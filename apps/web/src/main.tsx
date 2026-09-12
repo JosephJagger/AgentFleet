@@ -9,6 +9,7 @@ import "./apple-polish.css";
 import "./matrix-theme.css";
 import "./storybook-themes.css";
 import "./cinema-themes.css";
+import "./message-themes.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

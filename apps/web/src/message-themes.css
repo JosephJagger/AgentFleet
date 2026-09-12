@@ -1,0 +1,124 @@
+/* Shared reading rhythm, with twelve distinct frames and materials. */
+:root[data-theme] {
+  --message-frame: 12px;
+  --message-badge: 9px;
+  --message-rule: var(--cobalt);
+  --message-header: var(--paper-solid);
+  --message-quote: var(--cobalt-soft);
+  --message-edge: var(--line-strong);
+  --message-shadow: none;
+  --message-composer: var(--paper-raised, var(--paper));
+}
+:root[data-theme="daylight"] {
+  --message-frame: 14px; --message-badge: 9px;
+  --message-header: #f3f6fb; --message-quote: #f0f6fd;
+  --message-shadow: 0 2px 8px #20385908;
+}
+:root[data-theme="midnight"] {
+  --message-frame: 16px; --message-badge: 50%;
+  --message-header: #262830; --message-quote: #232a36;
+  --message-shadow: inset 0 1px 0 #ffffff08;
+}
+:root[data-theme="forest"] {
+  --message-frame: 6px 16px 16px 6px; --message-badge: 12px 3px;
+  --message-header: #243426; --message-quote: #213023;
+  --message-edge: #6a7854; --message-composer: #192b20;
+}
+:root[data-theme="eyecare"] {
+  --message-frame: 5px; --message-badge: 7px;
+  --message-header: #e4e7d4; --message-quote: #e9ebda;
+  --message-composer: #f5f3e7;
+}
+:root[data-theme="matrix"] {
+  --message-frame: 4px; --message-badge: 3px;
+  --message-header: #10231a; --message-quote: #0f2015;
+  --message-edge: #416b4c; --message-composer: #08140d;
+  --message-shadow: inset 2px 0 0 #65f58d33;
+}
+:root[data-theme="frozen"] {
+  --message-frame: 16px 4px 16px 4px; --message-badge: 11px 3px;
+  --message-header: linear-gradient(110deg,#fafdff,#dcebf9,#e9e4f7);
+  --message-quote: #e6f1fb; --message-edge: #98bdd8;
+  --message-composer: linear-gradient(115deg,#fafdff,#e8f2fb);
+  --message-shadow: inset 0 1px 0 #fff, 0 2px 8px #526c8510;
+}
+:root[data-theme="wizard"] {
+  --message-frame: 5px 13px 13px 5px; --message-badge: 50% 50% 35% 35%;
+  --message-header: #352b31; --message-quote: #30292f;
+  --message-rule: #e5bf77; --message-edge: #82705a;
+  --message-composer: #eee1c2; --message-shadow: inset 3px 0 0 #82705a66;
+}
+:root[data-theme="cyber"] {
+  --message-frame: 3px 15px 3px 3px; --message-badge: 3px 9px 3px 3px;
+  --message-header: #303022; --message-quote: #292a20;
+  --message-rule: #f3dd45; --message-edge: #60717a;
+  --message-composer: #202b32;
+}
+:root[data-theme="starwars"] {
+  --message-frame: 16px 5px; --message-badge: 50%;
+  --message-header: #1d3148; --message-quote: #192b40;
+  --message-composer: #19293b; --message-shadow: inset 0 2px 0 #8ccfff55;
+}
+:root[data-theme="spirited"] {
+  --message-frame: 6px 6px 14px 14px; --message-badge: 7px;
+  --message-header: #eee0c9; --message-quote: #f5e8d7;
+  --message-edge: #b69d7e; --message-composer: linear-gradient(110deg,#fffdf5,#faf1df);
+  --message-shadow: 0 2px 0 #dccdb580;
+}
+:root[data-theme="rivendell"] {
+  --message-frame: 18px 5px 18px 5px; --message-badge: 14px 3px;
+  --message-header: #e5ecd9; --message-quote: #e8eedf;
+  --message-rule: #806222; --message-edge: #a99e69;
+  --message-composer: #f7f9ef; --message-shadow: inset 3px 0 0 #e1d9b9;
+}
+:root[data-theme="mario"] {
+  --message-frame: 7px; --message-badge: 6px;
+  --message-header: #e0f0df; --message-quote: #f9f0d2;
+  --message-edge: #8aa7be; --message-composer: #f5faff;
+  --message-shadow: 0 3px 0 #b7ccdb;
+}
+:root[data-theme] .timeline-event__node {
+  border: 1px solid var(--message-edge); border-radius: var(--message-badge);
+  background: var(--message-header); box-shadow: var(--message-shadow);
+}
+:root[data-theme] .timeline-event--agent .timeline-event__node { color: var(--cobalt); border-color: var(--cobalt); }
+:root[data-theme] .timeline-event--user .timeline-event__node { color: var(--teal); background: var(--teal-soft); border-color: var(--teal); }
+:root[data-theme] .message-markdown__body :is(h1,h2,h3,h4,h5,h6) { color: var(--ink); text-wrap: pretty; }
+:root[data-theme] .message-markdown__body h2 { border-bottom: 1px solid var(--line); padding-bottom: .4em; }
+:root[data-theme] .message-markdown__body blockquote {
+  background: var(--message-quote); border-left: 3px solid var(--message-rule);
+  border-radius: 0 8px 8px 0; padding: 10px 14px; margin-inline: 0; color: var(--ink);
+}
+:root[data-theme] .message-markdown__body blockquote > :first-child { margin-top: 0; }
+:root[data-theme] .message-markdown__body blockquote > :last-child { margin-bottom: 0; }
+:root[data-theme] .message-markdown__body hr { border: 0; border-top: 1px solid var(--message-edge); margin-block: 24px; }
+:root[data-theme] :is(.markdown-code,.command-execution) { border: 1px solid var(--message-edge); border-radius: var(--message-frame); box-shadow: var(--message-shadow); }
+:root[data-theme] :is(.markdown-code__header,.command-execution__header) { background: var(--message-header); color: var(--ink); border-bottom: 1px solid var(--message-edge); }
+:root[data-theme] .markdown-code__header { border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+:root[data-theme] .markdown-table { border: 1px solid var(--message-edge); border-radius: var(--message-frame); }
+:root[data-theme] .markdown-table th { background: var(--message-header); color: var(--ink); }
+:root[data-theme] .markdown-table td { border-color: var(--line); }
+:root[data-theme] .composer-input { background: var(--message-composer); border-radius: var(--message-frame); }
+:root[data-theme] .composer-input:focus-within { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+:root[data-theme="daylight"] .timeline-event--user > p { background: #eef5ff; border: 1px solid #c8dcef; border-radius: 14px 14px 5px 14px; }
+:root[data-theme="midnight"] .timeline-event--user > p { background: #2a303c; border: 1px solid #515969; border-radius: 16px 16px 5px 16px; }
+:root[data-theme="forest"] .timeline-event--user > p { background: #203728; border: 1px solid #526c4b; border-radius: 5px 16px 16px 16px; }
+:root[data-theme="eyecare"] .timeline-event--user > p { background: #e4e9d7; border: 1px solid #a1b097; border-radius: 6px; }
+:root[data-theme="matrix"] .timeline-event--user > p { background: #112419; border: 1px solid #355b40; border-radius: 4px; }
+:root[data-theme="cyber"] .timeline-event--user > p { background: #203036; border: 1px solid #60717a; border-radius: 3px 14px 3px 3px; }
+:root[data-theme="starwars"] .timeline-event--user > p { background: #1c3048; border: 1px solid #526d88; border-radius: 16px 5px; }
+:root[data-theme="rivendell"] .timeline-event--user > p { background: #e5eddc; border: 1px solid #a0ad87; border-radius: 16px 4px 16px 4px; }
+/* Small material cues, kept away from the text and selection area. */
+:root[data-theme="matrix"] .markdown-code__header { border-left: 3px solid var(--cobalt); }
+:root[data-theme="cyber"] .command-execution__header { border-left: 3px solid var(--cobalt); }
+:root[data-theme="starwars"] .markdown-code__header { box-shadow: inset 0 2px 0 #8ccfff66; }
+:root[data-theme="wizard"] .message-markdown__body blockquote { border-left-style: double; border-left-width: 4px; }
+:root[data-theme="spirited"] .message-markdown__body blockquote { border-radius: 3px 10px 10px 3px; border-left-color: #a13e32; }
+:root[data-theme="rivendell"] .message-markdown__body blockquote { border-radius: 16px 3px; }
+:root[data-theme="mario"] .message-markdown__body blockquote { border: 1px solid #b59a50; border-left: 4px solid #b59a50; border-radius: 5px; }
+:root[data-theme="frozen"] .timeline-event__node { box-shadow: inset 0 0 0 2px #ffffff80; }
+:root[data-theme="wizard"] .timeline-event__node { box-shadow: inset 0 0 0 2px var(--paper); }
+:root[data-theme="spirited"] .timeline-event--agent .timeline-event__node { box-shadow: inset 0 0 0 2px #f4eddf; }
+@media (prefers-contrast: more) {
+  :root[data-theme] { --message-edge: var(--ink); }
+}
