@@ -1,4 +1,13 @@
 {
+  "星球大战": "Star Wars",
+  "千与千寻": "Spirited Away",
+  "指环王": "The Lord of the Rings",
+  "超级马里奥": "Super Mario",
+  "夜之城剪影、警示黄与工业切角": "Night City skyline, signal yellow and industrial corners",
+  "深空舰桥、舷窗与光剑蓝信号": "Deep-space bridge, portholes and lightsaber-blue signals",
+  "汤屋夜灯、朱红木牌与温润信纸": "Bathhouse lanterns, vermilion wood and warm stationery",
+  "瑞文戴尔山谷、精灵拱门与金色叶纹": "Rivendell valleys, Elven arches and golden leaves",
+  "蘑菇王国、像素丘陵与关卡卡片": "Mushroom Kingdom, pixel hills and level cards",
   "已复用近期刷新请求，或暂无支持额度查询的在线主机。": "A recent refresh request was reused, or no compatible host is online.",
   "刷新额度": "Refresh quota",
   "总消耗 {0} tokens": "Total usage: {0} tokens",

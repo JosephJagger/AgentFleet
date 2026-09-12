@@ -1,0 +1,109 @@
+/* Scene artwork stays outside reading surfaces; each theme has its own materials. */
+:root[data-theme="cyber"] {
+  color-scheme: dark;
+  --canvas: #14171c; --paper: #1c2229; --paper-solid: #272e35; --paper-raised: #242c34; --terminal: #11191f;
+  --ink: #eef2ec; --muted: #b0bcbf; --faint: #98aaad;
+  --line: #35434b; --line-strong: #60717a; --component-line: #53646c;
+  --cobalt: #f3dd45; --cobalt-deep: #ffec7a; --cobalt-soft: #39351c;
+  --teal: #73e1df; --teal-soft: #183b40; --amber: #f5c777; --amber-soft: #40321c;
+  --red: #ffa0a9; --red-soft: #462730; --magenta: #e8abeb; --magenta-soft: #3b2942;
+  --scene: url('/themes/cyber.svg'); --surface-shadow: inset 0 1px 0 #46525a; --control-shadow: none;
+}
+:root[data-theme="starwars"] {
+  color-scheme: dark;
+  --canvas: #0c1420; --paper: #142132; --paper-solid: #1d2e42; --paper-raised: #1a2a3d; --terminal: #0d1928;
+  --ink: #e5edf7; --muted: #a9bdd2; --faint: #91a8c2;
+  --line: #30465f; --line-strong: #607c9a; --component-line: #526d88;
+  --cobalt: #8ccfff; --cobalt-deep: #bce4ff; --cobalt-soft: #1b3a56;
+  --teal: #89d9bd; --teal-soft: #1c3b39; --amber: #f0c579; --amber-soft: #3c3424;
+  --red: #ffa2a2; --red-soft: #432c38; --magenta: #c9b9f8; --magenta-soft: #322e4c;
+  --scene: url('/themes/starwars.svg'); --surface-shadow: inset 0 1px 0 #3d5369, 0 8px 24px #0002; --control-shadow: inset 0 1px 0 #ffffff12;
+}
+:root[data-theme="spirited"] {
+  color-scheme: light;
+  --canvas: #f4eddf; --paper: #fffaf0; --paper-solid: #eee3cf; --paper-raised: #faf2e4; --terminal: #f2e9d9;
+  --ink: #40392e; --muted: #716351; --faint: #7c6b58;
+  --line: #dccdb5; --line-strong: #a98d70; --component-line: #b69d7e;
+  --cobalt: #a13e32; --cobalt-deep: #813026; --cobalt-soft: #f4ded3;
+  --teal: #346e60; --teal-soft: #dfebe1; --amber: #8b5d20; --amber-soft: #f5e6c6;
+  --red: #ac3447; --red-soft: #f8dfe2; --magenta: #815483; --magenta-soft: #eee0ed;
+  --scene: url('/themes/spirited.svg'); --surface-shadow: 0 5px 18px #6b41280b; --control-shadow: inset 0 1px 0 #fff9;
+}
+:root[data-theme="rivendell"] {
+  color-scheme: light;
+  --canvas: #edf0e6; --paper: #fbfcf5; --paper-solid: #e3e9d9; --paper-raised: #f3f6eb; --terminal: #eaf0e2;
+  --ink: #304538; --muted: #5b6e5b; --faint: #67745c;
+  --line: #cbd5be; --line-strong: #93a17c; --component-line: #9cae8b;
+  --cobalt: #386446; --cobalt-deep: #244b33; --cobalt-soft: #dce9d6;
+  --teal: #296c69; --teal-soft: #dcebe7; --amber: #806222; --amber-soft: #eee6cc;
+  --red: #ab4245; --red-soft: #f4dfe0; --magenta: #79568d; --magenta-soft: #eee3f3;
+  --scene: url('/themes/rivendell.svg'); --surface-shadow: inset 0 1px 0 #fff, 0 6px 20px #30453809; --control-shadow: inset 0 1px 0 #fff9;
+}
+:root[data-theme="mario"] {
+  color-scheme: light;
+  --canvas: #edf6fc; --paper: #fffefa; --paper-solid: #e2edf5; --paper-raised: #f6fafd; --terminal: #eaf2f9;
+  --ink: #263e54; --muted: #566b7d; --faint: #647387;
+  --line: #c5d8e6; --line-strong: #789bb4; --component-line: #94b0c5;
+  --cobalt: #b9362e; --cobalt-deep: #932a25; --cobalt-soft: #fce3dc;
+  --teal: #287349; --teal-soft: #ddefdf; --amber: #866014; --amber-soft: #fbefc6;
+  --red: #ae303d; --red-soft: #f9dfe2; --magenta: #7952a0; --magenta-soft: #eee2f7;
+  --scene: url('/themes/mario.svg'); --surface-shadow: 0 3px 0 #b7ccdb; --control-shadow: 0 2px 0 #bccfdd;
+}
+:root:is([data-theme="cyber"],[data-theme="starwars"],[data-theme="spirited"],[data-theme="rivendell"],[data-theme="mario"]) .machine-rail {
+  background-image: linear-gradient(var(--canvas),transparent),var(--scene);
+  background-position: center bottom; background-repeat: no-repeat; background-size: auto 220px;
+}
+:root:is([data-theme="cyber"],[data-theme="starwars"],[data-theme="spirited"],[data-theme="rivendell"],[data-theme="mario"]) .inspector--empty {
+  background-image: var(--scene); background-position: center bottom; background-repeat: no-repeat; background-size: 100% auto;
+}
+:is(.theme-option--cyber,.theme-option--starwars,.theme-option--spirited,.theme-option--rivendell,.theme-option--mario) .theme-option__preview { display: block; padding: 0; }
+:is(.theme-option--cyber,.theme-option--starwars,.theme-option--spirited,.theme-option--rivendell,.theme-option--mario) .theme-option__preview::before { display: none; }
+.theme-option__preview img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.theme-scene--cyber { background: #151c29; }
+.theme-scene--starwars { background: #0b1528; }
+.theme-scene--spirited { background: #253a3a; }
+.theme-scene--rivendell { background: #dae6db; }
+.theme-scene--mario { background: #b8e5ff; }
+:root:is([data-theme="cyber"],[data-theme="starwars"]) :is(.button--primary,.button--share,.usage-pagination button[aria-current="page"]) { background: var(--cobalt); color: var(--canvas); }
+:root:is([data-theme="cyber"],[data-theme="starwars"]) .button--danger { color: var(--canvas); }
+/* Night City: clipped badge, amber instrument labels and angular terminal frames. */
+:root[data-theme="cyber"] .brand-glyph { color: var(--canvas); background: var(--cobalt); border-radius: 2px; clip-path: polygon(0 0,78% 0,100% 22%,100% 100%,22% 100%,0 78%); }
+:root[data-theme="cyber"] :is(.host-card,.settings-block,.command-execution) { border-radius: 3px 15px 3px 3px; }
+:root[data-theme="cyber"] .catalog-project-heading { border-left: 3px solid var(--cobalt); background: linear-gradient(90deg,#39351c,var(--paper)); }
+:root[data-theme="cyber"] .primary-nav button.active { background: var(--cobalt-soft); color: var(--cobalt); box-shadow: inset 0 -2px 0 var(--cobalt); border-radius: 4px; }
+:root[data-theme="cyber"] .composer-input { border-radius: 4px 18px 4px 4px; border-top: 2px solid var(--teal); }
+:root[data-theme="cyber"] .command-execution__header { border-bottom: 1px solid var(--line-strong); }
+/* Fleet bridge: structural portholes and one thin light-saber selection signal. */
+:root[data-theme="starwars"] .brand-glyph { background: #1a3149; color: var(--cobalt); border: 1px solid var(--line-strong); border-radius: 50%; box-shadow: inset 0 0 0 3px var(--canvas); }
+:root[data-theme="starwars"] :is(.host-card,.settings-block) { border-radius: 18px 6px; border-top: 2px solid var(--line-strong); }
+:root[data-theme="starwars"] .primary-nav button.active { box-shadow: inset 0 -2px 0 #9cdbff, 0 2px 8px #8ccfff18; }
+:root[data-theme="starwars"] .session-row--active { box-shadow: inset 3px 0 0 var(--cobalt); }
+:root[data-theme="starwars"] .command-execution { border-radius: 6px; border: 1px solid var(--line-strong); }
+:root[data-theme="starwars"] .composer-input { border-radius: 20px 20px 10px 10px; box-shadow: inset 0 2px 0 var(--line-strong); }
+/* Bathhouse: wood lintels, small seal and quiet stationery. */
+:root[data-theme="spirited"] .brand-glyph { border-radius: 9px; background: #a13e32; color: #fff5df; box-shadow: inset 0 0 0 3px #b76049; }
+:root[data-theme="spirited"] :is(.host-card,.settings-block) { border-top: 3px solid #987253; border-radius: 6px 6px 14px 14px; }
+:root[data-theme="spirited"] .catalog-project-heading { background: #eee0c9; border-bottom-color: #ba9b77; }
+:root[data-theme="spirited"] .composer-input { background: linear-gradient(110deg,#fffdf5,#faf1df); border-radius: 7px; box-shadow: inset 0 0 0 3px #eee3cf; }
+:root[data-theme="spirited"] .timeline-event--user > p { background: #f4e3d4; border: 1px solid #d5b89a; border-radius: 5px 16px 16px 16px; }
+/* Rivendell: leaf-shaped controls and a restrained gilded book edge. */
+:root[data-theme="rivendell"] .brand-glyph { background: #dce9d6; border: 1px solid #93a17c; border-radius: 16px 3px 16px 3px; color: #386446; }
+:root[data-theme="rivendell"] :is(.host-card,.settings-block) { border-radius: 20px 6px 20px 6px; border-top: 1px solid #aa995e; box-shadow: inset 3px 0 0 #e1d9b9; }
+:root[data-theme="rivendell"] .catalog-project-heading { background: linear-gradient(90deg,#e5ecd9,var(--paper)); }
+:root[data-theme="rivendell"] .primary-nav button.active { border-radius: 14px 4px; box-shadow: inset 0 -1px 0 #978549; }
+:root[data-theme="rivendell"] .composer-input { border-radius: 18px 5px 18px 5px; border-color: #9cae8b; }
+:root[data-theme="rivendell"] .command-execution { border-left: 3px solid #aa995e; }
+/* Mushroom Kingdom: tactile level cards, pipe-like headings and brick edges. */
+:root[data-theme="mario"] .brand-glyph { color: #fff; background: #b9362e; border-radius: 9px; box-shadow: 0 3px 0 #85281f, inset 0 2px 0 #e66c51; }
+:root[data-theme="mario"] :is(.host-card,.settings-block) { border: 2px solid #9db8cb; border-radius: 10px; box-shadow: 0 3px 0 #b7ccdb; }
+:root[data-theme="mario"] .catalog-project-heading { background: #e0f0df; border-top: 3px solid #4f9460; border-bottom: 1px solid #a0c59e; }
+:root[data-theme="mario"] .primary-nav button.active { background: #fce3dc; box-shadow: inset 0 -3px 0 #b9362e; }
+:root[data-theme="mario"] .composer-input { border: 2px solid #9db8cb; border-radius: 12px; box-shadow: 0 3px 0 #b7ccdb; }
+:root[data-theme="mario"] .command-execution { border-radius: 5px; border-bottom: 3px solid #8aa7be; }
+:root[data-theme="mario"] .timeline-event--user > p { background: #e2effb; border: 1px solid #a4c4dd; border-radius: 12px 12px 4px 12px; }
+@media (max-width: 900px) {
+  :root:is([data-theme="cyber"],[data-theme="starwars"],[data-theme="spirited"],[data-theme="rivendell"],[data-theme="mario"]) .machine-rail { background-image: none; }
+}
+@media (prefers-contrast: more) {
+  :root:is([data-theme="cyber"],[data-theme="starwars"],[data-theme="spirited"],[data-theme="rivendell"],[data-theme="mario"]) { --line: var(--muted); --component-line: var(--muted); --line-strong: var(--ink); }
+}
