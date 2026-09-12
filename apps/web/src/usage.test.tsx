@@ -84,6 +84,7 @@ it("shows a dedicated host usage page with weekly cache rates and opens sessions
  expect(await screen.findByRole("heading",{name:"消耗"})).toBeTruthy();
  expect(screen.getAllByText("37.5%").length).toBeGreaterThanOrEqual(2);
  expect(screen.getByText("1,020")).toBeTruthy();
+ expect(screen.getByText("1,020").closest("td")?.getAttribute("data-label")).toBe("总消耗");
  fireEvent.click(screen.getByRole("button",{name:"Usage page"}));expect(select).toHaveBeenCalledWith("s1");
 });
 

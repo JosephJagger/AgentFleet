@@ -82,6 +82,19 @@ h1, h2, h3 { font-weight: 650; letter-spacing: -.018em; }
   .usage-body { padding: 18px; }
   .usage-pagination { flex-wrap: wrap; }
 }
+@media (max-width: 700px) {
+  .usage-table-wrap { overflow: visible; border: 0; border-radius: 0; }
+  .usage-table { display: block; min-width: 0; width: 100%; }
+  .usage-table thead { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .usage-table tbody { display: grid; gap: 10px; }
+  .usage-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; padding: 14px; border: 1px solid var(--component-line); border-radius: 14px; background: var(--paper); box-shadow: var(--surface-shadow); }
+  .usage-table td { display: block; min-width: 0; padding: 0; border: 0; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+  .usage-table td:first-child { grid-column: 1 / -1; width: auto; max-width: none; padding-bottom: 11px; border-bottom: 1px solid var(--line); }
+  .usage-table td:nth-child(4) { grid-column: 1 / -1; }
+  .usage-table td:not(:first-child)::before { content: attr(data-label); display: block; margin-bottom: 4px; color: var(--muted); font-family: var(--font); font-size: var(--text-caption); font-weight: 400; line-height: 1.4; }
+  .usage-table td small { display: block; margin-top: 2px; font-family: var(--font); }
+  .usage-table .usage-table-empty { grid-column: 1 / -1; padding: 22px 8px; border: 0; }
+}
 @media (prefers-reduced-transparency: reduce) {
   .topbar, .primary-nav, .modal, .session-config-dialog, .activity-panel { background: var(--paper); backdrop-filter: none; -webkit-backdrop-filter: none; }
   .modal-backdrop, .activity-backdrop, .session-config-dialog::backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
