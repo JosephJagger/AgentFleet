@@ -28,7 +28,7 @@ describe("theme switching", () => {
     setTheme("cyber");
     render(<ThemeSettings />);
     const eyecare = screen.getByRole("radio", { name: /护眼/ });
-    expect(screen.getAllByRole("radio")).toHaveLength(6);
+    expect(screen.getAllByRole("radio")).toHaveLength(8);
     fireEvent.click(eyecare);
     expect(eyecare.getAttribute("aria-checked")).toBe("true");
     expect(document.documentElement.dataset.theme).toBe("eyecare");

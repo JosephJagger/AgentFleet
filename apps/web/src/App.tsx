@@ -6,7 +6,7 @@ import { RuntimeSettingsShortcut } from "./components/RuntimeSettingsShortcut";
 import type { RuntimeSummary } from "./components/CodexSettingsPanel";
 import { UsageButton } from "./components/UsageButton";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
-import { ThemeSwitcher } from "./components/ThemeSwitcher";
+import { ThemeEmblem, ThemeSwitcher } from "./components/ThemeSwitcher";
 import { count, t, locale, systemText, useLocale } from "./i18n";
 import { SessionConfiguration, type ConfigurationRequest } from "./components/SessionConfiguration";
 import { FleetStatus } from "./components/FleetStatus";
@@ -212,7 +212,7 @@ function Login({ onLogin }: { onLogin: (dashboard: Dashboard) => void }) {
       <section className="login-copy">
         <div className="login-preferences"><LanguageSwitcher /><ThemeSwitcher /></div>
         <div className="brand-lockup brand-lockup--large">
-          <span className="brand-glyph"><Radio size={18} strokeWidth={2.5} /></span>
+          <span className="brand-glyph"><ThemeEmblem /></span>
           <span>AgentFleets for Codex</span>
         </div>
         <h1>{t("你的代码留在主机。")}<br />{t("控制权跟你走。")}</h1>
@@ -1299,7 +1299,7 @@ function App() {
   return (
     <div className={`app-shell${view === "fleet" && (displayedSession || detailLoading) ? " app-shell--conversation" : ""}`}>
       <header className="topbar">
-        <div className="brand-lockup"><span className="brand-glyph"><Radio size={16} strokeWidth={2.6} /></span><span>AgentFleets</span></div>
+        <div className="brand-lockup"><span className="brand-glyph"><ThemeEmblem /></span><span>AgentFleets</span></div>
         <WorldClocks side="left" />
         <nav className="primary-nav" aria-label={t("主导航")}>
           <button aria-current={view === "fleet" ? "page" : undefined} className={view === "fleet" ? "active" : ""} onClick={() => { setView("fleet"); }}><MonitorDot size={16} />{t("工作台")}</button>
