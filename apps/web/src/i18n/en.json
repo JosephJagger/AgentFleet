@@ -351,7 +351,7 @@
   "已保存的来源：": "Saved source:",
   "。展开后可直接修改下方选项，用于下次发送；保存后作为此会话的独立配置。": ". Change the options below for your next message, or save them as this session's settings.",
   "修改尚未保存，不影响会话默认值。": "Unsaved changes do not affect session defaults.",
-  "当前选择尚未保存：仅用于下次发送，刷新后恢复已保存配置。": "These unsaved choices apply only to your next message. Refreshing restores saved settings.",
+  "修改尚未保存，发送消息仍使用已保存配置。": "Changes are not saved. Messages still use the saved settings.",
   "模型目录读取于": "Model list retrieved at",
   "。账号或模型权限变化后，请在主机页重连运行时。取消已保存的默认配置需清除对应范围的覆盖。": ". Reconnect the runtime from the host page after account or model access changes. Remove the override for the relevant scope to clear saved defaults.",
   "模型": "Model",

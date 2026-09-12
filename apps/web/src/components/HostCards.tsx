@@ -1,6 +1,7 @@
 import { count, t, locale } from "../i18n";
 import { Check, CircleDot, LoaderCircle, Server, Unplug } from "lucide-react";
 import type { Machine } from "../lib/types";
+import { onlineFirst } from "../lib/machine-order";
 
 export function hostCardState(machine: Machine) {
   if (machine.identity === "revoked" || machine.reachability === "unreachable") return { tone: "offline", connection: t("未连接"), activity: t("运行状态未知") };
@@ -18,7 +19,7 @@ export function HostCards({ machines, selectedId, onSelect }: { machines: Machin
   return <section className="host-overview" aria-label={t("主机概览")}>
     <div className="host-overview__heading"><h2>{t("选择主机")}</h2><span>{count(machines.length, "台主机")} </span></div>
     <div className="host-cards" role="group" aria-label={t("选择主机")}>
-      {machines.map(machine => {
+      {onlineFirst(machines).map(machine => {
         const state = hostCardState(machine);
         const selected = machine.id === selectedId;
         return <button type="button" key={machine.id} className={`host-card host-card--${state.tone}${selected ? " host-card--selected" : ""}`}

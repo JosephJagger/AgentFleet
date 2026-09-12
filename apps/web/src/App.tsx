@@ -1,4 +1,5 @@
 import { WorldClocks } from "./components/WorldClocks";
+import { onlineFirst } from "./lib/machine-order";
 import { MarkdownMessage } from "./components/MarkdownMessage";
 import { SessionActions } from "./components/SessionActions";
 import { useMobileViewport } from "./lib/mobile-viewport";
@@ -278,7 +279,7 @@ function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPa
             <strong>{t("连接第一台主机")}</strong>
             <small>Linux · macOS · Windows</small>
           </button>
-        ) : machines.map((machine) => {
+        ) : onlineFirst(machines).map((machine) => {
           const live = machine.reachability === "live";
           const warning = machine.compatibility !== "compatible";
           return (

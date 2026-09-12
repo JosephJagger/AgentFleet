@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 
 export type ConfigurationRequest = { section: "all" | "settings" | "permissions" | "tools" | "help"; nonce: number };
 
-/** Keep controls mounted when closed: unsaved next-turn choices must survive dismissal. */
+/** Keep controls mounted when closed so configuration drafts survive dismissal. */
 export function SessionConfiguration({ request, title, onClose, children }: {
   request?: ConfigurationRequest; title: string; onClose: () => void; children: ReactNode;
 }) {

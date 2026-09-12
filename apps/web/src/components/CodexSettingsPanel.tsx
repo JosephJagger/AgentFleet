@@ -31,7 +31,7 @@ export function CodexSettingsPanel({ sessionId = "", machineId, observed, onChan
     }).catch((error) => { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : t("读取配置失败")); });
     return () => { controller.abort(); generation.current += 1; };
   }, [sessionId, machineId, onChange, retry]);
-  const select = (next?: CodexSettings) => { setChoice(next); onChange({ sessionId, settings: next }); };
+  const select = (next?: CodexSettings) => { setChoice(next); };
   const model = data?.catalog?.models.find((item) => item.model === choice?.model);
   const valid = Boolean(model && !data?.catalog?.error && (!choice?.effort || model.efforts.includes(choice.effort)) && (!choice?.mode || data?.catalog?.modes.includes(choice.mode))
     && (choice?.serviceTier == null || model.serviceTiers?.some((tier) => tier.id === choice.serviceTier))
@@ -44,7 +44,7 @@ export function CodexSettingsPanel({ sessionId = "", machineId, observed, onChan
       const next = machineId ? await api.saveMachineCodexPreferences(machineId, input) : await api.saveCodexPreferences(sessionId, { scope, ...input });
       if (current !== generation.current) return;
       const nextChoice = next.desired ?? undefined;
-      setData(next); select(nextChoice); setMessage(t("面板配置已保存；下次发送时应用，不修改正在运行的任务。"));
+      setData(next); select(nextChoice); onChange({ sessionId, settings: nextChoice }); setMessage(t("面板配置已保存；下次发送时应用，不修改正在运行的任务。"));
     } catch (error) { if (current === generation.current) setMessage(error instanceof Error ? error.message : t("保存失败")); }
     finally { if (current === generation.current) setBusy(false); }
   }
@@ -52,15 +52,15 @@ export function CodexSettingsPanel({ sessionId = "", machineId, observed, onChan
   const changed = Boolean(data && !settingsEqual(choice, data.desired));
   const saveChanged = Boolean(data && !settingsEqual(choice, data.preferences[scope].settings));
   useEffect(() => {
-    onSummary?.({ sessionId, source: data?.source, settings: choice, changed: Boolean(changed), loaded: Boolean(data), failed: !data && Boolean(message) });
-  }, [sessionId, data, choice, changed, message, onSummary]);
+    onSummary?.({ sessionId, source: data?.source, settings: data?.desired ?? undefined, changed: false, loaded: Boolean(data), failed: !data && Boolean(message) });
+  }, [sessionId, data, message, onSummary]);
   const summary = data ? `${changed ? t("未保存的选择") : labels[data.source]} · ${choice?.model ?? t("继承 Codex")} · ${choice?.effort ?? t("继承强度")} · ${choice?.mode === "plan" ? t("计划") : choice?.mode === "default" ? t("执行") : t("继承模式")}` : t("读取中");
   const content = <>
     {!machineId && <p>{t("应用于下一条新任务，正在执行的任务保持原配置。")}</p>}
     {machineId && <p>{t("新会话默认使用此配置，项目和会话可单独设置。")}</p>}
     {!data ? <p>{t("配置尚未读取。")}</p> : !data.catalog || data.catalog.error ? <p>{t("此主机暂未提供可用模型列表。请升级 Agent 或在主机页重连运行时。")}{locale() === "en" ? " " : ""}{data.catalog?.error}</p> : <>
       {!machineId && <p>{t("已保存的来源：")}{labels[data.source]}</p>}
-      {changed && <p role="status">{machineId ? t("修改尚未保存，不影响会话默认值。") : t("当前选择尚未保存：仅用于下次发送，刷新后恢复已保存配置。")}</p>}
+      {changed && <p role="status">{machineId ? t("修改尚未保存，不影响会话默认值。") : t("修改尚未保存，发送消息仍使用已保存配置。")}</p>}
       <div className="codex-settings-fields">
       <label>{t("模型")}<select aria-label={machineId ? t("主机默认模型") : t("会话模型")} disabled={busy} value={choice?.model ?? ""} onChange={(event) => {
         const next = data.catalog!.models.find((item) => item.model === event.target.value);

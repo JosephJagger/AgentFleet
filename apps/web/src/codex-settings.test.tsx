@@ -45,9 +45,11 @@ it("selects advertised tier and personality, preserving explicit default-tier re
   await screen.findByRole("option", { name: "Fast" });
   fireEvent.change(screen.getByLabelText("服务档位"), { target: { value: "fast" } });
   fireEvent.change(screen.getByLabelText("沟通风格"), { target: { value: "pragmatic" } });
-  expect(changed).toHaveBeenLastCalledWith({ sessionId: "s", settings: { model: "host-model", effort: "low", serviceTier: "fast", personality: "pragmatic" } });
+  expect(changed).toHaveBeenLastCalledWith({ sessionId: "s", settings: fixture.desired });
   fireEvent.change(screen.getByLabelText("服务档位"), { target: { value: "__default" } });
-  expect(changed).toHaveBeenLastCalledWith({ sessionId: "s", settings: { model: "host-model", effort: "low", serviceTier: null, personality: "pragmatic" } });
+  expect(changed).toHaveBeenLastCalledWith({ sessionId: "s", settings: fixture.desired });
+  expect((screen.getByLabelText("服务档位") as HTMLSelectElement).value).toBe("__default");
+  expect((screen.getByLabelText("沟通风格") as HTMLSelectElement).value).toBe("pragmatic");
 });
 it("uses host catalog and saves a revisioned scoped preference without claiming native application", async () => {
   vi.mocked(api.codexPreferences).mockResolvedValue(fixture);
@@ -56,13 +58,14 @@ it("uses host catalog and saves a revisioned scoped preference without claiming 
   fireEvent.click(screen.getByText(/运行配置/));
   await screen.findByRole("option", { name: "Host model" });
   fireEvent.change(screen.getByLabelText("推理强度"), { target: { value: "high" } });
-  expect(changed).toHaveBeenLastCalledWith({ sessionId: "s", settings: { model: "host-model", effort: "high" } });
+  expect(changed).toHaveBeenLastCalledWith({ sessionId: "s", settings: fixture.desired });
   expect(api.saveCodexPreferences).not.toHaveBeenCalled();
   const save = screen.getByRole("button", { name: "保存为此会话配置" }) as HTMLButtonElement;
   expect(save.disabled).toBe(false);
   fireEvent.click(save);
   await waitFor(() => expect(api.saveCodexPreferences).toHaveBeenCalledWith("s", { scope: "session", settings: { model: "host-model", effort: "high" }, revision: 0 }));
   await screen.findByText(/面板配置已保存/);
+  expect(changed).toHaveBeenLastCalledWith({ sessionId: "s", settings: { model: "host-model", effort: "high" } });
   expect(save.disabled).toBe(true);
   fireEvent.change(screen.getByLabelText("推理强度"), { target: { value: "low" } });
   expect(save.disabled).toBe(false);
