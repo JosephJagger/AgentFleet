@@ -96,3 +96,16 @@ h1, h2, h3 { font-weight: 650; letter-spacing: -.018em; }
 }
 /* Inline usage belongs to its project; keep it visually part of the heading. */
 .project-usage .usage-trigger { box-shadow: none; }
+/* A focused mobile composer must fit the visible area left above the keyboard. */
+@media (max-width: 900px) {
+  html[data-keyboard-open] .app-shell--conversation .inspector { overflow: hidden; }
+  html[data-keyboard-open] .inspector-head { flex: 0 0 auto; padding-block: 10px 8px; min-height: 56px; }
+  html[data-keyboard-open] .inspector-title-row > h2 { -webkit-line-clamp: 1; margin-bottom: 0; }
+  html[data-keyboard-open] .inspector-back,
+  html[data-keyboard-open] .inspector-head__actions { top: 6px; }
+  html[data-keyboard-open] .conversation-viewport { min-height: 0; flex: 1 1 0; }
+  html[data-keyboard-open] .composer { flex: 0 1 auto; max-height: 48%; padding: 4px 10px 6px; overflow-y: auto; }
+  html[data-keyboard-open] .composer textarea { min-height: 44px; max-height: min(96px, 20dvh); padding: 10px 12px; overflow-y: auto; }
+  html[data-keyboard-open] .composer-actions { padding: 0 6px 6px 12px; }
+  html[data-keyboard-open] .runtime-settings-shortcut { display: none; }
+}

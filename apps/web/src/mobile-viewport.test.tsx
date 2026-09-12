@@ -28,3 +28,26 @@ it("tracks keyboard resize and pan, leaves pinch zoom alone, and cleans up", asy
   unmount();
   expect(root.style.getPropertyValue("--visible-height")).toBe("");
 });
+it("detects a keyboard when Chrome resizes both layout and visual viewports", async () => {
+  const height = window.innerHeight;
+  const viewport = Object.assign(new EventTarget(), { height, offsetTop: 0, scale: 1 });
+  Object.defineProperty(window, "visualViewport", { configurable: true, value: viewport });
+  render(<><Viewport /><textarea aria-label="message" /></>);
+  const input = document.querySelector('textarea')!;
+  act(() => input.focus());
+  await waitFor(() => expect(document.documentElement.style.getPropertyValue('--visible-height')).toBe(`${height}px`));
+  try {
+    act(() => {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 360 });
+      viewport.height = 360;
+      window.dispatchEvent(new Event('resize'));
+    });
+    await waitFor(() => expect(document.documentElement.hasAttribute('data-keyboard-open')).toBe(true));
+    act(() => {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
+      viewport.height = height;
+      window.dispatchEvent(new Event('resize'));
+    });
+    await waitFor(() => expect(document.documentElement.hasAttribute('data-keyboard-open')).toBe(false));
+  } finally { Object.defineProperty(window, 'innerHeight', { configurable: true, value: height }); }
+});
