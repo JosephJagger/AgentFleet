@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from "react";
 
-export type Theme = "cyber" | "daylight" | "midnight" | "forest" | "eyecare";
+export type Theme = "cyber" | "daylight" | "midnight" | "forest" | "eyecare" | "matrix";
 
 const STORAGE_KEY = "agentfleet.theme";
-const themes: Theme[] = ["cyber", "daylight", "midnight", "forest", "eyecare"];
+const themes: Theme[] = ["cyber", "daylight", "midnight", "forest", "eyecare", "matrix"];
 const listeners = new Set<() => void>();
 
 function isTheme(value: string | null): value is Theme {
@@ -29,6 +29,7 @@ function updateDocument() {
     midnight: "#161618",
     forest: "#0d1813",
     eyecare: "#e8e5cf",
+    matrix: "#050907",
   }[current]);
 }
 

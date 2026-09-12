@@ -28,9 +28,12 @@ describe("theme switching", () => {
     setTheme("cyber");
     render(<ThemeSettings />);
     const eyecare = screen.getByRole("radio", { name: /护眼/ });
-    expect(screen.getAllByRole("radio")).toHaveLength(5);
+    expect(screen.getAllByRole("radio")).toHaveLength(6);
     fireEvent.click(eyecare);
     expect(eyecare.getAttribute("aria-checked")).toBe("true");
     expect(document.documentElement.dataset.theme).toBe("eyecare");
+    fireEvent.click(screen.getByRole("radio", { name: /骇客帝国/ }));
+    expect(document.documentElement.dataset.theme).toBe("matrix");
+    expect(localStorage.getItem("agentfleet.theme")).toBe("matrix");
   });
 });

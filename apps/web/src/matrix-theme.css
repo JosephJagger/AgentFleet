@@ -1,0 +1,58 @@
+/* Matrix: phosphor signals on black glass. Decoration stays off reading surfaces. */
+:root[data-theme="matrix"] {
+  color-scheme: dark;
+  --canvas: #050907;
+  --paper: #0b130e;
+  --paper-solid: #122019;
+  --paper-raised: #122019;
+  --terminal: #030805;
+  --ink: #ddeddf;
+  --muted: #9db6a4;
+  --faint: #87a58f;
+  --line: #233c2c;
+  --line-strong: #416b4c;
+  --component-line: #355b40;
+  --cobalt: #65f58d;
+  --cobalt-deep: #a2ffb9;
+  --cobalt-soft: #153522;
+  --teal: #73e8b4;
+  --teal-soft: #14382c;
+  --amber: #efc776;
+  --amber-soft: #392d16;
+  --red: #ff8e91;
+  --red-soft: #3d2026;
+  --magenta: #c6b7f5;
+  --magenta-soft: #2c263d;
+  --surface-shadow: 0 1px 0 rgb(124 255 159 / .04), 0 8px 24px rgb(0 0 0 / .18);
+  --control-shadow: 0 1px 0 rgb(124 255 159 / .08);
+}
+.theme-option--matrix { --sample-canvas: #050907; --sample-paper: #122019; --sample-line: #416b4c; --sample-accent: #65f58d; }
+.theme-option--matrix .theme-option__preview { background-image: repeating-linear-gradient(90deg, transparent 0 8px, rgb(101 245 141 / .09) 8px 9px); }
+:root[data-theme="matrix"] .topbar { border-bottom-color: var(--line-strong); box-shadow: 0 1px 12px rgb(101 245 141 / .045); }
+:root[data-theme="matrix"] .brand-glyph { border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: inset 0 0 14px rgb(101 245 141 / .09); }
+:root[data-theme="matrix"] .brand-lockup { font-family: var(--mono); letter-spacing: -.045em; }
+:root[data-theme="matrix"] .primary-nav { border-color: var(--line); background: var(--terminal); }
+:root[data-theme="matrix"] .primary-nav button.active { background: var(--cobalt-soft); color: var(--cobalt); box-shadow: inset 0 -2px 0 var(--cobalt), 0 0 12px rgb(101 245 141 / .07); }
+:root[data-theme="matrix"] .world-clock time { font-family: var(--mono); color: var(--cobalt-deep); }
+:root[data-theme="matrix"] .machine-link--active { box-shadow: inset 3px 0 0 var(--cobalt), 0 0 16px rgb(101 245 141 / .06); }
+:root[data-theme="matrix"] .rail-node { background: var(--terminal); border: 1px solid var(--line); border-radius: 8px; }
+:root[data-theme="matrix"] .button--primary,
+:root[data-theme="matrix"] .button--share,
+:root[data-theme="matrix"] .usage-pagination button[aria-current="page"] { color: var(--canvas); background: var(--cobalt); }
+:root[data-theme="matrix"] .button--danger { color: var(--canvas); }
+:root[data-theme="matrix"] .composer-input { background: var(--terminal); }
+:root[data-theme="matrix"] .composer-input:focus-within { box-shadow: 0 0 0 2px var(--cobalt-soft), 0 0 18px rgb(101 245 141 / .08); }
+:root[data-theme="matrix"] .command-execution,
+:root[data-theme="matrix"] .markdown-code { border-color: var(--line-strong); border-radius: 10px; box-shadow: inset 0 1px 0 rgb(101 245 141 / .08); }
+:root[data-theme="matrix"] .command-execution__header { background: var(--paper-solid); border-bottom-color: var(--line-strong); }
+:root[data-theme="matrix"] .command-execution__log { color: var(--cobalt-deep); }
+:root[data-theme="matrix"] .timeline-event--user > p { background: var(--paper-solid); border: 1px solid var(--line); }
+:root[data-theme="matrix"] .usage-table th { background: var(--terminal); }
+:root[data-theme="matrix"] .usage-overview-cards strong { color: var(--cobalt-deep); }
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme="matrix"] .button--primary:hover:not(:disabled),
+  :root[data-theme="matrix"] .button--share:hover:not(:disabled) { background: var(--cobalt-deep); }
+}
+@media (prefers-contrast: more) {
+  :root[data-theme="matrix"] { --component-line: #87a58f; --line: #87a58f; }
+}

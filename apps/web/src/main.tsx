@@ -6,6 +6,7 @@ import "./styles.css";
 import "./themes.css";
 import "./interface.css";
 import "./apple-polish.css";
+import "./matrix-theme.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

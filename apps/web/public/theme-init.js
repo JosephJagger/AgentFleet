@@ -1,5 +1,5 @@
 // Match the React default before the first paint, without overwriting saved choices.
-const themeColors = { cyber: "#101923", daylight: "#f5f5f7", midnight: "#161618", forest: "#0d1813", eyecare: "#e8e5cf" };
+const themeColors = { cyber: "#101923", daylight: "#f5f5f7", midnight: "#161618", forest: "#0d1813", eyecare: "#e8e5cf", matrix: "#050907" };
 let initialTheme = "daylight";
 try {
   const saved = localStorage.getItem("agentfleet.theme");

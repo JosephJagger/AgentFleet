@@ -13,6 +13,7 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
         <option value="midnight">{t("午夜")}</option>
         <option value="forest">{t("森林")}</option>
         <option value="eyecare">{t("护眼")}</option>
+        <option value="matrix">{t("骇客帝国")}</option>
       </select>
     </label>
   );
@@ -24,6 +25,7 @@ const themeOptions: { value: Theme; label: string; description: string }[] = [
   { value: "midnight", label: "午夜", description: "柔和炭黑，适合夜间阅读" },
   { value: "forest", label: "森林", description: "沉静深绿，温暖金色点缀" },
   { value: "eyecare", label: "护眼", description: "温暖纸色，柔和墨绿文字" },
+  { value: "matrix", label: "骇客帝国", description: "深黑终端，荧光绿信号与微光边界" },
 ];
 
 export function ThemeSettings() {
