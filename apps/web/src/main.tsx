@@ -5,6 +5,7 @@ import "@fontsource-variable/noto-sans-sc";
 import "./styles.css";
 import "./themes.css";
 import "./interface.css";
+import "./apple-polish.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
