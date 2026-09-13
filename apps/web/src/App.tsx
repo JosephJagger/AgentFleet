@@ -862,7 +862,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {imageDraft.processing && <p className="image-draft-notice" role="status">{t("正在处理粘贴的图片…")}</p>}
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
         {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("请先在主机页更新连接服务，才能发送图片") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
-        {completions.length > 0 && <div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={t("编程提示语补全")}>
+        {completions.length > 0 && <div className="prompt-completions-shell"><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={t("编程提示语补全")}>
           <div className="prompt-completions__head" role="presentation"><Code2 size={14} aria-hidden="true" /><span>{t("编程补全")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
           {completions.map((completion, index) => <button
             type="button"
@@ -877,7 +877,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
             onClick={() => acceptCompletion(completion)}
             onMouseEnter={() => setActiveCompletion(index)}
           ><span className="prompt-completion__kind">{completion.kind === "term" ? t("术语") : completion.kind === "rewrite" ? t("表达优化") : t("提示语")}</span><code>{completion.label}</code><small>{t(completion.detail)}</small></button>)}
-        </div>}
+        </div><button type="button" className="prompt-completions-dismiss" aria-label={t("收起补全建议")} title={t("收起补全建议")} onMouseDown={event => event.preventDefault()} onClick={() => { setDismissedCompletion(completionKey); textArea.current?.focus(); }}><X size={16} aria-hidden="true" /></button></div>}
         <textarea
           ref={textArea}
           aria-label={t("发送给 Codex 的消息")}
