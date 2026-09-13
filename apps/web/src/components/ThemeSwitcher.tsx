@@ -4,7 +4,7 @@ import { setTheme, useTheme, type Theme } from "../lib/theme";
 
 export function ThemeEmblem() {
   const selected = useTheme();
-  const Icon = ({ daylight: Cloud, midnight: Shield, forest: TreePine, eyecare: Heart, frozen: Snowflake, wizard: Wand2, starwars: Orbit, spirited: Flower2, rivendell: Leaf, mario: Gamepad2, cyber: Zap } as Partial<Record<Theme, typeof Radio>>)[selected] ?? Radio;
+  const Icon = ({ daylight: Cloud, midnight: Shield, forest: TreePine, eyecare: Heart, wukong: SunMoon, nezha: Flower2, whitesnake: Leaf, qingming: Cloud, jiangshan: TreePine, frozen: Snowflake, wizard: Wand2, starwars: Orbit, spirited: Flower2, rivendell: Leaf, mario: Gamepad2, cyber: Zap } as Partial<Record<Theme, typeof Radio>>)[selected] ?? Radio;
   return <Icon size={18} aria-hidden="true" />;
 }
 
@@ -26,6 +26,11 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
         <option value="spirited">{t("千与千寻")}</option>
         <option value="rivendell">{t("指环王")}</option>
         <option value="mario">{t("超级马里奥")}</option>
+        <option value="wukong">{t("大闹天宫")}</option>
+        <option value="nezha">{t("哪吒闹海")}</option>
+        <option value="whitesnake">{t("白蛇传说")}</option>
+        <option value="qingming">{t("清明上河")}</option>
+        <option value="jiangshan">{t("千里江山")}</option>
       </select>
     </label>
   );
@@ -44,6 +49,11 @@ const themeOptions: { value: Theme; label: string; description: string }[] = [
   { value: "spirited", label: "千与千寻", description: "汤屋夜灯、朱红木牌与温润信纸" },
   { value: "rivendell", label: "指环王", description: "瑞文戴尔山谷、精灵拱门与金色叶纹" },
   { value: "mario", label: "超级马里奥", description: "蘑菇王国、像素丘陵与关卡卡片" },
+  { value: "wukong", label: "大闹天宫", description: "天宫云阙、金箍纹饰与朱红鎏金" },
+  { value: "nezha", label: "哪吒闹海", description: "莲花水纹、混天绫与朱砂暖白" },
+  { value: "whitesnake", label: "白蛇传说", description: "断桥烟雨、青白瓷色与水波细线" },
+  { value: "qingming", label: "清明上河", description: "汴京舟桥、绢本淡墨与宋画暖褐" },
+  { value: "jiangshan", label: "千里江山", description: "青绿山水、石青石绿与绢本金边" },
 ];
 const illustrated = (value: Theme) => value !== "matrix";
 const sceneAsset = (value: Theme) => value === "eyecare" ? "rabbit" : value;

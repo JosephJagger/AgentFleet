@@ -17,6 +17,11 @@ describe("theme switching", () => {
     ["rivendell", "指环王", "#edf0e6"],
     ["mario", "超级马里奥", "#edf6fc"],
     ["cyber", "赛博朋克", "#14171c"],
+    ["wukong", "大闹天宫", "#241b20"],
+    ["nezha", "哪吒闹海", "#fbefe7"],
+    ["whitesnake", "白蛇传说", "#edf4f0"],
+    ["qingming", "清明上河", "#f0e8d6"],
+    ["jiangshan", "千里江山", "#102d32"],
     ["daylight", "天空之城", "#edf5fa"],
     ["midnight", "黑暗骑士", "#14171c"],
     ["forest", "龙猫森林", "#14251e"],
@@ -51,7 +56,7 @@ describe("theme switching", () => {
     setTheme("cyber");
     render(<ThemeSettings />);
     const eyecare = screen.getByRole("radio", { name: /彼得兔园/ });
-    expect(screen.getAllByRole("radio")).toHaveLength(12);
+    expect(screen.getAllByRole("radio")).toHaveLength(17);
     fireEvent.click(eyecare);
     expect(eyecare.getAttribute("aria-checked")).toBe("true");
     expect(document.documentElement.dataset.theme).toBe("eyecare");

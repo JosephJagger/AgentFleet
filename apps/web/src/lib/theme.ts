@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from "react";
 
-export type Theme = "cyber" | "daylight" | "midnight" | "forest" | "eyecare" | "matrix" | "frozen" | "wizard" | "starwars" | "spirited" | "rivendell" | "mario";
+export type Theme = "cyber" | "daylight" | "midnight" | "forest" | "eyecare" | "matrix" | "frozen" | "wizard" | "starwars" | "spirited" | "rivendell" | "mario" | "wukong" | "nezha" | "whitesnake" | "qingming" | "jiangshan";
 
 const STORAGE_KEY = "agentfleet.theme";
-const themes: Theme[] = ["cyber", "daylight", "midnight", "forest", "eyecare", "matrix", "frozen", "wizard", "starwars", "spirited", "rivendell", "mario"];
+const themes: Theme[] = ["cyber", "daylight", "midnight", "forest", "eyecare", "matrix", "frozen", "wizard", "starwars", "spirited", "rivendell", "mario", "wukong", "nezha", "whitesnake", "qingming", "jiangshan"];
 const listeners = new Set<() => void>();
 
 function isTheme(value: string | null): value is Theme {
@@ -36,6 +36,11 @@ function updateDocument() {
     spirited: "#f4eddf",
     rivendell: "#edf0e6",
     mario: "#edf6fc",
+    wukong: "#241b20",
+    nezha: "#fbefe7",
+    whitesnake: "#edf4f0",
+    qingming: "#f0e8d6",
+    jiangshan: "#102d32",
   }[current]);
 }
 

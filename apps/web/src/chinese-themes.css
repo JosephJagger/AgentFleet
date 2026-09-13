@@ -1,0 +1,196 @@
+/* Five Chinese classics: materials frame content without decorating the reading surface. */
+:root[data-theme="wukong"] {
+ color-scheme: dark;
+ --canvas: #241b20;
+ --paper: #32242a;
+ --paper-solid: #423037;
+ --paper-raised: #3b2930;
+ --terminal: #21191d;
+ --ink: #f4e4c4;
+ --muted: #cbb79c;
+ --faint: #b5a28e;
+ --line: #59433f;
+ --line-strong: #93715a;
+ --component-line: #87624d;
+ --cobalt: #edc777;
+ --cobalt-deep: #f7dca0;
+ --cobalt-soft: #4d3825;
+ --teal: #9fc9b0;
+ --teal-soft: #283e35;
+ --amber: #f0bd7d;
+ --amber-soft: #4b3525;
+ --red: #f4a0a0;
+ --red-soft: #502b34;
+ --magenta: #d5b2e3;
+ --magenta-soft: #44304b;
+ --scene: url('/themes/wukong.svg'); --message-frame: 5px 16px 16px 5px; --message-badge: 50%;
+ --message-header: #443026; --message-quote: #4d3825; --message-edge: #93715a; --message-composer: #3b2930;
+ --surface-shadow: inset 0 1px 0 #59433f, 0 5px 20px #00000008; --control-shadow: none; --message-shadow: none;
+}
+.theme-scene--wukong { background: #241b20; }
+:root[data-theme="nezha"] {
+ color-scheme: light;
+ --canvas: #fbefe7;
+ --paper: #fffbf7;
+ --paper-solid: #f3e2d7;
+ --paper-raised: #fff5ed;
+ --terminal: #f6e8df;
+ --ink: #513c38;
+ --muted: #7a635b;
+ --faint: #866c60;
+ --line: #e4cbbc;
+ --line-strong: #bb9586;
+ --component-line: #c69c8c;
+ --cobalt: #aa4239;
+ --cobalt-deep: #8e302a;
+ --cobalt-soft: #f8ddd3;
+ --teal: #397d80;
+ --teal-soft: #e0eeee;
+ --amber: #8d611f;
+ --amber-soft: #f8e9c8;
+ --red: #ac3445;
+ --red-soft: #f8dfe4;
+ --magenta: #875488;
+ --magenta-soft: #efe0ee;
+ --scene: url('/themes/nezha.svg'); --message-frame: 17px 5px 17px 5px; --message-badge: 12px 4px;
+ --message-header: #f7dfd6; --message-quote: #f8ddd3; --message-edge: #bb9586; --message-composer: #fff5ed;
+ --surface-shadow: inset 0 1px 0 #e4cbbc, 0 5px 20px #00000008; --control-shadow: none; --message-shadow: none;
+}
+.theme-scene--nezha { background: #fbefe7; }
+:root[data-theme="whitesnake"] {
+ color-scheme: light;
+ --canvas: #edf4f0;
+ --paper: #fbfefb;
+ --paper-solid: #dfebe4;
+ --paper-raised: #f4f9f5;
+ --terminal: #e8f1ec;
+ --ink: #314c43;
+ --muted: #59746a;
+ --faint: #637e72;
+ --line: #c6dcd0;
+ --line-strong: #87aa98;
+ --component-line: #95b9a5;
+ --cobalt: #347569;
+ --cobalt-deep: #245d52;
+ --cobalt-soft: #dceee6;
+ --teal: #3c758a;
+ --teal-soft: #dfedf2;
+ --amber: #87672c;
+ --amber-soft: #f2ead4;
+ --red: #a54353;
+ --red-soft: #f5e0e5;
+ --magenta: #79618d;
+ --magenta-soft: #ebe3f2;
+ --scene: url('/themes/whitesnake.svg'); --message-frame: 18px 18px 6px 18px; --message-badge: 50% 50% 30% 30%;
+ --message-header: #e0eee7; --message-quote: #dceee6; --message-edge: #87aa98; --message-composer: #f4f9f5;
+ --surface-shadow: inset 0 1px 0 #c6dcd0, 0 5px 20px #00000008; --control-shadow: none; --message-shadow: none;
+}
+.theme-scene--whitesnake { background: #edf4f0; }
+:root[data-theme="qingming"] {
+ color-scheme: light;
+ --canvas: #f0e8d6;
+ --paper: #faf5e7;
+ --paper-solid: #e8dec7;
+ --paper-raised: #f6efdf;
+ --terminal: #ece3d0;
+ --ink: #443c30;
+ --muted: #70624e;
+ --faint: #7d6c54;
+ --line: #d4c5a6;
+ --line-strong: #a08c67;
+ --component-line: #af9972;
+ --cobalt: #83533c;
+ --cobalt-deep: #6c402c;
+ --cobalt-soft: #ecddc7;
+ --teal: #4e7464;
+ --teal-soft: #e1e9dc;
+ --amber: #816326;
+ --amber-soft: #f0e4c5;
+ --red: #a4443c;
+ --red-soft: #f2ddd4;
+ --magenta: #7a6079;
+ --magenta-soft: #e9deea;
+ --scene: url('/themes/qingming.svg'); --message-frame: 4px; --message-badge: 6px;
+ --message-header: #e7dbc1; --message-quote: #ecddc7; --message-edge: #a08c67; --message-composer: #f6efdf;
+ --surface-shadow: inset 0 1px 0 #d4c5a6, 0 5px 20px #00000008; --control-shadow: none; --message-shadow: none;
+}
+.theme-scene--qingming { background: #f0e8d6; }
+:root[data-theme="jiangshan"] {
+ color-scheme: dark;
+ --canvas: #102d32;
+ --paper: #183b40;
+ --paper-solid: #254a4b;
+ --paper-raised: #204347;
+ --terminal: #102d31;
+ --ink: #e7efd8;
+ --muted: #b0c9b6;
+ --faint: #9bb7a4;
+ --line: #365b58;
+ --line-strong: #729078;
+ --component-line: #66896f;
+ --cobalt: #e0c788;
+ --cobalt-deep: #f0dfb0;
+ --cobalt-soft: #414735;
+ --teal: #83d0be;
+ --teal-soft: #214c49;
+ --amber: #e6bd7c;
+ --amber-soft: #454331;
+ --red: #f2a3a0;
+ --red-soft: #4c3639;
+ --magenta: #cfbae3;
+ --magenta-soft: #3b4053;
+ --scene: url('/themes/jiangshan.svg'); --message-frame: 18px 4px 18px 4px; --message-badge: 14px 3px;
+ --message-header: #294d4a; --message-quote: #414735; --message-edge: #729078; --message-composer: #204347;
+ --surface-shadow: inset 0 1px 0 #365b58, 0 5px 20px #00000008; --control-shadow: none; --message-shadow: none;
+}
+.theme-scene--jiangshan { background: #102d32; }
+
+:is(.theme-option--wukong,.theme-option--nezha,.theme-option--whitesnake,.theme-option--qingming,.theme-option--jiangshan) .theme-option__preview { display: block; padding: 0; }
+:is(.theme-option--wukong,.theme-option--nezha,.theme-option--whitesnake,.theme-option--qingming,.theme-option--jiangshan) .theme-option__preview::before { display: none; }
+:root:is([data-theme="wukong"],[data-theme="nezha"],[data-theme="whitesnake"],[data-theme="qingming"],[data-theme="jiangshan"]) .machine-rail {
+ background-image: linear-gradient(var(--canvas),transparent),var(--scene); background-position: center bottom; background-repeat: no-repeat; background-size: auto 220px;
+}
+:root:is([data-theme="wukong"],[data-theme="nezha"],[data-theme="whitesnake"],[data-theme="qingming"],[data-theme="jiangshan"]) .inspector--empty {
+ background-image: var(--scene); background-position: center bottom; background-repeat: no-repeat; background-size: 100% auto;
+}
+:root:is([data-theme="wukong"],[data-theme="jiangshan"]) :is(.button--primary,.button--share,.usage-pagination button[aria-current="page"],.button--danger) { color: var(--canvas); }
+:root:is([data-theme="wukong"],[data-theme="jiangshan"]) :is(.button--primary,.button--share,.usage-pagination button[aria-current="page"]) { background: var(--cobalt); }
+:root:is([data-theme="wukong"],[data-theme="nezha"],[data-theme="whitesnake"],[data-theme="qingming"],[data-theme="jiangshan"]) .timeline-event--user > p {
+ background: var(--cobalt-soft); border: 1px solid var(--component-line); border-radius: var(--message-frame);
+}
+:root[data-theme="wukong"] .brand-glyph { background: #702e31; color: #edc777; border: 1px solid #edc777; border-radius: 50%; box-shadow: inset 0 0 0 3px #32242a; }
+:root[data-theme="wukong"] :is(.host-card,.settings-block) { border-radius: 5px 16px 16px 5px; border-left: 3px double #ad895a; }
+:root[data-theme="wukong"] .primary-nav button.active { background: #4d3825; color: #edc777; box-shadow: inset 0 -2px 0 #edc777; }
+:root[data-theme="wukong"] .catalog-project-heading { background: linear-gradient(90deg,#4d2b2c,#32242a); }
+:root[data-theme="wukong"] .command-execution__header { border-bottom: 3px double #93715a; }
+:root[data-theme="wukong"] .message-markdown__body blockquote { border-left: 3px double #edc777; }
+:root[data-theme="nezha"] .brand-glyph { color: #aa4239; background: #f8ddd3; border: 1px solid #c69c8c; border-radius: 14px 4px 14px 4px; }
+:root[data-theme="nezha"] :is(.host-card,.settings-block) { border-radius: 18px 5px 18px 5px; border-top: 2px solid #c77c6b; }
+:root[data-theme="nezha"] .catalog-project-heading { background: linear-gradient(110deg,#f8e2d9,#fffbf7); }
+:root[data-theme="nezha"] .primary-nav button.active { background: #f8ddd3; box-shadow: inset 0 -2px 0 #aa4239; }
+:root[data-theme="nezha"] .message-markdown__body blockquote { border-radius: 14px 4px; }
+:root[data-theme="nezha"] .composer-input { border-bottom: 2px solid #397d80; }
+:root[data-theme="whitesnake"] .brand-glyph { color: #347569; border: 1px solid #95b9a5; background: #f4f9f5; border-radius: 50%; box-shadow: inset 0 0 0 3px #dfebe4; }
+:root[data-theme="whitesnake"] :is(.host-card,.settings-block) { border-radius: 20px 20px 8px 8px; box-shadow: inset 0 2px 0 #fff, 0 3px 14px #314c4308; }
+:root[data-theme="whitesnake"] .catalog-project-heading { background: linear-gradient(90deg,#e0eee7,#fbfefb); }
+:root[data-theme="whitesnake"] .primary-nav button.active { box-shadow: inset 0 -1px 0 #347569; }
+:root[data-theme="whitesnake"] .message-markdown__body hr { border-top-style: double; border-top-width: 3px; }
+:root[data-theme="whitesnake"] .composer-input { box-shadow: inset 0 0 0 3px #e8f1ec; }
+:root[data-theme="qingming"] .brand-glyph { color: #faf5e7; background: #83533c; border: 1px solid #a08c67; border-radius: 4px; box-shadow: inset 0 0 0 3px #966449; }
+:root[data-theme="qingming"] :is(.host-card,.settings-block) { border-radius: 5px; border-inline: 3px solid #af9972; }
+:root[data-theme="qingming"] .catalog-project-heading { background: #e8dec7; }
+:root[data-theme="qingming"] .primary-nav button.active { box-shadow: inset 0 -2px 0 #83533c; border-radius: 5px; }
+:root[data-theme="qingming"] .message-markdown__body blockquote { border-radius: 0; border-left-color: #a08c67; }
+:root[data-theme="qingming"] .command-execution { border-inline: 3px solid #af9972; }
+:root[data-theme="jiangshan"] .brand-glyph { color: #e0c788; border: 1px solid #a49a69; background: #254a4b; border-radius: 14px 3px; }
+:root[data-theme="jiangshan"] :is(.host-card,.settings-block) { border-radius: 18px 4px 18px 4px; border-top-color: #ad9c68; }
+:root[data-theme="jiangshan"] .catalog-project-heading { background: linear-gradient(110deg,#2d5146,#183b40); }
+:root[data-theme="jiangshan"] .primary-nav button.active { color: #e0c788; box-shadow: inset 0 -2px 0 #a49a69; background: #294d4a; }
+:root[data-theme="jiangshan"] .message-markdown__body blockquote { border-left-color: #83d0be; border-radius: 12px 3px; }
+:root[data-theme="jiangshan"] .composer-input { border-top: 2px solid #a49a69; }
+@media (max-width: 900px) {
+ :root:is([data-theme="wukong"],[data-theme="nezha"],[data-theme="whitesnake"],[data-theme="qingming"],[data-theme="jiangshan"]) .machine-rail { background-image: none; }
+}
+@media (prefers-contrast: more) {
+ :root:is([data-theme="wukong"],[data-theme="nezha"],[data-theme="whitesnake"],[data-theme="qingming"],[data-theme="jiangshan"]) { --line: var(--muted); --component-line: var(--muted); --message-edge: var(--ink); }
+}

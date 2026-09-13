@@ -11,6 +11,7 @@ import "./storybook-themes.css";
 import "./cinema-themes.css";
 import "./message-themes.css";
 import "./classic-themes.css";
+import "./chinese-themes.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
