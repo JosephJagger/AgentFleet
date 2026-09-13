@@ -164,11 +164,11 @@ describe("会话工作区", () => {
     render(<SessionInspector {...inspectorProps("A")} />);
     const prompt = screen.getByLabelText("发送给 Codex 的消息") as HTMLTextAreaElement;
     fireEvent.change(prompt, { target: { value: "请用 type" } });
-    expect(screen.getByRole("option", { name: /TypeScript/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /TypeScript 类型安全/ })).toBeTruthy();
     fireEvent.keyDown(prompt, { key: "Escape" });
     expect(screen.queryByRole("listbox", { name: "编程提示语补全" })).toBeNull();
     fireEvent.change(prompt, { target: { value: "请用 types" } });
-    expect(screen.getByRole("option", { name: /TypeScript/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /TypeScript 类型安全/ })).toBeTruthy();
   });
   it("输入辅助开关分别生效，按会话保存并跨刷新保留", () => {
     HTMLDialogElement.prototype.showModal = function () { this.open = true; };
@@ -410,6 +410,7 @@ describe("会话工作区", () => {
     expect(screen.queryByText("remote-restricted-v1")).toBeNull();
     expect(screen.queryByText("项目内写入 · 网络关闭")).toBeNull();
     expect(Array.from(status.children).map(row => row.textContent)).toEqual(["2在线主机", "0运行中", "2已接管", "赛博朋克天空之城黑暗骑士龙猫森林彼得兔园骇客帝国冰雪奇缘哈利波特星球大战千与千寻指环王超级马里奥大闹天宫哪吒闹海白蛇传说清明上河千里江山", "正在重新连接"]);
+    await waitFor(() => expect(subscribeToFleet).toHaveBeenCalled());
     const onConnected = vi.mocked(subscribeToFleet).mock.calls[0][2];
     act(() => onConnected(true));
     expect(status.textContent).toContain("连接正常");

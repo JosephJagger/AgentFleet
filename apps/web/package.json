@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare:terms": "node scripts/build-term-dictionary.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "lint": "tsc -b --pretty false",
@@ -11,6 +12,7 @@
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-sc": "5.3.0",
+    "fuse.js": "7.5.0",
     "highlight.js": "11.12.0",
     "lowlight": "3.3.0",
     "lucide-react": "^0.468.0",
@@ -21,6 +23,7 @@
     "strip-ansi": "7.2.0"
   },
   "devDependencies": {
+    "@cspell/dict-software-terms": "5.4.4",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.0.3",
     "@types/react-dom": "^19.0.2",

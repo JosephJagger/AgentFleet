@@ -1,4 +1,9 @@
+import Fuse from "fuse.js";
+import softwareTerms from "./software-terms.generated.json";
+
+export type LearnedTerm = { id: string; phrase: string; replacement: string; scope: string; uses: number; status: string };
 export type PromptCompletion = {
+  memoryId?: string;
   label: string;
   insertText: string;
   detail: string;
@@ -14,6 +19,10 @@ type CompletionTerm = {
 };
 
 const terms: CompletionTerm[] = [
+  { label: "防抖", detail: "停止输入后再触发操作", aliases: ["防抖", "停止输入再查"] },
+  { label: "debounce", detail: "停止输入后再触发操作", aliases: ["debounce", "debouncing"] },
+  { label: "节流", detail: "限制操作触发频率", aliases: ["节流", "限制触发频率"] },
+  { label: "throttle", detail: "限制操作触发频率", aliases: ["throttle", "throttling"] },
   { label: "unit tests", detail: "验证独立逻辑单元", aliases: ["unit tests", "unit test"] },
   { label: "integration tests", detail: "验证模块间协作", aliases: ["integration tests", "integration"] },
   { label: "end-to-end tests", detail: "验证完整用户流程", aliases: ["end-to-end tests", "e2e"] },
@@ -49,6 +58,11 @@ const terms: CompletionTerm[] = [
   { label: "错误处理", detail: "定义失败路径与恢复行为", aliases: ["错误处理", "错误处"] },
   { label: "并发安全", detail: "避免并发读写冲突", aliases: ["并发安全", "并发安"] },
 ];
+
+const curatedLabels = new Set(terms.map(term => term.label.toLowerCase()));
+const dictionary = softwareTerms.filter(term => !curatedLabels.has(term.toLowerCase()));
+const fuzzyTerms = new Fuse([...terms.map(term => term.label), ...dictionary], { threshold: 0.28, ignoreLocation: true, includeScore: true, minMatchCharLength: 3 });
+export const softwareTermCount = new Set([...terms.map(term => term.label.toLowerCase()), ...dictionary.map(term => term.toLowerCase())]).size;
 
 const phraseRules: Array<{ pattern: RegExp; label: string; detail: string }> = [
   { pattern: /(?:为|给).*(?:接口|API).*补充$/i, label: "单元测试，并覆盖正常、边界和异常分支", detail: "补全测试范围" },
@@ -112,11 +126,28 @@ function currentFragment(prompt: string, caret: number) {
   return undefined;
 }
 
-export function promptCompletions(prompt: string, caret: number, limit = 5): PromptCompletion[] {
+export function promptCompletions(prompt: string, caret: number, limit = 5, learned: LearnedTerm[] = []): PromptCompletion[] {
   if (!prompt || prompt.trimStart().startsWith("/") || caret < 0 || caret > prompt.length) return [];
   // Do not replace a word fragment while the caret is inside that word.
   if (/[A-Za-z0-9_]/.test(prompt[caret] ?? "")) return [];
   const beforeCaret = prompt.slice(0, caret);
+  const learnedMatches: PromptCompletion[] = learned.filter(entry => entry.status === "active").sort((a,b) => b.uses-a.uses).flatMap(entry => {
+    const phrase = entry.phrase.toLowerCase();
+    const before = beforeCaret.toLowerCase();
+    const isRewrite = entry.phrase !== entry.replacement;
+    const query = isRewrite ? entry.phrase : beforeCaret.match(/[A-Za-z][A-Za-z0-9._+-]*$|[\u3400-\u9fff]{2,20}$/)?.[0];
+    if (!query || query.length < 2 || (isRewrite ? !before.endsWith(phrase) : !phrase.startsWith(query.toLowerCase()) || phrase === query.toLowerCase())) return [];
+    const start = caret-query.length;
+    if (/[A-Za-z0-9_]/.test(prompt[start-1] ?? "") && /^[A-Za-z]/.test(query)) return [];
+    return [{ memoryId: entry.id, label: entry.replacement, insertText: entry.replacement, detail: entry.scope === "project" ? "项目词库" : "个人词库", kind: isRewrite ? "rewrite" : "term", replaceStart: start, replaceEnd: caret }];
+  });
+  const token = beforeCaret.match(/(?:^|[^A-Za-z0-9_./:@-])([A-Za-z][A-Za-z0-9.+#-]{2,39})$/)?.[1];
+  const dictionaryMatches: PromptCompletion[] = !token ? [] : (() => {
+    if (curatedLabels.has(token.toLowerCase())) return [];
+    const prefix = dictionary.filter(term => term.toLowerCase().startsWith(token.toLowerCase()) && term.toLowerCase() !== token.toLowerCase()).slice(0, limit);
+    const matches = prefix.length ? prefix : token.length >= 4 && !curatedLabels.has(token.toLowerCase()) && !dictionary.some(term => term.toLowerCase() === token.toLowerCase()) ? fuzzyTerms.search(token, { limit }).map(result => result.item) : [];
+    return matches.map(label => ({ label, insertText: label, detail: "软件术语词库", kind: "term", replaceStart: caret-token.length, replaceEnd: caret }));
+  })();
   const rewrites = rewriteRules.flatMap((rule): PromptCompletion[] => {
     const match = rule.pattern.exec(beforeCaret);
     if (!match) return [];
@@ -140,7 +171,7 @@ export function promptCompletions(prompt: string, caret: number, limit = 5): Pro
       replaceEnd: caret,
     }));
   const fragment = currentFragment(prompt, caret);
-  if (!fragment || fragment.query.length < 2) return [...rewrites, ...phrases].slice(0, limit);
+  if (!fragment || fragment.query.length < 2) return [...learnedMatches, ...rewrites, ...phrases, ...dictionaryMatches].slice(0, limit);
   const query = fragment.query.toLocaleLowerCase();
   const termMatches = terms
     .map((term) => {
@@ -156,7 +187,7 @@ export function promptCompletions(prompt: string, caret: number, limit = 5): Pro
     .filter(({ score }) => score < 99)
     .sort((a, b) => a.score - b.score || a.term.label.localeCompare(b.term.label))
     .map(({ term }): PromptCompletion => ({ label: term.label, insertText: term.label, detail: term.detail, kind: "term", replaceStart: fragment.start, replaceEnd: fragment.end }));
-  return [...rewrites, ...phrases, ...termMatches].slice(0, limit);
+  return [...learnedMatches, ...rewrites, ...phrases, ...termMatches, ...dictionaryMatches].filter((item,index,all) => all.findIndex(other => other.label === item.label) === index).slice(0, limit);
 }
 
 export function applyPromptCompletion(prompt: string, completion: PromptCompletion) {

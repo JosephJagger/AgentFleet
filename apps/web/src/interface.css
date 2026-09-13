@@ -320,6 +320,19 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
 .completion-settings label { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; cursor: pointer; }
 .completion-settings input { flex: 0 0 auto; margin-top: 4px; accent-color: var(--cobalt); }
 .completion-settings small { display: block; margin-top: 3px; }
+.writing-memory-panel > p { color: var(--muted); font-size: var(--text-caption); line-height: 1.6; }
+.writing-memory-panel label, .writing-entry-form { display: grid; gap: 6px; margin-block: 10px; }
+.writing-memory-panel .writing-toggle, .writing-toggle { display: flex; align-items: center; gap: 8px; }
+.writing-toggle input { width: auto; accent-color: var(--cobalt); }
+.writing-memory-list { max-height: 280px; overflow-y: auto; margin-block: 12px; }
+.writing-memory-list article { border-top: 1px solid var(--line); padding: 10px 0; overflow-wrap: anywhere; }
+.writing-memory-list p { margin: 4px 0; }
+.writing-memory-list small, .writing-memory-list a { font-size: var(--text-caption); margin-right: 8px; }
+.writing-entry-actions { display: flex; gap: 8px; margin-top: 8px; }
+.writing-entry-actions button { background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+.writing-ai-results { padding: 8px; max-height: 180px; overflow-y: auto; }
+.writing-ai-results button { display: block; background: var(--cobalt-soft); color: var(--ink); border: 0; border-radius: 8px; padding: 10px; margin-bottom: 6px; text-align: left; width: 100%; overflow-wrap: anywhere; }
+.writing-ai-results small { display: block; color: var(--muted); margin-top: 4px; }
 @media (max-width: 900px), (pointer: coarse) {
   .prompt-completions__head kbd { display: none; }
   .prompt-completions__touch { display: inline; }

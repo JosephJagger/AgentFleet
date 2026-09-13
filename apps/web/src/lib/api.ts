@@ -1,4 +1,5 @@
 import type { TokenCounts, UsageSummary } from "./usage";
+import type { WritingAISettings, WritingMemoryState } from "./writing-assistance";
 import { t } from "../i18n";
 import type {
   Approval,
@@ -591,6 +592,14 @@ export interface RuntimeReleaseStatus {
 }
 
 export const api = {
+  writingMemory: (id: string, signal?: AbortSignal) => request<WritingMemoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-memory`, { signal }),
+  writingLearning: (id: string, enabled: boolean, scope: string) => request<WritingMemoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-memory/preferences`, { method: "PUT", body: JSON.stringify({enabled,scope}) }),
+  saveWritingEntry: (id: string, entry: {phrase:string;replacement:string;scope:string}, entryId?: string) => request<WritingMemoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-memory${entryId ? `/${encodeURIComponent(entryId)}` : ""}`, {method:entryId ? "PUT" : "POST",body:JSON.stringify(entry)}),
+  deleteWritingEntry: (id: string, entryId: string) => request<WritingMemoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-memory/${encodeURIComponent(entryId)}`, {method:"DELETE"}),
+  acceptWritingEntry: (id: string, entryId: string) => request<{ok:boolean}>(`/api/sessions/${encodeURIComponent(id)}/writing-memory/${encodeURIComponent(entryId)}/accepted`, {method:"POST"}),
+  writingAI: () => request<WritingAISettings>("/api/settings/writing-ai"),
+  saveWritingAI: (value: {endpoint:string;model:string;enabled:boolean;apiKey:string;clearKey:boolean}) => request<WritingAISettings>("/api/settings/writing-ai", {method:"PUT",body:JSON.stringify(value)}),
+  writingSuggestions: (id: string, draft: string, signal: AbortSignal) => request<{suggestions:string[]}>(`/api/sessions/${encodeURIComponent(id)}/writing-suggestions`, {method:"POST",body:JSON.stringify({draft}),signal}),
   refreshQuota: (id:string) => request<{requested:boolean}>(`/api/machines/${encodeURIComponent(id)}/usage/refresh`,{method:"POST",body:"{}"}),
   usage: (scope: "session" | "project" | "machine", id: string, signal?: AbortSignal) => request<UsageSummary>(`/api/${scope === "session" ? "sessions" : scope === "project" ? "projects" : "machines"}/${encodeURIComponent(id)}/usage`, { signal }),
   imageSessions: (id: string, cursor = "", signal?: AbortSignal) => request<{sessions: import("./types").ImageSessionUsage[]; nextCursor: string | null}>(`/api/machines/${encodeURIComponent(id)}/images/sessions?cursor=${encodeURIComponent(cursor)}`, { signal }),

@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { applyPromptCompletion, promptCompletions } from "./prompt-completions";
+import { applyPromptCompletion, promptCompletions, softwareTermCount } from "./prompt-completions";
 
 describe("prompt completions", () => {
+  it("uses the open-source dictionary with typo tolerance", () => {
+    expect(softwareTermCount).toBeGreaterThan(3900);
+    expect(promptCompletions("use typscript", 13).some(item=>item.label === "TypeScript")).toBe(true);
+  });
+  it("uses only confirmed learned entries and keeps surrounding text", () => {
+    const entries = [{id:"a",phrase:"等我输完再查",replacement:"对输入查询添加防抖",scope:"project",status:"active",uses:3}, {id:"b",phrase:"MysteryTerm",replacement:"MysteryTerm",scope:"personal",status:"candidate",uses:0}];
+    const prompt="请实现：等我输完再查";
+    const completion=promptCompletions(prompt,prompt.length,5,entries)[0];
+    expect(completion.memoryId).toBe("a");
+    expect(applyPromptCompletion(prompt,completion).value).toBe("请实现：对输入查询添加防抖");
+    expect(promptCompletions("Mystery",7,5,entries).some(item=>item.memoryId === "b")).toBe(false);
+  });
   it.each([["Use types", "TypeScript"], ["请使用types", "TypeScript"], ["write unit te", "unit tests"], ["use responsive", "responsive design"]])("completes mixed and English input: %s", (prompt, label) => {
     expect(promptCompletions(prompt, prompt.length)[0]?.label).toBe(label);
   });

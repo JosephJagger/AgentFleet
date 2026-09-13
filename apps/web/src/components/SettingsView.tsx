@@ -4,6 +4,7 @@ import { Laptop, LoaderCircle, ShieldCheck, SunMoon } from "lucide-react";
 import { api } from "../lib/api";
 import type { ClientSessionInfo, Dashboard, Project } from "../lib/types";
 import { ThemeSettings } from "./ThemeSwitcher";
+import { WritingAISettings } from "./WritingAISettings";
 
 type Notice = (tone: "info" | "success" | "danger", message: string) => void;
 const errorText = (error: unknown) => error instanceof Error ? error.message : t("操作未完成，请稍后重试");
@@ -85,6 +86,7 @@ export function SettingsView({ dashboard, onUpdated, onToast }: { dashboard: Das
   return <section className="wide-view settings-view">
     <div className="wide-view__heading"><div><h1>{t("设置")}</h1><p>{t("管理界面外观、浏览器登录和云端历史。")}</p></div><ShieldCheck size={30} /></div>
     <div className="settings-layout">
+      <WritingAISettings />
       <section className="settings-block theme-settings-block"><h2><SunMoon size={18} />{t("界面外观")}</h2><p className="subtle">{t("选择阅读更舒适的外观，自动保存在此浏览器。")}</p><ThemeSettings /></section>
       <section className="settings-block"><h2>{t("云端历史")}</h2><p className="subtle">{t("按项目设置保存内容和时长。宿主机上的原始会话不受影响。")}</p>
         {machines.length === 0 ? <p className="subtle">{t("添加主机并发现项目后，可以设置历史保存方式。")}</p> : <>

@@ -1,4 +1,6 @@
 import { createWorldWeather } from "./world-weather.js";
+import { WritingMemory } from "./writing-memory.js";
+import { WritingAI } from "./writing-ai.js";
 import { QuotaRefreshService } from "./quota-refresh.js";
 import { UsageService } from "./usage.js";
 import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
@@ -147,6 +149,8 @@ export async function buildControlPlane(
   db.bootstrap(config);
   const auth = new AuthService(db, config);
   const registry = new RegistryService(db, config);
+  const writingMemory = new WritingMemory(db);
+  const writingAI = new WritingAI(db, config.databasePath, writingMemory);
   const startupMachineReconciliation = registry.reconcileControlPlaneRestart();
   const coordination = new CoordinationService(db, config);
   const usage = new UsageService(db);
@@ -771,6 +775,21 @@ export async function buildControlPlane(
       queue: coordination.listQueue(principal, logicalSessionId),
     };
   });
+  app.get("/api/sessions/:id/writing-memory", { preHandler: authenticate }, async request => writingMemory.read(request.principal as Principal, routeId(request)));
+  app.get("/api/settings/writing-ai", { preHandler: authenticate }, async request => writingAI.read(request.principal as Principal));
+  app.put("/api/settings/writing-ai", { preHandler: mutate }, async request => writingAI.save(request.principal as Principal, record(request.body)));
+  app.post("/api/sessions/:id/writing-suggestions", { preHandler: mutate }, async request => {
+    limiter.check(`writing-ai:${request.principal!.userId}`, 12, 60_000);
+    return writingAI.suggest(request.principal as Principal, routeId(request), record(request.body).draft);
+  });
+  app.put("/api/sessions/:id/writing-memory/preferences", { preHandler: mutate }, async request => writingMemory.configure(request.principal as Principal, routeId(request), record(request.body)));
+  app.post("/api/sessions/:id/writing-memory", { preHandler: mutate }, async request => writingMemory.save(request.principal as Principal, routeId(request), record(request.body)));
+  app.put("/api/sessions/:id/writing-memory/:entryId", { preHandler: mutate }, async request => writingMemory.save(request.principal as Principal, routeId(request), record(request.body), routeId(request, "entryId")));
+  app.delete("/api/sessions/:id/writing-memory/:entryId", { preHandler: mutate }, async request => writingMemory.remove(request.principal as Principal, routeId(request), routeId(request, "entryId")));
+  app.post("/api/sessions/:id/writing-memory/:entryId/accepted", { preHandler: mutate }, async request => {
+    limiter.check(`writing-feedback:${request.principal!.userId}`, 60, 60_000);
+    return writingMemory.feedback(request.principal as Principal, routeId(request), routeId(request, "entryId"));
+  });
   app.get("/api/sessions/:id/queue", { preHandler: authenticate }, async (request) => ({
     queue: coordination.listQueue(request.principal as Principal, routeId(request)),
   }));
@@ -1101,6 +1120,7 @@ export async function buildControlPlane(
                 nextExpectedHostSeq: result.nextExpectedHostSeq,
               });
               if (!result.duplicate) {
+                try { writingMemory.learnEvent(result.eventId); } catch { app.log.warn("Writing memory extraction failed; event remains acknowledged"); }
                 broadcastSession(message.event.logicalSessionId, { type: "event", event: result.event });
                 if (["turn.completed", "turn.failed", "turn.interrupted"].includes(message.event.type)) {
                   dispatchReadyQueues(identity.machineId, identity.workspaceId);

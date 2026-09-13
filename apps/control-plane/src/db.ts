@@ -798,7 +798,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 28) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 29) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1112,6 +1112,31 @@ export class ControlPlaneDatabase {
       if(!columns.has("input_tokens"))this.sqlite.exec("ALTER TABLE usage_intervals ADD COLUMN input_tokens INTEGER");
       if(!columns.has("cached_input_tokens"))this.sqlite.exec("ALTER TABLE usage_intervals ADD COLUMN cached_input_tokens INTEGER");
       this.sqlite.exec("PRAGMA user_version=28");
+    });
+    if (version < 29) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS writing_learning (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        user_id TEXT NOT NULL REFERENCES users(user_id),
+        session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id) ON DELETE CASCADE,
+        enabled INTEGER NOT NULL DEFAULT 0, scope TEXT NOT NULL DEFAULT 'project',
+        after_seq INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id,session_id)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS writing_memory (
+        id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        user_id TEXT NOT NULL REFERENCES users(user_id), scope TEXT NOT NULL,
+        target_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
+        phrase TEXT NOT NULL, replacement TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('candidate','active','deleted')),
+        source_session TEXT, source_event TEXT, uses INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        UNIQUE(user_id,scope,target_id,fingerprint)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS writing_memory_scope ON writing_memory(user_id,scope,target_id,status);
+      CREATE TABLE IF NOT EXISTS writing_ai (
+        user_id TEXT PRIMARY KEY REFERENCES users(user_id), workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        endpoint TEXT NOT NULL, model TEXT NOT NULL, encrypted_key TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 0
+      ) STRICT;
+      PRAGMA user_version=29`);
     });
   }
 

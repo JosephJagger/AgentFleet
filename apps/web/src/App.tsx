@@ -81,6 +81,8 @@ import { CodexCommandGuide } from "./components/CodexCommandGuide";
 import { sessionPath, useSessionDraft } from "./lib/session-workspace";
 import { useAutoSizeTextarea } from "./lib/auto-size-textarea";
 import { useCompletionPreferences } from "./lib/completion-preferences";
+import { useWritingMemory } from "./lib/writing-assistance";
+import { WritingMemoryPanel } from "./components/WritingMemoryPanel";
 import { applyPromptCompletion, promptCompletions, type PromptCompletion } from "./lib/prompt-completions";
 import { routeFromPath, routePath, type AppRoute, type View } from "./lib/navigation";
 import type {
@@ -627,6 +629,13 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
 }) {
   const [prompt, setPrompt] = useSessionDraft(draftOwner ?? "preview", detail?.session.id);
   const [completionPreferences, updateCompletionPreferences] = useCompletionPreferences(draftOwner ?? "preview", detail?.session.id);
+  const writingMemory = useWritingMemory(draftOwner ?? "preview", detail?.session.id, detail?.events.at(-1)?.id);
+  const [aiResult, setAIResult] = useState<{session:string;draft:string;suggestions:string[]}>();
+  const [aiBusy, setAIBusy] = useState(false);
+  const [aiMessage, setAIMessage] = useState("");
+  const aiRequest = useRef<AbortController | null>(null);
+  useEffect(() => { aiRequest.current?.abort(); setAIBusy(false); setAIResult(undefined); setAIMessage(""); }, [prompt, draftOwner, detail?.session.id, completionPreferences.suggestions]);
+  useEffect(() => () => aiRequest.current?.abort(), []);
   const imageDraft = useImageDraft(draftOwner ?? "preview", detail?.session.id);
   const [configuration, setConfiguration] = useState<ConfigurationRequest>();
   const [runtimeChoice, setRuntimeChoice] = useState<RuntimeChoice>();
@@ -646,13 +655,14 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const [composingPrompt, setComposingPrompt] = useState(false);
   const [completionSelectionEnd, setCompletionSelectionEnd] = useState(0);
   const completionKey = `${prompt}\u0000${completionCaret}`;
-  const completions = useMemo(() => busy || !completionFocused || composingPrompt || completionSelectionEnd !== completionCaret || dismissedCompletion === completionKey ? [] : promptCompletions(prompt, completionCaret).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions), [busy, completionFocused, composingPrompt, completionSelectionEnd, completionCaret, completionKey, dismissedCompletion, prompt, completionPreferences.terms, completionPreferences.suggestions]);
+  const completions = useMemo(() => busy || !completionFocused || composingPrompt || completionSelectionEnd !== completionCaret || dismissedCompletion === completionKey ? [] : promptCompletions(prompt, completionCaret, 10, writingMemory.value?.entries).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions).slice(0,5), [busy, completionFocused, composingPrompt, completionSelectionEnd, completionCaret, completionKey, dismissedCompletion, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value]);
   useAutoSizeTextarea(textArea, prompt, `${detail?.session.id ?? ""}:${loading}`);
   useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); }, [detail?.session.id, draftOwner]);
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
   useEffect(() => { setCompletionFocused(false); setComposingPrompt(false); setCompletionCaret(0); setCompletionSelectionEnd(0); }, [detail?.session.id, draftOwner, loading]);
 
   function acceptCompletion(completion: PromptCompletion) {
+    if (completion.memoryId && detail) void api.acceptWritingEntry(detail.session.id, completion.memoryId).catch(() => undefined);
     const next = applyPromptCompletion(prompt, completion);
     setPrompt(next.value);
     setCompletionCaret(next.caret);
@@ -831,6 +841,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           <label><input type="checkbox" checked={completionPreferences.terms} onChange={event => updateCompletionPreferences({ terms: event.target.checked })} /><span>{t("术语补全")}<small>{t("补全中英文开发术语和技术缩写。")}</small></span></label>
           <label><input type="checkbox" checked={completionPreferences.suggestions} onChange={event => updateCompletionPreferences({ suggestions: event.target.checked })} /><span>{t("提示语与表达建议")}<small>{t("补充开发指令，或将口语改为专业表达；采用后仍可编辑。")}</small></span></label>
         </section>
+        <WritingMemoryPanel key={`memory:${draftOwner}:${session.id}`} sessionId={session.id} value={writingMemory.value} error={writingMemory.error} refresh={writingMemory.refresh} />
         <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
           <CodexInspectionPanel key={`inspect:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} request={inspectionRequest?.sessionId === session.id ? inspectionRequest : undefined} onChanged={onRefresh} />
@@ -845,6 +856,8 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {canQueueOrSteer && <div className="composer-mode"><Activity size={14} />{t("Codex 正在处理：可补充当前任务，或排到下一轮")}</div>}
         <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>
         <div className="composer-input">
+        {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
+        {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" key={suggestion} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}>{suggestion}<small>{t("点击采用")}</small></button>)}</div>}
         {imageDraft.images.length > 0 && <MessageImages images={imageDraft.images} onRemove={imageDraft.remove} disabled={busy || imageDraft.processing} />}
         {imageDraft.processing && <p className="image-draft-notice" role="status">{t("正在处理粘贴的图片…")}</p>}
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
@@ -920,6 +933,17 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           }}
         />
         <div className="composer-actions">
+          {completionPreferences.suggestions && <button type="button" className="button button--quiet" disabled={aiBusy || busy || !prompt.trim() || Boolean(slashCommand)} onClick={async()=>{
+            const controller = new AbortController(); aiRequest.current?.abort(); aiRequest.current=controller; setAIBusy(true); setAIMessage("");
+            try {
+              const settings = await api.writingAI();
+              if (controller.signal.aborted) return;
+              if (!settings.enabled || !settings.configured) { setAIMessage(t("请先在设置中配置 AI 理解；基础补全与自动学习仍可使用")); return; }
+              const result = await api.writingSuggestions(session.id,prompt,controller.signal);
+              if (!controller.signal.aborted) { setAIResult({session:session.id,draft:prompt,suggestions:result.suggestions}); if(!result.suggestions.length)setAIMessage(t("暂无更合适的表达，保留当前草稿")); }
+            } catch { if(!controller.signal.aborted)setAIMessage(t("AI 建议暂不可用，基础补全仍可使用")); }
+            finally { if(!controller.signal.aborted)setAIBusy(false); }
+          }}>{aiBusy ? t("正在优化…") : t("AI 优化")}</button>}
           <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{detail.writeBlockedReason || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
           <span className="composer-touch-hint">{detail.writeBlockedReason || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
           {canQueueOrSteer ? (
