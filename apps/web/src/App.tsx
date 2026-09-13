@@ -80,6 +80,8 @@ import { codexCommands, coverageLabels, initInstructions, parseCodexCommand } fr
 import { CodexCommandGuide } from "./components/CodexCommandGuide";
 import { sessionPath, useSessionDraft } from "./lib/session-workspace";
 import { useAutoSizeTextarea } from "./lib/auto-size-textarea";
+import { useCompletionPreferences } from "./lib/completion-preferences";
+import { applyPromptCompletion, promptCompletions, type PromptCompletion } from "./lib/prompt-completions";
 import { routeFromPath, routePath, type AppRoute, type View } from "./lib/navigation";
 import type {
   Approval,
@@ -624,6 +626,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   onNewSession?: () => void;
 }) {
   const [prompt, setPrompt] = useSessionDraft(draftOwner ?? "preview", detail?.session.id);
+  const [completionPreferences, updateCompletionPreferences] = useCompletionPreferences(draftOwner ?? "preview", detail?.session.id);
   const imageDraft = useImageDraft(draftOwner ?? "preview", detail?.session.id);
   const [configuration, setConfiguration] = useState<ConfigurationRequest>();
   const [runtimeChoice, setRuntimeChoice] = useState<RuntimeChoice>();
@@ -636,8 +639,33 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const [busy, setBusy] = useState(false);
   const [releaseConfirming, setReleaseConfirming] = useState(false);
   const textArea = useRef<HTMLTextAreaElement>(null);
+  const [completionCaret, setCompletionCaret] = useState(0);
+  const [activeCompletion, setActiveCompletion] = useState(0);
+  const [dismissedCompletion, setDismissedCompletion] = useState("");
+  const [completionFocused, setCompletionFocused] = useState(false);
+  const [composingPrompt, setComposingPrompt] = useState(false);
+  const [completionSelectionEnd, setCompletionSelectionEnd] = useState(0);
+  const completionKey = `${prompt}\u0000${completionCaret}`;
+  const completions = useMemo(() => busy || !completionFocused || composingPrompt || completionSelectionEnd !== completionCaret || dismissedCompletion === completionKey ? [] : promptCompletions(prompt, completionCaret).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions), [busy, completionFocused, composingPrompt, completionSelectionEnd, completionCaret, completionKey, dismissedCompletion, prompt, completionPreferences.terms, completionPreferences.suggestions]);
   useAutoSizeTextarea(textArea, prompt, `${detail?.session.id ?? ""}:${loading}`);
   useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); }, [detail?.session.id, draftOwner]);
+  useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
+  useEffect(() => { setCompletionFocused(false); setComposingPrompt(false); setCompletionCaret(0); setCompletionSelectionEnd(0); }, [detail?.session.id, draftOwner, loading]);
+
+  function acceptCompletion(completion: PromptCompletion) {
+    const next = applyPromptCompletion(prompt, completion);
+    setPrompt(next.value);
+    setCompletionCaret(next.caret);
+    setCompletionSelectionEnd(next.caret);
+    setDismissedCompletion(`${next.value}\u0000${next.caret}`);
+    requestAnimationFrame(() => {
+      const input = textArea.current;
+      if (input?.value === next.value) {
+        input.focus();
+        input.setSelectionRange(next.caret, next.caret);
+      }
+    });
+  }
 
   if (loading) return <aside className="inspector inspector--loading"><IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton><LoaderCircle className="spin" size={22} /><span>{t("正在读取会话")}</span></aside>;
   if (!detail) return <aside className="inspector inspector--empty"><MonitorDot size={27} /><h2>{t("选择一个会话")}</h2><p>{t("打开已有会话，或新建会话开始。")}</p></aside>;
@@ -797,6 +825,12 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
         <CodexSettingsPanel key={`${draftOwner}:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />
         <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />
+        <section className="session-config-section completion-settings" aria-label={t("输入辅助")}>
+          <h3>{t("输入辅助")}</h3>
+          <p>{t("即时生效，仅保存当前浏览器中此账号、此会话的偏好。")}</p>
+          <label><input type="checkbox" checked={completionPreferences.terms} onChange={event => updateCompletionPreferences({ terms: event.target.checked })} /><span>{t("术语补全")}<small>{t("补全中英文开发术语和技术缩写。")}</small></span></label>
+          <label><input type="checkbox" checked={completionPreferences.suggestions} onChange={event => updateCompletionPreferences({ suggestions: event.target.checked })} /><span>{t("提示语与表达建议")}<small>{t("补充开发指令，或将口语改为专业表达；采用后仍可编辑。")}</small></span></label>
+        </section>
         <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
           <CodexInspectionPanel key={`inspect:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} request={inspectionRequest?.sessionId === session.id ? inspectionRequest : undefined} onChanged={onRefresh} />
@@ -815,17 +849,59 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {imageDraft.processing && <p className="image-draft-notice" role="status">{t("正在处理粘贴的图片…")}</p>}
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
         {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("请先在主机页更新连接服务，才能发送图片") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
+        {completions.length > 0 && <div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={t("编程提示语补全")}>
+          <div className="prompt-completions__head" role="presentation"><Code2 size={14} aria-hidden="true" /><span>{t("编程补全")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
+          {completions.map((completion, index) => <button
+            type="button"
+            role="option"
+            aria-selected={index === activeCompletion}
+            id={`prompt-completion-${index}`}
+            className={index === activeCompletion ? "prompt-completion--active" : ""}
+            key={`${completion.kind}:${completion.label}`}
+            tabIndex={-1}
+            title={completion.label}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => acceptCompletion(completion)}
+            onMouseEnter={() => setActiveCompletion(index)}
+          ><span className="prompt-completion__kind">{completion.kind === "term" ? t("术语") : completion.kind === "rewrite" ? t("表达优化") : t("提示语")}</span><code>{completion.label}</code><small>{t(completion.detail)}</small></button>)}
+        </div>}
         <textarea
           ref={textArea}
           aria-label={t("发送给 Codex 的消息")}
+          aria-autocomplete="list"
+          aria-controls={completions.length > 0 ? "prompt-completions" : undefined}
+          aria-activedescendant={completions.length > 0 ? `prompt-completion-${activeCompletion}` : undefined}
           placeholder={canSend ? t("告诉 Codex 下一步做什么…") : canQueueOrSteer ? t("补充当前任务，或写入下一轮队列…") : t("先写下想法，恢复可用后手动发送…")}
           value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
+          onChange={(event) => { setPrompt(event.target.value); setCompletionFocused(true); setCompletionCaret(event.target.selectionStart); setCompletionSelectionEnd(event.target.selectionEnd); setDismissedCompletion(""); }}
+          onFocus={() => setCompletionFocused(true)}
+          onBlur={() => setCompletionFocused(false)}
+          onCompositionStart={() => setComposingPrompt(true)}
+          onCompositionEnd={(event) => { setComposingPrompt(false); setCompletionCaret(event.currentTarget.selectionStart); setCompletionSelectionEnd(event.currentTarget.selectionEnd); }}
+          onSelect={(event) => { setCompletionCaret(event.currentTarget.selectionStart); setCompletionSelectionEnd(event.currentTarget.selectionEnd); }}
           onPaste={event => { if (!busy) void imageDraft.onPaste(event); }}
           disabled={busy}
           rows={1}
           onKeyDown={(event) => {
-            if (event.key !== "Enter" || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+            if (composingPrompt || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+            if (completions.length > 0) {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setActiveCompletion((current) => (current + (event.key === "ArrowDown" ? 1 : completions.length - 1)) % completions.length);
+                return;
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setDismissedCompletion(completionKey);
+                return;
+              }
+              if (event.key === "Tab" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                event.preventDefault();
+                acceptCompletion(completions[activeCompletion] ?? completions[0]);
+                return;
+              }
+            }
+            if (event.key !== "Enter") return;
             // On a touch keyboard Return inserts a line; the visible Send button submits.
             if (window.matchMedia?.("(max-width: 900px), (pointer: coarse)").matches && !event.ctrlKey && !event.metaKey) return;
             if ((event.ctrlKey || event.metaKey) && !event.altKey) {
@@ -844,7 +920,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           }}
         />
         <div className="composer-actions">
-          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Enter 发送，Ctrl / ⌘ + Enter 换行")}>{detail.writeBlockedReason || (canSend ? t("Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{detail.writeBlockedReason || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
           <span className="composer-touch-hint">{detail.writeBlockedReason || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
           {canQueueOrSteer ? (
             <div className="active-turn-actions">

@@ -5,6 +5,7 @@ import App, { ApprovalsView, SessionInspector } from "./App";
 import { OperationReceipts, receiptStatus } from "./components/OperationReceipts";
 import { api, subscribeToFleet } from "./lib/api";
 import { draftKey } from "./lib/session-workspace";
+import { setLocale } from "./i18n";
 import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
@@ -145,7 +146,88 @@ describe("会话工作区", () => {
     const prompt = screen.getByLabelText("发送给 Codex 的消息") as HTMLTextAreaElement;
     expect(prompt.rows).toBe(1);
     expect(screen.getByRole("button", { name: "发送" }).closest(".composer-input")).toBe(prompt.parentElement);
-    expect(screen.getByText("Enter 发送 · Ctrl / ⌘ + Enter 换行").closest(".composer-input")).toBe(prompt.parentElement);
+    expect(screen.getByText("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行").closest(".composer-input")).toBe(prompt.parentElement);
+  });
+  it("按上下文补全开发提示语，Tab 接受且不会直接发送", () => {
+    const send = vi.fn(noop);
+    render(<SessionInspector {...inspectorProps("A")} onSend={send} />);
+    const prompt = screen.getByLabelText("发送给 Codex 的消息") as HTMLTextAreaElement;
+    fireEvent.change(prompt, { target: { value: "请为这个接口补充" } });
+    expect(screen.getByRole("listbox", { name: "编程提示语补全" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /单元测试，并覆盖正常、边界和异常分支/ })).toBeTruthy();
+    fireEvent.keyDown(prompt, { key: "Tab" });
+    expect(prompt.value).toBe("请为这个接口补充单元测试，并覆盖正常、边界和异常分支");
+    expect(screen.queryByRole("listbox", { name: "编程提示语补全" })).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+  });
+  it("补全开发术语，并可用 Esc 关闭当前候选", () => {
+    render(<SessionInspector {...inspectorProps("A")} />);
+    const prompt = screen.getByLabelText("发送给 Codex 的消息") as HTMLTextAreaElement;
+    fireEvent.change(prompt, { target: { value: "请用 type" } });
+    expect(screen.getByRole("option", { name: /TypeScript/ })).toBeTruthy();
+    fireEvent.keyDown(prompt, { key: "Escape" });
+    expect(screen.queryByRole("listbox", { name: "编程提示语补全" })).toBeNull();
+    fireEvent.change(prompt, { target: { value: "请用 types" } });
+    expect(screen.getByRole("option", { name: /TypeScript/ })).toBeTruthy();
+  });
+  it("输入辅助开关分别生效，按会话保存并跨刷新保留", () => {
+    HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    HTMLDialogElement.prototype.close = function () { this.open = false; };
+    const view = render(<SessionInspector {...inspectorProps("A")} />);
+    fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /术语补全/ }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭会话配置" }));
+    const input = screen.getByLabelText("发送给 Codex 的消息");
+    fireEvent.change(input, { target: { value: "use types" } });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    fireEvent.change(input, { target: { value: "页面很卡" } });
+    expect(screen.getByRole("option", { name: /表达优化/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /提示语与表达建议/ }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭会话配置" }));
+    fireEvent.change(input, { target: { value: "网页很卡" } });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    view.rerender(<SessionInspector {...inspectorProps("B")} />);
+    fireEvent.change(input, { target: { value: "use types" } });
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    view.unmount();
+    render(<SessionInspector {...inspectorProps("A")} />);
+    fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
+    expect((screen.getByRole("checkbox", { name: /术语补全/ }) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole("checkbox", { name: /提示语与表达建议/ }) as HTMLInputElement).checked).toBe(false);
+  });
+  it("英文界面支持英文口语改写，点击只更新草稿", () => {
+    setLocale("en");
+    try {
+      const send = vi.fn(noop);
+      render(<SessionInspector {...inspectorProps("A")} onSend={send} />);
+      const input = screen.getByLabelText("Message to Codex") as HTMLTextAreaElement;
+      fireEvent.change(input, { target: { value: "the button doesn't work" } });
+      expect(screen.getByRole("listbox", { name: "Programming prompt completions" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("option", { name: /Rewrite.*investigate/ }));
+      expect(input.value).toContain("event handling");
+      expect(send).not.toHaveBeenCalled();
+    } finally { setLocale("zh-CN"); }
+  });
+  it("输入法合成、文本选区和失焦时隐藏建议，Shift Tab 不接受", () => {
+    render(<SessionInspector {...inspectorProps("A")} />);
+    const input = screen.getByLabelText("发送给 Codex 的消息") as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "use types" } });
+    fireEvent.keyDown(input, { key: "Tab", shiftKey: true });
+    expect(input.value).toBe("use types");
+    fireEvent.compositionStart(input);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    fireEvent.keyDown(input, { key: "Tab" });
+    expect(input.value).toBe("use types");
+    fireEvent.compositionEnd(input);
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    input.setSelectionRange(4, 9);
+    fireEvent.select(input);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    input.setSelectionRange(9, 9);
+    fireEvent.select(input);
+    fireEvent.blur(input);
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
   it("中文输入法确认时不触发快捷键提交", () => {
     const send = vi.fn(noop);
