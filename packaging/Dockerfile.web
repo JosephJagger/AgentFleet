@@ -13,5 +13,5 @@ ARG AGENTFLEET_BUILD_SHA=unknown
 ENV AGENTFLEET_BUILD_SHA=${AGENTFLEET_BUILD_SHA}
 # Drop obsolete browser bundles, which can contain superseded deployment defaults.
 # Published Agent downloads and backend files remain intact.
-RUN rm -rf /app/web/assets
+RUN rm -rf /app/web/assets /app/web/themes
 COPY --from=web-build --chown=agentfleet:agentfleet /build/apps/web/dist/ /app/web/

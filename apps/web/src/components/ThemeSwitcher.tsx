@@ -18,7 +18,7 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
         <option value="daylight">{t("天空之城")}</option>
         <option value="midnight">{t("黑暗骑士")}</option>
         <option value="forest">{t("龙猫森林")}</option>
-        <option value="eyecare">{t("小熊维尼")}</option>
+        <option value="eyecare">{t("彼得兔园")}</option>
         <option value="matrix">{t("骇客帝国")}</option>
         <option value="frozen">{t("冰雪奇缘")}</option>
         <option value="wizard">{t("哈利波特")}</option>
@@ -36,7 +36,7 @@ const themeOptions: { value: Theme; label: string; description: string }[] = [
   { value: "daylight", label: "天空之城", description: "云海浮岛、飞行石与轻盈白蓝" },
   { value: "midnight", label: "黑暗骑士", description: "哥谭夜幕、蝙蝠探照灯与装甲边框" },
   { value: "forest", label: "龙猫森林", description: "森林树洞、叶伞与安静苔绿" },
-  { value: "eyecare", label: "小熊维尼", description: "百亩森林、蜂蜜罐与暖奶油信纸" },
+  { value: "eyecare", label: "彼得兔园", description: "蓝衣兔子、菜园篱笆与暖色信纸" },
   { value: "matrix", label: "骇客帝国", description: "深黑终端，荧光绿信号与微光边界" },
   { value: "frozen", label: "冰雪奇缘", description: "冰晶宫殿、雪花纹饰与通透冰蓝" },
   { value: "wizard", label: "哈利波特", description: "星夜城堡、羊皮纸与古铜魔法书" },
@@ -46,12 +46,13 @@ const themeOptions: { value: Theme; label: string; description: string }[] = [
   { value: "mario", label: "超级马里奥", description: "蘑菇王国、像素丘陵与关卡卡片" },
 ];
 const illustrated = (value: Theme) => value !== "matrix";
+const sceneAsset = (value: Theme) => value === "eyecare" ? "rabbit" : value;
 
 export function ThemeSettings() {
   const selected = useTheme();
   return (
     <>
-    {illustrated(selected) && <div className={`theme-scene theme-scene--${selected}`} aria-hidden="true"><img src={`/themes/${selected}.svg`} alt="" /></div>}
+    {illustrated(selected) && <div className={`theme-scene theme-scene--${selected}`} aria-hidden="true"><img src={`/themes/${sceneAsset(selected)}.svg`} alt="" /></div>}
     <div className="theme-options" role="radiogroup" aria-label={t("界面主题")}>
       {themeOptions.map(option => (
         <button
@@ -62,7 +63,7 @@ export function ThemeSettings() {
           key={option.value}
           onClick={() => setTheme(option.value)}
         >
-          <span className="theme-option__preview" aria-hidden="true">{illustrated(option.value) ? <img src={`/themes/${option.value}.svg`} alt="" /> : <><i /><i /><i /></>}</span>
+          <span className="theme-option__preview" aria-hidden="true">{illustrated(option.value) ? <img src={`/themes/${sceneAsset(option.value)}.svg`} alt="" /> : <><i /><i /><i /></>}</span>
           <span className="theme-option__copy"><strong>{t(option.label)}</strong><small>{t(option.description)}</small></span>
           <span className="theme-option__check" aria-hidden="true">{selected === option.value && <Check size={14} />}</span>
         </button>

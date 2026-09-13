@@ -20,7 +20,7 @@ describe("theme switching", () => {
     ["daylight", "天空之城", "#edf5fa"],
     ["midnight", "黑暗骑士", "#14171c"],
     ["forest", "龙猫森林", "#14251e"],
-    ["eyecare", "小熊维尼", "#f4ecd6"],
+    ["eyecare", "彼得兔园", "#f4ecd6"],
   ])("persists %s and displays its scene", (value, label, color) => {
     const meta = document.createElement("meta");
     meta.name = "theme-color";
@@ -30,7 +30,7 @@ describe("theme switching", () => {
     fireEvent.click(screen.getByRole("radio", { name: new RegExp(label) }));
     expect(localStorage.getItem("agentfleet.theme")).toBe(value);
     expect(meta.content).toBe(color);
-    expect(view.container.querySelector(".theme-scene img")?.getAttribute("src")).toBe(`/themes/${value}.svg`);
+    expect(view.container.querySelector(".theme-scene img")?.getAttribute("src")).toBe(`/themes/${value === "eyecare" ? "rabbit" : value}.svg`);
     expect(document.documentElement.dataset.theme).toBe(value as Theme);
     meta.remove();
   });
@@ -50,7 +50,7 @@ describe("theme switching", () => {
   it("offers a complete theme picker for settings", () => {
     setTheme("cyber");
     render(<ThemeSettings />);
-    const eyecare = screen.getByRole("radio", { name: /小熊维尼/ });
+    const eyecare = screen.getByRole("radio", { name: /彼得兔园/ });
     expect(screen.getAllByRole("radio")).toHaveLength(12);
     fireEvent.click(eyecare);
     expect(eyecare.getAttribute("aria-checked")).toBe("true");
