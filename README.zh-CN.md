@@ -111,12 +111,12 @@ Codex 负责在每台电脑上执行，AgentFleets 负责统筹所有电脑，�
 
 桌面端可在左侧栏“已接管”下方切换主题；窄屏和移动端可从导航菜单切换，设置页也提供完整主题选择。布局会随移动端宽度调整，选中的主题会保存在当前浏览器中。
 
-以下均为模拟截图，使用虚构数据。查看 **[全部 17 套桌面主题与 6 张手机预览](docs/themes.md)**。
+以下均为模拟截图，使用虚构数据。查看 **[全部 17 套桌面主题与 6 张手机预览](docs/themes.zh-CN.md)**。
 
-| **大闹天宫**<br>[![大闹天宫 demo](docs/assets/themes/wukong-desktop.jpg)](docs/themes.md) | **千里江山**<br>[![千里江山 demo](docs/assets/themes/jiangshan-desktop.jpg)](docs/themes.md) |
+| **大闹天宫**<br>[![大闹天宫 模拟截图](docs/assets/themes/wukong-desktop.jpg)](docs/themes.zh-CN.md) | **千里江山**<br>[![千里江山 模拟截图](docs/assets/themes/jiangshan-desktop.jpg)](docs/themes.zh-CN.md) |
 | --- | --- |
-| **白蛇传说**<br>[![白蛇传说 demo](docs/assets/themes/whitesnake-desktop.jpg)](docs/themes.md) | **骇客帝国**<br>[![骇客帝国 demo](docs/assets/themes/matrix-desktop.jpg)](docs/themes.md) |
-| **哈利波特**<br>[![哈利波特 demo](docs/assets/themes/wizard-desktop.jpg)](docs/themes.md) | **彼得兔园**<br>[![彼得兔园 demo](docs/assets/themes/eyecare-desktop.jpg)](docs/themes.md) |
+| **白蛇传说**<br>[![白蛇传说 模拟截图](docs/assets/themes/whitesnake-desktop.jpg)](docs/themes.zh-CN.md) | **骇客帝国**<br>[![骇客帝国 模拟截图](docs/assets/themes/matrix-desktop.jpg)](docs/themes.zh-CN.md) |
+| **哈利波特**<br>[![哈利波特 模拟截图](docs/assets/themes/wizard-desktop.jpg)](docs/themes.zh-CN.md) | **彼得兔园**<br>[![彼得兔园 模拟截图](docs/assets/themes/eyecare-desktop.jpg)](docs/themes.zh-CN.md) |
 
 ### 知道额度还剩多少，消耗在哪里
 

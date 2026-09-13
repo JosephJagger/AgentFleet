@@ -113,10 +113,10 @@ On desktop, use the theme control below **Controlled** in the left sidebar. On n
 
 All screenshots use fictional demo data. Browse **[all 17 desktop themes and 6 mobile previews](docs/themes.md)**.
 
-| **Havoc in Heaven**<br>[![大闹天宫 demo](docs/assets/themes/wukong-desktop.jpg)](docs/themes.md) | **A Thousand Li of Rivers and Mountains**<br>[![千里江山 demo](docs/assets/themes/jiangshan-desktop.jpg)](docs/themes.md) |
+| **Havoc in Heaven**<br>[![Havoc in Heaven demo](docs/assets/themes/wukong-desktop.jpg)](docs/themes.md) | **A Thousand Li of Rivers and Mountains**<br>[![A Thousand Li of Rivers and Mountains demo](docs/assets/themes/jiangshan-desktop.jpg)](docs/themes.md) |
 | --- | --- |
-| **Legend of the White Snake**<br>[![白蛇传说 demo](docs/assets/themes/whitesnake-desktop.jpg)](docs/themes.md) | **The Matrix**<br>[![骇客帝国 demo](docs/assets/themes/matrix-desktop.jpg)](docs/themes.md) |
-| **Harry Potter**<br>[![哈利波特 demo](docs/assets/themes/wizard-desktop.jpg)](docs/themes.md) | **Peter Rabbit Garden**<br>[![彼得兔园 demo](docs/assets/themes/eyecare-desktop.jpg)](docs/themes.md) |
+| **Legend of the White Snake**<br>[![Legend of the White Snake demo](docs/assets/themes/whitesnake-desktop.jpg)](docs/themes.md) | **The Matrix**<br>[![The Matrix demo](docs/assets/themes/matrix-desktop.jpg)](docs/themes.md) |
+| **Harry Potter**<br>[![Harry Potter demo](docs/assets/themes/wizard-desktop.jpg)](docs/themes.md) | **Peter Rabbit Garden**<br>[![Peter Rabbit Garden demo](docs/assets/themes/eyecare-desktop.jpg)](docs/themes.md) |
 
 ### Know what is using your quota
 

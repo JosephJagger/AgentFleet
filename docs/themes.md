@@ -1,100 +1,96 @@
-# 主题截图 / Theme gallery
+# Theme gallery
 
-17 套主题的真实界面截图，全部使用虚构模拟数据。主机、项目、会话、模型配置、消耗和天气均为演示内容，不包含生产信息，也不代表真实运行结果。
+[Back to README](../README.md) · [Chinese version](themes.zh-CN.md)
 
-Real application screenshots with fictional demo data. Hosts, projects, conversations, model settings, usage and weather are simulated; no production data is shown.
+Real application screenshots of 17 themes with fictional demo data. Hosts, projects, conversations, model settings, usage and weather are simulated; no production data is shown or real execution results implied.
 
-桌面截图为 1920 × 1080，手机截图为 390 × 1000。点击图片查看原尺寸。当前默认主题为「天空之城」，已有浏览器保留原选择。
+Desktop captures are 1920 × 1080; mobile captures are 390 × 1000. Click an image for full resolution. Castle in the Sky is the default for new browsers; existing preferences are retained. The screenshots show the Chinese interface.
 
-Desktop captures are 1920 × 1080; mobile captures are 390 × 1000. Click an image for full resolution. Castle in the Sky is the default for new browsers; existing preferences are retained.
+## Cyberpunk
 
-[返回中文说明](../README.zh-CN.md) · [English README](../README.md)
+[![Cyberpunk desktop demo](assets/themes/cyber-desktop.jpg)](assets/themes/cyber-desktop.jpg)
 
-## 赛博朋克 · Cyberpunk
+## Castle in the Sky
 
-[![赛博朋克 桌面模拟截图](assets/themes/cyber-desktop.jpg)](assets/themes/cyber-desktop.jpg)
+[![Castle in the Sky desktop demo](assets/themes/daylight-desktop.jpg)](assets/themes/daylight-desktop.jpg)
 
-## 天空之城 · Castle in the Sky
+## The Dark Knight
 
-[![天空之城 桌面模拟截图](assets/themes/daylight-desktop.jpg)](assets/themes/daylight-desktop.jpg)
+[![The Dark Knight desktop demo](assets/themes/midnight-desktop.jpg)](assets/themes/midnight-desktop.jpg)
 
-## 黑暗骑士 · The Dark Knight
+## Totoro Forest
 
-[![黑暗骑士 桌面模拟截图](assets/themes/midnight-desktop.jpg)](assets/themes/midnight-desktop.jpg)
+[![Totoro Forest desktop demo](assets/themes/forest-desktop.jpg)](assets/themes/forest-desktop.jpg)
 
-## 龙猫森林 · Totoro Forest
+## Peter Rabbit Garden
 
-[![龙猫森林 桌面模拟截图](assets/themes/forest-desktop.jpg)](assets/themes/forest-desktop.jpg)
+[![Peter Rabbit Garden desktop demo](assets/themes/eyecare-desktop.jpg)](assets/themes/eyecare-desktop.jpg)
 
-## 彼得兔园 · Peter Rabbit Garden
+## The Matrix
 
-[![彼得兔园 桌面模拟截图](assets/themes/eyecare-desktop.jpg)](assets/themes/eyecare-desktop.jpg)
+[![The Matrix desktop demo](assets/themes/matrix-desktop.jpg)](assets/themes/matrix-desktop.jpg)
 
-## 骇客帝国 · The Matrix
+## Frozen
 
-[![骇客帝国 桌面模拟截图](assets/themes/matrix-desktop.jpg)](assets/themes/matrix-desktop.jpg)
+[![Frozen desktop demo](assets/themes/frozen-desktop.jpg)](assets/themes/frozen-desktop.jpg)
 
-## 冰雪奇缘 · Frozen
+## Harry Potter
 
-[![冰雪奇缘 桌面模拟截图](assets/themes/frozen-desktop.jpg)](assets/themes/frozen-desktop.jpg)
+[![Harry Potter desktop demo](assets/themes/wizard-desktop.jpg)](assets/themes/wizard-desktop.jpg)
 
-## 哈利波特 · Harry Potter
+## Star Wars
 
-[![哈利波特 桌面模拟截图](assets/themes/wizard-desktop.jpg)](assets/themes/wizard-desktop.jpg)
+[![Star Wars desktop demo](assets/themes/starwars-desktop.jpg)](assets/themes/starwars-desktop.jpg)
 
-## 星球大战 · Star Wars
+## Spirited Away
 
-[![星球大战 桌面模拟截图](assets/themes/starwars-desktop.jpg)](assets/themes/starwars-desktop.jpg)
+[![Spirited Away desktop demo](assets/themes/spirited-desktop.jpg)](assets/themes/spirited-desktop.jpg)
 
-## 千与千寻 · Spirited Away
+## The Lord of the Rings
 
-[![千与千寻 桌面模拟截图](assets/themes/spirited-desktop.jpg)](assets/themes/spirited-desktop.jpg)
+[![The Lord of the Rings desktop demo](assets/themes/rivendell-desktop.jpg)](assets/themes/rivendell-desktop.jpg)
 
-## 指环王 · The Lord of the Rings
+## Super Mario
 
-[![指环王 桌面模拟截图](assets/themes/rivendell-desktop.jpg)](assets/themes/rivendell-desktop.jpg)
+[![Super Mario desktop demo](assets/themes/mario-desktop.jpg)](assets/themes/mario-desktop.jpg)
 
-## 超级马里奥 · Super Mario
+## Havoc in Heaven
 
-[![超级马里奥 桌面模拟截图](assets/themes/mario-desktop.jpg)](assets/themes/mario-desktop.jpg)
+[![Havoc in Heaven desktop demo](assets/themes/wukong-desktop.jpg)](assets/themes/wukong-desktop.jpg)
 
-## 大闹天宫 · Havoc in Heaven
+## Nezha Conquers the Dragon King
 
-[![大闹天宫 桌面模拟截图](assets/themes/wukong-desktop.jpg)](assets/themes/wukong-desktop.jpg)
+[![Nezha Conquers the Dragon King desktop demo](assets/themes/nezha-desktop.jpg)](assets/themes/nezha-desktop.jpg)
 
-## 哪吒闹海 · Nezha Conquers the Dragon King
+## Legend of the White Snake
 
-[![哪吒闹海 桌面模拟截图](assets/themes/nezha-desktop.jpg)](assets/themes/nezha-desktop.jpg)
+[![Legend of the White Snake desktop demo](assets/themes/whitesnake-desktop.jpg)](assets/themes/whitesnake-desktop.jpg)
 
-## 白蛇传说 · Legend of the White Snake
+## Along the River
 
-[![白蛇传说 桌面模拟截图](assets/themes/whitesnake-desktop.jpg)](assets/themes/whitesnake-desktop.jpg)
+[![Along the River desktop demo](assets/themes/qingming-desktop.jpg)](assets/themes/qingming-desktop.jpg)
 
-## 清明上河 · Along the River
+## A Thousand Li of Rivers and Mountains
 
-[![清明上河 桌面模拟截图](assets/themes/qingming-desktop.jpg)](assets/themes/qingming-desktop.jpg)
+[![A Thousand Li of Rivers and Mountains desktop demo](assets/themes/jiangshan-desktop.jpg)](assets/themes/jiangshan-desktop.jpg)
 
-## 千里江山 · A Thousand Li of Rivers and Mountains
+## Mobile previews
 
-[![千里江山 桌面模拟截图](assets/themes/jiangshan-desktop.jpg)](assets/themes/jiangshan-desktop.jpg)
-
-## 手机预览 / Mobile previews
-
-| 天空之城 | 骇客帝国 |
+| Castle in the Sky | The Matrix |
 | --- | --- |
-| [![天空之城 手机模拟截图](assets/themes/daylight-mobile.jpg)](assets/themes/daylight-mobile.jpg) | [![骇客帝国 手机模拟截图](assets/themes/matrix-mobile.jpg)](assets/themes/matrix-mobile.jpg) |
+| [![Castle in the Sky mobile demo](assets/themes/daylight-mobile.jpg)](assets/themes/daylight-mobile.jpg) | [![The Matrix mobile demo](assets/themes/matrix-mobile.jpg)](assets/themes/matrix-mobile.jpg) |
 
-| 哈利波特 | 彼得兔园 |
+| Harry Potter | Peter Rabbit Garden |
 | --- | --- |
-| [![哈利波特 手机模拟截图](assets/themes/wizard-mobile.jpg)](assets/themes/wizard-mobile.jpg) | [![彼得兔园 手机模拟截图](assets/themes/eyecare-mobile.jpg)](assets/themes/eyecare-mobile.jpg) |
+| [![Harry Potter mobile demo](assets/themes/wizard-mobile.jpg)](assets/themes/wizard-mobile.jpg) | [![Peter Rabbit Garden mobile demo](assets/themes/eyecare-mobile.jpg)](assets/themes/eyecare-mobile.jpg) |
 
-| 白蛇传说 | 千里江山 |
+| Legend of the White Snake | A Thousand Li of Rivers and Mountains |
 | --- | --- |
-| [![白蛇传说 手机模拟截图](assets/themes/whitesnake-mobile.jpg)](assets/themes/whitesnake-mobile.jpg) | [![千里江山 手机模拟截图](assets/themes/jiangshan-mobile.jpg)](assets/themes/jiangshan-mobile.jpg) |
+| [![Legend of the White Snake mobile demo](assets/themes/whitesnake-mobile.jpg)](assets/themes/whitesnake-mobile.jpg) | [![A Thousand Li of Rivers and Mountains mobile demo](assets/themes/jiangshan-mobile.jpg)](assets/themes/jiangshan-mobile.jpg) |
 
-## 重新生成 / Reproduce
+## Reproduce
 
-演示数据和截图脚本位于 [screenshots](screenshots)。在本地启动网页开发服务器（端口 22344），通过 Playwright CLI 打开页面，然后依次运行：
+Demo fixtures and capture scripts are in [screenshots](screenshots). Start the local web development server on port 22344, open it with Playwright CLI, then run:
 
 ```sh
 playwright-cli run-code --filename docs/screenshots/demo-fixture.js
