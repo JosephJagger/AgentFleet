@@ -1,10 +1,10 @@
-import { Check, Radio, Snowflake, SunMoon, Wand2, Orbit, Flower2, Leaf, Gamepad2, Zap } from "lucide-react";
+import { Check, Radio, Snowflake, SunMoon, Wand2, Orbit, Flower2, Leaf, Gamepad2, Zap, Cloud, Shield, TreePine, Heart } from "lucide-react";
 import { t } from "../i18n";
 import { setTheme, useTheme, type Theme } from "../lib/theme";
 
 export function ThemeEmblem() {
   const selected = useTheme();
-  const Icon = ({ frozen: Snowflake, wizard: Wand2, starwars: Orbit, spirited: Flower2, rivendell: Leaf, mario: Gamepad2, cyber: Zap } as Partial<Record<Theme, typeof Radio>>)[selected] ?? Radio;
+  const Icon = ({ daylight: Cloud, midnight: Shield, forest: TreePine, eyecare: Heart, frozen: Snowflake, wizard: Wand2, starwars: Orbit, spirited: Flower2, rivendell: Leaf, mario: Gamepad2, cyber: Zap } as Partial<Record<Theme, typeof Radio>>)[selected] ?? Radio;
   return <Icon size={18} aria-hidden="true" />;
 }
 
@@ -15,10 +15,10 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
       <SunMoon size={15} aria-hidden="true" />
       <select aria-label={t("界面主题")} value={selected} onChange={event => { setTheme(event.target.value as Theme); onChange?.(); }}>
         <option value="cyber">{t("赛博朋克")}</option>
-        <option value="daylight">{t("日光")}</option>
-        <option value="midnight">{t("午夜")}</option>
-        <option value="forest">{t("森林")}</option>
-        <option value="eyecare">{t("护眼")}</option>
+        <option value="daylight">{t("天空之城")}</option>
+        <option value="midnight">{t("黑暗骑士")}</option>
+        <option value="forest">{t("龙猫森林")}</option>
+        <option value="eyecare">{t("小熊维尼")}</option>
         <option value="matrix">{t("骇客帝国")}</option>
         <option value="frozen">{t("冰雪奇缘")}</option>
         <option value="wizard">{t("哈利波特")}</option>
@@ -33,10 +33,10 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
 
 const themeOptions: { value: Theme; label: string; description: string }[] = [
   { value: "cyber", label: "赛博朋克", description: "夜之城剪影、警示黄与工业切角" },
-  { value: "daylight", label: "日光", description: "柔和浅灰，清晰蓝色与轻盈层次" },
-  { value: "midnight", label: "午夜", description: "柔和炭黑，适合夜间阅读" },
-  { value: "forest", label: "森林", description: "沉静深绿，温暖金色点缀" },
-  { value: "eyecare", label: "护眼", description: "温暖纸色，柔和墨绿文字" },
+  { value: "daylight", label: "天空之城", description: "云海浮岛、飞行石与轻盈白蓝" },
+  { value: "midnight", label: "黑暗骑士", description: "哥谭夜幕、蝙蝠探照灯与装甲边框" },
+  { value: "forest", label: "龙猫森林", description: "森林树洞、叶伞与安静苔绿" },
+  { value: "eyecare", label: "小熊维尼", description: "百亩森林、蜂蜜罐与暖奶油信纸" },
   { value: "matrix", label: "骇客帝国", description: "深黑终端，荧光绿信号与微光边界" },
   { value: "frozen", label: "冰雪奇缘", description: "冰晶宫殿、雪花纹饰与通透冰蓝" },
   { value: "wizard", label: "哈利波特", description: "星夜城堡、羊皮纸与古铜魔法书" },
@@ -45,7 +45,7 @@ const themeOptions: { value: Theme; label: string; description: string }[] = [
   { value: "rivendell", label: "指环王", description: "瑞文戴尔山谷、精灵拱门与金色叶纹" },
   { value: "mario", label: "超级马里奥", description: "蘑菇王国、像素丘陵与关卡卡片" },
 ];
-const illustrated = (value: Theme) => ["cyber", "frozen", "wizard", "starwars", "spirited", "rivendell", "mario"].includes(value);
+const illustrated = (value: Theme) => value !== "matrix";
 
 export function ThemeSettings() {
   const selected = useTheme();

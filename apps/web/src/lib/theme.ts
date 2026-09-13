@@ -25,10 +25,10 @@ function updateDocument() {
   document.documentElement.dataset.theme = current;
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", {
     cyber: "#14171c",
-    daylight: "#f5f5f7",
-    midnight: "#161618",
-    forest: "#0d1813",
-    eyecare: "#e8e5cf",
+    daylight: "#edf5fa",
+    midnight: "#14171c",
+    forest: "#14251e",
+    eyecare: "#f4ecd6",
     matrix: "#050907",
     frozen: "#eaf4fb",
     wizard: "#171522",
