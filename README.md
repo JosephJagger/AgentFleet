@@ -19,7 +19,7 @@ Keep execution in your own environment.</p>
 
 <p align="center">A self-hosted operations console for Codex CLI across Linux servers and personal computers.<br>Manage native sessions, send images, and track usage from one English or Chinese web interface.</p>
 
-![AgentFleets workspace showing remaining weekly quota, project and session token usage, and quick model settings](docs/assets/workspace-en.png)
+![Castle in the Sky workspace with fictional demo data](docs/assets/themes/daylight-desktop.jpg)
 
 <p align="center"><sub>Actual interface with synthetic demo data. No production accounts, hosts, or conversations are shown.</sub></p>
 
@@ -34,7 +34,7 @@ Think of each enrolled host as a place where Codex executes work, and AgentFleet
 | **Graphical Codex session management** | Browse hosts, projects, and conversations; continue native sessions; adjust model settings and execution permissions in the panel. |
 | **Images from your browser to a remote session** | Paste a screenshot, preview it, and send it with your instructions to Codex on the selected host, without manually copying the image to that server first. |
 | **An overview across multiple hosts** | Follow running work, return to completed-but-controlled sessions, queue follow-up messages, and inspect recorded tokens and reported account quota. |
-| **Switchable interface themes** | Use Cyberpunk by default, or switch to Daylight, Midnight, Forest, or the warm Eye Care theme. Each changes the palette, surfaces, borders, and atmosphere rather than only swapping accent colors. |
+| **Switchable interface themes** | Choose from 17 themes, with Castle in the Sky as the default for new browsers. Five Chinese classics join illustrated themes with coordinated messages, Markdown, code blocks and composers. |
 
 ### Visual context, even on a headless server
 
@@ -89,7 +89,7 @@ Counts and open lists update as reported state changes. **Controlled means curre
 
 ### Model and reasoning settings that follow your workflow
 
-A compact line above the message box shows the inherited or selected model and reasoning effort. Click it to jump directly to model settings; changes apply to the next turn, and unsaved choices are labeled.
+The model shortcut above the composer shows saved model settings and reasoning effort. Draft changes and failed saves do not update the shortcut or send settings; running tasks retain their current configuration.
 
 Keep using Codex's own configuration when no panel override is set. Or save host defaults once and make exceptions for a particular session. Existing project defaults participate in the same precedence:
 
@@ -107,9 +107,16 @@ Together with direct access to running and completed-but-controlled sessions, na
 
 ### Themes for different working environments
 
-Cyberpunk remains the default theme. Daylight uses a bright drafting-board treatment, Midnight uses softer dark surfaces and lavender highlights, Forest combines deep green texture with brass tones, and Eye Care uses warm ivory, muted moss, and a matte paper feel for a gentler reading surface.
+Choose from **17 themes**, with Castle in the Sky as the default for new browsers. Five Chinese classics join Cyberpunk, The Matrix, Frozen and other illustrated themes. Each coordinates scene artwork, component borders, message bubbles, Markdown tables and quotations, code blocks and the composer.
 
 On desktop, use the theme control below **Controlled** in the left sidebar. On narrow screens, open the navigation menu; the full theme selector is also available in Settings. The layout adapts to mobile widths, and the selected theme is remembered in the current browser.
+
+All screenshots use fictional demo data. Browse **[all 17 desktop themes and 6 mobile previews](docs/themes.md)**.
+
+| **Havoc in Heaven**<br>[![大闹天宫 demo](docs/assets/themes/wukong-desktop.jpg)](docs/themes.md) | **A Thousand Li of Rivers and Mountains**<br>[![千里江山 demo](docs/assets/themes/jiangshan-desktop.jpg)](docs/themes.md) |
+| --- | --- |
+| **Legend of the White Snake**<br>[![白蛇传说 demo](docs/assets/themes/whitesnake-desktop.jpg)](docs/themes.md) | **The Matrix**<br>[![骇客帝国 demo](docs/assets/themes/matrix-desktop.jpg)](docs/themes.md) |
+| **Harry Potter**<br>[![哈利波特 demo](docs/assets/themes/wizard-desktop.jpg)](docs/themes.md) | **Peter Rabbit Garden**<br>[![彼得兔园 demo](docs/assets/themes/eyecare-desktop.jpg)](docs/themes.md) |
 
 ### Know what is using your quota
 
