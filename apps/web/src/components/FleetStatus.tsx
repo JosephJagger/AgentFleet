@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Activity, ArrowUpRight, ChevronRight, Layers3, Server, X } from "lucide-react";
 import type { FleetSession, Machine } from "../lib/types";
 import { hostCardState } from "./HostCards";
+import { hasLiveTransport } from "../lib/machine-order";
 
 type Category = "hosts" | "running" | "managed";
 const categories = localized(() => ([
@@ -19,7 +20,7 @@ export function FleetStatus({ machines, sessions, connected, onSession, onMachin
   const [category, setCategory] = useState<Category>();
   const dialog = useRef<HTMLElement>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
-  const online = machines.filter(machine => machine.identity === "paired" && machine.reachability === "live");
+  const online = machines.filter(hasLiveTransport);
   const running = sessions.filter(session => session.state.currentTurn === "in_progress");
   const managed = sessions.filter(session => session.state.ownership === "agentfleet_owned");
   const counts = { hosts: online.length, running: running.length, managed: managed.length };

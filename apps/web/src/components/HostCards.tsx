@@ -6,6 +6,7 @@ import { onlineFirst } from "../lib/machine-order";
 export function hostCardState(machine: Machine) {
   if (machine.identity === "revoked" || machine.reachability === "unreachable") return { tone: "offline", connection: t("未连接"), activity: t("运行状态未知") };
   if (machine.reachability === "connecting") return { tone: "connecting", connection: t("正在连接"), activity: t("等待主机连接") };
+  if (machine.reachability === "reconnecting") return { tone: "connecting", connection: t("正在重连"), activity: t("连接已中断，正在恢复") };
   if (machine.reachability === "reconciling") return { tone: "connecting", connection: t("正在同步"), activity: t("正在更新状态") };
   if (machine.discovery?.checks?.some(check => check.id === "sandbox" && check.state === "failed")) return { tone: "unknown", connection: t("已连接"), activity: t("隔离检查未通过 · 仅可查看") };
   if (machine.discovery?.readiness === "action_required" || machine.discovery?.readiness === "read_only" || machine.compatibility === "degraded_read_only" || machine.compatibility === "incompatible") return { tone: "unknown", connection: t("已连接"), activity: t("需要处理 · 查看自检详情") };

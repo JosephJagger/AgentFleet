@@ -184,10 +184,12 @@ describe("会话工作区", () => {
     HTMLDialogElement.prototype.close = function () { this.open = false; };
     const view = render(<SessionInspector {...inspectorProps("A")} />);
     fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
-    fireEvent.click(screen.getByText("输入辅助",{selector:"summary"}));
+    fireEvent.click(screen.getByLabelText("输入辅助").querySelector("summary")!);
     await waitFor(()=>expect((screen.getByRole("checkbox", {name:/术语补全/}) as HTMLInputElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("checkbox", { name: /术语补全/ }));
     await waitFor(()=>expect((screen.getByRole("checkbox",{name:/术语补全/}) as HTMLInputElement).checked).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "保存为此会话配置" }));
+    await screen.findByText("输入辅助配置已保存，现已生效。");
     fireEvent.click(screen.getByRole("button", { name: "关闭会话配置" }));
     const input = screen.getByLabelText("发送给 Codex 的消息");
     fireEvent.change(input, { target: { value: "use types" } });
@@ -197,6 +199,8 @@ describe("会话工作区", () => {
     fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
     fireEvent.click(screen.getByRole("checkbox", { name: /提示语与表达建议/ }));
     await waitFor(()=>expect((screen.getByRole("checkbox",{name:/提示语与表达建议/}) as HTMLInputElement).checked).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "保存为此会话配置" }));
+    await screen.findByText("输入辅助配置已保存，现已生效。");
     fireEvent.click(screen.getByRole("button", { name: "关闭会话配置" }));
     fireEvent.change(input, { target: { value: "网页很卡" } });
     expect(screen.queryByRole("listbox")).toBeNull();
@@ -206,7 +210,7 @@ describe("会话工作区", () => {
     view.unmount();
     render(<SessionInspector {...inspectorProps("A")} />);
     fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
-    fireEvent.click(screen.getByText("输入辅助",{selector:"summary"}));
+    fireEvent.click(screen.getByLabelText("输入辅助").querySelector("summary")!);
     await waitFor(()=>expect((screen.getByRole("checkbox", { name: /术语补全/ }) as HTMLInputElement).checked).toBe(false));
     expect((screen.getByRole("checkbox", { name: /提示语与表达建议/ }) as HTMLInputElement).checked).toBe(false);
   });
@@ -285,8 +289,9 @@ describe("会话工作区", () => {
     fireEvent.compositionEnd(input);
     expect(await screen.findByRole("option",{name:/排查登录会话意外失效/})).toBeTruthy();
     fireEvent.click(screen.getByRole("button",{name:"会话配置"}));
-    fireEvent.click(screen.getByText("输入辅助",{selector:"summary"}));
+    fireEvent.click(screen.getByLabelText("输入辅助").querySelector("summary")!);
     fireEvent.click(screen.getByRole("checkbox",{name:/本地 NLP 建议/}));
+    fireEvent.click(screen.getByRole("button", { name: "保存为此会话配置" }));
     await waitFor(()=>expect(screen.queryByRole("option",{name:/排查登录会话意外失效/})).toBeNull());
   });
   it("中文输入法确认时不触发快捷键提交", () => {

@@ -94,6 +94,8 @@ interface RelayAccess {
   enqueueInbound(event: MessageEvent, sourceSocket: WebSocket): void;
 }
 
+const wait = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
 const identity: MachineIdentity = {
   metadata: {
     algorithm: "Ed25519",
@@ -306,6 +308,27 @@ test("reconciliation drains the captured watermarks before commands are enabled"
   await enqueue(access, socket, offer("attempt-missing", { producerEpoch: undefined }));
   assert.equal(runtime.commandCalls.length, 1);
   assert.equal((socket.sent.at(-1)?.detail as { code?: unknown } | undefined)?.code, "DISPATCH_BINDING_MISSING");
+});
+
+test("registry changes during reconciliation collapse into one delayed follow-up hello", async (t) => {
+  const { store, runtime, socket, access } = await setup();
+  t.after(() => store.close());
+  access.beginHelloCycle();
+  await enqueue(access, socket, {
+    type: "hello.ack",
+    reconciliationId: "reconciliation-1",
+    projects: {},
+    sessionContentEpochs: {},
+  });
+  runtime.callbacks?.onRegistryChanged();
+  runtime.callbacks?.onRegistryChanged();
+  await enqueue(access, socket, { type: "reconciliation.ack", reconciliationId: "reconciliation-1" });
+
+  assert.equal(access.reconciliationReady, false, "command admission stays frozen while a follow-up is pending");
+  assert.equal(socket.sent.filter((message) => message.type === "hello").length, 1);
+  runtime.callbacks?.onRegistryChanged();
+  await wait(600);
+  assert.equal(socket.sent.filter((message) => message.type === "hello").length, 2);
 });
 
 test("commands remain serial while history acknowledgements can pass an unfinished command", async () => {

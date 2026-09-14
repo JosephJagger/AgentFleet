@@ -118,6 +118,15 @@ function mapProject(rawValue: unknown): Project {
   };
 }
 
+export function mapMachineReachability(rawReachability: unknown, unreachableReason: unknown): Machine["reachability"] {
+  if (rawReachability === "online") return "live";
+  if (rawReachability === "connecting") return "connecting";
+  if (rawReachability === "reconnecting") {
+    return unreachableReason === "reconciliation_pending" ? "reconciling" : "reconnecting";
+  }
+  return "unreachable";
+}
+
 function mapMachine(rawValue: unknown, projects: Project[]): Machine {
   const raw = record(rawValue);
   const securityDegraded = raw.securityState === "degraded_read_only";
@@ -127,11 +136,7 @@ function mapMachine(rawValue: unknown, projects: Project[]): Machine {
     : rawCompatibility === "compatible" || rawCompatibility === "incompatible"
       ? rawCompatibility
       : "unknown";
-  const reachability = raw.reachability === "online"
-    ? "live"
-    : raw.reachability === "connecting" || raw.reachability === "reconnecting"
-      ? "reconciling"
-      : "unreachable";
+  const reachability = mapMachineReachability(raw.reachability, raw.unreachableReason);
   const capacity = ["idle", "busy", "saturated"].includes(string(raw.capacity))
     ? string(raw.capacity) as Machine["capacity"]
     : "unknown";

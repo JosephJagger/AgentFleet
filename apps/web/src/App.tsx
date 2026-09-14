@@ -1,6 +1,6 @@
 import { writingAIErrorMessage } from "./lib/writing-assistance";
 import { WorldClocks } from "./components/WorldClocks";
-import { onlineFirst } from "./lib/machine-order";
+import { hasLiveTransport, onlineFirst } from "./lib/machine-order";
 import { MarkdownMessage } from "./components/MarkdownMessage";
 import { SessionActions } from "./components/SessionActions";
 import { useMobileViewport } from "./lib/mobile-viewport";
@@ -289,6 +289,7 @@ function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPa
           </button>
         ) : onlineFirst(machines).map((machine) => {
           const live = machine.reachability === "live";
+          const transportConnected = hasLiveTransport(machine);
           const warning = machine.compatibility !== "compatible";
           return (
             <button
@@ -298,12 +299,12 @@ function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPa
               aria-pressed={selectedId === machine.id}
               onClick={() => onSelect(machine.id)}
             >
-              <span className={`rail-node${live ? " rail-node--live" : ""}${live && (machine.capacity === "busy" || machine.capacity === "saturated") ? " rail-node--running" : ""}`}><Server size={15} /></span>
+              <span className={`rail-node${transportConnected ? " rail-node--live" : ""}${live && (machine.capacity === "busy" || machine.capacity === "saturated") ? " rail-node--running" : ""}`}><Server size={15} /></span>
               <span className="machine-link__copy">
                 <strong>{machine.name}</strong>
-                <small>{live ? machine.capacity === "busy" || machine.capacity === "saturated" ? t("正在执行") : t("在线可用") : t("不可达 · {0}", timeAgo(machine.lastSeenAt))}</small>
+                <small>{live ? machine.capacity === "busy" || machine.capacity === "saturated" ? t("正在执行") : t("在线可用") : machine.reachability === "reconciling" ? t("正在同步") : machine.reachability === "reconnecting" ? t("正在重连") : t("不可达 · {0}", timeAgo(machine.lastSeenAt))}</small>
               </span>
-              {warning ? <AlertTriangle className="machine-warning" size={15} /> : <StatusDot tone={live ? "live" : "muted"} pulse={live && (machine.capacity === "busy" || machine.capacity === "saturated")} />}
+              {warning ? <AlertTriangle className="machine-warning" size={15} /> : <StatusDot tone={transportConnected ? "live" : "muted"} pulse={live && (machine.capacity === "busy" || machine.capacity === "saturated")} />}
             </button>
           );
         })}
@@ -421,7 +422,7 @@ export function MachineSummaryHeader({ machine, onAliasChange }: {
       </div>
       <div className="machine-summary__actions">
         <UsageButton scope="machine" id={machine.id}/>
-        <div className="machine-summary__facts"><span><GitBranch size={14} />{count(machine.discovery?.discoveredProjects ?? machine.projects.length, "个项目")} </span><span>{machine.reachability === "live" ? t("在线") : t("等待连接")}</span></div>
+        <div className="machine-summary__facts"><span><GitBranch size={14} />{count(machine.discovery?.discoveredProjects ?? machine.projects.length, "个项目")} </span><span>{machine.reachability === "live" ? t("在线") : machine.reachability === "reconciling" ? t("正在同步") : machine.reachability === "reconnecting" ? t("正在重连") : t("等待连接")}</span></div>
       </div>
     </section>
   );

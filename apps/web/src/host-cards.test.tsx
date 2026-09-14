@@ -54,7 +54,7 @@ it.each([
 });
 
 it.each([
-  ["unreachable", "offline", "未连接"], ["connecting", "connecting", "正在连接"], ["reconciling", "connecting", "正在同步"],
+  ["unreachable", "offline", "未连接"], ["connecting", "connecting", "正在连接"], ["reconnecting", "connecting", "正在重连"], ["reconciling", "connecting", "正在同步"],
 ] as const)("%s 优先于残留的运行状态", (reachability, tone, connection) => {
   expect(hostCardState({ ...host, reachability, capacity: "busy" })).toMatchObject({ tone, connection });
 });

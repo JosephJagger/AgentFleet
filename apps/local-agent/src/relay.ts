@@ -77,6 +77,8 @@ interface PendingReconciliation {
   completeSent: boolean;
 }
 
+const REGISTRY_HELLO_COALESCE_MS = 500;
+
 export function captureReconciliationStreams(store: StateStore): ReconciliationStreamWatermark[] {
   const state = store.snapshot();
   if (!state.activeProducerEpoch) {
@@ -100,6 +102,7 @@ export class RelayConnection {
   private reconciliationReady = false;
   private helloCycleActive = false;
   private helloAgain = false;
+  private helloFollowupTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingReconciliation: PendingReconciliation | undefined;
   private inboundTail: Promise<void> = Promise.resolve();
   private commandTail: Promise<void> = Promise.resolve();
@@ -148,6 +151,8 @@ export class RelayConnection {
         this.logger.warn(`relay disconnected: ${errorMessage(error)}`);
         attempt += 1;
       } finally {
+        if (this.helloFollowupTimer) clearTimeout(this.helloFollowupTimer);
+        this.helloFollowupTimer = undefined;
         this.socket = undefined;
         this.generation = undefined;
         this.helloAcknowledged = false;
@@ -216,11 +221,22 @@ export class RelayConnection {
   private requestRegistryHello(): void {
     if (this.socket?.readyState !== WebSocket.OPEN) return;
     this.reconciliationReady = false;
-    if (this.helloCycleActive) {
+    if (this.helloCycleActive || this.helloFollowupTimer) {
       this.helloAgain = true;
       return;
     }
     this.beginHelloCycle();
+  }
+
+  private scheduleFollowupHello(): void {
+    if (this.helloFollowupTimer) return;
+    this.helloFollowupTimer = setTimeout(() => {
+      this.helloFollowupTimer = undefined;
+      if (!this.helloAgain || this.helloCycleActive || this.socket?.readyState !== WebSocket.OPEN) return;
+      this.helloAgain = false;
+      this.beginHelloCycle();
+    }, REGISTRY_HELLO_COALESCE_MS);
+    this.helloFollowupTimer.unref();
   }
 
   private beginHelloCycle(): void {
@@ -361,8 +377,10 @@ export class RelayConnection {
         this.helloCycleActive = false;
         this.pendingReconciliation = undefined;
         if (this.helloAgain) {
-          this.helloAgain = false;
-          this.beginHelloCycle();
+          // Registry writes often arrive in a short burst while a hello is in
+          // flight. Keep command admission frozen and collapse that burst into
+          // one authoritative follow-up snapshot.
+          this.scheduleFollowupHello();
         } else {
           this.reconciliationReady = true;
           this.onReady?.();

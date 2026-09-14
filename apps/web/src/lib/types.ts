@@ -1,7 +1,7 @@
 import type { TokenCounts } from "./usage";
 
 export type MachineIdentity = "paired" | "revoked";
-export type MachineReachability = "connecting" | "live" | "reconciling" | "unreachable";
+export type MachineReachability = "connecting" | "live" | "reconciling" | "reconnecting" | "unreachable";
 export type MachineCompatibility = "compatible" | "degraded_read_only" | "incompatible" | "unknown";
 export type MachineCapacity = "unknown" | "idle" | "busy" | "saturated";
 

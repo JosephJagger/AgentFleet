@@ -580,6 +580,8 @@
   "运行状态未知": "Runtime status unknown",
   "正在连接": "Connecting",
   "正在同步": "Syncing",
+  "正在重连": "Reconnecting",
+  "连接已中断，正在恢复": "Connection interrupted. Reconnecting",
   "正在更新状态": "Updating status",
   "已连接": "Connected",
   "隔离检查未通过 · 仅可查看": "Isolation check failed · Read-only",
