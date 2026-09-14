@@ -1,4 +1,7 @@
 {
+  "收起连接配置": "Collapse connection settings",
+  "已保存模型：{0}": "Saved model: {0}",
+  "尚未配置模型": "No model configured",
   "主题分页": "Theme pages",
   "浏览器登录分页": "Browser session pages",
   "第 {0} / {1} 页": "Page {0} of {1}",
