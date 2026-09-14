@@ -195,3 +195,43 @@ test("explicit answer rewrites automatically become scoped suggestions only for 
  db.run("UPDATE content_blobs SET deleted_at='2026-01-01' WHERE payload_ref='event-1'");service.cleanup();
  assert.equal(service.read(principal,'a').entries.length,0);
 });
+
+test("DeepSeek optimization disables thinking and reports safe actionable failures", async t => {
+  const {db,principal,service}=fixture();t.after(()=>db.close());
+  let response=()=>Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({suggestions:['排查登录会话意外失效的原因']})}}]});
+  let timeout=false;
+  const ai=new WritingAI(db,':memory:',service,async(url,options)=>{
+    assert.equal(url,'https://api.deepseek.com/chat/completions');
+    const body=JSON.parse(String(options?.body));
+    assert.deepEqual(body.thinking,{type:'disabled'});assert.ok(body.max_tokens>=2000);
+    if(timeout)throw new DOMException('private provider details','TimeoutError');
+    return response();
+  });
+  ai.save(principal,{endpoint:'https://api.deepseek.com',model:'deepseek-flash',apiKey:'test-key',enabled:true});
+  assert.equal((await ai.suggest(principal,'a','登录老掉')).suggestions.length,1);
+  for(const [status,code] of [[401,'WRITING_AI_AUTH'],[402,'WRITING_AI_BALANCE'],[429,'WRITING_AI_RATE_LIMIT'],[400,'WRITING_AI_CONFIG'],[503,'WRITING_AI_FAILED']] as const){
+    response=()=>Response.json({error:{message:'private provider details'}},{status});
+    await assert.rejects(()=>ai.suggest(principal,'a','登录老掉'),(e:any)=>e.code===code && !e.message.includes('private'));
+  }
+  response=()=>Response.json({choices:[{finish_reason:'length',message:{content:'{"suggestions":['}}]});
+  await assert.rejects(()=>ai.suggest(principal,'a','登录老掉'),{code:'WRITING_AI_TRUNCATED'});
+  response=()=>Response.json({choices:[{finish_reason:'stop',message:{content:'invalid JSON'}}]});
+  await assert.rejects(()=>ai.suggest(principal,'a','登录老掉'),{code:'WRITING_AI_FORMAT'});
+  timeout=true;await assert.rejects(()=>ai.suggest(principal,'a','登录老掉'),{code:'WRITING_AI_TIMEOUT'});
+});
+
+test("OpenAI uses its token parameter while custom providers retain compatible parameters",async t=>{
+ const {db,principal,service}=fixture();t.after(()=>db.close());
+ let expected='api.openai.com';
+ const ai=new WritingAI(db,':memory:',service,async(url,options)=>{
+  const body=JSON.parse(String(options?.body));assert.equal(new URL(String(url)).hostname,expected);
+  assert.equal(body.thinking,undefined);
+  if(expected==='api.openai.com'){assert.equal(body.max_completion_tokens,2400);assert.equal(body.max_tokens,undefined);}
+  else {assert.equal(body.max_tokens,2400);assert.equal(body.max_completion_tokens,undefined);}
+  return Response.json({choices:[{message:{content:'{"suggestions":["Investigate login session expiry","Second alternative"]}'}}]});
+ });
+ for(const endpoint of ['https://api.openai.com/v1','https://api.deepseek.com.example.test/v1']){
+  expected=new URL(endpoint).hostname;ai.save(principal,{endpoint,model:'gpt-4.1-mini',enabled:true});
+  assert.deepEqual((await ai.suggest(principal,'a','login keeps dropping')).suggestions,['Investigate login session expiry']);
+ }
+});

@@ -52,3 +52,31 @@ it("session options inherit individually and restore global settings",async()=>{
  await waitFor(()=>expect(api.saveWritingPreferences).toHaveBeenLastCalledWith(null,'session'));
  await waitFor(()=>expect((screen.getByRole('checkbox',{name:/术语补全/}) as HTMLInputElement).checked).toBe(false));
 });
+
+it("AI failures show localized actionable messages without provider details",async()=>{
+  const {writingAIErrorMessage}=await import('./lib/writing-assistance');
+  const {ApiError}=await import('./lib/types');
+  expect(writingAIErrorMessage(new ApiError('secret provider detail',502,'WRITING_AI_TRUNCATED'))).toContain('截断');
+  expect(writingAIErrorMessage(new ApiError('secret provider detail',502,'WRITING_AI_AUTH'))).toContain('密钥');
+  setLocale('en');
+  expect(writingAIErrorMessage(new ApiError('secret provider detail',504,'WRITING_AI_TIMEOUT'))).toContain('timed out');
+  expect(writingAIErrorMessage(new Error('secret provider detail'))).not.toContain('secret');
+});
+
+it("provider presets prefill official endpoints and models without carrying keys across providers",async()=>{
+ vi.mocked(api.writingAI).mockResolvedValue({endpoint:'https://api.deepseek.com',model:'deepseek-flash',hasKey:true,enabled:true,configured:true});
+ render(<WritingAISettings/>);
+ await waitFor(()=>expect((screen.getByRole('button',{name:'保存 AI 配置'}) as HTMLButtonElement).disabled).toBe(false));
+ fireEvent.click(screen.getByRole('button',{name:/查看与编辑连接配置/}));
+ const provider=screen.getByLabelText('AI 服务商');
+ expect((provider as HTMLSelectElement).value).toBe('deepseek');
+ fireEvent.change(screen.getByLabelText('API 密钥'),{target:{value:'do-not-forward'}});
+ fireEvent.change(provider,{target:{value:'openai'}});
+ expect((screen.getByLabelText('API 基础地址') as HTMLInputElement).value).toBe('https://api.openai.com/v1');
+ expect((screen.getByLabelText('模型名称') as HTMLInputElement).value).toBe('gpt-4.1-mini');
+ expect((screen.getByLabelText('API 密钥') as HTMLInputElement).value).toBe('');
+ fireEvent.change(provider,{target:{value:'custom'}});
+ expect((screen.getByLabelText('API 基础地址') as HTMLInputElement).value).toBe('');
+ fireEvent.change(provider,{target:{value:'deepseek'}});
+ expect((screen.getByLabelText('API 基础地址') as HTMLInputElement).value).toBe('https://api.deepseek.com');
+});

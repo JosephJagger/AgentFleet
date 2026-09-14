@@ -1394,7 +1394,6 @@
   "托管目标信息超限": "Managed release metadata exceeds the size limit",
   "这个托管版本在本机更新失败并已回退，等待新的验证目标": "This managed version failed on this host and was rolled back. Waiting for a newly verified target.",
   "托管切换失败": "Managed runtime switch failed",
-  "第 {0} / {1} 页": "Page {0} of {1}",
   "第 {0} 页": "Page {0}",
   "{0} 前有效": "Expires at {0}",
   "选择全部匹配会话（{0}）": "Select all matching sessions ({0})",
@@ -1601,5 +1600,18 @@
   "保存到当前账号，所有会话默认继承，可在会话配置中单独修改。": "Saved to your account. Conversations inherit these defaults and can override individual options.",
   "输入辅助设置暂不可用，请重试": "Writing settings are unavailable. Please retry.",
   "恢复继承全局设置": "Restore global defaults",
-  "可选：连接兼容 Chat Completions 的模型服务。未配置时使用基础词库和自动学习；仅点击 AI 优化时发送当前草稿与可用词条，可能产生模型费用。": "Optional: connect a Chat Completions compatible model service. Built-in vocabulary and automatic learning work without it. Only Improve with AI sends the draft and available vocabulary; provider charges may apply."
+  "可选：连接兼容 Chat Completions 的模型服务。未配置时使用基础词库和自动学习；仅点击 AI 优化时发送当前草稿与可用词条，可能产生模型费用。": "Optional: connect a Chat Completions compatible model service. Built-in vocabulary and automatic learning work without it. Only Improve with AI sends the draft and available vocabulary; provider charges may apply.",
+  "AI 服务拒绝了密钥，请检查密钥与访问权限": "The AI service rejected the key. Check your API key and access permissions.",
+  "AI 服务余额不足，请检查服务账户": "The AI service has insufficient balance. Check your provider account.",
+  "AI 请求过于频繁，请稍后重试": "Too many AI requests. Please try again later.",
+  "AI 服务不接受当前请求，请检查基础地址、模型名称与接口兼容性": "The AI service rejected the request. Check the base URL, model name and API compatibility.",
+  "AI 返回内容被截断，请缩短草稿后重试": "The AI response was truncated. Shorten the draft and retry.",
+  "AI 优化超时，请稍后重试": "AI optimization timed out. Please try again later.",
+  "AI 未返回有效的建议格式，请重试": "The AI returned an invalid suggestion format. Please retry.",
+  "草稿过长或包含敏感信息，请精简后重试": "The draft is too long or contains sensitive information. Shorten it and retry.",
+  "AI 服务商": "AI provider",
+  "自定义兼容接口": "Custom compatible API",
+  "已预填 DeepSeek 官方地址与模型；表达优化关闭思考，只返回精炼改写。": "Official DeepSeek URL and model are prefilled. Optimization disables thinking and returns one concise rewrite.",
+  "已预填 OpenAI 官方地址与快速模型，使用 OpenAI API 密钥；模型可修改。": "Official OpenAI URL and a fast model are prefilled. Use an OpenAI API key; the model is editable.",
+  "填写兼容 Chat Completions 的基础地址与模型名称。": "Enter a Chat Completions compatible base URL and model name."
 }

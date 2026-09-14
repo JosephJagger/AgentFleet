@@ -1,3 +1,4 @@
+import { writingAIErrorMessage } from "./lib/writing-assistance";
 import { WorldClocks } from "./components/WorldClocks";
 import { onlineFirst } from "./lib/machine-order";
 import { MarkdownMessage } from "./components/MarkdownMessage";
@@ -777,7 +778,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
               if (!settings.enabled || !settings.configured) { setAIMessage(t("请先在设置中配置 AI 理解；基础补全与自动学习仍可使用")); return; }
               const result = await api.writingSuggestions(session.id,prompt,controller.signal);
               if (!controller.signal.aborted) { setAIResult({session:session.id,draft:prompt,suggestions:result.suggestions}); if(!result.suggestions.length)setAIMessage(t("暂无更合适的表达，保留当前草稿")); }
-            } catch { if(!controller.signal.aborted)setAIMessage(t("AI 建议暂不可用，基础补全仍可使用")); }
+            } catch (error) { if(!controller.signal.aborted)setAIMessage(writingAIErrorMessage(error)); }
             finally { if(!controller.signal.aborted)setAIBusy(false); }
           }}>{aiBusy ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}{aiBusy ? t("正在优化…") : t("AI 优化")}</button>;
 
