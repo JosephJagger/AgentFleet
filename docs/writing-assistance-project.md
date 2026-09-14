@@ -99,3 +99,7 @@ schema 31 增加账号默认设置、会话覆盖和自动词条来源关联，�
 上述后续项尚未实现，不能计入当前能力。
 
 交互组件选型补充：[text-expander-element 适配评估](text-expander-assessment.md)。当前保留自有 React 交互，未引入该依赖。
+
+## 词库分类规范
+
+新增领域、专业概念和表达意图须遵循[词库分类规范](writing-taxonomy.md)，先登记领域与子类，再补充双语内容和测试。

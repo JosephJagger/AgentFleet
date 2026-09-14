@@ -1,5 +1,8 @@
 [
   {
+    "id": "session-expiry",
+    "domain": "programming",
+    "category": "programming.reliability",
     "label": "会话持久性",
     "detail": "排查登录会话意外失效",
     "aliases": [
@@ -7,6 +10,9 @@
     ]
   },
   {
+    "id": "session-expiry",
+    "domain": "programming",
+    "category": "programming.reliability",
     "label": "Session persistence",
     "detail": "排查登录会话意外失效",
     "aliases": [
@@ -14,6 +20,9 @@
     ]
   },
   {
+    "id": "large-list",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "列表渲染性能",
     "detail": "排查大数据量列表的渲染性能",
     "aliases": [
@@ -21,6 +30,9 @@
     ]
   },
   {
+    "id": "large-list",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "List rendering performance",
     "detail": "排查大数据量列表的渲染性能",
     "aliases": [
@@ -28,6 +40,9 @@
     ]
   },
   {
+    "id": "page-performance",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "页面性能",
     "detail": "排查页面加载与交互性能",
     "aliases": [
@@ -35,6 +50,9 @@
     ]
   },
   {
+    "id": "page-performance",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "Page performance",
     "detail": "排查页面加载与交互性能",
     "aliases": [
@@ -42,6 +60,9 @@
     ]
   },
   {
+    "id": "button-response",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "交互响应",
     "detail": "排查点击交互无响应",
     "aliases": [
@@ -49,6 +70,9 @@
     ]
   },
   {
+    "id": "button-response",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "Interaction response",
     "detail": "排查点击交互无响应",
     "aliases": [
@@ -56,6 +80,9 @@
     ]
   },
   {
+    "id": "mobile-layout",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "响应式布局",
     "detail": "修复移动端响应式布局与内容遮挡",
     "aliases": [
@@ -63,6 +90,9 @@
     ]
   },
   {
+    "id": "mobile-layout",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "Responsive layout",
     "detail": "修复移动端响应式布局与内容遮挡",
     "aliases": [
@@ -70,6 +100,9 @@
     ]
   },
   {
+    "id": "save-failure",
+    "domain": "programming",
+    "category": "programming.reliability",
     "label": "数据持久化",
     "detail": "排查保存操作失败",
     "aliases": [
@@ -77,6 +110,9 @@
     ]
   },
   {
+    "id": "save-failure",
+    "domain": "programming",
+    "category": "programming.reliability",
     "label": "Data persistence",
     "detail": "排查保存操作失败",
     "aliases": [
@@ -84,6 +120,9 @@
     ]
   },
   {
+    "id": "data-discrepancy",
+    "domain": "analytics",
+    "category": "analytics.metrics",
     "label": "数据一致性",
     "detail": "核对数据口径与结果一致性",
     "aliases": [
@@ -91,6 +130,9 @@
     ]
   },
   {
+    "id": "data-discrepancy",
+    "domain": "analytics",
+    "category": "analytics.metrics",
     "label": "Data consistency",
     "detail": "核对数据口径与结果一致性",
     "aliases": [
@@ -98,6 +140,9 @@
     ]
   },
   {
+    "id": "input-debounce",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "防抖",
     "detail": "为输入查询添加防抖",
     "aliases": [
@@ -105,6 +150,9 @@
     ]
   },
   {
+    "id": "input-debounce",
+    "domain": "programming",
+    "category": "programming.interface",
     "label": "Debounce",
     "detail": "为输入查询添加防抖",
     "aliases": [
@@ -112,6 +160,9 @@
     ]
   },
   {
+    "id": "duplicate-submit",
+    "domain": "programming",
+    "category": "programming.reliability",
     "label": "幂等性",
     "detail": "检查重复提交与幂等性",
     "aliases": [
@@ -119,6 +170,9 @@
     ]
   },
   {
+    "id": "duplicate-submit",
+    "domain": "programming",
+    "category": "programming.reliability",
     "label": "Idempotency",
     "detail": "检查重复提交与幂等性",
     "aliases": [
@@ -126,6 +180,9 @@
     ]
   },
   {
+    "id": "api-failure",
+    "domain": "programming",
+    "category": "programming.reliability",
     "label": "接口可靠性",
     "detail": "排查接口请求失败与超时",
     "aliases": [
@@ -133,6 +190,9 @@
     ]
   },
   {
+    "id": "api-failure",
+    "domain": "programming",
+    "category": "programming.reliability",
     "label": "API reliability",
     "detail": "排查接口请求失败与超时",
     "aliases": [
@@ -140,6 +200,9 @@
     ]
   },
   {
+    "id": "agent-approval",
+    "domain": "agent",
+    "category": "agent.control",
     "label": "操作审批",
     "detail": "为 Agent 的关键操作设置人工确认",
     "aliases": [
@@ -147,6 +210,9 @@
     ]
   },
   {
+    "id": "agent-approval",
+    "domain": "agent",
+    "category": "agent.control",
     "label": "Action approval",
     "detail": "为 Agent 的关键操作设置人工确认",
     "aliases": [
@@ -154,6 +220,9 @@
     ]
   },
   {
+    "id": "agent-resume",
+    "domain": "agent",
+    "category": "agent.orchestration",
     "label": "任务恢复",
     "detail": "支持 Agent 中断后的任务恢复",
     "aliases": [
@@ -161,6 +230,9 @@
     ]
   },
   {
+    "id": "agent-resume",
+    "domain": "agent",
+    "category": "agent.orchestration",
     "label": "Task resumption",
     "detail": "支持 Agent 中断后的任务恢复",
     "aliases": [
@@ -168,6 +240,9 @@
     ]
   },
   {
+    "id": "agent-context",
+    "domain": "agent",
+    "category": "agent.memory",
     "label": "上下文管理",
     "detail": "改进 Agent 的上下文与约束保留",
     "aliases": [
@@ -175,6 +250,9 @@
     ]
   },
   {
+    "id": "agent-context",
+    "domain": "agent",
+    "category": "agent.memory",
     "label": "Context management",
     "detail": "改进 Agent 的上下文与约束保留",
     "aliases": [
@@ -182,20 +260,29 @@
     ]
   },
   {
+    "id": "agent.tool-calling",
+    "domain": "agent",
+    "category": "agent.tools",
     "label": "工具调用",
-    "detail": "为 Agent 接入任务所需的工具",
+    "detail": "让模型通过指定工具查询信息或执行操作",
     "aliases": [
       "工具调用"
     ]
   },
   {
+    "id": "agent.tool-calling",
+    "domain": "agent",
+    "category": "agent.tools",
     "label": "Tool calling",
-    "detail": "为 Agent 接入任务所需的工具",
+    "detail": "让模型通过指定工具查询信息或执行操作",
     "aliases": [
       "Tool calling"
     ]
   },
   {
+    "id": "agent-parallel",
+    "domain": "agent",
+    "category": "agent.orchestration",
     "label": "并行任务",
     "detail": "将可独立执行的任务交给多个 Agent 并行处理",
     "aliases": [
@@ -203,6 +290,9 @@
     ]
   },
   {
+    "id": "agent-parallel",
+    "domain": "agent",
+    "category": "agent.orchestration",
     "label": "Parallel tasks",
     "detail": "将可独立执行的任务交给多个 Agent 并行处理",
     "aliases": [
@@ -210,6 +300,9 @@
     ]
   },
   {
+    "id": "sheet-merge",
+    "domain": "office",
+    "category": "office.data",
     "label": "表格合并",
     "detail": "按匹配字段合并表格并核对结果",
     "aliases": [
@@ -217,6 +310,9 @@
     ]
   },
   {
+    "id": "sheet-merge",
+    "domain": "office",
+    "category": "office.data",
     "label": "Spreadsheet consolidation",
     "detail": "按匹配字段合并表格并核对结果",
     "aliases": [
@@ -224,6 +320,9 @@
     ]
   },
   {
+    "id": "sheet-dedupe",
+    "domain": "office",
+    "category": "office.data",
     "label": "数据去重",
     "detail": "按指定字段识别并处理重复记录",
     "aliases": [
@@ -231,6 +330,9 @@
     ]
   },
   {
+    "id": "sheet-dedupe",
+    "domain": "office",
+    "category": "office.data",
     "label": "Data deduplication",
     "detail": "按指定字段识别并处理重复记录",
     "aliases": [
@@ -238,6 +340,9 @@
     ]
   },
   {
+    "id": "office-report",
+    "domain": "office",
+    "category": "office.data",
     "label": "报表自动化",
     "detail": "自动汇总数据并生成定期报表",
     "aliases": [
@@ -245,6 +350,9 @@
     ]
   },
   {
+    "id": "office-report",
+    "domain": "office",
+    "category": "office.data",
     "label": "Report automation",
     "detail": "自动汇总数据并生成定期报表",
     "aliases": [
@@ -252,6 +360,9 @@
     ]
   },
   {
+    "id": "office-files",
+    "domain": "office",
+    "category": "office.workflow",
     "label": "批量文件处理",
     "detail": "按规则批量整理和重命名文件",
     "aliases": [
@@ -259,6 +370,9 @@
     ]
   },
   {
+    "id": "office-files",
+    "domain": "office",
+    "category": "office.workflow",
     "label": "Batch file processing",
     "detail": "按规则批量整理和重命名文件",
     "aliases": [
@@ -266,6 +380,9 @@
     ]
   },
   {
+    "id": "office-mail",
+    "domain": "office",
+    "category": "office.workflow",
     "label": "邮件工作流",
     "detail": "按条件自动分类邮件并准备回复",
     "aliases": [
@@ -273,6 +390,9 @@
     ]
   },
   {
+    "id": "office-mail",
+    "domain": "office",
+    "category": "office.workflow",
     "label": "Email workflow",
     "detail": "按条件自动分类邮件并准备回复",
     "aliases": [
@@ -280,6 +400,9 @@
     ]
   },
   {
+    "id": "game-collision",
+    "domain": "games",
+    "category": "games.simulation",
     "label": "碰撞检测",
     "detail": "排查游戏对象穿透与碰撞检测",
     "aliases": [
@@ -287,6 +410,9 @@
     ]
   },
   {
+    "id": "game-collision",
+    "domain": "games",
+    "category": "games.simulation",
     "label": "Collision detection",
     "detail": "排查游戏对象穿透与碰撞检测",
     "aliases": [
@@ -294,6 +420,9 @@
     ]
   },
   {
+    "id": "game-frame",
+    "domain": "games",
+    "category": "games.simulation",
     "label": "帧率稳定性",
     "detail": "排查游戏掉帧与帧时间波动",
     "aliases": [
@@ -301,6 +430,9 @@
     ]
   },
   {
+    "id": "game-frame",
+    "domain": "games",
+    "category": "games.simulation",
     "label": "Frame-rate stability",
     "detail": "排查游戏掉帧与帧时间波动",
     "aliases": [
@@ -308,6 +440,9 @@
     ]
   },
   {
+    "id": "game-save",
+    "domain": "games",
+    "category": "games.state",
     "label": "存档恢复",
     "detail": "排查游戏存档恢复与进度丢失",
     "aliases": [
@@ -315,6 +450,9 @@
     ]
   },
   {
+    "id": "game-save",
+    "domain": "games",
+    "category": "games.state",
     "label": "Save-game restoration",
     "detail": "排查游戏存档恢复与进度丢失",
     "aliases": [
@@ -322,20 +460,30 @@
     ]
   },
   {
+    "id": "video.audio-video-synchronization",
+    "domain": "video",
+    "category": "video.audio",
     "label": "音画同步",
-    "detail": "校正音频与画面的时间同步",
+    "detail": "对齐声音与画面时间",
     "aliases": [
       "音画同步"
     ]
   },
   {
+    "id": "video.audio-video-synchronization",
+    "domain": "video",
+    "category": "video.audio",
     "label": "Audio-video synchronization",
-    "detail": "校正音频与画面的时间同步",
+    "detail": "对齐声音与画面时间",
     "aliases": [
-      "Audio-video synchronization"
+      "Audio-video synchronization",
+      "lip sync"
     ]
   },
   {
+    "id": "video-captions",
+    "domain": "video",
+    "category": "video.captions",
     "label": "自动字幕",
     "detail": "识别语音并生成对齐时间轴的字幕",
     "aliases": [
@@ -343,6 +491,9 @@
     ]
   },
   {
+    "id": "video-captions",
+    "domain": "video",
+    "category": "video.captions",
     "label": "Automatic captions",
     "detail": "识别语音并生成对齐时间轴的字幕",
     "aliases": [
@@ -350,6 +501,9 @@
     ]
   },
   {
+    "id": "video-color",
+    "domain": "video",
+    "category": "video.color",
     "label": "色彩匹配",
     "detail": "统一不同镜头的色彩与曝光",
     "aliases": [
@@ -357,6 +511,9 @@
     ]
   },
   {
+    "id": "video-color",
+    "domain": "video",
+    "category": "video.color",
     "label": "Color matching",
     "detail": "统一不同镜头的色彩与曝光",
     "aliases": [
@@ -364,6 +521,9 @@
     ]
   },
   {
+    "id": "engineering-tolerance",
+    "domain": "engineering",
+    "category": "engineering.design",
     "label": "装配公差",
     "detail": "检查零件配合尺寸与公差设置",
     "aliases": [
@@ -371,6 +531,9 @@
     ]
   },
   {
+    "id": "engineering-tolerance",
+    "domain": "engineering",
+    "category": "engineering.design",
     "label": "Assembly tolerances",
     "detail": "检查零件配合尺寸与公差设置",
     "aliases": [
@@ -378,6 +541,9 @@
     ]
   },
   {
+    "id": "engineering-mesh",
+    "domain": "engineering",
+    "category": "engineering.simulation",
     "label": "网格收敛",
     "detail": "检查仿真结果对网格划分的敏感性",
     "aliases": [
@@ -385,6 +551,9 @@
     ]
   },
   {
+    "id": "engineering-mesh",
+    "domain": "engineering",
+    "category": "engineering.simulation",
     "label": "Mesh convergence",
     "detail": "检查仿真结果对网格划分的敏感性",
     "aliases": [
@@ -392,6 +561,9 @@
     ]
   },
   {
+    "id": "engineering-revision",
+    "domain": "engineering",
+    "category": "engineering.design",
     "label": "图纸版本管理",
     "detail": "管理图纸版本并追踪设计变更",
     "aliases": [
@@ -399,6 +571,9 @@
     ]
   },
   {
+    "id": "engineering-revision",
+    "domain": "engineering",
+    "category": "engineering.design",
     "label": "Drawing revision management",
     "detail": "管理图纸版本并追踪设计变更",
     "aliases": [
@@ -406,76 +581,111 @@
     ]
   },
   {
+    "id": "video.j-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "J型剪辑",
-    "detail": "使用声音先入的镜头衔接",
+    "detail": "下一镜头声音先于画面进入",
     "aliases": [
       "J型剪辑"
     ]
   },
   {
+    "id": "video.j-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "J-cut",
-    "detail": "使用声音先入的镜头衔接",
+    "detail": "下一镜头声音先于画面进入",
     "aliases": [
-      "J-cut"
+      "J-cut",
+      "J cut"
     ]
   },
   {
+    "id": "video.l-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "L型剪辑",
-    "detail": "使用声音延续的镜头衔接",
+    "detail": "前一镜头声音延续到下一画面",
     "aliases": [
       "L型剪辑"
     ]
   },
   {
+    "id": "video.l-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "L-cut",
-    "detail": "使用声音延续的镜头衔接",
+    "detail": "前一镜头声音延续到下一画面",
     "aliases": [
-      "L-cut"
+      "L-cut",
+      "L cut"
     ]
   },
   {
+    "id": "video.audio-ducking",
+    "domain": "video",
+    "category": "video.audio",
     "label": "音频闪避",
-    "detail": "在人声出现时降低背景音乐音量",
+    "detail": "人声出现时降低背景音量",
     "aliases": [
       "音频闪避"
     ]
   },
   {
+    "id": "video.audio-ducking",
+    "domain": "video",
+    "category": "video.audio",
     "label": "Audio ducking",
-    "detail": "在人声出现时降低背景音乐音量",
+    "detail": "人声出现时降低背景音量",
     "aliases": [
       "Audio ducking"
     ]
   },
   {
+    "id": "video.speed-ramping",
+    "domain": "video",
+    "category": "video.motion",
     "label": "速度渐变",
-    "detail": "调整片段的渐变变速效果",
+    "detail": "让片段播放速度逐渐变化",
     "aliases": [
       "速度渐变"
     ]
   },
   {
+    "id": "video.speed-ramping",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Speed ramping",
-    "detail": "调整片段的渐变变速效果",
+    "detail": "让片段播放速度逐渐变化",
     "aliases": [
       "Speed ramping"
     ]
   },
   {
+    "id": "video.subtitle-timing",
+    "domain": "video",
+    "category": "video.captions",
     "label": "字幕时间轴",
-    "detail": "校准字幕与人声的时间对应",
+    "detail": "设置字幕出现与消失时间",
     "aliases": [
       "字幕时间轴"
     ]
   },
   {
+    "id": "video.subtitle-timing",
+    "domain": "video",
+    "category": "video.captions",
     "label": "Subtitle timing",
-    "detail": "校准字幕与人声的时间对应",
+    "detail": "设置字幕出现与消失时间",
     "aliases": [
       "Subtitle timing"
     ]
   },
   {
+    "id": "philosophy-premises",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "论证前提",
     "detail": "梳理论证的前提与结论",
     "aliases": [
@@ -483,6 +693,9 @@
     ]
   },
   {
+    "id": "philosophy-premises",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Argument premises",
     "detail": "梳理论证的前提与结论",
     "aliases": [
@@ -490,6 +703,9 @@
     ]
   },
   {
+    "id": "philosophy.is-ought-distinction",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "实然与应然",
     "detail": "区分事实判断与规范判断",
     "aliases": [
@@ -497,6 +713,9 @@
     ]
   },
   {
+    "id": "philosophy.is-ought-distinction",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "Is-ought distinction",
     "detail": "区分事实判断与规范判断",
     "aliases": [
@@ -504,48 +723,611 @@
     ]
   },
   {
+    "id": "cognition.confirmation-bias",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "确认偏误",
-    "detail": "检查证据选择是否存在确认偏误",
+    "detail": "偏向支持既有信念的信息",
     "aliases": [
-      "确认偏误"
+      "确认偏误",
+      "证实偏差",
+      "确认偏差"
     ]
   },
   {
+    "id": "cognition.confirmation-bias",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Confirmation bias",
-    "detail": "检查证据选择是否存在确认偏误",
+    "detail": "偏向支持既有信念的信息",
     "aliases": [
       "Confirmation bias"
     ]
   },
   {
+    "id": "cognition.sunk-cost-fallacy",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "沉没成本谬误",
-    "detail": "区分不可回收投入与后续决策依据",
+    "detail": "让不可收回成本左右后续选择",
     "aliases": [
       "沉没成本谬误"
     ]
   },
   {
+    "id": "cognition.sunk-cost-fallacy",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Sunk cost fallacy",
-    "detail": "区分不可回收投入与后续决策依据",
+    "detail": "让不可收回成本左右后续选择",
     "aliases": [
       "Sunk cost fallacy"
     ]
   },
   {
+    "id": "cognition.retrieval-practice",
+    "domain": "cognition",
+    "category": "cognition.learning",
     "label": "提取练习",
-    "detail": "设计主动回忆的学习练习",
+    "detail": "通过主动回忆巩固学习",
     "aliases": [
       "提取练习"
     ]
   },
   {
+    "id": "cognition.retrieval-practice",
+    "domain": "cognition",
+    "category": "cognition.learning",
     "label": "Retrieval practice",
-    "detail": "设计主动回忆的学习练习",
+    "detail": "通过主动回忆巩固学习",
     "aliases": [
       "Retrieval practice"
     ]
   },
   {
+    "id": "ai-rag",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "知识库问答",
+    "detail": "接入检索增强生成，基于相关知识库资料回答并标注来源",
+    "aliases": [
+      "知识库问答"
+    ]
+  },
+  {
+    "id": "ai-rag",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Knowledge-base question answering",
+    "detail": "接入检索增强生成，基于相关知识库资料回答并标注来源",
+    "aliases": [
+      "Knowledge-base question answering"
+    ]
+  },
+  {
+    "id": "ai-hallucination",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "回答事实核验",
+    "detail": "核验模型回答与资料的一致性，对缺乏依据的内容明确说明不确定性",
+    "aliases": [
+      "回答事实核验"
+    ]
+  },
+  {
+    "id": "ai-hallucination",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "Answer fact checking",
+    "detail": "核验模型回答与资料的一致性，对缺乏依据的内容明确说明不确定性",
+    "aliases": [
+      "Answer fact checking"
+    ]
+  },
+  {
+    "id": "ai-json",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "结构化结果校验",
+    "detail": "约束模型输出的字段和类型，并校验结构化结果",
+    "aliases": [
+      "结构化结果校验"
+    ]
+  },
+  {
+    "id": "ai-json",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "Structured result validation",
+    "detail": "约束模型输出的字段和类型，并校验结构化结果",
+    "aliases": [
+      "Structured result validation"
+    ]
+  },
+  {
+    "id": "ai-retrieval",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "检索质量优化",
+    "detail": "检查文档分块、召回和重排序，提升知识库检索相关性",
+    "aliases": [
+      "检索质量优化"
+    ]
+  },
+  {
+    "id": "ai-retrieval",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Retrieval quality improvement",
+    "detail": "检查文档分块、召回和重排序，提升知识库检索相关性",
+    "aliases": [
+      "Retrieval quality improvement"
+    ]
+  },
+  {
+    "id": "ai-injection",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "不可信指令隔离",
+    "detail": "区分可信任务指令与外部内容，检查提示词注入对工具调用的影响",
+    "aliases": [
+      "不可信指令隔离"
+    ]
+  },
+  {
+    "id": "ai-injection",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "Untrusted instruction isolation",
+    "detail": "区分可信任务指令与外部内容，检查提示词注入对工具调用的影响",
+    "aliases": [
+      "Untrusted instruction isolation"
+    ]
+  },
+  {
+    "id": "ai-cost",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "模型调用成本优化",
+    "detail": "分析输入输出词元、重复请求和缓存命中，在质量约束下降低调用成本",
+    "aliases": [
+      "模型调用成本优化"
+    ]
+  },
+  {
+    "id": "ai-cost",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Model call cost optimization",
+    "detail": "分析输入输出词元、重复请求和缓存命中，在质量约束下降低调用成本",
+    "aliases": [
+      "Model call cost optimization"
+    ]
+  },
+  {
+    "id": "ai-latency",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "生成响应延迟优化",
+    "detail": "区分首词元延迟与生成速度，检查模型调用链路并评估流式输出",
+    "aliases": [
+      "生成响应延迟优化"
+    ]
+  },
+  {
+    "id": "ai-latency",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Generation latency improvement",
+    "detail": "区分首词元延迟与生成速度，检查模型调用链路并评估流式输出",
+    "aliases": [
+      "Generation latency improvement"
+    ]
+  },
+  {
+    "id": "ai-evaluation",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "模型变更回归评测",
+    "detail": "建立代表性任务集，对比模型或提示词变更前后的质量、成本和延迟",
+    "aliases": [
+      "模型变更回归评测"
+    ]
+  },
+  {
+    "id": "ai-evaluation",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "Model change regression evaluation",
+    "detail": "建立代表性任务集，对比模型或提示词变更前后的质量、成本和延迟",
+    "aliases": [
+      "Model change regression evaluation"
+    ]
+  },
+  {
+    "id": "ai-loop",
+    "domain": "agent",
+    "category": "agent.control",
+    "label": "智能体循环控制",
+    "detail": "检查任务终止条件、工具重试与步数预算，定位智能体重复执行的原因",
+    "aliases": [
+      "智能体循环控制"
+    ]
+  },
+  {
+    "id": "ai-loop",
+    "domain": "agent",
+    "category": "agent.control",
+    "label": "Agent loop control",
+    "detail": "检查任务终止条件、工具重试与步数预算，定位智能体重复执行的原因",
+    "aliases": [
+      "Agent loop control"
+    ]
+  },
+  {
+    "id": "ai-finetune",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "领域模型适配",
+    "detail": "比较提示词、检索增强与微调，选择适合领域任务和数据条件的方案",
+    "aliases": [
+      "领域模型适配"
+    ]
+  },
+  {
+    "id": "ai-finetune",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Domain model adaptation",
+    "detail": "比较提示词、检索增强与微调，选择适合领域任务和数据条件的方案",
+    "aliases": [
+      "Domain model adaptation"
+    ]
+  },
+  {
+    "id": "commerce-margin",
+    "domain": "ecommerce",
+    "category": "ecommerce.profit",
+    "label": "订单利润核算",
+    "detail": "核算商品、物流、平台、广告和退货成本，分析订单贡献利润",
+    "aliases": [
+      "订单利润核算"
+    ]
+  },
+  {
+    "id": "commerce-margin",
+    "domain": "ecommerce",
+    "category": "ecommerce.profit",
+    "label": "Order profitability analysis",
+    "detail": "核算商品、物流、平台、广告和退货成本，分析订单贡献利润",
+    "aliases": [
+      "Order profitability analysis"
+    ]
+  },
+  {
+    "id": "commerce-stock",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "库存补货规划",
+    "detail": "结合需求、补货周期和安全库存制定补货计划",
+    "aliases": [
+      "库存补货规划"
+    ]
+  },
+  {
+    "id": "commerce-stock",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "Inventory replenishment planning",
+    "detail": "结合需求、补货周期和安全库存制定补货计划",
+    "aliases": [
+      "Inventory replenishment planning"
+    ]
+  },
+  {
+    "id": "commerce-returns",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "退货原因分析",
+    "detail": "按商品、市场和原因拆分退货，定位可改进环节",
+    "aliases": [
+      "退货原因分析"
+    ]
+  },
+  {
+    "id": "commerce-returns",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "Return reason analysis",
+    "detail": "按商品、市场和原因拆分退货，定位可改进环节",
+    "aliases": [
+      "Return reason analysis"
+    ]
+  },
+  {
+    "id": "analytics-experiment",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "实验结果评估",
+    "detail": "检查实验分组、样本量和效应区间，评估版本差异",
+    "aliases": [
+      "实验结果评估"
+    ]
+  },
+  {
+    "id": "analytics-experiment",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "Experiment result assessment",
+    "detail": "检查实验分组、样本量和效应区间，评估版本差异",
+    "aliases": [
+      "Experiment result assessment"
+    ]
+  },
+  {
+    "id": "analytics-distribution",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "分布与极值分析",
+    "detail": "同时查看中位数、分位数和异常值，解释平均值变化",
+    "aliases": [
+      "分布与极值分析"
+    ]
+  },
+  {
+    "id": "analytics-distribution",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "Distribution and extreme value analysis",
+    "detail": "同时查看中位数、分位数和异常值，解释平均值变化",
+    "aliases": [
+      "Distribution and extreme value analysis"
+    ]
+  },
+  {
+    "id": "operations-retention",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "用户留存分析",
+    "detail": "按新增时间分组分析后续活跃和复购，定位留存流失阶段",
+    "aliases": [
+      "用户留存分析"
+    ]
+  },
+  {
+    "id": "operations-retention",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "Customer retention analysis",
+    "detail": "按新增时间分组分析后续活跃和复购，定位留存流失阶段",
+    "aliases": [
+      "Customer retention analysis"
+    ]
+  },
+  {
+    "id": "operations-funnel",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "购买漏斗分析",
+    "detail": "拆分访问、加购、结账和支付步骤，定位购买转化流失",
+    "aliases": [
+      "购买漏斗分析"
+    ]
+  },
+  {
+    "id": "operations-funnel",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "Purchase funnel analysis",
+    "detail": "拆分访问、加购、结账和支付步骤，定位购买转化流失",
+    "aliases": [
+      "Purchase funnel analysis"
+    ]
+  },
+  {
+    "id": "operations-service",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "客服工单流程优化",
+    "detail": "按问题类型、优先级和响应目标分配工单并跟踪处理时长",
+    "aliases": [
+      "客服工单流程优化"
+    ]
+  },
+  {
+    "id": "operations-service",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "Support workflow improvement",
+    "detail": "按问题类型、优先级和响应目标分配工单并跟踪处理时长",
+    "aliases": [
+      "Support workflow improvement"
+    ]
+  },
+  {
+    "id": "marketing-roas",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "投放收益核验",
+    "detail": "区分广告归因收入与实际利润，核对费用、退款和归因窗口",
+    "aliases": [
+      "投放收益核验"
+    ]
+  },
+  {
+    "id": "marketing-roas",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "Advertising return validation",
+    "detail": "区分广告归因收入与实际利润，核对费用、退款和归因窗口",
+    "aliases": [
+      "Advertising return validation"
+    ]
+  },
+  {
+    "id": "marketing-seo",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "搜索收录排查",
+    "detail": "检查抓取、索引、规范网址和页面内容，定位搜索不可见原因",
+    "aliases": [
+      "搜索收录排查"
+    ]
+  },
+  {
+    "id": "marketing-seo",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "Search indexing diagnosis",
+    "detail": "检查抓取、索引、规范网址和页面内容，定位搜索不可见原因",
+    "aliases": [
+      "Search indexing diagnosis"
+    ]
+  },
+  {
+    "id": "marketing-tracking",
+    "domain": "marketing",
+    "category": "marketing.attribution",
+    "label": "渠道转化追踪",
+    "detail": "统一渠道参数、转化事件与归因窗口，核对流量和转化来源",
+    "aliases": [
+      "渠道转化追踪"
+    ]
+  },
+  {
+    "id": "marketing-tracking",
+    "domain": "marketing",
+    "category": "marketing.attribution",
+    "label": "Channel conversion tracking",
+    "detail": "统一渠道参数、转化事件与归因窗口，核对流量和转化来源",
+    "aliases": [
+      "Channel conversion tracking"
+    ]
+  },
+  {
+    "id": "finance-cost",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "回测成本建模",
+    "detail": "在回测中加入手续费、买卖价差、滑点和换手成本，检查收益稳健性",
+    "aliases": [
+      "回测成本建模"
+    ]
+  },
+  {
+    "id": "finance-cost",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Backtest cost modeling",
+    "detail": "在回测中加入手续费、买卖价差、滑点和换手成本，检查收益稳健性",
+    "aliases": [
+      "Backtest cost modeling"
+    ]
+  },
+  {
+    "id": "finance-lookahead",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "历史信息可用性核查",
+    "detail": "核对数据发布时间、信号时点和成交时点，排查前视偏差",
+    "aliases": [
+      "历史信息可用性核查"
+    ]
+  },
+  {
+    "id": "finance-lookahead",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Historical information availability audit",
+    "detail": "核对数据发布时间、信号时点和成交时点，排查前视偏差",
+    "aliases": [
+      "Historical information availability audit"
+    ]
+  },
+  {
+    "id": "finance-overfit",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "策略泛化检验",
+    "detail": "区分训练与样本外区间，通过滚动验证和参数敏感性检查评估泛化",
+    "aliases": [
+      "策略泛化检验"
+    ]
+  },
+  {
+    "id": "finance-overfit",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Strategy generalization assessment",
+    "detail": "区分训练与样本外区间，通过滚动验证和参数敏感性检查评估泛化",
+    "aliases": [
+      "Strategy generalization assessment"
+    ]
+  },
+  {
+    "id": "finance-risk",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "组合回撤分析",
+    "detail": "分析净值回撤、波动和风险暴露，定位亏损集中阶段与来源",
+    "aliases": [
+      "组合回撤分析"
+    ]
+  },
+  {
+    "id": "finance-risk",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Portfolio drawdown analysis",
+    "detail": "分析净值回撤、波动和风险暴露，定位亏损集中阶段与来源",
+    "aliases": [
+      "Portfolio drawdown analysis"
+    ]
+  },
+  {
+    "id": "finance-factor",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "因子有效性评估",
+    "detail": "检查因子信息系数、分组收益、稳定性和交易成本后的表现",
+    "aliases": [
+      "因子有效性评估"
+    ]
+  },
+  {
+    "id": "finance-factor",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Factor effectiveness evaluation",
+    "detail": "检查因子信息系数、分组收益、稳定性和交易成本后的表现",
+    "aliases": [
+      "Factor effectiveness evaluation"
+    ]
+  },
+  {
+    "id": "finance-adjustment",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "历史价格可比性核查",
+    "detail": "核对分红、拆股和复权口径，解释历史价格与收益的异常跳变",
+    "aliases": [
+      "历史价格可比性核查"
+    ]
+  },
+  {
+    "id": "finance-adjustment",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Historical price comparability audit",
+    "detail": "核对分红、拆股和复权口径，解释历史价格与收益的异常跳变",
+    "aliases": [
+      "Historical price comparability audit"
+    ]
+  },
+  {
+    "id": "video.timeline",
+    "domain": "video",
+    "category": "video.editing",
     "label": "时间线",
     "detail": "按时间排列音视频片段",
     "aliases": [
@@ -553,6 +1335,9 @@
     ]
   },
   {
+    "id": "video.timeline",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Timeline",
     "detail": "按时间排列音视频片段",
     "aliases": [
@@ -560,6 +1345,9 @@
     ]
   },
   {
+    "id": "video.bin",
+    "domain": "video",
+    "category": "video.editing",
     "label": "素材箱",
     "detail": "分类管理媒体素材",
     "aliases": [
@@ -567,6 +1355,9 @@
     ]
   },
   {
+    "id": "video.bin",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Bin",
     "detail": "分类管理媒体素材",
     "aliases": [
@@ -574,6 +1365,9 @@
     ]
   },
   {
+    "id": "video.in-point",
+    "domain": "video",
+    "category": "video.editing",
     "label": "入点",
     "detail": "标记片段开始位置",
     "aliases": [
@@ -581,6 +1375,9 @@
     ]
   },
   {
+    "id": "video.in-point",
+    "domain": "video",
+    "category": "video.editing",
     "label": "In point",
     "detail": "标记片段开始位置",
     "aliases": [
@@ -588,6 +1385,9 @@
     ]
   },
   {
+    "id": "video.out-point",
+    "domain": "video",
+    "category": "video.editing",
     "label": "出点",
     "detail": "标记片段结束位置",
     "aliases": [
@@ -595,6 +1395,9 @@
     ]
   },
   {
+    "id": "video.out-point",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Out point",
     "detail": "标记片段结束位置",
     "aliases": [
@@ -602,6 +1405,9 @@
     ]
   },
   {
+    "id": "video.rough-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "粗剪",
     "detail": "建立初步叙事结构",
     "aliases": [
@@ -609,6 +1415,9 @@
     ]
   },
   {
+    "id": "video.rough-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Rough cut",
     "detail": "建立初步叙事结构",
     "aliases": [
@@ -616,6 +1425,9 @@
     ]
   },
   {
+    "id": "video.fine-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "精剪",
     "detail": "细化镜头长度与衔接",
     "aliases": [
@@ -623,6 +1435,9 @@
     ]
   },
   {
+    "id": "video.fine-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Fine cut",
     "detail": "细化镜头长度与衔接",
     "aliases": [
@@ -630,6 +1445,9 @@
     ]
   },
   {
+    "id": "video.picture-lock",
+    "domain": "video",
+    "category": "video.editing",
     "label": "锁画",
     "detail": "确定画面剪辑版本",
     "aliases": [
@@ -637,6 +1455,9 @@
     ]
   },
   {
+    "id": "video.picture-lock",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Picture lock",
     "detail": "确定画面剪辑版本",
     "aliases": [
@@ -644,6 +1465,9 @@
     ]
   },
   {
+    "id": "video.ripple-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "波纹剪辑",
     "detail": "修剪片段并移动后续片段",
     "aliases": [
@@ -651,6 +1475,9 @@
     ]
   },
   {
+    "id": "video.ripple-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Ripple edit",
     "detail": "修剪片段并移动后续片段",
     "aliases": [
@@ -658,6 +1485,9 @@
     ]
   },
   {
+    "id": "video.rolling-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "滚动剪辑",
     "detail": "移动相邻片段的共同剪辑点",
     "aliases": [
@@ -665,6 +1495,9 @@
     ]
   },
   {
+    "id": "video.rolling-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Rolling edit",
     "detail": "移动相邻片段的共同剪辑点",
     "aliases": [
@@ -672,6 +1505,9 @@
     ]
   },
   {
+    "id": "video.slip-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "滑移剪辑",
     "detail": "保持位置和时长调整片段内容",
     "aliases": [
@@ -679,6 +1515,9 @@
     ]
   },
   {
+    "id": "video.slip-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Slip edit",
     "detail": "保持位置和时长调整片段内容",
     "aliases": [
@@ -686,6 +1525,9 @@
     ]
   },
   {
+    "id": "video.slide-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "滑动剪辑",
     "detail": "移动片段并修剪相邻片段",
     "aliases": [
@@ -693,6 +1535,9 @@
     ]
   },
   {
+    "id": "video.slide-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Slide edit",
     "detail": "移动片段并修剪相邻片段",
     "aliases": [
@@ -700,6 +1545,9 @@
     ]
   },
   {
+    "id": "video.insert-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "插入剪辑",
     "detail": "插入素材并推移后续内容",
     "aliases": [
@@ -707,6 +1555,9 @@
     ]
   },
   {
+    "id": "video.insert-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Insert edit",
     "detail": "插入素材并推移后续内容",
     "aliases": [
@@ -714,6 +1565,9 @@
     ]
   },
   {
+    "id": "video.overwrite-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "覆盖剪辑",
     "detail": "用素材替换目标时间段",
     "aliases": [
@@ -721,6 +1575,9 @@
     ]
   },
   {
+    "id": "video.overwrite-edit",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Overwrite edit",
     "detail": "用素材替换目标时间段",
     "aliases": [
@@ -728,6 +1585,9 @@
     ]
   },
   {
+    "id": "video.match-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "匹配剪辑",
     "detail": "利用相似构图或动作连接镜头",
     "aliases": [
@@ -735,6 +1595,9 @@
     ]
   },
   {
+    "id": "video.match-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Match cut",
     "detail": "利用相似构图或动作连接镜头",
     "aliases": [
@@ -742,6 +1605,9 @@
     ]
   },
   {
+    "id": "video.jump-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "跳切",
     "detail": "形成明显时间或位置跳跃的切换",
     "aliases": [
@@ -749,6 +1615,9 @@
     ]
   },
   {
+    "id": "video.jump-cut",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Jump cut",
     "detail": "形成明显时间或位置跳跃的切换",
     "aliases": [
@@ -756,6 +1625,9 @@
     ]
   },
   {
+    "id": "video.cross-cutting",
+    "domain": "video",
+    "category": "video.editing",
     "label": "交叉剪辑",
     "detail": "交替呈现不同场景的行动",
     "aliases": [
@@ -763,6 +1635,9 @@
     ]
   },
   {
+    "id": "video.cross-cutting",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Cross-cutting",
     "detail": "交替呈现不同场景的行动",
     "aliases": [
@@ -770,6 +1645,9 @@
     ]
   },
   {
+    "id": "video.parallel-editing",
+    "domain": "video",
+    "category": "video.editing",
     "label": "平行剪辑",
     "detail": "交替呈现相关叙事线",
     "aliases": [
@@ -777,6 +1655,9 @@
     ]
   },
   {
+    "id": "video.parallel-editing",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Parallel editing",
     "detail": "交替呈现相关叙事线",
     "aliases": [
@@ -784,6 +1665,9 @@
     ]
   },
   {
+    "id": "video.cutaway-shot",
+    "domain": "video",
+    "category": "video.editing",
     "label": "切出镜头",
     "detail": "插入主体之外的相关画面",
     "aliases": [
@@ -791,6 +1675,9 @@
     ]
   },
   {
+    "id": "video.cutaway-shot",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Cutaway shot",
     "detail": "插入主体之外的相关画面",
     "aliases": [
@@ -798,6 +1685,9 @@
     ]
   },
   {
+    "id": "video.b-roll",
+    "domain": "video",
+    "category": "video.editing",
     "label": "补充镜头",
     "detail": "补充主体叙述的辅助画面",
     "aliases": [
@@ -805,6 +1695,9 @@
     ]
   },
   {
+    "id": "video.b-roll",
+    "domain": "video",
+    "category": "video.editing",
     "label": "B-roll",
     "detail": "补充主体叙述的辅助画面",
     "aliases": [
@@ -812,6 +1705,9 @@
     ]
   },
   {
+    "id": "video.establishing-shot",
+    "domain": "video",
+    "category": "video.editing",
     "label": "建立镜头",
     "detail": "交代场景环境与空间关系",
     "aliases": [
@@ -819,6 +1715,9 @@
     ]
   },
   {
+    "id": "video.establishing-shot",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Establishing shot",
     "detail": "交代场景环境与空间关系",
     "aliases": [
@@ -826,6 +1725,9 @@
     ]
   },
   {
+    "id": "video.180-degree-rule",
+    "domain": "video",
+    "category": "video.editing",
     "label": "轴线规则",
     "detail": "维持镜头间空间方向一致",
     "aliases": [
@@ -833,6 +1735,9 @@
     ]
   },
   {
+    "id": "video.180-degree-rule",
+    "domain": "video",
+    "category": "video.editing",
     "label": "180-degree rule",
     "detail": "维持镜头间空间方向一致",
     "aliases": [
@@ -840,6 +1745,9 @@
     ]
   },
   {
+    "id": "video.match-on-action",
+    "domain": "video",
+    "category": "video.editing",
     "label": "动作匹配",
     "detail": "在动作连续处衔接镜头",
     "aliases": [
@@ -847,6 +1755,9 @@
     ]
   },
   {
+    "id": "video.match-on-action",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Match on action",
     "detail": "在动作连续处衔接镜头",
     "aliases": [
@@ -854,6 +1765,9 @@
     ]
   },
   {
+    "id": "video.fade",
+    "domain": "video",
+    "category": "video.motion",
     "label": "淡入淡出",
     "detail": "逐渐显示或隐去画面声音",
     "aliases": [
@@ -861,6 +1775,9 @@
     ]
   },
   {
+    "id": "video.fade",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Fade",
     "detail": "逐渐显示或隐去画面声音",
     "aliases": [
@@ -868,6 +1785,9 @@
     ]
   },
   {
+    "id": "video.cross-dissolve",
+    "domain": "video",
+    "category": "video.motion",
     "label": "交叉溶解",
     "detail": "两个画面逐渐交叠过渡",
     "aliases": [
@@ -875,6 +1795,9 @@
     ]
   },
   {
+    "id": "video.cross-dissolve",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Cross dissolve",
     "detail": "两个画面逐渐交叠过渡",
     "aliases": [
@@ -882,6 +1805,9 @@
     ]
   },
   {
+    "id": "video.time-remapping",
+    "domain": "video",
+    "category": "video.motion",
     "label": "时间重映射",
     "detail": "控制素材时间与播放时间的对应",
     "aliases": [
@@ -889,6 +1815,9 @@
     ]
   },
   {
+    "id": "video.time-remapping",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Time remapping",
     "detail": "控制素材时间与播放时间的对应",
     "aliases": [
@@ -896,6 +1825,9 @@
     ]
   },
   {
+    "id": "video.optical-flow-interpolation",
+    "domain": "video",
+    "category": "video.motion",
     "label": "光流补帧",
     "detail": "估算运动以生成中间帧",
     "aliases": [
@@ -903,6 +1835,9 @@
     ]
   },
   {
+    "id": "video.optical-flow-interpolation",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Optical flow interpolation",
     "detail": "估算运动以生成中间帧",
     "aliases": [
@@ -910,6 +1845,9 @@
     ]
   },
   {
+    "id": "video.freeze-frame",
+    "domain": "video",
+    "category": "video.motion",
     "label": "定格",
     "detail": "延长单帧画面的显示时间",
     "aliases": [
@@ -917,6 +1855,9 @@
     ]
   },
   {
+    "id": "video.freeze-frame",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Freeze frame",
     "detail": "延长单帧画面的显示时间",
     "aliases": [
@@ -924,6 +1865,9 @@
     ]
   },
   {
+    "id": "video.keyframe",
+    "domain": "video",
+    "category": "video.motion",
     "label": "关键帧",
     "detail": "记录参数在指定时间的数值",
     "aliases": [
@@ -931,6 +1875,9 @@
     ]
   },
   {
+    "id": "video.keyframe",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Keyframe",
     "detail": "记录参数在指定时间的数值",
     "aliases": [
@@ -938,6 +1885,9 @@
     ]
   },
   {
+    "id": "video.ease-in-and-out",
+    "domain": "video",
+    "category": "video.motion",
     "label": "缓入缓出",
     "detail": "平滑动画起止速度",
     "aliases": [
@@ -945,6 +1895,9 @@
     ]
   },
   {
+    "id": "video.ease-in-and-out",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Ease in and out",
     "detail": "平滑动画起止速度",
     "aliases": [
@@ -952,6 +1905,9 @@
     ]
   },
   {
+    "id": "video.bezier-curve",
+    "domain": "video",
+    "category": "video.motion",
     "label": "贝塞尔曲线",
     "detail": "通过控制点调整插值曲线",
     "aliases": [
@@ -959,6 +1915,9 @@
     ]
   },
   {
+    "id": "video.bezier-curve",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Bezier curve",
     "detail": "通过控制点调整插值曲线",
     "aliases": [
@@ -966,6 +1925,9 @@
     ]
   },
   {
+    "id": "video.motion-tracking",
+    "domain": "video",
+    "category": "video.motion",
     "label": "运动跟踪",
     "detail": "追踪画面中特征的运动",
     "aliases": [
@@ -973,6 +1935,9 @@
     ]
   },
   {
+    "id": "video.motion-tracking",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Motion tracking",
     "detail": "追踪画面中特征的运动",
     "aliases": [
@@ -980,6 +1945,9 @@
     ]
   },
   {
+    "id": "video.video-stabilization",
+    "domain": "video",
+    "category": "video.motion",
     "label": "画面稳定",
     "detail": "减少拍摄抖动",
     "aliases": [
@@ -987,6 +1955,9 @@
     ]
   },
   {
+    "id": "video.video-stabilization",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Video stabilization",
     "detail": "减少拍摄抖动",
     "aliases": [
@@ -994,6 +1965,9 @@
     ]
   },
   {
+    "id": "video.mask",
+    "domain": "video",
+    "category": "video.motion",
     "label": "遮罩",
     "detail": "限制效果作用的画面区域",
     "aliases": [
@@ -1001,6 +1975,9 @@
     ]
   },
   {
+    "id": "video.mask",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Mask",
     "detail": "限制效果作用的画面区域",
     "aliases": [
@@ -1008,6 +1985,9 @@
     ]
   },
   {
+    "id": "video.rotoscoping",
+    "domain": "video",
+    "category": "video.motion",
     "label": "转描",
     "detail": "逐帧分离或描绘画面对象",
     "aliases": [
@@ -1015,6 +1995,9 @@
     ]
   },
   {
+    "id": "video.rotoscoping",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Rotoscoping",
     "detail": "逐帧分离或描绘画面对象",
     "aliases": [
@@ -1022,6 +2005,9 @@
     ]
   },
   {
+    "id": "video.chroma-key",
+    "domain": "video",
+    "category": "video.motion",
     "label": "色度抠像",
     "detail": "依据背景颜色分离主体",
     "aliases": [
@@ -1029,6 +2015,9 @@
     ]
   },
   {
+    "id": "video.chroma-key",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Chroma key",
     "detail": "依据背景颜色分离主体",
     "aliases": [
@@ -1036,6 +2025,9 @@
     ]
   },
   {
+    "id": "video.luma-key",
+    "domain": "video",
+    "category": "video.motion",
     "label": "亮度抠像",
     "detail": "依据亮度分离画面区域",
     "aliases": [
@@ -1043,6 +2035,9 @@
     ]
   },
   {
+    "id": "video.luma-key",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Luma key",
     "detail": "依据亮度分离画面区域",
     "aliases": [
@@ -1050,6 +2045,9 @@
     ]
   },
   {
+    "id": "video.alpha-channel",
+    "domain": "video",
+    "category": "video.motion",
     "label": "透明通道",
     "detail": "存储像素透明度",
     "aliases": [
@@ -1057,6 +2055,9 @@
     ]
   },
   {
+    "id": "video.alpha-channel",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Alpha channel",
     "detail": "存储像素透明度",
     "aliases": [
@@ -1064,6 +2065,9 @@
     ]
   },
   {
+    "id": "video.premultiplied-alpha",
+    "domain": "video",
+    "category": "video.motion",
     "label": "预乘透明度",
     "detail": "颜色值已乘以透明度",
     "aliases": [
@@ -1071,6 +2075,9 @@
     ]
   },
   {
+    "id": "video.premultiplied-alpha",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Premultiplied alpha",
     "detail": "颜色值已乘以透明度",
     "aliases": [
@@ -1078,6 +2085,9 @@
     ]
   },
   {
+    "id": "video.blend-mode",
+    "domain": "video",
+    "category": "video.motion",
     "label": "混合模式",
     "detail": "定义图层颜色的合成方式",
     "aliases": [
@@ -1085,6 +2095,9 @@
     ]
   },
   {
+    "id": "video.blend-mode",
+    "domain": "video",
+    "category": "video.motion",
     "label": "Blend mode",
     "detail": "定义图层颜色的合成方式",
     "aliases": [
@@ -1092,6 +2105,9 @@
     ]
   },
   {
+    "id": "video.color-grading",
+    "domain": "video",
+    "category": "video.color",
     "label": "调色",
     "detail": "塑造影像色彩风格",
     "aliases": [
@@ -1099,6 +2115,9 @@
     ]
   },
   {
+    "id": "video.color-grading",
+    "domain": "video",
+    "category": "video.color",
     "label": "Color grading",
     "detail": "塑造影像色彩风格",
     "aliases": [
@@ -1106,6 +2125,9 @@
     ]
   },
   {
+    "id": "video.color-correction",
+    "domain": "video",
+    "category": "video.color",
     "label": "色彩校正",
     "detail": "校正曝光白平衡与镜头差异",
     "aliases": [
@@ -1113,6 +2135,9 @@
     ]
   },
   {
+    "id": "video.color-correction",
+    "domain": "video",
+    "category": "video.color",
     "label": "Color correction",
     "detail": "校正曝光白平衡与镜头差异",
     "aliases": [
@@ -1120,6 +2145,9 @@
     ]
   },
   {
+    "id": "video.white-balance",
+    "domain": "video",
+    "category": "video.color",
     "label": "白平衡",
     "detail": "调整中性色的色温与色偏",
     "aliases": [
@@ -1127,6 +2155,9 @@
     ]
   },
   {
+    "id": "video.white-balance",
+    "domain": "video",
+    "category": "video.color",
     "label": "White balance",
     "detail": "调整中性色的色温与色偏",
     "aliases": [
@@ -1134,6 +2165,9 @@
     ]
   },
   {
+    "id": "video.color-space",
+    "domain": "video",
+    "category": "video.color",
     "label": "色彩空间",
     "detail": "定义颜色表示范围与方式",
     "aliases": [
@@ -1141,6 +2175,9 @@
     ]
   },
   {
+    "id": "video.color-space",
+    "domain": "video",
+    "category": "video.color",
     "label": "Color space",
     "detail": "定义颜色表示范围与方式",
     "aliases": [
@@ -1148,6 +2185,9 @@
     ]
   },
   {
+    "id": "video.color-gamut",
+    "domain": "video",
+    "category": "video.color",
     "label": "色域",
     "detail": "设备或系统可表示的颜色范围",
     "aliases": [
@@ -1155,6 +2195,9 @@
     ]
   },
   {
+    "id": "video.color-gamut",
+    "domain": "video",
+    "category": "video.color",
     "label": "Color gamut",
     "detail": "设备或系统可表示的颜色范围",
     "aliases": [
@@ -1162,6 +2205,9 @@
     ]
   },
   {
+    "id": "video.gamma",
+    "domain": "video",
+    "category": "video.color",
     "label": "伽马",
     "detail": "描述信号与亮度的非线性关系",
     "aliases": [
@@ -1169,6 +2215,9 @@
     ]
   },
   {
+    "id": "video.gamma",
+    "domain": "video",
+    "category": "video.color",
     "label": "Gamma",
     "detail": "描述信号与亮度的非线性关系",
     "aliases": [
@@ -1176,6 +2225,9 @@
     ]
   },
   {
+    "id": "video.look-up-table",
+    "domain": "video",
+    "category": "video.color",
     "label": "查找表",
     "detail": "通过数值映射转换色彩",
     "aliases": [
@@ -1183,6 +2235,9 @@
     ]
   },
   {
+    "id": "video.look-up-table",
+    "domain": "video",
+    "category": "video.color",
     "label": "Look-up table",
     "detail": "通过数值映射转换色彩",
     "aliases": [
@@ -1191,6 +2246,9 @@
     ]
   },
   {
+    "id": "video.waveform-monitor",
+    "domain": "video",
+    "category": "video.color",
     "label": "波形监视器",
     "detail": "显示画面信号水平的分布",
     "aliases": [
@@ -1198,6 +2256,9 @@
     ]
   },
   {
+    "id": "video.waveform-monitor",
+    "domain": "video",
+    "category": "video.color",
     "label": "Waveform monitor",
     "detail": "显示画面信号水平的分布",
     "aliases": [
@@ -1205,6 +2266,9 @@
     ]
   },
   {
+    "id": "video.vectorscope",
+    "domain": "video",
+    "category": "video.color",
     "label": "矢量示波器",
     "detail": "显示色度方向与饱和程度",
     "aliases": [
@@ -1212,6 +2276,9 @@
     ]
   },
   {
+    "id": "video.vectorscope",
+    "domain": "video",
+    "category": "video.color",
     "label": "Vectorscope",
     "detail": "显示色度方向与饱和程度",
     "aliases": [
@@ -1219,6 +2286,9 @@
     ]
   },
   {
+    "id": "video.zebra-pattern",
+    "domain": "video",
+    "category": "video.color",
     "label": "斑马纹",
     "detail": "标记达到设定曝光阈值的区域",
     "aliases": [
@@ -1226,6 +2296,9 @@
     ]
   },
   {
+    "id": "video.zebra-pattern",
+    "domain": "video",
+    "category": "video.color",
     "label": "Zebra pattern",
     "detail": "标记达到设定曝光阈值的区域",
     "aliases": [
@@ -1233,6 +2306,9 @@
     ]
   },
   {
+    "id": "video.dynamic-range",
+    "domain": "video",
+    "category": "video.color",
     "label": "动态范围",
     "detail": "可记录或显示的亮暗跨度",
     "aliases": [
@@ -1240,6 +2316,9 @@
     ]
   },
   {
+    "id": "video.dynamic-range",
+    "domain": "video",
+    "category": "video.color",
     "label": "Dynamic range",
     "detail": "可记录或显示的亮暗跨度",
     "aliases": [
@@ -1247,6 +2326,9 @@
     ]
   },
   {
+    "id": "video.log-profile",
+    "domain": "video",
+    "category": "video.color",
     "label": "对数曲线",
     "detail": "用对数方式编码影像亮度",
     "aliases": [
@@ -1254,6 +2336,9 @@
     ]
   },
   {
+    "id": "video.log-profile",
+    "domain": "video",
+    "category": "video.color",
     "label": "Log profile",
     "detail": "用对数方式编码影像亮度",
     "aliases": [
@@ -1261,6 +2346,9 @@
     ]
   },
   {
+    "id": "video.color-management",
+    "domain": "video",
+    "category": "video.color",
     "label": "色彩管理",
     "detail": "协调输入处理和输出的色彩转换",
     "aliases": [
@@ -1268,6 +2356,9 @@
     ]
   },
   {
+    "id": "video.color-management",
+    "domain": "video",
+    "category": "video.color",
     "label": "Color management",
     "detail": "协调输入处理和输出的色彩转换",
     "aliases": [
@@ -1275,6 +2366,9 @@
     ]
   },
   {
+    "id": "video.secondary-color-correction",
+    "domain": "video",
+    "category": "video.color",
     "label": "二级调色",
     "detail": "针对特定颜色或区域调整",
     "aliases": [
@@ -1282,6 +2376,9 @@
     ]
   },
   {
+    "id": "video.secondary-color-correction",
+    "domain": "video",
+    "category": "video.color",
     "label": "Secondary color correction",
     "detail": "针对特定颜色或区域调整",
     "aliases": [
@@ -1289,6 +2386,9 @@
     ]
   },
   {
+    "id": "video.skin-tone-protection",
+    "domain": "video",
+    "category": "video.color",
     "label": "肤色保护",
     "detail": "调色时保持肤色自然一致",
     "aliases": [
@@ -1296,6 +2396,9 @@
     ]
   },
   {
+    "id": "video.skin-tone-protection",
+    "domain": "video",
+    "category": "video.color",
     "label": "Skin tone protection",
     "detail": "调色时保持肤色自然一致",
     "aliases": [
@@ -1303,6 +2406,9 @@
     ]
   },
   {
+    "id": "video.proxy-editing",
+    "domain": "video",
+    "category": "video.media",
     "label": "代理剪辑",
     "detail": "使用轻量替代素材进行剪辑",
     "aliases": [
@@ -1310,6 +2416,9 @@
     ]
   },
   {
+    "id": "video.proxy-editing",
+    "domain": "video",
+    "category": "video.media",
     "label": "Proxy editing",
     "detail": "使用轻量替代素材进行剪辑",
     "aliases": [
@@ -1317,6 +2426,9 @@
     ]
   },
   {
+    "id": "video.offline-editing",
+    "domain": "video",
+    "category": "video.media",
     "label": "脱机剪辑",
     "detail": "使用工作素材完成创意剪辑",
     "aliases": [
@@ -1324,6 +2436,9 @@
     ]
   },
   {
+    "id": "video.offline-editing",
+    "domain": "video",
+    "category": "video.media",
     "label": "Offline editing",
     "detail": "使用工作素材完成创意剪辑",
     "aliases": [
@@ -1331,6 +2446,9 @@
     ]
   },
   {
+    "id": "video.conforming",
+    "domain": "video",
+    "category": "video.media",
     "label": "套底",
     "detail": "把剪辑对应到高质量原始素材",
     "aliases": [
@@ -1338,6 +2456,9 @@
     ]
   },
   {
+    "id": "video.conforming",
+    "domain": "video",
+    "category": "video.media",
     "label": "Conforming",
     "detail": "把剪辑对应到高质量原始素材",
     "aliases": [
@@ -1345,6 +2466,9 @@
     ]
   },
   {
+    "id": "video.transcoding",
+    "domain": "video",
+    "category": "video.media",
     "label": "转码",
     "detail": "转换媒体编码格式",
     "aliases": [
@@ -1352,6 +2476,9 @@
     ]
   },
   {
+    "id": "video.transcoding",
+    "domain": "video",
+    "category": "video.media",
     "label": "Transcoding",
     "detail": "转换媒体编码格式",
     "aliases": [
@@ -1359,6 +2486,9 @@
     ]
   },
   {
+    "id": "video.encoder",
+    "domain": "video",
+    "category": "video.media",
     "label": "编码器",
     "detail": "将音视频压缩为目标编码",
     "aliases": [
@@ -1366,6 +2496,9 @@
     ]
   },
   {
+    "id": "video.encoder",
+    "domain": "video",
+    "category": "video.media",
     "label": "Encoder",
     "detail": "将音视频压缩为目标编码",
     "aliases": [
@@ -1373,6 +2506,9 @@
     ]
   },
   {
+    "id": "video.container-format",
+    "domain": "video",
+    "category": "video.media",
     "label": "封装格式",
     "detail": "组织媒体流与元数据",
     "aliases": [
@@ -1380,6 +2516,9 @@
     ]
   },
   {
+    "id": "video.container-format",
+    "domain": "video",
+    "category": "video.media",
     "label": "Container format",
     "detail": "组织媒体流与元数据",
     "aliases": [
@@ -1387,6 +2526,9 @@
     ]
   },
   {
+    "id": "video.bitrate",
+    "domain": "video",
+    "category": "video.media",
     "label": "码率",
     "detail": "单位时间传输或存储的数据量",
     "aliases": [
@@ -1394,6 +2536,9 @@
     ]
   },
   {
+    "id": "video.bitrate",
+    "domain": "video",
+    "category": "video.media",
     "label": "Bitrate",
     "detail": "单位时间传输或存储的数据量",
     "aliases": [
@@ -1401,6 +2546,9 @@
     ]
   },
   {
+    "id": "video.constant-bitrate",
+    "domain": "video",
+    "category": "video.media",
     "label": "恒定码率",
     "detail": "保持近似固定的数据速率",
     "aliases": [
@@ -1408,6 +2556,9 @@
     ]
   },
   {
+    "id": "video.constant-bitrate",
+    "domain": "video",
+    "category": "video.media",
     "label": "Constant bitrate",
     "detail": "保持近似固定的数据速率",
     "aliases": [
@@ -1416,6 +2567,9 @@
     ]
   },
   {
+    "id": "video.variable-bitrate",
+    "domain": "video",
+    "category": "video.media",
     "label": "可变码率",
     "detail": "按内容复杂度分配数据速率",
     "aliases": [
@@ -1423,6 +2577,9 @@
     ]
   },
   {
+    "id": "video.variable-bitrate",
+    "domain": "video",
+    "category": "video.media",
     "label": "Variable bitrate",
     "detail": "按内容复杂度分配数据速率",
     "aliases": [
@@ -1431,6 +2588,9 @@
     ]
   },
   {
+    "id": "video.frame-rate",
+    "domain": "video",
+    "category": "video.media",
     "label": "帧率",
     "detail": "每秒显示或记录的帧数",
     "aliases": [
@@ -1438,6 +2598,9 @@
     ]
   },
   {
+    "id": "video.frame-rate",
+    "domain": "video",
+    "category": "video.media",
     "label": "Frame rate",
     "detail": "每秒显示或记录的帧数",
     "aliases": [
@@ -1445,6 +2608,9 @@
     ]
   },
   {
+    "id": "video.variable-frame-rate",
+    "domain": "video",
+    "category": "video.media",
     "label": "可变帧率",
     "detail": "帧间时间间隔可变化",
     "aliases": [
@@ -1452,6 +2618,9 @@
     ]
   },
   {
+    "id": "video.variable-frame-rate",
+    "domain": "video",
+    "category": "video.media",
     "label": "Variable frame rate",
     "detail": "帧间时间间隔可变化",
     "aliases": [
@@ -1460,6 +2629,9 @@
     ]
   },
   {
+    "id": "video.timecode",
+    "domain": "video",
+    "category": "video.media",
     "label": "时间码",
     "detail": "为音视频帧提供时间标识",
     "aliases": [
@@ -1467,6 +2639,9 @@
     ]
   },
   {
+    "id": "video.timecode",
+    "domain": "video",
+    "category": "video.media",
     "label": "Timecode",
     "detail": "为音视频帧提供时间标识",
     "aliases": [
@@ -1474,6 +2649,9 @@
     ]
   },
   {
+    "id": "video.drop-frame-timecode",
+    "domain": "video",
+    "category": "video.media",
     "label": "丢帧时间码",
     "detail": "跳过部分编号以校准时钟时间",
     "aliases": [
@@ -1481,6 +2659,9 @@
     ]
   },
   {
+    "id": "video.drop-frame-timecode",
+    "domain": "video",
+    "category": "video.media",
     "label": "Drop-frame timecode",
     "detail": "跳过部分编号以校准时钟时间",
     "aliases": [
@@ -1488,6 +2669,9 @@
     ]
   },
   {
+    "id": "video.pixel-aspect-ratio",
+    "domain": "video",
+    "category": "video.media",
     "label": "像素宽高比",
     "detail": "单个像素宽与高的比例",
     "aliases": [
@@ -1495,6 +2679,9 @@
     ]
   },
   {
+    "id": "video.pixel-aspect-ratio",
+    "domain": "video",
+    "category": "video.media",
     "label": "Pixel aspect ratio",
     "detail": "单个像素宽与高的比例",
     "aliases": [
@@ -1502,6 +2689,9 @@
     ]
   },
   {
+    "id": "video.chroma-subsampling",
+    "domain": "video",
+    "category": "video.media",
     "label": "色度抽样",
     "detail": "降低色度采样以减少数据量",
     "aliases": [
@@ -1509,6 +2699,9 @@
     ]
   },
   {
+    "id": "video.chroma-subsampling",
+    "domain": "video",
+    "category": "video.media",
     "label": "Chroma subsampling",
     "detail": "降低色度采样以减少数据量",
     "aliases": [
@@ -1516,6 +2709,9 @@
     ]
   },
   {
+    "id": "video.bit-depth",
+    "domain": "video",
+    "category": "video.media",
     "label": "位深",
     "detail": "每个采样值使用的比特数量",
     "aliases": [
@@ -1523,6 +2719,9 @@
     ]
   },
   {
+    "id": "video.bit-depth",
+    "domain": "video",
+    "category": "video.media",
     "label": "Bit depth",
     "detail": "每个采样值使用的比特数量",
     "aliases": [
@@ -1530,6 +2729,9 @@
     ]
   },
   {
+    "id": "video.loudness-normalization",
+    "domain": "video",
+    "category": "video.audio",
     "label": "响度标准化",
     "detail": "把感知响度调整到目标值",
     "aliases": [
@@ -1537,6 +2739,9 @@
     ]
   },
   {
+    "id": "video.loudness-normalization",
+    "domain": "video",
+    "category": "video.audio",
     "label": "Loudness normalization",
     "detail": "把感知响度调整到目标值",
     "aliases": [
@@ -1544,6 +2749,9 @@
     ]
   },
   {
+    "id": "video.true-peak",
+    "domain": "video",
+    "category": "video.audio",
     "label": "真峰值",
     "detail": "估计重建波形的峰值",
     "aliases": [
@@ -1551,6 +2759,9 @@
     ]
   },
   {
+    "id": "video.true-peak",
+    "domain": "video",
+    "category": "video.audio",
     "label": "True peak",
     "detail": "估计重建波形的峰值",
     "aliases": [
@@ -1558,6 +2769,9 @@
     ]
   },
   {
+    "id": "video.noise-reduction",
+    "domain": "video",
+    "category": "video.audio",
     "label": "降噪",
     "detail": "减少不需要的背景噪声",
     "aliases": [
@@ -1565,6 +2779,9 @@
     ]
   },
   {
+    "id": "video.noise-reduction",
+    "domain": "video",
+    "category": "video.audio",
     "label": "Noise reduction",
     "detail": "减少不需要的背景噪声",
     "aliases": [
@@ -1572,6 +2789,9 @@
     ]
   },
   {
+    "id": "video.equalizer",
+    "domain": "video",
+    "category": "video.audio",
     "label": "均衡器",
     "detail": "调整不同频段的增益",
     "aliases": [
@@ -1579,6 +2799,9 @@
     ]
   },
   {
+    "id": "video.equalizer",
+    "domain": "video",
+    "category": "video.audio",
     "label": "Equalizer",
     "detail": "调整不同频段的增益",
     "aliases": [
@@ -1586,6 +2809,9 @@
     ]
   },
   {
+    "id": "video.dynamic-range-compression",
+    "domain": "video",
+    "category": "video.audio",
     "label": "动态压缩",
     "detail": "缩小音频电平变化范围",
     "aliases": [
@@ -1593,6 +2819,9 @@
     ]
   },
   {
+    "id": "video.dynamic-range-compression",
+    "domain": "video",
+    "category": "video.audio",
     "label": "Dynamic range compression",
     "detail": "缩小音频电平变化范围",
     "aliases": [
@@ -1600,6 +2829,9 @@
     ]
   },
   {
+    "id": "video.limiter",
+    "domain": "video",
+    "category": "video.audio",
     "label": "限幅器",
     "detail": "限制音频峰值电平",
     "aliases": [
@@ -1607,6 +2839,9 @@
     ]
   },
   {
+    "id": "video.limiter",
+    "domain": "video",
+    "category": "video.audio",
     "label": "Limiter",
     "detail": "限制音频峰值电平",
     "aliases": [
@@ -1614,6 +2849,9 @@
     ]
   },
   {
+    "id": "video.safe-area",
+    "domain": "video",
+    "category": "video.captions",
     "label": "安全框",
     "detail": "标示重要内容的显示安全区域",
     "aliases": [
@@ -1621,6 +2859,9 @@
     ]
   },
   {
+    "id": "video.safe-area",
+    "domain": "video",
+    "category": "video.captions",
     "label": "Safe area",
     "detail": "标示重要内容的显示安全区域",
     "aliases": [
@@ -1628,6 +2869,9 @@
     ]
   },
   {
+    "id": "video.multicam-editing",
+    "domain": "video",
+    "category": "video.editing",
     "label": "多机位剪辑",
     "detail": "在同步的多个机位间切换",
     "aliases": [
@@ -1635,6 +2879,9 @@
     ]
   },
   {
+    "id": "video.multicam-editing",
+    "domain": "video",
+    "category": "video.editing",
     "label": "Multicam editing",
     "detail": "在同步的多个机位间切换",
     "aliases": [
@@ -1642,6 +2889,9 @@
     ]
   },
   {
+    "id": "philosophy.epistemology",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "认识论",
     "detail": "研究知识及其来源与证成",
     "aliases": [
@@ -1650,6 +2900,9 @@
     ]
   },
   {
+    "id": "philosophy.epistemology",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Epistemology",
     "detail": "研究知识及其来源与证成",
     "aliases": [
@@ -1657,6 +2910,9 @@
     ]
   },
   {
+    "id": "philosophy.ontology",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "本体论",
     "detail": "研究存在及存在者的类别",
     "aliases": [
@@ -1664,6 +2920,9 @@
     ]
   },
   {
+    "id": "philosophy.ontology",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Ontology",
     "detail": "研究存在及存在者的类别",
     "aliases": [
@@ -1671,6 +2930,9 @@
     ]
   },
   {
+    "id": "philosophy.metaphysics",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "形而上学",
     "detail": "研究实在的基本结构",
     "aliases": [
@@ -1678,6 +2940,9 @@
     ]
   },
   {
+    "id": "philosophy.metaphysics",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Metaphysics",
     "detail": "研究实在的基本结构",
     "aliases": [
@@ -1685,6 +2950,9 @@
     ]
   },
   {
+    "id": "philosophy.ethics",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "伦理学",
     "detail": "研究道德判断与行动理由",
     "aliases": [
@@ -1692,6 +2960,9 @@
     ]
   },
   {
+    "id": "philosophy.ethics",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Ethics",
     "detail": "研究道德判断与行动理由",
     "aliases": [
@@ -1699,6 +2970,9 @@
     ]
   },
   {
+    "id": "philosophy.aesthetics",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "美学",
     "detail": "研究审美经验与艺术价值",
     "aliases": [
@@ -1706,6 +2980,9 @@
     ]
   },
   {
+    "id": "philosophy.aesthetics",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Aesthetics",
     "detail": "研究审美经验与艺术价值",
     "aliases": [
@@ -1713,6 +2990,9 @@
     ]
   },
   {
+    "id": "philosophy.logic",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "逻辑学",
     "detail": "研究有效推理的形式与规则",
     "aliases": [
@@ -1720,6 +3000,9 @@
     ]
   },
   {
+    "id": "philosophy.logic",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Logic",
     "detail": "研究有效推理的形式与规则",
     "aliases": [
@@ -1727,6 +3010,9 @@
     ]
   },
   {
+    "id": "philosophy.phenomenology",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "现象学",
     "detail": "研究经验如何向意识显现",
     "aliases": [
@@ -1734,6 +3020,9 @@
     ]
   },
   {
+    "id": "philosophy.phenomenology",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Phenomenology",
     "detail": "研究经验如何向意识显现",
     "aliases": [
@@ -1741,6 +3030,9 @@
     ]
   },
   {
+    "id": "philosophy.hermeneutics",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "诠释学",
     "detail": "研究理解与解释的条件",
     "aliases": [
@@ -1748,6 +3040,9 @@
     ]
   },
   {
+    "id": "philosophy.hermeneutics",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Hermeneutics",
     "detail": "研究理解与解释的条件",
     "aliases": [
@@ -1755,6 +3050,9 @@
     ]
   },
   {
+    "id": "philosophy.pragmatism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "实用主义",
     "detail": "重视实践后果与探究过程",
     "aliases": [
@@ -1762,6 +3060,9 @@
     ]
   },
   {
+    "id": "philosophy.pragmatism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Pragmatism",
     "detail": "重视实践后果与探究过程",
     "aliases": [
@@ -1769,6 +3070,9 @@
     ]
   },
   {
+    "id": "philosophy.empiricism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "经验主义",
     "detail": "强调经验在知识形成中的作用",
     "aliases": [
@@ -1776,6 +3080,9 @@
     ]
   },
   {
+    "id": "philosophy.empiricism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Empiricism",
     "detail": "强调经验在知识形成中的作用",
     "aliases": [
@@ -1783,6 +3090,9 @@
     ]
   },
   {
+    "id": "philosophy.rationalism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "理性主义",
     "detail": "强调理性在知识中的作用",
     "aliases": [
@@ -1790,6 +3100,9 @@
     ]
   },
   {
+    "id": "philosophy.rationalism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Rationalism",
     "detail": "强调理性在知识中的作用",
     "aliases": [
@@ -1797,6 +3110,9 @@
     ]
   },
   {
+    "id": "philosophy.skepticism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "怀疑主义",
     "detail": "质疑知识主张的根据或范围",
     "aliases": [
@@ -1804,6 +3120,9 @@
     ]
   },
   {
+    "id": "philosophy.skepticism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Skepticism",
     "detail": "质疑知识主张的根据或范围",
     "aliases": [
@@ -1811,6 +3130,9 @@
     ]
   },
   {
+    "id": "philosophy.realism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "实在论",
     "detail": "主张某类对象或事实独立存在",
     "aliases": [
@@ -1818,6 +3140,9 @@
     ]
   },
   {
+    "id": "philosophy.realism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Realism",
     "detail": "主张某类对象或事实独立存在",
     "aliases": [
@@ -1825,6 +3150,9 @@
     ]
   },
   {
+    "id": "philosophy.instrumentalism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "工具主义",
     "detail": "将理论视为预测与解释的工具",
     "aliases": [
@@ -1832,6 +3160,9 @@
     ]
   },
   {
+    "id": "philosophy.instrumentalism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Instrumentalism",
     "detail": "将理论视为预测与解释的工具",
     "aliases": [
@@ -1839,6 +3170,9 @@
     ]
   },
   {
+    "id": "philosophy.materialism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "唯物主义",
     "detail": "强调物质在实在中的基础地位",
     "aliases": [
@@ -1846,6 +3180,9 @@
     ]
   },
   {
+    "id": "philosophy.materialism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Materialism",
     "detail": "强调物质在实在中的基础地位",
     "aliases": [
@@ -1853,6 +3190,9 @@
     ]
   },
   {
+    "id": "philosophy.dualism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "二元论",
     "detail": "主张两类不可还原的基本实体或属性",
     "aliases": [
@@ -1860,6 +3200,9 @@
     ]
   },
   {
+    "id": "philosophy.dualism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Dualism",
     "detail": "主张两类不可还原的基本实体或属性",
     "aliases": [
@@ -1867,6 +3210,9 @@
     ]
   },
   {
+    "id": "philosophy.physicalism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "物理主义",
     "detail": "主张一切实在最终具有物理性质",
     "aliases": [
@@ -1874,6 +3220,9 @@
     ]
   },
   {
+    "id": "philosophy.physicalism",
+    "domain": "philosophy",
+    "category": "philosophy.foundations",
     "label": "Physicalism",
     "detail": "主张一切实在最终具有物理性质",
     "aliases": [
@@ -1881,6 +3230,9 @@
     ]
   },
   {
+    "id": "philosophy.emergence",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "涌现",
     "detail": "整体呈现层次性的新增性质",
     "aliases": [
@@ -1888,6 +3240,9 @@
     ]
   },
   {
+    "id": "philosophy.emergence",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Emergence",
     "detail": "整体呈现层次性的新增性质",
     "aliases": [
@@ -1895,6 +3250,9 @@
     ]
   },
   {
+    "id": "philosophy.reductionism",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "还原论",
     "detail": "用更基础层次解释复杂现象",
     "aliases": [
@@ -1902,6 +3260,9 @@
     ]
   },
   {
+    "id": "philosophy.reductionism",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Reductionism",
     "detail": "用更基础层次解释复杂现象",
     "aliases": [
@@ -1909,6 +3270,9 @@
     ]
   },
   {
+    "id": "philosophy.determinism",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "决定论",
     "detail": "先前状态与规律决定后续状态",
     "aliases": [
@@ -1916,6 +3280,9 @@
     ]
   },
   {
+    "id": "philosophy.determinism",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Determinism",
     "detail": "先前状态与规律决定后续状态",
     "aliases": [
@@ -1923,6 +3290,9 @@
     ]
   },
   {
+    "id": "philosophy.free-will",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "自由意志",
     "detail": "探讨行动者的选择与控制能力",
     "aliases": [
@@ -1930,6 +3300,9 @@
     ]
   },
   {
+    "id": "philosophy.free-will",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Free will",
     "detail": "探讨行动者的选择与控制能力",
     "aliases": [
@@ -1937,6 +3310,9 @@
     ]
   },
   {
+    "id": "philosophy.compatibilism",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "相容论",
     "detail": "认为自由意志可与决定论相容",
     "aliases": [
@@ -1944,6 +3320,9 @@
     ]
   },
   {
+    "id": "philosophy.compatibilism",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Compatibilism",
     "detail": "认为自由意志可与决定论相容",
     "aliases": [
@@ -1951,6 +3330,9 @@
     ]
   },
   {
+    "id": "philosophy.intentionality",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "意向性",
     "detail": "心灵状态指向对象或内容的特征",
     "aliases": [
@@ -1958,6 +3340,9 @@
     ]
   },
   {
+    "id": "philosophy.intentionality",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Intentionality",
     "detail": "心灵状态指向对象或内容的特征",
     "aliases": [
@@ -1965,6 +3350,9 @@
     ]
   },
   {
+    "id": "philosophy.qualia",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "感受质",
     "detail": "主观经验所具有的感受性质",
     "aliases": [
@@ -1972,6 +3360,9 @@
     ]
   },
   {
+    "id": "philosophy.qualia",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Qualia",
     "detail": "主观经验所具有的感受性质",
     "aliases": [
@@ -1979,6 +3370,9 @@
     ]
   },
   {
+    "id": "philosophy.intersubjectivity",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "主体间性",
     "detail": "主体之间共享理解与经验的关系",
     "aliases": [
@@ -1986,6 +3380,9 @@
     ]
   },
   {
+    "id": "philosophy.intersubjectivity",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Intersubjectivity",
     "detail": "主体之间共享理解与经验的关系",
     "aliases": [
@@ -1993,6 +3390,9 @@
     ]
   },
   {
+    "id": "philosophy.a-priori-knowledge",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "先天知识",
     "detail": "不依赖特定经验的知识根据",
     "aliases": [
@@ -2000,6 +3400,9 @@
     ]
   },
   {
+    "id": "philosophy.a-priori-knowledge",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "A priori knowledge",
     "detail": "不依赖特定经验的知识根据",
     "aliases": [
@@ -2007,6 +3410,9 @@
     ]
   },
   {
+    "id": "philosophy.a-posteriori-knowledge",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "后验知识",
     "detail": "以经验为根据的知识",
     "aliases": [
@@ -2014,6 +3420,9 @@
     ]
   },
   {
+    "id": "philosophy.a-posteriori-knowledge",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "A posteriori knowledge",
     "detail": "以经验为根据的知识",
     "aliases": [
@@ -2021,6 +3430,9 @@
     ]
   },
   {
+    "id": "philosophy.justification",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "证成",
     "detail": "支持信念合理性的根据",
     "aliases": [
@@ -2028,6 +3440,9 @@
     ]
   },
   {
+    "id": "philosophy.justification",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Justification",
     "detail": "支持信念合理性的根据",
     "aliases": [
@@ -2035,6 +3450,9 @@
     ]
   },
   {
+    "id": "philosophy.gettier-problem",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "盖梯尔问题",
     "detail": "质疑证成真信念足以构成知识",
     "aliases": [
@@ -2042,6 +3460,9 @@
     ]
   },
   {
+    "id": "philosophy.gettier-problem",
+    "domain": "philosophy",
+    "category": "philosophy.knowledge",
     "label": "Gettier problem",
     "detail": "质疑证成真信念足以构成知识",
     "aliases": [
@@ -2049,6 +3470,9 @@
     ]
   },
   {
+    "id": "philosophy.deductive-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "演绎推理",
     "detail": "考察前提是否必然支持结论",
     "aliases": [
@@ -2056,6 +3480,9 @@
     ]
   },
   {
+    "id": "philosophy.deductive-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Deductive reasoning",
     "detail": "考察前提是否必然支持结论",
     "aliases": [
@@ -2063,6 +3490,9 @@
     ]
   },
   {
+    "id": "philosophy.inductive-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "归纳推理",
     "detail": "从个别观察推向一般判断",
     "aliases": [
@@ -2070,6 +3500,9 @@
     ]
   },
   {
+    "id": "philosophy.inductive-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Inductive reasoning",
     "detail": "从个别观察推向一般判断",
     "aliases": [
@@ -2077,6 +3510,9 @@
     ]
   },
   {
+    "id": "philosophy.abductive-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "溯因推理",
     "detail": "寻求对观察的最佳解释",
     "aliases": [
@@ -2084,6 +3520,9 @@
     ]
   },
   {
+    "id": "philosophy.abductive-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Abductive reasoning",
     "detail": "寻求对观察的最佳解释",
     "aliases": [
@@ -2091,6 +3530,9 @@
     ]
   },
   {
+    "id": "philosophy.falsifiability",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "可证伪性",
     "detail": "主张能否被可能的反例检验",
     "aliases": [
@@ -2098,6 +3540,9 @@
     ]
   },
   {
+    "id": "philosophy.falsifiability",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Falsifiability",
     "detail": "主张能否被可能的反例检验",
     "aliases": [
@@ -2105,6 +3550,9 @@
     ]
   },
   {
+    "id": "philosophy.necessary-condition",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "必要条件",
     "detail": "结果成立所必须具备的条件",
     "aliases": [
@@ -2112,6 +3560,9 @@
     ]
   },
   {
+    "id": "philosophy.necessary-condition",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Necessary condition",
     "detail": "结果成立所必须具备的条件",
     "aliases": [
@@ -2119,6 +3570,9 @@
     ]
   },
   {
+    "id": "philosophy.sufficient-condition",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "充分条件",
     "detail": "成立时足以推出结果的条件",
     "aliases": [
@@ -2126,6 +3580,9 @@
     ]
   },
   {
+    "id": "philosophy.sufficient-condition",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Sufficient condition",
     "detail": "成立时足以推出结果的条件",
     "aliases": [
@@ -2133,6 +3590,9 @@
     ]
   },
   {
+    "id": "philosophy.thought-experiment",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "思想实验",
     "detail": "通过设想情境检验概念与论证",
     "aliases": [
@@ -2140,6 +3600,9 @@
     ]
   },
   {
+    "id": "philosophy.thought-experiment",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Thought experiment",
     "detail": "通过设想情境检验概念与论证",
     "aliases": [
@@ -2147,6 +3610,9 @@
     ]
   },
   {
+    "id": "philosophy.counterfactual-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "反事实推理",
     "detail": "考察事实不同情况下的可能结果",
     "aliases": [
@@ -2154,6 +3620,9 @@
     ]
   },
   {
+    "id": "philosophy.counterfactual-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Counterfactual reasoning",
     "detail": "考察事实不同情况下的可能结果",
     "aliases": [
@@ -2161,6 +3630,9 @@
     ]
   },
   {
+    "id": "philosophy.circular-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "循环论证",
     "detail": "用待证明结论支持其自身",
     "aliases": [
@@ -2168,6 +3640,9 @@
     ]
   },
   {
+    "id": "philosophy.circular-reasoning",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Circular reasoning",
     "detail": "用待证明结论支持其自身",
     "aliases": [
@@ -2175,6 +3650,9 @@
     ]
   },
   {
+    "id": "philosophy.straw-man-fallacy",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "稻草人谬误",
     "detail": "歪曲对方论点后加以反驳",
     "aliases": [
@@ -2182,6 +3660,9 @@
     ]
   },
   {
+    "id": "philosophy.straw-man-fallacy",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Straw man fallacy",
     "detail": "歪曲对方论点后加以反驳",
     "aliases": [
@@ -2189,6 +3670,9 @@
     ]
   },
   {
+    "id": "philosophy.equivocation",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "偷换概念",
     "detail": "在论证中改变关键用语含义",
     "aliases": [
@@ -2196,6 +3680,9 @@
     ]
   },
   {
+    "id": "philosophy.equivocation",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Equivocation",
     "detail": "在论证中改变关键用语含义",
     "aliases": [
@@ -2203,6 +3690,9 @@
     ]
   },
   {
+    "id": "philosophy.false-dilemma",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "虚假两难",
     "detail": "把多种可能压缩为两个选项",
     "aliases": [
@@ -2210,6 +3700,9 @@
     ]
   },
   {
+    "id": "philosophy.false-dilemma",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "False dilemma",
     "detail": "把多种可能压缩为两个选项",
     "aliases": [
@@ -2217,6 +3710,9 @@
     ]
   },
   {
+    "id": "philosophy.ad-hominem",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "诉诸人身",
     "detail": "以针对人的攻击代替回应论证",
     "aliases": [
@@ -2224,6 +3720,9 @@
     ]
   },
   {
+    "id": "philosophy.ad-hominem",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "label": "Ad hominem",
     "detail": "以针对人的攻击代替回应论证",
     "aliases": [
@@ -2231,6 +3730,9 @@
     ]
   },
   {
+    "id": "philosophy.deontology",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "义务论",
     "detail": "强调行动的义务与约束",
     "aliases": [
@@ -2238,6 +3740,9 @@
     ]
   },
   {
+    "id": "philosophy.deontology",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "Deontology",
     "detail": "强调行动的义务与约束",
     "aliases": [
@@ -2245,6 +3750,9 @@
     ]
   },
   {
+    "id": "philosophy.consequentialism",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "后果主义",
     "detail": "根据行动后果评价其道德性",
     "aliases": [
@@ -2252,6 +3760,9 @@
     ]
   },
   {
+    "id": "philosophy.consequentialism",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "Consequentialism",
     "detail": "根据行动后果评价其道德性",
     "aliases": [
@@ -2259,6 +3770,9 @@
     ]
   },
   {
+    "id": "philosophy.utilitarianism",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "功利主义",
     "detail": "以总体福祉评价行动或规则",
     "aliases": [
@@ -2266,6 +3780,9 @@
     ]
   },
   {
+    "id": "philosophy.utilitarianism",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "Utilitarianism",
     "detail": "以总体福祉评价行动或规则",
     "aliases": [
@@ -2273,6 +3790,9 @@
     ]
   },
   {
+    "id": "philosophy.virtue-ethics",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "德性伦理",
     "detail": "强调品格与德性的伦理进路",
     "aliases": [
@@ -2280,6 +3800,9 @@
     ]
   },
   {
+    "id": "philosophy.virtue-ethics",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "label": "Virtue ethics",
     "detail": "强调品格与德性的伦理进路",
     "aliases": [
@@ -2287,6 +3810,9 @@
     ]
   },
   {
+    "id": "cognition.metacognition",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "元认知",
     "detail": "监测和调节自身认知过程",
     "aliases": [
@@ -2294,6 +3820,9 @@
     ]
   },
   {
+    "id": "cognition.metacognition",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Metacognition",
     "detail": "监测和调节自身认知过程",
     "aliases": [
@@ -2301,6 +3830,9 @@
     ]
   },
   {
+    "id": "cognition.cognitive-load",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "认知负荷",
     "detail": "任务对有限认知资源的占用",
     "aliases": [
@@ -2308,6 +3840,9 @@
     ]
   },
   {
+    "id": "cognition.cognitive-load",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Cognitive load",
     "detail": "任务对有限认知资源的占用",
     "aliases": [
@@ -2315,6 +3850,9 @@
     ]
   },
   {
+    "id": "cognition.working-memory",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "工作记忆",
     "detail": "暂时保持并加工信息的系统",
     "aliases": [
@@ -2322,6 +3860,9 @@
     ]
   },
   {
+    "id": "cognition.working-memory",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Working memory",
     "detail": "暂时保持并加工信息的系统",
     "aliases": [
@@ -2329,6 +3870,9 @@
     ]
   },
   {
+    "id": "cognition.long-term-memory",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "长期记忆",
     "detail": "相对持久的信息保持",
     "aliases": [
@@ -2336,6 +3880,9 @@
     ]
   },
   {
+    "id": "cognition.long-term-memory",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Long-term memory",
     "detail": "相对持久的信息保持",
     "aliases": [
@@ -2343,6 +3890,9 @@
     ]
   },
   {
+    "id": "cognition.attention",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "注意力",
     "detail": "选择并分配信息处理资源",
     "aliases": [
@@ -2350,6 +3900,9 @@
     ]
   },
   {
+    "id": "cognition.attention",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Attention",
     "detail": "选择并分配信息处理资源",
     "aliases": [
@@ -2357,6 +3910,9 @@
     ]
   },
   {
+    "id": "cognition.selective-attention",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "选择性注意",
     "detail": "优先处理特定信息",
     "aliases": [
@@ -2364,6 +3920,9 @@
     ]
   },
   {
+    "id": "cognition.selective-attention",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Selective attention",
     "detail": "优先处理特定信息",
     "aliases": [
@@ -2371,6 +3930,9 @@
     ]
   },
   {
+    "id": "cognition.inhibitory-control",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "抑制控制",
     "detail": "抑制不合适的冲动或反应",
     "aliases": [
@@ -2378,6 +3940,9 @@
     ]
   },
   {
+    "id": "cognition.inhibitory-control",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Inhibitory control",
     "detail": "抑制不合适的冲动或反应",
     "aliases": [
@@ -2385,6 +3950,9 @@
     ]
   },
   {
+    "id": "cognition.executive-functions",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "执行功能",
     "detail": "支持目标导向行为的控制过程",
     "aliases": [
@@ -2392,6 +3960,9 @@
     ]
   },
   {
+    "id": "cognition.executive-functions",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Executive functions",
     "detail": "支持目标导向行为的控制过程",
     "aliases": [
@@ -2399,6 +3970,9 @@
     ]
   },
   {
+    "id": "cognition.cognitive-flexibility",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "认知灵活性",
     "detail": "根据情境切换规则与视角",
     "aliases": [
@@ -2406,6 +3980,9 @@
     ]
   },
   {
+    "id": "cognition.cognitive-flexibility",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Cognitive flexibility",
     "detail": "根据情境切换规则与视角",
     "aliases": [
@@ -2413,6 +3990,9 @@
     ]
   },
   {
+    "id": "cognition.mental-model",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "心理模型",
     "detail": "对系统运行方式的内部表征",
     "aliases": [
@@ -2420,6 +4000,9 @@
     ]
   },
   {
+    "id": "cognition.mental-model",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Mental model",
     "detail": "对系统运行方式的内部表征",
     "aliases": [
@@ -2427,6 +4010,9 @@
     ]
   },
   {
+    "id": "cognition.schema",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "图式",
     "detail": "组织经验与知识的认知结构",
     "aliases": [
@@ -2434,6 +4020,9 @@
     ]
   },
   {
+    "id": "cognition.schema",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Schema",
     "detail": "组织经验与知识的认知结构",
     "aliases": [
@@ -2441,6 +4030,9 @@
     ]
   },
   {
+    "id": "cognition.cognitive-dissonance",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "认知失调",
     "detail": "不一致认知所产生的不适",
     "aliases": [
@@ -2448,6 +4040,9 @@
     ]
   },
   {
+    "id": "cognition.cognitive-dissonance",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Cognitive dissonance",
     "detail": "不一致认知所产生的不适",
     "aliases": [
@@ -2455,6 +4050,9 @@
     ]
   },
   {
+    "id": "cognition.anchoring-effect",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "锚定效应",
     "detail": "判断受到初始参照的影响",
     "aliases": [
@@ -2462,6 +4060,9 @@
     ]
   },
   {
+    "id": "cognition.anchoring-effect",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Anchoring effect",
     "detail": "判断受到初始参照的影响",
     "aliases": [
@@ -2469,6 +4070,9 @@
     ]
   },
   {
+    "id": "cognition.availability-heuristic",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "可得性启发式",
     "detail": "依据信息易想起程度作判断",
     "aliases": [
@@ -2476,6 +4080,9 @@
     ]
   },
   {
+    "id": "cognition.availability-heuristic",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Availability heuristic",
     "detail": "依据信息易想起程度作判断",
     "aliases": [
@@ -2483,6 +4090,9 @@
     ]
   },
   {
+    "id": "cognition.representativeness-heuristic",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "代表性启发式",
     "detail": "依据典型性判断概率或类别",
     "aliases": [
@@ -2490,6 +4100,9 @@
     ]
   },
   {
+    "id": "cognition.representativeness-heuristic",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Representativeness heuristic",
     "detail": "依据典型性判断概率或类别",
     "aliases": [
@@ -2497,6 +4110,9 @@
     ]
   },
   {
+    "id": "cognition.loss-aversion",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "损失厌恶",
     "detail": "相对同等收益更重视损失",
     "aliases": [
@@ -2504,6 +4120,9 @@
     ]
   },
   {
+    "id": "cognition.loss-aversion",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Loss aversion",
     "detail": "相对同等收益更重视损失",
     "aliases": [
@@ -2511,6 +4130,9 @@
     ]
   },
   {
+    "id": "cognition.framing-effect",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "框架效应",
     "detail": "信息呈现方式影响判断",
     "aliases": [
@@ -2518,6 +4140,9 @@
     ]
   },
   {
+    "id": "cognition.framing-effect",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Framing effect",
     "detail": "信息呈现方式影响判断",
     "aliases": [
@@ -2525,6 +4150,9 @@
     ]
   },
   {
+    "id": "cognition.survivorship-bias",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "幸存者偏差",
     "detail": "仅观察留存样本而忽略退出样本",
     "aliases": [
@@ -2532,6 +4160,9 @@
     ]
   },
   {
+    "id": "cognition.survivorship-bias",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Survivorship bias",
     "detail": "仅观察留存样本而忽略退出样本",
     "aliases": [
@@ -2539,6 +4170,9 @@
     ]
   },
   {
+    "id": "cognition.fundamental-attribution-error",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "基本归因错误",
     "detail": "解释他人行为时低估情境作用",
     "aliases": [
@@ -2546,6 +4180,9 @@
     ]
   },
   {
+    "id": "cognition.fundamental-attribution-error",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Fundamental attribution error",
     "detail": "解释他人行为时低估情境作用",
     "aliases": [
@@ -2553,6 +4190,9 @@
     ]
   },
   {
+    "id": "cognition.hindsight-bias",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "后见之明偏差",
     "detail": "事后高估结果的可预见性",
     "aliases": [
@@ -2560,6 +4200,9 @@
     ]
   },
   {
+    "id": "cognition.hindsight-bias",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Hindsight bias",
     "detail": "事后高估结果的可预见性",
     "aliases": [
@@ -2567,6 +4210,9 @@
     ]
   },
   {
+    "id": "cognition.overconfidence",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "过度自信",
     "detail": "信心超过判断的实际准确程度",
     "aliases": [
@@ -2574,6 +4220,9 @@
     ]
   },
   {
+    "id": "cognition.overconfidence",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "label": "Overconfidence",
     "detail": "信心超过判断的实际准确程度",
     "aliases": [
@@ -2581,6 +4230,9 @@
     ]
   },
   {
+    "id": "cognition.cognitive-reappraisal",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "认知重评",
     "detail": "改变对情境的解释以调节情绪",
     "aliases": [
@@ -2588,6 +4240,9 @@
     ]
   },
   {
+    "id": "cognition.cognitive-reappraisal",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Cognitive reappraisal",
     "detail": "改变对情境的解释以调节情绪",
     "aliases": [
@@ -2595,6 +4250,9 @@
     ]
   },
   {
+    "id": "cognition.spaced-practice",
+    "domain": "cognition",
+    "category": "cognition.learning",
     "label": "间隔学习",
     "detail": "分散安排学习时间",
     "aliases": [
@@ -2602,6 +4260,9 @@
     ]
   },
   {
+    "id": "cognition.spaced-practice",
+    "domain": "cognition",
+    "category": "cognition.learning",
     "label": "Spaced practice",
     "detail": "分散安排学习时间",
     "aliases": [
@@ -2609,6 +4270,9 @@
     ]
   },
   {
+    "id": "cognition.interleaved-practice",
+    "domain": "cognition",
+    "category": "cognition.learning",
     "label": "交错学习",
     "detail": "交替练习不同类型的任务",
     "aliases": [
@@ -2616,6 +4280,9 @@
     ]
   },
   {
+    "id": "cognition.interleaved-practice",
+    "domain": "cognition",
+    "category": "cognition.learning",
     "label": "Interleaved practice",
     "detail": "交替练习不同类型的任务",
     "aliases": [
@@ -2623,6 +4290,9 @@
     ]
   },
   {
+    "id": "cognition.transfer-of-learning",
+    "domain": "cognition",
+    "category": "cognition.learning",
     "label": "迁移学习",
     "detail": "将所学应用于新的任务情境",
     "aliases": [
@@ -2630,6 +4300,9 @@
     ]
   },
   {
+    "id": "cognition.transfer-of-learning",
+    "domain": "cognition",
+    "category": "cognition.learning",
     "label": "Transfer of learning",
     "detail": "将所学应用于新的任务情境",
     "aliases": [
@@ -2637,6 +4310,9 @@
     ]
   },
   {
+    "id": "cognition.embodied-cognition",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "具身认知",
     "detail": "研究身体与环境对认知的作用",
     "aliases": [
@@ -2644,6 +4320,9 @@
     ]
   },
   {
+    "id": "cognition.embodied-cognition",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Embodied cognition",
     "detail": "研究身体与环境对认知的作用",
     "aliases": [
@@ -2651,6 +4330,9 @@
     ]
   },
   {
+    "id": "cognition.predictive-processing",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "预测加工",
     "detail": "以预测及误差更新解释认知的框架",
     "aliases": [
@@ -2658,6 +4340,9 @@
     ]
   },
   {
+    "id": "cognition.predictive-processing",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Predictive processing",
     "detail": "以预测及误差更新解释认知的框架",
     "aliases": [
@@ -2665,6 +4350,9 @@
     ]
   },
   {
+    "id": "cognition.bayesian-updating",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "贝叶斯更新",
     "detail": "根据新证据调整概率判断",
     "aliases": [
@@ -2672,6 +4360,9 @@
     ]
   },
   {
+    "id": "cognition.bayesian-updating",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Bayesian updating",
     "detail": "根据新证据调整概率判断",
     "aliases": [
@@ -2679,6 +4370,9 @@
     ]
   },
   {
+    "id": "cognition.dual-process-theory",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "双加工理论",
     "detail": "区分不同类型加工过程的理论家族",
     "aliases": [
@@ -2686,6 +4380,9 @@
     ]
   },
   {
+    "id": "cognition.dual-process-theory",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Dual-process theory",
     "detail": "区分不同类型加工过程的理论家族",
     "aliases": [
@@ -2693,6 +4390,9 @@
     ]
   },
   {
+    "id": "cognition.theory-of-mind",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "心智理论",
     "detail": "理解他人可能具有不同心理状态",
     "aliases": [
@@ -2700,10 +4400,4121 @@
     ]
   },
   {
+    "id": "cognition.theory-of-mind",
+    "domain": "cognition",
+    "category": "cognition.processes",
     "label": "Theory of mind",
     "detail": "理解他人可能具有不同心理状态",
     "aliases": [
       "Theory of mind"
+    ]
+  },
+  {
+    "id": "ai.artificial-intelligence",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "人工智能",
+    "detail": "让计算机执行识别、推理和生成等任务",
+    "aliases": [
+      "人工智能"
+    ]
+  },
+  {
+    "id": "ai.artificial-intelligence",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Artificial intelligence",
+    "detail": "让计算机执行识别、推理和生成等任务",
+    "aliases": [
+      "Artificial intelligence",
+      "AI"
+    ]
+  },
+  {
+    "id": "ai.machine-learning",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "机器学习",
+    "detail": "从数据中学习用于预测或决策的模式",
+    "aliases": [
+      "机器学习"
+    ]
+  },
+  {
+    "id": "ai.machine-learning",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Machine learning",
+    "detail": "从数据中学习用于预测或决策的模式",
+    "aliases": [
+      "Machine learning",
+      "ML"
+    ]
+  },
+  {
+    "id": "ai.deep-learning",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "深度学习",
+    "detail": "使用多层神经网络学习数据表示",
+    "aliases": [
+      "深度学习"
+    ]
+  },
+  {
+    "id": "ai.deep-learning",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Deep learning",
+    "detail": "使用多层神经网络学习数据表示",
+    "aliases": [
+      "Deep learning",
+      "DL"
+    ]
+  },
+  {
+    "id": "ai.neural-network",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "神经网络",
+    "detail": "由可训练的连接组成的计算模型",
+    "aliases": [
+      "神经网络"
+    ]
+  },
+  {
+    "id": "ai.neural-network",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Neural network",
+    "detail": "由可训练的连接组成的计算模型",
+    "aliases": [
+      "Neural network"
+    ]
+  },
+  {
+    "id": "ai.large-language-model",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "大语言模型",
+    "detail": "处理和生成自然语言的语言模型",
+    "aliases": [
+      "大语言模型"
+    ]
+  },
+  {
+    "id": "ai.large-language-model",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Large language model",
+    "detail": "处理和生成自然语言的语言模型",
+    "aliases": [
+      "Large language model",
+      "LLM"
+    ]
+  },
+  {
+    "id": "ai.foundation-model",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "基础模型",
+    "detail": "在广泛数据上训练并适配多种任务的模型",
+    "aliases": [
+      "基础模型"
+    ]
+  },
+  {
+    "id": "ai.foundation-model",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Foundation model",
+    "detail": "在广泛数据上训练并适配多种任务的模型",
+    "aliases": [
+      "Foundation model"
+    ]
+  },
+  {
+    "id": "ai.multimodal-model",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "多模态模型",
+    "detail": "处理文本、图像或音频等多种输入形式",
+    "aliases": [
+      "多模态模型"
+    ]
+  },
+  {
+    "id": "ai.multimodal-model",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Multimodal model",
+    "detail": "处理文本、图像或音频等多种输入形式",
+    "aliases": [
+      "Multimodal model"
+    ]
+  },
+  {
+    "id": "ai.vision-language-model",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "视觉语言模型",
+    "detail": "联合处理图像与自然语言",
+    "aliases": [
+      "视觉语言模型"
+    ]
+  },
+  {
+    "id": "ai.vision-language-model",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Vision-language model",
+    "detail": "联合处理图像与自然语言",
+    "aliases": [
+      "Vision-language model",
+      "VLM"
+    ]
+  },
+  {
+    "id": "ai.tokenizer",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "分词器",
+    "detail": "把文本转换为模型使用的词元序列",
+    "aliases": [
+      "分词器"
+    ]
+  },
+  {
+    "id": "ai.tokenizer",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Tokenizer",
+    "detail": "把文本转换为模型使用的词元序列",
+    "aliases": [
+      "Tokenizer"
+    ]
+  },
+  {
+    "id": "ai.token",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "词元",
+    "detail": "模型处理文本时使用的基本单位",
+    "aliases": [
+      "词元"
+    ]
+  },
+  {
+    "id": "ai.token",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Token",
+    "detail": "模型处理文本时使用的基本单位",
+    "aliases": [
+      "Token",
+      "tokens"
+    ]
+  },
+  {
+    "id": "ai.context-window",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "上下文窗口",
+    "detail": "一次模型请求可容纳的上下文范围",
+    "aliases": [
+      "上下文窗口"
+    ]
+  },
+  {
+    "id": "ai.context-window",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Context window",
+    "detail": "一次模型请求可容纳的上下文范围",
+    "aliases": [
+      "Context window"
+    ]
+  },
+  {
+    "id": "ai.context-engineering",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "上下文工程",
+    "detail": "组织任务所需的指令、资料和工具结果",
+    "aliases": [
+      "上下文工程"
+    ]
+  },
+  {
+    "id": "ai.context-engineering",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "Context engineering",
+    "detail": "组织任务所需的指令、资料和工具结果",
+    "aliases": [
+      "Context engineering"
+    ]
+  },
+  {
+    "id": "ai.prompt-engineering",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "提示词工程",
+    "detail": "明确任务、约束、示例和输出要求",
+    "aliases": [
+      "提示词工程"
+    ]
+  },
+  {
+    "id": "ai.prompt-engineering",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "Prompt engineering",
+    "detail": "明确任务、约束、示例和输出要求",
+    "aliases": [
+      "Prompt engineering"
+    ]
+  },
+  {
+    "id": "ai.system-prompt",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "系统提示词",
+    "detail": "为模型设置角色与整体行为规则",
+    "aliases": [
+      "系统提示词"
+    ]
+  },
+  {
+    "id": "ai.system-prompt",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "System prompt",
+    "detail": "为模型设置角色与整体行为规则",
+    "aliases": [
+      "System prompt"
+    ]
+  },
+  {
+    "id": "ai.few-shot-prompting",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "少样本提示",
+    "detail": "用少量示例说明期望的任务结果",
+    "aliases": [
+      "少样本提示"
+    ]
+  },
+  {
+    "id": "ai.few-shot-prompting",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "Few-shot prompting",
+    "detail": "用少量示例说明期望的任务结果",
+    "aliases": [
+      "Few-shot prompting"
+    ]
+  },
+  {
+    "id": "ai.zero-shot-prompting",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "零样本提示",
+    "detail": "仅通过任务说明提出要求而不提供示例",
+    "aliases": [
+      "零样本提示"
+    ]
+  },
+  {
+    "id": "ai.zero-shot-prompting",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "Zero-shot prompting",
+    "detail": "仅通过任务说明提出要求而不提供示例",
+    "aliases": [
+      "Zero-shot prompting"
+    ]
+  },
+  {
+    "id": "ai.structured-output",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "结构化输出",
+    "detail": "按约定字段和格式生成结果",
+    "aliases": [
+      "结构化输出"
+    ]
+  },
+  {
+    "id": "ai.structured-output",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "Structured output",
+    "detail": "按约定字段和格式生成结果",
+    "aliases": [
+      "Structured output"
+    ]
+  },
+  {
+    "id": "programming.json-schema",
+    "domain": "programming",
+    "category": "programming.reliability",
+    "label": "JSON模式",
+    "detail": "定义结构化输出的字段、类型和约束",
+    "aliases": [
+      "JSON模式",
+      "JSON Schema",
+      "输出模式约束"
+    ]
+  },
+  {
+    "id": "programming.json-schema",
+    "domain": "programming",
+    "category": "programming.reliability",
+    "label": "JSON Schema",
+    "detail": "定义结构化输出的字段、类型和约束",
+    "aliases": [
+      "JSON Schema"
+    ]
+  },
+  {
+    "id": "ai.chain-of-thought-prompting",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "思维链提示",
+    "detail": "引导模型分步骤处理复杂问题",
+    "aliases": [
+      "思维链提示"
+    ]
+  },
+  {
+    "id": "ai.chain-of-thought-prompting",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "label": "Chain-of-thought prompting",
+    "detail": "引导模型分步骤处理复杂问题",
+    "aliases": [
+      "Chain-of-thought prompting",
+      "CoT"
+    ]
+  },
+  {
+    "id": "ai.prompt-injection",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "提示词注入",
+    "detail": "识别不可信内容中干扰模型指令的文本",
+    "aliases": [
+      "提示词注入"
+    ]
+  },
+  {
+    "id": "ai.prompt-injection",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "Prompt injection",
+    "detail": "识别不可信内容中干扰模型指令的文本",
+    "aliases": [
+      "Prompt injection"
+    ]
+  },
+  {
+    "id": "ai.hallucination",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "模型幻觉",
+    "detail": "识别缺乏事实依据或与资料不符的模型输出",
+    "aliases": [
+      "模型幻觉"
+    ]
+  },
+  {
+    "id": "ai.hallucination",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "Hallucination",
+    "detail": "识别缺乏事实依据或与资料不符的模型输出",
+    "aliases": [
+      "Hallucination"
+    ]
+  },
+  {
+    "id": "ai.retrieval-augmented-generation",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "检索增强生成",
+    "detail": "先检索相关资料，再结合资料生成回答",
+    "aliases": [
+      "检索增强生成"
+    ]
+  },
+  {
+    "id": "ai.retrieval-augmented-generation",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Retrieval-augmented generation",
+    "detail": "先检索相关资料，再结合资料生成回答",
+    "aliases": [
+      "Retrieval-augmented generation",
+      "RAG"
+    ]
+  },
+  {
+    "id": "ai.text-embedding",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "文本嵌入",
+    "detail": "把文本映射为便于比较相似度的向量",
+    "aliases": [
+      "文本嵌入"
+    ]
+  },
+  {
+    "id": "ai.text-embedding",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Text embedding",
+    "detail": "把文本映射为便于比较相似度的向量",
+    "aliases": [
+      "Text embedding",
+      "embedding",
+      "embeddings"
+    ]
+  },
+  {
+    "id": "ai.vector-database",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "向量数据库",
+    "detail": "存储和检索向量表示的数据",
+    "aliases": [
+      "向量数据库"
+    ]
+  },
+  {
+    "id": "ai.vector-database",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Vector database",
+    "detail": "存储和检索向量表示的数据",
+    "aliases": [
+      "Vector database"
+    ]
+  },
+  {
+    "id": "ai.vector-search",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "向量检索",
+    "detail": "根据向量相似度查找相关内容",
+    "aliases": [
+      "向量检索"
+    ]
+  },
+  {
+    "id": "ai.vector-search",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Vector search",
+    "detail": "根据向量相似度查找相关内容",
+    "aliases": [
+      "Vector search"
+    ]
+  },
+  {
+    "id": "ai.semantic-search",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "语义检索",
+    "detail": "依据含义而非仅靠字面关键词检索",
+    "aliases": [
+      "语义检索"
+    ]
+  },
+  {
+    "id": "ai.semantic-search",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Semantic search",
+    "detail": "依据含义而非仅靠字面关键词检索",
+    "aliases": [
+      "Semantic search"
+    ]
+  },
+  {
+    "id": "ai.hybrid-search",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "混合检索",
+    "detail": "结合关键词检索与向量检索",
+    "aliases": [
+      "混合检索"
+    ]
+  },
+  {
+    "id": "ai.hybrid-search",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Hybrid search",
+    "detail": "结合关键词检索与向量检索",
+    "aliases": [
+      "Hybrid search"
+    ]
+  },
+  {
+    "id": "ai.reranking",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "检索重排序",
+    "detail": "对初步检索结果重新评估相关性并排序",
+    "aliases": [
+      "检索重排序"
+    ]
+  },
+  {
+    "id": "ai.reranking",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Reranking",
+    "detail": "对初步检索结果重新评估相关性并排序",
+    "aliases": [
+      "Reranking",
+      "reranker"
+    ]
+  },
+  {
+    "id": "ai.document-chunking",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "文档分块",
+    "detail": "把长文档划分为适合检索的片段",
+    "aliases": [
+      "文档分块"
+    ]
+  },
+  {
+    "id": "ai.document-chunking",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Document chunking",
+    "detail": "把长文档划分为适合检索的片段",
+    "aliases": [
+      "Document chunking",
+      "chunking"
+    ]
+  },
+  {
+    "id": "ai.chunk-overlap",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "分块重叠",
+    "detail": "让相邻文档片段保留部分共享内容",
+    "aliases": [
+      "分块重叠"
+    ]
+  },
+  {
+    "id": "ai.chunk-overlap",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Chunk overlap",
+    "detail": "让相邻文档片段保留部分共享内容",
+    "aliases": [
+      "Chunk overlap"
+    ]
+  },
+  {
+    "id": "ai.query-rewriting",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "查询改写",
+    "detail": "把用户问题转换为更适合检索的查询",
+    "aliases": [
+      "查询改写"
+    ]
+  },
+  {
+    "id": "ai.query-rewriting",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Query rewriting",
+    "detail": "把用户问题转换为更适合检索的查询",
+    "aliases": [
+      "Query rewriting"
+    ]
+  },
+  {
+    "id": "ai.answer-grounding",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "回答溯源",
+    "detail": "让回答依据可追溯的资料并标注来源",
+    "aliases": [
+      "回答溯源"
+    ]
+  },
+  {
+    "id": "ai.answer-grounding",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "label": "Answer grounding",
+    "detail": "让回答依据可追溯的资料并标注来源",
+    "aliases": [
+      "Answer grounding",
+      "grounding"
+    ]
+  },
+  {
+    "id": "agent.ai-agent",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "label": "智能体",
+    "detail": "结合模型、工具和任务状态执行工作",
+    "aliases": [
+      "智能体"
+    ]
+  },
+  {
+    "id": "agent.ai-agent",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "label": "AI agent",
+    "detail": "结合模型、工具和任务状态执行工作",
+    "aliases": [
+      "AI agent",
+      "agent"
+    ]
+  },
+  {
+    "id": "agent.function-calling",
+    "domain": "agent",
+    "category": "agent.tools",
+    "label": "函数调用",
+    "detail": "按函数定义生成供应用执行的调用参数",
+    "aliases": [
+      "函数调用"
+    ]
+  },
+  {
+    "id": "agent.function-calling",
+    "domain": "agent",
+    "category": "agent.tools",
+    "label": "Function calling",
+    "detail": "按函数定义生成供应用执行的调用参数",
+    "aliases": [
+      "Function calling"
+    ]
+  },
+  {
+    "id": "agent.model-context-protocol",
+    "domain": "agent",
+    "category": "agent.tools",
+    "label": "模型上下文协议",
+    "detail": "通过标准协议连接模型应用与工具和资源",
+    "aliases": [
+      "模型上下文协议"
+    ]
+  },
+  {
+    "id": "agent.model-context-protocol",
+    "domain": "agent",
+    "category": "agent.tools",
+    "label": "Model Context Protocol",
+    "detail": "通过标准协议连接模型应用与工具和资源",
+    "aliases": [
+      "Model Context Protocol",
+      "MCP"
+    ]
+  },
+  {
+    "id": "agent.agent-skill",
+    "domain": "agent",
+    "category": "agent.tools",
+    "label": "Agent技能",
+    "detail": "封装可复用的任务说明和操作资源",
+    "aliases": [
+      "Agent技能"
+    ]
+  },
+  {
+    "id": "agent.agent-skill",
+    "domain": "agent",
+    "category": "agent.tools",
+    "label": "Agent skill",
+    "detail": "封装可复用的任务说明和操作资源",
+    "aliases": [
+      "Agent skill",
+      "skills"
+    ]
+  },
+  {
+    "id": "agent.multi-agent-collaboration",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "label": "多智能体协作",
+    "detail": "让多个智能体分工协作完成任务",
+    "aliases": [
+      "多智能体协作"
+    ]
+  },
+  {
+    "id": "agent.multi-agent-collaboration",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "label": "Multi-agent collaboration",
+    "detail": "让多个智能体分工协作完成任务",
+    "aliases": [
+      "Multi-agent collaboration",
+      "multi-agent"
+    ]
+  },
+  {
+    "id": "agent.agent-orchestration",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "label": "智能体编排",
+    "detail": "安排智能体之间的执行顺序与协作关系",
+    "aliases": [
+      "智能体编排"
+    ]
+  },
+  {
+    "id": "agent.agent-orchestration",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "label": "Agent orchestration",
+    "detail": "安排智能体之间的执行顺序与协作关系",
+    "aliases": [
+      "Agent orchestration"
+    ]
+  },
+  {
+    "id": "agent.agent-handoff",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "label": "任务移交",
+    "detail": "把任务控制权和必要上下文交给另一智能体",
+    "aliases": [
+      "任务移交"
+    ]
+  },
+  {
+    "id": "agent.agent-handoff",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "label": "Agent handoff",
+    "detail": "把任务控制权和必要上下文交给另一智能体",
+    "aliases": [
+      "Agent handoff",
+      "handoff"
+    ]
+  },
+  {
+    "id": "agent.human-in-the-loop",
+    "domain": "agent",
+    "category": "agent.control",
+    "label": "人在回路",
+    "detail": "在关键节点加入人工审核或决策",
+    "aliases": [
+      "人在回路"
+    ]
+  },
+  {
+    "id": "agent.human-in-the-loop",
+    "domain": "agent",
+    "category": "agent.control",
+    "label": "Human-in-the-loop",
+    "detail": "在关键节点加入人工审核或决策",
+    "aliases": [
+      "Human-in-the-loop",
+      "HITL"
+    ]
+  },
+  {
+    "id": "agent.agent-memory",
+    "domain": "agent",
+    "category": "agent.memory",
+    "label": "智能体记忆",
+    "detail": "保存任务外仍需复用的信息和偏好",
+    "aliases": [
+      "智能体记忆"
+    ]
+  },
+  {
+    "id": "agent.agent-memory",
+    "domain": "agent",
+    "category": "agent.memory",
+    "label": "Agent memory",
+    "detail": "保存任务外仍需复用的信息和偏好",
+    "aliases": [
+      "Agent memory"
+    ]
+  },
+  {
+    "id": "agent.tool-execution-sandbox",
+    "domain": "agent",
+    "category": "agent.control",
+    "label": "工具执行沙箱",
+    "detail": "限制工具执行时可访问的环境和资源",
+    "aliases": [
+      "工具执行沙箱"
+    ]
+  },
+  {
+    "id": "agent.tool-execution-sandbox",
+    "domain": "agent",
+    "category": "agent.control",
+    "label": "Tool execution sandbox",
+    "detail": "限制工具执行时可访问的环境和资源",
+    "aliases": [
+      "Tool execution sandbox",
+      "sandbox"
+    ]
+  },
+  {
+    "id": "agent.agent-trace",
+    "domain": "agent",
+    "category": "agent.evaluation",
+    "label": "智能体轨迹",
+    "detail": "记录任务中的工具调用和状态变化",
+    "aliases": [
+      "智能体轨迹"
+    ]
+  },
+  {
+    "id": "agent.agent-trace",
+    "domain": "agent",
+    "category": "agent.evaluation",
+    "label": "Agent trace",
+    "detail": "记录任务中的工具调用和状态变化",
+    "aliases": [
+      "Agent trace",
+      "tracing"
+    ]
+  },
+  {
+    "id": "agent.agent-evaluation",
+    "domain": "agent",
+    "category": "agent.evaluation",
+    "label": "智能体评测",
+    "detail": "用任务集评估智能体的成功率与行为",
+    "aliases": [
+      "智能体评测"
+    ]
+  },
+  {
+    "id": "agent.agent-evaluation",
+    "domain": "agent",
+    "category": "agent.evaluation",
+    "label": "Agent evaluation",
+    "detail": "用任务集评估智能体的成功率与行为",
+    "aliases": [
+      "Agent evaluation",
+      "evals"
+    ]
+  },
+  {
+    "id": "ai.supervised-fine-tuning",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "监督微调",
+    "detail": "用标注的输入输出样本调整模型",
+    "aliases": [
+      "监督微调"
+    ]
+  },
+  {
+    "id": "ai.supervised-fine-tuning",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Supervised fine-tuning",
+    "detail": "用标注的输入输出样本调整模型",
+    "aliases": [
+      "Supervised fine-tuning",
+      "SFT"
+    ]
+  },
+  {
+    "id": "ai.low-rank-adaptation",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "低秩适配",
+    "detail": "用可训练的低秩参数适配模型",
+    "aliases": [
+      "低秩适配"
+    ]
+  },
+  {
+    "id": "ai.low-rank-adaptation",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Low-rank adaptation",
+    "detail": "用可训练的低秩参数适配模型",
+    "aliases": [
+      "Low-rank adaptation",
+      "LoRA"
+    ]
+  },
+  {
+    "id": "ai.quantized-low-rank-adaptation",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "量化低秩适配",
+    "detail": "在量化基础模型上训练低秩适配参数",
+    "aliases": [
+      "量化低秩适配"
+    ]
+  },
+  {
+    "id": "ai.quantized-low-rank-adaptation",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Quantized low-rank adaptation",
+    "detail": "在量化基础模型上训练低秩适配参数",
+    "aliases": [
+      "Quantized low-rank adaptation",
+      "QLoRA"
+    ]
+  },
+  {
+    "id": "ai.model-quantization",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "模型量化",
+    "detail": "降低模型数值精度以减少存储或计算开销",
+    "aliases": [
+      "模型量化"
+    ]
+  },
+  {
+    "id": "ai.model-quantization",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Model quantization",
+    "detail": "降低模型数值精度以减少存储或计算开销",
+    "aliases": [
+      "Model quantization"
+    ]
+  },
+  {
+    "id": "ai.knowledge-distillation",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "知识蒸馏",
+    "detail": "用教师模型的输出或表示训练学生模型",
+    "aliases": [
+      "知识蒸馏"
+    ]
+  },
+  {
+    "id": "ai.knowledge-distillation",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Knowledge distillation",
+    "detail": "用教师模型的输出或表示训练学生模型",
+    "aliases": [
+      "Knowledge distillation"
+    ]
+  },
+  {
+    "id": "ai.reinforcement-learning",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "强化学习",
+    "detail": "通过环境反馈和奖励学习决策策略",
+    "aliases": [
+      "强化学习"
+    ]
+  },
+  {
+    "id": "ai.reinforcement-learning",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Reinforcement learning",
+    "detail": "通过环境反馈和奖励学习决策策略",
+    "aliases": [
+      "Reinforcement learning",
+      "RL"
+    ]
+  },
+  {
+    "id": "ai.reinforcement-learning-from-human-feedback",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "人类反馈强化学习",
+    "detail": "利用人类偏好反馈指导模型训练",
+    "aliases": [
+      "人类反馈强化学习"
+    ]
+  },
+  {
+    "id": "ai.reinforcement-learning-from-human-feedback",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Reinforcement learning from human feedback",
+    "detail": "利用人类偏好反馈指导模型训练",
+    "aliases": [
+      "Reinforcement learning from human feedback",
+      "RLHF"
+    ]
+  },
+  {
+    "id": "ai.direct-preference-optimization",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "直接偏好优化",
+    "detail": "用偏好样本直接优化模型行为",
+    "aliases": [
+      "直接偏好优化"
+    ]
+  },
+  {
+    "id": "ai.direct-preference-optimization",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Direct preference optimization",
+    "detail": "用偏好样本直接优化模型行为",
+    "aliases": [
+      "Direct preference optimization",
+      "DPO"
+    ]
+  },
+  {
+    "id": "ai.pretraining",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "预训练",
+    "detail": "从大规模数据中学习通用表示",
+    "aliases": [
+      "预训练"
+    ]
+  },
+  {
+    "id": "ai.pretraining",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Pretraining",
+    "detail": "从大规模数据中学习通用表示",
+    "aliases": [
+      "Pretraining"
+    ]
+  },
+  {
+    "id": "ai.model-inference",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "模型推理",
+    "detail": "使用已训练模型处理输入并生成结果",
+    "aliases": [
+      "模型推理"
+    ]
+  },
+  {
+    "id": "ai.model-inference",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Model inference",
+    "detail": "使用已训练模型处理输入并生成结果",
+    "aliases": [
+      "Model inference"
+    ]
+  },
+  {
+    "id": "ai.inference-serving",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "推理服务",
+    "detail": "部署模型并提供可调用的推理接口",
+    "aliases": [
+      "推理服务"
+    ]
+  },
+  {
+    "id": "ai.inference-serving",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Inference serving",
+    "detail": "部署模型并提供可调用的推理接口",
+    "aliases": [
+      "Inference serving"
+    ]
+  },
+  {
+    "id": "ai.streaming-output",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "流式输出",
+    "detail": "逐步返回生成内容以减少等待感",
+    "aliases": [
+      "流式输出"
+    ]
+  },
+  {
+    "id": "ai.streaming-output",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Streaming output",
+    "detail": "逐步返回生成内容以减少等待感",
+    "aliases": [
+      "Streaming output"
+    ]
+  },
+  {
+    "id": "ai.time-to-first-token",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "首词元延迟",
+    "detail": "从请求开始到收到首个输出词元的时间",
+    "aliases": [
+      "首词元延迟"
+    ]
+  },
+  {
+    "id": "ai.time-to-first-token",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Time to first token",
+    "detail": "从请求开始到收到首个输出词元的时间",
+    "aliases": [
+      "Time to first token",
+      "TTFT"
+    ]
+  },
+  {
+    "id": "ai.token-throughput",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "生成吞吐量",
+    "detail": "单位时间内生成或处理的词元数量",
+    "aliases": [
+      "生成吞吐量"
+    ]
+  },
+  {
+    "id": "ai.token-throughput",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Token throughput",
+    "detail": "单位时间内生成或处理的词元数量",
+    "aliases": [
+      "Token throughput",
+      "tokens per second"
+    ]
+  },
+  {
+    "id": "ai.kv-cache",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "键值缓存",
+    "detail": "复用注意力计算中的键和值",
+    "aliases": [
+      "键值缓存"
+    ]
+  },
+  {
+    "id": "ai.kv-cache",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "KV cache",
+    "detail": "复用注意力计算中的键和值",
+    "aliases": [
+      "KV cache"
+    ]
+  },
+  {
+    "id": "ai.prompt-caching",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "提示词缓存",
+    "detail": "复用重复输入前缀的处理结果",
+    "aliases": [
+      "提示词缓存"
+    ]
+  },
+  {
+    "id": "ai.prompt-caching",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Prompt caching",
+    "detail": "复用重复输入前缀的处理结果",
+    "aliases": [
+      "Prompt caching"
+    ]
+  },
+  {
+    "id": "ai.batch-inference",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "批量推理",
+    "detail": "把多个输入组合后进行模型推理",
+    "aliases": [
+      "批量推理"
+    ]
+  },
+  {
+    "id": "ai.batch-inference",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Batch inference",
+    "detail": "把多个输入组合后进行模型推理",
+    "aliases": [
+      "Batch inference"
+    ]
+  },
+  {
+    "id": "ai.temperature-sampling",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "温度采样",
+    "detail": "调节生成时概率分布的随机性",
+    "aliases": [
+      "温度采样"
+    ]
+  },
+  {
+    "id": "ai.temperature-sampling",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Temperature sampling",
+    "detail": "调节生成时概率分布的随机性",
+    "aliases": [
+      "Temperature sampling",
+      "temperature"
+    ]
+  },
+  {
+    "id": "ai.nucleus-sampling",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "核采样",
+    "detail": "从累计概率达到阈值的候选中采样",
+    "aliases": [
+      "核采样"
+    ]
+  },
+  {
+    "id": "ai.nucleus-sampling",
+    "domain": "ai",
+    "category": "ai.inference",
+    "label": "Nucleus sampling",
+    "detail": "从累计概率达到阈值的候选中采样",
+    "aliases": [
+      "Nucleus sampling",
+      "top-p"
+    ]
+  },
+  {
+    "id": "ai.model-evaluation",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "模型评测",
+    "detail": "用固定任务和指标衡量模型表现",
+    "aliases": [
+      "模型评测"
+    ]
+  },
+  {
+    "id": "ai.model-evaluation",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "Model evaluation",
+    "detail": "用固定任务和指标衡量模型表现",
+    "aliases": [
+      "Model evaluation",
+      "benchmark"
+    ]
+  },
+  {
+    "id": "ai.model-drift",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "模型漂移",
+    "detail": "监测模型表现随数据或环境变化而下降",
+    "aliases": [
+      "模型漂移"
+    ]
+  },
+  {
+    "id": "ai.model-drift",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "Model drift",
+    "detail": "监测模型表现随数据或环境变化而下降",
+    "aliases": [
+      "Model drift"
+    ]
+  },
+  {
+    "id": "ai.data-leakage",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "数据泄漏",
+    "detail": "识别训练或评测中不应提前获得的信息",
+    "aliases": [
+      "数据泄漏"
+    ]
+  },
+  {
+    "id": "ai.data-leakage",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "label": "Data leakage",
+    "detail": "识别训练或评测中不应提前获得的信息",
+    "aliases": [
+      "Data leakage"
+    ]
+  },
+  {
+    "id": "ai.synthetic-data",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "合成数据",
+    "detail": "生成用于训练或测试的人工数据",
+    "aliases": [
+      "合成数据"
+    ]
+  },
+  {
+    "id": "ai.synthetic-data",
+    "domain": "ai",
+    "category": "ai.training",
+    "label": "Synthetic data",
+    "detail": "生成用于训练或测试的人工数据",
+    "aliases": [
+      "Synthetic data"
+    ]
+  },
+  {
+    "id": "ai.attention-mechanism",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "注意力机制",
+    "detail": "按相关性聚合输入中的信息",
+    "aliases": [
+      "注意力机制"
+    ]
+  },
+  {
+    "id": "ai.attention-mechanism",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Attention mechanism",
+    "detail": "按相关性聚合输入中的信息",
+    "aliases": [
+      "Attention mechanism"
+    ]
+  },
+  {
+    "id": "ai.mixture-of-experts",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "混合专家模型",
+    "detail": "通过路由选择部分专家模块处理输入",
+    "aliases": [
+      "混合专家模型"
+    ]
+  },
+  {
+    "id": "ai.mixture-of-experts",
+    "domain": "ai",
+    "category": "ai.foundations",
+    "label": "Mixture of experts",
+    "detail": "通过路由选择部分专家模块处理输入",
+    "aliases": [
+      "Mixture of experts",
+      "MoE"
+    ]
+  },
+  {
+    "id": "ecommerce.stock-keeping-unit",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "库存单位",
+    "detail": "区分可独立管理库存的商品规格",
+    "aliases": [
+      "库存单位"
+    ]
+  },
+  {
+    "id": "ecommerce.stock-keeping-unit",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "Stock keeping unit",
+    "detail": "区分可独立管理库存的商品规格",
+    "aliases": [
+      "Stock keeping unit",
+      "SKU"
+    ]
+  },
+  {
+    "id": "ecommerce.product-listing",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "商品刊登",
+    "detail": "整理商品标题、图片、属性和描述",
+    "aliases": [
+      "商品刊登"
+    ]
+  },
+  {
+    "id": "ecommerce.product-listing",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "Product listing",
+    "detail": "整理商品标题、图片、属性和描述",
+    "aliases": [
+      "Product listing",
+      "listing"
+    ]
+  },
+  {
+    "id": "ecommerce.product-variant",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "商品变体",
+    "detail": "区分同一商品的颜色、尺寸等选项",
+    "aliases": [
+      "商品变体"
+    ]
+  },
+  {
+    "id": "ecommerce.product-variant",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "Product variant",
+    "detail": "区分同一商品的颜色、尺寸等选项",
+    "aliases": [
+      "Product variant"
+    ]
+  },
+  {
+    "id": "ecommerce.landed-cost",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "到岸成本",
+    "detail": "核算商品送达目的地前的采购、运输和进口成本",
+    "aliases": [
+      "到岸成本"
+    ]
+  },
+  {
+    "id": "ecommerce.landed-cost",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "Landed cost",
+    "detail": "核算商品送达目的地前的采购、运输和进口成本",
+    "aliases": [
+      "Landed cost"
+    ]
+  },
+  {
+    "id": "ecommerce.localized-pricing",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "本地化定价",
+    "detail": "按目标市场调整币种、展示价格和定价策略",
+    "aliases": [
+      "本地化定价"
+    ]
+  },
+  {
+    "id": "ecommerce.localized-pricing",
+    "domain": "ecommerce",
+    "category": "ecommerce.catalog",
+    "label": "Localized pricing",
+    "detail": "按目标市场调整币种、展示价格和定价策略",
+    "aliases": [
+      "Localized pricing"
+    ]
+  },
+  {
+    "id": "ecommerce.order-management-system",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "订单管理系统",
+    "detail": "统一跟踪订单接收、处理和履约状态",
+    "aliases": [
+      "订单管理系统"
+    ]
+  },
+  {
+    "id": "ecommerce.order-management-system",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "Order management system",
+    "detail": "统一跟踪订单接收、处理和履约状态",
+    "aliases": [
+      "Order management system",
+      "OMS"
+    ]
+  },
+  {
+    "id": "ecommerce.chargeback",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "支付拒付",
+    "detail": "处理持卡人通过发卡机构提出的交易争议",
+    "aliases": [
+      "支付拒付"
+    ]
+  },
+  {
+    "id": "ecommerce.chargeback",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "Chargeback",
+    "detail": "处理持卡人通过发卡机构提出的交易争议",
+    "aliases": [
+      "Chargeback"
+    ]
+  },
+  {
+    "id": "ecommerce.return-merchandise-authorization",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "退货授权",
+    "detail": "为退货申请建立可追踪的授权流程",
+    "aliases": [
+      "退货授权"
+    ]
+  },
+  {
+    "id": "ecommerce.return-merchandise-authorization",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "Return merchandise authorization",
+    "detail": "为退货申请建立可追踪的授权流程",
+    "aliases": [
+      "Return merchandise authorization",
+      "RMA"
+    ]
+  },
+  {
+    "id": "ecommerce.refund-rate",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "退款率",
+    "detail": "按明确订单范围和时间窗口统计退款比例",
+    "aliases": [
+      "退款率"
+    ]
+  },
+  {
+    "id": "ecommerce.refund-rate",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "label": "Refund rate",
+    "detail": "按明确订单范围和时间窗口统计退款比例",
+    "aliases": [
+      "Refund rate"
+    ]
+  },
+  {
+    "id": "ecommerce.third-party-logistics",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "第三方物流",
+    "detail": "由外部服务商提供仓储和物流服务",
+    "aliases": [
+      "第三方物流"
+    ]
+  },
+  {
+    "id": "ecommerce.third-party-logistics",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "Third-party logistics",
+    "detail": "由外部服务商提供仓储和物流服务",
+    "aliases": [
+      "Third-party logistics",
+      "3PL"
+    ]
+  },
+  {
+    "id": "ecommerce.overseas-warehouse",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "海外仓",
+    "detail": "在目标市场附近存储商品并完成配送",
+    "aliases": [
+      "海外仓"
+    ]
+  },
+  {
+    "id": "ecommerce.overseas-warehouse",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "Overseas warehouse",
+    "detail": "在目标市场附近存储商品并完成配送",
+    "aliases": [
+      "Overseas warehouse"
+    ]
+  },
+  {
+    "id": "ecommerce.first-leg-shipping",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "头程物流",
+    "detail": "把商品从发货地运送到目标仓库或分拨节点",
+    "aliases": [
+      "头程物流"
+    ]
+  },
+  {
+    "id": "ecommerce.first-leg-shipping",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "First-leg shipping",
+    "detail": "把商品从发货地运送到目标仓库或分拨节点",
+    "aliases": [
+      "First-leg shipping"
+    ]
+  },
+  {
+    "id": "ecommerce.last-mile-delivery",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "尾程配送",
+    "detail": "把包裹从末端节点送达收件人",
+    "aliases": [
+      "尾程配送"
+    ]
+  },
+  {
+    "id": "ecommerce.last-mile-delivery",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "Last-mile delivery",
+    "detail": "把包裹从末端节点送达收件人",
+    "aliases": [
+      "Last-mile delivery"
+    ]
+  },
+  {
+    "id": "ecommerce.inventory-turnover",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "库存周转率",
+    "detail": "衡量一定期间内库存被销售或消耗的速度",
+    "aliases": [
+      "库存周转率"
+    ]
+  },
+  {
+    "id": "ecommerce.inventory-turnover",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "Inventory turnover",
+    "detail": "衡量一定期间内库存被销售或消耗的速度",
+    "aliases": [
+      "Inventory turnover"
+    ]
+  },
+  {
+    "id": "ecommerce.reorder-point",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "补货点",
+    "detail": "定义触发补货的库存水平",
+    "aliases": [
+      "补货点"
+    ]
+  },
+  {
+    "id": "ecommerce.reorder-point",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "Reorder point",
+    "detail": "定义触发补货的库存水平",
+    "aliases": [
+      "Reorder point",
+      "ROP"
+    ]
+  },
+  {
+    "id": "ecommerce.safety-stock",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "安全库存",
+    "detail": "为需求和交付波动预留库存缓冲",
+    "aliases": [
+      "安全库存"
+    ]
+  },
+  {
+    "id": "ecommerce.safety-stock",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "Safety stock",
+    "detail": "为需求和交付波动预留库存缓冲",
+    "aliases": [
+      "Safety stock"
+    ]
+  },
+  {
+    "id": "ecommerce.stockout-rate",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "缺货率",
+    "detail": "按商品、订单或时间口径统计缺货比例",
+    "aliases": [
+      "缺货率"
+    ]
+  },
+  {
+    "id": "ecommerce.stockout-rate",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "label": "Stockout rate",
+    "detail": "按商品、订单或时间口径统计缺货比例",
+    "aliases": [
+      "Stockout rate"
+    ]
+  },
+  {
+    "id": "ecommerce.contribution-margin",
+    "domain": "ecommerce",
+    "category": "ecommerce.profit",
+    "label": "贡献毛益",
+    "detail": "用收入减去可变成本评估商品或订单的贡献",
+    "aliases": [
+      "贡献毛益"
+    ]
+  },
+  {
+    "id": "ecommerce.contribution-margin",
+    "domain": "ecommerce",
+    "category": "ecommerce.profit",
+    "label": "Contribution margin",
+    "detail": "用收入减去可变成本评估商品或订单的贡献",
+    "aliases": [
+      "Contribution margin"
+    ]
+  },
+  {
+    "id": "ecommerce.unit-economics",
+    "domain": "ecommerce",
+    "category": "ecommerce.profit",
+    "label": "单位经济模型",
+    "detail": "按单件商品、订单或客户分析收入与成本",
+    "aliases": [
+      "单位经济模型"
+    ]
+  },
+  {
+    "id": "ecommerce.unit-economics",
+    "domain": "ecommerce",
+    "category": "ecommerce.profit",
+    "label": "Unit economics",
+    "detail": "按单件商品、订单或客户分析收入与成本",
+    "aliases": [
+      "Unit economics"
+    ]
+  },
+  {
+    "id": "ecommerce.return-cost",
+    "domain": "ecommerce",
+    "category": "ecommerce.profit",
+    "label": "退货成本",
+    "detail": "核算退货运输、处理和商品损失",
+    "aliases": [
+      "退货成本"
+    ]
+  },
+  {
+    "id": "ecommerce.return-cost",
+    "domain": "ecommerce",
+    "category": "ecommerce.profit",
+    "label": "Return cost",
+    "detail": "核算退货运输、处理和商品损失",
+    "aliases": [
+      "Return cost"
+    ]
+  },
+  {
+    "id": "analytics.metric-definition",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "指标口径",
+    "detail": "明确统计对象、计算规则、时间窗口和去重方式",
+    "aliases": [
+      "指标口径"
+    ]
+  },
+  {
+    "id": "analytics.metric-definition",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "Metric definition",
+    "detail": "明确统计对象、计算规则、时间窗口和去重方式",
+    "aliases": [
+      "Metric definition"
+    ]
+  },
+  {
+    "id": "analytics.conversion-rate",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "转化率",
+    "detail": "按明确分母计算完成目标行为的比例",
+    "aliases": [
+      "转化率"
+    ]
+  },
+  {
+    "id": "analytics.conversion-rate",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "Conversion rate",
+    "detail": "按明确分母计算完成目标行为的比例",
+    "aliases": [
+      "Conversion rate",
+      "CVR"
+    ]
+  },
+  {
+    "id": "analytics.average-order-value",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "客单价",
+    "detail": "按有效订单范围计算平均订单金额",
+    "aliases": [
+      "客单价"
+    ]
+  },
+  {
+    "id": "analytics.average-order-value",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "Average order value",
+    "detail": "按有效订单范围计算平均订单金额",
+    "aliases": [
+      "Average order value",
+      "AOV"
+    ]
+  },
+  {
+    "id": "analytics.customer-acquisition-cost",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "客户获取成本",
+    "detail": "按明确费用和客户范围核算获客成本",
+    "aliases": [
+      "客户获取成本"
+    ]
+  },
+  {
+    "id": "analytics.customer-acquisition-cost",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "Customer acquisition cost",
+    "detail": "按明确费用和客户范围核算获客成本",
+    "aliases": [
+      "Customer acquisition cost",
+      "CAC"
+    ]
+  },
+  {
+    "id": "analytics.customer-lifetime-value",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "客户终身价值",
+    "detail": "估算客户关系期间带来的累计价值",
+    "aliases": [
+      "客户终身价值"
+    ]
+  },
+  {
+    "id": "analytics.customer-lifetime-value",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "Customer lifetime value",
+    "detail": "估算客户关系期间带来的累计价值",
+    "aliases": [
+      "Customer lifetime value",
+      "LTV",
+      "CLV"
+    ]
+  },
+  {
+    "id": "analytics.retention-rate",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "留存率",
+    "detail": "统计同一批用户在后续窗口仍然活跃的比例",
+    "aliases": [
+      "留存率"
+    ]
+  },
+  {
+    "id": "analytics.retention-rate",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "label": "Retention rate",
+    "detail": "统计同一批用户在后续窗口仍然活跃的比例",
+    "aliases": [
+      "Retention rate"
+    ]
+  },
+  {
+    "id": "analytics.median",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "中位数",
+    "detail": "用排序后位于中间的位置描述数据中心",
+    "aliases": [
+      "中位数"
+    ]
+  },
+  {
+    "id": "analytics.median",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "Median",
+    "detail": "用排序后位于中间的位置描述数据中心",
+    "aliases": [
+      "Median"
+    ]
+  },
+  {
+    "id": "analytics.percentile",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "百分位数",
+    "detail": "描述数据分布中指定比例所处的位置",
+    "aliases": [
+      "百分位数"
+    ]
+  },
+  {
+    "id": "analytics.percentile",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "Percentile",
+    "detail": "描述数据分布中指定比例所处的位置",
+    "aliases": [
+      "Percentile",
+      "P95"
+    ]
+  },
+  {
+    "id": "analytics.standard-deviation",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "标准差",
+    "detail": "衡量数值围绕平均值的离散程度",
+    "aliases": [
+      "标准差"
+    ]
+  },
+  {
+    "id": "analytics.standard-deviation",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "Standard deviation",
+    "detail": "衡量数值围绕平均值的离散程度",
+    "aliases": [
+      "Standard deviation"
+    ]
+  },
+  {
+    "id": "analytics.confidence-interval",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "置信区间",
+    "detail": "用具有规定长期覆盖性质的区间估计总体参数",
+    "aliases": [
+      "置信区间"
+    ]
+  },
+  {
+    "id": "analytics.confidence-interval",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "Confidence interval",
+    "detail": "用具有规定长期覆盖性质的区间估计总体参数",
+    "aliases": [
+      "Confidence interval"
+    ]
+  },
+  {
+    "id": "analytics.statistical-significance",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "统计显著性",
+    "detail": "依据检验假设和显著性水平判断统计证据",
+    "aliases": [
+      "统计显著性"
+    ]
+  },
+  {
+    "id": "analytics.statistical-significance",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "Statistical significance",
+    "detail": "依据检验假设和显著性水平判断统计证据",
+    "aliases": [
+      "Statistical significance"
+    ]
+  },
+  {
+    "id": "analytics.effect-size",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "效应量",
+    "detail": "量化差异或关联的实际幅度",
+    "aliases": [
+      "效应量"
+    ]
+  },
+  {
+    "id": "analytics.effect-size",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "Effect size",
+    "detail": "量化差异或关联的实际幅度",
+    "aliases": [
+      "Effect size"
+    ]
+  },
+  {
+    "id": "analytics.correlation",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "相关性",
+    "detail": "衡量变量共同变化的程度而不直接断言因果",
+    "aliases": [
+      "相关性"
+    ]
+  },
+  {
+    "id": "analytics.correlation",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "label": "Correlation",
+    "detail": "衡量变量共同变化的程度而不直接断言因果",
+    "aliases": [
+      "Correlation"
+    ]
+  },
+  {
+    "id": "analytics.randomized-controlled-experiment",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "随机对照实验",
+    "detail": "通过随机分组比较处理组与对照组",
+    "aliases": [
+      "随机对照实验"
+    ]
+  },
+  {
+    "id": "analytics.randomized-controlled-experiment",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "Randomized controlled experiment",
+    "detail": "通过随机分组比较处理组与对照组",
+    "aliases": [
+      "Randomized controlled experiment",
+      "RCT"
+    ]
+  },
+  {
+    "id": "analytics.a-b-testing",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "A/B测试",
+    "detail": "比较不同版本对预先定义指标的影响",
+    "aliases": [
+      "A/B测试"
+    ]
+  },
+  {
+    "id": "analytics.a-b-testing",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "A/B testing",
+    "detail": "比较不同版本对预先定义指标的影响",
+    "aliases": [
+      "A/B testing",
+      "AB test"
+    ]
+  },
+  {
+    "id": "analytics.sample-size-estimation",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "样本量估算",
+    "detail": "根据效应、波动和检验要求估算所需样本",
+    "aliases": [
+      "样本量估算"
+    ]
+  },
+  {
+    "id": "analytics.sample-size-estimation",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "Sample size estimation",
+    "detail": "根据效应、波动和检验要求估算所需样本",
+    "aliases": [
+      "Sample size estimation"
+    ]
+  },
+  {
+    "id": "analytics.causal-inference",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "因果推断",
+    "detail": "在明确假设下估计干预对结果的影响",
+    "aliases": [
+      "因果推断"
+    ]
+  },
+  {
+    "id": "analytics.causal-inference",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "label": "Causal inference",
+    "detail": "在明确假设下估计干预对结果的影响",
+    "aliases": [
+      "Causal inference"
+    ]
+  },
+  {
+    "id": "analytics.missing-value-handling",
+    "domain": "analytics",
+    "category": "analytics.quality",
+    "label": "缺失值处理",
+    "detail": "识别数据缺失模式并选择处理方式",
+    "aliases": [
+      "缺失值处理"
+    ]
+  },
+  {
+    "id": "analytics.missing-value-handling",
+    "domain": "analytics",
+    "category": "analytics.quality",
+    "label": "Missing value handling",
+    "detail": "识别数据缺失模式并选择处理方式",
+    "aliases": [
+      "Missing value handling"
+    ]
+  },
+  {
+    "id": "analytics.outlier-detection",
+    "domain": "analytics",
+    "category": "analytics.quality",
+    "label": "异常值检测",
+    "detail": "识别偏离主要分布的数据并核查原因",
+    "aliases": [
+      "异常值检测"
+    ]
+  },
+  {
+    "id": "analytics.outlier-detection",
+    "domain": "analytics",
+    "category": "analytics.quality",
+    "label": "Outlier detection",
+    "detail": "识别偏离主要分布的数据并核查原因",
+    "aliases": [
+      "Outlier detection"
+    ]
+  },
+  {
+    "id": "analytics.deduplication-rules",
+    "domain": "analytics",
+    "category": "analytics.quality",
+    "label": "数据去重规则",
+    "detail": "明确唯一标识和重复记录保留策略",
+    "aliases": [
+      "数据去重规则"
+    ]
+  },
+  {
+    "id": "analytics.deduplication-rules",
+    "domain": "analytics",
+    "category": "analytics.quality",
+    "label": "Deduplication rules",
+    "detail": "明确唯一标识和重复记录保留策略",
+    "aliases": [
+      "Deduplication rules"
+    ]
+  },
+  {
+    "id": "operations.customer-segmentation",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "用户分层",
+    "detail": "按行为、价值或需求划分用户群体",
+    "aliases": [
+      "用户分层"
+    ]
+  },
+  {
+    "id": "operations.customer-segmentation",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "Customer segmentation",
+    "detail": "按行为、价值或需求划分用户群体",
+    "aliases": [
+      "Customer segmentation"
+    ]
+  },
+  {
+    "id": "operations.user-onboarding",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "新用户引导",
+    "detail": "帮助新用户完成首次使用的关键步骤",
+    "aliases": [
+      "新用户引导"
+    ]
+  },
+  {
+    "id": "operations.user-onboarding",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "User onboarding",
+    "detail": "帮助新用户完成首次使用的关键步骤",
+    "aliases": [
+      "User onboarding"
+    ]
+  },
+  {
+    "id": "operations.user-activation",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "用户激活",
+    "detail": "定义并推动用户首次获得产品价值的行为",
+    "aliases": [
+      "用户激活"
+    ]
+  },
+  {
+    "id": "operations.user-activation",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "User activation",
+    "detail": "定义并推动用户首次获得产品价值的行为",
+    "aliases": [
+      "User activation"
+    ]
+  },
+  {
+    "id": "operations.user-reactivation",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "用户召回",
+    "detail": "针对沉默或流失用户设计回访策略",
+    "aliases": [
+      "用户召回"
+    ]
+  },
+  {
+    "id": "operations.user-reactivation",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "User reactivation",
+    "detail": "针对沉默或流失用户设计回访策略",
+    "aliases": [
+      "User reactivation"
+    ]
+  },
+  {
+    "id": "operations.churn-prediction",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "流失预警",
+    "detail": "识别用户可能停止使用或购买的信号",
+    "aliases": [
+      "流失预警"
+    ]
+  },
+  {
+    "id": "operations.churn-prediction",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "Churn prediction",
+    "detail": "识别用户可能停止使用或购买的信号",
+    "aliases": [
+      "Churn prediction"
+    ]
+  },
+  {
+    "id": "operations.lifecycle-messaging",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "生命周期触达",
+    "detail": "按用户阶段和行为安排沟通内容",
+    "aliases": [
+      "生命周期触达"
+    ]
+  },
+  {
+    "id": "operations.lifecycle-messaging",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "Lifecycle messaging",
+    "detail": "按用户阶段和行为安排沟通内容",
+    "aliases": [
+      "Lifecycle messaging"
+    ]
+  },
+  {
+    "id": "operations.rfm-segmentation",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "RFM分层",
+    "detail": "按最近购买时间、购买频次和消费金额分层",
+    "aliases": [
+      "RFM分层"
+    ]
+  },
+  {
+    "id": "operations.rfm-segmentation",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "label": "RFM segmentation",
+    "detail": "按最近购买时间、购买频次和消费金额分层",
+    "aliases": [
+      "RFM segmentation",
+      "RFM"
+    ]
+  },
+  {
+    "id": "operations.conversion-funnel",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "转化漏斗",
+    "detail": "按步骤分析从访问到目标行为的流失",
+    "aliases": [
+      "转化漏斗"
+    ]
+  },
+  {
+    "id": "operations.conversion-funnel",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "Conversion funnel",
+    "detail": "按步骤分析从访问到目标行为的流失",
+    "aliases": [
+      "Conversion funnel",
+      "funnel"
+    ]
+  },
+  {
+    "id": "operations.growth-experiment",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "增长实验",
+    "detail": "用可验证假设评估增长策略",
+    "aliases": [
+      "增长实验"
+    ]
+  },
+  {
+    "id": "operations.growth-experiment",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "Growth experiment",
+    "detail": "用可验证假设评估增长策略",
+    "aliases": [
+      "Growth experiment"
+    ]
+  },
+  {
+    "id": "operations.north-star-metric",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "北极星指标",
+    "detail": "选择能反映核心用户价值的长期方向指标",
+    "aliases": [
+      "北极星指标"
+    ]
+  },
+  {
+    "id": "operations.north-star-metric",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "North star metric",
+    "detail": "选择能反映核心用户价值的长期方向指标",
+    "aliases": [
+      "North star metric",
+      "NSM"
+    ]
+  },
+  {
+    "id": "operations.repeat-purchase-strategy",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "复购运营",
+    "detail": "设计促使已有客户再次购买的机制",
+    "aliases": [
+      "复购运营"
+    ]
+  },
+  {
+    "id": "operations.repeat-purchase-strategy",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "Repeat purchase strategy",
+    "detail": "设计促使已有客户再次购买的机制",
+    "aliases": [
+      "Repeat purchase strategy"
+    ]
+  },
+  {
+    "id": "operations.cross-selling",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "交叉销售",
+    "detail": "推荐与当前购买需求互补的商品或服务",
+    "aliases": [
+      "交叉销售"
+    ]
+  },
+  {
+    "id": "operations.cross-selling",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "Cross-selling",
+    "detail": "推荐与当前购买需求互补的商品或服务",
+    "aliases": [
+      "Cross-selling"
+    ]
+  },
+  {
+    "id": "operations.upselling",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "追加销售",
+    "detail": "推荐更高配置或更高价值的购买选项",
+    "aliases": [
+      "追加销售"
+    ]
+  },
+  {
+    "id": "operations.upselling",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "Upselling",
+    "detail": "推荐更高配置或更高价值的购买选项",
+    "aliases": [
+      "Upselling"
+    ]
+  },
+  {
+    "id": "operations.cart-recovery",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "购物车挽回",
+    "detail": "针对加入购物车但未完成购买的用户进行触达",
+    "aliases": [
+      "购物车挽回"
+    ]
+  },
+  {
+    "id": "operations.cart-recovery",
+    "domain": "operations",
+    "category": "operations.growth",
+    "label": "Cart recovery",
+    "detail": "针对加入购物车但未完成购买的用户进行触达",
+    "aliases": [
+      "Cart recovery"
+    ]
+  },
+  {
+    "id": "operations.standard-operating-procedure",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "标准作业流程",
+    "detail": "把重复工作整理为可执行的步骤与责任",
+    "aliases": [
+      "标准作业流程"
+    ]
+  },
+  {
+    "id": "operations.standard-operating-procedure",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "Standard operating procedure",
+    "detail": "把重复工作整理为可执行的步骤与责任",
+    "aliases": [
+      "Standard operating procedure",
+      "SOP"
+    ]
+  },
+  {
+    "id": "operations.service-level-agreement",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "服务水平协议",
+    "detail": "约定服务响应、可用性或交付目标",
+    "aliases": [
+      "服务水平协议"
+    ]
+  },
+  {
+    "id": "operations.service-level-agreement",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "Service-level agreement",
+    "detail": "约定服务响应、可用性或交付目标",
+    "aliases": [
+      "Service-level agreement",
+      "SLA"
+    ]
+  },
+  {
+    "id": "operations.ticket-routing",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "工单分流",
+    "detail": "按问题类型和优先级分配服务请求",
+    "aliases": [
+      "工单分流"
+    ]
+  },
+  {
+    "id": "operations.ticket-routing",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "Ticket routing",
+    "detail": "按问题类型和优先级分配服务请求",
+    "aliases": [
+      "Ticket routing"
+    ]
+  },
+  {
+    "id": "operations.customer-satisfaction-score",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "客户满意度",
+    "detail": "通过明确调查口径衡量客户满意程度",
+    "aliases": [
+      "客户满意度"
+    ]
+  },
+  {
+    "id": "operations.customer-satisfaction-score",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "Customer satisfaction score",
+    "detail": "通过明确调查口径衡量客户满意程度",
+    "aliases": [
+      "Customer satisfaction score",
+      "CSAT"
+    ]
+  },
+  {
+    "id": "operations.net-promoter-score",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "净推荐值",
+    "detail": "按推荐意愿调查统计推荐者与贬损者比例差",
+    "aliases": [
+      "净推荐值"
+    ]
+  },
+  {
+    "id": "operations.net-promoter-score",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "Net promoter score",
+    "detail": "按推荐意愿调查统计推荐者与贬损者比例差",
+    "aliases": [
+      "Net promoter score",
+      "NPS"
+    ]
+  },
+  {
+    "id": "operations.operations-review",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "运营复盘",
+    "detail": "对照目标分析结果、原因和后续行动",
+    "aliases": [
+      "运营复盘"
+    ]
+  },
+  {
+    "id": "operations.operations-review",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "label": "Operations review",
+    "detail": "对照目标分析结果、原因和后续行动",
+    "aliases": [
+      "Operations review"
+    ]
+  },
+  {
+    "id": "marketing.search-engine-optimization",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "搜索引擎优化",
+    "detail": "改善页面被搜索引擎发现、理解和展示的能力",
+    "aliases": [
+      "搜索引擎优化"
+    ]
+  },
+  {
+    "id": "marketing.search-engine-optimization",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "Search engine optimization",
+    "detail": "改善页面被搜索引擎发现、理解和展示的能力",
+    "aliases": [
+      "Search engine optimization",
+      "SEO"
+    ]
+  },
+  {
+    "id": "marketing.search-intent",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "搜索意图",
+    "detail": "识别搜索者希望获取信息或完成的任务",
+    "aliases": [
+      "搜索意图"
+    ]
+  },
+  {
+    "id": "marketing.search-intent",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "Search intent",
+    "detail": "识别搜索者希望获取信息或完成的任务",
+    "aliases": [
+      "Search intent"
+    ]
+  },
+  {
+    "id": "marketing.keyword-research",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "关键词研究",
+    "detail": "分析目标受众的搜索用语与需求",
+    "aliases": [
+      "关键词研究"
+    ]
+  },
+  {
+    "id": "marketing.keyword-research",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "Keyword research",
+    "detail": "分析目标受众的搜索用语与需求",
+    "aliases": [
+      "Keyword research"
+    ]
+  },
+  {
+    "id": "marketing.on-page-seo",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "站内优化",
+    "detail": "优化页面内容、标题、结构和内部链接",
+    "aliases": [
+      "站内优化"
+    ]
+  },
+  {
+    "id": "marketing.on-page-seo",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "On-page SEO",
+    "detail": "优化页面内容、标题、结构和内部链接",
+    "aliases": [
+      "On-page SEO"
+    ]
+  },
+  {
+    "id": "marketing.technical-seo",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "技术SEO",
+    "detail": "检查抓取、索引和网站技术可访问性",
+    "aliases": [
+      "技术SEO"
+    ]
+  },
+  {
+    "id": "marketing.technical-seo",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "Technical SEO",
+    "detail": "检查抓取、索引和网站技术可访问性",
+    "aliases": [
+      "Technical SEO"
+    ]
+  },
+  {
+    "id": "marketing.canonical-url",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "规范网址",
+    "detail": "声明重复或相似页面的首选网址",
+    "aliases": [
+      "规范网址"
+    ]
+  },
+  {
+    "id": "marketing.canonical-url",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "Canonical URL",
+    "detail": "声明重复或相似页面的首选网址",
+    "aliases": [
+      "Canonical URL",
+      "canonical"
+    ]
+  },
+  {
+    "id": "marketing.hreflang",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "多语言标注",
+    "detail": "声明页面的语言及地区替代版本",
+    "aliases": [
+      "多语言标注"
+    ]
+  },
+  {
+    "id": "marketing.hreflang",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "Hreflang",
+    "detail": "声明页面的语言及地区替代版本",
+    "aliases": [
+      "Hreflang",
+      "hreflang"
+    ]
+  },
+  {
+    "id": "marketing.structured-data",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "结构化数据",
+    "detail": "用机器可读标记描述页面中的实体和内容",
+    "aliases": [
+      "结构化数据"
+    ]
+  },
+  {
+    "id": "marketing.structured-data",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "label": "Structured data",
+    "detail": "用机器可读标记描述页面中的实体和内容",
+    "aliases": [
+      "Structured data",
+      "schema markup"
+    ]
+  },
+  {
+    "id": "marketing.content-marketing",
+    "domain": "marketing",
+    "category": "marketing.content",
+    "label": "内容营销",
+    "detail": "通过有用内容吸引和服务目标受众",
+    "aliases": [
+      "内容营销"
+    ]
+  },
+  {
+    "id": "marketing.content-marketing",
+    "domain": "marketing",
+    "category": "marketing.content",
+    "label": "Content marketing",
+    "detail": "通过有用内容吸引和服务目标受众",
+    "aliases": [
+      "Content marketing"
+    ]
+  },
+  {
+    "id": "marketing.call-to-action",
+    "domain": "marketing",
+    "category": "marketing.content",
+    "label": "行动号召",
+    "detail": "明确引导用户完成下一步操作",
+    "aliases": [
+      "行动号召"
+    ]
+  },
+  {
+    "id": "marketing.call-to-action",
+    "domain": "marketing",
+    "category": "marketing.content",
+    "label": "Call to action",
+    "detail": "明确引导用户完成下一步操作",
+    "aliases": [
+      "Call to action",
+      "CTA"
+    ]
+  },
+  {
+    "id": "marketing.landing-page",
+    "domain": "marketing",
+    "category": "marketing.content",
+    "label": "落地页",
+    "detail": "承接渠道流量并围绕目标行为组织内容",
+    "aliases": [
+      "落地页"
+    ]
+  },
+  {
+    "id": "marketing.landing-page",
+    "domain": "marketing",
+    "category": "marketing.content",
+    "label": "Landing page",
+    "detail": "承接渠道流量并围绕目标行为组织内容",
+    "aliases": [
+      "Landing page"
+    ]
+  },
+  {
+    "id": "marketing.user-generated-content",
+    "domain": "marketing",
+    "category": "marketing.content",
+    "label": "用户生成内容",
+    "detail": "组织和使用用户创作的内容",
+    "aliases": [
+      "用户生成内容"
+    ]
+  },
+  {
+    "id": "marketing.user-generated-content",
+    "domain": "marketing",
+    "category": "marketing.content",
+    "label": "User-generated content",
+    "detail": "组织和使用用户创作的内容",
+    "aliases": [
+      "User-generated content",
+      "UGC"
+    ]
+  },
+  {
+    "id": "marketing.click-through-rate",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "点击率",
+    "detail": "按展示次数计算点击比例",
+    "aliases": [
+      "点击率"
+    ]
+  },
+  {
+    "id": "marketing.click-through-rate",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "Click-through rate",
+    "detail": "按展示次数计算点击比例",
+    "aliases": [
+      "Click-through rate",
+      "CTR"
+    ]
+  },
+  {
+    "id": "marketing.cost-per-click",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "单次点击成本",
+    "detail": "计算广告每次点击的平均费用",
+    "aliases": [
+      "单次点击成本"
+    ]
+  },
+  {
+    "id": "marketing.cost-per-click",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "Cost per click",
+    "detail": "计算广告每次点击的平均费用",
+    "aliases": [
+      "Cost per click",
+      "CPC"
+    ]
+  },
+  {
+    "id": "marketing.cost-per-mille",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "千次展示成本",
+    "detail": "计算广告每千次展示的费用",
+    "aliases": [
+      "千次展示成本"
+    ]
+  },
+  {
+    "id": "marketing.cost-per-mille",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "Cost per mille",
+    "detail": "计算广告每千次展示的费用",
+    "aliases": [
+      "Cost per mille",
+      "CPM"
+    ]
+  },
+  {
+    "id": "marketing.cost-per-acquisition",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "单次转化成本",
+    "detail": "按定义的转化行为计算平均广告成本",
+    "aliases": [
+      "单次转化成本"
+    ]
+  },
+  {
+    "id": "marketing.cost-per-acquisition",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "Cost per acquisition",
+    "detail": "按定义的转化行为计算平均广告成本",
+    "aliases": [
+      "Cost per acquisition",
+      "CPA"
+    ]
+  },
+  {
+    "id": "marketing.return-on-ad-spend",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "广告支出回报",
+    "detail": "比较归因收入与广告支出，不直接等同利润",
+    "aliases": [
+      "广告支出回报"
+    ]
+  },
+  {
+    "id": "marketing.return-on-ad-spend",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "Return on ad spend",
+    "detail": "比较归因收入与广告支出，不直接等同利润",
+    "aliases": [
+      "Return on ad spend",
+      "ROAS"
+    ]
+  },
+  {
+    "id": "marketing.retargeting",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "再营销",
+    "detail": "向有过访问或互动的受众再次投放广告",
+    "aliases": [
+      "再营销"
+    ]
+  },
+  {
+    "id": "marketing.retargeting",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "label": "Retargeting",
+    "detail": "向有过访问或互动的受众再次投放广告",
+    "aliases": [
+      "Retargeting"
+    ]
+  },
+  {
+    "id": "marketing.marketing-attribution",
+    "domain": "marketing",
+    "category": "marketing.attribution",
+    "label": "营销归因",
+    "detail": "按规则分配不同触点对转化的贡献",
+    "aliases": [
+      "营销归因"
+    ]
+  },
+  {
+    "id": "marketing.marketing-attribution",
+    "domain": "marketing",
+    "category": "marketing.attribution",
+    "label": "Marketing attribution",
+    "detail": "按规则分配不同触点对转化的贡献",
+    "aliases": [
+      "Marketing attribution"
+    ]
+  },
+  {
+    "id": "marketing.utm-parameters",
+    "domain": "marketing",
+    "category": "marketing.attribution",
+    "label": "UTM参数",
+    "detail": "用链接参数区分流量来源、媒介和活动",
+    "aliases": [
+      "UTM参数"
+    ]
+  },
+  {
+    "id": "marketing.utm-parameters",
+    "domain": "marketing",
+    "category": "marketing.attribution",
+    "label": "UTM parameters",
+    "detail": "用链接参数区分流量来源、媒介和活动",
+    "aliases": [
+      "UTM parameters",
+      "UTM"
+    ]
+  },
+  {
+    "id": "finance.balance-sheet",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "资产负债表",
+    "detail": "展示特定时点的资产、负债和所有者权益",
+    "aliases": [
+      "资产负债表"
+    ]
+  },
+  {
+    "id": "finance.balance-sheet",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Balance sheet",
+    "detail": "展示特定时点的资产、负债和所有者权益",
+    "aliases": [
+      "Balance sheet"
+    ]
+  },
+  {
+    "id": "finance.income-statement",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "利润表",
+    "detail": "展示一定期间内的收入、费用和利润",
+    "aliases": [
+      "利润表"
+    ]
+  },
+  {
+    "id": "finance.income-statement",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Income statement",
+    "detail": "展示一定期间内的收入、费用和利润",
+    "aliases": [
+      "Income statement"
+    ]
+  },
+  {
+    "id": "finance.cash-flow-statement",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "现金流量表",
+    "detail": "按经营、投资和融资活动展示现金流",
+    "aliases": [
+      "现金流量表"
+    ]
+  },
+  {
+    "id": "finance.cash-flow-statement",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Cash flow statement",
+    "detail": "按经营、投资和融资活动展示现金流",
+    "aliases": [
+      "Cash flow statement"
+    ]
+  },
+  {
+    "id": "finance.free-cash-flow",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "自由现金流",
+    "detail": "按明确口径衡量经营和资本支出后的可用现金流",
+    "aliases": [
+      "自由现金流"
+    ]
+  },
+  {
+    "id": "finance.free-cash-flow",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Free cash flow",
+    "detail": "按明确口径衡量经营和资本支出后的可用现金流",
+    "aliases": [
+      "Free cash flow",
+      "FCF"
+    ]
+  },
+  {
+    "id": "finance.price-to-earnings-ratio",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "市盈率",
+    "detail": "比较股价与每股收益并明确收益期间",
+    "aliases": [
+      "市盈率"
+    ]
+  },
+  {
+    "id": "finance.price-to-earnings-ratio",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Price-to-earnings ratio",
+    "detail": "比较股价与每股收益并明确收益期间",
+    "aliases": [
+      "Price-to-earnings ratio",
+      "P/E",
+      "PE"
+    ]
+  },
+  {
+    "id": "finance.price-to-book-ratio",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "市净率",
+    "detail": "比较股票市值与账面净资产",
+    "aliases": [
+      "市净率"
+    ]
+  },
+  {
+    "id": "finance.price-to-book-ratio",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Price-to-book ratio",
+    "detail": "比较股票市值与账面净资产",
+    "aliases": [
+      "Price-to-book ratio",
+      "P/B",
+      "PB"
+    ]
+  },
+  {
+    "id": "finance.dividend-yield",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "股息收益率",
+    "detail": "比较每股股息与股价并明确股息口径",
+    "aliases": [
+      "股息收益率"
+    ]
+  },
+  {
+    "id": "finance.dividend-yield",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Dividend yield",
+    "detail": "比较每股股息与股价并明确股息口径",
+    "aliases": [
+      "Dividend yield"
+    ]
+  },
+  {
+    "id": "finance.return-on-equity",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "净资产收益率",
+    "detail": "衡量净利润相对于股东权益的比例",
+    "aliases": [
+      "净资产收益率"
+    ]
+  },
+  {
+    "id": "finance.return-on-equity",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Return on equity",
+    "detail": "衡量净利润相对于股东权益的比例",
+    "aliases": [
+      "Return on equity",
+      "ROE"
+    ]
+  },
+  {
+    "id": "finance.yield-curve",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "收益率曲线",
+    "detail": "展示同类债务工具不同期限的收益率",
+    "aliases": [
+      "收益率曲线"
+    ]
+  },
+  {
+    "id": "finance.yield-curve",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Yield curve",
+    "detail": "展示同类债务工具不同期限的收益率",
+    "aliases": [
+      "Yield curve"
+    ]
+  },
+  {
+    "id": "finance.discounted-cash-flow",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "贴现现金流",
+    "detail": "把预期未来现金流折算为当前价值",
+    "aliases": [
+      "贴现现金流"
+    ]
+  },
+  {
+    "id": "finance.discounted-cash-flow",
+    "domain": "finance",
+    "category": "finance.foundations",
+    "label": "Discounted cash flow",
+    "detail": "把预期未来现金流折算为当前价值",
+    "aliases": [
+      "Discounted cash flow",
+      "DCF"
+    ]
+  },
+  {
+    "id": "finance.market-capitalization",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "市值",
+    "detail": "用股价与对应股本数量计算股票市场价值",
+    "aliases": [
+      "市值"
+    ]
+  },
+  {
+    "id": "finance.market-capitalization",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Market capitalization",
+    "detail": "用股价与对应股本数量计算股票市场价值",
+    "aliases": [
+      "Market capitalization"
+    ]
+  },
+  {
+    "id": "finance.bid-ask-spread",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "买卖价差",
+    "detail": "衡量最优卖价与最优买价之间的差额",
+    "aliases": [
+      "买卖价差"
+    ]
+  },
+  {
+    "id": "finance.bid-ask-spread",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Bid-ask spread",
+    "detail": "衡量最优卖价与最优买价之间的差额",
+    "aliases": [
+      "Bid-ask spread"
+    ]
+  },
+  {
+    "id": "finance.order-book",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "订单簿",
+    "detail": "按价格记录等待成交的买卖委托",
+    "aliases": [
+      "订单簿"
+    ]
+  },
+  {
+    "id": "finance.order-book",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Order book",
+    "detail": "按价格记录等待成交的买卖委托",
+    "aliases": [
+      "Order book"
+    ]
+  },
+  {
+    "id": "finance.limit-order",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "限价单",
+    "detail": "指定可接受买入最高价或卖出最低价",
+    "aliases": [
+      "限价单"
+    ]
+  },
+  {
+    "id": "finance.limit-order",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Limit order",
+    "detail": "指定可接受买入最高价或卖出最低价",
+    "aliases": [
+      "Limit order"
+    ]
+  },
+  {
+    "id": "finance.market-order",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "市价单",
+    "detail": "按市场可得报价寻求成交而不保证成交价格",
+    "aliases": [
+      "市价单"
+    ]
+  },
+  {
+    "id": "finance.market-order",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Market order",
+    "detail": "按市场可得报价寻求成交而不保证成交价格",
+    "aliases": [
+      "Market order"
+    ]
+  },
+  {
+    "id": "finance.trading-volume",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "成交量",
+    "detail": "统计指定期间内的成交数量",
+    "aliases": [
+      "成交量"
+    ]
+  },
+  {
+    "id": "finance.trading-volume",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Trading volume",
+    "detail": "统计指定期间内的成交数量",
+    "aliases": [
+      "Trading volume",
+      "volume"
+    ]
+  },
+  {
+    "id": "finance.turnover-ratio",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "换手率",
+    "detail": "按明确股本口径衡量交易活跃程度",
+    "aliases": [
+      "换手率"
+    ]
+  },
+  {
+    "id": "finance.turnover-ratio",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Turnover ratio",
+    "detail": "按明确股本口径衡量交易活跃程度",
+    "aliases": [
+      "Turnover ratio"
+    ]
+  },
+  {
+    "id": "finance.liquidity",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "流动性",
+    "detail": "衡量资产以较小成本和价格冲击成交的能力",
+    "aliases": [
+      "流动性"
+    ]
+  },
+  {
+    "id": "finance.liquidity",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Liquidity",
+    "detail": "衡量资产以较小成本和价格冲击成交的能力",
+    "aliases": [
+      "Liquidity"
+    ]
+  },
+  {
+    "id": "finance.ex-rights-and-ex-dividend",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "除权除息",
+    "detail": "识别权益分配对报价和历史价格可比性的影响",
+    "aliases": [
+      "除权除息"
+    ]
+  },
+  {
+    "id": "finance.ex-rights-and-ex-dividend",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Ex-rights and ex-dividend",
+    "detail": "识别权益分配对报价和历史价格可比性的影响",
+    "aliases": [
+      "Ex-rights and ex-dividend"
+    ]
+  },
+  {
+    "id": "finance.adjusted-price",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "复权价格",
+    "detail": "按分红、拆股等事件调整历史价格序列",
+    "aliases": [
+      "复权价格"
+    ]
+  },
+  {
+    "id": "finance.adjusted-price",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "label": "Adjusted price",
+    "detail": "按分红、拆股等事件调整历史价格序列",
+    "aliases": [
+      "Adjusted price"
+    ]
+  },
+  {
+    "id": "finance.asset-allocation",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "资产配置",
+    "detail": "按目标和约束分配不同资产的权重",
+    "aliases": [
+      "资产配置"
+    ]
+  },
+  {
+    "id": "finance.asset-allocation",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Asset allocation",
+    "detail": "按目标和约束分配不同资产的权重",
+    "aliases": [
+      "Asset allocation"
+    ]
+  },
+  {
+    "id": "finance.portfolio-rebalancing",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "组合再平衡",
+    "detail": "把组合权重调整回选定目标",
+    "aliases": [
+      "组合再平衡"
+    ]
+  },
+  {
+    "id": "finance.portfolio-rebalancing",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Portfolio rebalancing",
+    "detail": "把组合权重调整回选定目标",
+    "aliases": [
+      "Portfolio rebalancing"
+    ]
+  },
+  {
+    "id": "finance.volatility",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "波动率",
+    "detail": "衡量收益率波动并说明采样频率和年化方式",
+    "aliases": [
+      "波动率"
+    ]
+  },
+  {
+    "id": "finance.volatility",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Volatility",
+    "detail": "衡量收益率波动并说明采样频率和年化方式",
+    "aliases": [
+      "Volatility"
+    ]
+  },
+  {
+    "id": "finance.maximum-drawdown",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "最大回撤",
+    "detail": "衡量净值从历史峰值到随后低点的最大跌幅",
+    "aliases": [
+      "最大回撤"
+    ]
+  },
+  {
+    "id": "finance.maximum-drawdown",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Maximum drawdown",
+    "detail": "衡量净值从历史峰值到随后低点的最大跌幅",
+    "aliases": [
+      "Maximum drawdown",
+      "MDD"
+    ]
+  },
+  {
+    "id": "finance.sharpe-ratio",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "夏普比率",
+    "detail": "用超额收益相对于其波动率衡量风险调整表现",
+    "aliases": [
+      "夏普比率"
+    ]
+  },
+  {
+    "id": "finance.sharpe-ratio",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Sharpe ratio",
+    "detail": "用超额收益相对于其波动率衡量风险调整表现",
+    "aliases": [
+      "Sharpe ratio"
+    ]
+  },
+  {
+    "id": "finance.sortino-ratio",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "索提诺比率",
+    "detail": "用超过目标的收益相对于下行偏差衡量表现",
+    "aliases": [
+      "索提诺比率"
+    ]
+  },
+  {
+    "id": "finance.sortino-ratio",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Sortino ratio",
+    "detail": "用超过目标的收益相对于下行偏差衡量表现",
+    "aliases": [
+      "Sortino ratio"
+    ]
+  },
+  {
+    "id": "finance.information-ratio",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "信息比率",
+    "detail": "比较相对基准的主动收益与跟踪误差",
+    "aliases": [
+      "信息比率"
+    ]
+  },
+  {
+    "id": "finance.information-ratio",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Information ratio",
+    "detail": "比较相对基准的主动收益与跟踪误差",
+    "aliases": [
+      "Information ratio",
+      "IR"
+    ]
+  },
+  {
+    "id": "finance.tracking-error",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "跟踪误差",
+    "detail": "衡量组合相对基准收益差的波动",
+    "aliases": [
+      "跟踪误差"
+    ]
+  },
+  {
+    "id": "finance.tracking-error",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Tracking error",
+    "detail": "衡量组合相对基准收益差的波动",
+    "aliases": [
+      "Tracking error"
+    ]
+  },
+  {
+    "id": "finance.beta",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "贝塔系数",
+    "detail": "衡量资产收益对基准收益变化的敏感度",
+    "aliases": [
+      "贝塔系数"
+    ]
+  },
+  {
+    "id": "finance.beta",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Beta",
+    "detail": "衡量资产收益对基准收益变化的敏感度",
+    "aliases": [
+      "Beta"
+    ]
+  },
+  {
+    "id": "finance.alpha",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "阿尔法",
+    "detail": "在指定模型下衡量未被基准风险解释的收益",
+    "aliases": [
+      "阿尔法"
+    ]
+  },
+  {
+    "id": "finance.alpha",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Alpha",
+    "detail": "在指定模型下衡量未被基准风险解释的收益",
+    "aliases": [
+      "Alpha"
+    ]
+  },
+  {
+    "id": "finance.value-at-risk",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "风险价值",
+    "detail": "估计给定期限和置信水平下损失分布的分位点",
+    "aliases": [
+      "风险价值"
+    ]
+  },
+  {
+    "id": "finance.value-at-risk",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Value at risk",
+    "detail": "估计给定期限和置信水平下损失分布的分位点",
+    "aliases": [
+      "Value at risk",
+      "VaR"
+    ]
+  },
+  {
+    "id": "finance.expected-shortfall",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "预期损失",
+    "detail": "衡量损失分布尾部超过指定分位点的平均损失",
+    "aliases": [
+      "预期损失"
+    ]
+  },
+  {
+    "id": "finance.expected-shortfall",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "label": "Expected shortfall",
+    "detail": "衡量损失分布尾部超过指定分位点的平均损失",
+    "aliases": [
+      "Expected shortfall",
+      "ES",
+      "CVaR"
+    ]
+  },
+  {
+    "id": "finance.quantitative-factor",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "量化因子",
+    "detail": "构造用于解释或预测收益的可计算特征",
+    "aliases": [
+      "量化因子"
+    ]
+  },
+  {
+    "id": "finance.quantitative-factor",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Quantitative factor",
+    "detail": "构造用于解释或预测收益的可计算特征",
+    "aliases": [
+      "Quantitative factor",
+      "factor"
+    ]
+  },
+  {
+    "id": "finance.factor-exposure",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "因子暴露",
+    "detail": "衡量资产或组合对指定因子的敏感程度",
+    "aliases": [
+      "因子暴露"
+    ]
+  },
+  {
+    "id": "finance.factor-exposure",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Factor exposure",
+    "detail": "衡量资产或组合对指定因子的敏感程度",
+    "aliases": [
+      "Factor exposure"
+    ]
+  },
+  {
+    "id": "finance.information-coefficient",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "信息系数",
+    "detail": "衡量因子信号与后续收益之间的相关性",
+    "aliases": [
+      "信息系数"
+    ]
+  },
+  {
+    "id": "finance.information-coefficient",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Information coefficient",
+    "detail": "衡量因子信号与后续收益之间的相关性",
+    "aliases": [
+      "Information coefficient",
+      "IC"
+    ]
+  },
+  {
+    "id": "finance.factor-neutralization",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "因子中性化",
+    "detail": "控制行业、市值等已有暴露对因子信号的影响",
+    "aliases": [
+      "因子中性化"
+    ]
+  },
+  {
+    "id": "finance.factor-neutralization",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Factor neutralization",
+    "detail": "控制行业、市值等已有暴露对因子信号的影响",
+    "aliases": [
+      "Factor neutralization"
+    ]
+  },
+  {
+    "id": "finance.cross-sectional-analysis",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "横截面分析",
+    "detail": "在同一时点比较不同资产的特征和收益",
+    "aliases": [
+      "横截面分析"
+    ]
+  },
+  {
+    "id": "finance.cross-sectional-analysis",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Cross-sectional analysis",
+    "detail": "在同一时点比较不同资产的特征和收益",
+    "aliases": [
+      "Cross-sectional analysis"
+    ]
+  },
+  {
+    "id": "finance.time-series-analysis",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "时间序列分析",
+    "detail": "分析按时间排列的数据及其变化规律",
+    "aliases": [
+      "时间序列分析"
+    ]
+  },
+  {
+    "id": "finance.time-series-analysis",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Time-series analysis",
+    "detail": "分析按时间排列的数据及其变化规律",
+    "aliases": [
+      "Time-series analysis"
+    ]
+  },
+  {
+    "id": "finance.mean-reversion",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "均值回归",
+    "detail": "研究变量偏离某一水平后回归的统计倾向",
+    "aliases": [
+      "均值回归"
+    ]
+  },
+  {
+    "id": "finance.mean-reversion",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Mean reversion",
+    "detail": "研究变量偏离某一水平后回归的统计倾向",
+    "aliases": [
+      "Mean reversion"
+    ]
+  },
+  {
+    "id": "finance.momentum-strategy",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "动量策略",
+    "detail": "依据过去一段时间的相对或绝对表现构造信号",
+    "aliases": [
+      "动量策略"
+    ]
+  },
+  {
+    "id": "finance.momentum-strategy",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Momentum strategy",
+    "detail": "依据过去一段时间的相对或绝对表现构造信号",
+    "aliases": [
+      "Momentum strategy"
+    ]
+  },
+  {
+    "id": "finance.pairs-trading",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "配对交易",
+    "detail": "研究两项相关资产的相对价格关系并构造交易",
+    "aliases": [
+      "配对交易"
+    ]
+  },
+  {
+    "id": "finance.pairs-trading",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Pairs trading",
+    "detail": "研究两项相关资产的相对价格关系并构造交易",
+    "aliases": [
+      "Pairs trading"
+    ]
+  },
+  {
+    "id": "finance.market-neutrality",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "市场中性",
+    "detail": "按指定风险模型控制对整体市场的净暴露",
+    "aliases": [
+      "市场中性"
+    ]
+  },
+  {
+    "id": "finance.market-neutrality",
+    "domain": "finance",
+    "category": "finance.research",
+    "label": "Market neutrality",
+    "detail": "按指定风险模型控制对整体市场的净暴露",
+    "aliases": [
+      "Market neutrality"
+    ]
+  },
+  {
+    "id": "finance.strategy-backtesting",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "策略回测",
+    "detail": "用历史数据和明确成交规则模拟策略表现",
+    "aliases": [
+      "策略回测"
+    ]
+  },
+  {
+    "id": "finance.strategy-backtesting",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Strategy backtesting",
+    "detail": "用历史数据和明确成交规则模拟策略表现",
+    "aliases": [
+      "Strategy backtesting",
+      "backtest"
+    ]
+  },
+  {
+    "id": "finance.look-ahead-bias",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "前视偏差",
+    "detail": "识别回测中使用当时尚不可得信息的问题",
+    "aliases": [
+      "前视偏差"
+    ]
+  },
+  {
+    "id": "finance.look-ahead-bias",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Look-ahead bias",
+    "detail": "识别回测中使用当时尚不可得信息的问题",
+    "aliases": [
+      "Look-ahead bias"
+    ]
+  },
+  {
+    "id": "finance.out-of-sample-validation",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "样本外验证",
+    "detail": "用未参与策略选择或拟合的数据验证表现",
+    "aliases": [
+      "样本外验证"
+    ]
+  },
+  {
+    "id": "finance.out-of-sample-validation",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Out-of-sample validation",
+    "detail": "用未参与策略选择或拟合的数据验证表现",
+    "aliases": [
+      "Out-of-sample validation",
+      "OOS"
+    ]
+  },
+  {
+    "id": "finance.walk-forward-validation",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "滚动前推验证",
+    "detail": "按时间滚动训练窗口并验证后续区间",
+    "aliases": [
+      "滚动前推验证"
+    ]
+  },
+  {
+    "id": "finance.walk-forward-validation",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Walk-forward validation",
+    "detail": "按时间滚动训练窗口并验证后续区间",
+    "aliases": [
+      "Walk-forward validation",
+      "walk-forward"
+    ]
+  },
+  {
+    "id": "finance.backtest-overfitting",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "回测过拟合",
+    "detail": "识别反复试验后只适合历史样本的策略",
+    "aliases": [
+      "回测过拟合"
+    ]
+  },
+  {
+    "id": "finance.backtest-overfitting",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Backtest overfitting",
+    "detail": "识别反复试验后只适合历史样本的策略",
+    "aliases": [
+      "Backtest overfitting"
+    ]
+  },
+  {
+    "id": "finance.slippage",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "交易滑点",
+    "detail": "比较预期成交价与实际或模拟成交价的差异",
+    "aliases": [
+      "交易滑点"
+    ]
+  },
+  {
+    "id": "finance.slippage",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Slippage",
+    "detail": "比较预期成交价与实际或模拟成交价的差异",
+    "aliases": [
+      "Slippage"
+    ]
+  },
+  {
+    "id": "finance.market-impact",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "市场冲击",
+    "detail": "评估自身订单对市场价格和成交成本的影响",
+    "aliases": [
+      "市场冲击"
+    ]
+  },
+  {
+    "id": "finance.market-impact",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Market impact",
+    "detail": "评估自身订单对市场价格和成交成本的影响",
+    "aliases": [
+      "Market impact"
+    ]
+  },
+  {
+    "id": "finance.transaction-costs",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "交易成本",
+    "detail": "计入手续费、价差、滑点等交易开销",
+    "aliases": [
+      "交易成本"
+    ]
+  },
+  {
+    "id": "finance.transaction-costs",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Transaction costs",
+    "detail": "计入手续费、价差、滑点等交易开销",
+    "aliases": [
+      "Transaction costs"
+    ]
+  },
+  {
+    "id": "finance.portfolio-turnover",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "策略换手率",
+    "detail": "按明确买卖金额和资产规模衡量调仓频率",
+    "aliases": [
+      "策略换手率"
+    ]
+  },
+  {
+    "id": "finance.portfolio-turnover",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Portfolio turnover",
+    "detail": "按明确买卖金额和资产规模衡量调仓频率",
+    "aliases": [
+      "Portfolio turnover"
+    ]
+  },
+  {
+    "id": "finance.point-in-time-data",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "时点数据",
+    "detail": "保留信息实际可获得的时间以重建历史决策环境",
+    "aliases": [
+      "时点数据"
+    ]
+  },
+  {
+    "id": "finance.point-in-time-data",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "label": "Point-in-time data",
+    "detail": "保留信息实际可获得的时间以重建历史决策环境",
+    "aliases": [
+      "Point-in-time data",
+      "PIT"
     ]
   }
 ]

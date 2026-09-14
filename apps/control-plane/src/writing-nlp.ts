@@ -62,7 +62,7 @@ const intents: Intent[] = [
   { id: "api-failure", groups: [["api"], ["timeout", "failure"]], label: "排查接口请求失败与超时" },
 ];
 
-export type NLPSuggestion = { label: string; insertText: string; replaceStart: number; replaceEnd: number; intent: string; source?: "lexical" | "semantic"; domain?: string };
+export type NLPSuggestion = { label: string; insertText: string; replaceStart: number; replaceEnd: number; intent: string; source?: "lexical" | "semantic"; domain?: string; category?: string };
 const guard = /不要|不想|不希望|不需要|不允许|不用|无需|禁止|避免|防止|并非|不是|不会|别再|已经修好|已修好|已经解决|已经修复|已解决|已修复|恢复正常|没有问题|没有异常|没有掉线|没再|不再|不怎么|不慢|不卡|\b(?:not(?! (?:match|fit|respond|work)\b)|never|don't)\b/i;
 
 export function prepareWritingDraft(draft: unknown) {
@@ -70,7 +70,11 @@ export function prepareWritingDraft(draft: unknown) {
   const match = /[^。！？!?\n]+[。！？!?]*\s*$/.exec(draft);
   if (!match) return;
   const sentence = match[0].trim();
-  if (sentence.length < 4 || sentence.length > 300 || guard.test(sentence)) return;
+  // Reviewed examples can describe a negative symptom ("never return") rather than
+  // prohibit an action. Keep the conservative guard for all other wording.
+  const normalized = sentence.normalize("NFKC").toLowerCase().replace(/[。！？!?.]+$/, "");
+  const reviewedExample = corpus.intents.some(intent => [...intent.examples.zh, ...intent.examples.en].some(example => example.normalize("NFKC").toLowerCase() === normalized));
+  if (sentence.length < 4 || sentence.length > 300 || (guard.test(sentence) && !reviewedExample)) return;
   if (corpus.intents.some(intent => sentence.includes(intent.goals.zh) || sentence.includes(intent.goals.en))) return;
   return { sentence, start: match.index, end: draft.length, language: /[\u3400-\u9fff]/.test(sentence) ? "zh" as const : "en" as const };
 }
@@ -79,7 +83,9 @@ export function lexicalIntents(sentence: string): string[] {
   const concepts = chineseConcepts(sentence);
   const ids = new Set(intents.filter(intent => intent.groups.every(group => group.some(tag => concepts.has(tag)))).map(intent => intent.id));
   const normalized = sentence.normalize("NFKC").toLowerCase().replace(/[。！？!?.]+$/, "");
-  for (const intent of corpus.intents) if ([...intent.examples.zh, ...intent.examples.en].some(example => normalized === example.normalize("NFKC").toLowerCase())) ids.add(intent.id);
+  const exact = corpus.intents.filter(intent => [...intent.examples.zh, ...intent.examples.en].some(example => normalized === example.normalize("NFKC").toLowerCase())).map(intent => intent.id);
+  // A reviewed full-sentence match is more specific than generic symptom keywords.
+  if (exact.length) return exact;
   if (ids.has("large-list")) ids.delete("page-performance");
   return [...ids];
 }
@@ -89,7 +95,7 @@ function suggestion(prepared: NonNullable<ReturnType<typeof prepareWritingDraft>
   if (!intent) return;
   // Preserve every condition and detail; never infer a diagnosis or implementation from similarity.
   const label = `${intent.goals[prepared.language]}${prepared.language === "zh" ? "：" : ": "}${prepared.sentence}`;
-  return { label, insertText: label, replaceStart: prepared.start, replaceEnd: prepared.end, intent: id, source, domain: intent.domain };
+  return { label, insertText: label, replaceStart: prepared.start, replaceEnd: prepared.end, intent: id, source, domain: intent.domain, category: intent.category };
 }
 
 export function localChineseSuggestions(draft: unknown): { suggestions: NLPSuggestion[] } {

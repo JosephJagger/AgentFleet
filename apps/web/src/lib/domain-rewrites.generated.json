@@ -1,5 +1,132 @@
 [
   {
+    "id": "data-discrepancy",
+    "domain": "analytics",
+    "category": "analytics.metrics",
+    "examples": {
+      "zh": [
+        "报表数字对不上",
+        "两份统计的数据不一样",
+        "金额统计不准确",
+        "两个报表算出来的销售额对不上",
+        "后台和表格的订单数量对不上"
+      ],
+      "en": [
+        "The reports show different totals",
+        "The numbers in these reports do not match",
+        "Sales totals differ between two reports",
+        "Order counts differ between the dashboard and spreadsheet"
+      ]
+    },
+    "goals": {
+      "zh": "核对数据口径与结果一致性",
+      "en": "Reconcile data definitions and inconsistent results"
+    }
+  },
+  {
+    "id": "agent-approval",
+    "domain": "agent",
+    "category": "agent.control",
+    "examples": {
+      "zh": [
+        "agent删除文件前先问我",
+        "智能体执行危险操作要确认",
+        "让助手改生产环境之前征求同意"
+      ],
+      "en": [
+        "Ask me before the agent deletes files",
+        "Require approval before the agent changes production"
+      ]
+    },
+    "goals": {
+      "zh": "为 Agent 的关键操作设置人工确认",
+      "en": "Require human confirmation for critical agent actions"
+    }
+  },
+  {
+    "id": "agent-resume",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "examples": {
+      "zh": [
+        "agent断了以后接着干",
+        "助手中途退出后从上次继续",
+        "智能体任务断线后续跑"
+      ],
+      "en": [
+        "Let the agent continue after a disconnect",
+        "Resume the interrupted agent task"
+      ]
+    },
+    "goals": {
+      "zh": "支持 Agent 中断后的任务恢复",
+      "en": "Resume agent tasks after interruption"
+    }
+  },
+  {
+    "id": "agent-context",
+    "domain": "agent",
+    "category": "agent.memory",
+    "examples": {
+      "zh": [
+        "agent老忘记前面说过的要求",
+        "助手聊久了忘了之前的限制",
+        "智能体记不住项目背景"
+      ],
+      "en": [
+        "The agent forgets my earlier instructions",
+        "The assistant loses project context in long conversations"
+      ]
+    },
+    "goals": {
+      "zh": "改进 Agent 的上下文与约束保留",
+      "en": "Improve agent context and constraint retention"
+    }
+  },
+  {
+    "id": "agent-tools",
+    "domain": "agent",
+    "category": "agent.tools",
+    "examples": {
+      "zh": [
+        "让agent能用浏览器操作网页",
+        "让助手调用公司的工具",
+        "智能体需要连接外部工具"
+      ],
+      "en": [
+        "Let the agent use a browser",
+        "Connect the assistant to our tools"
+      ]
+    },
+    "goals": {
+      "zh": "为 Agent 接入任务所需的工具",
+      "en": "Connect the agent to tools required for the task"
+    }
+  },
+  {
+    "id": "agent-parallel",
+    "domain": "agent",
+    "category": "agent.orchestration",
+    "examples": {
+      "zh": [
+        "几个agent分头干活",
+        "让多个助手同时处理不同任务",
+        "智能体一起做能拆开的任务"
+      ],
+      "en": [
+        "Have several agents work on independent tasks",
+        "Split the work across agents in parallel"
+      ]
+    },
+    "goals": {
+      "zh": "将可独立执行的任务交给多个 Agent 并行处理",
+      "en": "Run independent tasks with multiple agents in parallel"
+    }
+  },
+  {
+    "id": "video-j-cut",
+    "domain": "video",
+    "category": "video.editing",
     "examples": {
       "zh": [
         "先听到下个镜头的声音再切画面"
@@ -14,6 +141,9 @@
     }
   },
   {
+    "id": "video-l-cut",
+    "domain": "video",
+    "category": "video.editing",
     "examples": {
       "zh": [
         "画面切走了但上个镜头声音继续"
@@ -28,6 +158,9 @@
     }
   },
   {
+    "id": "video-ducking",
+    "domain": "video",
+    "category": "video.audio",
     "examples": {
       "zh": [
         "有人说话的时候背景音乐小一点"
@@ -42,6 +175,9 @@
     }
   },
   {
+    "id": "video-speed-ramp",
+    "domain": "video",
+    "category": "video.motion",
     "examples": {
       "zh": [
         "这个镜头先慢再逐渐变快"
@@ -56,6 +192,9 @@
     }
   },
   {
+    "id": "video-subtitle-timing",
+    "domain": "video",
+    "category": "video.captions",
     "examples": {
       "zh": [
         "字幕比说话晚出来"
@@ -70,6 +209,9 @@
     }
   },
   {
+    "id": "philosophy-premises",
+    "domain": "philosophy",
+    "category": "philosophy.logic",
     "examples": {
       "zh": [
         "帮我拆开这段话的前提和结论"
@@ -84,6 +226,9 @@
     }
   },
   {
+    "id": "philosophy-is-ought",
+    "domain": "philosophy",
+    "category": "philosophy.ethics",
     "examples": {
       "zh": [
         "这是事实还是在说应该怎样"
@@ -98,6 +243,9 @@
     }
   },
   {
+    "id": "cognition-confirmation",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "examples": {
       "zh": [
         "我是否只找支持自己观点的证据"
@@ -112,6 +260,9 @@
     }
   },
   {
+    "id": "cognition-sunk-cost",
+    "domain": "cognition",
+    "category": "cognition.biases",
     "examples": {
       "zh": [
         "已经花了很多钱所以舍不得停下来"
@@ -126,6 +277,9 @@
     }
   },
   {
+    "id": "cognition-retrieval",
+    "domain": "cognition",
+    "category": "cognition.learning",
     "examples": {
       "zh": [
         "帮我设计不看书回忆知识的练习"
@@ -137,6 +291,519 @@
     "goals": {
       "zh": "设计主动回忆的学习练习",
       "en": "Design active recall exercises"
+    }
+  },
+  {
+    "id": "ai-rag",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "examples": {
+      "zh": [
+        "让AI根据公司文档回答问题",
+        "让模型查我们的知识库再回答"
+      ],
+      "en": [
+        "Have the AI answer using our company documents",
+        "Search our knowledge base before answering"
+      ]
+    },
+    "goals": {
+      "zh": "接入检索增强生成，基于相关知识库资料回答并标注来源",
+      "en": "Add retrieval-augmented generation with source citations"
+    }
+  },
+  {
+    "id": "ai-hallucination",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "examples": {
+      "zh": [
+        "AI总是编造答案",
+        "模型回答的东西资料里根本没有"
+      ],
+      "en": [
+        "The AI keeps making up facts",
+        "The model gives answers that are missing from the sources"
+      ]
+    },
+    "goals": {
+      "zh": "核验模型回答与资料的一致性，对缺乏依据的内容明确说明不确定性",
+      "en": "Check answers against sources and state uncertainty when evidence is missing"
+    }
+  },
+  {
+    "id": "ai-json",
+    "domain": "ai",
+    "category": "ai.prompting",
+    "examples": {
+      "zh": [
+        "让AI每次都按固定字段输出",
+        "模型返回的JSON格式总是不对"
+      ],
+      "en": [
+        "Make the AI return the same fields every time",
+        "The model keeps returning invalid JSON"
+      ]
+    },
+    "goals": {
+      "zh": "约束模型输出的字段和类型，并校验结构化结果",
+      "en": "Constrain output fields and types and validate the structured result"
+    }
+  },
+  {
+    "id": "ai-retrieval",
+    "domain": "ai",
+    "category": "ai.retrieval",
+    "examples": {
+      "zh": [
+        "知识库搜出来的内容和问题无关",
+        "问公司资料时总是找错文档"
+      ],
+      "en": [
+        "Knowledge base results are irrelevant to the question",
+        "The search keeps finding the wrong documents"
+      ]
+    },
+    "goals": {
+      "zh": "检查文档分块、召回和重排序，提升知识库检索相关性",
+      "en": "Review chunking, retrieval, and reranking to improve knowledge-base relevance"
+    }
+  },
+  {
+    "id": "ai-injection",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "examples": {
+      "zh": [
+        "网页里一句话就把AI带偏了",
+        "文档里的指令让助手偏离了任务"
+      ],
+      "en": [
+        "Text on a web page derails the AI task",
+        "Instructions inside documents redirect the assistant"
+      ]
+    },
+    "goals": {
+      "zh": "区分可信任务指令与外部内容，检查提示词注入对工具调用的影响",
+      "en": "Separate trusted instructions from external content and check prompt injection risks in tool calls"
+    }
+  },
+  {
+    "id": "ai-cost",
+    "domain": "ai",
+    "category": "ai.inference",
+    "examples": {
+      "zh": [
+        "AI调用太费token了",
+        "相同问题反复请求模型太浪费了"
+      ],
+      "en": [
+        "AI calls use too many tokens",
+        "Repeated model requests for the same question are wasteful"
+      ]
+    },
+    "goals": {
+      "zh": "分析输入输出词元、重复请求和缓存命中，在质量约束下降低调用成本",
+      "en": "Analyze tokens, duplicate requests, and cache hits to reduce cost while preserving quality"
+    }
+  },
+  {
+    "id": "ai-latency",
+    "domain": "ai",
+    "category": "ai.inference",
+    "examples": {
+      "zh": [
+        "AI等很久才开始出字",
+        "模型回答半天才显示第一个字"
+      ],
+      "en": [
+        "The AI takes ages to start responding",
+        "The first word of the model response takes too long"
+      ]
+    },
+    "goals": {
+      "zh": "区分首词元延迟与生成速度，检查模型调用链路并评估流式输出",
+      "en": "Separate first-token latency from generation speed and evaluate streaming"
+    }
+  },
+  {
+    "id": "ai-evaluation",
+    "domain": "ai",
+    "category": "ai.evaluation-safety",
+    "examples": {
+      "zh": [
+        "换模型后怎么知道效果好不好",
+        "改了提示词想知道有没有变差"
+      ],
+      "en": [
+        "How can I tell if switching models improved results",
+        "Check whether my prompt changes made results worse"
+      ]
+    },
+    "goals": {
+      "zh": "建立代表性任务集，对比模型或提示词变更前后的质量、成本和延迟",
+      "en": "Compare quality, cost, and latency on representative tasks before and after model or prompt changes"
+    }
+  },
+  {
+    "id": "ai-loop",
+    "domain": "agent",
+    "category": "agent.control",
+    "examples": {
+      "zh": [
+        "agent一直重复调用同一个工具",
+        "智能体一直转圈停不下来"
+      ],
+      "en": [
+        "The agent keeps calling the same tool in a loop",
+        "The agent keeps running without finishing"
+      ]
+    },
+    "goals": {
+      "zh": "检查任务终止条件、工具重试与步数预算，定位智能体重复执行的原因",
+      "en": "Inspect stop conditions, tool retries, and step budgets to diagnose agent loops"
+    }
+  },
+  {
+    "id": "ai-finetune",
+    "domain": "ai",
+    "category": "ai.training",
+    "examples": {
+      "zh": [
+        "想让模型学会我们行业的说法",
+        "想用自己的样本教模型做任务"
+      ],
+      "en": [
+        "Teach the model our industry terminology",
+        "Adapt the model to tasks using our own examples"
+      ]
+    },
+    "goals": {
+      "zh": "比较提示词、检索增强与微调，选择适合领域任务和数据条件的方案",
+      "en": "Compare prompting, retrieval augmentation, and fine-tuning for the domain task and available data"
+    }
+  },
+  {
+    "id": "commerce-margin",
+    "domain": "ecommerce",
+    "category": "ecommerce.profit",
+    "examples": {
+      "zh": [
+        "卖了很多单却没赚到钱",
+        "跨境订单扣完各种费用不知道赚多少"
+      ],
+      "en": [
+        "We sell lots of orders but make little profit",
+        "Calculate profit after all cross-border order costs"
+      ]
+    },
+    "goals": {
+      "zh": "核算商品、物流、平台、广告和退货成本，分析订单贡献利润",
+      "en": "Calculate product, shipping, platform, advertising, and return costs to assess order contribution"
+    }
+  },
+  {
+    "id": "commerce-stock",
+    "domain": "ecommerce",
+    "category": "ecommerce.fulfillment",
+    "examples": {
+      "zh": [
+        "海外仓经常断货",
+        "总是快卖完了才想起来补货"
+      ],
+      "en": [
+        "Our overseas warehouse keeps running out of stock",
+        "We replenish only when inventory is almost gone"
+      ]
+    },
+    "goals": {
+      "zh": "结合需求、补货周期和安全库存制定补货计划",
+      "en": "Plan replenishment using demand, lead times, and safety stock"
+    }
+  },
+  {
+    "id": "commerce-returns",
+    "domain": "ecommerce",
+    "category": "ecommerce.orders",
+    "examples": {
+      "zh": [
+        "买家退货越来越多",
+        "想知道哪些商品最容易被退回来"
+      ],
+      "en": [
+        "More customers are returning their orders",
+        "Find which products get returned most often"
+      ]
+    },
+    "goals": {
+      "zh": "按商品、市场和原因拆分退货，定位可改进环节",
+      "en": "Break down returns by product, market, and reason to identify improvements"
+    }
+  },
+  {
+    "id": "analytics-experiment",
+    "domain": "analytics",
+    "category": "analytics.experiments",
+    "examples": {
+      "zh": [
+        "新版转化高一点是不是就算赢了",
+        "测试样本很少能不能下结论"
+      ],
+      "en": [
+        "Is a slightly higher conversion rate enough to call a winner",
+        "Can we draw conclusions from a tiny experiment"
+      ]
+    },
+    "goals": {
+      "zh": "检查实验分组、样本量和效应区间，评估版本差异",
+      "en": "Check experimental groups, sample sizes, and effect intervals to assess variant differences"
+    }
+  },
+  {
+    "id": "analytics-distribution",
+    "domain": "analytics",
+    "category": "analytics.statistics",
+    "examples": {
+      "zh": [
+        "几个大订单把平均数拉高了",
+        "平均值看着很好但大多数订单很小"
+      ],
+      "en": [
+        "A few large orders inflate the average",
+        "The average looks good but most orders are small"
+      ]
+    },
+    "goals": {
+      "zh": "同时查看中位数、分位数和异常值，解释平均值变化",
+      "en": "Inspect medians, percentiles, and outliers to explain changes in averages"
+    }
+  },
+  {
+    "id": "operations-retention",
+    "domain": "operations",
+    "category": "operations.lifecycle",
+    "examples": {
+      "zh": [
+        "用户来了以后就再也不回来了",
+        "新客买一次就没再买过"
+      ],
+      "en": [
+        "Users arrive and never come back",
+        "New customers buy once and never return"
+      ]
+    },
+    "goals": {
+      "zh": "按新增时间分组分析后续活跃和复购，定位留存流失阶段",
+      "en": "Analyze activity and repeat purchases by acquisition cohort to locate retention drop-off"
+    }
+  },
+  {
+    "id": "operations-funnel",
+    "domain": "operations",
+    "category": "operations.growth",
+    "examples": {
+      "zh": [
+        "访问很多但就是没人下单",
+        "很多人加购却没付款"
+      ],
+      "en": [
+        "Lots of visitors but hardly anyone orders",
+        "Many people add to cart but never pay"
+      ]
+    },
+    "goals": {
+      "zh": "拆分访问、加购、结账和支付步骤，定位购买转化流失",
+      "en": "Break down visits, cart additions, checkout, and payment to locate purchase drop-off"
+    }
+  },
+  {
+    "id": "operations-service",
+    "domain": "operations",
+    "category": "operations.workflow",
+    "examples": {
+      "zh": [
+        "客服问题总是没人跟进",
+        "买家的问题转来转去没人处理"
+      ],
+      "en": [
+        "Support requests keep falling through the cracks",
+        "Customer issues are passed around without resolution"
+      ]
+    },
+    "goals": {
+      "zh": "按问题类型、优先级和响应目标分配工单并跟踪处理时长",
+      "en": "Route tickets by issue type, priority, and response targets and track resolution time"
+    }
+  },
+  {
+    "id": "marketing-roas",
+    "domain": "marketing",
+    "category": "marketing.ads",
+    "examples": {
+      "zh": [
+        "广告回报看着很高却还是亏钱",
+        "ROAS很好但利润很低"
+      ],
+      "en": [
+        "ROAS looks great but we still lose money",
+        "Ad revenue is high but profit is low"
+      ]
+    },
+    "goals": {
+      "zh": "区分广告归因收入与实际利润，核对费用、退款和归因窗口",
+      "en": "Separate attributed revenue from profit and verify costs, refunds, and attribution windows"
+    }
+  },
+  {
+    "id": "marketing-seo",
+    "domain": "marketing",
+    "category": "marketing.seo",
+    "examples": {
+      "zh": [
+        "商品页在搜索引擎里找不到",
+        "网站上线很久了搜索不到页面"
+      ],
+      "en": [
+        "Product pages never appear in search engines",
+        "Our published pages cannot be found in search"
+      ]
+    },
+    "goals": {
+      "zh": "检查抓取、索引、规范网址和页面内容，定位搜索不可见原因",
+      "en": "Inspect crawling, indexing, canonical URLs, and content to diagnose search visibility"
+    }
+  },
+  {
+    "id": "marketing-tracking",
+    "domain": "marketing",
+    "category": "marketing.attribution",
+    "examples": {
+      "zh": [
+        "不知道订单是哪个广告带来的",
+        "想分清邮件和社交媒体各带来多少订单"
+      ],
+      "en": [
+        "We cannot tell which ads generated the orders",
+        "Separate orders from email and social media"
+      ]
+    },
+    "goals": {
+      "zh": "统一渠道参数、转化事件与归因窗口，核对流量和转化来源",
+      "en": "Align campaign parameters, conversion events, and attribution windows to reconcile traffic and conversion sources"
+    }
+  },
+  {
+    "id": "finance-cost",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "examples": {
+      "zh": [
+        "回测赚钱实盘却亏钱",
+        "策略收益算完手续费就没了"
+      ],
+      "en": [
+        "The backtest makes money but live trading loses",
+        "Strategy returns disappear after fees"
+      ]
+    },
+    "goals": {
+      "zh": "在回测中加入手续费、买卖价差、滑点和换手成本，检查收益稳健性",
+      "en": "Include fees, spreads, slippage, and turnover costs in backtests to assess return robustness"
+    }
+  },
+  {
+    "id": "finance-lookahead",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "examples": {
+      "zh": [
+        "回测好像提前知道了后面的价格",
+        "用当天收盘价选股又按当天收盘价成交"
+      ],
+      "en": [
+        "The backtest seems to know future prices",
+        "Signals and fills both use the same closing price"
+      ]
+    },
+    "goals": {
+      "zh": "核对数据发布时间、信号时点和成交时点，排查前视偏差",
+      "en": "Check publication, signal, and execution timestamps for look-ahead bias"
+    }
+  },
+  {
+    "id": "finance-overfit",
+    "domain": "finance",
+    "category": "finance.backtesting",
+    "examples": {
+      "zh": [
+        "参数调得越多回测越好实盘越差",
+        "策略换一段时间就失效"
+      ],
+      "en": [
+        "More tuning improves backtests but worsens live results",
+        "The strategy fails on a different period"
+      ]
+    },
+    "goals": {
+      "zh": "区分训练与样本外区间，通过滚动验证和参数敏感性检查评估泛化",
+      "en": "Separate training and out-of-sample periods and assess generalization with rolling validation and parameter sensitivity"
+    }
+  },
+  {
+    "id": "finance-risk",
+    "domain": "finance",
+    "category": "finance.portfolio",
+    "examples": {
+      "zh": [
+        "收益看着不错但中间跌得太厉害",
+        "想知道组合最难扛的时候亏多少"
+      ],
+      "en": [
+        "Returns look good but the losses along the way are severe",
+        "Measure the portfolio's worst peak-to-trough loss"
+      ]
+    },
+    "goals": {
+      "zh": "分析净值回撤、波动和风险暴露，定位亏损集中阶段与来源",
+      "en": "Analyze drawdowns, volatility, and exposures to locate concentrated loss periods and sources"
+    }
+  },
+  {
+    "id": "finance-factor",
+    "domain": "finance",
+    "category": "finance.research",
+    "examples": {
+      "zh": [
+        "不知道这个选股因子有没有用",
+        "因子在一个年份有效其他年份不行"
+      ],
+      "en": [
+        "Check whether this stock selection factor is useful",
+        "The factor works in one year but fails in others"
+      ]
+    },
+    "goals": {
+      "zh": "检查因子信息系数、分组收益、稳定性和交易成本后的表现",
+      "en": "Evaluate factor information coefficients, grouped returns, stability, and performance after costs"
+    }
+  },
+  {
+    "id": "finance-adjustment",
+    "domain": "finance",
+    "category": "finance.stocks",
+    "examples": {
+      "zh": [
+        "股票分红后图上突然跌了一大截",
+        "历史价格调整后算出来的收益不一样"
+      ],
+      "en": [
+        "The chart drops sharply after a dividend",
+        "Adjusted historical prices produce different returns"
+      ]
+    },
+    "goals": {
+      "zh": "核对分红、拆股和复权口径，解释历史价格与收益的异常跳变",
+      "en": "Check dividends, splits, and adjustment conventions to explain unusual price and return jumps"
     }
   }
 ]

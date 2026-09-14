@@ -1,0 +1,502 @@
+{
+  "version": 1,
+  "domains": [
+    {
+      "id": "programming",
+      "label": {
+        "zh": "编程开发",
+        "en": "Programming"
+      },
+      "categories": [
+        {
+          "id": "programming.interface",
+          "label": {
+            "zh": "界面与交互",
+            "en": "Interface and interaction"
+          }
+        },
+        {
+          "id": "programming.reliability",
+          "label": {
+            "zh": "可靠性与数据",
+            "en": "Reliability and data"
+          }
+        },
+        {
+          "id": "programming.software-vocabulary",
+          "label": {
+            "zh": "软件通用词汇",
+            "en": "General software vocabulary"
+          }
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "label": {
+        "zh": "智能体",
+        "en": "Agents"
+      },
+      "categories": [
+        {
+          "id": "agent.tools",
+          "label": {
+            "zh": "工具与协议",
+            "en": "Tools and protocols"
+          }
+        },
+        {
+          "id": "agent.orchestration",
+          "label": {
+            "zh": "任务编排",
+            "en": "Task orchestration"
+          }
+        },
+        {
+          "id": "agent.memory",
+          "label": {
+            "zh": "上下文与记忆",
+            "en": "Context and memory"
+          }
+        },
+        {
+          "id": "agent.control",
+          "label": {
+            "zh": "权限与执行控制",
+            "en": "Permissions and execution control"
+          }
+        },
+        {
+          "id": "agent.evaluation",
+          "label": {
+            "zh": "轨迹与评测",
+            "en": "Traces and evaluation"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ai",
+      "label": {
+        "zh": "人工智能",
+        "en": "AI"
+      },
+      "categories": [
+        {
+          "id": "ai.foundations",
+          "label": {
+            "zh": "基础概念",
+            "en": "Foundations"
+          }
+        },
+        {
+          "id": "ai.prompting",
+          "label": {
+            "zh": "提示词与上下文",
+            "en": "Prompting and context"
+          }
+        },
+        {
+          "id": "ai.retrieval",
+          "label": {
+            "zh": "知识库与检索",
+            "en": "Knowledge bases and retrieval"
+          }
+        },
+        {
+          "id": "ai.training",
+          "label": {
+            "zh": "训练与适配",
+            "en": "Training and adaptation"
+          }
+        },
+        {
+          "id": "ai.inference",
+          "label": {
+            "zh": "推理与性能",
+            "en": "Inference and performance"
+          }
+        },
+        {
+          "id": "ai.evaluation-safety",
+          "label": {
+            "zh": "评测与安全",
+            "en": "Evaluation and safety"
+          }
+        }
+      ]
+    },
+    {
+      "id": "office",
+      "label": {
+        "zh": "办公自动化",
+        "en": "Office automation"
+      },
+      "categories": [
+        {
+          "id": "office.data",
+          "label": {
+            "zh": "表格与数据",
+            "en": "Spreadsheets and data"
+          }
+        },
+        {
+          "id": "office.workflow",
+          "label": {
+            "zh": "文件与工作流",
+            "en": "Files and workflows"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engineering",
+      "label": {
+        "zh": "工程设计",
+        "en": "Engineering"
+      },
+      "categories": [
+        {
+          "id": "engineering.design",
+          "label": {
+            "zh": "设计与制造",
+            "en": "Design and manufacturing"
+          }
+        },
+        {
+          "id": "engineering.simulation",
+          "label": {
+            "zh": "仿真与验证",
+            "en": "Simulation and verification"
+          }
+        }
+      ]
+    },
+    {
+      "id": "games",
+      "label": {
+        "zh": "游戏开发",
+        "en": "Games"
+      },
+      "categories": [
+        {
+          "id": "games.simulation",
+          "label": {
+            "zh": "物理与性能",
+            "en": "Physics and performance"
+          }
+        },
+        {
+          "id": "games.state",
+          "label": {
+            "zh": "游戏状态与存档",
+            "en": "Game state and saves"
+          }
+        }
+      ]
+    },
+    {
+      "id": "video",
+      "label": {
+        "zh": "视频剪辑",
+        "en": "Video editing"
+      },
+      "categories": [
+        {
+          "id": "video.editing",
+          "label": {
+            "zh": "剪辑与叙事",
+            "en": "Editing and storytelling"
+          }
+        },
+        {
+          "id": "video.motion",
+          "label": {
+            "zh": "动画与合成",
+            "en": "Motion and compositing"
+          }
+        },
+        {
+          "id": "video.color",
+          "label": {
+            "zh": "色彩与调色",
+            "en": "Color and grading"
+          }
+        },
+        {
+          "id": "video.media",
+          "label": {
+            "zh": "素材与交付",
+            "en": "Media and delivery"
+          }
+        },
+        {
+          "id": "video.audio",
+          "label": {
+            "zh": "音频处理",
+            "en": "Audio processing"
+          }
+        },
+        {
+          "id": "video.captions",
+          "label": {
+            "zh": "字幕与版式",
+            "en": "Captions and layout"
+          }
+        }
+      ]
+    },
+    {
+      "id": "philosophy",
+      "label": {
+        "zh": "哲学",
+        "en": "Philosophy"
+      },
+      "categories": [
+        {
+          "id": "philosophy.foundations",
+          "label": {
+            "zh": "分支与流派",
+            "en": "Branches and schools"
+          }
+        },
+        {
+          "id": "philosophy.knowledge",
+          "label": {
+            "zh": "知识与心灵",
+            "en": "Knowledge and mind"
+          }
+        },
+        {
+          "id": "philosophy.logic",
+          "label": {
+            "zh": "逻辑与论证",
+            "en": "Logic and argument"
+          }
+        },
+        {
+          "id": "philosophy.ethics",
+          "label": {
+            "zh": "伦理与价值",
+            "en": "Ethics and values"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cognition",
+      "label": {
+        "zh": "认知与学习",
+        "en": "Cognition and learning"
+      },
+      "categories": [
+        {
+          "id": "cognition.processes",
+          "label": {
+            "zh": "认知过程",
+            "en": "Cognitive processes"
+          }
+        },
+        {
+          "id": "cognition.biases",
+          "label": {
+            "zh": "偏差与决策",
+            "en": "Biases and decisions"
+          }
+        },
+        {
+          "id": "cognition.learning",
+          "label": {
+            "zh": "学习与记忆",
+            "en": "Learning and memory"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ecommerce",
+      "label": {
+        "zh": "跨境电商",
+        "en": "Cross-border commerce"
+      },
+      "categories": [
+        {
+          "id": "ecommerce.catalog",
+          "label": {
+            "zh": "商品与定价",
+            "en": "Catalog and pricing"
+          }
+        },
+        {
+          "id": "ecommerce.orders",
+          "label": {
+            "zh": "订单与交易",
+            "en": "Orders and transactions"
+          }
+        },
+        {
+          "id": "ecommerce.fulfillment",
+          "label": {
+            "zh": "物流与履约",
+            "en": "Logistics and fulfillment"
+          }
+        },
+        {
+          "id": "ecommerce.profit",
+          "label": {
+            "zh": "成本与利润",
+            "en": "Costs and profit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "analytics",
+      "label": {
+        "zh": "数据统计",
+        "en": "Data and statistics"
+      },
+      "categories": [
+        {
+          "id": "analytics.metrics",
+          "label": {
+            "zh": "指标与口径",
+            "en": "Metrics and definitions"
+          }
+        },
+        {
+          "id": "analytics.statistics",
+          "label": {
+            "zh": "统计与推断",
+            "en": "Statistics and inference"
+          }
+        },
+        {
+          "id": "analytics.experiments",
+          "label": {
+            "zh": "实验与因果",
+            "en": "Experiments and causality"
+          }
+        },
+        {
+          "id": "analytics.quality",
+          "label": {
+            "zh": "数据质量",
+            "en": "Data quality"
+          }
+        }
+      ]
+    },
+    {
+      "id": "operations",
+      "label": {
+        "zh": "运营",
+        "en": "Operations"
+      },
+      "categories": [
+        {
+          "id": "operations.lifecycle",
+          "label": {
+            "zh": "用户生命周期",
+            "en": "Customer lifecycle"
+          }
+        },
+        {
+          "id": "operations.growth",
+          "label": {
+            "zh": "增长与转化",
+            "en": "Growth and conversion"
+          }
+        },
+        {
+          "id": "operations.workflow",
+          "label": {
+            "zh": "流程与服务",
+            "en": "Workflows and service"
+          }
+        }
+      ]
+    },
+    {
+      "id": "marketing",
+      "label": {
+        "zh": "网络营销",
+        "en": "Digital marketing"
+      },
+      "categories": [
+        {
+          "id": "marketing.seo",
+          "label": {
+            "zh": "搜索优化",
+            "en": "Search optimization"
+          }
+        },
+        {
+          "id": "marketing.content",
+          "label": {
+            "zh": "内容与渠道",
+            "en": "Content and channels"
+          }
+        },
+        {
+          "id": "marketing.ads",
+          "label": {
+            "zh": "广告投放",
+            "en": "Advertising"
+          }
+        },
+        {
+          "id": "marketing.attribution",
+          "label": {
+            "zh": "归因与追踪",
+            "en": "Attribution and tracking"
+          }
+        }
+      ]
+    },
+    {
+      "id": "finance",
+      "label": {
+        "zh": "金融与量化",
+        "en": "Finance and quantitative research"
+      },
+      "categories": [
+        {
+          "id": "finance.foundations",
+          "label": {
+            "zh": "金融基础",
+            "en": "Financial foundations"
+          }
+        },
+        {
+          "id": "finance.stocks",
+          "label": {
+            "zh": "股票与交易",
+            "en": "Stocks and trading"
+          }
+        },
+        {
+          "id": "finance.portfolio",
+          "label": {
+            "zh": "组合与风险",
+            "en": "Portfolio and risk"
+          }
+        },
+        {
+          "id": "finance.research",
+          "label": {
+            "zh": "量化研究",
+            "en": "Quantitative research"
+          }
+        },
+        {
+          "id": "finance.backtesting",
+          "label": {
+            "zh": "回测与执行",
+            "en": "Backtesting and execution"
+          }
+        }
+      ]
+    }
+  ]
+}

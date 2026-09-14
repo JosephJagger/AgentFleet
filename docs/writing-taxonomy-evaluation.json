@@ -1,0 +1,264 @@
+{
+  "cases": 51,
+  "hits": 11,
+  "wrong": 0,
+  "abstained": 19,
+  "rejected": 21,
+  "results": [
+    {
+      "draft": "登录没多久就让我再输一遍密码",
+      "expected": "session-expiry",
+      "actual": null
+    },
+    {
+      "draft": "手机上内容互相盖住了",
+      "expected": "mobile-layout",
+      "actual": "mobile-layout"
+    },
+    {
+      "draft": "网页打开之后要卡好久才显示",
+      "expected": "page-performance",
+      "actual": "page-performance"
+    },
+    {
+      "draft": "搜索要等输入停止后才发起",
+      "expected": "input-debounce",
+      "actual": "input-debounce"
+    },
+    {
+      "draft": "表格里客户名字有重复想清理掉",
+      "expected": "sheet-dedupe",
+      "actual": null
+    },
+    {
+      "draft": "把两个工作簿按相同客户号合在一起",
+      "expected": "sheet-merge",
+      "actual": null
+    },
+    {
+      "draft": "每月自动整理一份销售统计报告",
+      "expected": "office-report",
+      "actual": "office-report"
+    },
+    {
+      "draft": "智能助手运行到中途掉线了怎么接着做",
+      "expected": "agent-resume",
+      "actual": null
+    },
+    {
+      "draft": "聊了一阵助手就记不住一开始的要求",
+      "expected": "agent-context",
+      "actual": "agent-context"
+    },
+    {
+      "draft": "想让助手使用网页浏览器完成操作",
+      "expected": "agent-tools",
+      "actual": "agent-tools"
+    },
+    {
+      "draft": "怪物多起来游戏就不流畅",
+      "expected": "game-frame",
+      "actual": "game-frame"
+    },
+    {
+      "draft": "人物碰到墙却能钻过去",
+      "expected": "game-collision",
+      "actual": "game-collision"
+    },
+    {
+      "draft": "视频里的说话声和嘴巴动作有延迟",
+      "expected": "video-sync",
+      "actual": null
+    },
+    {
+      "draft": "给这段访谈自动生成带时间的字幕",
+      "expected": "video-captions",
+      "actual": null
+    },
+    {
+      "draft": "仿真里把网格细化后计算结果变化很大",
+      "expected": "engineering-mesh",
+      "actual": null
+    },
+    {
+      "draft": "The app signs me out after a few minutes",
+      "expected": "session-expiry",
+      "actual": null
+    },
+    {
+      "draft": "Combine the customer tables on a common identifier",
+      "expected": "sheet-merge",
+      "actual": null
+    },
+    {
+      "draft": "The assistant forgets the project requirements during a long chat",
+      "expected": "agent-context",
+      "actual": "agent-context"
+    },
+    {
+      "draft": "Audio lags behind the picture in my edited clip",
+      "expected": "video-sync",
+      "actual": null
+    },
+    {
+      "draft": "The player can pass straight through solid walls",
+      "expected": "game-collision",
+      "actual": "game-collision"
+    },
+    {
+      "draft": "登录现在很稳定了",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "页面不卡只是颜色不好看",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "游戏音乐很好听",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "帮我翻译这封邮件",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "Excel 的图标怎么换颜色",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "视频里的人穿的什么衣服",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "两个需求：登录老掉并且页面很慢",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "Do not delete duplicate rows",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "The login issue is already resolved",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "What does collision detection mean?",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "The page is not slow",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "我想了解防抖和节流的区别",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "帮我设计一个游戏故事",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "办公室有好几张桌子",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "How do I pronounce idempotency?",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "模型老是一本正经地胡编事实",
+      "expected": "ai-hallucination",
+      "actual": null
+    },
+    {
+      "draft": "Use internal company documents as sources for answers",
+      "expected": "ai-rag",
+      "actual": null
+    },
+    {
+      "draft": "模型结果经常不是合法JSON",
+      "expected": "ai-json",
+      "actual": null
+    },
+    {
+      "draft": "工具被智能体一遍一遍调用却不结束",
+      "expected": "ai-loop",
+      "actual": null
+    },
+    {
+      "draft": "海外仓库存又卖光了来不及补货",
+      "expected": "commerce-stock",
+      "actual": null
+    },
+    {
+      "draft": "Lots of ad-attributed revenue but negative profit",
+      "expected": "marketing-roas",
+      "actual": "marketing-roas"
+    },
+    {
+      "draft": "客户只买了第一单之后就没有回来",
+      "expected": "operations-retention",
+      "actual": null
+    },
+    {
+      "draft": "回测没考虑手续费和滑点",
+      "expected": "finance-cost",
+      "actual": null
+    },
+    {
+      "draft": "The backtest uses information published after the trade",
+      "expected": "finance-lookahead",
+      "actual": null
+    },
+    {
+      "draft": "The strategy only works on the data used to tune it",
+      "expected": "finance-overfit",
+      "actual": null
+    },
+    {
+      "draft": "今天股市为什么涨",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "帮我推荐一只明天上涨的股票",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "我想了解金融历史",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "Who founded this company",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "买家送了我一件礼物",
+      "expected": null,
+      "actual": null
+    },
+    {
+      "draft": "今天想看一部电影",
+      "expected": null,
+      "actual": null
+    }
+  ]
+}

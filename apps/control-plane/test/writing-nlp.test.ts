@@ -48,13 +48,32 @@ test("semantic retrieval abstains on weak or ambiguous matches and preserves the
   assert.equal((await hybridWritingSuggestions("I keep getting logged out",search)).suggestions[0]!.intent,"session-expiry");
 });
 
-test("curated bilingual corpus covers eight domains without duplicate IDs or overlong suggestions",async()=>{
+test("curated bilingual corpus covers fourteen domains without duplicate IDs or overlong suggestions",async()=>{
   const {default:corpus}=await import("../src/writing-corpus.json",{with:{type:"json"}});
   assert.equal(new Set(corpus.intents.map(item=>item.id)).size,corpus.intents.length);
-  assert.equal(new Set(corpus.intents.map(item=>item.domain)).size,8);
+  assert.equal(new Set(corpus.intents.map(item=>item.domain)).size,14);
   for(const intent of corpus.intents) for(const example of [...intent.examples.zh,...intent.examples.en]) {
     const result=localChineseSuggestions(example).suggestions;
     assert.equal(result[0]?.intent,intent.id,example);
     assert.ok(result[0]!.label.length<=500);
   }
+});
+
+test("curated terms and intents have stable classifications and shared concept references",async()=>{
+ const {default:glossary}=await import('../src/writing-glossary.json',{with:{type:'json'}});
+ const {default:corpus}=await import('../src/writing-corpus.json',{with:{type:'json'}});
+ const {default:taxonomy}=await import('../src/writing-taxonomy.json',{with:{type:'json'}});
+ const categories=new Map(taxonomy.domains.flatMap(domain=>domain.categories.map(category=>[category.id,domain.id])));
+ const entries=[...glossary.entries,...corpus.intents];
+ assert.equal(new Set(entries.map(entry=>entry.id)).size,entries.length);
+ for(const entry of entries) assert.equal(categories.get(entry.category),entry.domain,entry.id);
+ const terms=new Map(glossary.entries.map(entry=>[entry.id,entry]));
+ for(const intent of corpus.intents) if('conceptId' in intent && intent.conceptId) assert.ok(terms.has(intent.conceptId));
+ assert.equal(glossary.entries.find(entry=>entry.terms.en==='Model Context Protocol')?.category,'agent.tools');
+ assert.equal(glossary.entries.find(entry=>entry.terms.en==='Retrieval-augmented generation')?.category,'ai.retrieval');
+ for(const intent of corpus.intents.filter(intent=>intent.id.startsWith('ai-'))) for(const draft of [...intent.examples.zh,...intent.examples.en]) {
+  const suggestion=localChineseSuggestions(draft).suggestions[0];
+  assert.equal(suggestion?.intent,intent.id,draft);
+  assert.equal(suggestion?.category,intent.category);
+ }
 });

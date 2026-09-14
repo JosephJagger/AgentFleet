@@ -16,7 +16,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.timeline",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -31,7 +35,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.bin",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -46,7 +54,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.in-point",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -61,7 +73,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.out-point",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -76,7 +92,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.rough-cut",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -91,7 +111,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.fine-cut",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -106,7 +130,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.picture-lock",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -121,7 +149,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.ripple-edit",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -136,7 +168,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.rolling-edit",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -151,7 +187,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.slip-edit",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -166,7 +206,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.slide-edit",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -181,7 +225,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.insert-edit",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -196,7 +244,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.overwrite-edit",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -211,7 +263,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.match-cut",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -226,7 +282,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.jump-cut",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -241,7 +301,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.cross-cutting",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -256,7 +320,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.parallel-editing",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -273,7 +341,11 @@
         "en": [
           "J cut"
         ]
-      }
+      },
+      "category": "video.editing",
+      "id": "video.j-cut",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -290,7 +362,11 @@
         "en": [
           "L cut"
         ]
-      }
+      },
+      "category": "video.editing",
+      "id": "video.l-cut",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -305,7 +381,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.cutaway-shot",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -320,7 +400,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.b-roll",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -335,7 +419,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.establishing-shot",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -350,7 +438,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.180-degree-rule",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -365,7 +457,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.match-on-action",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -380,7 +476,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.fade",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -395,7 +495,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.cross-dissolve",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -410,7 +514,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.speed-ramping",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -425,7 +533,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.time-remapping",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -440,7 +552,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.optical-flow-interpolation",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -455,7 +571,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.freeze-frame",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -470,7 +590,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.keyframe",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -485,7 +609,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.ease-in-and-out",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -500,7 +628,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.bezier-curve",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -515,7 +647,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.motion-tracking",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -530,7 +666,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.video-stabilization",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -545,7 +685,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.mask",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -560,7 +704,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.rotoscoping",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -575,7 +723,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.chroma-key",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -590,7 +742,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.luma-key",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -605,7 +761,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.alpha-channel",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -620,7 +780,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.premultiplied-alpha",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -635,7 +799,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.motion",
+      "id": "video.blend-mode",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -650,7 +818,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.color-grading",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -665,7 +837,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.color-correction",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -680,7 +856,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.white-balance",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -695,7 +875,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.color-space",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -710,7 +894,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.color-gamut",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -725,7 +913,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.gamma",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -742,7 +934,11 @@
         "en": [
           "LUT"
         ]
-      }
+      },
+      "category": "video.color",
+      "id": "video.look-up-table",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -757,7 +953,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.waveform-monitor",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -772,7 +972,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.vectorscope",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -787,7 +991,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.zebra-pattern",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -802,7 +1010,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.dynamic-range",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -817,7 +1029,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.log-profile",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -832,7 +1048,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.color-management",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -847,7 +1067,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.secondary-color-correction",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -862,7 +1086,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.color",
+      "id": "video.skin-tone-protection",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -877,7 +1105,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.proxy-editing",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -892,7 +1124,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.offline-editing",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -907,7 +1143,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.conforming",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -922,7 +1162,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.transcoding",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -937,7 +1181,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.encoder",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -952,7 +1200,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.container-format",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -967,7 +1219,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.bitrate",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -984,7 +1240,11 @@
         "en": [
           "CBR"
         ]
-      }
+      },
+      "category": "video.media",
+      "id": "video.constant-bitrate",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1001,7 +1261,11 @@
         "en": [
           "VBR"
         ]
-      }
+      },
+      "category": "video.media",
+      "id": "video.variable-bitrate",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1016,7 +1280,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.frame-rate",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1033,7 +1301,11 @@
         "en": [
           "VFR"
         ]
-      }
+      },
+      "category": "video.media",
+      "id": "video.variable-frame-rate",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1048,7 +1320,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.timecode",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1063,7 +1339,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.drop-frame-timecode",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1078,7 +1358,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.pixel-aspect-ratio",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1093,7 +1377,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.chroma-subsampling",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1108,7 +1396,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.media",
+      "id": "video.bit-depth",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1123,7 +1415,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.audio",
+      "id": "video.loudness-normalization",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1138,7 +1434,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.audio",
+      "id": "video.true-peak",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1153,7 +1453,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.audio",
+      "id": "video.audio-ducking",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1168,7 +1472,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.audio",
+      "id": "video.noise-reduction",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1183,7 +1491,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.audio",
+      "id": "video.equalizer",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1198,7 +1510,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.audio",
+      "id": "video.dynamic-range-compression",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1213,7 +1529,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.audio",
+      "id": "video.limiter",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1230,7 +1550,11 @@
         "en": [
           "lip sync"
         ]
-      }
+      },
+      "category": "video.audio",
+      "id": "video.audio-video-synchronization",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1245,7 +1569,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.captions",
+      "id": "video.subtitle-timing",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1260,7 +1588,11 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.captions",
+      "id": "video.safe-area",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
       "domain": "video",
@@ -1275,10 +1607,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "video.editing",
+      "id": "video.multicam-editing",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "认识论",
         "en": "Epistemology"
@@ -1292,10 +1628,14 @@
           "知识论"
         ],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.epistemology",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "本体论",
         "en": "Ontology"
@@ -1307,10 +1647,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.ontology",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "形而上学",
         "en": "Metaphysics"
@@ -1322,10 +1666,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.metaphysics",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "伦理学",
         "en": "Ethics"
@@ -1337,10 +1685,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.ethics",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "美学",
         "en": "Aesthetics"
@@ -1352,10 +1704,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.aesthetics",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "逻辑学",
         "en": "Logic"
@@ -1367,10 +1723,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.logic",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "现象学",
         "en": "Phenomenology"
@@ -1382,10 +1742,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.phenomenology",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "诠释学",
         "en": "Hermeneutics"
@@ -1397,10 +1761,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.hermeneutics",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "实用主义",
         "en": "Pragmatism"
@@ -1412,10 +1780,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.pragmatism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "经验主义",
         "en": "Empiricism"
@@ -1427,10 +1799,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.empiricism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "理性主义",
         "en": "Rationalism"
@@ -1442,10 +1818,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.rationalism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "怀疑主义",
         "en": "Skepticism"
@@ -1457,10 +1837,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.skepticism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "实在论",
         "en": "Realism"
@@ -1472,10 +1856,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.realism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "工具主义",
         "en": "Instrumentalism"
@@ -1487,10 +1875,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.instrumentalism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "唯物主义",
         "en": "Materialism"
@@ -1502,10 +1894,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.materialism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "二元论",
         "en": "Dualism"
@@ -1517,10 +1913,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.dualism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "物理主义",
         "en": "Physicalism"
@@ -1532,10 +1932,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.foundations",
+      "id": "philosophy.physicalism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "涌现",
         "en": "Emergence"
@@ -1547,10 +1951,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.emergence",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "还原论",
         "en": "Reductionism"
@@ -1562,10 +1970,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.reductionism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "决定论",
         "en": "Determinism"
@@ -1577,10 +1989,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.determinism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "自由意志",
         "en": "Free will"
@@ -1592,10 +2008,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.free-will",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "相容论",
         "en": "Compatibilism"
@@ -1607,10 +2027,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.compatibilism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "意向性",
         "en": "Intentionality"
@@ -1622,10 +2046,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.intentionality",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "感受质",
         "en": "Qualia"
@@ -1637,10 +2065,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.qualia",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "主体间性",
         "en": "Intersubjectivity"
@@ -1652,10 +2084,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.intersubjectivity",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "先天知识",
         "en": "A priori knowledge"
@@ -1667,10 +2103,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.a-priori-knowledge",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "后验知识",
         "en": "A posteriori knowledge"
@@ -1682,10 +2122,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.a-posteriori-knowledge",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "证成",
         "en": "Justification"
@@ -1697,10 +2141,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.justification",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "盖梯尔问题",
         "en": "Gettier problem"
@@ -1712,10 +2160,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.knowledge",
+      "id": "philosophy.gettier-problem",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "演绎推理",
         "en": "Deductive reasoning"
@@ -1727,10 +2179,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.deductive-reasoning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "归纳推理",
         "en": "Inductive reasoning"
@@ -1742,10 +2198,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.inductive-reasoning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "溯因推理",
         "en": "Abductive reasoning"
@@ -1757,10 +2217,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.abductive-reasoning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "可证伪性",
         "en": "Falsifiability"
@@ -1772,10 +2236,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.falsifiability",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "必要条件",
         "en": "Necessary condition"
@@ -1787,10 +2255,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.necessary-condition",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "充分条件",
         "en": "Sufficient condition"
@@ -1802,10 +2274,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.sufficient-condition",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "思想实验",
         "en": "Thought experiment"
@@ -1817,10 +2293,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.thought-experiment",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "反事实推理",
         "en": "Counterfactual reasoning"
@@ -1832,10 +2312,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.counterfactual-reasoning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "循环论证",
         "en": "Circular reasoning"
@@ -1847,10 +2331,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.circular-reasoning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "稻草人谬误",
         "en": "Straw man fallacy"
@@ -1862,10 +2350,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.straw-man-fallacy",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "偷换概念",
         "en": "Equivocation"
@@ -1877,10 +2369,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.equivocation",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "虚假两难",
         "en": "False dilemma"
@@ -1892,10 +2388,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.false-dilemma",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "诉诸人身",
         "en": "Ad hominem"
@@ -1907,25 +2407,33 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.logic",
+      "id": "philosophy.ad-hominem",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "实然与应然",
         "en": "Is-ought distinction"
       },
       "definitions": {
         "zh": "区分事实判断与规范判断",
-        "en": "Distinguish factual from normative claims"
+        "en": "Distinguish factual claims from normative claims"
       },
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.ethics",
+      "id": "philosophy.is-ought-distinction",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "义务论",
         "en": "Deontology"
@@ -1937,10 +2445,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.ethics",
+      "id": "philosophy.deontology",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "后果主义",
         "en": "Consequentialism"
@@ -1952,10 +2464,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.ethics",
+      "id": "philosophy.consequentialism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "功利主义",
         "en": "Utilitarianism"
@@ -1967,10 +2483,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.ethics",
+      "id": "philosophy.utilitarianism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "philosophy",
       "terms": {
         "zh": "德性伦理",
         "en": "Virtue ethics"
@@ -1982,10 +2502,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "philosophy.ethics",
+      "id": "philosophy.virtue-ethics",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "元认知",
         "en": "Metacognition"
@@ -1997,10 +2521,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.metacognition",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "认知负荷",
         "en": "Cognitive load"
@@ -2012,10 +2540,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.cognitive-load",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "工作记忆",
         "en": "Working memory"
@@ -2027,10 +2559,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.working-memory",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "长期记忆",
         "en": "Long-term memory"
@@ -2042,10 +2578,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.long-term-memory",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "注意力",
         "en": "Attention"
@@ -2057,10 +2597,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.attention",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "选择性注意",
         "en": "Selective attention"
@@ -2072,10 +2616,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.selective-attention",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "抑制控制",
         "en": "Inhibitory control"
@@ -2087,10 +2635,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.inhibitory-control",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "执行功能",
         "en": "Executive functions"
@@ -2102,10 +2654,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.executive-functions",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "认知灵活性",
         "en": "Cognitive flexibility"
@@ -2117,10 +2673,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.cognitive-flexibility",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "心理模型",
         "en": "Mental model"
@@ -2132,10 +2692,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.mental-model",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "图式",
         "en": "Schema"
@@ -2147,10 +2711,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.schema",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "认知失调",
         "en": "Cognitive dissonance"
@@ -2162,10 +2730,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.cognitive-dissonance",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "确认偏误",
         "en": "Confirmation bias"
@@ -2180,10 +2752,14 @@
           "确认偏差"
         ],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.confirmation-bias",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "锚定效应",
         "en": "Anchoring effect"
@@ -2195,10 +2771,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.anchoring-effect",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "可得性启发式",
         "en": "Availability heuristic"
@@ -2210,10 +2790,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.availability-heuristic",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "代表性启发式",
         "en": "Representativeness heuristic"
@@ -2225,10 +2809,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.representativeness-heuristic",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "损失厌恶",
         "en": "Loss aversion"
@@ -2240,10 +2828,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.loss-aversion",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "框架效应",
         "en": "Framing effect"
@@ -2255,10 +2847,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.framing-effect",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "沉没成本谬误",
         "en": "Sunk cost fallacy"
@@ -2270,10 +2866,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.sunk-cost-fallacy",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "幸存者偏差",
         "en": "Survivorship bias"
@@ -2285,10 +2885,17 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.survivorship-bias",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "基本归因错误",
         "en": "Fundamental attribution error"
@@ -2300,10 +2907,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.fundamental-attribution-error",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "后见之明偏差",
         "en": "Hindsight bias"
@@ -2315,10 +2926,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.hindsight-bias",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "过度自信",
         "en": "Overconfidence"
@@ -2330,10 +2945,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.biases",
+      "id": "cognition.overconfidence",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "认知重评",
         "en": "Cognitive reappraisal"
@@ -2345,10 +2964,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.cognitive-reappraisal",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "间隔学习",
         "en": "Spaced practice"
@@ -2360,10 +2983,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.learning",
+      "id": "cognition.spaced-practice",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "提取练习",
         "en": "Retrieval practice"
@@ -2375,10 +3002,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.learning",
+      "id": "cognition.retrieval-practice",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "交错学习",
         "en": "Interleaved practice"
@@ -2390,10 +3021,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.learning",
+      "id": "cognition.interleaved-practice",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "迁移学习",
         "en": "Transfer of learning"
@@ -2405,10 +3040,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.learning",
+      "id": "cognition.transfer-of-learning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "具身认知",
         "en": "Embodied cognition"
@@ -2420,10 +3059,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.embodied-cognition",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "预测加工",
         "en": "Predictive processing"
@@ -2435,10 +3078,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.predictive-processing",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "贝叶斯更新",
         "en": "Bayesian updating"
@@ -2450,10 +3097,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.bayesian-updating",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "双加工理论",
         "en": "Dual-process theory"
@@ -2465,10 +3116,14 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.dual-process-theory",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     },
     {
-      "domain": "philosophy-cognition",
+      "domain": "cognition",
       "terms": {
         "zh": "心智理论",
         "en": "Theory of mind"
@@ -2480,7 +3135,4082 @@
       "aliases": {
         "zh": [],
         "en": []
-      }
+      },
+      "category": "cognition.processes",
+      "id": "cognition.theory-of-mind",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "人工智能",
+        "en": "Artificial intelligence"
+      },
+      "definitions": {
+        "zh": "让计算机执行识别、推理和生成等任务",
+        "en": "Build systems for recognition, reasoning, and generation"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "AI"
+        ]
+      },
+      "category": "ai.foundations",
+      "id": "ai.artificial-intelligence",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "机器学习",
+        "en": "Machine learning"
+      },
+      "definitions": {
+        "zh": "从数据中学习用于预测或决策的模式",
+        "en": "Learn patterns from data for predictions or decisions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "ML"
+        ]
+      },
+      "category": "ai.foundations",
+      "id": "ai.machine-learning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "深度学习",
+        "en": "Deep learning"
+      },
+      "definitions": {
+        "zh": "使用多层神经网络学习数据表示",
+        "en": "Learn representations with multilayer neural networks"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "DL"
+        ]
+      },
+      "category": "ai.foundations",
+      "id": "ai.deep-learning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "神经网络",
+        "en": "Neural network"
+      },
+      "definitions": {
+        "zh": "由可训练的连接组成的计算模型",
+        "en": "A computational model with trainable connections"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.foundations",
+      "id": "ai.neural-network",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "大语言模型",
+        "en": "Large language model"
+      },
+      "definitions": {
+        "zh": "处理和生成自然语言的语言模型",
+        "en": "A language model for processing and generating natural language"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "LLM"
+        ]
+      },
+      "category": "ai.foundations",
+      "id": "ai.large-language-model",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "基础模型",
+        "en": "Foundation model"
+      },
+      "definitions": {
+        "zh": "在广泛数据上训练并适配多种任务的模型",
+        "en": "A model trained on broad data and adapted to multiple tasks"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.foundations",
+      "id": "ai.foundation-model",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "多模态模型",
+        "en": "Multimodal model"
+      },
+      "definitions": {
+        "zh": "处理文本、图像或音频等多种输入形式",
+        "en": "Process multiple modalities such as text, images, or audio"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.foundations",
+      "id": "ai.multimodal-model",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "视觉语言模型",
+        "en": "Vision-language model"
+      },
+      "definitions": {
+        "zh": "联合处理图像与自然语言",
+        "en": "Process images and natural language together"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "VLM"
+        ]
+      },
+      "category": "ai.foundations",
+      "id": "ai.vision-language-model",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "分词器",
+        "en": "Tokenizer"
+      },
+      "definitions": {
+        "zh": "把文本转换为模型使用的词元序列",
+        "en": "Convert text into a sequence of model tokens"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.foundations",
+      "id": "ai.tokenizer",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "词元",
+        "en": "Token"
+      },
+      "definitions": {
+        "zh": "模型处理文本时使用的基本单位",
+        "en": "A basic unit used by a model to process text"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "tokens"
+        ]
+      },
+      "category": "ai.foundations",
+      "id": "ai.token",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "上下文窗口",
+        "en": "Context window"
+      },
+      "definitions": {
+        "zh": "一次模型请求可容纳的上下文范围",
+        "en": "The amount of context a model can process in one request"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.foundations",
+      "id": "ai.context-window",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "上下文工程",
+        "en": "Context engineering"
+      },
+      "definitions": {
+        "zh": "组织任务所需的指令、资料和工具结果",
+        "en": "Organize instructions, documents, and tool results for a task"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.prompting",
+      "id": "ai.context-engineering",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "提示词工程",
+        "en": "Prompt engineering"
+      },
+      "definitions": {
+        "zh": "明确任务、约束、示例和输出要求",
+        "en": "Specify tasks, constraints, examples, and output requirements"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.prompting",
+      "id": "ai.prompt-engineering",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "系统提示词",
+        "en": "System prompt"
+      },
+      "definitions": {
+        "zh": "为模型设置角色与整体行为规则",
+        "en": "Set a model's role and overall behavior rules"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.prompting",
+      "id": "ai.system-prompt",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "少样本提示",
+        "en": "Few-shot prompting"
+      },
+      "definitions": {
+        "zh": "用少量示例说明期望的任务结果",
+        "en": "Use a few examples to demonstrate expected results"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.prompting",
+      "id": "ai.few-shot-prompting",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "零样本提示",
+        "en": "Zero-shot prompting"
+      },
+      "definitions": {
+        "zh": "仅通过任务说明提出要求而不提供示例",
+        "en": "Describe a task without providing examples"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.prompting",
+      "id": "ai.zero-shot-prompting",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "结构化输出",
+        "en": "Structured output"
+      },
+      "definitions": {
+        "zh": "按约定字段和格式生成结果",
+        "en": "Generate results in a specified schema and format"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.prompting",
+      "id": "ai.structured-output",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "programming",
+      "terms": {
+        "zh": "JSON模式",
+        "en": "JSON Schema"
+      },
+      "definitions": {
+        "zh": "定义结构化输出的字段、类型和约束",
+        "en": "Define fields, types, and constraints for structured output"
+      },
+      "aliases": {
+        "zh": [
+          "JSON Schema",
+          "输出模式约束"
+        ],
+        "en": []
+      },
+      "category": "programming.reliability",
+      "id": "programming.json-schema",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "思维链提示",
+        "en": "Chain-of-thought prompting"
+      },
+      "definitions": {
+        "zh": "引导模型分步骤处理复杂问题",
+        "en": "Prompt a model to work through complex tasks step by step"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CoT"
+        ]
+      },
+      "category": "ai.prompting",
+      "id": "ai.chain-of-thought-prompting",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "提示词注入",
+        "en": "Prompt injection"
+      },
+      "definitions": {
+        "zh": "识别不可信内容中干扰模型指令的文本",
+        "en": "Identify instructions in untrusted content that interfere with a task"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.evaluation-safety",
+      "id": "ai.prompt-injection",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "模型幻觉",
+        "en": "Hallucination"
+      },
+      "definitions": {
+        "zh": "识别缺乏事实依据或与资料不符的模型输出",
+        "en": "Identify model output unsupported by facts or source material"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.evaluation-safety",
+      "id": "ai.hallucination",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "检索增强生成",
+        "en": "Retrieval-augmented generation"
+      },
+      "definitions": {
+        "zh": "先检索相关资料，再结合资料生成回答",
+        "en": "Retrieve relevant sources before generating an answer"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "RAG"
+        ]
+      },
+      "category": "ai.retrieval",
+      "id": "ai.retrieval-augmented-generation",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "文本嵌入",
+        "en": "Text embedding"
+      },
+      "definitions": {
+        "zh": "把文本映射为便于比较相似度的向量",
+        "en": "Represent text as vectors for similarity comparison"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "embedding",
+          "embeddings"
+        ]
+      },
+      "category": "ai.retrieval",
+      "id": "ai.text-embedding",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "向量数据库",
+        "en": "Vector database"
+      },
+      "definitions": {
+        "zh": "存储和检索向量表示的数据",
+        "en": "Store and retrieve data represented as vectors"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.retrieval",
+      "id": "ai.vector-database",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "向量检索",
+        "en": "Vector search"
+      },
+      "definitions": {
+        "zh": "根据向量相似度查找相关内容",
+        "en": "Find relevant content by vector similarity"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.retrieval",
+      "id": "ai.vector-search",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "语义检索",
+        "en": "Semantic search"
+      },
+      "definitions": {
+        "zh": "依据含义而非仅靠字面关键词检索",
+        "en": "Search by meaning beyond literal keyword matches"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.retrieval",
+      "id": "ai.semantic-search",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "混合检索",
+        "en": "Hybrid search"
+      },
+      "definitions": {
+        "zh": "结合关键词检索与向量检索",
+        "en": "Combine keyword search with vector search"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.retrieval",
+      "id": "ai.hybrid-search",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "检索重排序",
+        "en": "Reranking"
+      },
+      "definitions": {
+        "zh": "对初步检索结果重新评估相关性并排序",
+        "en": "Reassess and reorder retrieved results by relevance"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "reranker"
+        ]
+      },
+      "category": "ai.retrieval",
+      "id": "ai.reranking",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "文档分块",
+        "en": "Document chunking"
+      },
+      "definitions": {
+        "zh": "把长文档划分为适合检索的片段",
+        "en": "Split long documents into retrieval-sized passages"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "chunking"
+        ]
+      },
+      "category": "ai.retrieval",
+      "id": "ai.document-chunking",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "分块重叠",
+        "en": "Chunk overlap"
+      },
+      "definitions": {
+        "zh": "让相邻文档片段保留部分共享内容",
+        "en": "Share some content between adjacent document chunks"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.retrieval",
+      "id": "ai.chunk-overlap",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "查询改写",
+        "en": "Query rewriting"
+      },
+      "definitions": {
+        "zh": "把用户问题转换为更适合检索的查询",
+        "en": "Rewrite a user question into a retrieval-friendly query"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.retrieval",
+      "id": "ai.query-rewriting",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "回答溯源",
+        "en": "Answer grounding"
+      },
+      "definitions": {
+        "zh": "让回答依据可追溯的资料并标注来源",
+        "en": "Ground answers in traceable sources with citations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "grounding"
+        ]
+      },
+      "category": "ai.retrieval",
+      "id": "ai.answer-grounding",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "智能体",
+        "en": "AI agent"
+      },
+      "definitions": {
+        "zh": "结合模型、工具和任务状态执行工作",
+        "en": "Execute work using a model, tools, and task state"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "agent"
+        ]
+      },
+      "category": "agent.orchestration",
+      "id": "agent.ai-agent",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "工具调用",
+        "en": "Tool calling"
+      },
+      "definitions": {
+        "zh": "让模型通过指定工具查询信息或执行操作",
+        "en": "Let a model retrieve information or act through defined tools"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "agent.tools",
+      "id": "agent.tool-calling",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "函数调用",
+        "en": "Function calling"
+      },
+      "definitions": {
+        "zh": "按函数定义生成供应用执行的调用参数",
+        "en": "Generate arguments for application-defined functions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "agent.tools",
+      "id": "agent.function-calling",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "模型上下文协议",
+        "en": "Model Context Protocol"
+      },
+      "definitions": {
+        "zh": "通过标准协议连接模型应用与工具和资源",
+        "en": "Connect model applications to tools and resources through a standard protocol"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "MCP"
+        ]
+      },
+      "category": "agent.tools",
+      "id": "agent.model-context-protocol",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "Agent技能",
+        "en": "Agent skill"
+      },
+      "definitions": {
+        "zh": "封装可复用的任务说明和操作资源",
+        "en": "Package reusable task instructions and supporting resources"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "skills"
+        ]
+      },
+      "category": "agent.tools",
+      "id": "agent.agent-skill",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "多智能体协作",
+        "en": "Multi-agent collaboration"
+      },
+      "definitions": {
+        "zh": "让多个智能体分工协作完成任务",
+        "en": "Coordinate multiple agents with separate responsibilities"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "multi-agent"
+        ]
+      },
+      "category": "agent.orchestration",
+      "id": "agent.multi-agent-collaboration",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "智能体编排",
+        "en": "Agent orchestration"
+      },
+      "definitions": {
+        "zh": "安排智能体之间的执行顺序与协作关系",
+        "en": "Manage execution order and coordination between agents"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "agent.orchestration",
+      "id": "agent.agent-orchestration",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "任务移交",
+        "en": "Agent handoff"
+      },
+      "definitions": {
+        "zh": "把任务控制权和必要上下文交给另一智能体",
+        "en": "Transfer task control and relevant context to another agent"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "handoff"
+        ]
+      },
+      "category": "agent.orchestration",
+      "id": "agent.agent-handoff",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "人在回路",
+        "en": "Human-in-the-loop"
+      },
+      "definitions": {
+        "zh": "在关键节点加入人工审核或决策",
+        "en": "Add human review or decisions at important steps"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "HITL"
+        ]
+      },
+      "category": "agent.control",
+      "id": "agent.human-in-the-loop",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "智能体记忆",
+        "en": "Agent memory"
+      },
+      "definitions": {
+        "zh": "保存任务外仍需复用的信息和偏好",
+        "en": "Retain information and preferences for future tasks"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "agent.memory",
+      "id": "agent.agent-memory",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "工具执行沙箱",
+        "en": "Tool execution sandbox"
+      },
+      "definitions": {
+        "zh": "限制工具执行时可访问的环境和资源",
+        "en": "Limit the environment and resources accessible during tool execution"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "sandbox"
+        ]
+      },
+      "category": "agent.control",
+      "id": "agent.tool-execution-sandbox",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "智能体轨迹",
+        "en": "Agent trace"
+      },
+      "definitions": {
+        "zh": "记录任务中的工具调用和状态变化",
+        "en": "Record tool calls and state changes during a task"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "tracing"
+        ]
+      },
+      "category": "agent.evaluation",
+      "id": "agent.agent-trace",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "agent",
+      "terms": {
+        "zh": "智能体评测",
+        "en": "Agent evaluation"
+      },
+      "definitions": {
+        "zh": "用任务集评估智能体的成功率与行为",
+        "en": "Evaluate agent success and behavior on a task set"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "evals"
+        ]
+      },
+      "category": "agent.evaluation",
+      "id": "agent.agent-evaluation",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "监督微调",
+        "en": "Supervised fine-tuning"
+      },
+      "definitions": {
+        "zh": "用标注的输入输出样本调整模型",
+        "en": "Adapt a model using labeled input-output examples"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "SFT"
+        ]
+      },
+      "category": "ai.training",
+      "id": "ai.supervised-fine-tuning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "低秩适配",
+        "en": "Low-rank adaptation"
+      },
+      "definitions": {
+        "zh": "用可训练的低秩参数适配模型",
+        "en": "Adapt a model with trainable low-rank parameters"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "LoRA"
+        ]
+      },
+      "category": "ai.training",
+      "id": "ai.low-rank-adaptation",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "量化低秩适配",
+        "en": "Quantized low-rank adaptation"
+      },
+      "definitions": {
+        "zh": "在量化基础模型上训练低秩适配参数",
+        "en": "Train low-rank adapters on a quantized base model"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "QLoRA"
+        ]
+      },
+      "category": "ai.training",
+      "id": "ai.quantized-low-rank-adaptation",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "模型量化",
+        "en": "Model quantization"
+      },
+      "definitions": {
+        "zh": "降低模型数值精度以减少存储或计算开销",
+        "en": "Reduce numerical precision to lower storage or compute costs"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.training",
+      "id": "ai.model-quantization",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "知识蒸馏",
+        "en": "Knowledge distillation"
+      },
+      "definitions": {
+        "zh": "用教师模型的输出或表示训练学生模型",
+        "en": "Train a student model using a teacher's outputs or representations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.training",
+      "id": "ai.knowledge-distillation",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "强化学习",
+        "en": "Reinforcement learning"
+      },
+      "definitions": {
+        "zh": "通过环境反馈和奖励学习决策策略",
+        "en": "Learn decision policies from feedback and rewards"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "RL"
+        ]
+      },
+      "category": "ai.training",
+      "id": "ai.reinforcement-learning",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "人类反馈强化学习",
+        "en": "Reinforcement learning from human feedback"
+      },
+      "definitions": {
+        "zh": "利用人类偏好反馈指导模型训练",
+        "en": "Guide model training with human preference feedback"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "RLHF"
+        ]
+      },
+      "category": "ai.training",
+      "id": "ai.reinforcement-learning-from-human-feedback",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "直接偏好优化",
+        "en": "Direct preference optimization"
+      },
+      "definitions": {
+        "zh": "用偏好样本直接优化模型行为",
+        "en": "Optimize model behavior directly from preference examples"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "DPO"
+        ]
+      },
+      "category": "ai.training",
+      "id": "ai.direct-preference-optimization",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "预训练",
+        "en": "Pretraining"
+      },
+      "definitions": {
+        "zh": "从大规模数据中学习通用表示",
+        "en": "Learn general representations from large datasets"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.training",
+      "id": "ai.pretraining",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "模型推理",
+        "en": "Model inference"
+      },
+      "definitions": {
+        "zh": "使用已训练模型处理输入并生成结果",
+        "en": "Use a trained model to process inputs and produce results"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.inference",
+      "id": "ai.model-inference",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "推理服务",
+        "en": "Inference serving"
+      },
+      "definitions": {
+        "zh": "部署模型并提供可调用的推理接口",
+        "en": "Deploy a model behind an inference interface"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.inference",
+      "id": "ai.inference-serving",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "流式输出",
+        "en": "Streaming output"
+      },
+      "definitions": {
+        "zh": "逐步返回生成内容以减少等待感",
+        "en": "Return generated content incrementally"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.inference",
+      "id": "ai.streaming-output",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "首词元延迟",
+        "en": "Time to first token"
+      },
+      "definitions": {
+        "zh": "从请求开始到收到首个输出词元的时间",
+        "en": "Time from a request to its first output token"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "TTFT"
+        ]
+      },
+      "category": "ai.inference",
+      "id": "ai.time-to-first-token",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "生成吞吐量",
+        "en": "Token throughput"
+      },
+      "definitions": {
+        "zh": "单位时间内生成或处理的词元数量",
+        "en": "The number of tokens generated or processed per unit time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "tokens per second"
+        ]
+      },
+      "category": "ai.inference",
+      "id": "ai.token-throughput",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "键值缓存",
+        "en": "KV cache"
+      },
+      "definitions": {
+        "zh": "复用注意力计算中的键和值",
+        "en": "Reuse keys and values from attention computations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.inference",
+      "id": "ai.kv-cache",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "提示词缓存",
+        "en": "Prompt caching"
+      },
+      "definitions": {
+        "zh": "复用重复输入前缀的处理结果",
+        "en": "Reuse processing of repeated input prefixes"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.inference",
+      "id": "ai.prompt-caching",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "批量推理",
+        "en": "Batch inference"
+      },
+      "definitions": {
+        "zh": "把多个输入组合后进行模型推理",
+        "en": "Run model inference over grouped inputs"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.inference",
+      "id": "ai.batch-inference",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "温度采样",
+        "en": "Temperature sampling"
+      },
+      "definitions": {
+        "zh": "调节生成时概率分布的随机性",
+        "en": "Adjust randomness in the generation probability distribution"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "temperature"
+        ]
+      },
+      "category": "ai.inference",
+      "id": "ai.temperature-sampling",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "核采样",
+        "en": "Nucleus sampling"
+      },
+      "definitions": {
+        "zh": "从累计概率达到阈值的候选中采样",
+        "en": "Sample from candidates within a cumulative probability threshold"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "top-p"
+        ]
+      },
+      "category": "ai.inference",
+      "id": "ai.nucleus-sampling",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "模型评测",
+        "en": "Model evaluation"
+      },
+      "definitions": {
+        "zh": "用固定任务和指标衡量模型表现",
+        "en": "Measure model performance with defined tasks and metrics"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "benchmark"
+        ]
+      },
+      "category": "ai.evaluation-safety",
+      "id": "ai.model-evaluation",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "模型漂移",
+        "en": "Model drift"
+      },
+      "definitions": {
+        "zh": "监测模型表现随数据或环境变化而下降",
+        "en": "Monitor performance changes as data or environments change"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.evaluation-safety",
+      "id": "ai.model-drift",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "数据泄漏",
+        "en": "Data leakage"
+      },
+      "definitions": {
+        "zh": "识别训练或评测中不应提前获得的信息",
+        "en": "Identify information that should not be available during training or evaluation"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.evaluation-safety",
+      "id": "ai.data-leakage",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "合成数据",
+        "en": "Synthetic data"
+      },
+      "definitions": {
+        "zh": "生成用于训练或测试的人工数据",
+        "en": "Generate artificial data for training or testing"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.training",
+      "id": "ai.synthetic-data",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "注意力机制",
+        "en": "Attention mechanism"
+      },
+      "definitions": {
+        "zh": "按相关性聚合输入中的信息",
+        "en": "Aggregate information from inputs according to relevance"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "category": "ai.foundations",
+      "id": "ai.attention-mechanism",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "domain": "ai",
+      "terms": {
+        "zh": "混合专家模型",
+        "en": "Mixture of experts"
+      },
+      "definitions": {
+        "zh": "通过路由选择部分专家模块处理输入",
+        "en": "Route inputs to selected expert modules"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "MoE"
+        ]
+      },
+      "category": "ai.foundations",
+      "id": "ai.mixture-of-experts",
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.stock-keeping-unit",
+      "domain": "ecommerce",
+      "category": "ecommerce.catalog",
+      "terms": {
+        "zh": "库存单位",
+        "en": "Stock keeping unit"
+      },
+      "definitions": {
+        "zh": "区分可独立管理库存的商品规格",
+        "en": "Identify a product variant with separately managed inventory"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "SKU"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.product-listing",
+      "domain": "ecommerce",
+      "category": "ecommerce.catalog",
+      "terms": {
+        "zh": "商品刊登",
+        "en": "Product listing"
+      },
+      "definitions": {
+        "zh": "整理商品标题、图片、属性和描述",
+        "en": "Prepare product titles, images, attributes, and descriptions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "listing"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.product-variant",
+      "domain": "ecommerce",
+      "category": "ecommerce.catalog",
+      "terms": {
+        "zh": "商品变体",
+        "en": "Product variant"
+      },
+      "definitions": {
+        "zh": "区分同一商品的颜色、尺寸等选项",
+        "en": "Distinguish options such as color and size for a product"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.landed-cost",
+      "domain": "ecommerce",
+      "category": "ecommerce.catalog",
+      "terms": {
+        "zh": "到岸成本",
+        "en": "Landed cost"
+      },
+      "definitions": {
+        "zh": "核算商品送达目的地前的采购、运输和进口成本",
+        "en": "Calculate purchase, shipping, and import costs to the destination"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.localized-pricing",
+      "domain": "ecommerce",
+      "category": "ecommerce.catalog",
+      "terms": {
+        "zh": "本地化定价",
+        "en": "Localized pricing"
+      },
+      "definitions": {
+        "zh": "按目标市场调整币种、展示价格和定价策略",
+        "en": "Adapt currency, displayed prices, and pricing strategy to a market"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.order-management-system",
+      "domain": "ecommerce",
+      "category": "ecommerce.orders",
+      "terms": {
+        "zh": "订单管理系统",
+        "en": "Order management system"
+      },
+      "definitions": {
+        "zh": "统一跟踪订单接收、处理和履约状态",
+        "en": "Track order intake, processing, and fulfillment states"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "OMS"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.chargeback",
+      "domain": "ecommerce",
+      "category": "ecommerce.orders",
+      "terms": {
+        "zh": "支付拒付",
+        "en": "Chargeback"
+      },
+      "definitions": {
+        "zh": "处理持卡人通过发卡机构提出的交易争议",
+        "en": "Handle a cardholder's transaction dispute through the card issuer"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.return-merchandise-authorization",
+      "domain": "ecommerce",
+      "category": "ecommerce.orders",
+      "terms": {
+        "zh": "退货授权",
+        "en": "Return merchandise authorization"
+      },
+      "definitions": {
+        "zh": "为退货申请建立可追踪的授权流程",
+        "en": "Create a traceable authorization process for returns"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "RMA"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.refund-rate",
+      "domain": "ecommerce",
+      "category": "ecommerce.orders",
+      "terms": {
+        "zh": "退款率",
+        "en": "Refund rate"
+      },
+      "definitions": {
+        "zh": "按明确订单范围和时间窗口统计退款比例",
+        "en": "Measure the share of refunded orders within a defined scope and period"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.third-party-logistics",
+      "domain": "ecommerce",
+      "category": "ecommerce.fulfillment",
+      "terms": {
+        "zh": "第三方物流",
+        "en": "Third-party logistics"
+      },
+      "definitions": {
+        "zh": "由外部服务商提供仓储和物流服务",
+        "en": "Use an external provider for warehousing and logistics"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "3PL"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.overseas-warehouse",
+      "domain": "ecommerce",
+      "category": "ecommerce.fulfillment",
+      "terms": {
+        "zh": "海外仓",
+        "en": "Overseas warehouse"
+      },
+      "definitions": {
+        "zh": "在目标市场附近存储商品并完成配送",
+        "en": "Store goods near a target market and fulfill deliveries"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.first-leg-shipping",
+      "domain": "ecommerce",
+      "category": "ecommerce.fulfillment",
+      "terms": {
+        "zh": "头程物流",
+        "en": "First-leg shipping"
+      },
+      "definitions": {
+        "zh": "把商品从发货地运送到目标仓库或分拨节点",
+        "en": "Move goods from origin to a destination warehouse or distribution point"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.last-mile-delivery",
+      "domain": "ecommerce",
+      "category": "ecommerce.fulfillment",
+      "terms": {
+        "zh": "尾程配送",
+        "en": "Last-mile delivery"
+      },
+      "definitions": {
+        "zh": "把包裹从末端节点送达收件人",
+        "en": "Deliver parcels from a local distribution point to the recipient"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.inventory-turnover",
+      "domain": "ecommerce",
+      "category": "ecommerce.fulfillment",
+      "terms": {
+        "zh": "库存周转率",
+        "en": "Inventory turnover"
+      },
+      "definitions": {
+        "zh": "衡量一定期间内库存被销售或消耗的速度",
+        "en": "Measure how quickly inventory is sold or consumed over a period"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.reorder-point",
+      "domain": "ecommerce",
+      "category": "ecommerce.fulfillment",
+      "terms": {
+        "zh": "补货点",
+        "en": "Reorder point"
+      },
+      "definitions": {
+        "zh": "定义触发补货的库存水平",
+        "en": "Define the inventory level that triggers replenishment"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "ROP"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.safety-stock",
+      "domain": "ecommerce",
+      "category": "ecommerce.fulfillment",
+      "terms": {
+        "zh": "安全库存",
+        "en": "Safety stock"
+      },
+      "definitions": {
+        "zh": "为需求和交付波动预留库存缓冲",
+        "en": "Hold inventory buffers for demand and delivery variability"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.stockout-rate",
+      "domain": "ecommerce",
+      "category": "ecommerce.fulfillment",
+      "terms": {
+        "zh": "缺货率",
+        "en": "Stockout rate"
+      },
+      "definitions": {
+        "zh": "按商品、订单或时间口径统计缺货比例",
+        "en": "Measure stockouts using a defined product, order, or time basis"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.contribution-margin",
+      "domain": "ecommerce",
+      "category": "ecommerce.profit",
+      "terms": {
+        "zh": "贡献毛益",
+        "en": "Contribution margin"
+      },
+      "definitions": {
+        "zh": "用收入减去可变成本评估商品或订单的贡献",
+        "en": "Assess contribution by subtracting variable costs from revenue"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.unit-economics",
+      "domain": "ecommerce",
+      "category": "ecommerce.profit",
+      "terms": {
+        "zh": "单位经济模型",
+        "en": "Unit economics"
+      },
+      "definitions": {
+        "zh": "按单件商品、订单或客户分析收入与成本",
+        "en": "Analyze revenue and cost per item, order, or customer"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ecommerce.return-cost",
+      "domain": "ecommerce",
+      "category": "ecommerce.profit",
+      "terms": {
+        "zh": "退货成本",
+        "en": "Return cost"
+      },
+      "definitions": {
+        "zh": "核算退货运输、处理和商品损失",
+        "en": "Calculate return shipping, handling, and product loss costs"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "analytics.metric-definition",
+      "domain": "analytics",
+      "category": "analytics.metrics",
+      "terms": {
+        "zh": "指标口径",
+        "en": "Metric definition"
+      },
+      "definitions": {
+        "zh": "明确统计对象、计算规则、时间窗口和去重方式",
+        "en": "Define population, calculation rules, time window, and deduplication"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "ecommerce",
+        "operations",
+        "marketing"
+      ]
+    },
+    {
+      "id": "analytics.conversion-rate",
+      "domain": "analytics",
+      "category": "analytics.metrics",
+      "terms": {
+        "zh": "转化率",
+        "en": "Conversion rate"
+      },
+      "definitions": {
+        "zh": "按明确分母计算完成目标行为的比例",
+        "en": "Measure goal completions against an explicitly defined denominator"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CVR"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "ecommerce",
+        "operations",
+        "marketing"
+      ]
+    },
+    {
+      "id": "analytics.average-order-value",
+      "domain": "analytics",
+      "category": "analytics.metrics",
+      "terms": {
+        "zh": "客单价",
+        "en": "Average order value"
+      },
+      "definitions": {
+        "zh": "按有效订单范围计算平均订单金额",
+        "en": "Calculate average order value for a defined set of valid orders"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "AOV"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "ecommerce",
+        "operations",
+        "marketing"
+      ]
+    },
+    {
+      "id": "analytics.customer-acquisition-cost",
+      "domain": "analytics",
+      "category": "analytics.metrics",
+      "terms": {
+        "zh": "客户获取成本",
+        "en": "Customer acquisition cost"
+      },
+      "definitions": {
+        "zh": "按明确费用和客户范围核算获客成本",
+        "en": "Calculate acquisition cost using defined spending and customer scopes"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CAC"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "ecommerce",
+        "operations",
+        "marketing"
+      ]
+    },
+    {
+      "id": "analytics.customer-lifetime-value",
+      "domain": "analytics",
+      "category": "analytics.metrics",
+      "terms": {
+        "zh": "客户终身价值",
+        "en": "Customer lifetime value"
+      },
+      "definitions": {
+        "zh": "估算客户关系期间带来的累计价值",
+        "en": "Estimate cumulative value over a customer relationship"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "LTV",
+          "CLV"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "ecommerce",
+        "operations",
+        "marketing"
+      ]
+    },
+    {
+      "id": "analytics.retention-rate",
+      "domain": "analytics",
+      "category": "analytics.metrics",
+      "terms": {
+        "zh": "留存率",
+        "en": "Retention rate"
+      },
+      "definitions": {
+        "zh": "统计同一批用户在后续窗口仍然活跃的比例",
+        "en": "Measure how many users in a cohort remain active in a later window"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "ecommerce",
+        "operations",
+        "marketing"
+      ]
+    },
+    {
+      "id": "analytics.median",
+      "domain": "analytics",
+      "category": "analytics.statistics",
+      "terms": {
+        "zh": "中位数",
+        "en": "Median"
+      },
+      "definitions": {
+        "zh": "用排序后位于中间的位置描述数据中心",
+        "en": "Describe the center using the middle position in sorted data"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.percentile",
+      "domain": "analytics",
+      "category": "analytics.statistics",
+      "terms": {
+        "zh": "百分位数",
+        "en": "Percentile"
+      },
+      "definitions": {
+        "zh": "描述数据分布中指定比例所处的位置",
+        "en": "Describe the position at a specified proportion of a distribution"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "P95"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.standard-deviation",
+      "domain": "analytics",
+      "category": "analytics.statistics",
+      "terms": {
+        "zh": "标准差",
+        "en": "Standard deviation"
+      },
+      "definitions": {
+        "zh": "衡量数值围绕平均值的离散程度",
+        "en": "Measure dispersion of values around the mean"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.confidence-interval",
+      "domain": "analytics",
+      "category": "analytics.statistics",
+      "terms": {
+        "zh": "置信区间",
+        "en": "Confidence interval"
+      },
+      "definitions": {
+        "zh": "用具有规定长期覆盖性质的区间估计总体参数",
+        "en": "Estimate a population parameter with an interval procedure of specified long-run coverage"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.statistical-significance",
+      "domain": "analytics",
+      "category": "analytics.statistics",
+      "terms": {
+        "zh": "统计显著性",
+        "en": "Statistical significance"
+      },
+      "definitions": {
+        "zh": "依据检验假设和显著性水平判断统计证据",
+        "en": "Assess statistical evidence under a hypothesis test and significance level"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.effect-size",
+      "domain": "analytics",
+      "category": "analytics.statistics",
+      "terms": {
+        "zh": "效应量",
+        "en": "Effect size"
+      },
+      "definitions": {
+        "zh": "量化差异或关联的实际幅度",
+        "en": "Quantify the magnitude of a difference or association"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.correlation",
+      "domain": "analytics",
+      "category": "analytics.statistics",
+      "terms": {
+        "zh": "相关性",
+        "en": "Correlation"
+      },
+      "definitions": {
+        "zh": "衡量变量共同变化的程度而不直接断言因果",
+        "en": "Measure how variables vary together without assuming causation"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.randomized-controlled-experiment",
+      "domain": "analytics",
+      "category": "analytics.experiments",
+      "terms": {
+        "zh": "随机对照实验",
+        "en": "Randomized controlled experiment"
+      },
+      "definitions": {
+        "zh": "通过随机分组比较处理组与对照组",
+        "en": "Compare treatment and control groups using random assignment"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "RCT"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.a-b-testing",
+      "domain": "analytics",
+      "category": "analytics.experiments",
+      "terms": {
+        "zh": "A/B测试",
+        "en": "A/B testing"
+      },
+      "definitions": {
+        "zh": "比较不同版本对预先定义指标的影响",
+        "en": "Compare variants against predefined metrics"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "AB test"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.sample-size-estimation",
+      "domain": "analytics",
+      "category": "analytics.experiments",
+      "terms": {
+        "zh": "样本量估算",
+        "en": "Sample size estimation"
+      },
+      "definitions": {
+        "zh": "根据效应、波动和检验要求估算所需样本",
+        "en": "Estimate required samples from effect size, variability, and test requirements"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.causal-inference",
+      "domain": "analytics",
+      "category": "analytics.experiments",
+      "terms": {
+        "zh": "因果推断",
+        "en": "Causal inference"
+      },
+      "definitions": {
+        "zh": "在明确假设下估计干预对结果的影响",
+        "en": "Estimate intervention effects under explicit assumptions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "finance"
+      ]
+    },
+    {
+      "id": "analytics.missing-value-handling",
+      "domain": "analytics",
+      "category": "analytics.quality",
+      "terms": {
+        "zh": "缺失值处理",
+        "en": "Missing value handling"
+      },
+      "definitions": {
+        "zh": "识别数据缺失模式并选择处理方式",
+        "en": "Identify missingness patterns and choose how to handle them"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "analytics.outlier-detection",
+      "domain": "analytics",
+      "category": "analytics.quality",
+      "terms": {
+        "zh": "异常值检测",
+        "en": "Outlier detection"
+      },
+      "definitions": {
+        "zh": "识别偏离主要分布的数据并核查原因",
+        "en": "Identify values outside the main distribution and investigate causes"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "analytics.deduplication-rules",
+      "domain": "analytics",
+      "category": "analytics.quality",
+      "terms": {
+        "zh": "数据去重规则",
+        "en": "Deduplication rules"
+      },
+      "definitions": {
+        "zh": "明确唯一标识和重复记录保留策略",
+        "en": "Define unique identifiers and rules for retaining duplicate records"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.customer-segmentation",
+      "domain": "operations",
+      "category": "operations.lifecycle",
+      "terms": {
+        "zh": "用户分层",
+        "en": "Customer segmentation"
+      },
+      "definitions": {
+        "zh": "按行为、价值或需求划分用户群体",
+        "en": "Group customers by behavior, value, or needs"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.user-onboarding",
+      "domain": "operations",
+      "category": "operations.lifecycle",
+      "terms": {
+        "zh": "新用户引导",
+        "en": "User onboarding"
+      },
+      "definitions": {
+        "zh": "帮助新用户完成首次使用的关键步骤",
+        "en": "Help new users complete essential first-use steps"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.user-activation",
+      "domain": "operations",
+      "category": "operations.lifecycle",
+      "terms": {
+        "zh": "用户激活",
+        "en": "User activation"
+      },
+      "definitions": {
+        "zh": "定义并推动用户首次获得产品价值的行为",
+        "en": "Define and encourage the first action that delivers product value"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.user-reactivation",
+      "domain": "operations",
+      "category": "operations.lifecycle",
+      "terms": {
+        "zh": "用户召回",
+        "en": "User reactivation"
+      },
+      "definitions": {
+        "zh": "针对沉默或流失用户设计回访策略",
+        "en": "Design reactivation efforts for inactive or churned users"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.churn-prediction",
+      "domain": "operations",
+      "category": "operations.lifecycle",
+      "terms": {
+        "zh": "流失预警",
+        "en": "Churn prediction"
+      },
+      "definitions": {
+        "zh": "识别用户可能停止使用或购买的信号",
+        "en": "Identify signals that a customer may stop using or buying"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.lifecycle-messaging",
+      "domain": "operations",
+      "category": "operations.lifecycle",
+      "terms": {
+        "zh": "生命周期触达",
+        "en": "Lifecycle messaging"
+      },
+      "definitions": {
+        "zh": "按用户阶段和行为安排沟通内容",
+        "en": "Schedule communications by lifecycle stage and behavior"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.rfm-segmentation",
+      "domain": "operations",
+      "category": "operations.lifecycle",
+      "terms": {
+        "zh": "RFM分层",
+        "en": "RFM segmentation"
+      },
+      "definitions": {
+        "zh": "按最近购买时间、购买频次和消费金额分层",
+        "en": "Segment by purchase recency, frequency, and monetary value"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "RFM"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.conversion-funnel",
+      "domain": "operations",
+      "category": "operations.growth",
+      "terms": {
+        "zh": "转化漏斗",
+        "en": "Conversion funnel"
+      },
+      "definitions": {
+        "zh": "按步骤分析从访问到目标行为的流失",
+        "en": "Analyze drop-off between visits and goal completion across steps"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "funnel"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.growth-experiment",
+      "domain": "operations",
+      "category": "operations.growth",
+      "terms": {
+        "zh": "增长实验",
+        "en": "Growth experiment"
+      },
+      "definitions": {
+        "zh": "用可验证假设评估增长策略",
+        "en": "Evaluate growth tactics using testable hypotheses"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.north-star-metric",
+      "domain": "operations",
+      "category": "operations.growth",
+      "terms": {
+        "zh": "北极星指标",
+        "en": "North star metric"
+      },
+      "definitions": {
+        "zh": "选择能反映核心用户价值的长期方向指标",
+        "en": "Choose a guiding metric that reflects core user value"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "NSM"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.repeat-purchase-strategy",
+      "domain": "operations",
+      "category": "operations.growth",
+      "terms": {
+        "zh": "复购运营",
+        "en": "Repeat purchase strategy"
+      },
+      "definitions": {
+        "zh": "设计促使已有客户再次购买的机制",
+        "en": "Design ways to encourage existing customers to purchase again"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.cross-selling",
+      "domain": "operations",
+      "category": "operations.growth",
+      "terms": {
+        "zh": "交叉销售",
+        "en": "Cross-selling"
+      },
+      "definitions": {
+        "zh": "推荐与当前购买需求互补的商品或服务",
+        "en": "Recommend products or services complementary to a purchase"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.upselling",
+      "domain": "operations",
+      "category": "operations.growth",
+      "terms": {
+        "zh": "追加销售",
+        "en": "Upselling"
+      },
+      "definitions": {
+        "zh": "推荐更高配置或更高价值的购买选项",
+        "en": "Recommend higher-tier or higher-value purchase options"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.cart-recovery",
+      "domain": "operations",
+      "category": "operations.growth",
+      "terms": {
+        "zh": "购物车挽回",
+        "en": "Cart recovery"
+      },
+      "definitions": {
+        "zh": "针对加入购物车但未完成购买的用户进行触达",
+        "en": "Reach customers who added items without completing a purchase"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.standard-operating-procedure",
+      "domain": "operations",
+      "category": "operations.workflow",
+      "terms": {
+        "zh": "标准作业流程",
+        "en": "Standard operating procedure"
+      },
+      "definitions": {
+        "zh": "把重复工作整理为可执行的步骤与责任",
+        "en": "Document repeatable work as steps and responsibilities"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "SOP"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.service-level-agreement",
+      "domain": "operations",
+      "category": "operations.workflow",
+      "terms": {
+        "zh": "服务水平协议",
+        "en": "Service-level agreement"
+      },
+      "definitions": {
+        "zh": "约定服务响应、可用性或交付目标",
+        "en": "Define service response, availability, or delivery commitments"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "SLA"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.ticket-routing",
+      "domain": "operations",
+      "category": "operations.workflow",
+      "terms": {
+        "zh": "工单分流",
+        "en": "Ticket routing"
+      },
+      "definitions": {
+        "zh": "按问题类型和优先级分配服务请求",
+        "en": "Assign service requests by issue type and priority"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.customer-satisfaction-score",
+      "domain": "operations",
+      "category": "operations.workflow",
+      "terms": {
+        "zh": "客户满意度",
+        "en": "Customer satisfaction score"
+      },
+      "definitions": {
+        "zh": "通过明确调查口径衡量客户满意程度",
+        "en": "Measure satisfaction using a defined survey method"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CSAT"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.net-promoter-score",
+      "domain": "operations",
+      "category": "operations.workflow",
+      "terms": {
+        "zh": "净推荐值",
+        "en": "Net promoter score"
+      },
+      "definitions": {
+        "zh": "按推荐意愿调查统计推荐者与贬损者比例差",
+        "en": "Measure the difference between promoter and detractor shares in a recommendation survey"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "NPS"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations.operations-review",
+      "domain": "operations",
+      "category": "operations.workflow",
+      "terms": {
+        "zh": "运营复盘",
+        "en": "Operations review"
+      },
+      "definitions": {
+        "zh": "对照目标分析结果、原因和后续行动",
+        "en": "Review results, causes, and next actions against goals"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.search-engine-optimization",
+      "domain": "marketing",
+      "category": "marketing.seo",
+      "terms": {
+        "zh": "搜索引擎优化",
+        "en": "Search engine optimization"
+      },
+      "definitions": {
+        "zh": "改善页面被搜索引擎发现、理解和展示的能力",
+        "en": "Improve how search engines discover, understand, and present pages"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "SEO"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.search-intent",
+      "domain": "marketing",
+      "category": "marketing.seo",
+      "terms": {
+        "zh": "搜索意图",
+        "en": "Search intent"
+      },
+      "definitions": {
+        "zh": "识别搜索者希望获取信息或完成的任务",
+        "en": "Identify the information or task a searcher seeks"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.keyword-research",
+      "domain": "marketing",
+      "category": "marketing.seo",
+      "terms": {
+        "zh": "关键词研究",
+        "en": "Keyword research"
+      },
+      "definitions": {
+        "zh": "分析目标受众的搜索用语与需求",
+        "en": "Analyze the search terms and needs of a target audience"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.on-page-seo",
+      "domain": "marketing",
+      "category": "marketing.seo",
+      "terms": {
+        "zh": "站内优化",
+        "en": "On-page SEO"
+      },
+      "definitions": {
+        "zh": "优化页面内容、标题、结构和内部链接",
+        "en": "Improve page content, titles, structure, and internal links"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.technical-seo",
+      "domain": "marketing",
+      "category": "marketing.seo",
+      "terms": {
+        "zh": "技术SEO",
+        "en": "Technical SEO"
+      },
+      "definitions": {
+        "zh": "检查抓取、索引和网站技术可访问性",
+        "en": "Inspect crawling, indexing, and technical accessibility"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.canonical-url",
+      "domain": "marketing",
+      "category": "marketing.seo",
+      "terms": {
+        "zh": "规范网址",
+        "en": "Canonical URL"
+      },
+      "definitions": {
+        "zh": "声明重复或相似页面的首选网址",
+        "en": "Declare a preferred URL among duplicate or similar pages"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "canonical"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.hreflang",
+      "domain": "marketing",
+      "category": "marketing.seo",
+      "terms": {
+        "zh": "多语言标注",
+        "en": "Hreflang"
+      },
+      "definitions": {
+        "zh": "声明页面的语言及地区替代版本",
+        "en": "Declare language and regional alternatives for a page"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "hreflang"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.structured-data",
+      "domain": "marketing",
+      "category": "marketing.seo",
+      "terms": {
+        "zh": "结构化数据",
+        "en": "Structured data"
+      },
+      "definitions": {
+        "zh": "用机器可读标记描述页面中的实体和内容",
+        "en": "Describe page entities and content using machine-readable markup"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "schema markup"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.content-marketing",
+      "domain": "marketing",
+      "category": "marketing.content",
+      "terms": {
+        "zh": "内容营销",
+        "en": "Content marketing"
+      },
+      "definitions": {
+        "zh": "通过有用内容吸引和服务目标受众",
+        "en": "Attract and serve an audience through useful content"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.call-to-action",
+      "domain": "marketing",
+      "category": "marketing.content",
+      "terms": {
+        "zh": "行动号召",
+        "en": "Call to action"
+      },
+      "definitions": {
+        "zh": "明确引导用户完成下一步操作",
+        "en": "Clearly guide users toward a next action"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CTA"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.landing-page",
+      "domain": "marketing",
+      "category": "marketing.content",
+      "terms": {
+        "zh": "落地页",
+        "en": "Landing page"
+      },
+      "definitions": {
+        "zh": "承接渠道流量并围绕目标行为组织内容",
+        "en": "Receive channel traffic with content focused on a target action"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.user-generated-content",
+      "domain": "marketing",
+      "category": "marketing.content",
+      "terms": {
+        "zh": "用户生成内容",
+        "en": "User-generated content"
+      },
+      "definitions": {
+        "zh": "组织和使用用户创作的内容",
+        "en": "Organize and use content created by users"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "UGC"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.click-through-rate",
+      "domain": "marketing",
+      "category": "marketing.ads",
+      "terms": {
+        "zh": "点击率",
+        "en": "Click-through rate"
+      },
+      "definitions": {
+        "zh": "按展示次数计算点击比例",
+        "en": "Calculate clicks as a share of impressions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CTR"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.cost-per-click",
+      "domain": "marketing",
+      "category": "marketing.ads",
+      "terms": {
+        "zh": "单次点击成本",
+        "en": "Cost per click"
+      },
+      "definitions": {
+        "zh": "计算广告每次点击的平均费用",
+        "en": "Calculate average advertising cost per click"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CPC"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.cost-per-mille",
+      "domain": "marketing",
+      "category": "marketing.ads",
+      "terms": {
+        "zh": "千次展示成本",
+        "en": "Cost per mille"
+      },
+      "definitions": {
+        "zh": "计算广告每千次展示的费用",
+        "en": "Calculate advertising cost per thousand impressions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CPM"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.cost-per-acquisition",
+      "domain": "marketing",
+      "category": "marketing.ads",
+      "terms": {
+        "zh": "单次转化成本",
+        "en": "Cost per acquisition"
+      },
+      "definitions": {
+        "zh": "按定义的转化行为计算平均广告成本",
+        "en": "Calculate average advertising cost per defined conversion"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CPA"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.return-on-ad-spend",
+      "domain": "marketing",
+      "category": "marketing.ads",
+      "terms": {
+        "zh": "广告支出回报",
+        "en": "Return on ad spend"
+      },
+      "definitions": {
+        "zh": "比较归因收入与广告支出，不直接等同利润",
+        "en": "Compare attributed revenue with ad spend without equating it to profit"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "ROAS"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.retargeting",
+      "domain": "marketing",
+      "category": "marketing.ads",
+      "terms": {
+        "zh": "再营销",
+        "en": "Retargeting"
+      },
+      "definitions": {
+        "zh": "向有过访问或互动的受众再次投放广告",
+        "en": "Advertise again to audiences with previous visits or interactions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.marketing-attribution",
+      "domain": "marketing",
+      "category": "marketing.attribution",
+      "terms": {
+        "zh": "营销归因",
+        "en": "Marketing attribution"
+      },
+      "definitions": {
+        "zh": "按规则分配不同触点对转化的贡献",
+        "en": "Assign conversion credit to touchpoints using defined rules"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing.utm-parameters",
+      "domain": "marketing",
+      "category": "marketing.attribution",
+      "terms": {
+        "zh": "UTM参数",
+        "en": "UTM parameters"
+      },
+      "definitions": {
+        "zh": "用链接参数区分流量来源、媒介和活动",
+        "en": "Distinguish traffic source, medium, and campaign through URL parameters"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "UTM"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.balance-sheet",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "资产负债表",
+        "en": "Balance sheet"
+      },
+      "definitions": {
+        "zh": "展示特定时点的资产、负债和所有者权益",
+        "en": "Present assets, liabilities, and equity at a point in time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.income-statement",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "利润表",
+        "en": "Income statement"
+      },
+      "definitions": {
+        "zh": "展示一定期间内的收入、费用和利润",
+        "en": "Present revenue, expenses, and profit over a period"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.cash-flow-statement",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "现金流量表",
+        "en": "Cash flow statement"
+      },
+      "definitions": {
+        "zh": "按经营、投资和融资活动展示现金流",
+        "en": "Present cash flows from operating, investing, and financing activities"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.free-cash-flow",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "自由现金流",
+        "en": "Free cash flow"
+      },
+      "definitions": {
+        "zh": "按明确口径衡量经营和资本支出后的可用现金流",
+        "en": "Measure cash available after operations and capital spending under a defined convention"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "FCF"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.price-to-earnings-ratio",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "市盈率",
+        "en": "Price-to-earnings ratio"
+      },
+      "definitions": {
+        "zh": "比较股价与每股收益并明确收益期间",
+        "en": "Compare share price with earnings per share for a defined earnings period"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "P/E",
+          "PE"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.price-to-book-ratio",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "市净率",
+        "en": "Price-to-book ratio"
+      },
+      "definitions": {
+        "zh": "比较股票市值与账面净资产",
+        "en": "Compare equity market value with book equity"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "P/B",
+          "PB"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.dividend-yield",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "股息收益率",
+        "en": "Dividend yield"
+      },
+      "definitions": {
+        "zh": "比较每股股息与股价并明确股息口径",
+        "en": "Compare dividends per share with price under a defined dividend convention"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.return-on-equity",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "净资产收益率",
+        "en": "Return on equity"
+      },
+      "definitions": {
+        "zh": "衡量净利润相对于股东权益的比例",
+        "en": "Measure net income relative to shareholders' equity"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "ROE"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.yield-curve",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "收益率曲线",
+        "en": "Yield curve"
+      },
+      "definitions": {
+        "zh": "展示同类债务工具不同期限的收益率",
+        "en": "Show yields across maturities for comparable debt instruments"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.discounted-cash-flow",
+      "domain": "finance",
+      "category": "finance.foundations",
+      "terms": {
+        "zh": "贴现现金流",
+        "en": "Discounted cash flow"
+      },
+      "definitions": {
+        "zh": "把预期未来现金流折算为当前价值",
+        "en": "Discount expected future cash flows to present value"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "DCF"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.market-capitalization",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "市值",
+        "en": "Market capitalization"
+      },
+      "definitions": {
+        "zh": "用股价与对应股本数量计算股票市场价值",
+        "en": "Calculate equity market value from share price and share count"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.bid-ask-spread",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "买卖价差",
+        "en": "Bid-ask spread"
+      },
+      "definitions": {
+        "zh": "衡量最优卖价与最优买价之间的差额",
+        "en": "Measure the difference between the best ask and bid"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.order-book",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "订单簿",
+        "en": "Order book"
+      },
+      "definitions": {
+        "zh": "按价格记录等待成交的买卖委托",
+        "en": "Record resting buy and sell orders by price"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.limit-order",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "限价单",
+        "en": "Limit order"
+      },
+      "definitions": {
+        "zh": "指定可接受买入最高价或卖出最低价",
+        "en": "Specify a maximum purchase price or minimum sale price"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.market-order",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "市价单",
+        "en": "Market order"
+      },
+      "definitions": {
+        "zh": "按市场可得报价寻求成交而不保证成交价格",
+        "en": "Seek execution at available market prices without guaranteeing price"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.trading-volume",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "成交量",
+        "en": "Trading volume"
+      },
+      "definitions": {
+        "zh": "统计指定期间内的成交数量",
+        "en": "Measure the quantity traded during a specified period"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "volume"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.turnover-ratio",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "换手率",
+        "en": "Turnover ratio"
+      },
+      "definitions": {
+        "zh": "按明确股本口径衡量交易活跃程度",
+        "en": "Measure trading activity against a defined share base"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.liquidity",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "流动性",
+        "en": "Liquidity"
+      },
+      "definitions": {
+        "zh": "衡量资产以较小成本和价格冲击成交的能力",
+        "en": "Assess the ability to trade with limited cost and price impact"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.ex-rights-and-ex-dividend",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "除权除息",
+        "en": "Ex-rights and ex-dividend"
+      },
+      "definitions": {
+        "zh": "识别权益分配对报价和历史价格可比性的影响",
+        "en": "Identify how distributions affect quotations and historical price comparability"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.adjusted-price",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "复权价格",
+        "en": "Adjusted price"
+      },
+      "definitions": {
+        "zh": "按分红、拆股等事件调整历史价格序列",
+        "en": "Adjust historical price series for dividends, splits, and similar events"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.asset-allocation",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "资产配置",
+        "en": "Asset allocation"
+      },
+      "definitions": {
+        "zh": "按目标和约束分配不同资产的权重",
+        "en": "Assign asset weights according to objectives and constraints"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.portfolio-rebalancing",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "组合再平衡",
+        "en": "Portfolio rebalancing"
+      },
+      "definitions": {
+        "zh": "把组合权重调整回选定目标",
+        "en": "Adjust portfolio weights toward selected targets"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.volatility",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "波动率",
+        "en": "Volatility"
+      },
+      "definitions": {
+        "zh": "衡量收益率波动并说明采样频率和年化方式",
+        "en": "Measure return variability with a specified sampling frequency and annualization method"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.maximum-drawdown",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "最大回撤",
+        "en": "Maximum drawdown"
+      },
+      "definitions": {
+        "zh": "衡量净值从历史峰值到随后低点的最大跌幅",
+        "en": "Measure the largest peak-to-subsequent-trough decline in portfolio value"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "MDD"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.sharpe-ratio",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "夏普比率",
+        "en": "Sharpe ratio"
+      },
+      "definitions": {
+        "zh": "用超额收益相对于其波动率衡量风险调整表现",
+        "en": "Measure risk-adjusted performance using excess return relative to its volatility"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.sortino-ratio",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "索提诺比率",
+        "en": "Sortino ratio"
+      },
+      "definitions": {
+        "zh": "用超过目标的收益相对于下行偏差衡量表现",
+        "en": "Measure return above a target relative to downside deviation"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.information-ratio",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "信息比率",
+        "en": "Information ratio"
+      },
+      "definitions": {
+        "zh": "比较相对基准的主动收益与跟踪误差",
+        "en": "Compare active return against a benchmark with tracking error"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "IR"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.tracking-error",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "跟踪误差",
+        "en": "Tracking error"
+      },
+      "definitions": {
+        "zh": "衡量组合相对基准收益差的波动",
+        "en": "Measure variability in portfolio returns relative to a benchmark"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.beta",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "贝塔系数",
+        "en": "Beta"
+      },
+      "definitions": {
+        "zh": "衡量资产收益对基准收益变化的敏感度",
+        "en": "Measure asset-return sensitivity to changes in benchmark returns"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.alpha",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "阿尔法",
+        "en": "Alpha"
+      },
+      "definitions": {
+        "zh": "在指定模型下衡量未被基准风险解释的收益",
+        "en": "Measure return unexplained by benchmark risk under a specified model"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.value-at-risk",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "风险价值",
+        "en": "Value at risk"
+      },
+      "definitions": {
+        "zh": "估计给定期限和置信水平下损失分布的分位点",
+        "en": "Estimate a loss quantile for a specified horizon and confidence level"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "VaR"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.expected-shortfall",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "预期损失",
+        "en": "Expected shortfall"
+      },
+      "definitions": {
+        "zh": "衡量损失分布尾部超过指定分位点的平均损失",
+        "en": "Measure average loss in the tail beyond a specified loss quantile"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "ES",
+          "CVaR"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.quantitative-factor",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "量化因子",
+        "en": "Quantitative factor"
+      },
+      "definitions": {
+        "zh": "构造用于解释或预测收益的可计算特征",
+        "en": "Construct measurable features to explain or predict returns"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "factor"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.factor-exposure",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "因子暴露",
+        "en": "Factor exposure"
+      },
+      "definitions": {
+        "zh": "衡量资产或组合对指定因子的敏感程度",
+        "en": "Measure an asset's or portfolio's sensitivity to a factor"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.information-coefficient",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "信息系数",
+        "en": "Information coefficient"
+      },
+      "definitions": {
+        "zh": "衡量因子信号与后续收益之间的相关性",
+        "en": "Measure correlation between factor signals and subsequent returns"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "IC"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.factor-neutralization",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "因子中性化",
+        "en": "Factor neutralization"
+      },
+      "definitions": {
+        "zh": "控制行业、市值等已有暴露对因子信号的影响",
+        "en": "Control effects of existing industry, size, or other exposures on a factor signal"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.cross-sectional-analysis",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "横截面分析",
+        "en": "Cross-sectional analysis"
+      },
+      "definitions": {
+        "zh": "在同一时点比较不同资产的特征和收益",
+        "en": "Compare features and returns across assets at the same point in time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.time-series-analysis",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "时间序列分析",
+        "en": "Time-series analysis"
+      },
+      "definitions": {
+        "zh": "分析按时间排列的数据及其变化规律",
+        "en": "Analyze observations ordered over time and their patterns"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.mean-reversion",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "均值回归",
+        "en": "Mean reversion"
+      },
+      "definitions": {
+        "zh": "研究变量偏离某一水平后回归的统计倾向",
+        "en": "Study the tendency of a variable to return toward a reference level"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.momentum-strategy",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "动量策略",
+        "en": "Momentum strategy"
+      },
+      "definitions": {
+        "zh": "依据过去一段时间的相对或绝对表现构造信号",
+        "en": "Build signals from relative or absolute performance over a past period"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.pairs-trading",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "配对交易",
+        "en": "Pairs trading"
+      },
+      "definitions": {
+        "zh": "研究两项相关资产的相对价格关系并构造交易",
+        "en": "Study relative pricing between two related assets to construct trades"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.market-neutrality",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "市场中性",
+        "en": "Market neutrality"
+      },
+      "definitions": {
+        "zh": "按指定风险模型控制对整体市场的净暴露",
+        "en": "Control net exposure to the broad market under a specified risk model"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.strategy-backtesting",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "策略回测",
+        "en": "Strategy backtesting"
+      },
+      "definitions": {
+        "zh": "用历史数据和明确成交规则模拟策略表现",
+        "en": "Simulate a strategy on historical data using explicit execution rules"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "backtest"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.look-ahead-bias",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "前视偏差",
+        "en": "Look-ahead bias"
+      },
+      "definitions": {
+        "zh": "识别回测中使用当时尚不可得信息的问题",
+        "en": "Identify the use of information unavailable at the simulated decision time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.out-of-sample-validation",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "样本外验证",
+        "en": "Out-of-sample validation"
+      },
+      "definitions": {
+        "zh": "用未参与策略选择或拟合的数据验证表现",
+        "en": "Validate performance on data unused for fitting or strategy selection"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "OOS"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.walk-forward-validation",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "滚动前推验证",
+        "en": "Walk-forward validation"
+      },
+      "definitions": {
+        "zh": "按时间滚动训练窗口并验证后续区间",
+        "en": "Roll training windows forward in time and validate subsequent periods"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "walk-forward"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.backtest-overfitting",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "回测过拟合",
+        "en": "Backtest overfitting"
+      },
+      "definitions": {
+        "zh": "识别反复试验后只适合历史样本的策略",
+        "en": "Identify strategies selected through repeated trials that fit only historical samples"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.slippage",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "交易滑点",
+        "en": "Slippage"
+      },
+      "definitions": {
+        "zh": "比较预期成交价与实际或模拟成交价的差异",
+        "en": "Compare expected execution prices with actual or simulated fills"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.market-impact",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "市场冲击",
+        "en": "Market impact"
+      },
+      "definitions": {
+        "zh": "评估自身订单对市场价格和成交成本的影响",
+        "en": "Assess how an order affects market prices and execution costs"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.transaction-costs",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "交易成本",
+        "en": "Transaction costs"
+      },
+      "definitions": {
+        "zh": "计入手续费、价差、滑点等交易开销",
+        "en": "Account for fees, spreads, slippage, and other trading costs"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.portfolio-turnover",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "策略换手率",
+        "en": "Portfolio turnover"
+      },
+      "definitions": {
+        "zh": "按明确买卖金额和资产规模衡量调仓频率",
+        "en": "Measure portfolio trading intensity using defined trade values and asset size"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance.point-in-time-data",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "时点数据",
+        "en": "Point-in-time data"
+      },
+      "definitions": {
+        "zh": "保留信息实际可获得的时间以重建历史决策环境",
+        "en": "Preserve when information became available to reconstruct historical decisions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "PIT"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     }
   ]
 }

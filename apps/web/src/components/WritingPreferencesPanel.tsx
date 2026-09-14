@@ -2,7 +2,7 @@ import { useState } from "react";
 import { t } from "../i18n";
 import { useCompletionPreferences, type CompletionPreferences } from "../lib/completion-preferences";
 const choices: {key:keyof CompletionPreferences;label:string;description:string}[]=[
-  {key:'terms',label:'术语补全',description:'补全编程、Agent、办公、工程、游戏、视频、哲学与认知的中英文术语。'},
+  {key:'terms',label:'术语补全',description:'补全 AI、编程、电商、营销、数据、金融及创作等领域的中英文专业术语。'},
   {key:'suggestions',label:'提示语与表达建议',description:'补充任务描述，或将口语改为专业表达；采用后仍可编辑。'},
   {key:'nlp',label:'本地 NLP 建议',description:'输入停顿后匹配意思相近的中英文表达，无需配置外部 AI。'},
   {key:'learning',label:'自动积累词库与表达',description:'从已同步的问答中自动提取术语和表达，通过过滤后直接用于输入建议，无需逐条确认。'},

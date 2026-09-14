@@ -85,7 +85,7 @@ describe("completion description localization", () => {
   afterEach(() => setLocale(originalLocale));
 
   it("localizes the mixed-source co suggestions without changing inserted terms", () => {
-    const suggestions = promptCompletions("co", 2);
+    const suggestions = promptCompletions("co", 2, 12);
     expect(suggestions.map(item => item.label)).toEqual(expect.arrayContaining(["Docker Compose", "Conforming", "Color gamut", "Color space", "Color grading"]));
     setLocale("zh-CN");
     for (const item of suggestions) expect(t(item.detail)).toMatch(/[\u3400-\u9fff]/);
@@ -105,4 +105,18 @@ describe("completion description localization", () => {
       expect(t(term.detail)).not.toMatch(/[\u3400-\u9fff]/);
     }
   });
+});
+
+it.each([['RAG','Retrieval-augmented generation'],['LoRA','Low-rank adaptation'],['MCP','Model Context Protocol'],['VLM','Vision-language model'],['提示词工','提示词工程'],['向量检','向量检索'],['上下文窗','上下文窗口'],['KV','KV cache']])('completes AI terms and abbreviations: %s',(input,label)=>{
+ expect(promptCompletions(input,input.length).some(item=>item.label===label)).toBe(true);
+});
+it.each(['AI总是编造答案','让AI根据公司文档回答问题','agent一直重复调用同一个工具','The model keeps returning invalid JSON'])('suggests actionable AI wording: %s',input=>{
+ expect(promptCompletions(input,input.length)[0]?.kind).toBe('rewrite');
+});
+
+it.each([['SKU','Stock keeping unit'],['ROAS','Return on ad spend'],['RFM','RFM segmentation'],['夏普','夏普比率'],['最大回','最大回撤'],['前视偏','前视偏差'],['LoRA','Low-rank adaptation'],['MCP','Model Context Protocol'],['置信区','置信区间'],['客户获取','客户获取成本']])('completes business and quantitative concepts: %s',(input,label)=>{
+ expect(promptCompletions(input,input.length).some(item=>item.label===label)).toBe(true);
+});
+it.each(['回测赚钱实盘却亏钱','海外仓经常断货','访问很多但就是没人下单','The AI keeps making up facts','ROAS looks great but we still lose money'])('rewrites specialist plain language: %s',input=>{
+ expect(promptCompletions(input,input.length)[0]?.kind).toBe('rewrite');
 });

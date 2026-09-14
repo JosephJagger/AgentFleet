@@ -27,7 +27,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "programming.reliability"
     },
     {
       "id": "large-list",
@@ -52,7 +53,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "programming.interface"
     },
     {
       "id": "page-performance",
@@ -77,7 +79,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "programming.interface"
     },
     {
       "id": "button-response",
@@ -102,7 +105,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "programming.interface"
     },
     {
       "id": "mobile-layout",
@@ -127,7 +131,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "programming.interface"
     },
     {
       "id": "save-failure",
@@ -152,11 +157,12 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "programming.reliability"
     },
     {
       "id": "data-discrepancy",
-      "domain": "office",
+      "domain": "analytics",
       "terms": {
         "zh": "数据一致性",
         "en": "Data consistency"
@@ -169,15 +175,20 @@
         "zh": [
           "报表数字对不上",
           "两份统计的数据不一样",
-          "金额统计不准确"
+          "金额统计不准确",
+          "两个报表算出来的销售额对不上",
+          "后台和表格的订单数量对不上"
         ],
         "en": [
           "The reports show different totals",
-          "The numbers in these reports do not match"
+          "The numbers in these reports do not match",
+          "Sales totals differ between two reports",
+          "Order counts differ between the dashboard and spreadsheet"
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "analytics.metrics"
     },
     {
       "id": "input-debounce",
@@ -202,7 +213,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "programming.interface"
     },
     {
       "id": "duplicate-submit",
@@ -227,7 +239,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "programming.reliability"
     },
     {
       "id": "api-failure",
@@ -252,7 +265,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "programming.reliability"
     },
     {
       "id": "agent-approval",
@@ -277,7 +291,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "agent.control"
     },
     {
       "id": "agent-resume",
@@ -302,7 +317,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "agent.orchestration"
     },
     {
       "id": "agent-context",
@@ -327,7 +343,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "agent.memory"
     },
     {
       "id": "agent-tools",
@@ -352,7 +369,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "agent.tools",
+      "conceptId": "agent.tool-calling"
     },
     {
       "id": "agent-parallel",
@@ -377,7 +396,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "agent.orchestration"
     },
     {
       "id": "sheet-merge",
@@ -402,7 +422,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "office.data"
     },
     {
       "id": "sheet-dedupe",
@@ -427,7 +448,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "office.data"
     },
     {
       "id": "office-report",
@@ -452,7 +474,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "office.data"
     },
     {
       "id": "office-files",
@@ -477,7 +500,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "office.workflow"
     },
     {
       "id": "office-mail",
@@ -502,7 +526,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "office.workflow"
     },
     {
       "id": "game-collision",
@@ -527,7 +552,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "games.simulation"
     },
     {
       "id": "game-frame",
@@ -552,7 +578,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "games.simulation"
     },
     {
       "id": "game-save",
@@ -577,7 +604,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "games.state"
     },
     {
       "id": "video-sync",
@@ -602,7 +630,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "video.audio",
+      "conceptId": "video.audio-video-synchronization"
     },
     {
       "id": "video-captions",
@@ -627,7 +657,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "video.captions"
     },
     {
       "id": "video-color",
@@ -652,7 +683,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "video.color"
     },
     {
       "id": "engineering-tolerance",
@@ -677,7 +709,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "engineering.design"
     },
     {
       "id": "engineering-mesh",
@@ -702,7 +735,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "engineering.simulation"
     },
     {
       "id": "engineering-revision",
@@ -727,7 +761,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "engineering.design"
     },
     {
       "id": "video-j-cut",
@@ -749,7 +784,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "video.editing",
+      "conceptId": "video.j-cut"
     },
     {
       "id": "video-l-cut",
@@ -771,7 +808,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "video.editing",
+      "conceptId": "video.l-cut"
     },
     {
       "id": "video-ducking",
@@ -793,7 +832,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "video.audio",
+      "conceptId": "video.audio-ducking"
     },
     {
       "id": "video-speed-ramp",
@@ -815,7 +856,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "video.motion",
+      "conceptId": "video.speed-ramping"
     },
     {
       "id": "video-subtitle-timing",
@@ -837,7 +880,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "video.captions",
+      "conceptId": "video.subtitle-timing"
     },
     {
       "id": "philosophy-premises",
@@ -859,7 +904,8 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "philosophy.logic"
     },
     {
       "id": "philosophy-is-ought",
@@ -881,7 +927,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "philosophy.ethics",
+      "conceptId": "philosophy.is-ought-distinction"
     },
     {
       "id": "cognition-confirmation",
@@ -903,7 +951,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "cognition.biases",
+      "conceptId": "cognition.confirmation-bias"
     },
     {
       "id": "cognition-sunk-cost",
@@ -925,7 +975,9 @@
         ]
       },
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "category": "cognition.biases",
+      "conceptId": "cognition.sunk-cost-fallacy"
     },
     {
       "id": "cognition-retrieval",
@@ -944,6 +996,683 @@
         ],
         "en": [
           "Help me practice recalling material without looking at the book"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "cognition.learning",
+      "conceptId": "cognition.retrieval-practice"
+    },
+    {
+      "id": "ai-rag",
+      "domain": "ai",
+      "terms": {
+        "zh": "知识库问答",
+        "en": "Knowledge-base question answering"
+      },
+      "goals": {
+        "zh": "接入检索增强生成，基于相关知识库资料回答并标注来源",
+        "en": "Add retrieval-augmented generation with source citations"
+      },
+      "examples": {
+        "zh": [
+          "让AI根据公司文档回答问题",
+          "让模型查我们的知识库再回答"
+        ],
+        "en": [
+          "Have the AI answer using our company documents",
+          "Search our knowledge base before answering"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "ai.retrieval"
+    },
+    {
+      "id": "ai-hallucination",
+      "domain": "ai",
+      "terms": {
+        "zh": "回答事实核验",
+        "en": "Answer fact checking"
+      },
+      "goals": {
+        "zh": "核验模型回答与资料的一致性，对缺乏依据的内容明确说明不确定性",
+        "en": "Check answers against sources and state uncertainty when evidence is missing"
+      },
+      "examples": {
+        "zh": [
+          "AI总是编造答案",
+          "模型回答的东西资料里根本没有"
+        ],
+        "en": [
+          "The AI keeps making up facts",
+          "The model gives answers that are missing from the sources"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "ai.evaluation-safety"
+    },
+    {
+      "id": "ai-json",
+      "domain": "ai",
+      "terms": {
+        "zh": "结构化结果校验",
+        "en": "Structured result validation"
+      },
+      "goals": {
+        "zh": "约束模型输出的字段和类型，并校验结构化结果",
+        "en": "Constrain output fields and types and validate the structured result"
+      },
+      "examples": {
+        "zh": [
+          "让AI每次都按固定字段输出",
+          "模型返回的JSON格式总是不对"
+        ],
+        "en": [
+          "Make the AI return the same fields every time",
+          "The model keeps returning invalid JSON"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "ai.prompting"
+    },
+    {
+      "id": "ai-retrieval",
+      "domain": "ai",
+      "terms": {
+        "zh": "检索质量优化",
+        "en": "Retrieval quality improvement"
+      },
+      "goals": {
+        "zh": "检查文档分块、召回和重排序，提升知识库检索相关性",
+        "en": "Review chunking, retrieval, and reranking to improve knowledge-base relevance"
+      },
+      "examples": {
+        "zh": [
+          "知识库搜出来的内容和问题无关",
+          "问公司资料时总是找错文档"
+        ],
+        "en": [
+          "Knowledge base results are irrelevant to the question",
+          "The search keeps finding the wrong documents"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "ai.retrieval"
+    },
+    {
+      "id": "ai-injection",
+      "domain": "ai",
+      "terms": {
+        "zh": "不可信指令隔离",
+        "en": "Untrusted instruction isolation"
+      },
+      "goals": {
+        "zh": "区分可信任务指令与外部内容，检查提示词注入对工具调用的影响",
+        "en": "Separate trusted instructions from external content and check prompt injection risks in tool calls"
+      },
+      "examples": {
+        "zh": [
+          "网页里一句话就把AI带偏了",
+          "文档里的指令让助手偏离了任务"
+        ],
+        "en": [
+          "Text on a web page derails the AI task",
+          "Instructions inside documents redirect the assistant"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "ai.evaluation-safety"
+    },
+    {
+      "id": "ai-cost",
+      "domain": "ai",
+      "terms": {
+        "zh": "模型调用成本优化",
+        "en": "Model call cost optimization"
+      },
+      "goals": {
+        "zh": "分析输入输出词元、重复请求和缓存命中，在质量约束下降低调用成本",
+        "en": "Analyze tokens, duplicate requests, and cache hits to reduce cost while preserving quality"
+      },
+      "examples": {
+        "zh": [
+          "AI调用太费token了",
+          "相同问题反复请求模型太浪费了"
+        ],
+        "en": [
+          "AI calls use too many tokens",
+          "Repeated model requests for the same question are wasteful"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "ai.inference"
+    },
+    {
+      "id": "ai-latency",
+      "domain": "ai",
+      "terms": {
+        "zh": "生成响应延迟优化",
+        "en": "Generation latency improvement"
+      },
+      "goals": {
+        "zh": "区分首词元延迟与生成速度，检查模型调用链路并评估流式输出",
+        "en": "Separate first-token latency from generation speed and evaluate streaming"
+      },
+      "examples": {
+        "zh": [
+          "AI等很久才开始出字",
+          "模型回答半天才显示第一个字"
+        ],
+        "en": [
+          "The AI takes ages to start responding",
+          "The first word of the model response takes too long"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "ai.inference"
+    },
+    {
+      "id": "ai-evaluation",
+      "domain": "ai",
+      "terms": {
+        "zh": "模型变更回归评测",
+        "en": "Model change regression evaluation"
+      },
+      "goals": {
+        "zh": "建立代表性任务集，对比模型或提示词变更前后的质量、成本和延迟",
+        "en": "Compare quality, cost, and latency on representative tasks before and after model or prompt changes"
+      },
+      "examples": {
+        "zh": [
+          "换模型后怎么知道效果好不好",
+          "改了提示词想知道有没有变差"
+        ],
+        "en": [
+          "How can I tell if switching models improved results",
+          "Check whether my prompt changes made results worse"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "ai.evaluation-safety"
+    },
+    {
+      "id": "ai-loop",
+      "domain": "agent",
+      "terms": {
+        "zh": "智能体循环控制",
+        "en": "Agent loop control"
+      },
+      "goals": {
+        "zh": "检查任务终止条件、工具重试与步数预算，定位智能体重复执行的原因",
+        "en": "Inspect stop conditions, tool retries, and step budgets to diagnose agent loops"
+      },
+      "examples": {
+        "zh": [
+          "agent一直重复调用同一个工具",
+          "智能体一直转圈停不下来"
+        ],
+        "en": [
+          "The agent keeps calling the same tool in a loop",
+          "The agent keeps running without finishing"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "agent.control"
+    },
+    {
+      "id": "ai-finetune",
+      "domain": "ai",
+      "terms": {
+        "zh": "领域模型适配",
+        "en": "Domain model adaptation"
+      },
+      "goals": {
+        "zh": "比较提示词、检索增强与微调，选择适合领域任务和数据条件的方案",
+        "en": "Compare prompting, retrieval augmentation, and fine-tuning for the domain task and available data"
+      },
+      "examples": {
+        "zh": [
+          "想让模型学会我们行业的说法",
+          "想用自己的样本教模型做任务"
+        ],
+        "en": [
+          "Teach the model our industry terminology",
+          "Adapt the model to tasks using our own examples"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0",
+      "category": "ai.training"
+    },
+    {
+      "id": "commerce-margin",
+      "domain": "ecommerce",
+      "category": "ecommerce.profit",
+      "terms": {
+        "zh": "订单利润核算",
+        "en": "Order profitability analysis"
+      },
+      "goals": {
+        "zh": "核算商品、物流、平台、广告和退货成本，分析订单贡献利润",
+        "en": "Calculate product, shipping, platform, advertising, and return costs to assess order contribution"
+      },
+      "examples": {
+        "zh": [
+          "卖了很多单却没赚到钱",
+          "跨境订单扣完各种费用不知道赚多少"
+        ],
+        "en": [
+          "We sell lots of orders but make little profit",
+          "Calculate profit after all cross-border order costs"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "commerce-stock",
+      "domain": "ecommerce",
+      "category": "ecommerce.fulfillment",
+      "terms": {
+        "zh": "库存补货规划",
+        "en": "Inventory replenishment planning"
+      },
+      "goals": {
+        "zh": "结合需求、补货周期和安全库存制定补货计划",
+        "en": "Plan replenishment using demand, lead times, and safety stock"
+      },
+      "examples": {
+        "zh": [
+          "海外仓经常断货",
+          "总是快卖完了才想起来补货"
+        ],
+        "en": [
+          "Our overseas warehouse keeps running out of stock",
+          "We replenish only when inventory is almost gone"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "commerce-returns",
+      "domain": "ecommerce",
+      "category": "ecommerce.orders",
+      "terms": {
+        "zh": "退货原因分析",
+        "en": "Return reason analysis"
+      },
+      "goals": {
+        "zh": "按商品、市场和原因拆分退货，定位可改进环节",
+        "en": "Break down returns by product, market, and reason to identify improvements"
+      },
+      "examples": {
+        "zh": [
+          "买家退货越来越多",
+          "想知道哪些商品最容易被退回来"
+        ],
+        "en": [
+          "More customers are returning their orders",
+          "Find which products get returned most often"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "analytics-experiment",
+      "domain": "analytics",
+      "category": "analytics.experiments",
+      "terms": {
+        "zh": "实验结果评估",
+        "en": "Experiment result assessment"
+      },
+      "goals": {
+        "zh": "检查实验分组、样本量和效应区间，评估版本差异",
+        "en": "Check experimental groups, sample sizes, and effect intervals to assess variant differences"
+      },
+      "examples": {
+        "zh": [
+          "新版转化高一点是不是就算赢了",
+          "测试样本很少能不能下结论"
+        ],
+        "en": [
+          "Is a slightly higher conversion rate enough to call a winner",
+          "Can we draw conclusions from a tiny experiment"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "analytics-distribution",
+      "domain": "analytics",
+      "category": "analytics.statistics",
+      "terms": {
+        "zh": "分布与极值分析",
+        "en": "Distribution and extreme value analysis"
+      },
+      "goals": {
+        "zh": "同时查看中位数、分位数和异常值，解释平均值变化",
+        "en": "Inspect medians, percentiles, and outliers to explain changes in averages"
+      },
+      "examples": {
+        "zh": [
+          "几个大订单把平均数拉高了",
+          "平均值看着很好但大多数订单很小"
+        ],
+        "en": [
+          "A few large orders inflate the average",
+          "The average looks good but most orders are small"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations-retention",
+      "domain": "operations",
+      "category": "operations.lifecycle",
+      "terms": {
+        "zh": "用户留存分析",
+        "en": "Customer retention analysis"
+      },
+      "goals": {
+        "zh": "按新增时间分组分析后续活跃和复购，定位留存流失阶段",
+        "en": "Analyze activity and repeat purchases by acquisition cohort to locate retention drop-off"
+      },
+      "examples": {
+        "zh": [
+          "用户来了以后就再也不回来了",
+          "新客买一次就没再买过"
+        ],
+        "en": [
+          "Users arrive and never come back",
+          "New customers buy once and never return"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations-funnel",
+      "domain": "operations",
+      "category": "operations.growth",
+      "terms": {
+        "zh": "购买漏斗分析",
+        "en": "Purchase funnel analysis"
+      },
+      "goals": {
+        "zh": "拆分访问、加购、结账和支付步骤，定位购买转化流失",
+        "en": "Break down visits, cart additions, checkout, and payment to locate purchase drop-off"
+      },
+      "examples": {
+        "zh": [
+          "访问很多但就是没人下单",
+          "很多人加购却没付款"
+        ],
+        "en": [
+          "Lots of visitors but hardly anyone orders",
+          "Many people add to cart but never pay"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "operations-service",
+      "domain": "operations",
+      "category": "operations.workflow",
+      "terms": {
+        "zh": "客服工单流程优化",
+        "en": "Support workflow improvement"
+      },
+      "goals": {
+        "zh": "按问题类型、优先级和响应目标分配工单并跟踪处理时长",
+        "en": "Route tickets by issue type, priority, and response targets and track resolution time"
+      },
+      "examples": {
+        "zh": [
+          "客服问题总是没人跟进",
+          "买家的问题转来转去没人处理"
+        ],
+        "en": [
+          "Support requests keep falling through the cracks",
+          "Customer issues are passed around without resolution"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing-roas",
+      "domain": "marketing",
+      "category": "marketing.ads",
+      "terms": {
+        "zh": "投放收益核验",
+        "en": "Advertising return validation"
+      },
+      "goals": {
+        "zh": "区分广告归因收入与实际利润，核对费用、退款和归因窗口",
+        "en": "Separate attributed revenue from profit and verify costs, refunds, and attribution windows"
+      },
+      "examples": {
+        "zh": [
+          "广告回报看着很高却还是亏钱",
+          "ROAS很好但利润很低"
+        ],
+        "en": [
+          "ROAS looks great but we still lose money",
+          "Ad revenue is high but profit is low"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing-seo",
+      "domain": "marketing",
+      "category": "marketing.seo",
+      "terms": {
+        "zh": "搜索收录排查",
+        "en": "Search indexing diagnosis"
+      },
+      "goals": {
+        "zh": "检查抓取、索引、规范网址和页面内容，定位搜索不可见原因",
+        "en": "Inspect crawling, indexing, canonical URLs, and content to diagnose search visibility"
+      },
+      "examples": {
+        "zh": [
+          "商品页在搜索引擎里找不到",
+          "网站上线很久了搜索不到页面"
+        ],
+        "en": [
+          "Product pages never appear in search engines",
+          "Our published pages cannot be found in search"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "marketing-tracking",
+      "domain": "marketing",
+      "category": "marketing.attribution",
+      "terms": {
+        "zh": "渠道转化追踪",
+        "en": "Channel conversion tracking"
+      },
+      "goals": {
+        "zh": "统一渠道参数、转化事件与归因窗口，核对流量和转化来源",
+        "en": "Align campaign parameters, conversion events, and attribution windows to reconcile traffic and conversion sources"
+      },
+      "examples": {
+        "zh": [
+          "不知道订单是哪个广告带来的",
+          "想分清邮件和社交媒体各带来多少订单"
+        ],
+        "en": [
+          "We cannot tell which ads generated the orders",
+          "Separate orders from email and social media"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance-cost",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "回测成本建模",
+        "en": "Backtest cost modeling"
+      },
+      "goals": {
+        "zh": "在回测中加入手续费、买卖价差、滑点和换手成本，检查收益稳健性",
+        "en": "Include fees, spreads, slippage, and turnover costs in backtests to assess return robustness"
+      },
+      "examples": {
+        "zh": [
+          "回测赚钱实盘却亏钱",
+          "策略收益算完手续费就没了"
+        ],
+        "en": [
+          "The backtest makes money but live trading loses",
+          "Strategy returns disappear after fees"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance-lookahead",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "历史信息可用性核查",
+        "en": "Historical information availability audit"
+      },
+      "goals": {
+        "zh": "核对数据发布时间、信号时点和成交时点，排查前视偏差",
+        "en": "Check publication, signal, and execution timestamps for look-ahead bias"
+      },
+      "examples": {
+        "zh": [
+          "回测好像提前知道了后面的价格",
+          "用当天收盘价选股又按当天收盘价成交"
+        ],
+        "en": [
+          "The backtest seems to know future prices",
+          "Signals and fills both use the same closing price"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance-overfit",
+      "domain": "finance",
+      "category": "finance.backtesting",
+      "terms": {
+        "zh": "策略泛化检验",
+        "en": "Strategy generalization assessment"
+      },
+      "goals": {
+        "zh": "区分训练与样本外区间，通过滚动验证和参数敏感性检查评估泛化",
+        "en": "Separate training and out-of-sample periods and assess generalization with rolling validation and parameter sensitivity"
+      },
+      "examples": {
+        "zh": [
+          "参数调得越多回测越好实盘越差",
+          "策略换一段时间就失效"
+        ],
+        "en": [
+          "More tuning improves backtests but worsens live results",
+          "The strategy fails on a different period"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance-risk",
+      "domain": "finance",
+      "category": "finance.portfolio",
+      "terms": {
+        "zh": "组合回撤分析",
+        "en": "Portfolio drawdown analysis"
+      },
+      "goals": {
+        "zh": "分析净值回撤、波动和风险暴露，定位亏损集中阶段与来源",
+        "en": "Analyze drawdowns, volatility, and exposures to locate concentrated loss periods and sources"
+      },
+      "examples": {
+        "zh": [
+          "收益看着不错但中间跌得太厉害",
+          "想知道组合最难扛的时候亏多少"
+        ],
+        "en": [
+          "Returns look good but the losses along the way are severe",
+          "Measure the portfolio's worst peak-to-trough loss"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance-factor",
+      "domain": "finance",
+      "category": "finance.research",
+      "terms": {
+        "zh": "因子有效性评估",
+        "en": "Factor effectiveness evaluation"
+      },
+      "goals": {
+        "zh": "检查因子信息系数、分组收益、稳定性和交易成本后的表现",
+        "en": "Evaluate factor information coefficients, grouped returns, stability, and performance after costs"
+      },
+      "examples": {
+        "zh": [
+          "不知道这个选股因子有没有用",
+          "因子在一个年份有效其他年份不行"
+        ],
+        "en": [
+          "Check whether this stock selection factor is useful",
+          "The factor works in one year but fails in others"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "finance-adjustment",
+      "domain": "finance",
+      "category": "finance.stocks",
+      "terms": {
+        "zh": "历史价格可比性核查",
+        "en": "Historical price comparability audit"
+      },
+      "goals": {
+        "zh": "核对分红、拆股和复权口径，解释历史价格与收益的异常跳变",
+        "en": "Check dividends, splits, and adjustment conventions to explain unusual price and return jumps"
+      },
+      "examples": {
+        "zh": [
+          "股票分红后图上突然跌了一大截",
+          "历史价格调整后算出来的收益不一样"
+        ],
+        "en": [
+          "The chart drops sharply after a dividend",
+          "Adjusted historical prices produce different returns"
         ]
       },
       "source": "AgentFleet authored",
