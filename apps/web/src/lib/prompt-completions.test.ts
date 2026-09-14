@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { locale, setLocale, t } from "../i18n";
+import domainTerms from "./domain-terms.generated.json";
+import { afterEach, describe, expect, it } from "vitest";
 import { applyPromptCompletion, promptCompletions, softwareTermCount } from "./prompt-completions";
 
 describe("prompt completions", () => {
@@ -75,4 +77,32 @@ it.each([['波纹剪','波纹剪辑'],['认识','认识论'],['元认','元认�
 });
 it.each(['先听到下个镜头的声音再切画面','我是否只找支持自己观点的证据','Make the background music quieter while someone speaks'])('offers a scoped wording suggestion for %s',input=>{
  expect(promptCompletions(input,input.length)[0]?.kind).toBe('rewrite');
+});
+
+
+describe("completion description localization", () => {
+  const originalLocale = locale();
+  afterEach(() => setLocale(originalLocale));
+
+  it("localizes the mixed-source co suggestions without changing inserted terms", () => {
+    const suggestions = promptCompletions("co", 2);
+    expect(suggestions.map(item => item.label)).toEqual(expect.arrayContaining(["Docker Compose", "Conforming", "Color gamut", "Color space", "Color grading"]));
+    setLocale("zh-CN");
+    for (const item of suggestions) expect(t(item.detail)).toMatch(/[\u3400-\u9fff]/);
+    const conforming = suggestions.find(item => item.label === "Conforming")!;
+    expect(t(conforming.detail)).toBe("把剪辑对应到高质量原始素材");
+    setLocale("en");
+    for (const item of suggestions) expect(t(item.detail)).not.toMatch(/[\u3400-\u9fff]/);
+    expect(t(conforming.detail)).toBe("Relink an edit to high-quality source media");
+    expect(applyPromptCompletion("co", conforming).value).toBe("Conforming");
+  });
+
+  it("provides both interface languages for every generated domain description", () => {
+    for (const term of domainTerms) {
+      setLocale("zh-CN");
+      expect(t(term.detail)).toMatch(/[\u3400-\u9fff]/);
+      setLocale("en");
+      expect(t(term.detail)).not.toMatch(/[\u3400-\u9fff]/);
+    }
+  });
 });

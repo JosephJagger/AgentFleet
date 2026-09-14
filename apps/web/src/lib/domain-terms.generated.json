@@ -8,7 +8,7 @@
   },
   {
     "label": "Session persistence",
-    "detail": "Investigate unexpected session expiration",
+    "detail": "排查登录会话意外失效",
     "aliases": [
       "Session persistence"
     ]
@@ -22,7 +22,7 @@
   },
   {
     "label": "List rendering performance",
-    "detail": "Investigate large-list rendering performance",
+    "detail": "排查大数据量列表的渲染性能",
     "aliases": [
       "List rendering performance"
     ]
@@ -36,7 +36,7 @@
   },
   {
     "label": "Page performance",
-    "detail": "Investigate page loading and interaction performance",
+    "detail": "排查页面加载与交互性能",
     "aliases": [
       "Page performance"
     ]
@@ -50,7 +50,7 @@
   },
   {
     "label": "Interaction response",
-    "detail": "Investigate unresponsive click interactions",
+    "detail": "排查点击交互无响应",
     "aliases": [
       "Interaction response"
     ]
@@ -64,7 +64,7 @@
   },
   {
     "label": "Responsive layout",
-    "detail": "Fix mobile layout and overlapping content",
+    "detail": "修复移动端响应式布局与内容遮挡",
     "aliases": [
       "Responsive layout"
     ]
@@ -78,7 +78,7 @@
   },
   {
     "label": "Data persistence",
-    "detail": "Investigate failed save operations",
+    "detail": "排查保存操作失败",
     "aliases": [
       "Data persistence"
     ]
@@ -92,7 +92,7 @@
   },
   {
     "label": "Data consistency",
-    "detail": "Reconcile data definitions and inconsistent results",
+    "detail": "核对数据口径与结果一致性",
     "aliases": [
       "Data consistency"
     ]
@@ -106,7 +106,7 @@
   },
   {
     "label": "Debounce",
-    "detail": "Debounce input-triggered searches",
+    "detail": "为输入查询添加防抖",
     "aliases": [
       "Debounce"
     ]
@@ -120,7 +120,7 @@
   },
   {
     "label": "Idempotency",
-    "detail": "Check duplicate submissions and idempotency",
+    "detail": "检查重复提交与幂等性",
     "aliases": [
       "Idempotency"
     ]
@@ -134,7 +134,7 @@
   },
   {
     "label": "API reliability",
-    "detail": "Investigate failed or timed-out API requests",
+    "detail": "排查接口请求失败与超时",
     "aliases": [
       "API reliability"
     ]
@@ -148,7 +148,7 @@
   },
   {
     "label": "Action approval",
-    "detail": "Require human confirmation for critical agent actions",
+    "detail": "为 Agent 的关键操作设置人工确认",
     "aliases": [
       "Action approval"
     ]
@@ -162,7 +162,7 @@
   },
   {
     "label": "Task resumption",
-    "detail": "Resume agent tasks after interruption",
+    "detail": "支持 Agent 中断后的任务恢复",
     "aliases": [
       "Task resumption"
     ]
@@ -176,7 +176,7 @@
   },
   {
     "label": "Context management",
-    "detail": "Improve agent context and constraint retention",
+    "detail": "改进 Agent 的上下文与约束保留",
     "aliases": [
       "Context management"
     ]
@@ -190,7 +190,7 @@
   },
   {
     "label": "Tool calling",
-    "detail": "Connect the agent to tools required for the task",
+    "detail": "为 Agent 接入任务所需的工具",
     "aliases": [
       "Tool calling"
     ]
@@ -204,7 +204,7 @@
   },
   {
     "label": "Parallel tasks",
-    "detail": "Run independent tasks with multiple agents in parallel",
+    "detail": "将可独立执行的任务交给多个 Agent 并行处理",
     "aliases": [
       "Parallel tasks"
     ]
@@ -218,7 +218,7 @@
   },
   {
     "label": "Spreadsheet consolidation",
-    "detail": "Merge spreadsheets by matching fields and verify the result",
+    "detail": "按匹配字段合并表格并核对结果",
     "aliases": [
       "Spreadsheet consolidation"
     ]
@@ -232,7 +232,7 @@
   },
   {
     "label": "Data deduplication",
-    "detail": "Identify and handle duplicate records by selected fields",
+    "detail": "按指定字段识别并处理重复记录",
     "aliases": [
       "Data deduplication"
     ]
@@ -246,7 +246,7 @@
   },
   {
     "label": "Report automation",
-    "detail": "Automate data aggregation and recurring reports",
+    "detail": "自动汇总数据并生成定期报表",
     "aliases": [
       "Report automation"
     ]
@@ -260,7 +260,7 @@
   },
   {
     "label": "Batch file processing",
-    "detail": "Organize and rename files in batches using rules",
+    "detail": "按规则批量整理和重命名文件",
     "aliases": [
       "Batch file processing"
     ]
@@ -274,7 +274,7 @@
   },
   {
     "label": "Email workflow",
-    "detail": "Classify emails and prepare replies using specified criteria",
+    "detail": "按条件自动分类邮件并准备回复",
     "aliases": [
       "Email workflow"
     ]
@@ -288,7 +288,7 @@
   },
   {
     "label": "Collision detection",
-    "detail": "Investigate object penetration and collision detection",
+    "detail": "排查游戏对象穿透与碰撞检测",
     "aliases": [
       "Collision detection"
     ]
@@ -302,7 +302,7 @@
   },
   {
     "label": "Frame-rate stability",
-    "detail": "Investigate frame drops and frame-time spikes",
+    "detail": "排查游戏掉帧与帧时间波动",
     "aliases": [
       "Frame-rate stability"
     ]
@@ -316,7 +316,7 @@
   },
   {
     "label": "Save-game restoration",
-    "detail": "Investigate save restoration and lost game progress",
+    "detail": "排查游戏存档恢复与进度丢失",
     "aliases": [
       "Save-game restoration"
     ]
@@ -330,7 +330,7 @@
   },
   {
     "label": "Audio-video synchronization",
-    "detail": "Correct audio-video synchronization",
+    "detail": "校正音频与画面的时间同步",
     "aliases": [
       "Audio-video synchronization"
     ]
@@ -344,7 +344,7 @@
   },
   {
     "label": "Automatic captions",
-    "detail": "Transcribe speech and align captions to the timeline",
+    "detail": "识别语音并生成对齐时间轴的字幕",
     "aliases": [
       "Automatic captions"
     ]
@@ -358,7 +358,7 @@
   },
   {
     "label": "Color matching",
-    "detail": "Match color and exposure across shots",
+    "detail": "统一不同镜头的色彩与曝光",
     "aliases": [
       "Color matching"
     ]
@@ -372,7 +372,7 @@
   },
   {
     "label": "Assembly tolerances",
-    "detail": "Check mating dimensions and assembly tolerances",
+    "detail": "检查零件配合尺寸与公差设置",
     "aliases": [
       "Assembly tolerances"
     ]
@@ -386,7 +386,7 @@
   },
   {
     "label": "Mesh convergence",
-    "detail": "Check simulation sensitivity to mesh resolution",
+    "detail": "检查仿真结果对网格划分的敏感性",
     "aliases": [
       "Mesh convergence"
     ]
@@ -400,7 +400,7 @@
   },
   {
     "label": "Drawing revision management",
-    "detail": "Manage drawing revisions and track design changes",
+    "detail": "管理图纸版本并追踪设计变更",
     "aliases": [
       "Drawing revision management"
     ]
@@ -414,7 +414,7 @@
   },
   {
     "label": "J-cut",
-    "detail": "Use an audio lead-in between shots",
+    "detail": "使用声音先入的镜头衔接",
     "aliases": [
       "J-cut"
     ]
@@ -428,7 +428,7 @@
   },
   {
     "label": "L-cut",
-    "detail": "Continue the previous shot audio across the cut",
+    "detail": "使用声音延续的镜头衔接",
     "aliases": [
       "L-cut"
     ]
@@ -442,7 +442,7 @@
   },
   {
     "label": "Audio ducking",
-    "detail": "Lower background music during speech",
+    "detail": "在人声出现时降低背景音乐音量",
     "aliases": [
       "Audio ducking"
     ]
@@ -456,7 +456,7 @@
   },
   {
     "label": "Speed ramping",
-    "detail": "Adjust gradual changes in playback speed",
+    "detail": "调整片段的渐变变速效果",
     "aliases": [
       "Speed ramping"
     ]
@@ -470,7 +470,7 @@
   },
   {
     "label": "Subtitle timing",
-    "detail": "Align subtitle timing with speech",
+    "detail": "校准字幕与人声的时间对应",
     "aliases": [
       "Subtitle timing"
     ]
@@ -484,7 +484,7 @@
   },
   {
     "label": "Argument premises",
-    "detail": "Identify the premises and conclusion of the argument",
+    "detail": "梳理论证的前提与结论",
     "aliases": [
       "Argument premises"
     ]
@@ -498,7 +498,7 @@
   },
   {
     "label": "Is-ought distinction",
-    "detail": "Distinguish factual claims from normative claims",
+    "detail": "区分事实判断与规范判断",
     "aliases": [
       "Is-ought distinction"
     ]
@@ -512,7 +512,7 @@
   },
   {
     "label": "Confirmation bias",
-    "detail": "Check evidence selection for confirmation bias",
+    "detail": "检查证据选择是否存在确认偏误",
     "aliases": [
       "Confirmation bias"
     ]
@@ -526,7 +526,7 @@
   },
   {
     "label": "Sunk cost fallacy",
-    "detail": "Separate irrecoverable costs from reasons for the next decision",
+    "detail": "区分不可回收投入与后续决策依据",
     "aliases": [
       "Sunk cost fallacy"
     ]
@@ -540,7 +540,7 @@
   },
   {
     "label": "Retrieval practice",
-    "detail": "Design active recall exercises",
+    "detail": "设计主动回忆的学习练习",
     "aliases": [
       "Retrieval practice"
     ]
@@ -554,7 +554,7 @@
   },
   {
     "label": "Timeline",
-    "detail": "Arrange clips over time",
+    "detail": "按时间排列音视频片段",
     "aliases": [
       "Timeline"
     ]
@@ -568,7 +568,7 @@
   },
   {
     "label": "Bin",
-    "detail": "Organize media assets",
+    "detail": "分类管理媒体素材",
     "aliases": [
       "Bin"
     ]
@@ -582,7 +582,7 @@
   },
   {
     "label": "In point",
-    "detail": "Mark the start of a clip",
+    "detail": "标记片段开始位置",
     "aliases": [
       "In point"
     ]
@@ -596,7 +596,7 @@
   },
   {
     "label": "Out point",
-    "detail": "Mark the end of a clip",
+    "detail": "标记片段结束位置",
     "aliases": [
       "Out point"
     ]
@@ -610,7 +610,7 @@
   },
   {
     "label": "Rough cut",
-    "detail": "Build an initial edit",
+    "detail": "建立初步叙事结构",
     "aliases": [
       "Rough cut"
     ]
@@ -624,7 +624,7 @@
   },
   {
     "label": "Fine cut",
-    "detail": "Refine shot timing and transitions",
+    "detail": "细化镜头长度与衔接",
     "aliases": [
       "Fine cut"
     ]
@@ -638,7 +638,7 @@
   },
   {
     "label": "Picture lock",
-    "detail": "Finalize picture editing",
+    "detail": "确定画面剪辑版本",
     "aliases": [
       "Picture lock"
     ]
@@ -652,7 +652,7 @@
   },
   {
     "label": "Ripple edit",
-    "detail": "Trim a clip and shift later clips",
+    "detail": "修剪片段并移动后续片段",
     "aliases": [
       "Ripple edit"
     ]
@@ -666,7 +666,7 @@
   },
   {
     "label": "Rolling edit",
-    "detail": "Move the cut between adjacent clips",
+    "detail": "移动相邻片段的共同剪辑点",
     "aliases": [
       "Rolling edit"
     ]
@@ -680,7 +680,7 @@
   },
   {
     "label": "Slip edit",
-    "detail": "Change source timing without moving the clip",
+    "detail": "保持位置和时长调整片段内容",
     "aliases": [
       "Slip edit"
     ]
@@ -694,7 +694,7 @@
   },
   {
     "label": "Slide edit",
-    "detail": "Move a clip while trimming its neighbors",
+    "detail": "移动片段并修剪相邻片段",
     "aliases": [
       "Slide edit"
     ]
@@ -708,7 +708,7 @@
   },
   {
     "label": "Insert edit",
-    "detail": "Insert media and shift later content",
+    "detail": "插入素材并推移后续内容",
     "aliases": [
       "Insert edit"
     ]
@@ -722,7 +722,7 @@
   },
   {
     "label": "Overwrite edit",
-    "detail": "Replace media in a time range",
+    "detail": "用素材替换目标时间段",
     "aliases": [
       "Overwrite edit"
     ]
@@ -736,7 +736,7 @@
   },
   {
     "label": "Match cut",
-    "detail": "Connect shots through matching form or action",
+    "detail": "利用相似构图或动作连接镜头",
     "aliases": [
       "Match cut"
     ]
@@ -750,7 +750,7 @@
   },
   {
     "label": "Jump cut",
-    "detail": "Create a visible jump in time or position",
+    "detail": "形成明显时间或位置跳跃的切换",
     "aliases": [
       "Jump cut"
     ]
@@ -764,7 +764,7 @@
   },
   {
     "label": "Cross-cutting",
-    "detail": "Alternate actions in different scenes",
+    "detail": "交替呈现不同场景的行动",
     "aliases": [
       "Cross-cutting"
     ]
@@ -778,7 +778,7 @@
   },
   {
     "label": "Parallel editing",
-    "detail": "Alternate related narrative strands",
+    "detail": "交替呈现相关叙事线",
     "aliases": [
       "Parallel editing"
     ]
@@ -792,7 +792,7 @@
   },
   {
     "label": "Cutaway shot",
-    "detail": "Insert a related shot away from the main action",
+    "detail": "插入主体之外的相关画面",
     "aliases": [
       "Cutaway shot"
     ]
@@ -806,7 +806,7 @@
   },
   {
     "label": "B-roll",
-    "detail": "Support the main narrative with additional footage",
+    "detail": "补充主体叙述的辅助画面",
     "aliases": [
       "B-roll"
     ]
@@ -820,7 +820,7 @@
   },
   {
     "label": "Establishing shot",
-    "detail": "Establish the setting and spatial relationships",
+    "detail": "交代场景环境与空间关系",
     "aliases": [
       "Establishing shot"
     ]
@@ -834,7 +834,7 @@
   },
   {
     "label": "180-degree rule",
-    "detail": "Maintain consistent screen direction",
+    "detail": "维持镜头间空间方向一致",
     "aliases": [
       "180-degree rule"
     ]
@@ -848,7 +848,7 @@
   },
   {
     "label": "Match on action",
-    "detail": "Join shots across a continuous action",
+    "detail": "在动作连续处衔接镜头",
     "aliases": [
       "Match on action"
     ]
@@ -862,7 +862,7 @@
   },
   {
     "label": "Fade",
-    "detail": "Gradually introduce or remove image or sound",
+    "detail": "逐渐显示或隐去画面声音",
     "aliases": [
       "Fade"
     ]
@@ -876,7 +876,7 @@
   },
   {
     "label": "Cross dissolve",
-    "detail": "Gradually blend between two images",
+    "detail": "两个画面逐渐交叠过渡",
     "aliases": [
       "Cross dissolve"
     ]
@@ -890,7 +890,7 @@
   },
   {
     "label": "Time remapping",
-    "detail": "Control the mapping of source time to playback time",
+    "detail": "控制素材时间与播放时间的对应",
     "aliases": [
       "Time remapping"
     ]
@@ -904,7 +904,7 @@
   },
   {
     "label": "Optical flow interpolation",
-    "detail": "Estimate motion to generate intermediate frames",
+    "detail": "估算运动以生成中间帧",
     "aliases": [
       "Optical flow interpolation"
     ]
@@ -918,7 +918,7 @@
   },
   {
     "label": "Freeze frame",
-    "detail": "Hold a single video frame",
+    "detail": "延长单帧画面的显示时间",
     "aliases": [
       "Freeze frame"
     ]
@@ -932,7 +932,7 @@
   },
   {
     "label": "Keyframe",
-    "detail": "Set a parameter value at a specific time",
+    "detail": "记录参数在指定时间的数值",
     "aliases": [
       "Keyframe"
     ]
@@ -946,7 +946,7 @@
   },
   {
     "label": "Ease in and out",
-    "detail": "Smooth the start and end of motion",
+    "detail": "平滑动画起止速度",
     "aliases": [
       "Ease in and out"
     ]
@@ -960,7 +960,7 @@
   },
   {
     "label": "Bezier curve",
-    "detail": "Shape interpolation with control points",
+    "detail": "通过控制点调整插值曲线",
     "aliases": [
       "Bezier curve"
     ]
@@ -974,7 +974,7 @@
   },
   {
     "label": "Motion tracking",
-    "detail": "Track the motion of image features",
+    "detail": "追踪画面中特征的运动",
     "aliases": [
       "Motion tracking"
     ]
@@ -988,7 +988,7 @@
   },
   {
     "label": "Video stabilization",
-    "detail": "Reduce camera shake",
+    "detail": "减少拍摄抖动",
     "aliases": [
       "Video stabilization"
     ]
@@ -1002,7 +1002,7 @@
   },
   {
     "label": "Mask",
-    "detail": "Restrict an effect to an image region",
+    "detail": "限制效果作用的画面区域",
     "aliases": [
       "Mask"
     ]
@@ -1016,7 +1016,7 @@
   },
   {
     "label": "Rotoscoping",
-    "detail": "Trace or isolate objects across frames",
+    "detail": "逐帧分离或描绘画面对象",
     "aliases": [
       "Rotoscoping"
     ]
@@ -1030,7 +1030,7 @@
   },
   {
     "label": "Chroma key",
-    "detail": "Separate a subject using background color",
+    "detail": "依据背景颜色分离主体",
     "aliases": [
       "Chroma key"
     ]
@@ -1044,7 +1044,7 @@
   },
   {
     "label": "Luma key",
-    "detail": "Separate image regions by brightness",
+    "detail": "依据亮度分离画面区域",
     "aliases": [
       "Luma key"
     ]
@@ -1058,7 +1058,7 @@
   },
   {
     "label": "Alpha channel",
-    "detail": "Store pixel transparency",
+    "detail": "存储像素透明度",
     "aliases": [
       "Alpha channel"
     ]
@@ -1072,7 +1072,7 @@
   },
   {
     "label": "Premultiplied alpha",
-    "detail": "Store color multiplied by alpha",
+    "detail": "颜色值已乘以透明度",
     "aliases": [
       "Premultiplied alpha"
     ]
@@ -1086,7 +1086,7 @@
   },
   {
     "label": "Blend mode",
-    "detail": "Define how layer colors combine",
+    "detail": "定义图层颜色的合成方式",
     "aliases": [
       "Blend mode"
     ]
@@ -1100,7 +1100,7 @@
   },
   {
     "label": "Color grading",
-    "detail": "Shape the visual color style",
+    "detail": "塑造影像色彩风格",
     "aliases": [
       "Color grading"
     ]
@@ -1114,7 +1114,7 @@
   },
   {
     "label": "Color correction",
-    "detail": "Correct exposure, white balance and shot differences",
+    "detail": "校正曝光白平衡与镜头差异",
     "aliases": [
       "Color correction"
     ]
@@ -1128,7 +1128,7 @@
   },
   {
     "label": "White balance",
-    "detail": "Adjust temperature and tint for neutral colors",
+    "detail": "调整中性色的色温与色偏",
     "aliases": [
       "White balance"
     ]
@@ -1142,7 +1142,7 @@
   },
   {
     "label": "Color space",
-    "detail": "Define a color representation system",
+    "detail": "定义颜色表示范围与方式",
     "aliases": [
       "Color space"
     ]
@@ -1156,7 +1156,7 @@
   },
   {
     "label": "Color gamut",
-    "detail": "Describe the range of representable colors",
+    "detail": "设备或系统可表示的颜色范围",
     "aliases": [
       "Color gamut"
     ]
@@ -1170,7 +1170,7 @@
   },
   {
     "label": "Gamma",
-    "detail": "Describe a nonlinear signal-to-luminance relationship",
+    "detail": "描述信号与亮度的非线性关系",
     "aliases": [
       "Gamma"
     ]
@@ -1184,7 +1184,7 @@
   },
   {
     "label": "Look-up table",
-    "detail": "Transform colors through numeric mappings",
+    "detail": "通过数值映射转换色彩",
     "aliases": [
       "Look-up table",
       "LUT"
@@ -1199,7 +1199,7 @@
   },
   {
     "label": "Waveform monitor",
-    "detail": "Display image signal levels",
+    "detail": "显示画面信号水平的分布",
     "aliases": [
       "Waveform monitor"
     ]
@@ -1213,7 +1213,7 @@
   },
   {
     "label": "Vectorscope",
-    "detail": "Display chroma direction and magnitude",
+    "detail": "显示色度方向与饱和程度",
     "aliases": [
       "Vectorscope"
     ]
@@ -1227,7 +1227,7 @@
   },
   {
     "label": "Zebra pattern",
-    "detail": "Mark regions reaching an exposure threshold",
+    "detail": "标记达到设定曝光阈值的区域",
     "aliases": [
       "Zebra pattern"
     ]
@@ -1241,7 +1241,7 @@
   },
   {
     "label": "Dynamic range",
-    "detail": "Describe the span between dark and bright levels",
+    "detail": "可记录或显示的亮暗跨度",
     "aliases": [
       "Dynamic range"
     ]
@@ -1255,7 +1255,7 @@
   },
   {
     "label": "Log profile",
-    "detail": "Encode image luminance logarithmically",
+    "detail": "用对数方式编码影像亮度",
     "aliases": [
       "Log profile"
     ]
@@ -1269,7 +1269,7 @@
   },
   {
     "label": "Color management",
-    "detail": "Coordinate color transforms across a workflow",
+    "detail": "协调输入处理和输出的色彩转换",
     "aliases": [
       "Color management"
     ]
@@ -1283,7 +1283,7 @@
   },
   {
     "label": "Secondary color correction",
-    "detail": "Adjust selected colors or regions",
+    "detail": "针对特定颜色或区域调整",
     "aliases": [
       "Secondary color correction"
     ]
@@ -1297,7 +1297,7 @@
   },
   {
     "label": "Skin tone protection",
-    "detail": "Preserve natural and consistent skin tones",
+    "detail": "调色时保持肤色自然一致",
     "aliases": [
       "Skin tone protection"
     ]
@@ -1311,7 +1311,7 @@
   },
   {
     "label": "Proxy editing",
-    "detail": "Edit with lightweight substitute media",
+    "detail": "使用轻量替代素材进行剪辑",
     "aliases": [
       "Proxy editing"
     ]
@@ -1325,7 +1325,7 @@
   },
   {
     "label": "Offline editing",
-    "detail": "Build the creative edit with working media",
+    "detail": "使用工作素材完成创意剪辑",
     "aliases": [
       "Offline editing"
     ]
@@ -1339,7 +1339,7 @@
   },
   {
     "label": "Conforming",
-    "detail": "Relink an edit to high-quality source media",
+    "detail": "把剪辑对应到高质量原始素材",
     "aliases": [
       "Conforming"
     ]
@@ -1353,7 +1353,7 @@
   },
   {
     "label": "Transcoding",
-    "detail": "Convert media between encoding formats",
+    "detail": "转换媒体编码格式",
     "aliases": [
       "Transcoding"
     ]
@@ -1367,7 +1367,7 @@
   },
   {
     "label": "Encoder",
-    "detail": "Encode media into a target format",
+    "detail": "将音视频压缩为目标编码",
     "aliases": [
       "Encoder"
     ]
@@ -1381,7 +1381,7 @@
   },
   {
     "label": "Container format",
-    "detail": "Package media streams and metadata",
+    "detail": "组织媒体流与元数据",
     "aliases": [
       "Container format"
     ]
@@ -1395,7 +1395,7 @@
   },
   {
     "label": "Bitrate",
-    "detail": "Measure data per unit of time",
+    "detail": "单位时间传输或存储的数据量",
     "aliases": [
       "Bitrate"
     ]
@@ -1409,7 +1409,7 @@
   },
   {
     "label": "Constant bitrate",
-    "detail": "Maintain an approximately constant data rate",
+    "detail": "保持近似固定的数据速率",
     "aliases": [
       "Constant bitrate",
       "CBR"
@@ -1424,7 +1424,7 @@
   },
   {
     "label": "Variable bitrate",
-    "detail": "Vary data rate with content complexity",
+    "detail": "按内容复杂度分配数据速率",
     "aliases": [
       "Variable bitrate",
       "VBR"
@@ -1439,7 +1439,7 @@
   },
   {
     "label": "Frame rate",
-    "detail": "Measure frames per second",
+    "detail": "每秒显示或记录的帧数",
     "aliases": [
       "Frame rate"
     ]
@@ -1453,7 +1453,7 @@
   },
   {
     "label": "Variable frame rate",
-    "detail": "Allow frame timing to vary",
+    "detail": "帧间时间间隔可变化",
     "aliases": [
       "Variable frame rate",
       "VFR"
@@ -1468,7 +1468,7 @@
   },
   {
     "label": "Timecode",
-    "detail": "Label media frames by time",
+    "detail": "为音视频帧提供时间标识",
     "aliases": [
       "Timecode"
     ]
@@ -1482,7 +1482,7 @@
   },
   {
     "label": "Drop-frame timecode",
-    "detail": "Skip timecode numbers to align with clock time",
+    "detail": "跳过部分编号以校准时钟时间",
     "aliases": [
       "Drop-frame timecode"
     ]
@@ -1496,7 +1496,7 @@
   },
   {
     "label": "Pixel aspect ratio",
-    "detail": "Describe the width-to-height ratio of a pixel",
+    "detail": "单个像素宽与高的比例",
     "aliases": [
       "Pixel aspect ratio"
     ]
@@ -1510,7 +1510,7 @@
   },
   {
     "label": "Chroma subsampling",
-    "detail": "Reduce chroma sampling to save data",
+    "detail": "降低色度采样以减少数据量",
     "aliases": [
       "Chroma subsampling"
     ]
@@ -1524,7 +1524,7 @@
   },
   {
     "label": "Bit depth",
-    "detail": "Specify bits per sample",
+    "detail": "每个采样值使用的比特数量",
     "aliases": [
       "Bit depth"
     ]
@@ -1538,7 +1538,7 @@
   },
   {
     "label": "Loudness normalization",
-    "detail": "Adjust perceived loudness to a target",
+    "detail": "把感知响度调整到目标值",
     "aliases": [
       "Loudness normalization"
     ]
@@ -1552,7 +1552,7 @@
   },
   {
     "label": "True peak",
-    "detail": "Estimate peaks in the reconstructed waveform",
+    "detail": "估计重建波形的峰值",
     "aliases": [
       "True peak"
     ]
@@ -1566,7 +1566,7 @@
   },
   {
     "label": "Noise reduction",
-    "detail": "Reduce unwanted background noise",
+    "detail": "减少不需要的背景噪声",
     "aliases": [
       "Noise reduction"
     ]
@@ -1580,7 +1580,7 @@
   },
   {
     "label": "Equalizer",
-    "detail": "Adjust gain across frequency bands",
+    "detail": "调整不同频段的增益",
     "aliases": [
       "Equalizer"
     ]
@@ -1594,7 +1594,7 @@
   },
   {
     "label": "Dynamic range compression",
-    "detail": "Reduce variation in audio levels",
+    "detail": "缩小音频电平变化范围",
     "aliases": [
       "Dynamic range compression"
     ]
@@ -1608,7 +1608,7 @@
   },
   {
     "label": "Limiter",
-    "detail": "Limit audio peak levels",
+    "detail": "限制音频峰值电平",
     "aliases": [
       "Limiter"
     ]
@@ -1622,7 +1622,7 @@
   },
   {
     "label": "Safe area",
-    "detail": "Mark safe regions for essential content",
+    "detail": "标示重要内容的显示安全区域",
     "aliases": [
       "Safe area"
     ]
@@ -1636,7 +1636,7 @@
   },
   {
     "label": "Multicam editing",
-    "detail": "Switch among synchronized camera angles",
+    "detail": "在同步的多个机位间切换",
     "aliases": [
       "Multicam editing"
     ]
@@ -1651,7 +1651,7 @@
   },
   {
     "label": "Epistemology",
-    "detail": "Study knowledge, its sources and justification",
+    "detail": "研究知识及其来源与证成",
     "aliases": [
       "Epistemology"
     ]
@@ -1665,7 +1665,7 @@
   },
   {
     "label": "Ontology",
-    "detail": "Study being and categories of entities",
+    "detail": "研究存在及存在者的类别",
     "aliases": [
       "Ontology"
     ]
@@ -1679,7 +1679,7 @@
   },
   {
     "label": "Metaphysics",
-    "detail": "Study the fundamental structure of reality",
+    "detail": "研究实在的基本结构",
     "aliases": [
       "Metaphysics"
     ]
@@ -1693,7 +1693,7 @@
   },
   {
     "label": "Ethics",
-    "detail": "Study moral judgment and reasons for action",
+    "detail": "研究道德判断与行动理由",
     "aliases": [
       "Ethics"
     ]
@@ -1707,7 +1707,7 @@
   },
   {
     "label": "Aesthetics",
-    "detail": "Study aesthetic experience and artistic value",
+    "detail": "研究审美经验与艺术价值",
     "aliases": [
       "Aesthetics"
     ]
@@ -1721,7 +1721,7 @@
   },
   {
     "label": "Logic",
-    "detail": "Study forms and rules of valid inference",
+    "detail": "研究有效推理的形式与规则",
     "aliases": [
       "Logic"
     ]
@@ -1735,7 +1735,7 @@
   },
   {
     "label": "Phenomenology",
-    "detail": "Study how experience appears to consciousness",
+    "detail": "研究经验如何向意识显现",
     "aliases": [
       "Phenomenology"
     ]
@@ -1749,7 +1749,7 @@
   },
   {
     "label": "Hermeneutics",
-    "detail": "Study the conditions of understanding and interpretation",
+    "detail": "研究理解与解释的条件",
     "aliases": [
       "Hermeneutics"
     ]
@@ -1763,7 +1763,7 @@
   },
   {
     "label": "Pragmatism",
-    "detail": "Emphasize practical consequences and inquiry",
+    "detail": "重视实践后果与探究过程",
     "aliases": [
       "Pragmatism"
     ]
@@ -1777,7 +1777,7 @@
   },
   {
     "label": "Empiricism",
-    "detail": "Emphasize experience in the formation of knowledge",
+    "detail": "强调经验在知识形成中的作用",
     "aliases": [
       "Empiricism"
     ]
@@ -1791,7 +1791,7 @@
   },
   {
     "label": "Rationalism",
-    "detail": "Emphasize reason as a source of knowledge",
+    "detail": "强调理性在知识中的作用",
     "aliases": [
       "Rationalism"
     ]
@@ -1805,7 +1805,7 @@
   },
   {
     "label": "Skepticism",
-    "detail": "Question the grounds or scope of knowledge claims",
+    "detail": "质疑知识主张的根据或范围",
     "aliases": [
       "Skepticism"
     ]
@@ -1819,7 +1819,7 @@
   },
   {
     "label": "Realism",
-    "detail": "Hold that certain objects or facts exist independently",
+    "detail": "主张某类对象或事实独立存在",
     "aliases": [
       "Realism"
     ]
@@ -1833,7 +1833,7 @@
   },
   {
     "label": "Instrumentalism",
-    "detail": "Treat theories as tools for prediction and explanation",
+    "detail": "将理论视为预测与解释的工具",
     "aliases": [
       "Instrumentalism"
     ]
@@ -1847,7 +1847,7 @@
   },
   {
     "label": "Materialism",
-    "detail": "Emphasize the fundamental status of matter",
+    "detail": "强调物质在实在中的基础地位",
     "aliases": [
       "Materialism"
     ]
@@ -1861,7 +1861,7 @@
   },
   {
     "label": "Dualism",
-    "detail": "Posit two irreducible kinds of entities or properties",
+    "detail": "主张两类不可还原的基本实体或属性",
     "aliases": [
       "Dualism"
     ]
@@ -1875,7 +1875,7 @@
   },
   {
     "label": "Physicalism",
-    "detail": "Hold that reality is ultimately physical",
+    "detail": "主张一切实在最终具有物理性质",
     "aliases": [
       "Physicalism"
     ]
@@ -1889,7 +1889,7 @@
   },
   {
     "label": "Emergence",
-    "detail": "Describe novel properties at a higher level",
+    "detail": "整体呈现层次性的新增性质",
     "aliases": [
       "Emergence"
     ]
@@ -1903,7 +1903,7 @@
   },
   {
     "label": "Reductionism",
-    "detail": "Explain complex phenomena through more basic levels",
+    "detail": "用更基础层次解释复杂现象",
     "aliases": [
       "Reductionism"
     ]
@@ -1917,7 +1917,7 @@
   },
   {
     "label": "Determinism",
-    "detail": "Prior states and laws determine subsequent states",
+    "detail": "先前状态与规律决定后续状态",
     "aliases": [
       "Determinism"
     ]
@@ -1931,7 +1931,7 @@
   },
   {
     "label": "Free will",
-    "detail": "Examine an agent's capacity for choice and control",
+    "detail": "探讨行动者的选择与控制能力",
     "aliases": [
       "Free will"
     ]
@@ -1945,7 +1945,7 @@
   },
   {
     "label": "Compatibilism",
-    "detail": "Hold that free will can coexist with determinism",
+    "detail": "认为自由意志可与决定论相容",
     "aliases": [
       "Compatibilism"
     ]
@@ -1959,7 +1959,7 @@
   },
   {
     "label": "Intentionality",
-    "detail": "Describe the aboutness of mental states",
+    "detail": "心灵状态指向对象或内容的特征",
     "aliases": [
       "Intentionality"
     ]
@@ -1973,7 +1973,7 @@
   },
   {
     "label": "Qualia",
-    "detail": "Describe the felt qualities of subjective experience",
+    "detail": "主观经验所具有的感受性质",
     "aliases": [
       "Qualia"
     ]
@@ -1987,7 +1987,7 @@
   },
   {
     "label": "Intersubjectivity",
-    "detail": "Examine shared understanding between subjects",
+    "detail": "主体之间共享理解与经验的关系",
     "aliases": [
       "Intersubjectivity"
     ]
@@ -2001,7 +2001,7 @@
   },
   {
     "label": "A priori knowledge",
-    "detail": "Knowledge justified independently of particular experience",
+    "detail": "不依赖特定经验的知识根据",
     "aliases": [
       "A priori knowledge"
     ]
@@ -2015,7 +2015,7 @@
   },
   {
     "label": "A posteriori knowledge",
-    "detail": "Knowledge grounded in experience",
+    "detail": "以经验为根据的知识",
     "aliases": [
       "A posteriori knowledge"
     ]
@@ -2029,7 +2029,7 @@
   },
   {
     "label": "Justification",
-    "detail": "Grounds supporting the rationality of a belief",
+    "detail": "支持信念合理性的根据",
     "aliases": [
       "Justification"
     ]
@@ -2043,7 +2043,7 @@
   },
   {
     "label": "Gettier problem",
-    "detail": "Challenge the sufficiency of justified true belief for knowledge",
+    "detail": "质疑证成真信念足以构成知识",
     "aliases": [
       "Gettier problem"
     ]
@@ -2057,7 +2057,7 @@
   },
   {
     "label": "Deductive reasoning",
-    "detail": "Assess whether premises necessitate a conclusion",
+    "detail": "考察前提是否必然支持结论",
     "aliases": [
       "Deductive reasoning"
     ]
@@ -2071,7 +2071,7 @@
   },
   {
     "label": "Inductive reasoning",
-    "detail": "Infer general claims from observations",
+    "detail": "从个别观察推向一般判断",
     "aliases": [
       "Inductive reasoning"
     ]
@@ -2085,7 +2085,7 @@
   },
   {
     "label": "Abductive reasoning",
-    "detail": "Infer a best explanation of observations",
+    "detail": "寻求对观察的最佳解释",
     "aliases": [
       "Abductive reasoning"
     ]
@@ -2099,7 +2099,7 @@
   },
   {
     "label": "Falsifiability",
-    "detail": "Whether a claim can be tested by possible counterevidence",
+    "detail": "主张能否被可能的反例检验",
     "aliases": [
       "Falsifiability"
     ]
@@ -2113,7 +2113,7 @@
   },
   {
     "label": "Necessary condition",
-    "detail": "A condition required for a result",
+    "detail": "结果成立所必须具备的条件",
     "aliases": [
       "Necessary condition"
     ]
@@ -2127,7 +2127,7 @@
   },
   {
     "label": "Sufficient condition",
-    "detail": "A condition enough to establish a result",
+    "detail": "成立时足以推出结果的条件",
     "aliases": [
       "Sufficient condition"
     ]
@@ -2141,7 +2141,7 @@
   },
   {
     "label": "Thought experiment",
-    "detail": "Test concepts and arguments through imagined cases",
+    "detail": "通过设想情境检验概念与论证",
     "aliases": [
       "Thought experiment"
     ]
@@ -2155,7 +2155,7 @@
   },
   {
     "label": "Counterfactual reasoning",
-    "detail": "Consider outcomes under alternatives to actual facts",
+    "detail": "考察事实不同情况下的可能结果",
     "aliases": [
       "Counterfactual reasoning"
     ]
@@ -2169,7 +2169,7 @@
   },
   {
     "label": "Circular reasoning",
-    "detail": "Use a conclusion to support itself",
+    "detail": "用待证明结论支持其自身",
     "aliases": [
       "Circular reasoning"
     ]
@@ -2183,7 +2183,7 @@
   },
   {
     "label": "Straw man fallacy",
-    "detail": "Refute a distorted version of an opposing argument",
+    "detail": "歪曲对方论点后加以反驳",
     "aliases": [
       "Straw man fallacy"
     ]
@@ -2197,7 +2197,7 @@
   },
   {
     "label": "Equivocation",
-    "detail": "Shift a key term's meaning within an argument",
+    "detail": "在论证中改变关键用语含义",
     "aliases": [
       "Equivocation"
     ]
@@ -2211,7 +2211,7 @@
   },
   {
     "label": "False dilemma",
-    "detail": "Present only two options when more exist",
+    "detail": "把多种可能压缩为两个选项",
     "aliases": [
       "False dilemma"
     ]
@@ -2225,7 +2225,7 @@
   },
   {
     "label": "Ad hominem",
-    "detail": "Attack a person instead of addressing an argument",
+    "detail": "以针对人的攻击代替回应论证",
     "aliases": [
       "Ad hominem"
     ]
@@ -2239,7 +2239,7 @@
   },
   {
     "label": "Deontology",
-    "detail": "Emphasize duties and constraints on action",
+    "detail": "强调行动的义务与约束",
     "aliases": [
       "Deontology"
     ]
@@ -2253,7 +2253,7 @@
   },
   {
     "label": "Consequentialism",
-    "detail": "Evaluate actions by their consequences",
+    "detail": "根据行动后果评价其道德性",
     "aliases": [
       "Consequentialism"
     ]
@@ -2267,7 +2267,7 @@
   },
   {
     "label": "Utilitarianism",
-    "detail": "Evaluate actions or rules by overall welfare",
+    "detail": "以总体福祉评价行动或规则",
     "aliases": [
       "Utilitarianism"
     ]
@@ -2281,7 +2281,7 @@
   },
   {
     "label": "Virtue ethics",
-    "detail": "Emphasize character and virtues in ethics",
+    "detail": "强调品格与德性的伦理进路",
     "aliases": [
       "Virtue ethics"
     ]
@@ -2295,7 +2295,7 @@
   },
   {
     "label": "Metacognition",
-    "detail": "Monitor and regulate one's own cognition",
+    "detail": "监测和调节自身认知过程",
     "aliases": [
       "Metacognition"
     ]
@@ -2309,7 +2309,7 @@
   },
   {
     "label": "Cognitive load",
-    "detail": "Demands a task places on cognitive resources",
+    "detail": "任务对有限认知资源的占用",
     "aliases": [
       "Cognitive load"
     ]
@@ -2323,7 +2323,7 @@
   },
   {
     "label": "Working memory",
-    "detail": "Temporarily hold and manipulate information",
+    "detail": "暂时保持并加工信息的系统",
     "aliases": [
       "Working memory"
     ]
@@ -2337,7 +2337,7 @@
   },
   {
     "label": "Long-term memory",
-    "detail": "Relatively durable retention of information",
+    "detail": "相对持久的信息保持",
     "aliases": [
       "Long-term memory"
     ]
@@ -2351,7 +2351,7 @@
   },
   {
     "label": "Attention",
-    "detail": "Select and allocate processing resources",
+    "detail": "选择并分配信息处理资源",
     "aliases": [
       "Attention"
     ]
@@ -2365,7 +2365,7 @@
   },
   {
     "label": "Selective attention",
-    "detail": "Prioritize particular information",
+    "detail": "优先处理特定信息",
     "aliases": [
       "Selective attention"
     ]
@@ -2379,7 +2379,7 @@
   },
   {
     "label": "Inhibitory control",
-    "detail": "Suppress inappropriate impulses or responses",
+    "detail": "抑制不合适的冲动或反应",
     "aliases": [
       "Inhibitory control"
     ]
@@ -2393,7 +2393,7 @@
   },
   {
     "label": "Executive functions",
-    "detail": "Control processes supporting goal-directed behavior",
+    "detail": "支持目标导向行为的控制过程",
     "aliases": [
       "Executive functions"
     ]
@@ -2407,7 +2407,7 @@
   },
   {
     "label": "Cognitive flexibility",
-    "detail": "Switch rules and perspectives as context changes",
+    "detail": "根据情境切换规则与视角",
     "aliases": [
       "Cognitive flexibility"
     ]
@@ -2421,7 +2421,7 @@
   },
   {
     "label": "Mental model",
-    "detail": "An internal representation of how a system works",
+    "detail": "对系统运行方式的内部表征",
     "aliases": [
       "Mental model"
     ]
@@ -2435,7 +2435,7 @@
   },
   {
     "label": "Schema",
-    "detail": "A cognitive structure organizing experience and knowledge",
+    "detail": "组织经验与知识的认知结构",
     "aliases": [
       "Schema"
     ]
@@ -2449,7 +2449,7 @@
   },
   {
     "label": "Cognitive dissonance",
-    "detail": "Discomfort associated with inconsistent cognitions",
+    "detail": "不一致认知所产生的不适",
     "aliases": [
       "Cognitive dissonance"
     ]
@@ -2463,7 +2463,7 @@
   },
   {
     "label": "Anchoring effect",
-    "detail": "Judgment influenced by an initial reference",
+    "detail": "判断受到初始参照的影响",
     "aliases": [
       "Anchoring effect"
     ]
@@ -2477,7 +2477,7 @@
   },
   {
     "label": "Availability heuristic",
-    "detail": "Judge by how readily examples come to mind",
+    "detail": "依据信息易想起程度作判断",
     "aliases": [
       "Availability heuristic"
     ]
@@ -2491,7 +2491,7 @@
   },
   {
     "label": "Representativeness heuristic",
-    "detail": "Judge probability or category by resemblance",
+    "detail": "依据典型性判断概率或类别",
     "aliases": [
       "Representativeness heuristic"
     ]
@@ -2505,7 +2505,7 @@
   },
   {
     "label": "Loss aversion",
-    "detail": "Give losses greater weight than equivalent gains",
+    "detail": "相对同等收益更重视损失",
     "aliases": [
       "Loss aversion"
     ]
@@ -2519,7 +2519,7 @@
   },
   {
     "label": "Framing effect",
-    "detail": "Presentation of information affects judgment",
+    "detail": "信息呈现方式影响判断",
     "aliases": [
       "Framing effect"
     ]
@@ -2533,7 +2533,7 @@
   },
   {
     "label": "Survivorship bias",
-    "detail": "Ignore missing cases while studying survivors",
+    "detail": "仅观察留存样本而忽略退出样本",
     "aliases": [
       "Survivorship bias"
     ]
@@ -2547,7 +2547,7 @@
   },
   {
     "label": "Fundamental attribution error",
-    "detail": "Underweight situations when explaining others' behavior",
+    "detail": "解释他人行为时低估情境作用",
     "aliases": [
       "Fundamental attribution error"
     ]
@@ -2561,7 +2561,7 @@
   },
   {
     "label": "Hindsight bias",
-    "detail": "Overestimate predictability after learning an outcome",
+    "detail": "事后高估结果的可预见性",
     "aliases": [
       "Hindsight bias"
     ]
@@ -2575,7 +2575,7 @@
   },
   {
     "label": "Overconfidence",
-    "detail": "Confidence exceeds actual judgment accuracy",
+    "detail": "信心超过判断的实际准确程度",
     "aliases": [
       "Overconfidence"
     ]
@@ -2589,7 +2589,7 @@
   },
   {
     "label": "Cognitive reappraisal",
-    "detail": "Change an interpretation to regulate emotion",
+    "detail": "改变对情境的解释以调节情绪",
     "aliases": [
       "Cognitive reappraisal"
     ]
@@ -2603,7 +2603,7 @@
   },
   {
     "label": "Spaced practice",
-    "detail": "Distribute learning across time",
+    "detail": "分散安排学习时间",
     "aliases": [
       "Spaced practice"
     ]
@@ -2617,7 +2617,7 @@
   },
   {
     "label": "Interleaved practice",
-    "detail": "Alternate different types of practice",
+    "detail": "交替练习不同类型的任务",
     "aliases": [
       "Interleaved practice"
     ]
@@ -2631,7 +2631,7 @@
   },
   {
     "label": "Transfer of learning",
-    "detail": "Apply learning to a new task or context",
+    "detail": "将所学应用于新的任务情境",
     "aliases": [
       "Transfer of learning"
     ]
@@ -2645,7 +2645,7 @@
   },
   {
     "label": "Embodied cognition",
-    "detail": "Study bodily and environmental contributions to cognition",
+    "detail": "研究身体与环境对认知的作用",
     "aliases": [
       "Embodied cognition"
     ]
@@ -2659,7 +2659,7 @@
   },
   {
     "label": "Predictive processing",
-    "detail": "Explain cognition through predictions and error updating",
+    "detail": "以预测及误差更新解释认知的框架",
     "aliases": [
       "Predictive processing"
     ]
@@ -2673,7 +2673,7 @@
   },
   {
     "label": "Bayesian updating",
-    "detail": "Revise probabilities in light of new evidence",
+    "detail": "根据新证据调整概率判断",
     "aliases": [
       "Bayesian updating"
     ]
@@ -2687,7 +2687,7 @@
   },
   {
     "label": "Dual-process theory",
-    "detail": "A family of theories distinguishing processing types",
+    "detail": "区分不同类型加工过程的理论家族",
     "aliases": [
       "Dual-process theory"
     ]
@@ -2701,7 +2701,7 @@
   },
   {
     "label": "Theory of mind",
-    "detail": "Understand that others may have different mental states",
+    "detail": "理解他人可能具有不同心理状态",
     "aliases": [
       "Theory of mind"
     ]
