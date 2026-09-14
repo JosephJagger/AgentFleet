@@ -856,7 +856,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         <CodexSettingsPanel key={`${draftOwner}:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />
         <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />
         <details className="session-config-section completion-settings" aria-label={t("输入辅助")}>
-          <summary>{t("输入辅助")}</summary>
+          <summary><span>{t("输入辅助")}<small>{t("术语补全、表达建议与自动学习；默认沿用全局设置，可单独调整")}</small></span></summary>
           <WritingPreferencesFields settings={writingSettings} session />
         </details>
         <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>

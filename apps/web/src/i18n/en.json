@@ -272,6 +272,7 @@
   "停止输入后再触发操作": "Trigger after input stops",
   "限制操作触发频率": "Limit how often an action runs",
   "输入辅助": "Writing assistance",
+  "术语补全、表达建议与自动学习；默认沿用全局设置，可单独调整": "Term completion, wording suggestions, and automatic learning; inherits global settings with per-session overrides",
   "即时生效，仅保存当前浏览器中此账号、此会话的偏好。": "Applies immediately. Saved for this account and conversation in this browser only.",
   "术语补全": "Term completion",
   "补全中英文开发术语和技术缩写。": "Complete Chinese and English development terms and technical abbreviations.",
