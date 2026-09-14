@@ -6,7 +6,7 @@ import { api } from "./lib/api";
 vi.mock("./lib/api",()=>({api:{writingAI:vi.fn(),saveWritingAI:vi.fn()}}));
 afterEach(()=>{cleanup();vi.resetAllMocks();});
 it("toggles repeatedly without submitting and summarizes only saved models",async()=>{
- const saved={endpoint:"https://example.test/v1",model:"saved-model",enabled:true,hasKey:true};
+ const saved={endpoint:"https://example.test/v1",model:"saved-model",enabled:true,hasKey:true,configured:true};
  vi.mocked(api.writingAI).mockResolvedValue(saved);
  vi.mocked(api.saveWritingAI).mockResolvedValue({...saved,model:"new-model"});
  render(<WritingAISettings/>);
@@ -29,7 +29,7 @@ it("toggles repeatedly without submitting and summarizes only saved models",asyn
  expect(toggle.getAttribute("aria-expanded")).toBe("false");
 });
 it("keeps the previous summary after a failed save",async()=>{
- vi.mocked(api.writingAI).mockResolvedValue({endpoint:"https://example.test/v1",model:"old",enabled:true,hasKey:true});
+ vi.mocked(api.writingAI).mockResolvedValue({endpoint:"https://example.test/v1",model:"old",enabled:true,hasKey:true,configured:true});
  vi.mocked(api.saveWritingAI).mockRejectedValue(new Error("failed"));
  render(<WritingAISettings/>);
  await screen.findByText("已保存模型：old");
