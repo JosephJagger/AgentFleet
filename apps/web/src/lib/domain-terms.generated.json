@@ -404,5 +404,2306 @@
     "aliases": [
       "Drawing revision management"
     ]
+  },
+  {
+    "label": "J型剪辑",
+    "detail": "使用声音先入的镜头衔接",
+    "aliases": [
+      "J型剪辑"
+    ]
+  },
+  {
+    "label": "J-cut",
+    "detail": "Use an audio lead-in between shots",
+    "aliases": [
+      "J-cut"
+    ]
+  },
+  {
+    "label": "L型剪辑",
+    "detail": "使用声音延续的镜头衔接",
+    "aliases": [
+      "L型剪辑"
+    ]
+  },
+  {
+    "label": "L-cut",
+    "detail": "Continue the previous shot audio across the cut",
+    "aliases": [
+      "L-cut"
+    ]
+  },
+  {
+    "label": "音频闪避",
+    "detail": "在人声出现时降低背景音乐音量",
+    "aliases": [
+      "音频闪避"
+    ]
+  },
+  {
+    "label": "Audio ducking",
+    "detail": "Lower background music during speech",
+    "aliases": [
+      "Audio ducking"
+    ]
+  },
+  {
+    "label": "速度渐变",
+    "detail": "调整片段的渐变变速效果",
+    "aliases": [
+      "速度渐变"
+    ]
+  },
+  {
+    "label": "Speed ramping",
+    "detail": "Adjust gradual changes in playback speed",
+    "aliases": [
+      "Speed ramping"
+    ]
+  },
+  {
+    "label": "字幕时间轴",
+    "detail": "校准字幕与人声的时间对应",
+    "aliases": [
+      "字幕时间轴"
+    ]
+  },
+  {
+    "label": "Subtitle timing",
+    "detail": "Align subtitle timing with speech",
+    "aliases": [
+      "Subtitle timing"
+    ]
+  },
+  {
+    "label": "论证前提",
+    "detail": "梳理论证的前提与结论",
+    "aliases": [
+      "论证前提"
+    ]
+  },
+  {
+    "label": "Argument premises",
+    "detail": "Identify the premises and conclusion of the argument",
+    "aliases": [
+      "Argument premises"
+    ]
+  },
+  {
+    "label": "实然与应然",
+    "detail": "区分事实判断与规范判断",
+    "aliases": [
+      "实然与应然"
+    ]
+  },
+  {
+    "label": "Is-ought distinction",
+    "detail": "Distinguish factual claims from normative claims",
+    "aliases": [
+      "Is-ought distinction"
+    ]
+  },
+  {
+    "label": "确认偏误",
+    "detail": "检查证据选择是否存在确认偏误",
+    "aliases": [
+      "确认偏误"
+    ]
+  },
+  {
+    "label": "Confirmation bias",
+    "detail": "Check evidence selection for confirmation bias",
+    "aliases": [
+      "Confirmation bias"
+    ]
+  },
+  {
+    "label": "沉没成本谬误",
+    "detail": "区分不可回收投入与后续决策依据",
+    "aliases": [
+      "沉没成本谬误"
+    ]
+  },
+  {
+    "label": "Sunk cost fallacy",
+    "detail": "Separate irrecoverable costs from reasons for the next decision",
+    "aliases": [
+      "Sunk cost fallacy"
+    ]
+  },
+  {
+    "label": "提取练习",
+    "detail": "设计主动回忆的学习练习",
+    "aliases": [
+      "提取练习"
+    ]
+  },
+  {
+    "label": "Retrieval practice",
+    "detail": "Design active recall exercises",
+    "aliases": [
+      "Retrieval practice"
+    ]
+  },
+  {
+    "label": "时间线",
+    "detail": "按时间排列音视频片段",
+    "aliases": [
+      "时间线"
+    ]
+  },
+  {
+    "label": "Timeline",
+    "detail": "Arrange clips over time",
+    "aliases": [
+      "Timeline"
+    ]
+  },
+  {
+    "label": "素材箱",
+    "detail": "分类管理媒体素材",
+    "aliases": [
+      "素材箱"
+    ]
+  },
+  {
+    "label": "Bin",
+    "detail": "Organize media assets",
+    "aliases": [
+      "Bin"
+    ]
+  },
+  {
+    "label": "入点",
+    "detail": "标记片段开始位置",
+    "aliases": [
+      "入点"
+    ]
+  },
+  {
+    "label": "In point",
+    "detail": "Mark the start of a clip",
+    "aliases": [
+      "In point"
+    ]
+  },
+  {
+    "label": "出点",
+    "detail": "标记片段结束位置",
+    "aliases": [
+      "出点"
+    ]
+  },
+  {
+    "label": "Out point",
+    "detail": "Mark the end of a clip",
+    "aliases": [
+      "Out point"
+    ]
+  },
+  {
+    "label": "粗剪",
+    "detail": "建立初步叙事结构",
+    "aliases": [
+      "粗剪"
+    ]
+  },
+  {
+    "label": "Rough cut",
+    "detail": "Build an initial edit",
+    "aliases": [
+      "Rough cut"
+    ]
+  },
+  {
+    "label": "精剪",
+    "detail": "细化镜头长度与衔接",
+    "aliases": [
+      "精剪"
+    ]
+  },
+  {
+    "label": "Fine cut",
+    "detail": "Refine shot timing and transitions",
+    "aliases": [
+      "Fine cut"
+    ]
+  },
+  {
+    "label": "锁画",
+    "detail": "确定画面剪辑版本",
+    "aliases": [
+      "锁画"
+    ]
+  },
+  {
+    "label": "Picture lock",
+    "detail": "Finalize picture editing",
+    "aliases": [
+      "Picture lock"
+    ]
+  },
+  {
+    "label": "波纹剪辑",
+    "detail": "修剪片段并移动后续片段",
+    "aliases": [
+      "波纹剪辑"
+    ]
+  },
+  {
+    "label": "Ripple edit",
+    "detail": "Trim a clip and shift later clips",
+    "aliases": [
+      "Ripple edit"
+    ]
+  },
+  {
+    "label": "滚动剪辑",
+    "detail": "移动相邻片段的共同剪辑点",
+    "aliases": [
+      "滚动剪辑"
+    ]
+  },
+  {
+    "label": "Rolling edit",
+    "detail": "Move the cut between adjacent clips",
+    "aliases": [
+      "Rolling edit"
+    ]
+  },
+  {
+    "label": "滑移剪辑",
+    "detail": "保持位置和时长调整片段内容",
+    "aliases": [
+      "滑移剪辑"
+    ]
+  },
+  {
+    "label": "Slip edit",
+    "detail": "Change source timing without moving the clip",
+    "aliases": [
+      "Slip edit"
+    ]
+  },
+  {
+    "label": "滑动剪辑",
+    "detail": "移动片段并修剪相邻片段",
+    "aliases": [
+      "滑动剪辑"
+    ]
+  },
+  {
+    "label": "Slide edit",
+    "detail": "Move a clip while trimming its neighbors",
+    "aliases": [
+      "Slide edit"
+    ]
+  },
+  {
+    "label": "插入剪辑",
+    "detail": "插入素材并推移后续内容",
+    "aliases": [
+      "插入剪辑"
+    ]
+  },
+  {
+    "label": "Insert edit",
+    "detail": "Insert media and shift later content",
+    "aliases": [
+      "Insert edit"
+    ]
+  },
+  {
+    "label": "覆盖剪辑",
+    "detail": "用素材替换目标时间段",
+    "aliases": [
+      "覆盖剪辑"
+    ]
+  },
+  {
+    "label": "Overwrite edit",
+    "detail": "Replace media in a time range",
+    "aliases": [
+      "Overwrite edit"
+    ]
+  },
+  {
+    "label": "匹配剪辑",
+    "detail": "利用相似构图或动作连接镜头",
+    "aliases": [
+      "匹配剪辑"
+    ]
+  },
+  {
+    "label": "Match cut",
+    "detail": "Connect shots through matching form or action",
+    "aliases": [
+      "Match cut"
+    ]
+  },
+  {
+    "label": "跳切",
+    "detail": "形成明显时间或位置跳跃的切换",
+    "aliases": [
+      "跳切"
+    ]
+  },
+  {
+    "label": "Jump cut",
+    "detail": "Create a visible jump in time or position",
+    "aliases": [
+      "Jump cut"
+    ]
+  },
+  {
+    "label": "交叉剪辑",
+    "detail": "交替呈现不同场景的行动",
+    "aliases": [
+      "交叉剪辑"
+    ]
+  },
+  {
+    "label": "Cross-cutting",
+    "detail": "Alternate actions in different scenes",
+    "aliases": [
+      "Cross-cutting"
+    ]
+  },
+  {
+    "label": "平行剪辑",
+    "detail": "交替呈现相关叙事线",
+    "aliases": [
+      "平行剪辑"
+    ]
+  },
+  {
+    "label": "Parallel editing",
+    "detail": "Alternate related narrative strands",
+    "aliases": [
+      "Parallel editing"
+    ]
+  },
+  {
+    "label": "切出镜头",
+    "detail": "插入主体之外的相关画面",
+    "aliases": [
+      "切出镜头"
+    ]
+  },
+  {
+    "label": "Cutaway shot",
+    "detail": "Insert a related shot away from the main action",
+    "aliases": [
+      "Cutaway shot"
+    ]
+  },
+  {
+    "label": "补充镜头",
+    "detail": "补充主体叙述的辅助画面",
+    "aliases": [
+      "补充镜头"
+    ]
+  },
+  {
+    "label": "B-roll",
+    "detail": "Support the main narrative with additional footage",
+    "aliases": [
+      "B-roll"
+    ]
+  },
+  {
+    "label": "建立镜头",
+    "detail": "交代场景环境与空间关系",
+    "aliases": [
+      "建立镜头"
+    ]
+  },
+  {
+    "label": "Establishing shot",
+    "detail": "Establish the setting and spatial relationships",
+    "aliases": [
+      "Establishing shot"
+    ]
+  },
+  {
+    "label": "轴线规则",
+    "detail": "维持镜头间空间方向一致",
+    "aliases": [
+      "轴线规则"
+    ]
+  },
+  {
+    "label": "180-degree rule",
+    "detail": "Maintain consistent screen direction",
+    "aliases": [
+      "180-degree rule"
+    ]
+  },
+  {
+    "label": "动作匹配",
+    "detail": "在动作连续处衔接镜头",
+    "aliases": [
+      "动作匹配"
+    ]
+  },
+  {
+    "label": "Match on action",
+    "detail": "Join shots across a continuous action",
+    "aliases": [
+      "Match on action"
+    ]
+  },
+  {
+    "label": "淡入淡出",
+    "detail": "逐渐显示或隐去画面声音",
+    "aliases": [
+      "淡入淡出"
+    ]
+  },
+  {
+    "label": "Fade",
+    "detail": "Gradually introduce or remove image or sound",
+    "aliases": [
+      "Fade"
+    ]
+  },
+  {
+    "label": "交叉溶解",
+    "detail": "两个画面逐渐交叠过渡",
+    "aliases": [
+      "交叉溶解"
+    ]
+  },
+  {
+    "label": "Cross dissolve",
+    "detail": "Gradually blend between two images",
+    "aliases": [
+      "Cross dissolve"
+    ]
+  },
+  {
+    "label": "时间重映射",
+    "detail": "控制素材时间与播放时间的对应",
+    "aliases": [
+      "时间重映射"
+    ]
+  },
+  {
+    "label": "Time remapping",
+    "detail": "Control the mapping of source time to playback time",
+    "aliases": [
+      "Time remapping"
+    ]
+  },
+  {
+    "label": "光流补帧",
+    "detail": "估算运动以生成中间帧",
+    "aliases": [
+      "光流补帧"
+    ]
+  },
+  {
+    "label": "Optical flow interpolation",
+    "detail": "Estimate motion to generate intermediate frames",
+    "aliases": [
+      "Optical flow interpolation"
+    ]
+  },
+  {
+    "label": "定格",
+    "detail": "延长单帧画面的显示时间",
+    "aliases": [
+      "定格"
+    ]
+  },
+  {
+    "label": "Freeze frame",
+    "detail": "Hold a single video frame",
+    "aliases": [
+      "Freeze frame"
+    ]
+  },
+  {
+    "label": "关键帧",
+    "detail": "记录参数在指定时间的数值",
+    "aliases": [
+      "关键帧"
+    ]
+  },
+  {
+    "label": "Keyframe",
+    "detail": "Set a parameter value at a specific time",
+    "aliases": [
+      "Keyframe"
+    ]
+  },
+  {
+    "label": "缓入缓出",
+    "detail": "平滑动画起止速度",
+    "aliases": [
+      "缓入缓出"
+    ]
+  },
+  {
+    "label": "Ease in and out",
+    "detail": "Smooth the start and end of motion",
+    "aliases": [
+      "Ease in and out"
+    ]
+  },
+  {
+    "label": "贝塞尔曲线",
+    "detail": "通过控制点调整插值曲线",
+    "aliases": [
+      "贝塞尔曲线"
+    ]
+  },
+  {
+    "label": "Bezier curve",
+    "detail": "Shape interpolation with control points",
+    "aliases": [
+      "Bezier curve"
+    ]
+  },
+  {
+    "label": "运动跟踪",
+    "detail": "追踪画面中特征的运动",
+    "aliases": [
+      "运动跟踪"
+    ]
+  },
+  {
+    "label": "Motion tracking",
+    "detail": "Track the motion of image features",
+    "aliases": [
+      "Motion tracking"
+    ]
+  },
+  {
+    "label": "画面稳定",
+    "detail": "减少拍摄抖动",
+    "aliases": [
+      "画面稳定"
+    ]
+  },
+  {
+    "label": "Video stabilization",
+    "detail": "Reduce camera shake",
+    "aliases": [
+      "Video stabilization"
+    ]
+  },
+  {
+    "label": "遮罩",
+    "detail": "限制效果作用的画面区域",
+    "aliases": [
+      "遮罩"
+    ]
+  },
+  {
+    "label": "Mask",
+    "detail": "Restrict an effect to an image region",
+    "aliases": [
+      "Mask"
+    ]
+  },
+  {
+    "label": "转描",
+    "detail": "逐帧分离或描绘画面对象",
+    "aliases": [
+      "转描"
+    ]
+  },
+  {
+    "label": "Rotoscoping",
+    "detail": "Trace or isolate objects across frames",
+    "aliases": [
+      "Rotoscoping"
+    ]
+  },
+  {
+    "label": "色度抠像",
+    "detail": "依据背景颜色分离主体",
+    "aliases": [
+      "色度抠像"
+    ]
+  },
+  {
+    "label": "Chroma key",
+    "detail": "Separate a subject using background color",
+    "aliases": [
+      "Chroma key"
+    ]
+  },
+  {
+    "label": "亮度抠像",
+    "detail": "依据亮度分离画面区域",
+    "aliases": [
+      "亮度抠像"
+    ]
+  },
+  {
+    "label": "Luma key",
+    "detail": "Separate image regions by brightness",
+    "aliases": [
+      "Luma key"
+    ]
+  },
+  {
+    "label": "透明通道",
+    "detail": "存储像素透明度",
+    "aliases": [
+      "透明通道"
+    ]
+  },
+  {
+    "label": "Alpha channel",
+    "detail": "Store pixel transparency",
+    "aliases": [
+      "Alpha channel"
+    ]
+  },
+  {
+    "label": "预乘透明度",
+    "detail": "颜色值已乘以透明度",
+    "aliases": [
+      "预乘透明度"
+    ]
+  },
+  {
+    "label": "Premultiplied alpha",
+    "detail": "Store color multiplied by alpha",
+    "aliases": [
+      "Premultiplied alpha"
+    ]
+  },
+  {
+    "label": "混合模式",
+    "detail": "定义图层颜色的合成方式",
+    "aliases": [
+      "混合模式"
+    ]
+  },
+  {
+    "label": "Blend mode",
+    "detail": "Define how layer colors combine",
+    "aliases": [
+      "Blend mode"
+    ]
+  },
+  {
+    "label": "调色",
+    "detail": "塑造影像色彩风格",
+    "aliases": [
+      "调色"
+    ]
+  },
+  {
+    "label": "Color grading",
+    "detail": "Shape the visual color style",
+    "aliases": [
+      "Color grading"
+    ]
+  },
+  {
+    "label": "色彩校正",
+    "detail": "校正曝光白平衡与镜头差异",
+    "aliases": [
+      "色彩校正"
+    ]
+  },
+  {
+    "label": "Color correction",
+    "detail": "Correct exposure, white balance and shot differences",
+    "aliases": [
+      "Color correction"
+    ]
+  },
+  {
+    "label": "白平衡",
+    "detail": "调整中性色的色温与色偏",
+    "aliases": [
+      "白平衡"
+    ]
+  },
+  {
+    "label": "White balance",
+    "detail": "Adjust temperature and tint for neutral colors",
+    "aliases": [
+      "White balance"
+    ]
+  },
+  {
+    "label": "色彩空间",
+    "detail": "定义颜色表示范围与方式",
+    "aliases": [
+      "色彩空间"
+    ]
+  },
+  {
+    "label": "Color space",
+    "detail": "Define a color representation system",
+    "aliases": [
+      "Color space"
+    ]
+  },
+  {
+    "label": "色域",
+    "detail": "设备或系统可表示的颜色范围",
+    "aliases": [
+      "色域"
+    ]
+  },
+  {
+    "label": "Color gamut",
+    "detail": "Describe the range of representable colors",
+    "aliases": [
+      "Color gamut"
+    ]
+  },
+  {
+    "label": "伽马",
+    "detail": "描述信号与亮度的非线性关系",
+    "aliases": [
+      "伽马"
+    ]
+  },
+  {
+    "label": "Gamma",
+    "detail": "Describe a nonlinear signal-to-luminance relationship",
+    "aliases": [
+      "Gamma"
+    ]
+  },
+  {
+    "label": "查找表",
+    "detail": "通过数值映射转换色彩",
+    "aliases": [
+      "查找表"
+    ]
+  },
+  {
+    "label": "Look-up table",
+    "detail": "Transform colors through numeric mappings",
+    "aliases": [
+      "Look-up table",
+      "LUT"
+    ]
+  },
+  {
+    "label": "波形监视器",
+    "detail": "显示画面信号水平的分布",
+    "aliases": [
+      "波形监视器"
+    ]
+  },
+  {
+    "label": "Waveform monitor",
+    "detail": "Display image signal levels",
+    "aliases": [
+      "Waveform monitor"
+    ]
+  },
+  {
+    "label": "矢量示波器",
+    "detail": "显示色度方向与饱和程度",
+    "aliases": [
+      "矢量示波器"
+    ]
+  },
+  {
+    "label": "Vectorscope",
+    "detail": "Display chroma direction and magnitude",
+    "aliases": [
+      "Vectorscope"
+    ]
+  },
+  {
+    "label": "斑马纹",
+    "detail": "标记达到设定曝光阈值的区域",
+    "aliases": [
+      "斑马纹"
+    ]
+  },
+  {
+    "label": "Zebra pattern",
+    "detail": "Mark regions reaching an exposure threshold",
+    "aliases": [
+      "Zebra pattern"
+    ]
+  },
+  {
+    "label": "动态范围",
+    "detail": "可记录或显示的亮暗跨度",
+    "aliases": [
+      "动态范围"
+    ]
+  },
+  {
+    "label": "Dynamic range",
+    "detail": "Describe the span between dark and bright levels",
+    "aliases": [
+      "Dynamic range"
+    ]
+  },
+  {
+    "label": "对数曲线",
+    "detail": "用对数方式编码影像亮度",
+    "aliases": [
+      "对数曲线"
+    ]
+  },
+  {
+    "label": "Log profile",
+    "detail": "Encode image luminance logarithmically",
+    "aliases": [
+      "Log profile"
+    ]
+  },
+  {
+    "label": "色彩管理",
+    "detail": "协调输入处理和输出的色彩转换",
+    "aliases": [
+      "色彩管理"
+    ]
+  },
+  {
+    "label": "Color management",
+    "detail": "Coordinate color transforms across a workflow",
+    "aliases": [
+      "Color management"
+    ]
+  },
+  {
+    "label": "二级调色",
+    "detail": "针对特定颜色或区域调整",
+    "aliases": [
+      "二级调色"
+    ]
+  },
+  {
+    "label": "Secondary color correction",
+    "detail": "Adjust selected colors or regions",
+    "aliases": [
+      "Secondary color correction"
+    ]
+  },
+  {
+    "label": "肤色保护",
+    "detail": "调色时保持肤色自然一致",
+    "aliases": [
+      "肤色保护"
+    ]
+  },
+  {
+    "label": "Skin tone protection",
+    "detail": "Preserve natural and consistent skin tones",
+    "aliases": [
+      "Skin tone protection"
+    ]
+  },
+  {
+    "label": "代理剪辑",
+    "detail": "使用轻量替代素材进行剪辑",
+    "aliases": [
+      "代理剪辑"
+    ]
+  },
+  {
+    "label": "Proxy editing",
+    "detail": "Edit with lightweight substitute media",
+    "aliases": [
+      "Proxy editing"
+    ]
+  },
+  {
+    "label": "脱机剪辑",
+    "detail": "使用工作素材完成创意剪辑",
+    "aliases": [
+      "脱机剪辑"
+    ]
+  },
+  {
+    "label": "Offline editing",
+    "detail": "Build the creative edit with working media",
+    "aliases": [
+      "Offline editing"
+    ]
+  },
+  {
+    "label": "套底",
+    "detail": "把剪辑对应到高质量原始素材",
+    "aliases": [
+      "套底"
+    ]
+  },
+  {
+    "label": "Conforming",
+    "detail": "Relink an edit to high-quality source media",
+    "aliases": [
+      "Conforming"
+    ]
+  },
+  {
+    "label": "转码",
+    "detail": "转换媒体编码格式",
+    "aliases": [
+      "转码"
+    ]
+  },
+  {
+    "label": "Transcoding",
+    "detail": "Convert media between encoding formats",
+    "aliases": [
+      "Transcoding"
+    ]
+  },
+  {
+    "label": "编码器",
+    "detail": "将音视频压缩为目标编码",
+    "aliases": [
+      "编码器"
+    ]
+  },
+  {
+    "label": "Encoder",
+    "detail": "Encode media into a target format",
+    "aliases": [
+      "Encoder"
+    ]
+  },
+  {
+    "label": "封装格式",
+    "detail": "组织媒体流与元数据",
+    "aliases": [
+      "封装格式"
+    ]
+  },
+  {
+    "label": "Container format",
+    "detail": "Package media streams and metadata",
+    "aliases": [
+      "Container format"
+    ]
+  },
+  {
+    "label": "码率",
+    "detail": "单位时间传输或存储的数据量",
+    "aliases": [
+      "码率"
+    ]
+  },
+  {
+    "label": "Bitrate",
+    "detail": "Measure data per unit of time",
+    "aliases": [
+      "Bitrate"
+    ]
+  },
+  {
+    "label": "恒定码率",
+    "detail": "保持近似固定的数据速率",
+    "aliases": [
+      "恒定码率"
+    ]
+  },
+  {
+    "label": "Constant bitrate",
+    "detail": "Maintain an approximately constant data rate",
+    "aliases": [
+      "Constant bitrate",
+      "CBR"
+    ]
+  },
+  {
+    "label": "可变码率",
+    "detail": "按内容复杂度分配数据速率",
+    "aliases": [
+      "可变码率"
+    ]
+  },
+  {
+    "label": "Variable bitrate",
+    "detail": "Vary data rate with content complexity",
+    "aliases": [
+      "Variable bitrate",
+      "VBR"
+    ]
+  },
+  {
+    "label": "帧率",
+    "detail": "每秒显示或记录的帧数",
+    "aliases": [
+      "帧率"
+    ]
+  },
+  {
+    "label": "Frame rate",
+    "detail": "Measure frames per second",
+    "aliases": [
+      "Frame rate"
+    ]
+  },
+  {
+    "label": "可变帧率",
+    "detail": "帧间时间间隔可变化",
+    "aliases": [
+      "可变帧率"
+    ]
+  },
+  {
+    "label": "Variable frame rate",
+    "detail": "Allow frame timing to vary",
+    "aliases": [
+      "Variable frame rate",
+      "VFR"
+    ]
+  },
+  {
+    "label": "时间码",
+    "detail": "为音视频帧提供时间标识",
+    "aliases": [
+      "时间码"
+    ]
+  },
+  {
+    "label": "Timecode",
+    "detail": "Label media frames by time",
+    "aliases": [
+      "Timecode"
+    ]
+  },
+  {
+    "label": "丢帧时间码",
+    "detail": "跳过部分编号以校准时钟时间",
+    "aliases": [
+      "丢帧时间码"
+    ]
+  },
+  {
+    "label": "Drop-frame timecode",
+    "detail": "Skip timecode numbers to align with clock time",
+    "aliases": [
+      "Drop-frame timecode"
+    ]
+  },
+  {
+    "label": "像素宽高比",
+    "detail": "单个像素宽与高的比例",
+    "aliases": [
+      "像素宽高比"
+    ]
+  },
+  {
+    "label": "Pixel aspect ratio",
+    "detail": "Describe the width-to-height ratio of a pixel",
+    "aliases": [
+      "Pixel aspect ratio"
+    ]
+  },
+  {
+    "label": "色度抽样",
+    "detail": "降低色度采样以减少数据量",
+    "aliases": [
+      "色度抽样"
+    ]
+  },
+  {
+    "label": "Chroma subsampling",
+    "detail": "Reduce chroma sampling to save data",
+    "aliases": [
+      "Chroma subsampling"
+    ]
+  },
+  {
+    "label": "位深",
+    "detail": "每个采样值使用的比特数量",
+    "aliases": [
+      "位深"
+    ]
+  },
+  {
+    "label": "Bit depth",
+    "detail": "Specify bits per sample",
+    "aliases": [
+      "Bit depth"
+    ]
+  },
+  {
+    "label": "响度标准化",
+    "detail": "把感知响度调整到目标值",
+    "aliases": [
+      "响度标准化"
+    ]
+  },
+  {
+    "label": "Loudness normalization",
+    "detail": "Adjust perceived loudness to a target",
+    "aliases": [
+      "Loudness normalization"
+    ]
+  },
+  {
+    "label": "真峰值",
+    "detail": "估计重建波形的峰值",
+    "aliases": [
+      "真峰值"
+    ]
+  },
+  {
+    "label": "True peak",
+    "detail": "Estimate peaks in the reconstructed waveform",
+    "aliases": [
+      "True peak"
+    ]
+  },
+  {
+    "label": "降噪",
+    "detail": "减少不需要的背景噪声",
+    "aliases": [
+      "降噪"
+    ]
+  },
+  {
+    "label": "Noise reduction",
+    "detail": "Reduce unwanted background noise",
+    "aliases": [
+      "Noise reduction"
+    ]
+  },
+  {
+    "label": "均衡器",
+    "detail": "调整不同频段的增益",
+    "aliases": [
+      "均衡器"
+    ]
+  },
+  {
+    "label": "Equalizer",
+    "detail": "Adjust gain across frequency bands",
+    "aliases": [
+      "Equalizer"
+    ]
+  },
+  {
+    "label": "动态压缩",
+    "detail": "缩小音频电平变化范围",
+    "aliases": [
+      "动态压缩"
+    ]
+  },
+  {
+    "label": "Dynamic range compression",
+    "detail": "Reduce variation in audio levels",
+    "aliases": [
+      "Dynamic range compression"
+    ]
+  },
+  {
+    "label": "限幅器",
+    "detail": "限制音频峰值电平",
+    "aliases": [
+      "限幅器"
+    ]
+  },
+  {
+    "label": "Limiter",
+    "detail": "Limit audio peak levels",
+    "aliases": [
+      "Limiter"
+    ]
+  },
+  {
+    "label": "安全框",
+    "detail": "标示重要内容的显示安全区域",
+    "aliases": [
+      "安全框"
+    ]
+  },
+  {
+    "label": "Safe area",
+    "detail": "Mark safe regions for essential content",
+    "aliases": [
+      "Safe area"
+    ]
+  },
+  {
+    "label": "多机位剪辑",
+    "detail": "在同步的多个机位间切换",
+    "aliases": [
+      "多机位剪辑"
+    ]
+  },
+  {
+    "label": "Multicam editing",
+    "detail": "Switch among synchronized camera angles",
+    "aliases": [
+      "Multicam editing"
+    ]
+  },
+  {
+    "label": "认识论",
+    "detail": "研究知识及其来源与证成",
+    "aliases": [
+      "认识论",
+      "知识论"
+    ]
+  },
+  {
+    "label": "Epistemology",
+    "detail": "Study knowledge, its sources and justification",
+    "aliases": [
+      "Epistemology"
+    ]
+  },
+  {
+    "label": "本体论",
+    "detail": "研究存在及存在者的类别",
+    "aliases": [
+      "本体论"
+    ]
+  },
+  {
+    "label": "Ontology",
+    "detail": "Study being and categories of entities",
+    "aliases": [
+      "Ontology"
+    ]
+  },
+  {
+    "label": "形而上学",
+    "detail": "研究实在的基本结构",
+    "aliases": [
+      "形而上学"
+    ]
+  },
+  {
+    "label": "Metaphysics",
+    "detail": "Study the fundamental structure of reality",
+    "aliases": [
+      "Metaphysics"
+    ]
+  },
+  {
+    "label": "伦理学",
+    "detail": "研究道德判断与行动理由",
+    "aliases": [
+      "伦理学"
+    ]
+  },
+  {
+    "label": "Ethics",
+    "detail": "Study moral judgment and reasons for action",
+    "aliases": [
+      "Ethics"
+    ]
+  },
+  {
+    "label": "美学",
+    "detail": "研究审美经验与艺术价值",
+    "aliases": [
+      "美学"
+    ]
+  },
+  {
+    "label": "Aesthetics",
+    "detail": "Study aesthetic experience and artistic value",
+    "aliases": [
+      "Aesthetics"
+    ]
+  },
+  {
+    "label": "逻辑学",
+    "detail": "研究有效推理的形式与规则",
+    "aliases": [
+      "逻辑学"
+    ]
+  },
+  {
+    "label": "Logic",
+    "detail": "Study forms and rules of valid inference",
+    "aliases": [
+      "Logic"
+    ]
+  },
+  {
+    "label": "现象学",
+    "detail": "研究经验如何向意识显现",
+    "aliases": [
+      "现象学"
+    ]
+  },
+  {
+    "label": "Phenomenology",
+    "detail": "Study how experience appears to consciousness",
+    "aliases": [
+      "Phenomenology"
+    ]
+  },
+  {
+    "label": "诠释学",
+    "detail": "研究理解与解释的条件",
+    "aliases": [
+      "诠释学"
+    ]
+  },
+  {
+    "label": "Hermeneutics",
+    "detail": "Study the conditions of understanding and interpretation",
+    "aliases": [
+      "Hermeneutics"
+    ]
+  },
+  {
+    "label": "实用主义",
+    "detail": "重视实践后果与探究过程",
+    "aliases": [
+      "实用主义"
+    ]
+  },
+  {
+    "label": "Pragmatism",
+    "detail": "Emphasize practical consequences and inquiry",
+    "aliases": [
+      "Pragmatism"
+    ]
+  },
+  {
+    "label": "经验主义",
+    "detail": "强调经验在知识形成中的作用",
+    "aliases": [
+      "经验主义"
+    ]
+  },
+  {
+    "label": "Empiricism",
+    "detail": "Emphasize experience in the formation of knowledge",
+    "aliases": [
+      "Empiricism"
+    ]
+  },
+  {
+    "label": "理性主义",
+    "detail": "强调理性在知识中的作用",
+    "aliases": [
+      "理性主义"
+    ]
+  },
+  {
+    "label": "Rationalism",
+    "detail": "Emphasize reason as a source of knowledge",
+    "aliases": [
+      "Rationalism"
+    ]
+  },
+  {
+    "label": "怀疑主义",
+    "detail": "质疑知识主张的根据或范围",
+    "aliases": [
+      "怀疑主义"
+    ]
+  },
+  {
+    "label": "Skepticism",
+    "detail": "Question the grounds or scope of knowledge claims",
+    "aliases": [
+      "Skepticism"
+    ]
+  },
+  {
+    "label": "实在论",
+    "detail": "主张某类对象或事实独立存在",
+    "aliases": [
+      "实在论"
+    ]
+  },
+  {
+    "label": "Realism",
+    "detail": "Hold that certain objects or facts exist independently",
+    "aliases": [
+      "Realism"
+    ]
+  },
+  {
+    "label": "工具主义",
+    "detail": "将理论视为预测与解释的工具",
+    "aliases": [
+      "工具主义"
+    ]
+  },
+  {
+    "label": "Instrumentalism",
+    "detail": "Treat theories as tools for prediction and explanation",
+    "aliases": [
+      "Instrumentalism"
+    ]
+  },
+  {
+    "label": "唯物主义",
+    "detail": "强调物质在实在中的基础地位",
+    "aliases": [
+      "唯物主义"
+    ]
+  },
+  {
+    "label": "Materialism",
+    "detail": "Emphasize the fundamental status of matter",
+    "aliases": [
+      "Materialism"
+    ]
+  },
+  {
+    "label": "二元论",
+    "detail": "主张两类不可还原的基本实体或属性",
+    "aliases": [
+      "二元论"
+    ]
+  },
+  {
+    "label": "Dualism",
+    "detail": "Posit two irreducible kinds of entities or properties",
+    "aliases": [
+      "Dualism"
+    ]
+  },
+  {
+    "label": "物理主义",
+    "detail": "主张一切实在最终具有物理性质",
+    "aliases": [
+      "物理主义"
+    ]
+  },
+  {
+    "label": "Physicalism",
+    "detail": "Hold that reality is ultimately physical",
+    "aliases": [
+      "Physicalism"
+    ]
+  },
+  {
+    "label": "涌现",
+    "detail": "整体呈现层次性的新增性质",
+    "aliases": [
+      "涌现"
+    ]
+  },
+  {
+    "label": "Emergence",
+    "detail": "Describe novel properties at a higher level",
+    "aliases": [
+      "Emergence"
+    ]
+  },
+  {
+    "label": "还原论",
+    "detail": "用更基础层次解释复杂现象",
+    "aliases": [
+      "还原论"
+    ]
+  },
+  {
+    "label": "Reductionism",
+    "detail": "Explain complex phenomena through more basic levels",
+    "aliases": [
+      "Reductionism"
+    ]
+  },
+  {
+    "label": "决定论",
+    "detail": "先前状态与规律决定后续状态",
+    "aliases": [
+      "决定论"
+    ]
+  },
+  {
+    "label": "Determinism",
+    "detail": "Prior states and laws determine subsequent states",
+    "aliases": [
+      "Determinism"
+    ]
+  },
+  {
+    "label": "自由意志",
+    "detail": "探讨行动者的选择与控制能力",
+    "aliases": [
+      "自由意志"
+    ]
+  },
+  {
+    "label": "Free will",
+    "detail": "Examine an agent's capacity for choice and control",
+    "aliases": [
+      "Free will"
+    ]
+  },
+  {
+    "label": "相容论",
+    "detail": "认为自由意志可与决定论相容",
+    "aliases": [
+      "相容论"
+    ]
+  },
+  {
+    "label": "Compatibilism",
+    "detail": "Hold that free will can coexist with determinism",
+    "aliases": [
+      "Compatibilism"
+    ]
+  },
+  {
+    "label": "意向性",
+    "detail": "心灵状态指向对象或内容的特征",
+    "aliases": [
+      "意向性"
+    ]
+  },
+  {
+    "label": "Intentionality",
+    "detail": "Describe the aboutness of mental states",
+    "aliases": [
+      "Intentionality"
+    ]
+  },
+  {
+    "label": "感受质",
+    "detail": "主观经验所具有的感受性质",
+    "aliases": [
+      "感受质"
+    ]
+  },
+  {
+    "label": "Qualia",
+    "detail": "Describe the felt qualities of subjective experience",
+    "aliases": [
+      "Qualia"
+    ]
+  },
+  {
+    "label": "主体间性",
+    "detail": "主体之间共享理解与经验的关系",
+    "aliases": [
+      "主体间性"
+    ]
+  },
+  {
+    "label": "Intersubjectivity",
+    "detail": "Examine shared understanding between subjects",
+    "aliases": [
+      "Intersubjectivity"
+    ]
+  },
+  {
+    "label": "先天知识",
+    "detail": "不依赖特定经验的知识根据",
+    "aliases": [
+      "先天知识"
+    ]
+  },
+  {
+    "label": "A priori knowledge",
+    "detail": "Knowledge justified independently of particular experience",
+    "aliases": [
+      "A priori knowledge"
+    ]
+  },
+  {
+    "label": "后验知识",
+    "detail": "以经验为根据的知识",
+    "aliases": [
+      "后验知识"
+    ]
+  },
+  {
+    "label": "A posteriori knowledge",
+    "detail": "Knowledge grounded in experience",
+    "aliases": [
+      "A posteriori knowledge"
+    ]
+  },
+  {
+    "label": "证成",
+    "detail": "支持信念合理性的根据",
+    "aliases": [
+      "证成"
+    ]
+  },
+  {
+    "label": "Justification",
+    "detail": "Grounds supporting the rationality of a belief",
+    "aliases": [
+      "Justification"
+    ]
+  },
+  {
+    "label": "盖梯尔问题",
+    "detail": "质疑证成真信念足以构成知识",
+    "aliases": [
+      "盖梯尔问题"
+    ]
+  },
+  {
+    "label": "Gettier problem",
+    "detail": "Challenge the sufficiency of justified true belief for knowledge",
+    "aliases": [
+      "Gettier problem"
+    ]
+  },
+  {
+    "label": "演绎推理",
+    "detail": "考察前提是否必然支持结论",
+    "aliases": [
+      "演绎推理"
+    ]
+  },
+  {
+    "label": "Deductive reasoning",
+    "detail": "Assess whether premises necessitate a conclusion",
+    "aliases": [
+      "Deductive reasoning"
+    ]
+  },
+  {
+    "label": "归纳推理",
+    "detail": "从个别观察推向一般判断",
+    "aliases": [
+      "归纳推理"
+    ]
+  },
+  {
+    "label": "Inductive reasoning",
+    "detail": "Infer general claims from observations",
+    "aliases": [
+      "Inductive reasoning"
+    ]
+  },
+  {
+    "label": "溯因推理",
+    "detail": "寻求对观察的最佳解释",
+    "aliases": [
+      "溯因推理"
+    ]
+  },
+  {
+    "label": "Abductive reasoning",
+    "detail": "Infer a best explanation of observations",
+    "aliases": [
+      "Abductive reasoning"
+    ]
+  },
+  {
+    "label": "可证伪性",
+    "detail": "主张能否被可能的反例检验",
+    "aliases": [
+      "可证伪性"
+    ]
+  },
+  {
+    "label": "Falsifiability",
+    "detail": "Whether a claim can be tested by possible counterevidence",
+    "aliases": [
+      "Falsifiability"
+    ]
+  },
+  {
+    "label": "必要条件",
+    "detail": "结果成立所必须具备的条件",
+    "aliases": [
+      "必要条件"
+    ]
+  },
+  {
+    "label": "Necessary condition",
+    "detail": "A condition required for a result",
+    "aliases": [
+      "Necessary condition"
+    ]
+  },
+  {
+    "label": "充分条件",
+    "detail": "成立时足以推出结果的条件",
+    "aliases": [
+      "充分条件"
+    ]
+  },
+  {
+    "label": "Sufficient condition",
+    "detail": "A condition enough to establish a result",
+    "aliases": [
+      "Sufficient condition"
+    ]
+  },
+  {
+    "label": "思想实验",
+    "detail": "通过设想情境检验概念与论证",
+    "aliases": [
+      "思想实验"
+    ]
+  },
+  {
+    "label": "Thought experiment",
+    "detail": "Test concepts and arguments through imagined cases",
+    "aliases": [
+      "Thought experiment"
+    ]
+  },
+  {
+    "label": "反事实推理",
+    "detail": "考察事实不同情况下的可能结果",
+    "aliases": [
+      "反事实推理"
+    ]
+  },
+  {
+    "label": "Counterfactual reasoning",
+    "detail": "Consider outcomes under alternatives to actual facts",
+    "aliases": [
+      "Counterfactual reasoning"
+    ]
+  },
+  {
+    "label": "循环论证",
+    "detail": "用待证明结论支持其自身",
+    "aliases": [
+      "循环论证"
+    ]
+  },
+  {
+    "label": "Circular reasoning",
+    "detail": "Use a conclusion to support itself",
+    "aliases": [
+      "Circular reasoning"
+    ]
+  },
+  {
+    "label": "稻草人谬误",
+    "detail": "歪曲对方论点后加以反驳",
+    "aliases": [
+      "稻草人谬误"
+    ]
+  },
+  {
+    "label": "Straw man fallacy",
+    "detail": "Refute a distorted version of an opposing argument",
+    "aliases": [
+      "Straw man fallacy"
+    ]
+  },
+  {
+    "label": "偷换概念",
+    "detail": "在论证中改变关键用语含义",
+    "aliases": [
+      "偷换概念"
+    ]
+  },
+  {
+    "label": "Equivocation",
+    "detail": "Shift a key term's meaning within an argument",
+    "aliases": [
+      "Equivocation"
+    ]
+  },
+  {
+    "label": "虚假两难",
+    "detail": "把多种可能压缩为两个选项",
+    "aliases": [
+      "虚假两难"
+    ]
+  },
+  {
+    "label": "False dilemma",
+    "detail": "Present only two options when more exist",
+    "aliases": [
+      "False dilemma"
+    ]
+  },
+  {
+    "label": "诉诸人身",
+    "detail": "以针对人的攻击代替回应论证",
+    "aliases": [
+      "诉诸人身"
+    ]
+  },
+  {
+    "label": "Ad hominem",
+    "detail": "Attack a person instead of addressing an argument",
+    "aliases": [
+      "Ad hominem"
+    ]
+  },
+  {
+    "label": "义务论",
+    "detail": "强调行动的义务与约束",
+    "aliases": [
+      "义务论"
+    ]
+  },
+  {
+    "label": "Deontology",
+    "detail": "Emphasize duties and constraints on action",
+    "aliases": [
+      "Deontology"
+    ]
+  },
+  {
+    "label": "后果主义",
+    "detail": "根据行动后果评价其道德性",
+    "aliases": [
+      "后果主义"
+    ]
+  },
+  {
+    "label": "Consequentialism",
+    "detail": "Evaluate actions by their consequences",
+    "aliases": [
+      "Consequentialism"
+    ]
+  },
+  {
+    "label": "功利主义",
+    "detail": "以总体福祉评价行动或规则",
+    "aliases": [
+      "功利主义"
+    ]
+  },
+  {
+    "label": "Utilitarianism",
+    "detail": "Evaluate actions or rules by overall welfare",
+    "aliases": [
+      "Utilitarianism"
+    ]
+  },
+  {
+    "label": "德性伦理",
+    "detail": "强调品格与德性的伦理进路",
+    "aliases": [
+      "德性伦理"
+    ]
+  },
+  {
+    "label": "Virtue ethics",
+    "detail": "Emphasize character and virtues in ethics",
+    "aliases": [
+      "Virtue ethics"
+    ]
+  },
+  {
+    "label": "元认知",
+    "detail": "监测和调节自身认知过程",
+    "aliases": [
+      "元认知"
+    ]
+  },
+  {
+    "label": "Metacognition",
+    "detail": "Monitor and regulate one's own cognition",
+    "aliases": [
+      "Metacognition"
+    ]
+  },
+  {
+    "label": "认知负荷",
+    "detail": "任务对有限认知资源的占用",
+    "aliases": [
+      "认知负荷"
+    ]
+  },
+  {
+    "label": "Cognitive load",
+    "detail": "Demands a task places on cognitive resources",
+    "aliases": [
+      "Cognitive load"
+    ]
+  },
+  {
+    "label": "工作记忆",
+    "detail": "暂时保持并加工信息的系统",
+    "aliases": [
+      "工作记忆"
+    ]
+  },
+  {
+    "label": "Working memory",
+    "detail": "Temporarily hold and manipulate information",
+    "aliases": [
+      "Working memory"
+    ]
+  },
+  {
+    "label": "长期记忆",
+    "detail": "相对持久的信息保持",
+    "aliases": [
+      "长期记忆"
+    ]
+  },
+  {
+    "label": "Long-term memory",
+    "detail": "Relatively durable retention of information",
+    "aliases": [
+      "Long-term memory"
+    ]
+  },
+  {
+    "label": "注意力",
+    "detail": "选择并分配信息处理资源",
+    "aliases": [
+      "注意力"
+    ]
+  },
+  {
+    "label": "Attention",
+    "detail": "Select and allocate processing resources",
+    "aliases": [
+      "Attention"
+    ]
+  },
+  {
+    "label": "选择性注意",
+    "detail": "优先处理特定信息",
+    "aliases": [
+      "选择性注意"
+    ]
+  },
+  {
+    "label": "Selective attention",
+    "detail": "Prioritize particular information",
+    "aliases": [
+      "Selective attention"
+    ]
+  },
+  {
+    "label": "抑制控制",
+    "detail": "抑制不合适的冲动或反应",
+    "aliases": [
+      "抑制控制"
+    ]
+  },
+  {
+    "label": "Inhibitory control",
+    "detail": "Suppress inappropriate impulses or responses",
+    "aliases": [
+      "Inhibitory control"
+    ]
+  },
+  {
+    "label": "执行功能",
+    "detail": "支持目标导向行为的控制过程",
+    "aliases": [
+      "执行功能"
+    ]
+  },
+  {
+    "label": "Executive functions",
+    "detail": "Control processes supporting goal-directed behavior",
+    "aliases": [
+      "Executive functions"
+    ]
+  },
+  {
+    "label": "认知灵活性",
+    "detail": "根据情境切换规则与视角",
+    "aliases": [
+      "认知灵活性"
+    ]
+  },
+  {
+    "label": "Cognitive flexibility",
+    "detail": "Switch rules and perspectives as context changes",
+    "aliases": [
+      "Cognitive flexibility"
+    ]
+  },
+  {
+    "label": "心理模型",
+    "detail": "对系统运行方式的内部表征",
+    "aliases": [
+      "心理模型"
+    ]
+  },
+  {
+    "label": "Mental model",
+    "detail": "An internal representation of how a system works",
+    "aliases": [
+      "Mental model"
+    ]
+  },
+  {
+    "label": "图式",
+    "detail": "组织经验与知识的认知结构",
+    "aliases": [
+      "图式"
+    ]
+  },
+  {
+    "label": "Schema",
+    "detail": "A cognitive structure organizing experience and knowledge",
+    "aliases": [
+      "Schema"
+    ]
+  },
+  {
+    "label": "认知失调",
+    "detail": "不一致认知所产生的不适",
+    "aliases": [
+      "认知失调"
+    ]
+  },
+  {
+    "label": "Cognitive dissonance",
+    "detail": "Discomfort associated with inconsistent cognitions",
+    "aliases": [
+      "Cognitive dissonance"
+    ]
+  },
+  {
+    "label": "锚定效应",
+    "detail": "判断受到初始参照的影响",
+    "aliases": [
+      "锚定效应"
+    ]
+  },
+  {
+    "label": "Anchoring effect",
+    "detail": "Judgment influenced by an initial reference",
+    "aliases": [
+      "Anchoring effect"
+    ]
+  },
+  {
+    "label": "可得性启发式",
+    "detail": "依据信息易想起程度作判断",
+    "aliases": [
+      "可得性启发式"
+    ]
+  },
+  {
+    "label": "Availability heuristic",
+    "detail": "Judge by how readily examples come to mind",
+    "aliases": [
+      "Availability heuristic"
+    ]
+  },
+  {
+    "label": "代表性启发式",
+    "detail": "依据典型性判断概率或类别",
+    "aliases": [
+      "代表性启发式"
+    ]
+  },
+  {
+    "label": "Representativeness heuristic",
+    "detail": "Judge probability or category by resemblance",
+    "aliases": [
+      "Representativeness heuristic"
+    ]
+  },
+  {
+    "label": "损失厌恶",
+    "detail": "相对同等收益更重视损失",
+    "aliases": [
+      "损失厌恶"
+    ]
+  },
+  {
+    "label": "Loss aversion",
+    "detail": "Give losses greater weight than equivalent gains",
+    "aliases": [
+      "Loss aversion"
+    ]
+  },
+  {
+    "label": "框架效应",
+    "detail": "信息呈现方式影响判断",
+    "aliases": [
+      "框架效应"
+    ]
+  },
+  {
+    "label": "Framing effect",
+    "detail": "Presentation of information affects judgment",
+    "aliases": [
+      "Framing effect"
+    ]
+  },
+  {
+    "label": "幸存者偏差",
+    "detail": "仅观察留存样本而忽略退出样本",
+    "aliases": [
+      "幸存者偏差"
+    ]
+  },
+  {
+    "label": "Survivorship bias",
+    "detail": "Ignore missing cases while studying survivors",
+    "aliases": [
+      "Survivorship bias"
+    ]
+  },
+  {
+    "label": "基本归因错误",
+    "detail": "解释他人行为时低估情境作用",
+    "aliases": [
+      "基本归因错误"
+    ]
+  },
+  {
+    "label": "Fundamental attribution error",
+    "detail": "Underweight situations when explaining others' behavior",
+    "aliases": [
+      "Fundamental attribution error"
+    ]
+  },
+  {
+    "label": "后见之明偏差",
+    "detail": "事后高估结果的可预见性",
+    "aliases": [
+      "后见之明偏差"
+    ]
+  },
+  {
+    "label": "Hindsight bias",
+    "detail": "Overestimate predictability after learning an outcome",
+    "aliases": [
+      "Hindsight bias"
+    ]
+  },
+  {
+    "label": "过度自信",
+    "detail": "信心超过判断的实际准确程度",
+    "aliases": [
+      "过度自信"
+    ]
+  },
+  {
+    "label": "Overconfidence",
+    "detail": "Confidence exceeds actual judgment accuracy",
+    "aliases": [
+      "Overconfidence"
+    ]
+  },
+  {
+    "label": "认知重评",
+    "detail": "改变对情境的解释以调节情绪",
+    "aliases": [
+      "认知重评"
+    ]
+  },
+  {
+    "label": "Cognitive reappraisal",
+    "detail": "Change an interpretation to regulate emotion",
+    "aliases": [
+      "Cognitive reappraisal"
+    ]
+  },
+  {
+    "label": "间隔学习",
+    "detail": "分散安排学习时间",
+    "aliases": [
+      "间隔学习"
+    ]
+  },
+  {
+    "label": "Spaced practice",
+    "detail": "Distribute learning across time",
+    "aliases": [
+      "Spaced practice"
+    ]
+  },
+  {
+    "label": "交错学习",
+    "detail": "交替练习不同类型的任务",
+    "aliases": [
+      "交错学习"
+    ]
+  },
+  {
+    "label": "Interleaved practice",
+    "detail": "Alternate different types of practice",
+    "aliases": [
+      "Interleaved practice"
+    ]
+  },
+  {
+    "label": "迁移学习",
+    "detail": "将所学应用于新的任务情境",
+    "aliases": [
+      "迁移学习"
+    ]
+  },
+  {
+    "label": "Transfer of learning",
+    "detail": "Apply learning to a new task or context",
+    "aliases": [
+      "Transfer of learning"
+    ]
+  },
+  {
+    "label": "具身认知",
+    "detail": "研究身体与环境对认知的作用",
+    "aliases": [
+      "具身认知"
+    ]
+  },
+  {
+    "label": "Embodied cognition",
+    "detail": "Study bodily and environmental contributions to cognition",
+    "aliases": [
+      "Embodied cognition"
+    ]
+  },
+  {
+    "label": "预测加工",
+    "detail": "以预测及误差更新解释认知的框架",
+    "aliases": [
+      "预测加工"
+    ]
+  },
+  {
+    "label": "Predictive processing",
+    "detail": "Explain cognition through predictions and error updating",
+    "aliases": [
+      "Predictive processing"
+    ]
+  },
+  {
+    "label": "贝叶斯更新",
+    "detail": "根据新证据调整概率判断",
+    "aliases": [
+      "贝叶斯更新"
+    ]
+  },
+  {
+    "label": "Bayesian updating",
+    "detail": "Revise probabilities in light of new evidence",
+    "aliases": [
+      "Bayesian updating"
+    ]
+  },
+  {
+    "label": "双加工理论",
+    "detail": "区分不同类型加工过程的理论家族",
+    "aliases": [
+      "双加工理论"
+    ]
+  },
+  {
+    "label": "Dual-process theory",
+    "detail": "A family of theories distinguishing processing types",
+    "aliases": [
+      "Dual-process theory"
+    ]
+  },
+  {
+    "label": "心智理论",
+    "detail": "理解他人可能具有不同心理状态",
+    "aliases": [
+      "心智理论"
+    ]
+  },
+  {
+    "label": "Theory of mind",
+    "detail": "Understand that others may have different mental states",
+    "aliases": [
+      "Theory of mind"
+    ]
   }
 ]

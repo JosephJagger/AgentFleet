@@ -728,6 +728,226 @@
       },
       "source": "AgentFleet authored",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "video-j-cut",
+      "domain": "video",
+      "terms": {
+        "zh": "J型剪辑",
+        "en": "J-cut"
+      },
+      "goals": {
+        "zh": "使用声音先入的镜头衔接",
+        "en": "Use an audio lead-in between shots"
+      },
+      "examples": {
+        "zh": [
+          "先听到下个镜头的声音再切画面"
+        ],
+        "en": [
+          "Play the next shot audio before cutting to its picture"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "video-l-cut",
+      "domain": "video",
+      "terms": {
+        "zh": "L型剪辑",
+        "en": "L-cut"
+      },
+      "goals": {
+        "zh": "使用声音延续的镜头衔接",
+        "en": "Continue the previous shot audio across the cut"
+      },
+      "examples": {
+        "zh": [
+          "画面切走了但上个镜头声音继续"
+        ],
+        "en": [
+          "Keep the previous shot audio after the picture changes"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "video-ducking",
+      "domain": "video",
+      "terms": {
+        "zh": "音频闪避",
+        "en": "Audio ducking"
+      },
+      "goals": {
+        "zh": "在人声出现时降低背景音乐音量",
+        "en": "Lower background music during speech"
+      },
+      "examples": {
+        "zh": [
+          "有人说话的时候背景音乐小一点"
+        ],
+        "en": [
+          "Make the background music quieter while someone speaks"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "video-speed-ramp",
+      "domain": "video",
+      "terms": {
+        "zh": "速度渐变",
+        "en": "Speed ramping"
+      },
+      "goals": {
+        "zh": "调整片段的渐变变速效果",
+        "en": "Adjust gradual changes in playback speed"
+      },
+      "examples": {
+        "zh": [
+          "这个镜头先慢再逐渐变快"
+        ],
+        "en": [
+          "Make this shot start slow and gradually speed up"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "video-subtitle-timing",
+      "domain": "video",
+      "terms": {
+        "zh": "字幕时间轴",
+        "en": "Subtitle timing"
+      },
+      "goals": {
+        "zh": "校准字幕与人声的时间对应",
+        "en": "Align subtitle timing with speech"
+      },
+      "examples": {
+        "zh": [
+          "字幕比说话晚出来"
+        ],
+        "en": [
+          "The subtitles appear later than the speech"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "philosophy-premises",
+      "domain": "philosophy",
+      "terms": {
+        "zh": "论证前提",
+        "en": "Argument premises"
+      },
+      "goals": {
+        "zh": "梳理论证的前提与结论",
+        "en": "Identify the premises and conclusion of the argument"
+      },
+      "examples": {
+        "zh": [
+          "帮我拆开这段话的前提和结论"
+        ],
+        "en": [
+          "Separate the premises and conclusion in this argument"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "philosophy-is-ought",
+      "domain": "philosophy",
+      "terms": {
+        "zh": "实然与应然",
+        "en": "Is-ought distinction"
+      },
+      "goals": {
+        "zh": "区分事实判断与规范判断",
+        "en": "Distinguish factual claims from normative claims"
+      },
+      "examples": {
+        "zh": [
+          "这是事实还是在说应该怎样"
+        ],
+        "en": [
+          "Is this a factual claim or a claim about what ought to happen"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "cognition-confirmation",
+      "domain": "cognition",
+      "terms": {
+        "zh": "确认偏误",
+        "en": "Confirmation bias"
+      },
+      "goals": {
+        "zh": "检查证据选择是否存在确认偏误",
+        "en": "Check evidence selection for confirmation bias"
+      },
+      "examples": {
+        "zh": [
+          "我是否只找支持自己观点的证据"
+        ],
+        "en": [
+          "Am I only looking for evidence supporting my own view"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "cognition-sunk-cost",
+      "domain": "cognition",
+      "terms": {
+        "zh": "沉没成本谬误",
+        "en": "Sunk cost fallacy"
+      },
+      "goals": {
+        "zh": "区分不可回收投入与后续决策依据",
+        "en": "Separate irrecoverable costs from reasons for the next decision"
+      },
+      "examples": {
+        "zh": [
+          "已经花了很多钱所以舍不得停下来"
+        ],
+        "en": [
+          "I cannot stop because I have already spent so much money"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "cognition-retrieval",
+      "domain": "cognition",
+      "terms": {
+        "zh": "提取练习",
+        "en": "Retrieval practice"
+      },
+      "goals": {
+        "zh": "设计主动回忆的学习练习",
+        "en": "Design active recall exercises"
+      },
+      "examples": {
+        "zh": [
+          "帮我设计不看书回忆知识的练习"
+        ],
+        "en": [
+          "Help me practice recalling material without looking at the book"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     }
   ]
 }

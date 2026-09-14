@@ -1,3 +1,4 @@
+import domainRewrites from "./domain-rewrites.generated.json";
 import Fuse from "fuse.js";
 import domainTerms from "./domain-terms.generated.json";
 import softwareTerms from "./software-terms.generated.json";
@@ -104,6 +105,11 @@ const rewriteRules: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /(?:it is|it's) (?:broken|not working)$/i, label: "identify the reproducible failure, trace its root cause, and add a regression test" },
   { pattern: /(?:the page|it) (?:is )?(?:slow|laggy)$/i, label: "profile the page, identify rendering and network bottlenecks, and verify the improvement" },
 ];
+
+for (const rule of domainRewrites) for (const language of ["zh", "en"] as const) for (const example of rule.examples[language]) {
+  const escaped = example.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  rewriteRules.push({pattern: new RegExp(`^${escaped}[。.!！?？]*$`, "i"), label: `${rule.goals[language]}${language === "zh" ? "：" : ": "}${example}`});
+}
 
 function currentFragment(prompt: string, caret: number) {
   const beforeCaret = prompt.slice(0, caret);

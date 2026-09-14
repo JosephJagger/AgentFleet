@@ -1,0 +1,2486 @@
+{
+  "version": 1,
+  "license": "CC0-1.0",
+  "source": "AgentFleet authored",
+  "entries": [
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "时间线",
+        "en": "Timeline"
+      },
+      "definitions": {
+        "zh": "按时间排列音视频片段",
+        "en": "Arrange clips over time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "素材箱",
+        "en": "Bin"
+      },
+      "definitions": {
+        "zh": "分类管理媒体素材",
+        "en": "Organize media assets"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "入点",
+        "en": "In point"
+      },
+      "definitions": {
+        "zh": "标记片段开始位置",
+        "en": "Mark the start of a clip"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "出点",
+        "en": "Out point"
+      },
+      "definitions": {
+        "zh": "标记片段结束位置",
+        "en": "Mark the end of a clip"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "粗剪",
+        "en": "Rough cut"
+      },
+      "definitions": {
+        "zh": "建立初步叙事结构",
+        "en": "Build an initial edit"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "精剪",
+        "en": "Fine cut"
+      },
+      "definitions": {
+        "zh": "细化镜头长度与衔接",
+        "en": "Refine shot timing and transitions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "锁画",
+        "en": "Picture lock"
+      },
+      "definitions": {
+        "zh": "确定画面剪辑版本",
+        "en": "Finalize picture editing"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "波纹剪辑",
+        "en": "Ripple edit"
+      },
+      "definitions": {
+        "zh": "修剪片段并移动后续片段",
+        "en": "Trim a clip and shift later clips"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "滚动剪辑",
+        "en": "Rolling edit"
+      },
+      "definitions": {
+        "zh": "移动相邻片段的共同剪辑点",
+        "en": "Move the cut between adjacent clips"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "滑移剪辑",
+        "en": "Slip edit"
+      },
+      "definitions": {
+        "zh": "保持位置和时长调整片段内容",
+        "en": "Change source timing without moving the clip"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "滑动剪辑",
+        "en": "Slide edit"
+      },
+      "definitions": {
+        "zh": "移动片段并修剪相邻片段",
+        "en": "Move a clip while trimming its neighbors"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "插入剪辑",
+        "en": "Insert edit"
+      },
+      "definitions": {
+        "zh": "插入素材并推移后续内容",
+        "en": "Insert media and shift later content"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "覆盖剪辑",
+        "en": "Overwrite edit"
+      },
+      "definitions": {
+        "zh": "用素材替换目标时间段",
+        "en": "Replace media in a time range"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "匹配剪辑",
+        "en": "Match cut"
+      },
+      "definitions": {
+        "zh": "利用相似构图或动作连接镜头",
+        "en": "Connect shots through matching form or action"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "跳切",
+        "en": "Jump cut"
+      },
+      "definitions": {
+        "zh": "形成明显时间或位置跳跃的切换",
+        "en": "Create a visible jump in time or position"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "交叉剪辑",
+        "en": "Cross-cutting"
+      },
+      "definitions": {
+        "zh": "交替呈现不同场景的行动",
+        "en": "Alternate actions in different scenes"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "平行剪辑",
+        "en": "Parallel editing"
+      },
+      "definitions": {
+        "zh": "交替呈现相关叙事线",
+        "en": "Alternate related narrative strands"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "J型剪辑",
+        "en": "J-cut"
+      },
+      "definitions": {
+        "zh": "下一镜头声音先于画面进入",
+        "en": "Introduce the next shot's audio before its image"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "J cut"
+        ]
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "L型剪辑",
+        "en": "L-cut"
+      },
+      "definitions": {
+        "zh": "前一镜头声音延续到下一画面",
+        "en": "Continue the previous shot's audio over the next image"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "L cut"
+        ]
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "切出镜头",
+        "en": "Cutaway shot"
+      },
+      "definitions": {
+        "zh": "插入主体之外的相关画面",
+        "en": "Insert a related shot away from the main action"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "补充镜头",
+        "en": "B-roll"
+      },
+      "definitions": {
+        "zh": "补充主体叙述的辅助画面",
+        "en": "Support the main narrative with additional footage"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "建立镜头",
+        "en": "Establishing shot"
+      },
+      "definitions": {
+        "zh": "交代场景环境与空间关系",
+        "en": "Establish the setting and spatial relationships"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "轴线规则",
+        "en": "180-degree rule"
+      },
+      "definitions": {
+        "zh": "维持镜头间空间方向一致",
+        "en": "Maintain consistent screen direction"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "动作匹配",
+        "en": "Match on action"
+      },
+      "definitions": {
+        "zh": "在动作连续处衔接镜头",
+        "en": "Join shots across a continuous action"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "淡入淡出",
+        "en": "Fade"
+      },
+      "definitions": {
+        "zh": "逐渐显示或隐去画面声音",
+        "en": "Gradually introduce or remove image or sound"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "交叉溶解",
+        "en": "Cross dissolve"
+      },
+      "definitions": {
+        "zh": "两个画面逐渐交叠过渡",
+        "en": "Gradually blend between two images"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "速度渐变",
+        "en": "Speed ramping"
+      },
+      "definitions": {
+        "zh": "让片段播放速度逐渐变化",
+        "en": "Vary clip playback speed over time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "时间重映射",
+        "en": "Time remapping"
+      },
+      "definitions": {
+        "zh": "控制素材时间与播放时间的对应",
+        "en": "Control the mapping of source time to playback time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "光流补帧",
+        "en": "Optical flow interpolation"
+      },
+      "definitions": {
+        "zh": "估算运动以生成中间帧",
+        "en": "Estimate motion to generate intermediate frames"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "定格",
+        "en": "Freeze frame"
+      },
+      "definitions": {
+        "zh": "延长单帧画面的显示时间",
+        "en": "Hold a single video frame"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "关键帧",
+        "en": "Keyframe"
+      },
+      "definitions": {
+        "zh": "记录参数在指定时间的数值",
+        "en": "Set a parameter value at a specific time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "缓入缓出",
+        "en": "Ease in and out"
+      },
+      "definitions": {
+        "zh": "平滑动画起止速度",
+        "en": "Smooth the start and end of motion"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "贝塞尔曲线",
+        "en": "Bezier curve"
+      },
+      "definitions": {
+        "zh": "通过控制点调整插值曲线",
+        "en": "Shape interpolation with control points"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "运动跟踪",
+        "en": "Motion tracking"
+      },
+      "definitions": {
+        "zh": "追踪画面中特征的运动",
+        "en": "Track the motion of image features"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "画面稳定",
+        "en": "Video stabilization"
+      },
+      "definitions": {
+        "zh": "减少拍摄抖动",
+        "en": "Reduce camera shake"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "遮罩",
+        "en": "Mask"
+      },
+      "definitions": {
+        "zh": "限制效果作用的画面区域",
+        "en": "Restrict an effect to an image region"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "转描",
+        "en": "Rotoscoping"
+      },
+      "definitions": {
+        "zh": "逐帧分离或描绘画面对象",
+        "en": "Trace or isolate objects across frames"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "色度抠像",
+        "en": "Chroma key"
+      },
+      "definitions": {
+        "zh": "依据背景颜色分离主体",
+        "en": "Separate a subject using background color"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "亮度抠像",
+        "en": "Luma key"
+      },
+      "definitions": {
+        "zh": "依据亮度分离画面区域",
+        "en": "Separate image regions by brightness"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "透明通道",
+        "en": "Alpha channel"
+      },
+      "definitions": {
+        "zh": "存储像素透明度",
+        "en": "Store pixel transparency"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "预乘透明度",
+        "en": "Premultiplied alpha"
+      },
+      "definitions": {
+        "zh": "颜色值已乘以透明度",
+        "en": "Store color multiplied by alpha"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "混合模式",
+        "en": "Blend mode"
+      },
+      "definitions": {
+        "zh": "定义图层颜色的合成方式",
+        "en": "Define how layer colors combine"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "调色",
+        "en": "Color grading"
+      },
+      "definitions": {
+        "zh": "塑造影像色彩风格",
+        "en": "Shape the visual color style"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "色彩校正",
+        "en": "Color correction"
+      },
+      "definitions": {
+        "zh": "校正曝光白平衡与镜头差异",
+        "en": "Correct exposure, white balance and shot differences"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "白平衡",
+        "en": "White balance"
+      },
+      "definitions": {
+        "zh": "调整中性色的色温与色偏",
+        "en": "Adjust temperature and tint for neutral colors"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "色彩空间",
+        "en": "Color space"
+      },
+      "definitions": {
+        "zh": "定义颜色表示范围与方式",
+        "en": "Define a color representation system"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "色域",
+        "en": "Color gamut"
+      },
+      "definitions": {
+        "zh": "设备或系统可表示的颜色范围",
+        "en": "Describe the range of representable colors"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "伽马",
+        "en": "Gamma"
+      },
+      "definitions": {
+        "zh": "描述信号与亮度的非线性关系",
+        "en": "Describe a nonlinear signal-to-luminance relationship"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "查找表",
+        "en": "Look-up table"
+      },
+      "definitions": {
+        "zh": "通过数值映射转换色彩",
+        "en": "Transform colors through numeric mappings"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "LUT"
+        ]
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "波形监视器",
+        "en": "Waveform monitor"
+      },
+      "definitions": {
+        "zh": "显示画面信号水平的分布",
+        "en": "Display image signal levels"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "矢量示波器",
+        "en": "Vectorscope"
+      },
+      "definitions": {
+        "zh": "显示色度方向与饱和程度",
+        "en": "Display chroma direction and magnitude"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "斑马纹",
+        "en": "Zebra pattern"
+      },
+      "definitions": {
+        "zh": "标记达到设定曝光阈值的区域",
+        "en": "Mark regions reaching an exposure threshold"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "动态范围",
+        "en": "Dynamic range"
+      },
+      "definitions": {
+        "zh": "可记录或显示的亮暗跨度",
+        "en": "Describe the span between dark and bright levels"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "对数曲线",
+        "en": "Log profile"
+      },
+      "definitions": {
+        "zh": "用对数方式编码影像亮度",
+        "en": "Encode image luminance logarithmically"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "色彩管理",
+        "en": "Color management"
+      },
+      "definitions": {
+        "zh": "协调输入处理和输出的色彩转换",
+        "en": "Coordinate color transforms across a workflow"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "二级调色",
+        "en": "Secondary color correction"
+      },
+      "definitions": {
+        "zh": "针对特定颜色或区域调整",
+        "en": "Adjust selected colors or regions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "肤色保护",
+        "en": "Skin tone protection"
+      },
+      "definitions": {
+        "zh": "调色时保持肤色自然一致",
+        "en": "Preserve natural and consistent skin tones"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "代理剪辑",
+        "en": "Proxy editing"
+      },
+      "definitions": {
+        "zh": "使用轻量替代素材进行剪辑",
+        "en": "Edit with lightweight substitute media"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "脱机剪辑",
+        "en": "Offline editing"
+      },
+      "definitions": {
+        "zh": "使用工作素材完成创意剪辑",
+        "en": "Build the creative edit with working media"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "套底",
+        "en": "Conforming"
+      },
+      "definitions": {
+        "zh": "把剪辑对应到高质量原始素材",
+        "en": "Relink an edit to high-quality source media"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "转码",
+        "en": "Transcoding"
+      },
+      "definitions": {
+        "zh": "转换媒体编码格式",
+        "en": "Convert media between encoding formats"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "编码器",
+        "en": "Encoder"
+      },
+      "definitions": {
+        "zh": "将音视频压缩为目标编码",
+        "en": "Encode media into a target format"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "封装格式",
+        "en": "Container format"
+      },
+      "definitions": {
+        "zh": "组织媒体流与元数据",
+        "en": "Package media streams and metadata"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "码率",
+        "en": "Bitrate"
+      },
+      "definitions": {
+        "zh": "单位时间传输或存储的数据量",
+        "en": "Measure data per unit of time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "恒定码率",
+        "en": "Constant bitrate"
+      },
+      "definitions": {
+        "zh": "保持近似固定的数据速率",
+        "en": "Maintain an approximately constant data rate"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CBR"
+        ]
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "可变码率",
+        "en": "Variable bitrate"
+      },
+      "definitions": {
+        "zh": "按内容复杂度分配数据速率",
+        "en": "Vary data rate with content complexity"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "VBR"
+        ]
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "帧率",
+        "en": "Frame rate"
+      },
+      "definitions": {
+        "zh": "每秒显示或记录的帧数",
+        "en": "Measure frames per second"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "可变帧率",
+        "en": "Variable frame rate"
+      },
+      "definitions": {
+        "zh": "帧间时间间隔可变化",
+        "en": "Allow frame timing to vary"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "VFR"
+        ]
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "时间码",
+        "en": "Timecode"
+      },
+      "definitions": {
+        "zh": "为音视频帧提供时间标识",
+        "en": "Label media frames by time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "丢帧时间码",
+        "en": "Drop-frame timecode"
+      },
+      "definitions": {
+        "zh": "跳过部分编号以校准时钟时间",
+        "en": "Skip timecode numbers to align with clock time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "像素宽高比",
+        "en": "Pixel aspect ratio"
+      },
+      "definitions": {
+        "zh": "单个像素宽与高的比例",
+        "en": "Describe the width-to-height ratio of a pixel"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "色度抽样",
+        "en": "Chroma subsampling"
+      },
+      "definitions": {
+        "zh": "降低色度采样以减少数据量",
+        "en": "Reduce chroma sampling to save data"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "位深",
+        "en": "Bit depth"
+      },
+      "definitions": {
+        "zh": "每个采样值使用的比特数量",
+        "en": "Specify bits per sample"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "响度标准化",
+        "en": "Loudness normalization"
+      },
+      "definitions": {
+        "zh": "把感知响度调整到目标值",
+        "en": "Adjust perceived loudness to a target"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "真峰值",
+        "en": "True peak"
+      },
+      "definitions": {
+        "zh": "估计重建波形的峰值",
+        "en": "Estimate peaks in the reconstructed waveform"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "音频闪避",
+        "en": "Audio ducking"
+      },
+      "definitions": {
+        "zh": "人声出现时降低背景音量",
+        "en": "Lower background audio while speech is present"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "降噪",
+        "en": "Noise reduction"
+      },
+      "definitions": {
+        "zh": "减少不需要的背景噪声",
+        "en": "Reduce unwanted background noise"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "均衡器",
+        "en": "Equalizer"
+      },
+      "definitions": {
+        "zh": "调整不同频段的增益",
+        "en": "Adjust gain across frequency bands"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "动态压缩",
+        "en": "Dynamic range compression"
+      },
+      "definitions": {
+        "zh": "缩小音频电平变化范围",
+        "en": "Reduce variation in audio levels"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "限幅器",
+        "en": "Limiter"
+      },
+      "definitions": {
+        "zh": "限制音频峰值电平",
+        "en": "Limit audio peak levels"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "音画同步",
+        "en": "Audio-video synchronization"
+      },
+      "definitions": {
+        "zh": "对齐声音与画面时间",
+        "en": "Align audio and video timing"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "lip sync"
+        ]
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "字幕时间轴",
+        "en": "Subtitle timing"
+      },
+      "definitions": {
+        "zh": "设置字幕出现与消失时间",
+        "en": "Set subtitle start and end times"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "安全框",
+        "en": "Safe area"
+      },
+      "definitions": {
+        "zh": "标示重要内容的显示安全区域",
+        "en": "Mark safe regions for essential content"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "video",
+      "terms": {
+        "zh": "多机位剪辑",
+        "en": "Multicam editing"
+      },
+      "definitions": {
+        "zh": "在同步的多个机位间切换",
+        "en": "Switch among synchronized camera angles"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "认识论",
+        "en": "Epistemology"
+      },
+      "definitions": {
+        "zh": "研究知识及其来源与证成",
+        "en": "Study knowledge, its sources and justification"
+      },
+      "aliases": {
+        "zh": [
+          "知识论"
+        ],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "本体论",
+        "en": "Ontology"
+      },
+      "definitions": {
+        "zh": "研究存在及存在者的类别",
+        "en": "Study being and categories of entities"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "形而上学",
+        "en": "Metaphysics"
+      },
+      "definitions": {
+        "zh": "研究实在的基本结构",
+        "en": "Study the fundamental structure of reality"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "伦理学",
+        "en": "Ethics"
+      },
+      "definitions": {
+        "zh": "研究道德判断与行动理由",
+        "en": "Study moral judgment and reasons for action"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "美学",
+        "en": "Aesthetics"
+      },
+      "definitions": {
+        "zh": "研究审美经验与艺术价值",
+        "en": "Study aesthetic experience and artistic value"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "逻辑学",
+        "en": "Logic"
+      },
+      "definitions": {
+        "zh": "研究有效推理的形式与规则",
+        "en": "Study forms and rules of valid inference"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "现象学",
+        "en": "Phenomenology"
+      },
+      "definitions": {
+        "zh": "研究经验如何向意识显现",
+        "en": "Study how experience appears to consciousness"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "诠释学",
+        "en": "Hermeneutics"
+      },
+      "definitions": {
+        "zh": "研究理解与解释的条件",
+        "en": "Study the conditions of understanding and interpretation"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "实用主义",
+        "en": "Pragmatism"
+      },
+      "definitions": {
+        "zh": "重视实践后果与探究过程",
+        "en": "Emphasize practical consequences and inquiry"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "经验主义",
+        "en": "Empiricism"
+      },
+      "definitions": {
+        "zh": "强调经验在知识形成中的作用",
+        "en": "Emphasize experience in the formation of knowledge"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "理性主义",
+        "en": "Rationalism"
+      },
+      "definitions": {
+        "zh": "强调理性在知识中的作用",
+        "en": "Emphasize reason as a source of knowledge"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "怀疑主义",
+        "en": "Skepticism"
+      },
+      "definitions": {
+        "zh": "质疑知识主张的根据或范围",
+        "en": "Question the grounds or scope of knowledge claims"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "实在论",
+        "en": "Realism"
+      },
+      "definitions": {
+        "zh": "主张某类对象或事实独立存在",
+        "en": "Hold that certain objects or facts exist independently"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "工具主义",
+        "en": "Instrumentalism"
+      },
+      "definitions": {
+        "zh": "将理论视为预测与解释的工具",
+        "en": "Treat theories as tools for prediction and explanation"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "唯物主义",
+        "en": "Materialism"
+      },
+      "definitions": {
+        "zh": "强调物质在实在中的基础地位",
+        "en": "Emphasize the fundamental status of matter"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "二元论",
+        "en": "Dualism"
+      },
+      "definitions": {
+        "zh": "主张两类不可还原的基本实体或属性",
+        "en": "Posit two irreducible kinds of entities or properties"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "物理主义",
+        "en": "Physicalism"
+      },
+      "definitions": {
+        "zh": "主张一切实在最终具有物理性质",
+        "en": "Hold that reality is ultimately physical"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "涌现",
+        "en": "Emergence"
+      },
+      "definitions": {
+        "zh": "整体呈现层次性的新增性质",
+        "en": "Describe novel properties at a higher level"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "还原论",
+        "en": "Reductionism"
+      },
+      "definitions": {
+        "zh": "用更基础层次解释复杂现象",
+        "en": "Explain complex phenomena through more basic levels"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "决定论",
+        "en": "Determinism"
+      },
+      "definitions": {
+        "zh": "先前状态与规律决定后续状态",
+        "en": "Prior states and laws determine subsequent states"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "自由意志",
+        "en": "Free will"
+      },
+      "definitions": {
+        "zh": "探讨行动者的选择与控制能力",
+        "en": "Examine an agent's capacity for choice and control"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "相容论",
+        "en": "Compatibilism"
+      },
+      "definitions": {
+        "zh": "认为自由意志可与决定论相容",
+        "en": "Hold that free will can coexist with determinism"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "意向性",
+        "en": "Intentionality"
+      },
+      "definitions": {
+        "zh": "心灵状态指向对象或内容的特征",
+        "en": "Describe the aboutness of mental states"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "感受质",
+        "en": "Qualia"
+      },
+      "definitions": {
+        "zh": "主观经验所具有的感受性质",
+        "en": "Describe the felt qualities of subjective experience"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "主体间性",
+        "en": "Intersubjectivity"
+      },
+      "definitions": {
+        "zh": "主体之间共享理解与经验的关系",
+        "en": "Examine shared understanding between subjects"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "先天知识",
+        "en": "A priori knowledge"
+      },
+      "definitions": {
+        "zh": "不依赖特定经验的知识根据",
+        "en": "Knowledge justified independently of particular experience"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "后验知识",
+        "en": "A posteriori knowledge"
+      },
+      "definitions": {
+        "zh": "以经验为根据的知识",
+        "en": "Knowledge grounded in experience"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "证成",
+        "en": "Justification"
+      },
+      "definitions": {
+        "zh": "支持信念合理性的根据",
+        "en": "Grounds supporting the rationality of a belief"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "盖梯尔问题",
+        "en": "Gettier problem"
+      },
+      "definitions": {
+        "zh": "质疑证成真信念足以构成知识",
+        "en": "Challenge the sufficiency of justified true belief for knowledge"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "演绎推理",
+        "en": "Deductive reasoning"
+      },
+      "definitions": {
+        "zh": "考察前提是否必然支持结论",
+        "en": "Assess whether premises necessitate a conclusion"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "归纳推理",
+        "en": "Inductive reasoning"
+      },
+      "definitions": {
+        "zh": "从个别观察推向一般判断",
+        "en": "Infer general claims from observations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "溯因推理",
+        "en": "Abductive reasoning"
+      },
+      "definitions": {
+        "zh": "寻求对观察的最佳解释",
+        "en": "Infer a best explanation of observations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "可证伪性",
+        "en": "Falsifiability"
+      },
+      "definitions": {
+        "zh": "主张能否被可能的反例检验",
+        "en": "Whether a claim can be tested by possible counterevidence"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "必要条件",
+        "en": "Necessary condition"
+      },
+      "definitions": {
+        "zh": "结果成立所必须具备的条件",
+        "en": "A condition required for a result"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "充分条件",
+        "en": "Sufficient condition"
+      },
+      "definitions": {
+        "zh": "成立时足以推出结果的条件",
+        "en": "A condition enough to establish a result"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "思想实验",
+        "en": "Thought experiment"
+      },
+      "definitions": {
+        "zh": "通过设想情境检验概念与论证",
+        "en": "Test concepts and arguments through imagined cases"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "反事实推理",
+        "en": "Counterfactual reasoning"
+      },
+      "definitions": {
+        "zh": "考察事实不同情况下的可能结果",
+        "en": "Consider outcomes under alternatives to actual facts"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "循环论证",
+        "en": "Circular reasoning"
+      },
+      "definitions": {
+        "zh": "用待证明结论支持其自身",
+        "en": "Use a conclusion to support itself"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "稻草人谬误",
+        "en": "Straw man fallacy"
+      },
+      "definitions": {
+        "zh": "歪曲对方论点后加以反驳",
+        "en": "Refute a distorted version of an opposing argument"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "偷换概念",
+        "en": "Equivocation"
+      },
+      "definitions": {
+        "zh": "在论证中改变关键用语含义",
+        "en": "Shift a key term's meaning within an argument"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "虚假两难",
+        "en": "False dilemma"
+      },
+      "definitions": {
+        "zh": "把多种可能压缩为两个选项",
+        "en": "Present only two options when more exist"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "诉诸人身",
+        "en": "Ad hominem"
+      },
+      "definitions": {
+        "zh": "以针对人的攻击代替回应论证",
+        "en": "Attack a person instead of addressing an argument"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "实然与应然",
+        "en": "Is-ought distinction"
+      },
+      "definitions": {
+        "zh": "区分事实判断与规范判断",
+        "en": "Distinguish factual from normative claims"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "义务论",
+        "en": "Deontology"
+      },
+      "definitions": {
+        "zh": "强调行动的义务与约束",
+        "en": "Emphasize duties and constraints on action"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "后果主义",
+        "en": "Consequentialism"
+      },
+      "definitions": {
+        "zh": "根据行动后果评价其道德性",
+        "en": "Evaluate actions by their consequences"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "功利主义",
+        "en": "Utilitarianism"
+      },
+      "definitions": {
+        "zh": "以总体福祉评价行动或规则",
+        "en": "Evaluate actions or rules by overall welfare"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "德性伦理",
+        "en": "Virtue ethics"
+      },
+      "definitions": {
+        "zh": "强调品格与德性的伦理进路",
+        "en": "Emphasize character and virtues in ethics"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "元认知",
+        "en": "Metacognition"
+      },
+      "definitions": {
+        "zh": "监测和调节自身认知过程",
+        "en": "Monitor and regulate one's own cognition"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "认知负荷",
+        "en": "Cognitive load"
+      },
+      "definitions": {
+        "zh": "任务对有限认知资源的占用",
+        "en": "Demands a task places on cognitive resources"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "工作记忆",
+        "en": "Working memory"
+      },
+      "definitions": {
+        "zh": "暂时保持并加工信息的系统",
+        "en": "Temporarily hold and manipulate information"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "长期记忆",
+        "en": "Long-term memory"
+      },
+      "definitions": {
+        "zh": "相对持久的信息保持",
+        "en": "Relatively durable retention of information"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "注意力",
+        "en": "Attention"
+      },
+      "definitions": {
+        "zh": "选择并分配信息处理资源",
+        "en": "Select and allocate processing resources"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "选择性注意",
+        "en": "Selective attention"
+      },
+      "definitions": {
+        "zh": "优先处理特定信息",
+        "en": "Prioritize particular information"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "抑制控制",
+        "en": "Inhibitory control"
+      },
+      "definitions": {
+        "zh": "抑制不合适的冲动或反应",
+        "en": "Suppress inappropriate impulses or responses"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "执行功能",
+        "en": "Executive functions"
+      },
+      "definitions": {
+        "zh": "支持目标导向行为的控制过程",
+        "en": "Control processes supporting goal-directed behavior"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "认知灵活性",
+        "en": "Cognitive flexibility"
+      },
+      "definitions": {
+        "zh": "根据情境切换规则与视角",
+        "en": "Switch rules and perspectives as context changes"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "心理模型",
+        "en": "Mental model"
+      },
+      "definitions": {
+        "zh": "对系统运行方式的内部表征",
+        "en": "An internal representation of how a system works"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "图式",
+        "en": "Schema"
+      },
+      "definitions": {
+        "zh": "组织经验与知识的认知结构",
+        "en": "A cognitive structure organizing experience and knowledge"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "认知失调",
+        "en": "Cognitive dissonance"
+      },
+      "definitions": {
+        "zh": "不一致认知所产生的不适",
+        "en": "Discomfort associated with inconsistent cognitions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "确认偏误",
+        "en": "Confirmation bias"
+      },
+      "definitions": {
+        "zh": "偏向支持既有信念的信息",
+        "en": "Favor information supporting existing beliefs"
+      },
+      "aliases": {
+        "zh": [
+          "证实偏差",
+          "确认偏差"
+        ],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "锚定效应",
+        "en": "Anchoring effect"
+      },
+      "definitions": {
+        "zh": "判断受到初始参照的影响",
+        "en": "Judgment influenced by an initial reference"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "可得性启发式",
+        "en": "Availability heuristic"
+      },
+      "definitions": {
+        "zh": "依据信息易想起程度作判断",
+        "en": "Judge by how readily examples come to mind"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "代表性启发式",
+        "en": "Representativeness heuristic"
+      },
+      "definitions": {
+        "zh": "依据典型性判断概率或类别",
+        "en": "Judge probability or category by resemblance"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "损失厌恶",
+        "en": "Loss aversion"
+      },
+      "definitions": {
+        "zh": "相对同等收益更重视损失",
+        "en": "Give losses greater weight than equivalent gains"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "框架效应",
+        "en": "Framing effect"
+      },
+      "definitions": {
+        "zh": "信息呈现方式影响判断",
+        "en": "Presentation of information affects judgment"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "沉没成本谬误",
+        "en": "Sunk cost fallacy"
+      },
+      "definitions": {
+        "zh": "让不可收回成本左右后续选择",
+        "en": "Let irrecoverable costs drive subsequent choices"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "幸存者偏差",
+        "en": "Survivorship bias"
+      },
+      "definitions": {
+        "zh": "仅观察留存样本而忽略退出样本",
+        "en": "Ignore missing cases while studying survivors"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "基本归因错误",
+        "en": "Fundamental attribution error"
+      },
+      "definitions": {
+        "zh": "解释他人行为时低估情境作用",
+        "en": "Underweight situations when explaining others' behavior"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "后见之明偏差",
+        "en": "Hindsight bias"
+      },
+      "definitions": {
+        "zh": "事后高估结果的可预见性",
+        "en": "Overestimate predictability after learning an outcome"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "过度自信",
+        "en": "Overconfidence"
+      },
+      "definitions": {
+        "zh": "信心超过判断的实际准确程度",
+        "en": "Confidence exceeds actual judgment accuracy"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "认知重评",
+        "en": "Cognitive reappraisal"
+      },
+      "definitions": {
+        "zh": "改变对情境的解释以调节情绪",
+        "en": "Change an interpretation to regulate emotion"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "间隔学习",
+        "en": "Spaced practice"
+      },
+      "definitions": {
+        "zh": "分散安排学习时间",
+        "en": "Distribute learning across time"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "提取练习",
+        "en": "Retrieval practice"
+      },
+      "definitions": {
+        "zh": "通过主动回忆巩固学习",
+        "en": "Strengthen learning through active recall"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "交错学习",
+        "en": "Interleaved practice"
+      },
+      "definitions": {
+        "zh": "交替练习不同类型的任务",
+        "en": "Alternate different types of practice"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "迁移学习",
+        "en": "Transfer of learning"
+      },
+      "definitions": {
+        "zh": "将所学应用于新的任务情境",
+        "en": "Apply learning to a new task or context"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "具身认知",
+        "en": "Embodied cognition"
+      },
+      "definitions": {
+        "zh": "研究身体与环境对认知的作用",
+        "en": "Study bodily and environmental contributions to cognition"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "预测加工",
+        "en": "Predictive processing"
+      },
+      "definitions": {
+        "zh": "以预测及误差更新解释认知的框架",
+        "en": "Explain cognition through predictions and error updating"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "贝叶斯更新",
+        "en": "Bayesian updating"
+      },
+      "definitions": {
+        "zh": "根据新证据调整概率判断",
+        "en": "Revise probabilities in light of new evidence"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "双加工理论",
+        "en": "Dual-process theory"
+      },
+      "definitions": {
+        "zh": "区分不同类型加工过程的理论家族",
+        "en": "A family of theories distinguishing processing types"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    },
+    {
+      "domain": "philosophy-cognition",
+      "terms": {
+        "zh": "心智理论",
+        "en": "Theory of mind"
+      },
+      "definitions": {
+        "zh": "理解他人可能具有不同心理状态",
+        "en": "Understand that others may have different mental states"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      }
+    }
+  ]
+}

@@ -48,10 +48,10 @@ test("semantic retrieval abstains on weak or ambiguous matches and preserves the
   assert.equal((await hybridWritingSuggestions("I keep getting logged out",search)).suggestions[0]!.intent,"session-expiry");
 });
 
-test("curated bilingual corpus covers six domains without duplicate IDs or overlong suggestions",async()=>{
+test("curated bilingual corpus covers eight domains without duplicate IDs or overlong suggestions",async()=>{
   const {default:corpus}=await import("../src/writing-corpus.json",{with:{type:"json"}});
   assert.equal(new Set(corpus.intents.map(item=>item.id)).size,corpus.intents.length);
-  assert.equal(new Set(corpus.intents.map(item=>item.domain)).size,6);
+  assert.equal(new Set(corpus.intents.map(item=>item.domain)).size,8);
   for(const intent of corpus.intents) for(const example of [...intent.examples.zh,...intent.examples.en]) {
     const result=localChineseSuggestions(example).suggestions;
     assert.equal(result[0]?.intent,intent.id,example);

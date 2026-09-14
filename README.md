@@ -42,6 +42,20 @@ For example, paste a screenshot of a broken page on your laptop, select the sess
 
 Codex CLI already supports image inputs through `--image` and interactive paste; AgentFleets makes that workflow accessible through a browser across enrolled hosts. See the [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli). Here, multimodal submission means **text and images**; a general file picker, drag-and-drop uploads, and audio/video submission are not currently provided by the panel.
 
+## Say what you need, even without the terminology
+
+You should not have to know the exact technical term before asking for help. **Writing assistance helps turn what you mean into a request you can review and send**, without leaving the conversation.
+
+- **Find the words as you type.** Chinese and English term suggestions cover programming, agents, office work, engineering, games, video editing, philosophy and cognition. Recall a name such as “ripple edit” or “metacognition” without interrupting your work to search for it.
+- **Start in everyday language.** “Play the next shot audio before cutting to its picture” can surface a suggestion for an audio lead-in. “Am I only looking for evidence supporting my own view” can prompt a check for confirmation bias. Suggestions help frame the question; they do not decide the answer for you.
+- **Improve wording when you want to.** Click **Improve wording** to request one concise rewrite that aims to preserve your intent and constraints. AI-assisted results are labeled, and you choose whether to apply, edit or ignore them.
+- **Keep familiar language close at hand.** Suitable terms and explicit rewrites from synced conversations are added automatically, so you do not have to maintain a dictionary or approve entries one by one.
+- **Use it comfortably on a phone or desktop.** Tap suggestions on mobile or use Tab for input completion on desktop. Longer wording suggestions show up to four lines on mobile, keeping the composer usable.
+
+Choose your writing assistance defaults once in Settings, then adjust individual conversations when needed. Basic completion and local wording suggestions work without an external AI account; the optional **Improve wording** action uses the provider you configure.
+
+The aim is fewer interruptions and clearer requests for both specialists and people working outside their expertise. Coverage continues to grow; a suggestion is an aid to expression, not a guarantee that every phrase is understood.
+
 ## Our vision
 
 **Every computer. Any operating system. Codex as the interface. AgentFleets in control.**

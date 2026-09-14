@@ -69,3 +69,10 @@ describe("prompt completions", () => {
     expect(applyPromptCompletion(prompt, completion).value).toBe("请帮我看看，排查按钮点击事件未触发或异步请求失败的问题，并补充明确的错误反馈");
   });
 });
+
+it.each([['波纹剪','波纹剪辑'],['认识','认识论'],['元认','元认知'],['Epistem','Epistemology'],['Rotoscop','Rotoscoping'],['LUT','Look-up table']])('completes specialist terminology %s', (input,label)=>{
+ expect(promptCompletions(input,input.length).some(item=>item.label===label)).toBe(true);
+});
+it.each(['先听到下个镜头的声音再切画面','我是否只找支持自己观点的证据','Make the background music quieter while someone speaks'])('offers a scoped wording suggestion for %s',input=>{
+ expect(promptCompletions(input,input.length)[0]?.kind).toBe('rewrite');
+});
