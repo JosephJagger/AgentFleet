@@ -28,6 +28,41 @@
             "zh": "软件通用词汇",
             "en": "General software vocabulary"
           }
+        },
+        {
+          "id": "programming.testing",
+          "label": {
+            "zh": "测试与排错",
+            "en": "Testing and debugging"
+          }
+        },
+        {
+          "id": "programming.devops",
+          "label": {
+            "zh": "部署与运维",
+            "en": "Deployment and operations"
+          }
+        },
+        {
+          "id": "programming.integration",
+          "label": {
+            "zh": "数据库与系统集成",
+            "en": "Databases and integration"
+          }
+        },
+        {
+          "id": "programming.mobile",
+          "label": {
+            "zh": "移动端与跨平台",
+            "en": "Mobile and cross-platform"
+          }
+        },
+        {
+          "id": "programming.security",
+          "label": {
+            "zh": "安全与权限",
+            "en": "Security and permissions"
+          }
         }
       ]
     },
@@ -145,6 +180,13 @@
           "label": {
             "zh": "文件与工作流",
             "en": "Files and workflows"
+          }
+        },
+        {
+          "id": "office.documents",
+          "label": {
+            "zh": "文件与文档自动化",
+            "en": "File and document automation"
           }
         }
       ]
@@ -494,6 +536,98 @@
           "label": {
             "zh": "回测与执行",
             "en": "Backtesting and execution"
+          }
+        }
+      ]
+    },
+    {
+      "id": "product",
+      "label": {
+        "zh": "产品需求",
+        "en": "Product requirements"
+      },
+      "categories": [
+        {
+          "id": "product.requirements",
+          "label": {
+            "zh": "需求与验收",
+            "en": "Requirements and acceptance"
+          }
+        }
+      ]
+    },
+    {
+      "id": "design",
+      "label": {
+        "zh": "界面与交互设计",
+        "en": "Interface and interaction design"
+      },
+      "categories": [
+        {
+          "id": "design.interaction",
+          "label": {
+            "zh": "界面与交互",
+            "en": "Interface and interaction"
+          }
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "label": {
+        "zh": "研究与教学",
+        "en": "Research and education"
+      },
+      "categories": [
+        {
+          "id": "research.evidence",
+          "label": {
+            "zh": "研究与证据",
+            "en": "Research and evidence"
+          }
+        },
+        {
+          "id": "research.education",
+          "label": {
+            "zh": "教学与知识整理",
+            "en": "Education and knowledge organization"
+          }
+        }
+      ]
+    },
+    {
+      "id": "technology",
+      "label": {
+        "zh": "科技与科技新闻",
+        "en": "Technology and technology news"
+      },
+      "categories": [
+        {
+          "id": "technology.chips",
+          "label": {
+            "zh": "半导体与算力",
+            "en": "Semiconductors and computing"
+          }
+        },
+        {
+          "id": "technology.networks",
+          "label": {
+            "zh": "通信与网络",
+            "en": "Communications and networking"
+          }
+        },
+        {
+          "id": "technology.space",
+          "label": {
+            "zh": "航天技术",
+            "en": "Space technology"
+          }
+        },
+        {
+          "id": "technology.energy",
+          "label": {
+            "zh": "能源技术",
+            "en": "Energy technology"
           }
         }
       ]

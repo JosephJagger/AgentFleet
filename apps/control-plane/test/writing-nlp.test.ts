@@ -48,10 +48,11 @@ test("semantic retrieval abstains on weak or ambiguous matches and preserves the
   assert.equal((await hybridWritingSuggestions("I keep getting logged out",search)).suggestions[0]!.intent,"session-expiry");
 });
 
-test("curated bilingual corpus covers fourteen domains without duplicate IDs or overlong suggestions",async()=>{
+test("curated bilingual corpus covers registered domains without duplicate IDs or overlong suggestions",async()=>{
   const {default:corpus}=await import("../src/writing-corpus.json",{with:{type:"json"}});
   assert.equal(new Set(corpus.intents.map(item=>item.id)).size,corpus.intents.length);
-  assert.equal(new Set(corpus.intents.map(item=>item.domain)).size,14);
+  const {default:taxonomy}=await import("../src/writing-taxonomy.json",{with:{type:"json"}});
+  for (const domain of new Set(corpus.intents.map(item=>item.domain))) assert.ok(taxonomy.domains.some(item=>item.id===domain));
   for(const intent of corpus.intents) for(const example of [...intent.examples.zh,...intent.examples.en]) {
     const result=localChineseSuggestions(example).suggestions;
     assert.equal(result[0]?.intent,intent.id,example);
@@ -76,4 +77,16 @@ test("curated terms and intents have stable classifications and shared concept r
   assert.equal(suggestion?.intent,intent.id,draft);
   assert.equal(suggestion?.category,intent.category);
  }
+});
+
+test("technology news reuses existing concepts and curated names stay unique", async()=>{
+ const {default:glossary}=await import('../src/writing-glossary.json',{with:{type:'json'}});
+ for(const language of ['zh','en'] as const) {
+  const labels=glossary.entries.map(entry=>entry.terms[language].normalize('NFKC').toLowerCase());
+  assert.equal(new Set(labels).size,labels.length,language);
+ }
+ const rag=glossary.entries.filter(entry=>entry.terms.en==='Retrieval-augmented generation');
+ assert.equal(rag.length,1);assert.equal(rag[0]!.domain,'ai');
+ assert.ok('relatedDomains' in rag[0]! && rag[0]!.relatedDomains?.includes('technology'));
+ assert.equal(glossary.entries.find(entry=>entry.terms.en==='High-bandwidth memory')?.category,'technology.chips');
 });

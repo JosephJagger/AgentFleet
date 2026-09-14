@@ -1592,7 +1592,10 @@
       "category": "video.captions",
       "id": "video.safe-area",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "programming"
+      ]
     },
     {
       "domain": "video",
@@ -3160,7 +3163,10 @@
       "category": "ai.foundations",
       "id": "ai.artificial-intelligence",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3181,7 +3187,10 @@
       "category": "ai.foundations",
       "id": "ai.machine-learning",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3202,7 +3211,10 @@
       "category": "ai.foundations",
       "id": "ai.deep-learning",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3221,7 +3233,10 @@
       "category": "ai.foundations",
       "id": "ai.neural-network",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3242,7 +3257,10 @@
       "category": "ai.foundations",
       "id": "ai.large-language-model",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3261,7 +3279,10 @@
       "category": "ai.foundations",
       "id": "ai.foundation-model",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3280,7 +3301,10 @@
       "category": "ai.foundations",
       "id": "ai.multimodal-model",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3301,7 +3325,10 @@
       "category": "ai.foundations",
       "id": "ai.vision-language-model",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3320,7 +3347,10 @@
       "category": "ai.foundations",
       "id": "ai.tokenizer",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3341,7 +3371,10 @@
       "category": "ai.foundations",
       "id": "ai.token",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3360,7 +3393,10 @@
       "category": "ai.foundations",
       "id": "ai.context-window",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3379,7 +3415,10 @@
       "category": "ai.prompting",
       "id": "ai.context-engineering",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3398,7 +3437,10 @@
       "category": "ai.prompting",
       "id": "ai.prompt-engineering",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3417,7 +3459,10 @@
       "category": "ai.prompting",
       "id": "ai.system-prompt",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3436,7 +3481,10 @@
       "category": "ai.prompting",
       "id": "ai.few-shot-prompting",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3455,7 +3503,10 @@
       "category": "ai.prompting",
       "id": "ai.zero-shot-prompting",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3474,7 +3525,10 @@
       "category": "ai.prompting",
       "id": "ai.structured-output",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "programming",
@@ -3517,7 +3571,10 @@
       "category": "ai.prompting",
       "id": "ai.chain-of-thought-prompting",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3536,7 +3593,10 @@
       "category": "ai.evaluation-safety",
       "id": "ai.prompt-injection",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3555,7 +3615,10 @@
       "category": "ai.evaluation-safety",
       "id": "ai.hallucination",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3576,7 +3639,10 @@
       "category": "ai.retrieval",
       "id": "ai.retrieval-augmented-generation",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3598,7 +3664,10 @@
       "category": "ai.retrieval",
       "id": "ai.text-embedding",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3617,7 +3686,10 @@
       "category": "ai.retrieval",
       "id": "ai.vector-database",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3636,7 +3708,10 @@
       "category": "ai.retrieval",
       "id": "ai.vector-search",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3655,7 +3730,10 @@
       "category": "ai.retrieval",
       "id": "ai.semantic-search",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3674,7 +3752,10 @@
       "category": "ai.retrieval",
       "id": "ai.hybrid-search",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3695,7 +3776,10 @@
       "category": "ai.retrieval",
       "id": "ai.reranking",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3716,7 +3800,10 @@
       "category": "ai.retrieval",
       "id": "ai.document-chunking",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3735,7 +3822,10 @@
       "category": "ai.retrieval",
       "id": "ai.chunk-overlap",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3754,7 +3844,10 @@
       "category": "ai.retrieval",
       "id": "ai.query-rewriting",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -3775,7 +3868,10 @@
       "category": "ai.retrieval",
       "id": "ai.answer-grounding",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3796,7 +3892,10 @@
       "category": "agent.orchestration",
       "id": "agent.ai-agent",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3815,7 +3914,10 @@
       "category": "agent.tools",
       "id": "agent.tool-calling",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3834,7 +3936,10 @@
       "category": "agent.tools",
       "id": "agent.function-calling",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3855,7 +3960,10 @@
       "category": "agent.tools",
       "id": "agent.model-context-protocol",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3876,7 +3984,10 @@
       "category": "agent.tools",
       "id": "agent.agent-skill",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3897,7 +4008,10 @@
       "category": "agent.orchestration",
       "id": "agent.multi-agent-collaboration",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3916,7 +4030,10 @@
       "category": "agent.orchestration",
       "id": "agent.agent-orchestration",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3937,7 +4054,10 @@
       "category": "agent.orchestration",
       "id": "agent.agent-handoff",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3958,7 +4078,10 @@
       "category": "agent.control",
       "id": "agent.human-in-the-loop",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3977,7 +4100,10 @@
       "category": "agent.memory",
       "id": "agent.agent-memory",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -3998,7 +4124,10 @@
       "category": "agent.control",
       "id": "agent.tool-execution-sandbox",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -4019,7 +4148,10 @@
       "category": "agent.evaluation",
       "id": "agent.agent-trace",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "agent",
@@ -4040,7 +4172,10 @@
       "category": "agent.evaluation",
       "id": "agent.agent-evaluation",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4061,7 +4196,10 @@
       "category": "ai.training",
       "id": "ai.supervised-fine-tuning",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4082,7 +4220,10 @@
       "category": "ai.training",
       "id": "ai.low-rank-adaptation",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4103,7 +4244,10 @@
       "category": "ai.training",
       "id": "ai.quantized-low-rank-adaptation",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4122,7 +4266,10 @@
       "category": "ai.training",
       "id": "ai.model-quantization",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4141,7 +4288,10 @@
       "category": "ai.training",
       "id": "ai.knowledge-distillation",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4162,7 +4312,10 @@
       "category": "ai.training",
       "id": "ai.reinforcement-learning",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4183,7 +4336,10 @@
       "category": "ai.training",
       "id": "ai.reinforcement-learning-from-human-feedback",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4204,7 +4360,10 @@
       "category": "ai.training",
       "id": "ai.direct-preference-optimization",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4223,7 +4382,10 @@
       "category": "ai.training",
       "id": "ai.pretraining",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4242,7 +4404,10 @@
       "category": "ai.inference",
       "id": "ai.model-inference",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4261,7 +4426,10 @@
       "category": "ai.inference",
       "id": "ai.inference-serving",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4280,7 +4448,10 @@
       "category": "ai.inference",
       "id": "ai.streaming-output",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4301,7 +4472,10 @@
       "category": "ai.inference",
       "id": "ai.time-to-first-token",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4322,7 +4496,10 @@
       "category": "ai.inference",
       "id": "ai.token-throughput",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4341,7 +4518,10 @@
       "category": "ai.inference",
       "id": "ai.kv-cache",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4360,7 +4540,10 @@
       "category": "ai.inference",
       "id": "ai.prompt-caching",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4379,7 +4562,10 @@
       "category": "ai.inference",
       "id": "ai.batch-inference",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4400,7 +4586,10 @@
       "category": "ai.inference",
       "id": "ai.temperature-sampling",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4421,7 +4610,10 @@
       "category": "ai.inference",
       "id": "ai.nucleus-sampling",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4442,7 +4634,10 @@
       "category": "ai.evaluation-safety",
       "id": "ai.model-evaluation",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4461,7 +4656,10 @@
       "category": "ai.evaluation-safety",
       "id": "ai.model-drift",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4480,7 +4678,10 @@
       "category": "ai.evaluation-safety",
       "id": "ai.data-leakage",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4499,7 +4700,10 @@
       "category": "ai.training",
       "id": "ai.synthetic-data",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4518,7 +4722,10 @@
       "category": "ai.foundations",
       "id": "ai.attention-mechanism",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "domain": "ai",
@@ -4539,7 +4746,10 @@
       "category": "ai.foundations",
       "id": "ai.mixture-of-experts",
       "source": "AgentFleet authored",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "relatedDomains": [
+        "technology"
+      ]
     },
     {
       "id": "ecommerce.stock-keeping-unit",
@@ -7207,6 +7417,2587 @@
         "zh": [],
         "en": [
           "PIT"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.user-story",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "用户故事",
+        "en": "User story"
+      },
+      "definitions": {
+        "zh": "从用户角色、目标和价值描述需求",
+        "en": "Describe a requirement through a user's role, goal, and value"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.acceptance-criteria",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "验收标准",
+        "en": "Acceptance criteria"
+      },
+      "definitions": {
+        "zh": "定义交付结果必须满足的可验证条件",
+        "en": "Define verifiable conditions a deliverable must satisfy"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.boundary-condition",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "边界条件",
+        "en": "Boundary condition"
+      },
+      "definitions": {
+        "zh": "明确输入范围、极端情况和处理规则",
+        "en": "Specify input limits, edge cases, and handling rules"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.business-rule",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "业务规则",
+        "en": "Business rule"
+      },
+      "definitions": {
+        "zh": "明确业务操作必须遵循的约束与判断条件",
+        "en": "Specify constraints and decision conditions for business operations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.minimum-viable-product",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "最小可行产品",
+        "en": "Minimum viable product"
+      },
+      "definitions": {
+        "zh": "以最小功能集合验证核心价值假设",
+        "en": "Validate a core value hypothesis with a minimal feature set"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "MVP"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.requirement-scope",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "需求范围",
+        "en": "Requirement scope"
+      },
+      "definitions": {
+        "zh": "明确本次交付包含与不包含的工作",
+        "en": "Define what is included and excluded from a delivery"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.non-functional-requirement",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "非功能需求",
+        "en": "Non-functional requirement"
+      },
+      "definitions": {
+        "zh": "描述性能、可靠性和可用性等质量要求",
+        "en": "Describe quality requirements such as performance, reliability, and usability"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "NFR"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.user-journey",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "用户旅程",
+        "en": "User journey"
+      },
+      "definitions": {
+        "zh": "描述用户完成目标时经历的步骤和接触点",
+        "en": "Describe steps and touchpoints along a user's path to a goal"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.use-case",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "用例",
+        "en": "Use case"
+      },
+      "definitions": {
+        "zh": "描述参与者在特定条件下与系统的交互",
+        "en": "Describe an actor's interactions with a system under specified conditions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.definition-of-done",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "完成定义",
+        "en": "Definition of done"
+      },
+      "definitions": {
+        "zh": "约定工作完成前必须通过的共同检查",
+        "en": "Agree on shared checks required before work is complete"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "DoD"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.requirements-traceability",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "需求追踪",
+        "en": "Requirements traceability"
+      },
+      "definitions": {
+        "zh": "关联需求、实现和验证证据",
+        "en": "Link requirements to implementation and verification evidence"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product.prioritization",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "优先级排序",
+        "en": "Prioritization"
+      },
+      "definitions": {
+        "zh": "依据价值、成本和依赖安排工作顺序",
+        "en": "Order work by value, cost, and dependencies"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.information-hierarchy",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "信息层级",
+        "en": "Information hierarchy"
+      },
+      "definitions": {
+        "zh": "通过布局和样式表达内容的重要程度",
+        "en": "Express content importance through layout and styling"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.empty-state",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "空状态",
+        "en": "Empty state"
+      },
+      "definitions": {
+        "zh": "为暂无内容的界面解释原因并提供下一步",
+        "en": "Explain an empty interface and provide a useful next step"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.skeleton-screen",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "骨架屏",
+        "en": "Skeleton screen"
+      },
+      "definitions": {
+        "zh": "在内容加载时展示预期布局占位",
+        "en": "Show placeholders for the expected layout while content loads"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.focus-management",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "焦点管理",
+        "en": "Focus management"
+      },
+      "definitions": {
+        "zh": "控制键盘焦点在交互中的移动与恢复",
+        "en": "Manage keyboard focus movement and restoration during interactions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.progressive-disclosure",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "渐进披露",
+        "en": "Progressive disclosure"
+      },
+      "definitions": {
+        "zh": "按需要逐步展示复杂功能和信息",
+        "en": "Reveal complex information and controls as needed"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.design-tokens",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "设计令牌",
+        "en": "Design tokens"
+      },
+      "definitions": {
+        "zh": "集中定义颜色、间距和字号等设计变量",
+        "en": "Define shared variables for colors, spacing, typography, and other design values"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.interaction-feedback",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "交互反馈",
+        "en": "Interaction feedback"
+      },
+      "definitions": {
+        "zh": "明确展示操作的等待、成功和失败状态",
+        "en": "Show clear pending, success, and failure states for actions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.visual-consistency",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "视觉一致性",
+        "en": "Visual consistency"
+      },
+      "definitions": {
+        "zh": "统一相同功能的样式和交互表达",
+        "en": "Use consistent appearance and behavior for equivalent functions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.touch-target",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "触控目标",
+        "en": "Touch target"
+      },
+      "definitions": {
+        "zh": "为触摸操作提供足够且可区分的点击区域",
+        "en": "Provide adequately sized and distinct touch interaction areas"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.semantic-structure",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "语义化结构",
+        "en": "Semantic structure"
+      },
+      "definitions": {
+        "zh": "用符合内容含义的结构支持理解和辅助技术",
+        "en": "Structure content by meaning for comprehension and assistive technology"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.cumulative-layout-shift",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "累计布局偏移",
+        "en": "Cumulative layout shift"
+      },
+      "definitions": {
+        "zh": "衡量页面元素意外移动造成的视觉稳定性变化",
+        "en": "Measure visual stability changes caused by unexpected movement of page elements"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CLS"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design.contrast-ratio",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "对比度",
+        "en": "Contrast ratio"
+      },
+      "definitions": {
+        "zh": "衡量前景与背景的视觉区分程度",
+        "en": "Measure visual distinction between foreground and background"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.minimal-reproduction",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "最小复现",
+        "en": "Minimal reproduction"
+      },
+      "definitions": {
+        "zh": "用尽量少的步骤和代码稳定重现问题",
+        "en": "Reproduce a problem reliably with minimal steps and code"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "repro"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.regression-testing",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "回归测试",
+        "en": "Regression testing"
+      },
+      "definitions": {
+        "zh": "验证修改后已有功能仍然符合预期",
+        "en": "Verify existing behavior after a change"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.race-condition",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "竞态条件",
+        "en": "Race condition"
+      },
+      "definitions": {
+        "zh": "排查结果依赖并发操作时序的问题",
+        "en": "Investigate outcomes that depend on concurrent operation timing"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.contract-testing",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "契约测试",
+        "en": "Contract testing"
+      },
+      "definitions": {
+        "zh": "验证接口提供方和使用方对请求响应的约定",
+        "en": "Verify request and response agreements between providers and consumers"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.root-cause-analysis",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "根因分析",
+        "en": "Root cause analysis"
+      },
+      "definitions": {
+        "zh": "从现象追踪导致故障的底层原因",
+        "en": "Trace a failure from symptoms to underlying causes"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "RCA"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.boundary-value-analysis",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "边界值分析",
+        "en": "Boundary value analysis"
+      },
+      "definitions": {
+        "zh": "围绕输入边界设计测试样本",
+        "en": "Design tests around input boundaries"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "BVA"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.equivalence-partitioning",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "等价类划分",
+        "en": "Equivalence partitioning"
+      },
+      "definitions": {
+        "zh": "将具有相似处理行为的输入分组测试",
+        "en": "Group inputs expected to behave similarly for testing"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.test-double",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "测试替身",
+        "en": "Test double"
+      },
+      "definitions": {
+        "zh": "在测试中替代外部依赖或复杂组件",
+        "en": "Replace dependencies or complex components during testing"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.flaky-test",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "不稳定测试",
+        "en": "Flaky test"
+      },
+      "definitions": {
+        "zh": "识别相同代码下结果不稳定的测试",
+        "en": "Identify tests with inconsistent results on unchanged code"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.smoke-testing",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "冒烟测试",
+        "en": "Smoke testing"
+      },
+      "definitions": {
+        "zh": "快速检查关键功能是否基本可用",
+        "en": "Quickly check that essential functions are usable"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.end-to-end-testing",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "端到端测试",
+        "en": "End-to-end testing"
+      },
+      "definitions": {
+        "zh": "验证跨组件的完整用户操作流程",
+        "en": "Verify complete user workflows across components"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "E2E"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.test-coverage",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "测试覆盖率",
+        "en": "Test coverage"
+      },
+      "definitions": {
+        "zh": "衡量被测试执行的代码或需求范围",
+        "en": "Measure the code or requirements exercised by tests"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.health-check",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "健康检查",
+        "en": "Health check"
+      },
+      "definitions": {
+        "zh": "检测服务是否存活并能处理请求",
+        "en": "Check whether a service is alive and able to handle requests"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.reverse-proxy",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "反向代理",
+        "en": "Reverse proxy"
+      },
+      "definitions": {
+        "zh": "在客户端与后端之间转发请求",
+        "en": "Forward requests between clients and backend services"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.persistent-volume",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "持久化卷",
+        "en": "Persistent volume"
+      },
+      "definitions": {
+        "zh": "让数据在容器或实例重建后仍可保留",
+        "en": "Preserve data across container or instance recreation"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.canary-deployment",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "灰度发布",
+        "en": "Canary deployment"
+      },
+      "definitions": {
+        "zh": "先向部分流量发布新版本并观察结果",
+        "en": "Release a version to limited traffic and observe results"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.deployment-rollback",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "发布回滚",
+        "en": "Deployment rollback"
+      },
+      "definitions": {
+        "zh": "在发布异常时恢复到已知版本",
+        "en": "Restore a known version after a problematic release"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.observability",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "可观测性",
+        "en": "Observability"
+      },
+      "definitions": {
+        "zh": "结合日志、指标和追踪理解系统运行状态",
+        "en": "Understand system behavior through logs, metrics, and traces"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.environment-variable",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "环境变量",
+        "en": "Environment variable"
+      },
+      "definitions": {
+        "zh": "通过运行环境传递应用配置",
+        "en": "Pass application configuration through the runtime environment"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "env"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.infrastructure-as-code",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "基础设施即代码",
+        "en": "Infrastructure as code"
+      },
+      "definitions": {
+        "zh": "用可版本管理的声明或代码配置基础设施",
+        "en": "Configure infrastructure with versioned declarations or code"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "IaC"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.blue-green-deployment",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "蓝绿部署",
+        "en": "Blue-green deployment"
+      },
+      "definitions": {
+        "zh": "在两套环境间切换生产流量",
+        "en": "Switch production traffic between two environments"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.graceful-shutdown",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "优雅停机",
+        "en": "Graceful shutdown"
+      },
+      "definitions": {
+        "zh": "停止接收新任务并处理已有请求后退出",
+        "en": "Stop accepting new work and finish existing requests before exit"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.backup-and-restore",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "备份恢复",
+        "en": "Backup and restore"
+      },
+      "definitions": {
+        "zh": "保存数据副本并验证恢复流程",
+        "en": "Create data backups and verify restoration procedures"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.service-level-objective",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "服务等级目标",
+        "en": "Service-level objective"
+      },
+      "definitions": {
+        "zh": "为服务可靠性指标设定可衡量目标",
+        "en": "Set measurable targets for service reliability metrics"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "SLO"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.optical-character-recognition",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "光学字符识别",
+        "en": "Optical character recognition"
+      },
+      "definitions": {
+        "zh": "从扫描件或图片中识别文字",
+        "en": "Recognize text in scans or images"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "OCR"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.batch-renaming",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "批量重命名",
+        "en": "Batch renaming"
+      },
+      "definitions": {
+        "zh": "按统一规则修改多个文件名称",
+        "en": "Rename multiple files using consistent rules"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.field-mapping",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "字段映射",
+        "en": "Field mapping"
+      },
+      "definitions": {
+        "zh": "定义不同数据来源之间的字段对应关系",
+        "en": "Define field correspondences between data sources"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.template-population",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "模板填充",
+        "en": "Template population"
+      },
+      "definitions": {
+        "zh": "把结构化数据填入预设文档位置",
+        "en": "Insert structured data into predefined document locations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.incremental-synchronization",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "增量同步",
+        "en": "Incremental synchronization"
+      },
+      "definitions": {
+        "zh": "只同步上次处理后新增或变化的数据",
+        "en": "Synchronize only data added or changed since the previous run"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.resumable-processing",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "断点续跑",
+        "en": "Resumable processing"
+      },
+      "definitions": {
+        "zh": "从已记录的进度继续处理未完成任务",
+        "en": "Resume unfinished processing from recorded progress"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.document-parsing",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "文档解析",
+        "en": "Document parsing"
+      },
+      "definitions": {
+        "zh": "提取文档中的正文、表格和结构信息",
+        "en": "Extract text, tables, and structure from documents"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.mail-merge",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "邮件合并",
+        "en": "Mail merge"
+      },
+      "definitions": {
+        "zh": "用收件人数据批量生成个性化文档或邮件",
+        "en": "Generate personalized documents or messages from recipient data"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.scheduled-job",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "定时任务",
+        "en": "Scheduled job"
+      },
+      "definitions": {
+        "zh": "按指定时间或周期自动执行工作",
+        "en": "Run work automatically at specified times or intervals"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "cron"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.file-deduplication",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "文件去重",
+        "en": "File deduplication"
+      },
+      "definitions": {
+        "zh": "识别重复文件并保留可追踪的处理结果",
+        "en": "Identify duplicate files and retain traceable processing results"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.format-conversion",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "格式转换",
+        "en": "Format conversion"
+      },
+      "definitions": {
+        "zh": "在保留必要内容的前提下转换文件格式",
+        "en": "Convert file formats while preserving required content"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office.processing-manifest",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "处理清单",
+        "en": "Processing manifest"
+      },
+      "definitions": {
+        "zh": "记录输入、输出、处理状态与失败原因",
+        "en": "Record inputs, outputs, processing states, and failure reasons"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.transaction-isolation",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "事务隔离",
+        "en": "Transaction isolation"
+      },
+      "definitions": {
+        "zh": "定义并发事务之间可见数据的规则",
+        "en": "Define data visibility rules between concurrent transactions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.database-index",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "数据库索引",
+        "en": "Database index"
+      },
+      "definitions": {
+        "zh": "用辅助结构加速特定数据查询",
+        "en": "Use auxiliary structures to accelerate specific data queries"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.data-migration",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "数据迁移",
+        "en": "Data migration"
+      },
+      "definitions": {
+        "zh": "按可验证流程移动或转换数据",
+        "en": "Move or transform data through a verifiable process"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.webhook",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "事件回调",
+        "en": "Webhook"
+      },
+      "definitions": {
+        "zh": "在事件发生时向指定地址发送通知",
+        "en": "Send a notification to a configured endpoint when an event occurs"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.cursor-pagination",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "游标分页",
+        "en": "Cursor pagination"
+      },
+      "definitions": {
+        "zh": "使用位置标识继续读取后续数据",
+        "en": "Read subsequent records using a position marker"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.exponential-backoff",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "指数退避",
+        "en": "Exponential backoff"
+      },
+      "definitions": {
+        "zh": "在连续重试之间逐步增加等待时间",
+        "en": "Increase waiting time between repeated retries"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.connection-pool",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "连接池",
+        "en": "Connection pool"
+      },
+      "definitions": {
+        "zh": "复用有限数量的连接处理请求",
+        "en": "Reuse a bounded set of connections for requests"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.message-queue",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "消息队列",
+        "en": "Message queue"
+      },
+      "definitions": {
+        "zh": "通过队列解耦消息生产与消费",
+        "en": "Decouple message producers and consumers through a queue"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.dead-letter-queue",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "死信队列",
+        "en": "Dead-letter queue"
+      },
+      "definitions": {
+        "zh": "隔离多次处理失败或无法消费的消息",
+        "en": "Isolate messages that repeatedly fail or cannot be consumed"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "DLQ"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.eventual-consistency",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "最终一致性",
+        "en": "Eventual consistency"
+      },
+      "definitions": {
+        "zh": "允许短期差异并在无新更新后趋于一致",
+        "en": "Allow temporary differences that converge after updates stop"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.rate-limiting",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "限流",
+        "en": "Rate limiting"
+      },
+      "definitions": {
+        "zh": "限制单位时间内允许处理的请求数量",
+        "en": "Limit the number of requests handled within a period"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.change-data-capture",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "变更数据捕获",
+        "en": "Change data capture"
+      },
+      "definitions": {
+        "zh": "捕获数据变更用于同步或后续处理",
+        "en": "Capture data changes for synchronization or downstream processing"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CDC"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.keyboard-avoidance",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "软键盘避让",
+        "en": "Keyboard avoidance"
+      },
+      "definitions": {
+        "zh": "在软键盘出现时保持输入内容和操作可见",
+        "en": "Keep inputs and actions visible when the software keyboard opens"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.deep-link",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "深度链接",
+        "en": "Deep link"
+      },
+      "definitions": {
+        "zh": "通过链接打开应用内指定内容",
+        "en": "Open specific in-app content through a link"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.offline-cache",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "离线缓存",
+        "en": "Offline cache"
+      },
+      "definitions": {
+        "zh": "在离线时使用已保存的数据或资源",
+        "en": "Use stored data or resources while offline"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.background-task",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "后台任务",
+        "en": "Background task"
+      },
+      "definitions": {
+        "zh": "按平台限制在非前台状态执行工作",
+        "en": "Run work outside the foreground within platform constraints"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.app-lifecycle",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "应用生命周期",
+        "en": "App lifecycle"
+      },
+      "definitions": {
+        "zh": "处理启动、前后台切换和终止等状态",
+        "en": "Handle startup, foreground transitions, backgrounding, and termination"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.permission-request",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "权限请求",
+        "en": "Permission request"
+      },
+      "definitions": {
+        "zh": "在需要时向用户申请系统资源访问权限",
+        "en": "Request access to system resources when needed"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.push-notification",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "推送通知",
+        "en": "Push notification"
+      },
+      "definitions": {
+        "zh": "通过系统通道向用户投递应用消息",
+        "en": "Deliver app messages through system notification channels"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.cold-start",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "冷启动",
+        "en": "Cold start"
+      },
+      "definitions": {
+        "zh": "衡量应用进程未运行时的启动过程",
+        "en": "Measure startup when the application process is not running"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.platform-adaptation",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "平台适配",
+        "en": "Platform adaptation"
+      },
+      "definitions": {
+        "zh": "根据平台能力和交互约定调整实现",
+        "en": "Adapt implementation to platform capabilities and conventions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.state-restoration",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "状态恢复",
+        "en": "State restoration"
+      },
+      "definitions": {
+        "zh": "重新打开应用时恢复必要的界面和任务状态",
+        "en": "Restore needed interface and task state when reopening an app"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.gesture-conflict",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "手势冲突",
+        "en": "Gesture conflict"
+      },
+      "definitions": {
+        "zh": "排查多个手势识别器竞争同一次操作",
+        "en": "Investigate gesture recognizers competing for the same interaction"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.least-privilege",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "最小权限",
+        "en": "Least privilege"
+      },
+      "definitions": {
+        "zh": "仅授予完成任务所需的访问能力",
+        "en": "Grant only the access needed to complete a task"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.role-based-access-control",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "基于角色的访问控制",
+        "en": "Role-based access control"
+      },
+      "definitions": {
+        "zh": "依据用户角色分配资源操作权限",
+        "en": "Assign resource permissions according to user roles"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "RBAC"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.key-rotation",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "密钥轮换",
+        "en": "Key rotation"
+      },
+      "definitions": {
+        "zh": "按流程替换密钥并处理旧凭据失效",
+        "en": "Replace keys and retire old credentials through a defined process"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.input-validation",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "输入校验",
+        "en": "Input validation"
+      },
+      "definitions": {
+        "zh": "检查输入是否满足类型、范围和格式约束",
+        "en": "Check input types, ranges, and format constraints"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.audit-log",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "审计日志",
+        "en": "Audit log"
+      },
+      "definitions": {
+        "zh": "记录敏感操作的主体、时间和结果",
+        "en": "Record actors, timestamps, and outcomes for sensitive operations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.authentication",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "身份认证",
+        "en": "Authentication"
+      },
+      "definitions": {
+        "zh": "核验请求者声明的身份",
+        "en": "Verify the identity claimed by a requester"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.authorization",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "资源授权",
+        "en": "Authorization"
+      },
+      "definitions": {
+        "zh": "判断已识别主体是否可以操作目标资源",
+        "en": "Determine whether an identified actor may act on a resource"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.cross-site-request-forgery",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "跨站请求伪造",
+        "en": "Cross-site request forgery"
+      },
+      "definitions": {
+        "zh": "识别利用用户已有身份发起非预期请求的风险",
+        "en": "Identify unintended requests made using a user's existing authentication"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CSRF"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.cross-site-scripting",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "跨站脚本",
+        "en": "Cross-site scripting"
+      },
+      "definitions": {
+        "zh": "识别不可信内容作为脚本在页面执行的风险",
+        "en": "Identify untrusted content executing as script in a page"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "XSS"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.sql-injection",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "SQL注入",
+        "en": "SQL injection"
+      },
+      "definitions": {
+        "zh": "识别用户输入改变数据库查询语义的风险",
+        "en": "Identify input that changes the meaning of a database query"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.data-masking",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "敏感数据脱敏",
+        "en": "Data masking"
+      },
+      "definitions": {
+        "zh": "隐藏不应直接展示的敏感字段",
+        "en": "Hide sensitive fields that should not be displayed directly"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "programming.tenant-isolation",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "租户隔离",
+        "en": "Tenant isolation"
+      },
+      "definitions": {
+        "zh": "限制不同租户之间的数据与操作访问",
+        "en": "Restrict data and action access across tenants"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.literature-review",
+      "domain": "research",
+      "category": "research.evidence",
+      "terms": {
+        "zh": "文献综述",
+        "en": "Literature review"
+      },
+      "definitions": {
+        "zh": "围绕研究问题整理已有研究的结论与分歧",
+        "en": "Synthesize findings and disagreements in prior research around a question"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.evidence-hierarchy",
+      "domain": "research",
+      "category": "research.evidence",
+      "terms": {
+        "zh": "证据等级",
+        "en": "Evidence hierarchy"
+      },
+      "definitions": {
+        "zh": "按适用方法评价证据强度与局限",
+        "en": "Assess evidence strength and limitations using an appropriate framework"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.citation-provenance",
+      "domain": "research",
+      "category": "research.evidence",
+      "terms": {
+        "zh": "引用溯源",
+        "en": "Citation provenance"
+      },
+      "definitions": {
+        "zh": "把陈述对应到可核验的原始来源",
+        "en": "Link claims to verifiable original sources"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.research-question",
+      "domain": "research",
+      "category": "research.evidence",
+      "terms": {
+        "zh": "研究问题",
+        "en": "Research question"
+      },
+      "definitions": {
+        "zh": "明确研究试图回答的具体问题",
+        "en": "Specify the question a study aims to answer"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.eligibility-criteria",
+      "domain": "research",
+      "category": "research.evidence",
+      "terms": {
+        "zh": "纳入排除标准",
+        "en": "Eligibility criteria"
+      },
+      "definitions": {
+        "zh": "定义资料或样本被纳入分析的条件",
+        "en": "Define conditions for including sources or samples in an analysis"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.reproducibility",
+      "domain": "research",
+      "category": "research.evidence",
+      "terms": {
+        "zh": "可复现性",
+        "en": "Reproducibility"
+      },
+      "definitions": {
+        "zh": "记录数据、方法和环境以便重复验证结果",
+        "en": "Document data, methods, and environment to enable verification"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.concept-map",
+      "domain": "research",
+      "category": "research.education",
+      "terms": {
+        "zh": "概念图",
+        "en": "Concept map"
+      },
+      "definitions": {
+        "zh": "用节点和关系组织概念之间的联系",
+        "en": "Organize relationships between concepts using nodes and links"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.assessment-rubric",
+      "domain": "research",
+      "category": "research.education",
+      "terms": {
+        "zh": "评分量规",
+        "en": "Assessment rubric"
+      },
+      "definitions": {
+        "zh": "用明确维度和等级描述评分依据",
+        "en": "Describe scoring criteria through explicit dimensions and levels"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.learning-objective",
+      "domain": "research",
+      "category": "research.education",
+      "terms": {
+        "zh": "学习目标",
+        "en": "Learning objective"
+      },
+      "definitions": {
+        "zh": "描述学习后应能展示的知识或能力",
+        "en": "Describe knowledge or abilities learners should demonstrate"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.formative-assessment",
+      "domain": "research",
+      "category": "research.education",
+      "terms": {
+        "zh": "形成性评价",
+        "en": "Formative assessment"
+      },
+      "definitions": {
+        "zh": "在学习过程中收集反馈以调整教学",
+        "en": "Collect feedback during learning to adjust instruction"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.instructional-scaffolding",
+      "domain": "research",
+      "category": "research.education",
+      "terms": {
+        "zh": "教学支架",
+        "en": "Instructional scaffolding"
+      },
+      "definitions": {
+        "zh": "提供逐步撤除的支持帮助完成学习任务",
+        "en": "Provide gradually removed support for completing learning tasks"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research.knowledge-gap",
+      "domain": "research",
+      "category": "research.education",
+      "terms": {
+        "zh": "知识缺口",
+        "en": "Knowledge gap"
+      },
+      "definitions": {
+        "zh": "识别已有理解与目标能力之间的不足",
+        "en": "Identify gaps between current understanding and target abilities"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.graphics-processing-unit",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "图形处理器",
+        "en": "Graphics processing unit"
+      },
+      "definitions": {
+        "zh": "以并行计算处理图形和其他计算任务",
+        "en": "Process graphics and other workloads through parallel computation"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "GPU"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.central-processing-unit",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "中央处理器",
+        "en": "Central processing unit"
+      },
+      "definitions": {
+        "zh": "执行通用指令并协调计算机运算",
+        "en": "Execute general-purpose instructions and coordinate computation"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "CPU"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.neural-processing-unit",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "神经网络处理器",
+        "en": "Neural processing unit"
+      },
+      "definitions": {
+        "zh": "针对神经网络运算设计的专用处理器",
+        "en": "A processor designed for neural network computations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "NPU"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.high-bandwidth-memory",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "高带宽内存",
+        "en": "High-bandwidth memory"
+      },
+      "definitions": {
+        "zh": "采用堆叠与宽接口设计提升内存带宽",
+        "en": "Increase memory bandwidth using stacked memory and wide interfaces"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "HBM"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.chiplet",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "芯粒",
+        "en": "Chiplet"
+      },
+      "definitions": {
+        "zh": "将多个独立裸片组合为完整芯片系统",
+        "en": "Combine separate dies into a complete chip system"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.advanced-packaging",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "先进封装",
+        "en": "Advanced packaging"
+      },
+      "definitions": {
+        "zh": "通过封装技术集成芯片并改善互连",
+        "en": "Integrate chips and improve interconnects through packaging techniques"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.extreme-ultraviolet-lithography",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "极紫外光刻",
+        "en": "Extreme ultraviolet lithography"
+      },
+      "definitions": {
+        "zh": "利用极紫外光形成半导体微细图案",
+        "en": "Use extreme ultraviolet light to pattern semiconductor features"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "EUV"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.semiconductor-process-node",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "半导体制程节点",
+        "en": "Semiconductor process node"
+      },
+      "definitions": {
+        "zh": "标识芯片制造工艺代际而非单一实际尺寸",
+        "en": "Identify a fabrication technology generation rather than a single physical dimension"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.semiconductor-foundry",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "晶圆代工",
+        "en": "Semiconductor foundry"
+      },
+      "definitions": {
+        "zh": "为外部芯片设计提供晶圆制造服务",
+        "en": "Fabricate wafers for external chip designs"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.manufacturing-yield",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "良率",
+        "en": "Manufacturing yield"
+      },
+      "definitions": {
+        "zh": "衡量生产输出中符合要求产品的比例",
+        "en": "Measure the proportion of manufacturing output meeting requirements"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.edge-computing",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "边缘计算",
+        "en": "Edge computing"
+      },
+      "definitions": {
+        "zh": "在靠近数据产生位置处理计算任务",
+        "en": "Process workloads near where data is generated"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.quantum-computing",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "量子计算",
+        "en": "Quantum computing"
+      },
+      "definitions": {
+        "zh": "利用量子态及其操作执行计算",
+        "en": "Perform computation using quantum states and operations"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.qubit",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "量子比特",
+        "en": "Qubit"
+      },
+      "definitions": {
+        "zh": "用量子系统表示可操作的量子信息单位",
+        "en": "Represent a manipulable unit of quantum information with a quantum system"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.compute-cluster",
+      "domain": "technology",
+      "category": "technology.chips",
+      "terms": {
+        "zh": "算力集群",
+        "en": "Compute cluster"
+      },
+      "definitions": {
+        "zh": "将多台计算节点组织为协同处理资源",
+        "en": "Organize multiple compute nodes into coordinated processing resources"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.low-earth-orbit-satellite-internet",
+      "domain": "technology",
+      "category": "technology.networks",
+      "terms": {
+        "zh": "低轨卫星互联网",
+        "en": "Low Earth orbit satellite internet"
+      },
+      "definitions": {
+        "zh": "利用低地球轨道卫星提供网络连接",
+        "en": "Provide connectivity using satellites in low Earth orbit"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "LEO satellite internet"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.network-slicing",
+      "domain": "technology",
+      "category": "technology.networks",
+      "terms": {
+        "zh": "网络切片",
+        "en": "Network slicing"
+      },
+      "definitions": {
+        "zh": "在共享网络基础设施上提供逻辑隔离的网络能力",
+        "en": "Provide logically separated network capabilities on shared infrastructure"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.end-to-end-latency",
+      "domain": "technology",
+      "category": "technology.networks",
+      "terms": {
+        "zh": "端到端时延",
+        "en": "End-to-end latency"
+      },
+      "definitions": {
+        "zh": "衡量数据或请求从起点到终点的总耗时",
+        "en": "Measure total time for data or a request to travel from source to destination"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.optical-interconnect",
+      "domain": "technology",
+      "category": "technology.networks",
+      "terms": {
+        "zh": "光互连",
+        "en": "Optical interconnect"
+      },
+      "definitions": {
+        "zh": "用光信号连接计算或通信组件",
+        "en": "Connect computing or communications components using optical signals"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.reusable-launch-vehicle",
+      "domain": "technology",
+      "category": "technology.space",
+      "terms": {
+        "zh": "可重复使用运载火箭",
+        "en": "Reusable launch vehicle"
+      },
+      "definitions": {
+        "zh": "通过回收并再次使用部分部件执行发射",
+        "en": "Perform launches by recovering and reusing vehicle components"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.payload",
+      "domain": "technology",
+      "category": "technology.space",
+      "terms": {
+        "zh": "载荷",
+        "en": "Payload"
+      },
+      "definitions": {
+        "zh": "运载工具承载的任务设备或货物",
+        "en": "Equipment or cargo carried to perform a mission"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.on-orbit-servicing",
+      "domain": "technology",
+      "category": "technology.space",
+      "terms": {
+        "zh": "在轨服务",
+        "en": "On-orbit servicing"
+      },
+      "definitions": {
+        "zh": "对在轨航天器实施维护、补给或其他支持",
+        "en": "Maintain, replenish, or otherwise support spacecraft in orbit"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.solid-state-battery",
+      "domain": "technology",
+      "category": "technology.energy",
+      "terms": {
+        "zh": "固态电池",
+        "en": "Solid-state battery"
+      },
+      "definitions": {
+        "zh": "使用固态电解质进行离子传导的电池",
+        "en": "A battery using a solid electrolyte for ion conduction"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.energy-density",
+      "domain": "technology",
+      "category": "technology.energy",
+      "terms": {
+        "zh": "能量密度",
+        "en": "Energy density"
+      },
+      "definitions": {
+        "zh": "按质量或体积衡量可储存的能量",
+        "en": "Measure stored energy per unit mass or volume"
+      },
+      "aliases": {
+        "zh": [],
+        "en": []
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.energy-storage-system",
+      "domain": "technology",
+      "category": "technology.energy",
+      "terms": {
+        "zh": "储能系统",
+        "en": "Energy storage system"
+      },
+      "definitions": {
+        "zh": "储存能量并在需要时释放使用的系统",
+        "en": "Store energy and release it when needed"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "ESS"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.battery-management-system",
+      "domain": "technology",
+      "category": "technology.energy",
+      "terms": {
+        "zh": "电池管理系统",
+        "en": "Battery management system"
+      },
+      "definitions": {
+        "zh": "监测并管理电池的状态和工作条件",
+        "en": "Monitor and manage battery state and operating conditions"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "BMS"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "technology.power-usage-effectiveness",
+      "domain": "technology",
+      "category": "technology.energy",
+      "terms": {
+        "zh": "电力使用效率",
+        "en": "Power usage effectiveness"
+      },
+      "definitions": {
+        "zh": "比较数据中心总能耗与信息设备能耗",
+        "en": "Compare total data-center energy use with IT equipment energy use"
+      },
+      "aliases": {
+        "zh": [],
+        "en": [
+          "PUE"
         ]
       },
       "source": "AgentFleet authored",

@@ -1325,6 +1325,546 @@
     ]
   },
   {
+    "id": "product-mvp",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "核心需求范围规划",
+    "detail": "明确目标用户和核心流程，划分首版范围与后续需求",
+    "aliases": [
+      "核心需求范围规划"
+    ]
+  },
+  {
+    "id": "product-mvp",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Core requirement scope planning",
+    "detail": "明确目标用户和核心流程，划分首版范围与后续需求",
+    "aliases": [
+      "Core requirement scope planning"
+    ]
+  },
+  {
+    "id": "product-acceptance",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "交付验收条件定义",
+    "detail": "将目标转为可验证的验收条件，覆盖正常流程与边界情况",
+    "aliases": [
+      "交付验收条件定义"
+    ]
+  },
+  {
+    "id": "product-acceptance",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Delivery acceptance definition",
+    "detail": "将目标转为可验证的验收条件，覆盖正常流程与边界情况",
+    "aliases": [
+      "Delivery acceptance definition"
+    ]
+  },
+  {
+    "id": "product-rules",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "业务规则澄清",
+    "detail": "梳理参与角色、操作条件和例外情况，明确业务规则",
+    "aliases": [
+      "业务规则澄清"
+    ]
+  },
+  {
+    "id": "product-rules",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Business rule clarification",
+    "detail": "梳理参与角色、操作条件和例外情况，明确业务规则",
+    "aliases": [
+      "Business rule clarification"
+    ]
+  },
+  {
+    "id": "design-hierarchy",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "界面层级梳理",
+    "detail": "梳理内容优先级、分组和留白，改善界面信息层级",
+    "aliases": [
+      "界面层级梳理"
+    ]
+  },
+  {
+    "id": "design-hierarchy",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Interface hierarchy refinement",
+    "detail": "梳理内容优先级、分组和留白，改善界面信息层级",
+    "aliases": [
+      "Interface hierarchy refinement"
+    ]
+  },
+  {
+    "id": "design-feedback",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "操作反馈完善",
+    "detail": "补充加载、成功与失败反馈，让用户知道操作当前状态",
+    "aliases": [
+      "操作反馈完善"
+    ]
+  },
+  {
+    "id": "design-feedback",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Action feedback improvement",
+    "detail": "补充加载、成功与失败反馈，让用户知道操作当前状态",
+    "aliases": [
+      "Action feedback improvement"
+    ]
+  },
+  {
+    "id": "design-focus",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "键盘焦点流程检查",
+    "detail": "检查焦点顺序、弹窗焦点约束与关闭后的焦点恢复",
+    "aliases": [
+      "键盘焦点流程检查"
+    ]
+  },
+  {
+    "id": "design-focus",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Keyboard focus flow review",
+    "detail": "检查焦点顺序、弹窗焦点约束与关闭后的焦点恢复",
+    "aliases": [
+      "Keyboard focus flow review"
+    ]
+  },
+  {
+    "id": "testing-repro",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "间歇故障复现整理",
+    "detail": "记录触发步骤、环境和日志，缩小间歇故障的最小复现范围",
+    "aliases": [
+      "间歇故障复现整理"
+    ]
+  },
+  {
+    "id": "testing-repro",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Intermittent failure reproduction",
+    "detail": "记录触发步骤、环境和日志，缩小间歇故障的最小复现范围",
+    "aliases": [
+      "Intermittent failure reproduction"
+    ]
+  },
+  {
+    "id": "testing-regression",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "关联功能回归验证",
+    "detail": "定位修改影响范围，为关联功能补充回归测试",
+    "aliases": [
+      "关联功能回归验证"
+    ]
+  },
+  {
+    "id": "testing-regression",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Related behavior regression verification",
+    "detail": "定位修改影响范围，为关联功能补充回归测试",
+    "aliases": [
+      "Related behavior regression verification"
+    ]
+  },
+  {
+    "id": "testing-flaky",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "测试不稳定性排查",
+    "detail": "检查测试隔离、异步等待和共享状态，定位不稳定测试",
+    "aliases": [
+      "测试不稳定性排查"
+    ]
+  },
+  {
+    "id": "testing-flaky",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Test instability diagnosis",
+    "detail": "检查测试隔离、异步等待和共享状态，定位不稳定测试",
+    "aliases": [
+      "Test instability diagnosis"
+    ]
+  },
+  {
+    "id": "devops-environment",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "运行环境差异排查",
+    "detail": "对比配置、依赖、权限和网络条件，定位本地与部署环境的差异",
+    "aliases": [
+      "运行环境差异排查"
+    ]
+  },
+  {
+    "id": "devops-environment",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Runtime environment comparison",
+    "detail": "对比配置、依赖、权限和网络条件，定位本地与部署环境的差异",
+    "aliases": [
+      "Runtime environment comparison"
+    ]
+  },
+  {
+    "id": "devops-persistence",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "重启数据保留排查",
+    "detail": "检查数据写入位置、持久化挂载和恢复流程，定位重启后数据丢失",
+    "aliases": [
+      "重启数据保留排查"
+    ]
+  },
+  {
+    "id": "devops-persistence",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Data persistence after restart diagnosis",
+    "detail": "检查数据写入位置、持久化挂载和恢复流程，定位重启后数据丢失",
+    "aliases": [
+      "Data persistence after restart diagnosis"
+    ]
+  },
+  {
+    "id": "devops-release",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "发布恢复流程规划",
+    "detail": "明确健康检查、分批发布和回滚条件，并验证恢复步骤",
+    "aliases": [
+      "发布恢复流程规划"
+    ]
+  },
+  {
+    "id": "devops-release",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Release recovery planning",
+    "detail": "明确健康检查、分批发布和回滚条件，并验证恢复步骤",
+    "aliases": [
+      "Release recovery planning"
+    ]
+  },
+  {
+    "id": "documents-extract",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "扫描文档表格提取",
+    "detail": "识别扫描文档中的文字和表格，统一字段并标记待核验内容",
+    "aliases": [
+      "扫描文档表格提取"
+    ]
+  },
+  {
+    "id": "documents-extract",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Scanned document table extraction",
+    "detail": "识别扫描文档中的文字和表格，统一字段并标记待核验内容",
+    "aliases": [
+      "Scanned document table extraction"
+    ]
+  },
+  {
+    "id": "documents-batch",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "批量文件整理规划",
+    "detail": "按可预览的命名和分类规则整理文件，处理重名并保留操作清单",
+    "aliases": [
+      "批量文件整理规划"
+    ]
+  },
+  {
+    "id": "documents-batch",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Batch file organization planning",
+    "detail": "按可预览的命名和分类规则整理文件，处理重名并保留操作清单",
+    "aliases": [
+      "Batch file organization planning"
+    ]
+  },
+  {
+    "id": "documents-resume",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "自动汇总任务续跑",
+    "detail": "安排定时增量处理，记录进度与失败项并支持从中断处继续",
+    "aliases": [
+      "自动汇总任务续跑"
+    ]
+  },
+  {
+    "id": "documents-resume",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Resumable aggregation workflow",
+    "detail": "安排定时增量处理，记录进度与失败项并支持从中断处继续",
+    "aliases": [
+      "Resumable aggregation workflow"
+    ]
+  },
+  {
+    "id": "integration-sync",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "跨系统增量同步规划",
+    "detail": "明确字段映射、唯一标识和变更来源，设计可重试的数据同步",
+    "aliases": [
+      "跨系统增量同步规划"
+    ]
+  },
+  {
+    "id": "integration-sync",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Cross-system incremental sync planning",
+    "detail": "明确字段映射、唯一标识和变更来源，设计可重试的数据同步",
+    "aliases": [
+      "Cross-system incremental sync planning"
+    ]
+  },
+  {
+    "id": "integration-query",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "数据库慢查询排查",
+    "detail": "检查查询执行计划、索引和数据规模，验证查询性能改进",
+    "aliases": [
+      "数据库慢查询排查"
+    ]
+  },
+  {
+    "id": "integration-query",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Slow database query diagnosis",
+    "detail": "检查查询执行计划、索引和数据规模，验证查询性能改进",
+    "aliases": [
+      "Slow database query diagnosis"
+    ]
+  },
+  {
+    "id": "integration-retry",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "失败请求重试规划",
+    "detail": "区分可重试错误，设置退避与上限，并检查重复执行的影响",
+    "aliases": [
+      "失败请求重试规划"
+    ]
+  },
+  {
+    "id": "integration-retry",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Failed request retry planning",
+    "detail": "区分可重试错误，设置退避与上限，并检查重复执行的影响",
+    "aliases": [
+      "Failed request retry planning"
+    ]
+  },
+  {
+    "id": "mobile-keyboard",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "软键盘布局适配",
+    "detail": "检查键盘高度、滚动容器和安全区域，保持输入框与提交操作可见",
+    "aliases": [
+      "软键盘布局适配"
+    ]
+  },
+  {
+    "id": "mobile-keyboard",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Software keyboard layout adaptation",
+    "detail": "检查键盘高度、滚动容器和安全区域，保持输入框与提交操作可见",
+    "aliases": [
+      "Software keyboard layout adaptation"
+    ]
+  },
+  {
+    "id": "mobile-background",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "前后台任务状态恢复",
+    "detail": "检查应用生命周期、后台限制和连接重建，恢复必要任务状态",
+    "aliases": [
+      "前后台任务状态恢复"
+    ]
+  },
+  {
+    "id": "mobile-background",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Foreground and background task recovery",
+    "detail": "检查应用生命周期、后台限制和连接重建，恢复必要任务状态",
+    "aliases": [
+      "Foreground and background task recovery"
+    ]
+  },
+  {
+    "id": "mobile-offline",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "离线使用与同步规划",
+    "detail": "明确离线可用内容、本地缓存和恢复联网后的冲突处理",
+    "aliases": [
+      "离线使用与同步规划"
+    ]
+  },
+  {
+    "id": "mobile-offline",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Offline use and synchronization planning",
+    "detail": "明确离线可用内容、本地缓存和恢复联网后的冲突处理",
+    "aliases": [
+      "Offline use and synchronization planning"
+    ]
+  },
+  {
+    "id": "security-access",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "资源访问边界核查",
+    "detail": "明确用户、角色和资源归属，在服务端校验访问权限与租户边界",
+    "aliases": [
+      "资源访问边界核查"
+    ]
+  },
+  {
+    "id": "security-access",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Resource access boundary review",
+    "detail": "明确用户、角色和资源归属，在服务端校验访问权限与租户边界",
+    "aliases": [
+      "Resource access boundary review"
+    ]
+  },
+  {
+    "id": "security-secret",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "敏感凭据暴露排查",
+    "detail": "检查日志、配置和前端资源中的凭据暴露，规划替换与失效验证",
+    "aliases": [
+      "敏感凭据暴露排查"
+    ]
+  },
+  {
+    "id": "security-secret",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Sensitive credential exposure review",
+    "detail": "检查日志、配置和前端资源中的凭据暴露，规划替换与失效验证",
+    "aliases": [
+      "Sensitive credential exposure review"
+    ]
+  },
+  {
+    "id": "security-audit",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "关键操作审计规划",
+    "detail": "记录操作主体、目标、时间与结果，明确查询范围和敏感字段处理",
+    "aliases": [
+      "关键操作审计规划"
+    ]
+  },
+  {
+    "id": "security-audit",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Sensitive action audit planning",
+    "detail": "记录操作主体、目标、时间与结果，明确查询范围和敏感字段处理",
+    "aliases": [
+      "Sensitive action audit planning"
+    ]
+  },
+  {
+    "id": "research-sources",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "资料证据整理",
+    "detail": "围绕问题整理来源、结论和分歧，把关键陈述关联到可核验引用",
+    "aliases": [
+      "资料证据整理"
+    ]
+  },
+  {
+    "id": "research-sources",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "Source evidence organization",
+    "detail": "围绕问题整理来源、结论和分歧，把关键陈述关联到可核验引用",
+    "aliases": [
+      "Source evidence organization"
+    ]
+  },
+  {
+    "id": "research-rubric",
+    "domain": "research",
+    "category": "research.education",
+    "label": "作业评价标准设计",
+    "detail": "根据学习目标设置评价维度、等级描述和可观察的评分依据",
+    "aliases": [
+      "作业评价标准设计"
+    ]
+  },
+  {
+    "id": "research-rubric",
+    "domain": "research",
+    "category": "research.education",
+    "label": "Assignment assessment criteria design",
+    "detail": "根据学习目标设置评价维度、等级描述和可观察的评分依据",
+    "aliases": [
+      "Assignment assessment criteria design"
+    ]
+  },
+  {
+    "id": "research-learning",
+    "domain": "research",
+    "category": "research.education",
+    "label": "学习内容结构化",
+    "detail": "明确学习目标与先修知识，用概念关系和练习组织学习内容",
+    "aliases": [
+      "学习内容结构化"
+    ]
+  },
+  {
+    "id": "research-learning",
+    "domain": "research",
+    "category": "research.education",
+    "label": "Learning material structuring",
+    "detail": "明确学习目标与先修知识，用概念关系和练习组织学习内容",
+    "aliases": [
+      "Learning material structuring"
+    ]
+  },
+  {
     "id": "video.timeline",
     "domain": "video",
     "category": "video.editing",
@@ -8515,6 +9055,2693 @@
     "aliases": [
       "Point-in-time data",
       "PIT"
+    ]
+  },
+  {
+    "id": "product.user-story",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "用户故事",
+    "detail": "从用户角色、目标和价值描述需求",
+    "aliases": [
+      "用户故事"
+    ]
+  },
+  {
+    "id": "product.user-story",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "User story",
+    "detail": "从用户角色、目标和价值描述需求",
+    "aliases": [
+      "User story"
+    ]
+  },
+  {
+    "id": "product.acceptance-criteria",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "验收标准",
+    "detail": "定义交付结果必须满足的可验证条件",
+    "aliases": [
+      "验收标准"
+    ]
+  },
+  {
+    "id": "product.acceptance-criteria",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Acceptance criteria",
+    "detail": "定义交付结果必须满足的可验证条件",
+    "aliases": [
+      "Acceptance criteria"
+    ]
+  },
+  {
+    "id": "product.boundary-condition",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "边界条件",
+    "detail": "明确输入范围、极端情况和处理规则",
+    "aliases": [
+      "边界条件"
+    ]
+  },
+  {
+    "id": "product.boundary-condition",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Boundary condition",
+    "detail": "明确输入范围、极端情况和处理规则",
+    "aliases": [
+      "Boundary condition"
+    ]
+  },
+  {
+    "id": "product.business-rule",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "业务规则",
+    "detail": "明确业务操作必须遵循的约束与判断条件",
+    "aliases": [
+      "业务规则"
+    ]
+  },
+  {
+    "id": "product.business-rule",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Business rule",
+    "detail": "明确业务操作必须遵循的约束与判断条件",
+    "aliases": [
+      "Business rule"
+    ]
+  },
+  {
+    "id": "product.minimum-viable-product",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "最小可行产品",
+    "detail": "以最小功能集合验证核心价值假设",
+    "aliases": [
+      "最小可行产品"
+    ]
+  },
+  {
+    "id": "product.minimum-viable-product",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Minimum viable product",
+    "detail": "以最小功能集合验证核心价值假设",
+    "aliases": [
+      "Minimum viable product",
+      "MVP"
+    ]
+  },
+  {
+    "id": "product.requirement-scope",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "需求范围",
+    "detail": "明确本次交付包含与不包含的工作",
+    "aliases": [
+      "需求范围"
+    ]
+  },
+  {
+    "id": "product.requirement-scope",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Requirement scope",
+    "detail": "明确本次交付包含与不包含的工作",
+    "aliases": [
+      "Requirement scope"
+    ]
+  },
+  {
+    "id": "product.non-functional-requirement",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "非功能需求",
+    "detail": "描述性能、可靠性和可用性等质量要求",
+    "aliases": [
+      "非功能需求"
+    ]
+  },
+  {
+    "id": "product.non-functional-requirement",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Non-functional requirement",
+    "detail": "描述性能、可靠性和可用性等质量要求",
+    "aliases": [
+      "Non-functional requirement",
+      "NFR"
+    ]
+  },
+  {
+    "id": "product.user-journey",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "用户旅程",
+    "detail": "描述用户完成目标时经历的步骤和接触点",
+    "aliases": [
+      "用户旅程"
+    ]
+  },
+  {
+    "id": "product.user-journey",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "User journey",
+    "detail": "描述用户完成目标时经历的步骤和接触点",
+    "aliases": [
+      "User journey"
+    ]
+  },
+  {
+    "id": "product.use-case",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "用例",
+    "detail": "描述参与者在特定条件下与系统的交互",
+    "aliases": [
+      "用例"
+    ]
+  },
+  {
+    "id": "product.use-case",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Use case",
+    "detail": "描述参与者在特定条件下与系统的交互",
+    "aliases": [
+      "Use case"
+    ]
+  },
+  {
+    "id": "product.definition-of-done",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "完成定义",
+    "detail": "约定工作完成前必须通过的共同检查",
+    "aliases": [
+      "完成定义"
+    ]
+  },
+  {
+    "id": "product.definition-of-done",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Definition of done",
+    "detail": "约定工作完成前必须通过的共同检查",
+    "aliases": [
+      "Definition of done",
+      "DoD"
+    ]
+  },
+  {
+    "id": "product.requirements-traceability",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "需求追踪",
+    "detail": "关联需求、实现和验证证据",
+    "aliases": [
+      "需求追踪"
+    ]
+  },
+  {
+    "id": "product.requirements-traceability",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Requirements traceability",
+    "detail": "关联需求、实现和验证证据",
+    "aliases": [
+      "Requirements traceability"
+    ]
+  },
+  {
+    "id": "product.prioritization",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "优先级排序",
+    "detail": "依据价值、成本和依赖安排工作顺序",
+    "aliases": [
+      "优先级排序"
+    ]
+  },
+  {
+    "id": "product.prioritization",
+    "domain": "product",
+    "category": "product.requirements",
+    "label": "Prioritization",
+    "detail": "依据价值、成本和依赖安排工作顺序",
+    "aliases": [
+      "Prioritization"
+    ]
+  },
+  {
+    "id": "design.information-hierarchy",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "信息层级",
+    "detail": "通过布局和样式表达内容的重要程度",
+    "aliases": [
+      "信息层级"
+    ]
+  },
+  {
+    "id": "design.information-hierarchy",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Information hierarchy",
+    "detail": "通过布局和样式表达内容的重要程度",
+    "aliases": [
+      "Information hierarchy"
+    ]
+  },
+  {
+    "id": "design.empty-state",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "空状态",
+    "detail": "为暂无内容的界面解释原因并提供下一步",
+    "aliases": [
+      "空状态"
+    ]
+  },
+  {
+    "id": "design.empty-state",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Empty state",
+    "detail": "为暂无内容的界面解释原因并提供下一步",
+    "aliases": [
+      "Empty state"
+    ]
+  },
+  {
+    "id": "design.skeleton-screen",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "骨架屏",
+    "detail": "在内容加载时展示预期布局占位",
+    "aliases": [
+      "骨架屏"
+    ]
+  },
+  {
+    "id": "design.skeleton-screen",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Skeleton screen",
+    "detail": "在内容加载时展示预期布局占位",
+    "aliases": [
+      "Skeleton screen"
+    ]
+  },
+  {
+    "id": "design.focus-management",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "焦点管理",
+    "detail": "控制键盘焦点在交互中的移动与恢复",
+    "aliases": [
+      "焦点管理"
+    ]
+  },
+  {
+    "id": "design.focus-management",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Focus management",
+    "detail": "控制键盘焦点在交互中的移动与恢复",
+    "aliases": [
+      "Focus management"
+    ]
+  },
+  {
+    "id": "design.progressive-disclosure",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "渐进披露",
+    "detail": "按需要逐步展示复杂功能和信息",
+    "aliases": [
+      "渐进披露"
+    ]
+  },
+  {
+    "id": "design.progressive-disclosure",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Progressive disclosure",
+    "detail": "按需要逐步展示复杂功能和信息",
+    "aliases": [
+      "Progressive disclosure"
+    ]
+  },
+  {
+    "id": "design.design-tokens",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "设计令牌",
+    "detail": "集中定义颜色、间距和字号等设计变量",
+    "aliases": [
+      "设计令牌"
+    ]
+  },
+  {
+    "id": "design.design-tokens",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Design tokens",
+    "detail": "集中定义颜色、间距和字号等设计变量",
+    "aliases": [
+      "Design tokens"
+    ]
+  },
+  {
+    "id": "design.interaction-feedback",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "交互反馈",
+    "detail": "明确展示操作的等待、成功和失败状态",
+    "aliases": [
+      "交互反馈"
+    ]
+  },
+  {
+    "id": "design.interaction-feedback",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Interaction feedback",
+    "detail": "明确展示操作的等待、成功和失败状态",
+    "aliases": [
+      "Interaction feedback"
+    ]
+  },
+  {
+    "id": "design.visual-consistency",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "视觉一致性",
+    "detail": "统一相同功能的样式和交互表达",
+    "aliases": [
+      "视觉一致性"
+    ]
+  },
+  {
+    "id": "design.visual-consistency",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Visual consistency",
+    "detail": "统一相同功能的样式和交互表达",
+    "aliases": [
+      "Visual consistency"
+    ]
+  },
+  {
+    "id": "design.touch-target",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "触控目标",
+    "detail": "为触摸操作提供足够且可区分的点击区域",
+    "aliases": [
+      "触控目标"
+    ]
+  },
+  {
+    "id": "design.touch-target",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Touch target",
+    "detail": "为触摸操作提供足够且可区分的点击区域",
+    "aliases": [
+      "Touch target"
+    ]
+  },
+  {
+    "id": "design.semantic-structure",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "语义化结构",
+    "detail": "用符合内容含义的结构支持理解和辅助技术",
+    "aliases": [
+      "语义化结构"
+    ]
+  },
+  {
+    "id": "design.semantic-structure",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Semantic structure",
+    "detail": "用符合内容含义的结构支持理解和辅助技术",
+    "aliases": [
+      "Semantic structure"
+    ]
+  },
+  {
+    "id": "design.cumulative-layout-shift",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "累计布局偏移",
+    "detail": "衡量页面元素意外移动造成的视觉稳定性变化",
+    "aliases": [
+      "累计布局偏移"
+    ]
+  },
+  {
+    "id": "design.cumulative-layout-shift",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Cumulative layout shift",
+    "detail": "衡量页面元素意外移动造成的视觉稳定性变化",
+    "aliases": [
+      "Cumulative layout shift",
+      "CLS"
+    ]
+  },
+  {
+    "id": "design.contrast-ratio",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "对比度",
+    "detail": "衡量前景与背景的视觉区分程度",
+    "aliases": [
+      "对比度"
+    ]
+  },
+  {
+    "id": "design.contrast-ratio",
+    "domain": "design",
+    "category": "design.interaction",
+    "label": "Contrast ratio",
+    "detail": "衡量前景与背景的视觉区分程度",
+    "aliases": [
+      "Contrast ratio"
+    ]
+  },
+  {
+    "id": "programming.minimal-reproduction",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "最小复现",
+    "detail": "用尽量少的步骤和代码稳定重现问题",
+    "aliases": [
+      "最小复现"
+    ]
+  },
+  {
+    "id": "programming.minimal-reproduction",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Minimal reproduction",
+    "detail": "用尽量少的步骤和代码稳定重现问题",
+    "aliases": [
+      "Minimal reproduction",
+      "repro"
+    ]
+  },
+  {
+    "id": "programming.regression-testing",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "回归测试",
+    "detail": "验证修改后已有功能仍然符合预期",
+    "aliases": [
+      "回归测试"
+    ]
+  },
+  {
+    "id": "programming.regression-testing",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Regression testing",
+    "detail": "验证修改后已有功能仍然符合预期",
+    "aliases": [
+      "Regression testing"
+    ]
+  },
+  {
+    "id": "programming.race-condition",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "竞态条件",
+    "detail": "排查结果依赖并发操作时序的问题",
+    "aliases": [
+      "竞态条件"
+    ]
+  },
+  {
+    "id": "programming.race-condition",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Race condition",
+    "detail": "排查结果依赖并发操作时序的问题",
+    "aliases": [
+      "Race condition"
+    ]
+  },
+  {
+    "id": "programming.contract-testing",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "契约测试",
+    "detail": "验证接口提供方和使用方对请求响应的约定",
+    "aliases": [
+      "契约测试"
+    ]
+  },
+  {
+    "id": "programming.contract-testing",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Contract testing",
+    "detail": "验证接口提供方和使用方对请求响应的约定",
+    "aliases": [
+      "Contract testing"
+    ]
+  },
+  {
+    "id": "programming.root-cause-analysis",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "根因分析",
+    "detail": "从现象追踪导致故障的底层原因",
+    "aliases": [
+      "根因分析"
+    ]
+  },
+  {
+    "id": "programming.root-cause-analysis",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Root cause analysis",
+    "detail": "从现象追踪导致故障的底层原因",
+    "aliases": [
+      "Root cause analysis",
+      "RCA"
+    ]
+  },
+  {
+    "id": "programming.boundary-value-analysis",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "边界值分析",
+    "detail": "围绕输入边界设计测试样本",
+    "aliases": [
+      "边界值分析"
+    ]
+  },
+  {
+    "id": "programming.boundary-value-analysis",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Boundary value analysis",
+    "detail": "围绕输入边界设计测试样本",
+    "aliases": [
+      "Boundary value analysis",
+      "BVA"
+    ]
+  },
+  {
+    "id": "programming.equivalence-partitioning",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "等价类划分",
+    "detail": "将具有相似处理行为的输入分组测试",
+    "aliases": [
+      "等价类划分"
+    ]
+  },
+  {
+    "id": "programming.equivalence-partitioning",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Equivalence partitioning",
+    "detail": "将具有相似处理行为的输入分组测试",
+    "aliases": [
+      "Equivalence partitioning"
+    ]
+  },
+  {
+    "id": "programming.test-double",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "测试替身",
+    "detail": "在测试中替代外部依赖或复杂组件",
+    "aliases": [
+      "测试替身"
+    ]
+  },
+  {
+    "id": "programming.test-double",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Test double",
+    "detail": "在测试中替代外部依赖或复杂组件",
+    "aliases": [
+      "Test double"
+    ]
+  },
+  {
+    "id": "programming.flaky-test",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "不稳定测试",
+    "detail": "识别相同代码下结果不稳定的测试",
+    "aliases": [
+      "不稳定测试"
+    ]
+  },
+  {
+    "id": "programming.flaky-test",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Flaky test",
+    "detail": "识别相同代码下结果不稳定的测试",
+    "aliases": [
+      "Flaky test"
+    ]
+  },
+  {
+    "id": "programming.smoke-testing",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "冒烟测试",
+    "detail": "快速检查关键功能是否基本可用",
+    "aliases": [
+      "冒烟测试"
+    ]
+  },
+  {
+    "id": "programming.smoke-testing",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Smoke testing",
+    "detail": "快速检查关键功能是否基本可用",
+    "aliases": [
+      "Smoke testing"
+    ]
+  },
+  {
+    "id": "programming.end-to-end-testing",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "端到端测试",
+    "detail": "验证跨组件的完整用户操作流程",
+    "aliases": [
+      "端到端测试"
+    ]
+  },
+  {
+    "id": "programming.end-to-end-testing",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "End-to-end testing",
+    "detail": "验证跨组件的完整用户操作流程",
+    "aliases": [
+      "End-to-end testing",
+      "E2E"
+    ]
+  },
+  {
+    "id": "programming.test-coverage",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "测试覆盖率",
+    "detail": "衡量被测试执行的代码或需求范围",
+    "aliases": [
+      "测试覆盖率"
+    ]
+  },
+  {
+    "id": "programming.test-coverage",
+    "domain": "programming",
+    "category": "programming.testing",
+    "label": "Test coverage",
+    "detail": "衡量被测试执行的代码或需求范围",
+    "aliases": [
+      "Test coverage"
+    ]
+  },
+  {
+    "id": "programming.health-check",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "健康检查",
+    "detail": "检测服务是否存活并能处理请求",
+    "aliases": [
+      "健康检查"
+    ]
+  },
+  {
+    "id": "programming.health-check",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Health check",
+    "detail": "检测服务是否存活并能处理请求",
+    "aliases": [
+      "Health check"
+    ]
+  },
+  {
+    "id": "programming.reverse-proxy",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "反向代理",
+    "detail": "在客户端与后端之间转发请求",
+    "aliases": [
+      "反向代理"
+    ]
+  },
+  {
+    "id": "programming.reverse-proxy",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Reverse proxy",
+    "detail": "在客户端与后端之间转发请求",
+    "aliases": [
+      "Reverse proxy"
+    ]
+  },
+  {
+    "id": "programming.persistent-volume",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "持久化卷",
+    "detail": "让数据在容器或实例重建后仍可保留",
+    "aliases": [
+      "持久化卷"
+    ]
+  },
+  {
+    "id": "programming.persistent-volume",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Persistent volume",
+    "detail": "让数据在容器或实例重建后仍可保留",
+    "aliases": [
+      "Persistent volume"
+    ]
+  },
+  {
+    "id": "programming.canary-deployment",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "灰度发布",
+    "detail": "先向部分流量发布新版本并观察结果",
+    "aliases": [
+      "灰度发布"
+    ]
+  },
+  {
+    "id": "programming.canary-deployment",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Canary deployment",
+    "detail": "先向部分流量发布新版本并观察结果",
+    "aliases": [
+      "Canary deployment"
+    ]
+  },
+  {
+    "id": "programming.deployment-rollback",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "发布回滚",
+    "detail": "在发布异常时恢复到已知版本",
+    "aliases": [
+      "发布回滚"
+    ]
+  },
+  {
+    "id": "programming.deployment-rollback",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Deployment rollback",
+    "detail": "在发布异常时恢复到已知版本",
+    "aliases": [
+      "Deployment rollback"
+    ]
+  },
+  {
+    "id": "programming.observability",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "可观测性",
+    "detail": "结合日志、指标和追踪理解系统运行状态",
+    "aliases": [
+      "可观测性"
+    ]
+  },
+  {
+    "id": "programming.observability",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Observability",
+    "detail": "结合日志、指标和追踪理解系统运行状态",
+    "aliases": [
+      "Observability"
+    ]
+  },
+  {
+    "id": "programming.environment-variable",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "环境变量",
+    "detail": "通过运行环境传递应用配置",
+    "aliases": [
+      "环境变量"
+    ]
+  },
+  {
+    "id": "programming.environment-variable",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Environment variable",
+    "detail": "通过运行环境传递应用配置",
+    "aliases": [
+      "Environment variable",
+      "env"
+    ]
+  },
+  {
+    "id": "programming.infrastructure-as-code",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "基础设施即代码",
+    "detail": "用可版本管理的声明或代码配置基础设施",
+    "aliases": [
+      "基础设施即代码"
+    ]
+  },
+  {
+    "id": "programming.infrastructure-as-code",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Infrastructure as code",
+    "detail": "用可版本管理的声明或代码配置基础设施",
+    "aliases": [
+      "Infrastructure as code",
+      "IaC"
+    ]
+  },
+  {
+    "id": "programming.blue-green-deployment",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "蓝绿部署",
+    "detail": "在两套环境间切换生产流量",
+    "aliases": [
+      "蓝绿部署"
+    ]
+  },
+  {
+    "id": "programming.blue-green-deployment",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Blue-green deployment",
+    "detail": "在两套环境间切换生产流量",
+    "aliases": [
+      "Blue-green deployment"
+    ]
+  },
+  {
+    "id": "programming.graceful-shutdown",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "优雅停机",
+    "detail": "停止接收新任务并处理已有请求后退出",
+    "aliases": [
+      "优雅停机"
+    ]
+  },
+  {
+    "id": "programming.graceful-shutdown",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Graceful shutdown",
+    "detail": "停止接收新任务并处理已有请求后退出",
+    "aliases": [
+      "Graceful shutdown"
+    ]
+  },
+  {
+    "id": "programming.backup-and-restore",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "备份恢复",
+    "detail": "保存数据副本并验证恢复流程",
+    "aliases": [
+      "备份恢复"
+    ]
+  },
+  {
+    "id": "programming.backup-and-restore",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Backup and restore",
+    "detail": "保存数据副本并验证恢复流程",
+    "aliases": [
+      "Backup and restore"
+    ]
+  },
+  {
+    "id": "programming.service-level-objective",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "服务等级目标",
+    "detail": "为服务可靠性指标设定可衡量目标",
+    "aliases": [
+      "服务等级目标"
+    ]
+  },
+  {
+    "id": "programming.service-level-objective",
+    "domain": "programming",
+    "category": "programming.devops",
+    "label": "Service-level objective",
+    "detail": "为服务可靠性指标设定可衡量目标",
+    "aliases": [
+      "Service-level objective",
+      "SLO"
+    ]
+  },
+  {
+    "id": "office.optical-character-recognition",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "光学字符识别",
+    "detail": "从扫描件或图片中识别文字",
+    "aliases": [
+      "光学字符识别"
+    ]
+  },
+  {
+    "id": "office.optical-character-recognition",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Optical character recognition",
+    "detail": "从扫描件或图片中识别文字",
+    "aliases": [
+      "Optical character recognition",
+      "OCR"
+    ]
+  },
+  {
+    "id": "office.batch-renaming",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "批量重命名",
+    "detail": "按统一规则修改多个文件名称",
+    "aliases": [
+      "批量重命名"
+    ]
+  },
+  {
+    "id": "office.batch-renaming",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Batch renaming",
+    "detail": "按统一规则修改多个文件名称",
+    "aliases": [
+      "Batch renaming"
+    ]
+  },
+  {
+    "id": "office.field-mapping",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "字段映射",
+    "detail": "定义不同数据来源之间的字段对应关系",
+    "aliases": [
+      "字段映射"
+    ]
+  },
+  {
+    "id": "office.field-mapping",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Field mapping",
+    "detail": "定义不同数据来源之间的字段对应关系",
+    "aliases": [
+      "Field mapping"
+    ]
+  },
+  {
+    "id": "office.template-population",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "模板填充",
+    "detail": "把结构化数据填入预设文档位置",
+    "aliases": [
+      "模板填充"
+    ]
+  },
+  {
+    "id": "office.template-population",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Template population",
+    "detail": "把结构化数据填入预设文档位置",
+    "aliases": [
+      "Template population"
+    ]
+  },
+  {
+    "id": "office.incremental-synchronization",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "增量同步",
+    "detail": "只同步上次处理后新增或变化的数据",
+    "aliases": [
+      "增量同步"
+    ]
+  },
+  {
+    "id": "office.incremental-synchronization",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Incremental synchronization",
+    "detail": "只同步上次处理后新增或变化的数据",
+    "aliases": [
+      "Incremental synchronization"
+    ]
+  },
+  {
+    "id": "office.resumable-processing",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "断点续跑",
+    "detail": "从已记录的进度继续处理未完成任务",
+    "aliases": [
+      "断点续跑"
+    ]
+  },
+  {
+    "id": "office.resumable-processing",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Resumable processing",
+    "detail": "从已记录的进度继续处理未完成任务",
+    "aliases": [
+      "Resumable processing"
+    ]
+  },
+  {
+    "id": "office.document-parsing",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "文档解析",
+    "detail": "提取文档中的正文、表格和结构信息",
+    "aliases": [
+      "文档解析"
+    ]
+  },
+  {
+    "id": "office.document-parsing",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Document parsing",
+    "detail": "提取文档中的正文、表格和结构信息",
+    "aliases": [
+      "Document parsing"
+    ]
+  },
+  {
+    "id": "office.mail-merge",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "邮件合并",
+    "detail": "用收件人数据批量生成个性化文档或邮件",
+    "aliases": [
+      "邮件合并"
+    ]
+  },
+  {
+    "id": "office.mail-merge",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Mail merge",
+    "detail": "用收件人数据批量生成个性化文档或邮件",
+    "aliases": [
+      "Mail merge"
+    ]
+  },
+  {
+    "id": "office.scheduled-job",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "定时任务",
+    "detail": "按指定时间或周期自动执行工作",
+    "aliases": [
+      "定时任务"
+    ]
+  },
+  {
+    "id": "office.scheduled-job",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Scheduled job",
+    "detail": "按指定时间或周期自动执行工作",
+    "aliases": [
+      "Scheduled job",
+      "cron"
+    ]
+  },
+  {
+    "id": "office.file-deduplication",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "文件去重",
+    "detail": "识别重复文件并保留可追踪的处理结果",
+    "aliases": [
+      "文件去重"
+    ]
+  },
+  {
+    "id": "office.file-deduplication",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "File deduplication",
+    "detail": "识别重复文件并保留可追踪的处理结果",
+    "aliases": [
+      "File deduplication"
+    ]
+  },
+  {
+    "id": "office.format-conversion",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "格式转换",
+    "detail": "在保留必要内容的前提下转换文件格式",
+    "aliases": [
+      "格式转换"
+    ]
+  },
+  {
+    "id": "office.format-conversion",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Format conversion",
+    "detail": "在保留必要内容的前提下转换文件格式",
+    "aliases": [
+      "Format conversion"
+    ]
+  },
+  {
+    "id": "office.processing-manifest",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "处理清单",
+    "detail": "记录输入、输出、处理状态与失败原因",
+    "aliases": [
+      "处理清单"
+    ]
+  },
+  {
+    "id": "office.processing-manifest",
+    "domain": "office",
+    "category": "office.documents",
+    "label": "Processing manifest",
+    "detail": "记录输入、输出、处理状态与失败原因",
+    "aliases": [
+      "Processing manifest"
+    ]
+  },
+  {
+    "id": "programming.transaction-isolation",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "事务隔离",
+    "detail": "定义并发事务之间可见数据的规则",
+    "aliases": [
+      "事务隔离"
+    ]
+  },
+  {
+    "id": "programming.transaction-isolation",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Transaction isolation",
+    "detail": "定义并发事务之间可见数据的规则",
+    "aliases": [
+      "Transaction isolation"
+    ]
+  },
+  {
+    "id": "programming.database-index",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "数据库索引",
+    "detail": "用辅助结构加速特定数据查询",
+    "aliases": [
+      "数据库索引"
+    ]
+  },
+  {
+    "id": "programming.database-index",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Database index",
+    "detail": "用辅助结构加速特定数据查询",
+    "aliases": [
+      "Database index"
+    ]
+  },
+  {
+    "id": "programming.data-migration",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "数据迁移",
+    "detail": "按可验证流程移动或转换数据",
+    "aliases": [
+      "数据迁移"
+    ]
+  },
+  {
+    "id": "programming.data-migration",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Data migration",
+    "detail": "按可验证流程移动或转换数据",
+    "aliases": [
+      "Data migration"
+    ]
+  },
+  {
+    "id": "programming.webhook",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "事件回调",
+    "detail": "在事件发生时向指定地址发送通知",
+    "aliases": [
+      "事件回调"
+    ]
+  },
+  {
+    "id": "programming.webhook",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Webhook",
+    "detail": "在事件发生时向指定地址发送通知",
+    "aliases": [
+      "Webhook"
+    ]
+  },
+  {
+    "id": "programming.cursor-pagination",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "游标分页",
+    "detail": "使用位置标识继续读取后续数据",
+    "aliases": [
+      "游标分页"
+    ]
+  },
+  {
+    "id": "programming.cursor-pagination",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Cursor pagination",
+    "detail": "使用位置标识继续读取后续数据",
+    "aliases": [
+      "Cursor pagination"
+    ]
+  },
+  {
+    "id": "programming.exponential-backoff",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "指数退避",
+    "detail": "在连续重试之间逐步增加等待时间",
+    "aliases": [
+      "指数退避"
+    ]
+  },
+  {
+    "id": "programming.exponential-backoff",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Exponential backoff",
+    "detail": "在连续重试之间逐步增加等待时间",
+    "aliases": [
+      "Exponential backoff"
+    ]
+  },
+  {
+    "id": "programming.connection-pool",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "连接池",
+    "detail": "复用有限数量的连接处理请求",
+    "aliases": [
+      "连接池"
+    ]
+  },
+  {
+    "id": "programming.connection-pool",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Connection pool",
+    "detail": "复用有限数量的连接处理请求",
+    "aliases": [
+      "Connection pool"
+    ]
+  },
+  {
+    "id": "programming.message-queue",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "消息队列",
+    "detail": "通过队列解耦消息生产与消费",
+    "aliases": [
+      "消息队列"
+    ]
+  },
+  {
+    "id": "programming.message-queue",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Message queue",
+    "detail": "通过队列解耦消息生产与消费",
+    "aliases": [
+      "Message queue"
+    ]
+  },
+  {
+    "id": "programming.dead-letter-queue",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "死信队列",
+    "detail": "隔离多次处理失败或无法消费的消息",
+    "aliases": [
+      "死信队列"
+    ]
+  },
+  {
+    "id": "programming.dead-letter-queue",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Dead-letter queue",
+    "detail": "隔离多次处理失败或无法消费的消息",
+    "aliases": [
+      "Dead-letter queue",
+      "DLQ"
+    ]
+  },
+  {
+    "id": "programming.eventual-consistency",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "最终一致性",
+    "detail": "允许短期差异并在无新更新后趋于一致",
+    "aliases": [
+      "最终一致性"
+    ]
+  },
+  {
+    "id": "programming.eventual-consistency",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Eventual consistency",
+    "detail": "允许短期差异并在无新更新后趋于一致",
+    "aliases": [
+      "Eventual consistency"
+    ]
+  },
+  {
+    "id": "programming.rate-limiting",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "限流",
+    "detail": "限制单位时间内允许处理的请求数量",
+    "aliases": [
+      "限流"
+    ]
+  },
+  {
+    "id": "programming.rate-limiting",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Rate limiting",
+    "detail": "限制单位时间内允许处理的请求数量",
+    "aliases": [
+      "Rate limiting"
+    ]
+  },
+  {
+    "id": "programming.change-data-capture",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "变更数据捕获",
+    "detail": "捕获数据变更用于同步或后续处理",
+    "aliases": [
+      "变更数据捕获"
+    ]
+  },
+  {
+    "id": "programming.change-data-capture",
+    "domain": "programming",
+    "category": "programming.integration",
+    "label": "Change data capture",
+    "detail": "捕获数据变更用于同步或后续处理",
+    "aliases": [
+      "Change data capture",
+      "CDC"
+    ]
+  },
+  {
+    "id": "programming.keyboard-avoidance",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "软键盘避让",
+    "detail": "在软键盘出现时保持输入内容和操作可见",
+    "aliases": [
+      "软键盘避让"
+    ]
+  },
+  {
+    "id": "programming.keyboard-avoidance",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Keyboard avoidance",
+    "detail": "在软键盘出现时保持输入内容和操作可见",
+    "aliases": [
+      "Keyboard avoidance"
+    ]
+  },
+  {
+    "id": "programming.deep-link",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "深度链接",
+    "detail": "通过链接打开应用内指定内容",
+    "aliases": [
+      "深度链接"
+    ]
+  },
+  {
+    "id": "programming.deep-link",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Deep link",
+    "detail": "通过链接打开应用内指定内容",
+    "aliases": [
+      "Deep link"
+    ]
+  },
+  {
+    "id": "programming.offline-cache",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "离线缓存",
+    "detail": "在离线时使用已保存的数据或资源",
+    "aliases": [
+      "离线缓存"
+    ]
+  },
+  {
+    "id": "programming.offline-cache",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Offline cache",
+    "detail": "在离线时使用已保存的数据或资源",
+    "aliases": [
+      "Offline cache"
+    ]
+  },
+  {
+    "id": "programming.background-task",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "后台任务",
+    "detail": "按平台限制在非前台状态执行工作",
+    "aliases": [
+      "后台任务"
+    ]
+  },
+  {
+    "id": "programming.background-task",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Background task",
+    "detail": "按平台限制在非前台状态执行工作",
+    "aliases": [
+      "Background task"
+    ]
+  },
+  {
+    "id": "programming.app-lifecycle",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "应用生命周期",
+    "detail": "处理启动、前后台切换和终止等状态",
+    "aliases": [
+      "应用生命周期"
+    ]
+  },
+  {
+    "id": "programming.app-lifecycle",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "App lifecycle",
+    "detail": "处理启动、前后台切换和终止等状态",
+    "aliases": [
+      "App lifecycle"
+    ]
+  },
+  {
+    "id": "programming.permission-request",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "权限请求",
+    "detail": "在需要时向用户申请系统资源访问权限",
+    "aliases": [
+      "权限请求"
+    ]
+  },
+  {
+    "id": "programming.permission-request",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Permission request",
+    "detail": "在需要时向用户申请系统资源访问权限",
+    "aliases": [
+      "Permission request"
+    ]
+  },
+  {
+    "id": "programming.push-notification",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "推送通知",
+    "detail": "通过系统通道向用户投递应用消息",
+    "aliases": [
+      "推送通知"
+    ]
+  },
+  {
+    "id": "programming.push-notification",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Push notification",
+    "detail": "通过系统通道向用户投递应用消息",
+    "aliases": [
+      "Push notification"
+    ]
+  },
+  {
+    "id": "programming.cold-start",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "冷启动",
+    "detail": "衡量应用进程未运行时的启动过程",
+    "aliases": [
+      "冷启动"
+    ]
+  },
+  {
+    "id": "programming.cold-start",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Cold start",
+    "detail": "衡量应用进程未运行时的启动过程",
+    "aliases": [
+      "Cold start"
+    ]
+  },
+  {
+    "id": "programming.platform-adaptation",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "平台适配",
+    "detail": "根据平台能力和交互约定调整实现",
+    "aliases": [
+      "平台适配"
+    ]
+  },
+  {
+    "id": "programming.platform-adaptation",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Platform adaptation",
+    "detail": "根据平台能力和交互约定调整实现",
+    "aliases": [
+      "Platform adaptation"
+    ]
+  },
+  {
+    "id": "programming.state-restoration",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "状态恢复",
+    "detail": "重新打开应用时恢复必要的界面和任务状态",
+    "aliases": [
+      "状态恢复"
+    ]
+  },
+  {
+    "id": "programming.state-restoration",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "State restoration",
+    "detail": "重新打开应用时恢复必要的界面和任务状态",
+    "aliases": [
+      "State restoration"
+    ]
+  },
+  {
+    "id": "programming.gesture-conflict",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "手势冲突",
+    "detail": "排查多个手势识别器竞争同一次操作",
+    "aliases": [
+      "手势冲突"
+    ]
+  },
+  {
+    "id": "programming.gesture-conflict",
+    "domain": "programming",
+    "category": "programming.mobile",
+    "label": "Gesture conflict",
+    "detail": "排查多个手势识别器竞争同一次操作",
+    "aliases": [
+      "Gesture conflict"
+    ]
+  },
+  {
+    "id": "programming.least-privilege",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "最小权限",
+    "detail": "仅授予完成任务所需的访问能力",
+    "aliases": [
+      "最小权限"
+    ]
+  },
+  {
+    "id": "programming.least-privilege",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Least privilege",
+    "detail": "仅授予完成任务所需的访问能力",
+    "aliases": [
+      "Least privilege"
+    ]
+  },
+  {
+    "id": "programming.role-based-access-control",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "基于角色的访问控制",
+    "detail": "依据用户角色分配资源操作权限",
+    "aliases": [
+      "基于角色的访问控制"
+    ]
+  },
+  {
+    "id": "programming.role-based-access-control",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Role-based access control",
+    "detail": "依据用户角色分配资源操作权限",
+    "aliases": [
+      "Role-based access control",
+      "RBAC"
+    ]
+  },
+  {
+    "id": "programming.key-rotation",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "密钥轮换",
+    "detail": "按流程替换密钥并处理旧凭据失效",
+    "aliases": [
+      "密钥轮换"
+    ]
+  },
+  {
+    "id": "programming.key-rotation",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Key rotation",
+    "detail": "按流程替换密钥并处理旧凭据失效",
+    "aliases": [
+      "Key rotation"
+    ]
+  },
+  {
+    "id": "programming.input-validation",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "输入校验",
+    "detail": "检查输入是否满足类型、范围和格式约束",
+    "aliases": [
+      "输入校验"
+    ]
+  },
+  {
+    "id": "programming.input-validation",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Input validation",
+    "detail": "检查输入是否满足类型、范围和格式约束",
+    "aliases": [
+      "Input validation"
+    ]
+  },
+  {
+    "id": "programming.audit-log",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "审计日志",
+    "detail": "记录敏感操作的主体、时间和结果",
+    "aliases": [
+      "审计日志"
+    ]
+  },
+  {
+    "id": "programming.audit-log",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Audit log",
+    "detail": "记录敏感操作的主体、时间和结果",
+    "aliases": [
+      "Audit log"
+    ]
+  },
+  {
+    "id": "programming.authentication",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "身份认证",
+    "detail": "核验请求者声明的身份",
+    "aliases": [
+      "身份认证"
+    ]
+  },
+  {
+    "id": "programming.authentication",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Authentication",
+    "detail": "核验请求者声明的身份",
+    "aliases": [
+      "Authentication"
+    ]
+  },
+  {
+    "id": "programming.authorization",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "资源授权",
+    "detail": "判断已识别主体是否可以操作目标资源",
+    "aliases": [
+      "资源授权"
+    ]
+  },
+  {
+    "id": "programming.authorization",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Authorization",
+    "detail": "判断已识别主体是否可以操作目标资源",
+    "aliases": [
+      "Authorization"
+    ]
+  },
+  {
+    "id": "programming.cross-site-request-forgery",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "跨站请求伪造",
+    "detail": "识别利用用户已有身份发起非预期请求的风险",
+    "aliases": [
+      "跨站请求伪造"
+    ]
+  },
+  {
+    "id": "programming.cross-site-request-forgery",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Cross-site request forgery",
+    "detail": "识别利用用户已有身份发起非预期请求的风险",
+    "aliases": [
+      "Cross-site request forgery",
+      "CSRF"
+    ]
+  },
+  {
+    "id": "programming.cross-site-scripting",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "跨站脚本",
+    "detail": "识别不可信内容作为脚本在页面执行的风险",
+    "aliases": [
+      "跨站脚本"
+    ]
+  },
+  {
+    "id": "programming.cross-site-scripting",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Cross-site scripting",
+    "detail": "识别不可信内容作为脚本在页面执行的风险",
+    "aliases": [
+      "Cross-site scripting",
+      "XSS"
+    ]
+  },
+  {
+    "id": "programming.sql-injection",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "SQL注入",
+    "detail": "识别用户输入改变数据库查询语义的风险",
+    "aliases": [
+      "SQL注入"
+    ]
+  },
+  {
+    "id": "programming.sql-injection",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "SQL injection",
+    "detail": "识别用户输入改变数据库查询语义的风险",
+    "aliases": [
+      "SQL injection"
+    ]
+  },
+  {
+    "id": "programming.data-masking",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "敏感数据脱敏",
+    "detail": "隐藏不应直接展示的敏感字段",
+    "aliases": [
+      "敏感数据脱敏"
+    ]
+  },
+  {
+    "id": "programming.data-masking",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Data masking",
+    "detail": "隐藏不应直接展示的敏感字段",
+    "aliases": [
+      "Data masking"
+    ]
+  },
+  {
+    "id": "programming.tenant-isolation",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "租户隔离",
+    "detail": "限制不同租户之间的数据与操作访问",
+    "aliases": [
+      "租户隔离"
+    ]
+  },
+  {
+    "id": "programming.tenant-isolation",
+    "domain": "programming",
+    "category": "programming.security",
+    "label": "Tenant isolation",
+    "detail": "限制不同租户之间的数据与操作访问",
+    "aliases": [
+      "Tenant isolation"
+    ]
+  },
+  {
+    "id": "research.literature-review",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "文献综述",
+    "detail": "围绕研究问题整理已有研究的结论与分歧",
+    "aliases": [
+      "文献综述"
+    ]
+  },
+  {
+    "id": "research.literature-review",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "Literature review",
+    "detail": "围绕研究问题整理已有研究的结论与分歧",
+    "aliases": [
+      "Literature review"
+    ]
+  },
+  {
+    "id": "research.evidence-hierarchy",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "证据等级",
+    "detail": "按适用方法评价证据强度与局限",
+    "aliases": [
+      "证据等级"
+    ]
+  },
+  {
+    "id": "research.evidence-hierarchy",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "Evidence hierarchy",
+    "detail": "按适用方法评价证据强度与局限",
+    "aliases": [
+      "Evidence hierarchy"
+    ]
+  },
+  {
+    "id": "research.citation-provenance",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "引用溯源",
+    "detail": "把陈述对应到可核验的原始来源",
+    "aliases": [
+      "引用溯源"
+    ]
+  },
+  {
+    "id": "research.citation-provenance",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "Citation provenance",
+    "detail": "把陈述对应到可核验的原始来源",
+    "aliases": [
+      "Citation provenance"
+    ]
+  },
+  {
+    "id": "research.research-question",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "研究问题",
+    "detail": "明确研究试图回答的具体问题",
+    "aliases": [
+      "研究问题"
+    ]
+  },
+  {
+    "id": "research.research-question",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "Research question",
+    "detail": "明确研究试图回答的具体问题",
+    "aliases": [
+      "Research question"
+    ]
+  },
+  {
+    "id": "research.eligibility-criteria",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "纳入排除标准",
+    "detail": "定义资料或样本被纳入分析的条件",
+    "aliases": [
+      "纳入排除标准"
+    ]
+  },
+  {
+    "id": "research.eligibility-criteria",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "Eligibility criteria",
+    "detail": "定义资料或样本被纳入分析的条件",
+    "aliases": [
+      "Eligibility criteria"
+    ]
+  },
+  {
+    "id": "research.reproducibility",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "可复现性",
+    "detail": "记录数据、方法和环境以便重复验证结果",
+    "aliases": [
+      "可复现性"
+    ]
+  },
+  {
+    "id": "research.reproducibility",
+    "domain": "research",
+    "category": "research.evidence",
+    "label": "Reproducibility",
+    "detail": "记录数据、方法和环境以便重复验证结果",
+    "aliases": [
+      "Reproducibility"
+    ]
+  },
+  {
+    "id": "research.concept-map",
+    "domain": "research",
+    "category": "research.education",
+    "label": "概念图",
+    "detail": "用节点和关系组织概念之间的联系",
+    "aliases": [
+      "概念图"
+    ]
+  },
+  {
+    "id": "research.concept-map",
+    "domain": "research",
+    "category": "research.education",
+    "label": "Concept map",
+    "detail": "用节点和关系组织概念之间的联系",
+    "aliases": [
+      "Concept map"
+    ]
+  },
+  {
+    "id": "research.assessment-rubric",
+    "domain": "research",
+    "category": "research.education",
+    "label": "评分量规",
+    "detail": "用明确维度和等级描述评分依据",
+    "aliases": [
+      "评分量规"
+    ]
+  },
+  {
+    "id": "research.assessment-rubric",
+    "domain": "research",
+    "category": "research.education",
+    "label": "Assessment rubric",
+    "detail": "用明确维度和等级描述评分依据",
+    "aliases": [
+      "Assessment rubric"
+    ]
+  },
+  {
+    "id": "research.learning-objective",
+    "domain": "research",
+    "category": "research.education",
+    "label": "学习目标",
+    "detail": "描述学习后应能展示的知识或能力",
+    "aliases": [
+      "学习目标"
+    ]
+  },
+  {
+    "id": "research.learning-objective",
+    "domain": "research",
+    "category": "research.education",
+    "label": "Learning objective",
+    "detail": "描述学习后应能展示的知识或能力",
+    "aliases": [
+      "Learning objective"
+    ]
+  },
+  {
+    "id": "research.formative-assessment",
+    "domain": "research",
+    "category": "research.education",
+    "label": "形成性评价",
+    "detail": "在学习过程中收集反馈以调整教学",
+    "aliases": [
+      "形成性评价"
+    ]
+  },
+  {
+    "id": "research.formative-assessment",
+    "domain": "research",
+    "category": "research.education",
+    "label": "Formative assessment",
+    "detail": "在学习过程中收集反馈以调整教学",
+    "aliases": [
+      "Formative assessment"
+    ]
+  },
+  {
+    "id": "research.instructional-scaffolding",
+    "domain": "research",
+    "category": "research.education",
+    "label": "教学支架",
+    "detail": "提供逐步撤除的支持帮助完成学习任务",
+    "aliases": [
+      "教学支架"
+    ]
+  },
+  {
+    "id": "research.instructional-scaffolding",
+    "domain": "research",
+    "category": "research.education",
+    "label": "Instructional scaffolding",
+    "detail": "提供逐步撤除的支持帮助完成学习任务",
+    "aliases": [
+      "Instructional scaffolding"
+    ]
+  },
+  {
+    "id": "research.knowledge-gap",
+    "domain": "research",
+    "category": "research.education",
+    "label": "知识缺口",
+    "detail": "识别已有理解与目标能力之间的不足",
+    "aliases": [
+      "知识缺口"
+    ]
+  },
+  {
+    "id": "research.knowledge-gap",
+    "domain": "research",
+    "category": "research.education",
+    "label": "Knowledge gap",
+    "detail": "识别已有理解与目标能力之间的不足",
+    "aliases": [
+      "Knowledge gap"
+    ]
+  },
+  {
+    "id": "technology.graphics-processing-unit",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "图形处理器",
+    "detail": "以并行计算处理图形和其他计算任务",
+    "aliases": [
+      "图形处理器"
+    ]
+  },
+  {
+    "id": "technology.graphics-processing-unit",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Graphics processing unit",
+    "detail": "以并行计算处理图形和其他计算任务",
+    "aliases": [
+      "Graphics processing unit",
+      "GPU"
+    ]
+  },
+  {
+    "id": "technology.central-processing-unit",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "中央处理器",
+    "detail": "执行通用指令并协调计算机运算",
+    "aliases": [
+      "中央处理器"
+    ]
+  },
+  {
+    "id": "technology.central-processing-unit",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Central processing unit",
+    "detail": "执行通用指令并协调计算机运算",
+    "aliases": [
+      "Central processing unit",
+      "CPU"
+    ]
+  },
+  {
+    "id": "technology.neural-processing-unit",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "神经网络处理器",
+    "detail": "针对神经网络运算设计的专用处理器",
+    "aliases": [
+      "神经网络处理器"
+    ]
+  },
+  {
+    "id": "technology.neural-processing-unit",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Neural processing unit",
+    "detail": "针对神经网络运算设计的专用处理器",
+    "aliases": [
+      "Neural processing unit",
+      "NPU"
+    ]
+  },
+  {
+    "id": "technology.high-bandwidth-memory",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "高带宽内存",
+    "detail": "采用堆叠与宽接口设计提升内存带宽",
+    "aliases": [
+      "高带宽内存"
+    ]
+  },
+  {
+    "id": "technology.high-bandwidth-memory",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "High-bandwidth memory",
+    "detail": "采用堆叠与宽接口设计提升内存带宽",
+    "aliases": [
+      "High-bandwidth memory",
+      "HBM"
+    ]
+  },
+  {
+    "id": "technology.chiplet",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "芯粒",
+    "detail": "将多个独立裸片组合为完整芯片系统",
+    "aliases": [
+      "芯粒"
+    ]
+  },
+  {
+    "id": "technology.chiplet",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Chiplet",
+    "detail": "将多个独立裸片组合为完整芯片系统",
+    "aliases": [
+      "Chiplet"
+    ]
+  },
+  {
+    "id": "technology.advanced-packaging",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "先进封装",
+    "detail": "通过封装技术集成芯片并改善互连",
+    "aliases": [
+      "先进封装"
+    ]
+  },
+  {
+    "id": "technology.advanced-packaging",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Advanced packaging",
+    "detail": "通过封装技术集成芯片并改善互连",
+    "aliases": [
+      "Advanced packaging"
+    ]
+  },
+  {
+    "id": "technology.extreme-ultraviolet-lithography",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "极紫外光刻",
+    "detail": "利用极紫外光形成半导体微细图案",
+    "aliases": [
+      "极紫外光刻"
+    ]
+  },
+  {
+    "id": "technology.extreme-ultraviolet-lithography",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Extreme ultraviolet lithography",
+    "detail": "利用极紫外光形成半导体微细图案",
+    "aliases": [
+      "Extreme ultraviolet lithography",
+      "EUV"
+    ]
+  },
+  {
+    "id": "technology.semiconductor-process-node",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "半导体制程节点",
+    "detail": "标识芯片制造工艺代际而非单一实际尺寸",
+    "aliases": [
+      "半导体制程节点"
+    ]
+  },
+  {
+    "id": "technology.semiconductor-process-node",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Semiconductor process node",
+    "detail": "标识芯片制造工艺代际而非单一实际尺寸",
+    "aliases": [
+      "Semiconductor process node"
+    ]
+  },
+  {
+    "id": "technology.semiconductor-foundry",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "晶圆代工",
+    "detail": "为外部芯片设计提供晶圆制造服务",
+    "aliases": [
+      "晶圆代工"
+    ]
+  },
+  {
+    "id": "technology.semiconductor-foundry",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Semiconductor foundry",
+    "detail": "为外部芯片设计提供晶圆制造服务",
+    "aliases": [
+      "Semiconductor foundry"
+    ]
+  },
+  {
+    "id": "technology.manufacturing-yield",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "良率",
+    "detail": "衡量生产输出中符合要求产品的比例",
+    "aliases": [
+      "良率"
+    ]
+  },
+  {
+    "id": "technology.manufacturing-yield",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Manufacturing yield",
+    "detail": "衡量生产输出中符合要求产品的比例",
+    "aliases": [
+      "Manufacturing yield"
+    ]
+  },
+  {
+    "id": "technology.edge-computing",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "边缘计算",
+    "detail": "在靠近数据产生位置处理计算任务",
+    "aliases": [
+      "边缘计算"
+    ]
+  },
+  {
+    "id": "technology.edge-computing",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Edge computing",
+    "detail": "在靠近数据产生位置处理计算任务",
+    "aliases": [
+      "Edge computing"
+    ]
+  },
+  {
+    "id": "technology.quantum-computing",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "量子计算",
+    "detail": "利用量子态及其操作执行计算",
+    "aliases": [
+      "量子计算"
+    ]
+  },
+  {
+    "id": "technology.quantum-computing",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Quantum computing",
+    "detail": "利用量子态及其操作执行计算",
+    "aliases": [
+      "Quantum computing"
+    ]
+  },
+  {
+    "id": "technology.qubit",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "量子比特",
+    "detail": "用量子系统表示可操作的量子信息单位",
+    "aliases": [
+      "量子比特"
+    ]
+  },
+  {
+    "id": "technology.qubit",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Qubit",
+    "detail": "用量子系统表示可操作的量子信息单位",
+    "aliases": [
+      "Qubit"
+    ]
+  },
+  {
+    "id": "technology.compute-cluster",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "算力集群",
+    "detail": "将多台计算节点组织为协同处理资源",
+    "aliases": [
+      "算力集群"
+    ]
+  },
+  {
+    "id": "technology.compute-cluster",
+    "domain": "technology",
+    "category": "technology.chips",
+    "label": "Compute cluster",
+    "detail": "将多台计算节点组织为协同处理资源",
+    "aliases": [
+      "Compute cluster"
+    ]
+  },
+  {
+    "id": "technology.low-earth-orbit-satellite-internet",
+    "domain": "technology",
+    "category": "technology.networks",
+    "label": "低轨卫星互联网",
+    "detail": "利用低地球轨道卫星提供网络连接",
+    "aliases": [
+      "低轨卫星互联网"
+    ]
+  },
+  {
+    "id": "technology.low-earth-orbit-satellite-internet",
+    "domain": "technology",
+    "category": "technology.networks",
+    "label": "Low Earth orbit satellite internet",
+    "detail": "利用低地球轨道卫星提供网络连接",
+    "aliases": [
+      "Low Earth orbit satellite internet",
+      "LEO satellite internet"
+    ]
+  },
+  {
+    "id": "technology.network-slicing",
+    "domain": "technology",
+    "category": "technology.networks",
+    "label": "网络切片",
+    "detail": "在共享网络基础设施上提供逻辑隔离的网络能力",
+    "aliases": [
+      "网络切片"
+    ]
+  },
+  {
+    "id": "technology.network-slicing",
+    "domain": "technology",
+    "category": "technology.networks",
+    "label": "Network slicing",
+    "detail": "在共享网络基础设施上提供逻辑隔离的网络能力",
+    "aliases": [
+      "Network slicing"
+    ]
+  },
+  {
+    "id": "technology.end-to-end-latency",
+    "domain": "technology",
+    "category": "technology.networks",
+    "label": "端到端时延",
+    "detail": "衡量数据或请求从起点到终点的总耗时",
+    "aliases": [
+      "端到端时延"
+    ]
+  },
+  {
+    "id": "technology.end-to-end-latency",
+    "domain": "technology",
+    "category": "technology.networks",
+    "label": "End-to-end latency",
+    "detail": "衡量数据或请求从起点到终点的总耗时",
+    "aliases": [
+      "End-to-end latency"
+    ]
+  },
+  {
+    "id": "technology.optical-interconnect",
+    "domain": "technology",
+    "category": "technology.networks",
+    "label": "光互连",
+    "detail": "用光信号连接计算或通信组件",
+    "aliases": [
+      "光互连"
+    ]
+  },
+  {
+    "id": "technology.optical-interconnect",
+    "domain": "technology",
+    "category": "technology.networks",
+    "label": "Optical interconnect",
+    "detail": "用光信号连接计算或通信组件",
+    "aliases": [
+      "Optical interconnect"
+    ]
+  },
+  {
+    "id": "technology.reusable-launch-vehicle",
+    "domain": "technology",
+    "category": "technology.space",
+    "label": "可重复使用运载火箭",
+    "detail": "通过回收并再次使用部分部件执行发射",
+    "aliases": [
+      "可重复使用运载火箭"
+    ]
+  },
+  {
+    "id": "technology.reusable-launch-vehicle",
+    "domain": "technology",
+    "category": "technology.space",
+    "label": "Reusable launch vehicle",
+    "detail": "通过回收并再次使用部分部件执行发射",
+    "aliases": [
+      "Reusable launch vehicle"
+    ]
+  },
+  {
+    "id": "technology.payload",
+    "domain": "technology",
+    "category": "technology.space",
+    "label": "载荷",
+    "detail": "运载工具承载的任务设备或货物",
+    "aliases": [
+      "载荷"
+    ]
+  },
+  {
+    "id": "technology.payload",
+    "domain": "technology",
+    "category": "technology.space",
+    "label": "Payload",
+    "detail": "运载工具承载的任务设备或货物",
+    "aliases": [
+      "Payload"
+    ]
+  },
+  {
+    "id": "technology.on-orbit-servicing",
+    "domain": "technology",
+    "category": "technology.space",
+    "label": "在轨服务",
+    "detail": "对在轨航天器实施维护、补给或其他支持",
+    "aliases": [
+      "在轨服务"
+    ]
+  },
+  {
+    "id": "technology.on-orbit-servicing",
+    "domain": "technology",
+    "category": "technology.space",
+    "label": "On-orbit servicing",
+    "detail": "对在轨航天器实施维护、补给或其他支持",
+    "aliases": [
+      "On-orbit servicing"
+    ]
+  },
+  {
+    "id": "technology.solid-state-battery",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "固态电池",
+    "detail": "使用固态电解质进行离子传导的电池",
+    "aliases": [
+      "固态电池"
+    ]
+  },
+  {
+    "id": "technology.solid-state-battery",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "Solid-state battery",
+    "detail": "使用固态电解质进行离子传导的电池",
+    "aliases": [
+      "Solid-state battery"
+    ]
+  },
+  {
+    "id": "technology.energy-density",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "能量密度",
+    "detail": "按质量或体积衡量可储存的能量",
+    "aliases": [
+      "能量密度"
+    ]
+  },
+  {
+    "id": "technology.energy-density",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "Energy density",
+    "detail": "按质量或体积衡量可储存的能量",
+    "aliases": [
+      "Energy density"
+    ]
+  },
+  {
+    "id": "technology.energy-storage-system",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "储能系统",
+    "detail": "储存能量并在需要时释放使用的系统",
+    "aliases": [
+      "储能系统"
+    ]
+  },
+  {
+    "id": "technology.energy-storage-system",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "Energy storage system",
+    "detail": "储存能量并在需要时释放使用的系统",
+    "aliases": [
+      "Energy storage system",
+      "ESS"
+    ]
+  },
+  {
+    "id": "technology.battery-management-system",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "电池管理系统",
+    "detail": "监测并管理电池的状态和工作条件",
+    "aliases": [
+      "电池管理系统"
+    ]
+  },
+  {
+    "id": "technology.battery-management-system",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "Battery management system",
+    "detail": "监测并管理电池的状态和工作条件",
+    "aliases": [
+      "Battery management system",
+      "BMS"
+    ]
+  },
+  {
+    "id": "technology.power-usage-effectiveness",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "电力使用效率",
+    "detail": "比较数据中心总能耗与信息设备能耗",
+    "aliases": [
+      "电力使用效率"
+    ]
+  },
+  {
+    "id": "technology.power-usage-effectiveness",
+    "domain": "technology",
+    "category": "technology.energy",
+    "label": "Power usage effectiveness",
+    "detail": "比较数据中心总能耗与信息设备能耗",
+    "aliases": [
+      "Power usage effectiveness",
+      "PUE"
     ]
   }
 ]

@@ -120,3 +120,28 @@ it.each([['SKU','Stock keeping unit'],['ROAS','Return on ad spend'],['RFM','RFM 
 it.each(['回测赚钱实盘却亏钱','海外仓经常断货','访问很多但就是没人下单','The AI keeps making up facts','ROAS looks great but we still lose money'])('rewrites specialist plain language: %s',input=>{
  expect(promptCompletions(input,input.length)[0]?.kind).toBe('rewrite');
 });
+
+it.each([
+ ['验收标','验收标准'],['MVP','Minimum viable product'],['骨架','骨架屏'],['设计令','设计令牌'],
+ ['最小复','最小复现'],['契约测','契约测试'],['持久化','持久化卷'],['灰度发','灰度发布'],
+ ['OCR','Optical character recognition'],['字段映','字段映射'],['CDC','Change data capture'],['游标分','游标分页'],
+ ['软键盘','软键盘避让'],['深度链','深度链接'],['RBAC','Role-based access control'],['租户隔','租户隔离'],
+ ['文献综','文献综述'],['评分量','评分量规'],['HBM','High-bandwidth memory'],['EUV','Extreme ultraviolet lithography'],
+ ['固态电','固态电池'],['Chipl','Chiplet'],
+])('completes workflow and technology vocabulary: %s',(input,label)=>{
+ expect(promptCompletions(input,input.length).some(item=>item.label===label)).toBe(true);
+});
+it.each([
+ '先做个能用的版本','页面东西太多看不到重点','代码没改测试一会过一会不过','重启容器以后数据全没了',
+ '把这些扫描PDF整理成表格','想把两个系统的数据自动同步起来','键盘弹出来把输入框挡住了',
+ '不同的人只能看到自己的数据','把这些资料整理成有依据的报告',
+ 'Make the acceptance requirements clear','The keyboard covers the input field',
+])('rewrites workflow language: %s',input=>{
+ expect(promptCompletions(input,input.length)[0]?.kind).toBe('rewrite');
+});
+
+it('prefers an explained concept over its bare imported abbreviation',()=>{
+ const items=promptCompletions('GPU',3,20);
+ expect(items.some(item=>item.label==='Graphics processing unit')).toBe(true);
+ expect(items.some(item=>item.label==='GPU')).toBe(false);
+});

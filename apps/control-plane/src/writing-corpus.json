@@ -1677,6 +1677,681 @@
       },
       "source": "AgentFleet authored",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "product-mvp",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "核心需求范围规划",
+        "en": "Core requirement scope planning"
+      },
+      "goals": {
+        "zh": "明确目标用户和核心流程，划分首版范围与后续需求",
+        "en": "Define target users and core workflows and separate first-release scope from later needs"
+      },
+      "examples": {
+        "zh": [
+          "先做个能用的版本",
+          "功能太多先做最重要的"
+        ],
+        "en": [
+          "Build a usable first version",
+          "Start with the most important features"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product-acceptance",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "交付验收条件定义",
+        "en": "Delivery acceptance definition"
+      },
+      "goals": {
+        "zh": "将目标转为可验证的验收条件，覆盖正常流程与边界情况",
+        "en": "Turn goals into verifiable acceptance criteria covering normal flows and edge cases"
+      },
+      "examples": {
+        "zh": [
+          "怎么才算这个功能做完了",
+          "想把验收要求写清楚"
+        ],
+        "en": [
+          "How do we know this feature is finished",
+          "Make the acceptance requirements clear"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "product-rules",
+      "domain": "product",
+      "category": "product.requirements",
+      "terms": {
+        "zh": "业务规则澄清",
+        "en": "Business rule clarification"
+      },
+      "goals": {
+        "zh": "梳理参与角色、操作条件和例外情况，明确业务规则",
+        "en": "Clarify actors, action conditions, and exceptions to define business rules"
+      },
+      "examples": {
+        "zh": [
+          "不同情况该怎么处理还没想清楚",
+          "需求里有些例外情况没说"
+        ],
+        "en": [
+          "We have not decided how each case should work",
+          "The requirements leave exceptions unspecified"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design-hierarchy",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "界面层级梳理",
+        "en": "Interface hierarchy refinement"
+      },
+      "goals": {
+        "zh": "梳理内容优先级、分组和留白，改善界面信息层级",
+        "en": "Review content priority, grouping, and spacing to improve information hierarchy"
+      },
+      "examples": {
+        "zh": [
+          "页面东西太多看不到重点",
+          "界面挤满了不知道先看哪"
+        ],
+        "en": [
+          "The page is crowded and nothing stands out",
+          "There is too much on screen to know where to look"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design-feedback",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "操作反馈完善",
+        "en": "Action feedback improvement"
+      },
+      "goals": {
+        "zh": "补充加载、成功与失败反馈，让用户知道操作当前状态",
+        "en": "Add loading, success, and failure feedback so users can understand action status"
+      },
+      "examples": {
+        "zh": [
+          "点完以后不知道成功没有",
+          "保存按钮按了之后没有状态提示"
+        ],
+        "en": [
+          "I cannot tell whether the action succeeded",
+          "The save button gives no status feedback"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "design-focus",
+      "domain": "design",
+      "category": "design.interaction",
+      "terms": {
+        "zh": "键盘焦点流程检查",
+        "en": "Keyboard focus flow review"
+      },
+      "goals": {
+        "zh": "检查焦点顺序、弹窗焦点约束与关闭后的焦点恢复",
+        "en": "Check focus order, focus containment in dialogs, and restoration after closing"
+      },
+      "examples": {
+        "zh": [
+          "弹窗关了之后键盘不知道选到哪里",
+          "用Tab键操作时顺序乱了"
+        ],
+        "en": [
+          "Keyboard focus gets lost after closing the dialog",
+          "Tab navigation jumps in the wrong order"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "testing-repro",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "间歇故障复现整理",
+        "en": "Intermittent failure reproduction"
+      },
+      "goals": {
+        "zh": "记录触发步骤、环境和日志，缩小间歇故障的最小复现范围",
+        "en": "Record triggers, environment, and logs to narrow an intermittent failure to a minimal reproduction"
+      },
+      "examples": {
+        "zh": [
+          "这个问题偶尔才出现很难复现",
+          "同样操作有时成功有时失败"
+        ],
+        "en": [
+          "This bug happens only occasionally and is hard to reproduce",
+          "The same action sometimes works and sometimes fails"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "testing-regression",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "关联功能回归验证",
+        "en": "Related behavior regression verification"
+      },
+      "goals": {
+        "zh": "定位修改影响范围，为关联功能补充回归测试",
+        "en": "Identify the change impact and add regression tests for related behavior"
+      },
+      "examples": {
+        "zh": [
+          "修了这里另一个功能又坏了",
+          "每次改东西都有旧功能出问题"
+        ],
+        "en": [
+          "Fixing one feature breaks another",
+          "Old features break whenever we make changes"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "testing-flaky",
+      "domain": "programming",
+      "category": "programming.testing",
+      "terms": {
+        "zh": "测试不稳定性排查",
+        "en": "Test instability diagnosis"
+      },
+      "goals": {
+        "zh": "检查测试隔离、异步等待和共享状态，定位不稳定测试",
+        "en": "Inspect test isolation, asynchronous waits, and shared state to diagnose flaky tests"
+      },
+      "examples": {
+        "zh": [
+          "代码没改测试一会过一会不过",
+          "测试单独跑能过一起跑就失败"
+        ],
+        "en": [
+          "Tests pass and fail without code changes",
+          "Tests pass alone but fail when run together"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "devops-environment",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "运行环境差异排查",
+        "en": "Runtime environment comparison"
+      },
+      "goals": {
+        "zh": "对比配置、依赖、权限和网络条件，定位本地与部署环境的差异",
+        "en": "Compare configuration, dependencies, permissions, and networking between local and deployed environments"
+      },
+      "examples": {
+        "zh": [
+          "本地能跑上线就不行",
+          "开发环境正常服务器上却报错"
+        ],
+        "en": [
+          "It works locally but fails after deployment",
+          "It works in development but errors on the server"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "devops-persistence",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "重启数据保留排查",
+        "en": "Data persistence after restart diagnosis"
+      },
+      "goals": {
+        "zh": "检查数据写入位置、持久化挂载和恢复流程，定位重启后数据丢失",
+        "en": "Inspect data paths, persistent mounts, and restoration to diagnose data loss after restart"
+      },
+      "examples": {
+        "zh": [
+          "重启容器以后数据全没了",
+          "服务重新部署后上传的文件不见了"
+        ],
+        "en": [
+          "All data disappears after restarting the container",
+          "Uploaded files vanish after redeploying the service"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "devops-release",
+      "domain": "programming",
+      "category": "programming.devops",
+      "terms": {
+        "zh": "发布恢复流程规划",
+        "en": "Release recovery planning"
+      },
+      "goals": {
+        "zh": "明确健康检查、分批发布和回滚条件，并验证恢复步骤",
+        "en": "Define health checks, staged rollout, and rollback conditions and verify recovery steps"
+      },
+      "examples": {
+        "zh": [
+          "新版上线出问题想退回旧版",
+          "发布失败后怎么恢复服务"
+        ],
+        "en": [
+          "We need to return to the previous version after a bad release",
+          "How should we restore service after a failed deployment"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "documents-extract",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "扫描文档表格提取",
+        "en": "Scanned document table extraction"
+      },
+      "goals": {
+        "zh": "识别扫描文档中的文字和表格，统一字段并标记待核验内容",
+        "en": "Extract text and tables from scans, align fields, and flag content needing verification"
+      },
+      "examples": {
+        "zh": [
+          "把这些扫描PDF整理成表格",
+          "图片里的表格想变成能编辑的数据"
+        ],
+        "en": [
+          "Turn these scanned PDFs into a spreadsheet",
+          "Convert the tables in these images into editable data"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "documents-batch",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "批量文件整理规划",
+        "en": "Batch file organization planning"
+      },
+      "goals": {
+        "zh": "按可预览的命名和分类规则整理文件，处理重名并保留操作清单",
+        "en": "Organize files with previewable naming and grouping rules, handle collisions, and keep a processing manifest"
+      },
+      "examples": {
+        "zh": [
+          "几百个文件想按日期统一改名",
+          "文件名乱七八糟想批量整理"
+        ],
+        "en": [
+          "Rename hundreds of files consistently by date",
+          "Organize a batch of files with messy names"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "documents-resume",
+      "domain": "office",
+      "category": "office.documents",
+      "terms": {
+        "zh": "自动汇总任务续跑",
+        "en": "Resumable aggregation workflow"
+      },
+      "goals": {
+        "zh": "安排定时增量处理，记录进度与失败项并支持从中断处继续",
+        "en": "Schedule incremental processing, record progress and failures, and resume interrupted work"
+      },
+      "examples": {
+        "zh": [
+          "每天自动汇总新增文件处理失败还能接着跑",
+          "整理到一半断了想从上次继续"
+        ],
+        "en": [
+          "Summarize new files daily and resume after failures",
+          "Continue processing from where the last run stopped"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "integration-sync",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "跨系统增量同步规划",
+        "en": "Cross-system incremental sync planning"
+      },
+      "goals": {
+        "zh": "明确字段映射、唯一标识和变更来源，设计可重试的数据同步",
+        "en": "Define field mappings, identifiers, and change sources for retryable data synchronization"
+      },
+      "examples": {
+        "zh": [
+          "想把两个系统的数据自动同步起来",
+          "系统之间字段名称不同怎么对接"
+        ],
+        "en": [
+          "Automatically synchronize data between two systems",
+          "Connect systems that use different field names"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "integration-query",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "数据库慢查询排查",
+        "en": "Slow database query diagnosis"
+      },
+      "goals": {
+        "zh": "检查查询执行计划、索引和数据规模，验证查询性能改进",
+        "en": "Inspect query plans, indexes, and data volume and verify query performance improvements"
+      },
+      "examples": {
+        "zh": [
+          "数据库查一点东西也要等很久",
+          "数据变多之后查询越来越慢"
+        ],
+        "en": [
+          "A small database query takes a long time",
+          "Queries get slower as data grows"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "integration-retry",
+      "domain": "programming",
+      "category": "programming.integration",
+      "terms": {
+        "zh": "失败请求重试规划",
+        "en": "Failed request retry planning"
+      },
+      "goals": {
+        "zh": "区分可重试错误，设置退避与上限，并检查重复执行的影响",
+        "en": "Classify retryable errors, set backoff and limits, and check duplicate execution effects"
+      },
+      "examples": {
+        "zh": [
+          "接口失败了想自动重试但怕重复处理",
+          "对方限流以后一直重试把服务打满了"
+        ],
+        "en": [
+          "Retry failed requests without processing them twice",
+          "Retries overwhelm the service after rate limiting"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "mobile-keyboard",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "软键盘布局适配",
+        "en": "Software keyboard layout adaptation"
+      },
+      "goals": {
+        "zh": "检查键盘高度、滚动容器和安全区域，保持输入框与提交操作可见",
+        "en": "Check keyboard height, scroll containers, and safe areas to keep inputs and submit actions visible"
+      },
+      "examples": {
+        "zh": [
+          "键盘弹出来把输入框挡住了",
+          "手机打字时发送按钮被键盘盖住"
+        ],
+        "en": [
+          "The keyboard covers the input field",
+          "The keyboard hides the send button while typing"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "mobile-background",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "前后台任务状态恢复",
+        "en": "Foreground and background task recovery"
+      },
+      "goals": {
+        "zh": "检查应用生命周期、后台限制和连接重建，恢复必要任务状态",
+        "en": "Inspect lifecycle events, background limits, and reconnection to restore necessary task state"
+      },
+      "examples": {
+        "zh": [
+          "切到后台回来任务就断了",
+          "手机锁屏后再打开进度丢了"
+        ],
+        "en": [
+          "The task disconnects after switching apps",
+          "Progress disappears after locking and reopening the phone"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "mobile-offline",
+      "domain": "programming",
+      "category": "programming.mobile",
+      "terms": {
+        "zh": "离线使用与同步规划",
+        "en": "Offline use and synchronization planning"
+      },
+      "goals": {
+        "zh": "明确离线可用内容、本地缓存和恢复联网后的冲突处理",
+        "en": "Define offline content, local caching, and conflict handling after reconnection"
+      },
+      "examples": {
+        "zh": [
+          "没网络时也想继续看之前的数据",
+          "离线改的内容联网后想自动同步"
+        ],
+        "en": [
+          "Keep viewing previously loaded data without a network",
+          "Synchronize offline edits when connectivity returns"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "security-access",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "资源访问边界核查",
+        "en": "Resource access boundary review"
+      },
+      "goals": {
+        "zh": "明确用户、角色和资源归属，在服务端校验访问权限与租户边界",
+        "en": "Define users, roles, and resource ownership and enforce access and tenant boundaries on the server"
+      },
+      "examples": {
+        "zh": [
+          "不同的人只能看到自己的数据",
+          "改一下地址就能看到别人的订单"
+        ],
+        "en": [
+          "Each person should see only their own data",
+          "Changing a URL exposes someone else's order"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "security-secret",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "敏感凭据暴露排查",
+        "en": "Sensitive credential exposure review"
+      },
+      "goals": {
+        "zh": "检查日志、配置和前端资源中的凭据暴露，规划替换与失效验证",
+        "en": "Inspect logs, configuration, and frontend assets for credential exposure and plan replacement and revocation checks"
+      },
+      "examples": {
+        "zh": [
+          "日志里把API密钥打印出来了",
+          "浏览器里能看到本来只该服务器用的密钥"
+        ],
+        "en": [
+          "API keys are printed in the logs",
+          "The browser exposes a key intended only for the server"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "security-audit",
+      "domain": "programming",
+      "category": "programming.security",
+      "terms": {
+        "zh": "关键操作审计规划",
+        "en": "Sensitive action audit planning"
+      },
+      "goals": {
+        "zh": "记录操作主体、目标、时间与结果，明确查询范围和敏感字段处理",
+        "en": "Record actors, targets, timestamps, and outcomes and define query access and sensitive-field handling"
+      },
+      "examples": {
+        "zh": [
+          "想知道是谁什么时候改了配置",
+          "有人删了数据但是查不到是谁"
+        ],
+        "en": [
+          "Find who changed the configuration and when",
+          "Data was deleted but we cannot identify who did it"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research-sources",
+      "domain": "research",
+      "category": "research.evidence",
+      "terms": {
+        "zh": "资料证据整理",
+        "en": "Source evidence organization"
+      },
+      "goals": {
+        "zh": "围绕问题整理来源、结论和分歧，把关键陈述关联到可核验引用",
+        "en": "Organize sources, findings, and disagreements around a question and link claims to verifiable citations"
+      },
+      "examples": {
+        "zh": [
+          "把这些资料整理成有依据的报告",
+          "几篇文章说法不一样想比较证据"
+        ],
+        "en": [
+          "Turn these materials into a report backed by sources",
+          "Compare the evidence behind conflicting articles"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research-rubric",
+      "domain": "research",
+      "category": "research.education",
+      "terms": {
+        "zh": "作业评价标准设计",
+        "en": "Assignment assessment criteria design"
+      },
+      "goals": {
+        "zh": "根据学习目标设置评价维度、等级描述和可观察的评分依据",
+        "en": "Define assessment dimensions, performance levels, and observable criteria from learning objectives"
+      },
+      "examples": {
+        "zh": [
+          "想让这份作业的评分标准更清楚",
+          "不同老师给分差很多想统一标准"
+        ],
+        "en": [
+          "Make the grading criteria for this assignment clearer",
+          "Align criteria when instructors grade very differently"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "research-learning",
+      "domain": "research",
+      "category": "research.education",
+      "terms": {
+        "zh": "学习内容结构化",
+        "en": "Learning material structuring"
+      },
+      "goals": {
+        "zh": "明确学习目标与先修知识，用概念关系和练习组织学习内容",
+        "en": "Define learning objectives and prerequisites and organize material through concept relationships and practice"
+      },
+      "examples": {
+        "zh": [
+          "资料太散不知道先学什么",
+          "想把这些知识点串起来做学习计划"
+        ],
+        "en": [
+          "The materials are scattered and I do not know what to study first",
+          "Connect these concepts into a learning plan"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
     }
   ]
 }

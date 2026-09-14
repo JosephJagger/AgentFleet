@@ -1,0 +1,917 @@
+{
+  "model": "paraphrase-multilingual-MiniLM-L12-v2 q8",
+  "threshold": 0.74,
+  "margin": 0.08,
+  "baselineHits": 2,
+  "cases": 65,
+  "hits": 12,
+  "wrong": 0,
+  "abstained": 27,
+  "rejected": 26,
+  "p95Ms": 59,
+  "results": [
+    {
+      "draft": "登录没多久就让我再输一遍密码",
+      "expected": "session-expiry",
+      "actual": null,
+      "top": [
+        {
+          "intent": "session-expiry",
+          "score": 0.644
+        },
+        {
+          "intent": "operations-retention",
+          "score": 0.521
+        }
+      ]
+    },
+    {
+      "draft": "手机上内容互相盖住了",
+      "expected": "mobile-layout",
+      "actual": "mobile-layout",
+      "top": [
+        {
+          "intent": "mobile-layout",
+          "score": 0.794
+        },
+        {
+          "intent": "mobile-background",
+          "score": 0.704
+        }
+      ]
+    },
+    {
+      "draft": "网页打开之后要卡好久才显示",
+      "expected": "page-performance",
+      "actual": "page-performance",
+      "top": []
+    },
+    {
+      "draft": "搜索要等输入停止后才发起",
+      "expected": "input-debounce",
+      "actual": "input-debounce",
+      "top": []
+    },
+    {
+      "draft": "表格里客户名字有重复想清理掉",
+      "expected": "sheet-dedupe",
+      "actual": null,
+      "top": [
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.583
+        },
+        {
+          "intent": "duplicate-submit",
+          "score": 0.512
+        }
+      ]
+    },
+    {
+      "draft": "把两个工作簿按相同客户号合在一起",
+      "expected": "sheet-merge",
+      "actual": null,
+      "top": [
+        {
+          "intent": "sheet-merge",
+          "score": 0.591
+        },
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.542
+        }
+      ]
+    },
+    {
+      "draft": "每月自动整理一份销售统计报告",
+      "expected": "office-report",
+      "actual": "office-report",
+      "top": [
+        {
+          "intent": "office-report",
+          "score": 0.747
+        },
+        {
+          "intent": "office-files",
+          "score": 0.638
+        }
+      ]
+    },
+    {
+      "draft": "智能助手运行到中途掉线了怎么接着做",
+      "expected": "agent-resume",
+      "actual": null,
+      "top": [
+        {
+          "intent": "agent-resume",
+          "score": 0.742
+        },
+        {
+          "intent": "agent-tools",
+          "score": 0.739
+        }
+      ]
+    },
+    {
+      "draft": "聊了一阵助手就记不住一开始的要求",
+      "expected": "agent-context",
+      "actual": "agent-context",
+      "top": [
+        {
+          "intent": "agent-context",
+          "score": 0.758
+        },
+        {
+          "intent": "ai-injection",
+          "score": 0.619
+        }
+      ]
+    },
+    {
+      "draft": "想让助手使用网页浏览器完成操作",
+      "expected": "agent-tools",
+      "actual": "agent-tools",
+      "top": [
+        {
+          "intent": "agent-tools",
+          "score": 0.788
+        },
+        {
+          "intent": "agent-parallel",
+          "score": 0.563
+        }
+      ]
+    },
+    {
+      "draft": "怪物多起来游戏就不流畅",
+      "expected": "game-frame",
+      "actual": "game-frame",
+      "top": [
+        {
+          "intent": "game-frame",
+          "score": 0.771
+        },
+        {
+          "intent": "game-save",
+          "score": 0.661
+        }
+      ]
+    },
+    {
+      "draft": "人物碰到墙却能钻过去",
+      "expected": "game-collision",
+      "actual": "game-collision",
+      "top": [
+        {
+          "intent": "game-collision",
+          "score": 0.818
+        },
+        {
+          "intent": "video-color",
+          "score": 0.481
+        }
+      ]
+    },
+    {
+      "draft": "视频里的说话声和嘴巴动作有延迟",
+      "expected": "video-sync",
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-sync",
+          "score": 0.721
+        },
+        {
+          "intent": "video-ducking",
+          "score": 0.601
+        }
+      ]
+    },
+    {
+      "draft": "给这段访谈自动生成带时间的字幕",
+      "expected": "video-captions",
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-captions",
+          "score": 0.714
+        },
+        {
+          "intent": "video-sync",
+          "score": 0.565
+        }
+      ]
+    },
+    {
+      "draft": "仿真里把网格细化后计算结果变化很大",
+      "expected": "engineering-mesh",
+      "actual": null,
+      "top": [
+        {
+          "intent": "engineering-mesh",
+          "score": 0.723
+        },
+        {
+          "intent": "finance-overfit",
+          "score": 0.583
+        }
+      ]
+    },
+    {
+      "draft": "The app signs me out after a few minutes",
+      "expected": "session-expiry",
+      "actual": null,
+      "top": [
+        {
+          "intent": "session-expiry",
+          "score": 0.71
+        },
+        {
+          "intent": "mobile-background",
+          "score": 0.537
+        }
+      ]
+    },
+    {
+      "draft": "Combine the customer tables on a common identifier",
+      "expected": "sheet-merge",
+      "actual": null,
+      "top": [
+        {
+          "intent": "sheet-merge",
+          "score": 0.687
+        },
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.535
+        }
+      ]
+    },
+    {
+      "draft": "The assistant forgets the project requirements during a long chat",
+      "expected": "agent-context",
+      "actual": "agent-context",
+      "top": [
+        {
+          "intent": "agent-context",
+          "score": 0.872
+        },
+        {
+          "intent": "ai-injection",
+          "score": 0.648
+        }
+      ]
+    },
+    {
+      "draft": "Audio lags behind the picture in my edited clip",
+      "expected": "video-sync",
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-sync",
+          "score": 0.772
+        },
+        {
+          "intent": "video-l-cut",
+          "score": 0.694
+        }
+      ]
+    },
+    {
+      "draft": "The player can pass straight through solid walls",
+      "expected": "game-collision",
+      "actual": "game-collision",
+      "top": [
+        {
+          "intent": "game-collision",
+          "score": 0.82
+        },
+        {
+          "intent": "game-frame",
+          "score": 0.377
+        }
+      ]
+    },
+    {
+      "draft": "登录现在很稳定了",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "session-expiry",
+          "score": 0.614
+        },
+        {
+          "intent": "product-acceptance",
+          "score": 0.482
+        }
+      ]
+    },
+    {
+      "draft": "页面不卡只是颜色不好看",
+      "expected": null,
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "游戏音乐很好听",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "game-frame",
+          "score": 0.506
+        },
+        {
+          "intent": "video-ducking",
+          "score": 0.436
+        }
+      ]
+    },
+    {
+      "draft": "帮我翻译这封邮件",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-subtitle-timing",
+          "score": 0.577
+        },
+        {
+          "intent": "office-mail",
+          "score": 0.438
+        }
+      ]
+    },
+    {
+      "draft": "Excel 的图标怎么换颜色",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-color",
+          "score": 0.572
+        },
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.504
+        }
+      ]
+    },
+    {
+      "draft": "视频里的人穿的什么衣服",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-captions",
+          "score": 0.513
+        },
+        {
+          "intent": "video-j-cut",
+          "score": 0.407
+        }
+      ]
+    },
+    {
+      "draft": "两个需求：登录老掉并且页面很慢",
+      "expected": null,
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "Do not delete duplicate rows",
+      "expected": null,
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "The login issue is already resolved",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "session-expiry",
+          "score": 0.647
+        },
+        {
+          "intent": "operations-service",
+          "score": 0.41
+        }
+      ]
+    },
+    {
+      "draft": "What does collision detection mean?",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "agent-approval",
+          "score": 0.393
+        },
+        {
+          "intent": "game-frame",
+          "score": 0.37
+        }
+      ]
+    },
+    {
+      "draft": "The page is not slow",
+      "expected": null,
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "我想了解防抖和节流的区别",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "research-rubric",
+          "score": 0.297
+        },
+        {
+          "intent": "ai-evaluation",
+          "score": 0.295
+        }
+      ]
+    },
+    {
+      "draft": "帮我设计一个游戏故事",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "game-frame",
+          "score": 0.649
+        },
+        {
+          "intent": "game-collision",
+          "score": 0.572
+        }
+      ]
+    },
+    {
+      "draft": "办公室有好几张桌子",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "data-discrepancy",
+          "score": 0.499
+        },
+        {
+          "intent": "agent-parallel",
+          "score": 0.493
+        }
+      ]
+    },
+    {
+      "draft": "How do I pronounce idempotency?",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-sync",
+          "score": 0.412
+        },
+        {
+          "intent": "video-subtitle-timing",
+          "score": 0.396
+        }
+      ]
+    },
+    {
+      "draft": "模型老是一本正经地胡编事实",
+      "expected": "ai-hallucination",
+      "actual": null,
+      "top": [
+        {
+          "intent": "ai-cost",
+          "score": 0.634
+        },
+        {
+          "intent": "engineering-revision",
+          "score": 0.516
+        }
+      ]
+    },
+    {
+      "draft": "Use internal company documents as sources for answers",
+      "expected": "ai-rag",
+      "actual": null,
+      "top": [
+        {
+          "intent": "ai-rag",
+          "score": 0.568
+        },
+        {
+          "intent": "research-sources",
+          "score": 0.529
+        }
+      ]
+    },
+    {
+      "draft": "模型结果经常不是合法JSON",
+      "expected": "ai-json",
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "工具被智能体一遍一遍调用却不结束",
+      "expected": "ai-loop",
+      "actual": null,
+      "top": [
+        {
+          "intent": "agent-parallel",
+          "score": 0.65
+        },
+        {
+          "intent": "agent-tools",
+          "score": 0.64
+        }
+      ]
+    },
+    {
+      "draft": "海外仓库存又卖光了来不及补货",
+      "expected": "commerce-stock",
+      "actual": null,
+      "top": [
+        {
+          "intent": "commerce-stock",
+          "score": 0.722
+        },
+        {
+          "intent": "commerce-margin",
+          "score": 0.556
+        }
+      ]
+    },
+    {
+      "draft": "Lots of ad-attributed revenue but negative profit",
+      "expected": "marketing-roas",
+      "actual": "marketing-roas",
+      "top": [
+        {
+          "intent": "marketing-roas",
+          "score": 0.744
+        },
+        {
+          "intent": "finance-cost",
+          "score": 0.555
+        }
+      ]
+    },
+    {
+      "draft": "客户只买了第一单之后就没有回来",
+      "expected": "operations-retention",
+      "actual": null,
+      "top": [
+        {
+          "intent": "operations-retention",
+          "score": 0.737
+        },
+        {
+          "intent": "commerce-stock",
+          "score": 0.58
+        }
+      ]
+    },
+    {
+      "draft": "回测没考虑手续费和滑点",
+      "expected": "finance-cost",
+      "actual": null,
+      "top": [
+        {
+          "intent": "finance-cost",
+          "score": 0.7
+        },
+        {
+          "intent": "engineering-tolerance",
+          "score": 0.555
+        }
+      ]
+    },
+    {
+      "draft": "The backtest uses information published after the trade",
+      "expected": "finance-lookahead",
+      "actual": null,
+      "top": [
+        {
+          "intent": "finance-lookahead",
+          "score": 0.575
+        },
+        {
+          "intent": "finance-cost",
+          "score": 0.567
+        }
+      ]
+    },
+    {
+      "draft": "The strategy only works on the data used to tune it",
+      "expected": "finance-overfit",
+      "actual": null,
+      "top": [
+        {
+          "intent": "finance-overfit",
+          "score": 0.617
+        },
+        {
+          "intent": "finance-cost",
+          "score": 0.436
+        }
+      ]
+    },
+    {
+      "draft": "今天股市为什么涨",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "finance-adjustment",
+          "score": 0.531
+        },
+        {
+          "intent": "marketing-roas",
+          "score": 0.53
+        }
+      ]
+    },
+    {
+      "draft": "帮我推荐一只明天上涨的股票",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "finance-factor",
+          "score": 0.47
+        },
+        {
+          "intent": "finance-lookahead",
+          "score": 0.455
+        }
+      ]
+    },
+    {
+      "draft": "我想了解金融历史",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "finance-adjustment",
+          "score": 0.414
+        },
+        {
+          "intent": "finance-risk",
+          "score": 0.399
+        }
+      ]
+    },
+    {
+      "draft": "Who founded this company",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "agent-tools",
+          "score": 0.395
+        },
+        {
+          "intent": "security-audit",
+          "score": 0.391
+        }
+      ]
+    },
+    {
+      "draft": "买家送了我一件礼物",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "commerce-returns",
+          "score": 0.459
+        },
+        {
+          "intent": "finance-cost",
+          "score": 0.413
+        }
+      ]
+    },
+    {
+      "draft": "今天想看一部电影",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-j-cut",
+          "score": 0.401
+        },
+        {
+          "intent": "session-expiry",
+          "score": 0.356
+        }
+      ]
+    },
+    {
+      "draft": "定义一下什么结果才算验收通过",
+      "expected": "product-acceptance",
+      "actual": "product-acceptance",
+      "top": [
+        {
+          "intent": "product-acceptance",
+          "score": 0.752
+        },
+        {
+          "intent": "research-rubric",
+          "score": 0.665
+        }
+      ]
+    },
+    {
+      "draft": "用户点完没看到成功还是失败",
+      "expected": "design-feedback",
+      "actual": null,
+      "top": [
+        {
+          "intent": "testing-repro",
+          "score": 0.703
+        },
+        {
+          "intent": "design-feedback",
+          "score": 0.678
+        }
+      ]
+    },
+    {
+      "draft": "改完这段代码其他页面出了问题",
+      "expected": "testing-regression",
+      "actual": null,
+      "top": [
+        {
+          "intent": "design-hierarchy",
+          "score": 0.586
+        },
+        {
+          "intent": "testing-regression",
+          "score": 0.567
+        }
+      ]
+    },
+    {
+      "draft": "上线以后环境变量和本地不一样",
+      "expected": "devops-environment",
+      "actual": null,
+      "top": [
+        {
+          "intent": "engineering-mesh",
+          "score": 0.552
+        },
+        {
+          "intent": "devops-environment",
+          "score": 0.518
+        }
+      ]
+    },
+    {
+      "draft": "扫描的发票想提取成Excel数据",
+      "expected": "documents-extract",
+      "actual": null,
+      "top": [
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.661
+        },
+        {
+          "intent": "documents-extract",
+          "score": 0.608
+        }
+      ]
+    },
+    {
+      "draft": "Slow SQL queries need profiling",
+      "expected": "integration-query",
+      "actual": null,
+      "top": [
+        {
+          "intent": "integration-query",
+          "score": 0.73
+        },
+        {
+          "intent": "large-list",
+          "score": 0.472
+        }
+      ]
+    },
+    {
+      "draft": "The phone keyboard leaves no room for the message field",
+      "expected": "mobile-keyboard",
+      "actual": null,
+      "top": [
+        {
+          "intent": "mobile-keyboard",
+          "score": 0.7
+        },
+        {
+          "intent": "mobile-layout",
+          "score": 0.626
+        }
+      ]
+    },
+    {
+      "draft": "跨租户ID可以读到其他公司的记录",
+      "expected": "security-access",
+      "actual": null,
+      "top": [
+        {
+          "intent": "security-access",
+          "score": 0.49
+        },
+        {
+          "intent": "marketing-tracking",
+          "score": 0.419
+        }
+      ]
+    },
+    {
+      "draft": "引用的结论找不到原始出处",
+      "expected": "research-sources",
+      "actual": null,
+      "top": [
+        {
+          "intent": "game-save",
+          "score": 0.558
+        },
+        {
+          "intent": "research-learning",
+          "score": 0.539
+        }
+      ]
+    },
+    {
+      "draft": "今晚要读一本小说",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "cognition-retrieval",
+          "score": 0.384
+        },
+        {
+          "intent": "session-expiry",
+          "score": 0.332
+        }
+      ]
+    },
+    {
+      "draft": "请不要调整任何权限",
+      "expected": null,
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "芯片制造的历史是什么",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "engineering-revision",
+          "score": 0.386
+        },
+        {
+          "intent": "security-audit",
+          "score": 0.381
+        }
+      ]
+    },
+    {
+      "draft": "What is the weather tomorrow",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "office-report",
+          "score": 0.258
+        },
+        {
+          "intent": "finance-lookahead",
+          "score": 0.239
+        }
+      ]
+    },
+    {
+      "draft": "帮我翻译这段新闻",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-subtitle-timing",
+          "score": 0.642
+        },
+        {
+          "intent": "video-captions",
+          "score": 0.494
+        }
+      ]
+    }
+  ]
+}

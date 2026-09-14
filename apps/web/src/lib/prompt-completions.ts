@@ -62,7 +62,8 @@ const terms: CompletionTerm[] = [
 ];
 
 terms.push(...domainTerms.filter(term => !terms.some(existing => existing.label.toLowerCase() === term.label.toLowerCase())));
-const curatedLabels = new Set(terms.map(term => term.label.toLowerCase()));
+// Curated names and aliases supersede bare imported words for the same concept.
+const curatedLabels = new Set(terms.flatMap(term => [term.label, ...term.aliases].map(value => value.toLowerCase())));
 const dictionary = softwareTerms.filter(term => !curatedLabels.has(term.toLowerCase()));
 const fuzzyTerms = new Fuse([...terms.map(term => term.label), ...dictionary], { threshold: 0.28, ignoreLocation: true, includeScore: true, minMatchCharLength: 3 });
 export const softwareTermCount = new Set([...terms.map(term => term.label.toLowerCase()), ...dictionary.map(term => term.toLowerCase())]).size;

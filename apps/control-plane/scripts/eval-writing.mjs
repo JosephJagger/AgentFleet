@@ -28,7 +28,7 @@ try {
     ['The game story is boring',null],['What should I have for lunch',null],
     ['Please do not change the spreadsheet',null],['The drawing on my wall is beautiful',null],
   ];
-  const cases = process.argv.includes('--calibration') ? calibration : JSON.parse(await readFile(new URL('./writing-holdout.json',import.meta.url),'utf8'));
+  const cases = process.argv.includes('--calibration') ? calibration : JSON.parse(await readFile(new URL(process.argv.includes('--workflow') ? './writing-workflow-holdout.json' : './writing-holdout.json',import.meta.url),'utf8'));
   let baselineHits=0;
   let hits=0, wrong=0, abstained=0, rejected=0; const durations=[]; const results=[];
   for (const [draft, expected] of cases) {
