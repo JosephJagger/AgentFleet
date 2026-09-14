@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { applyPromptCompletion, promptCompletions, softwareTermCount } from "./prompt-completions";
 
 describe("prompt completions", () => {
+  it.each(["登录老掉", "登陆老掉", "登陆老掉。", "登录经常掉线", "登陆总是退出 "])("recognizes Chinese login wording: %s", prompt => {
+    expect(promptCompletions(prompt, prompt.length)[0]).toMatchObject({ kind: "rewrite", label: "排查登录会话意外失效的问题，检查令牌过期、刷新和持久化逻辑" });
+  });
   it("uses the open-source dictionary with typo tolerance", () => {
     expect(softwareTermCount).toBeGreaterThan(3900);
     expect(promptCompletions("use typscript", 13).some(item=>item.label === "TypeScript")).toBe(true);

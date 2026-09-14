@@ -229,6 +229,18 @@ describe("会话工作区", () => {
     fireEvent.blur(input);
     expect(screen.queryByRole("listbox")).toBeNull();
   });
+  it("中文输入法确认登陆口语后显示表达优化，点击只修改草稿", () => {
+    const send = vi.fn(noop);
+    render(<SessionInspector {...inspectorProps("A")} onSend={send} />);
+    const input = screen.getByLabelText("发送给 Codex 的消息") as HTMLTextAreaElement;
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "登陆老掉。" } });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    fireEvent.compositionEnd(input);
+    fireEvent.click(screen.getByRole("option", { name: /表达优化.*排查登录会话/ }));
+    expect(input.value).toContain("检查令牌过期");
+    expect(send).not.toHaveBeenCalled();
+  });
   it("中文输入法确认时不触发快捷键提交", () => {
     const send = vi.fn(noop);
     render(<SessionInspector {...inspectorProps("A")} onSend={send} />);

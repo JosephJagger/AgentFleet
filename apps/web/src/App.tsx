@@ -867,6 +867,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           {completions.map((completion, index) => <button
             type="button"
             role="option"
+            data-kind={completion.kind}
             aria-selected={index === activeCompletion}
             id={`prompt-completion-${index}`}
             className={index === activeCompletion ? "prompt-completion--active" : ""}
