@@ -12,7 +12,19 @@ The lexical extractor recognizes inline-code terms and explicit quoted definitio
 
 Dictionaries are account-owned. Personal entries apply across projects; project entries apply only to that project. Entries store source session/event identifiers without duplicating complete messages. Candidate and confirmed vocabulary are independent of source transcript retention and remain until deleted. Deleted entries are erased except for a scoped fingerprint that prevents automatic relearning. Turning learning off keeps existing entries and skips newly received events; re-enabling does not process the skipped interval. Accepted entries receive a bounded usage counter for ranking, which is not evidence that their meaning is correct. Automatic extraction is capped at 500 records per account, including deletion fingerprints.
 
-## Optional AI understanding
+## Local Chinese NLP suggestions
+
+The existing browser dictionary stays immediate. After a 600 ms pause, Chinese drafts are also matched by the control-plane at `POST /api/sessions/:id/writing-nlp`. This uses Node's ICU-backed `Intl.Segmenter`, multi-word synonyms and concept combinations across ten development scenarios (session expiry, page performance, large lists, click response, mobile layout, save failure, inconsistent data, input debounce, duplicate submission and API failures). It is lexical NLP retrieval, not a trained language model or arbitrary semantic understanding. No package download, model file, GPU or external API is required.
+
+The backend considers only the final sentence, up to 300 characters, in drafts up to 2,000 characters. It adds professional wording while retaining the original sentence, preserves earlier sentences, declines selected negative/resolved expressions and ambiguous multiple matches, and skips obvious code/credential/URL inputs. These are conservative filters, not complete language or sensitive-data understanding. Unknown wording can still return no result. Confirmed learned vocabulary continues to be used by the immediate browser layer; this NLP layer currently uses its own versioned development concepts.
+
+The independent **Chinese language suggestions** switch is enabled by default in session configuration and also requires **Prompt and wording suggestions**. Turning either off stops requests. Drafts go only to this application's authenticated backend, are not written to the database or request-body logs, and receive `Cache-Control: no-store`. Requests require session access and CSRF and are limited to 90 per account per minute. The frontend suppresses requests during IME composition, selection, slash commands and mid-draft caret editing. Requests debounce, time out after 2.5 seconds, and are aborted on editing, session/account changes, dismissal or opt-out. Late responses cannot replace another draft. Failures are silent and leave immediate completions usable.
+
+Backend suggestions share the existing mobile candidate UI: actual content height up to four lines, then ellipsis; dismissing the keyboard retains the candidates. Adoption only edits the draft. The first immediate choices keep their order and duplicates by label are removed. Semantic vector retrieval is a future extension to the same offset-based response contract; it is not enabled or claimed in this release.
+
+References: [ECMA-402 Segmenter specification](https://tc39.es/ecma402/#segmenter-objects), [Node internationalization support](https://nodejs.org/api/intl.html).
+
+## Optional AI understanding (external service)
 
 Settings → AI understanding accepts a Chat Completions compatible API base URL, an explicit model identifier, optional API key, and enable switch. No provider/model is selected automatically. HTTPS is required except for loopback HTTP. With Docker, loopback refers to the container, not the host.
 

@@ -1,6 +1,7 @@
 import { createWorldWeather } from "./world-weather.js";
 import { WritingMemory } from "./writing-memory.js";
 import { WritingAI } from "./writing-ai.js";
+import { localChineseSuggestions } from "./writing-nlp.js";
 import { QuotaRefreshService } from "./quota-refresh.js";
 import { UsageService } from "./usage.js";
 import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
@@ -781,6 +782,12 @@ export async function buildControlPlane(
   app.post("/api/sessions/:id/writing-suggestions", { preHandler: mutate }, async request => {
     limiter.check(`writing-ai:${request.principal!.userId}`, 12, 60_000);
     return writingAI.suggest(request.principal as Principal, routeId(request), record(request.body).draft);
+  });
+  app.post("/api/sessions/:id/writing-nlp", { preHandler: mutate, bodyLimit: 12_000 }, async (request, reply) => {
+    limiter.check(`writing-nlp:${request.principal!.userId}`, 90, 60_000);
+    writingMemory.session(request.principal as Principal, routeId(request));
+    reply.header("cache-control", "no-store");
+    return localChineseSuggestions(record(request.body).draft);
   });
   app.put("/api/sessions/:id/writing-memory/preferences", { preHandler: mutate }, async request => writingMemory.configure(request.principal as Principal, routeId(request), record(request.body)));
   app.post("/api/sessions/:id/writing-memory", { preHandler: mutate }, async request => writingMemory.save(request.principal as Principal, routeId(request), record(request.body)));

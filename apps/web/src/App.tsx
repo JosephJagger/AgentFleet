@@ -82,6 +82,7 @@ import { sessionPath, useSessionDraft } from "./lib/session-workspace";
 import { useAutoSizeTextarea } from "./lib/auto-size-textarea";
 import { useCompletionPreferences } from "./lib/completion-preferences";
 import { useWritingMemory } from "./lib/writing-assistance";
+import { mergeWritingSuggestions, useChineseNLP } from "./lib/writing-nlp";
 import { WritingMemoryPanel } from "./components/WritingMemoryPanel";
 import { applyPromptCompletion, promptCompletions, type PromptCompletion } from "./lib/prompt-completions";
 import { routeFromPath, routePath, type AppRoute, type View } from "./lib/navigation";
@@ -655,10 +656,13 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const [composingPrompt, setComposingPrompt] = useState(false);
   const [completionSelectionEnd, setCompletionSelectionEnd] = useState(0);
   const completionKey = `${prompt}\u0000${completionCaret}`;
-  const completions = useMemo(() => busy || !completionFocused || composingPrompt || completionSelectionEnd !== completionCaret || dismissedCompletion === completionKey ? [] : promptCompletions(prompt, completionCaret, 10, writingMemory.value?.entries).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions).slice(0,5), [busy, completionFocused, composingPrompt, completionSelectionEnd, completionCaret, completionKey, dismissedCompletion, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value]);
+  const completionVisible = !loading && !busy && completionFocused && !composingPrompt && completionSelectionEnd === completionCaret && dismissedCompletion !== completionKey;
+  const chineseSuggestions = useChineseNLP(draftOwner ?? "preview", detail?.session.id, prompt, completionVisible && completionCaret === prompt.length && completionPreferences.suggestions && completionPreferences.nlp);
+  const completions = useMemo(() => !completionVisible ? [] : mergeWritingSuggestions(promptCompletions(prompt, completionCaret, 10, writingMemory.value?.entries).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions), chineseSuggestions), [completionVisible, completionCaret, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value, chineseSuggestions]);
   useAutoSizeTextarea(textArea, prompt, `${detail?.session.id ?? ""}:${loading}`);
   useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); }, [detail?.session.id, draftOwner]);
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
+  useEffect(() => { setActiveCompletion(current => Math.min(current, Math.max(0, completions.length - 1))); }, [completions.length]);
   useEffect(() => { setCompletionFocused(false); setComposingPrompt(false); setCompletionCaret(0); setCompletionSelectionEnd(0); }, [detail?.session.id, draftOwner, loading]);
 
   function acceptCompletion(completion: PromptCompletion) {
@@ -840,6 +844,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           <p>{t("即时生效，仅保存当前浏览器中此账号、此会话的偏好。")}</p>
           <label><input type="checkbox" checked={completionPreferences.terms} onChange={event => updateCompletionPreferences({ terms: event.target.checked })} /><span>{t("术语补全")}<small>{t("补全中英文开发术语和技术缩写。")}</small></span></label>
           <label><input type="checkbox" checked={completionPreferences.suggestions} onChange={event => updateCompletionPreferences({ suggestions: event.target.checked })} /><span>{t("提示语与表达建议")}<small>{t("补充开发指令，或将口语改为专业表达；采用后仍可编辑。")}</small></span></label>
+          <label><input type="checkbox" checked={completionPreferences.nlp} onChange={event => updateCompletionPreferences({ nlp: event.target.checked })} /><span>{t("中文分词建议")}<small>{t("输入停顿后将草稿发送至本站后端匹配中文表达，不保存草稿、不调用外部模型；需同时开启表达建议。")}</small></span></label>
         </section>
         <WritingMemoryPanel key={`memory:${draftOwner}:${session.id}`} sessionId={session.id} value={writingMemory.value} error={writingMemory.error} refresh={writingMemory.refresh} />
         <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>

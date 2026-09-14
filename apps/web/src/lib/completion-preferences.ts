@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-type CompletionPreferences = { terms: boolean; suggestions: boolean };
-const defaults: CompletionPreferences = { terms: true, suggestions: true };
+type CompletionPreferences = { terms: boolean; suggestions: boolean; nlp: boolean };
+const defaults: CompletionPreferences = { terms: true, suggestions: true, nlp: true };
 
 export function useCompletionPreferences(owner: string, sessionId?: string) {
   const key = `agentfleet.completions:${encodeURIComponent(owner)}:${encodeURIComponent(sessionId ?? "")}`;
@@ -9,7 +9,7 @@ export function useCompletionPreferences(owner: string, sessionId?: string) {
   let stored = defaults;
   try {
     const parsed = JSON.parse(localStorage.getItem(key) ?? "null");
-    stored = { terms: parsed?.terms !== false, suggestions: parsed?.suggestions !== false };
+    stored = { terms: parsed?.terms !== false, suggestions: parsed?.suggestions !== false, nlp: parsed?.nlp !== false };
   } catch { /* Use defaults when storage is unavailable or invalid. */ }
   const preferences = values[key] ?? stored;
   function update(next: Partial<CompletionPreferences>) {

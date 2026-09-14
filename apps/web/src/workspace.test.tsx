@@ -10,7 +10,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), login: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn() },
+  api: { writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), login: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -259,6 +259,20 @@ describe("会话工作区", () => {
       expect(input.value).toContain("检查令牌过期");
       expect(send).not.toHaveBeenCalled();
     } finally { window.matchMedia = original; }
+  });
+  it("中文合成结束后请求后端建议，关闭中文分词开关会移除候选", async () => {
+    const draft="登录之后过一会儿就自己退出来了";
+    vi.mocked(api.writingNLP).mockResolvedValue({suggestions:[{label:`排查登录会话意外失效：${draft}`,insertText:`排查登录会话意外失效：${draft}`,replaceStart:0,replaceEnd:draft.length,intent:"session-expiry"}]});
+    render(<SessionInspector {...inspectorProps("A")} />);
+    const input=screen.getByLabelText("发送给 Codex 的消息");
+    fireEvent.compositionStart(input);
+    fireEvent.change(input,{target:{value:draft}});
+    expect(api.writingNLP).not.toHaveBeenCalled();
+    fireEvent.compositionEnd(input);
+    expect(await screen.findByRole("option",{name:/排查登录会话意外失效/})).toBeTruthy();
+    fireEvent.click(screen.getByRole("button",{name:"会话配置"}));
+    fireEvent.click(screen.getByRole("checkbox",{name:/中文分词建议/}));
+    expect(screen.queryByRole("option",{name:/排查登录会话意外失效/})).toBeNull();
   });
   it("中文输入法确认时不触发快捷键提交", () => {
     const send = vi.fn(noop);

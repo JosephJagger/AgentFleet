@@ -82,7 +82,7 @@ test("AI is optional, encrypts credentials, never returns them, and clears crede
 });
 
 test("writing routes require authentication, CSRF, and do not call AI when unconfigured",async t=>{
-  const {app}=await buildControlPlane(config());t.after(()=>app.close());
+  const {app,db}=await buildControlPlane(config());t.after(()=>app.close());
   assert.equal((await app.inject({method:"GET",url:"/api/settings/writing-ai"})).statusCode,401);
   assert.equal((await app.inject({method:"GET",url:"/api/sessions/a/writing-memory"})).statusCode,401);
   const login=await app.inject({method:"POST",url:"/api/auth/login",headers:{origin:"http://writing.test"},payload:{email:"writing@example.test",password:"writing-test-password"}});
@@ -91,4 +91,21 @@ test("writing routes require authentication, CSRF, and do not call AI when uncon
   const save={endpoint:"https://provider.test/v1",model:"test-model",enabled:false};
   assert.equal((await app.inject({method:"PUT",url:"/api/settings/writing-ai",headers:{cookie},payload:save})).statusCode,403);
   assert.equal((await app.inject({method:"PUT",url:"/api/settings/writing-ai",headers:{...csrfHeaders(login.json().csrfToken,"http://writing.test"),cookie},payload:save})).statusCode,200);
+  const url="/api/sessions/nlp-session/writing-nlp";
+  const payload={draft:"登录之后过一会儿就自己退出来了"};
+  assert.equal((await app.inject({method:"POST",url,payload})).statusCode,401);
+  assert.equal((await app.inject({method:"POST",url,headers:{cookie},payload})).statusCode,403);
+  const headers={...csrfHeaders(login.json().csrfToken,"http://writing.test"),cookie};
+  assert.equal((await app.inject({method:"POST",url,headers,payload})).statusCode,404);
+  const {workspaceId}=db.bootstrap(config());const at=new Date().toISOString();
+  db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,created_at,updated_at) VALUES('nlp-m',?,'key','nlp-key','host','linux','24','x64',?,?)`,workspaceId,at,at);
+  db.run(`INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,created_at,last_reported_at) VALUES('nlp-p',?,'nlp-m','p','p','/nlp','nlp',?,?)`,workspaceId,at,at);
+  db.run(`INSERT INTO logical_sessions(logical_session_id,workspace_id,machine_id,project_id,title,managed,execution_state,reachability,created_at,updated_at) VALUES('nlp-session',?,'nlp-m','nlp-p','session',1,'idle','live',?,?)`,workspaceId,at,at);
+  const result=await app.inject({method:"POST",url,headers,payload});
+  assert.equal(result.statusCode,200);assert.equal(result.json().suggestions[0].intent,"session-expiry");
+  assert.equal(result.headers["cache-control"],"no-store");
+  assert.equal(db.get<{n:number}>("SELECT COUNT(*) n FROM writing_memory")!.n,0);
+  assert.equal(db.get<{n:number}>("SELECT COUNT(*) n FROM content_blobs")!.n,0);
+  for(let i=0;i<89;i++) await app.inject({method:"POST",url,headers,payload});
+  assert.equal((await app.inject({method:"POST",url,headers,payload})).statusCode,429);
 });
