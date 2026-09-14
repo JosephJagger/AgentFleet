@@ -11,6 +11,18 @@ afterEach(() => {
 });
 
 describe("theme switching", () => {
+  it("paginates settings themes and starts on the saved theme page", () => {
+    setTheme("jiangshan");
+    render(<ThemeSettings paginated />);
+    expect(screen.getAllByRole("radio")).toHaveLength(5);
+    expect(screen.getByRole("radio", { name: /千里江山/ }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "上一页" }));
+    expect(screen.getAllByRole("radio")).toHaveLength(6);
+    fireEvent.click(screen.getByRole("radio", { name: /哈利波特/ }));
+    expect(localStorage.getItem("agentfleet.theme")).toBe("wizard");
+    fireEvent.click(screen.getByRole("button", { name: "上一页" }));
+    expect(screen.getByRole("radio", { name: /天空之城/ })).toBeTruthy();
+  });
   it.each([
     ["starwars", "星球大战", "#0c1420"],
     ["spirited", "千与千寻", "#f4eddf"],

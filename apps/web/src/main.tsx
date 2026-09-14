@@ -12,6 +12,7 @@ import "./cinema-themes.css";
 import "./message-themes.css";
 import "./classic-themes.css";
 import "./chinese-themes.css";
+import "./settings-layout.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

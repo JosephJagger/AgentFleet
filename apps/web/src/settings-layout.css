@@ -1,0 +1,30 @@
+.settings-view .settings-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 20px; }
+.settings-layout > .settings-block { min-width: 0; }
+.settings-view .settings-block > h2 { display: flex; align-items: center; gap: 8px; line-height: 1.5; min-height: 27px; }
+.settings-layout > .completion-settings, .settings-layout > .writing-ai-settings { min-height: 360px; }
+.settings-view .completion-settings label + label { border-top: 1px solid var(--line); }
+.settings-view .completion-settings > p { margin-bottom: 16px; }
+.settings-view .settings-more { margin: 18px 0; border: 1px solid var(--component-line); border-radius: 10px; background: var(--canvas); }
+.settings-view .settings-more summary { cursor: pointer; padding: 12px 14px; color: var(--cobalt); font-size: var(--text-small); min-height: 44px; }
+.settings-view .settings-more[open] { padding: 0 14px 14px; }
+.settings-view .settings-more[open] summary { margin-inline: -14px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.settings-view .settings-more .settings-field { margin-top: 14px; }
+.settings-view .settings-more input { width: 100%; min-width: 0; }
+.settings-view .settings-more .writing-toggle input { width: auto; }
+.settings-view .writing-ai-settings form > .button { margin-top: 4px; }
+.settings-view .theme-scene { height: 120px; margin-top: 16px; }
+.settings-view .theme-options { min-height: 168px; align-content: start; }
+.settings-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+.settings-pagination > span { color: var(--muted); font-size: var(--text-caption); font-variant-numeric: tabular-nums; }
+.settings-pagination .button { min-height: 40px; }
+.browser-settings-block { display: flex; flex-direction: column; }
+.browser-settings-block .settings-pagination { margin-top: auto; }
+.settings-view .client-session-row { min-height: 96px; }
+@media (max-width: 800px) {
+  .settings-view .settings-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .settings-layout > .completion-settings, .settings-layout > .writing-ai-settings { min-height: 0; }
+  .settings-view .theme-options { min-height: 0; }
+  .settings-view .theme-scene { height: 100px; }
+  .settings-pagination .button { min-height: 44px; }
+  .browser-settings-block .settings-pagination { margin-top: 16px; }
+}

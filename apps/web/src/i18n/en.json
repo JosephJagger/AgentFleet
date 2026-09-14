@@ -1,4 +1,8 @@
 {
+  "主题分页": "Theme pages",
+  "浏览器登录分页": "Browser session pages",
+  "第 {0} / {1} 页": "Page {0} of {1}",
+  "查看与编辑连接配置": "View and edit connection settings",
   "中文分词建议": "Chinese language suggestions",
   "输入停顿后将草稿发送至本站后端匹配中文表达，不保存草稿、不调用外部模型；需同时开启表达建议。": "After a typing pause, send the draft to this site’s backend for Chinese phrase matching. Drafts are not stored and no external model is called. Wording suggestions must also be enabled.",
   "收起补全建议": "Dismiss completions",

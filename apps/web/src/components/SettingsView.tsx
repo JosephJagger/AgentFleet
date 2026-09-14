@@ -6,6 +6,7 @@ import type { ClientSessionInfo, Dashboard, Project } from "../lib/types";
 import { ThemeSettings } from "./ThemeSwitcher";
 import { WritingPreferencesPanel } from "./WritingPreferencesPanel";
 import { WritingAISettings } from "./WritingAISettings";
+import { SettingsPagination } from "./SettingsPagination";
 
 type Notice = (tone: "info" | "success" | "danger", message: string) => void;
 const errorText = (error: unknown) => error instanceof Error ? error.message : t("操作未完成，请稍后重试");
@@ -40,6 +41,10 @@ export function SettingsView({ dashboard, onUpdated, onToast }: { dashboard: Das
   const [sessionError, setSessionError] = useState("");
   const [revoking, setRevoking] = useState<string>();
   const [reloadSessions, setReloadSessions] = useState(0);
+  const [sessionPage, setSessionPage] = useState(0);
+  const sessionPages = Math.max(1, Math.ceil(sessions.length / 3));
+  const visibleSessionPage = Math.min(sessionPage, sessionPages - 1);
+  useEffect(() => setSessionPage(page => Math.min(page, sessionPages - 1)), [sessionPages]);
   useEffect(() => {
     let active = true;
     setLoadingSessions(true); setSessionError("");
@@ -89,7 +94,7 @@ export function SettingsView({ dashboard, onUpdated, onToast }: { dashboard: Das
     <div className="settings-layout">
       <WritingPreferencesPanel key={dashboard.user.id} owner={dashboard.user.id} />
       <WritingAISettings />
-      <section className="settings-block theme-settings-block"><h2><SunMoon size={18} />{t("界面外观")}</h2><p className="subtle">{t("选择阅读更舒适的外观，自动保存在此浏览器。")}</p><ThemeSettings /></section>
+      <section className="settings-block theme-settings-block"><h2><SunMoon size={18} />{t("界面外观")}</h2><p className="subtle">{t("选择阅读更舒适的外观，自动保存在此浏览器。")}</p><ThemeSettings paginated /></section>
       <section className="settings-block"><h2>{t("云端历史")}</h2><p className="subtle">{t("按项目设置保存内容和时长。宿主机上的原始会话不受影响。")}</p>
         {machines.length === 0 ? <p className="subtle">{t("添加主机并发现项目后，可以设置历史保存方式。")}</p> : <>
           <label className="settings-field"><span>{t("主机")}</span><select aria-label={t("历史设置主机")} value={machineId} onChange={event => setSelectedMachineId(event.target.value)}>{machines.map(machine => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label>
@@ -98,11 +103,12 @@ export function SettingsView({ dashboard, onUpdated, onToast }: { dashboard: Das
           {selected && <HistoryPolicy key={selected.id} project={selected} onToast={onToast} onSaved={project => { setProjects(items => items.map(item => item.id === project.id ? project : item)); void onUpdated().catch(() => undefined); }} />}
         </>}
       </section>
-      <section className="settings-block"><h2>{t("已登录浏览器")}</h2><p className="subtle">{t("退出不再使用的浏览器登录。")}</p>
-        {loadingSessions ? <div className="loading-line"><LoaderCircle className="spin" size={17} />{t("读取中")}</div> : sessionError ? <p className="catalog-error" role="alert">{sessionError} <button type="button" className="button button--quiet" onClick={() => setReloadSessions(value => value + 1)}>{t("重试")}</button></p> : sessions.map((session, index) => <div className="client-session-row" key={session.id}>
+      <section className="settings-block browser-settings-block"><h2>{t("已登录浏览器")}</h2><p className="subtle">{t("退出不再使用的浏览器登录。")}</p>
+        {loadingSessions ? <div className="loading-line"><LoaderCircle className="spin" size={17} />{t("读取中")}</div> : sessionError ? <p className="catalog-error" role="alert">{sessionError} <button type="button" className="button button--quiet" onClick={() => setReloadSessions(value => value + 1)}>{t("重试")}</button></p> : sessions.slice(visibleSessionPage * 3, visibleSessionPage * 3 + 3).map((session, offset) => { const index = visibleSessionPage * 3 + offset; return <div className="client-session-row" key={session.id}>
           <span className="client-icon"><Laptop size={17} /></span><div><strong>{session.current ? t("当前浏览器") : t("其他浏览器 {0}", index + 1)}</strong><span>{t("登录于")}{locale() === "en" ? " " : ""}{date(session.createdAt)}</span><span>{t("最近活动")}{locale() === "en" ? " " : ""}{date(session.lastSeenAt)}</span></div>
           {session.current ? <span className="current-label">{t("当前")}</span> : <button type="button" aria-label={t("退出浏览器 {0}", index + 1)} disabled={Boolean(revoking)} onClick={() => void revoke(session.id)}>{revoking === session.id ? t("正在退出…") : t("退出登录")}</button>}
-        </div>)}
+        </div>; })}
+        {!loadingSessions && !sessionError && <SettingsPagination page={visibleSessionPage} pages={sessionPages} onChange={setSessionPage} label={t("浏览器登录分页")} />}
       </section>
     </div>
   </section>;

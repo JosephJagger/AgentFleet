@@ -1,6 +1,8 @@
 import { Check, Radio, Snowflake, SunMoon, Wand2, Orbit, Flower2, Leaf, Gamepad2, Zap, Cloud, Shield, TreePine, Heart } from "lucide-react";
 import { t } from "../i18n";
 import { setTheme, useTheme, type Theme } from "../lib/theme";
+import { useEffect, useState } from "react";
+import { SettingsPagination } from "./SettingsPagination";
 
 export function ThemeEmblem() {
   const selected = useTheme();
@@ -58,13 +60,17 @@ const themeOptions: { value: Theme; label: string; description: string }[] = [
 const illustrated = (value: Theme) => value !== "matrix";
 const sceneAsset = (value: Theme) => value === "eyecare" ? "rabbit" : value;
 
-export function ThemeSettings() {
+export function ThemeSettings({ paginated = false }: { paginated?: boolean }) {
   const selected = useTheme();
+  const selectedPage = Math.floor(themeOptions.findIndex(option => option.value === selected) / 6);
+  const [page, setPage] = useState(selectedPage);
+  useEffect(() => setPage(selectedPage), [selectedPage]);
+  const options = paginated ? themeOptions.slice(page * 6, page * 6 + 6) : themeOptions;
   return (
     <>
     {illustrated(selected) && <div className={`theme-scene theme-scene--${selected}`} aria-hidden="true"><img src={`/themes/${sceneAsset(selected)}.svg`} alt="" /></div>}
     <div className="theme-options" role="radiogroup" aria-label={t("界面主题")}>
-      {themeOptions.map(option => (
+      {options.map(option => (
         <button
           className={`theme-option theme-option--${option.value}`}
           type="button"
@@ -79,6 +85,7 @@ export function ThemeSettings() {
         </button>
       ))}
     </div>
+    {paginated && <SettingsPagination page={page} pages={Math.ceil(themeOptions.length / 6)} onChange={setPage} label={t("主题分页")} />}
     </>
   );
 }

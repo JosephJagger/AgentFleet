@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SettingsView } from "./components/SettingsView";
 import { api } from "./lib/api";
@@ -10,6 +10,21 @@ beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.clientSessions).mockResolve
 const project = (id: string, machineId = "a"): Project => ({ id, machineId, alias: id, pathHint: `/work/${id}`, syncContent: true, retentionDays: 7 });
 const dashboard = { user:{id:"settings-user",email:"test@example.test",displayName:"Test",clientSessionId:"browser"}, machines: [{ id: "a", name: "Host A", identity: "paired" }, { id: "b", name: "Host B", identity: "paired" }], serverTime: "one" } as Dashboard;
 const onUpdated = vi.fn().mockResolvedValue(undefined), onToast = vi.fn();
+
+it("paginates browser sessions and returns to the previous page after revoking the last row", async () => {
+ vi.mocked(api.projects).mockResolvedValue({items:[],nextCursor:null});
+ vi.mocked(api.clientSessions).mockResolvedValue({sessions:Array.from({length:4},(_,i)=>({id:String(i),current:i===0,createdAt:"2026-09-14T00:00:00Z",lastSeenAt:"2026-09-14T00:00:00Z"} as ClientSessionInfo))});
+ vi.mocked(api.revokeClientSession).mockResolvedValue({} as never);
+ render(<SettingsView dashboard={dashboard} onUpdated={onUpdated} onToast={onToast}/>);
+ await screen.findByText("当前浏览器");
+ const pager=within(screen.getByRole("navigation",{name:"浏览器登录分页"}));
+ expect(screen.queryByText("其他浏览器 4")).toBeNull();
+ fireEvent.click(pager.getByRole("button",{name:"下一页"}));
+ fireEvent.click(await screen.findByRole("button",{name:"退出浏览器 4"}));
+ await waitFor(()=>expect(api.revokeClientSession).toHaveBeenCalledWith("3"));
+ await screen.findByText("当前浏览器");
+ expect(screen.queryByRole("navigation",{name:"浏览器登录分页"})).toBeNull();
+});
 
 it("loads all project pages and saves only the selected project after explicit submission", async () => {
  vi.mocked(api.projects).mockResolvedValueOnce({ items: [project("first")], nextCursor: "next" }).mockResolvedValueOnce({ items: [project("second")], nextCursor: null });
