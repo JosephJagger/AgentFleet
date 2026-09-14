@@ -39,7 +39,7 @@ export function useCompletionPreferences(owner: string, sessionId?: string) {
   },[refresh]);
   const current=state?.key===key ? state : undefined;
   async function update(settings:Partial<CompletionPreferences>|null) {
-    if(!current?.data || saving.current) return;
+    if(!current?.data || saving.current) return false;
     saving.current=true;revision.current++;
     setState({...current,busy:true,error:false});
     let changed=false;
@@ -49,6 +49,7 @@ export function useCompletionPreferences(owner: string, sessionId?: string) {
       if(scope.current===key) setState({key,data});
     } catch {if(scope.current===key)setState({...current,error:true,busy:false});}
     finally {saving.current=false;if(changed || scope.current!==key)window.dispatchEvent(new Event('writing-preferences-changed'));}
+    return changed;
   }
-  return [current?.data?.effective ?? fallback,update,{loading:!current?.data && !current?.error,error:!!current?.error,busy:!!current?.busy,overrides:current?.data?.overrides ?? null,refresh:()=>refresh()}] as const;
+  return [current?.data?.effective ?? fallback,update,{loading:!current?.data && !current?.error,error:!!current?.error,busy:!!current?.busy,overrides:current?.data?.overrides ?? null,defaults:current?.data?.defaults,refresh:()=>refresh()}] as const;
 }

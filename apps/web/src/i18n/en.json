@@ -272,7 +272,6 @@
   "停止输入后再触发操作": "Trigger after input stops",
   "限制操作触发频率": "Limit how often an action runs",
   "输入辅助": "Writing assistance",
-  "术语补全、表达建议与自动学习；默认沿用全局设置，可单独调整": "Term completion, wording suggestions, and automatic learning; inherits global settings with per-session overrides",
   "即时生效，仅保存当前浏览器中此账号、此会话的偏好。": "Applies immediately. Saved for this account and conversation in this browser only.",
   "术语补全": "Term completion",
   "补全中英文开发术语和技术缩写。": "Complete Chinese and English development terms and technical abbreviations.",
@@ -1820,5 +1819,15 @@
   "检查证据选择是否存在确认偏误": "Check evidence selection for confirmation bias",
   "区分不可回收投入与后续决策依据": "Separate irrecoverable costs from reasons for the next decision",
   "设计主动回忆的学习练习": "Design active recall exercises",
-  "补全编程、Agent、办公、工程、游戏、视频、哲学与认知的中英文术语。": "Complete Chinese and English terms for programming, agents, office work, engineering, games, video, philosophy and cognition."
+  "补全编程、Agent、办公、工程、游戏、视频、哲学与认知的中英文术语。": "Complete Chinese and English terms for programming, agents, office work, engineering, games, video, philosophy and cognition.",
+  "继承全局设置": "Inherited global settings",
+  "已恢复继承全局输入辅助设置。": "Global writing assistance settings restored.",
+  "输入辅助配置已保存，现已生效。": "Writing assistance settings saved and applied.",
+  "选择后点击保存，仅影响当前会话；未单独覆盖的选项继续继承全局设置。": "Save your selections to apply them to this session. Options without an override continue to inherit global settings.",
+  "修改尚未保存，输入辅助仍使用已保存配置。": "Unsaved changes. Writing assistance still uses the saved settings.",
+  "全局设置作为参考；会话覆盖优先，其余选项继续跟随全局。恢复继承会清除此会话的所有覆盖。": "Global settings provide the reference defaults. Session overrides take priority; other options follow global settings. Restoring inheritance clears all overrides for this session.",
+  "全局参考配置：": "Global reference settings: ",
+  "当前生效配置：": "Currently applied settings: ",
+  "已开启": "On",
+  "已关闭": "Off"
 }

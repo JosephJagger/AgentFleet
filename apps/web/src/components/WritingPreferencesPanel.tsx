@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { t } from "../i18n";
 import { useCompletionPreferences, type CompletionPreferences } from "../lib/completion-preferences";
 const choices: {key:keyof CompletionPreferences;label:string;description:string}[]=[
@@ -19,4 +20,44 @@ export function WritingPreferencesFields({settings,session=false}:{settings:Retu
 export function WritingPreferencesPanel({owner}:{owner:string}) {
   const settings=useCompletionPreferences(owner);
   return <section className="settings-block completion-settings"><h2>{t('输入辅助')}</h2><WritingPreferencesFields settings={settings}/></section>;
+}
+
+
+export function SessionWritingPreferencesPanel({settings}:{settings:ReturnType<typeof useCompletionPreferences>}) {
+  const [effective,update,meta]=settings;
+  const [draft,setDraft]=useState<Partial<CompletionPreferences>>({});
+  const [message,setMessage]=useState("");
+  const selected={...effective,...draft};
+  const changes=Object.fromEntries(choices.filter(({key})=>selected[key]!==effective[key]).map(({key})=>[key,selected[key]])) as Partial<CompletionPreferences>;
+  const dirty=Object.keys(changes).length>0;
+  const blocked=meta.loading || meta.busy || !meta.defaults;
+  const source=meta.overrides ? t("会话覆盖") : t("继承全局设置");
+  const describe=(value:CompletionPreferences)=>choices.map(({key,label})=>`${t(label)} ${value[key]?t("已开启"):t("已关闭")}`).join(" · ");
+  async function save(inherit=false) {
+    if(blocked || (!inherit && !dirty)) return;
+    setMessage("");
+    if(await update(inherit ? null : changes)) {
+      setDraft({});
+      setMessage(inherit ? t("已恢复继承全局输入辅助设置。") : t("输入辅助配置已保存，现已生效。"));
+    }
+  }
+  return <details className="session-config-section completion-settings" aria-label={t("输入辅助")}>
+    <summary><span>{t("输入辅助")}<small>{!meta.defaults ? meta.error ? t("配置尚未读取。") : t("读取中") : `${source} · ${describe(effective)}`}</small></span></summary>
+    <p>{t("选择后点击保存，仅影响当前会话；未单独覆盖的选项继续继承全局设置。")}</p>
+    {meta.defaults && <p>{t("已保存的来源：")}{source}</p>}
+    {dirty && <p role="status">{t("修改尚未保存，输入辅助仍使用已保存配置。")}</p>}
+    {meta.error && <p role="alert">{t("输入辅助设置暂不可用，请重试")}</p>}
+    {choices.map(choice=><label key={choice.key}><input type="checkbox" checked={selected[choice.key]} disabled={blocked} onChange={event=>{setDraft(previous=>({...previous,[choice.key]:event.target.checked}));setMessage("");}}/><span>{t(choice.label)}{meta.overrides?.[choice.key]!==undefined && <small>{t("会话覆盖")}</small>}<small>{t(choice.description)}</small></span></label>)}
+    <div className="codex-settings-save">
+      <button type="button" className="button button--quiet" disabled={blocked || !dirty} onClick={()=>void save()}>{t("保存为此会话配置")}</button>
+      <button type="button" className="button button--quiet" disabled={blocked || !meta.overrides} onClick={()=>void save(true)}>{t("恢复继承全局设置")}</button>
+      {dirty && <button type="button" className="button button--quiet" disabled={meta.busy} onClick={()=>{setDraft({});setMessage("");}}>{t("取消修改")}</button>}
+    </div>
+    <details className="settings-explanation"><summary>{t("配置说明与来源")}</summary>
+      <p>{t("全局设置作为参考；会话覆盖优先，其余选项继续跟随全局。恢复继承会清除此会话的所有覆盖。")}</p>
+      {meta.defaults && <><p>{t("全局参考配置：")}{describe(meta.defaults)}</p><p>{t("当前生效配置：")}{describe(effective)}</p></>}
+    </details>
+    {message && <p role="status">{message}</p>}
+    <button type="button" className="catalog-more" disabled={meta.busy} onClick={()=>{setDraft({});setMessage("");void meta.refresh();}}>{t("重新读取配置")}</button>
+  </details>;
 }

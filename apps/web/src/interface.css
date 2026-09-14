@@ -326,6 +326,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
 .completion-settings label { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; cursor: pointer; }
 .completion-settings input { flex: 0 0 auto; margin-top: 4px; accent-color: var(--cobalt); }
 .completion-settings small { display: block; margin-top: 3px; }
+.completion-settings .codex-settings-save { display: flex; flex-wrap: wrap; gap: 8px; }
+.completion-settings .settings-explanation p { color: var(--muted); font-size: var(--text-caption); line-height: 1.6; }
 .writing-memory-panel > p { color: var(--muted); font-size: var(--text-caption); line-height: 1.6; }
 .writing-memory-panel label, .writing-entry-form { display: grid; gap: 6px; margin-block: 10px; }
 .writing-memory-panel .writing-toggle, .writing-toggle { display: flex; align-items: center; gap: 8px; }

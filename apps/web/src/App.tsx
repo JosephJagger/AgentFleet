@@ -86,7 +86,7 @@ import { useCompletionPreferences } from "./lib/completion-preferences";
 import { useWritingMemory } from "./lib/writing-assistance";
 import { mergeWritingSuggestions, useChineseNLP } from "./lib/writing-nlp";
 import { CompletionSurface } from "./components/CompletionSurface";
-import { WritingPreferencesFields } from "./components/WritingPreferencesPanel";
+import { SessionWritingPreferencesPanel } from "./components/WritingPreferencesPanel";
 import { applyPromptCompletion, promptCompletions, type PromptCompletion } from "./lib/prompt-completions";
 import { routeFromPath, routePath, type AppRoute, type View } from "./lib/navigation";
 import type {
@@ -855,10 +855,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
         <CodexSettingsPanel key={`${draftOwner}:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />
         <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />
-        <details className="session-config-section completion-settings" aria-label={t("输入辅助")}>
-          <summary><span>{t("输入辅助")}<small>{t("术语补全、表达建议与自动学习；默认沿用全局设置，可单独调整")}</small></span></summary>
-          <WritingPreferencesFields settings={writingSettings} session />
-        </details>
+        <SessionWritingPreferencesPanel key={`writing:${draftOwner}:${session.id}`} settings={writingSettings} />
         <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
           <CodexInspectionPanel key={`inspect:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} request={inspectionRequest?.sessionId === session.id ? inspectionRequest : undefined} onChanged={onRefresh} />
