@@ -4,6 +4,8 @@ The composer combines curated Chinese/English terminology, 3,943 filtered CSpell
 
 Term completion and wording suggestions can be disabled separately in session configuration. Those display preferences stay in the browser. Mobile users tap suggestions; desktop users can use Tab, arrow keys, and Escape. IME composition and text selections suppress completions.
 
+Desktop candidates render in a floating surface anchored above the composer, outside its scroll container. Changing candidate count does not resize the input area. Position follows resize and scroll; touch layouts keep the inline candidate strip.
+
 ## Automatic learning
 
 Learning is enabled by default for newly received, successfully persisted `item.completed` user and assistant messages. There is no retrospective scan of conversation history, no access to unsynced native chats or project files, and no background model call. Messages from projects with body sync disabled, expired/deleted bodies, reasoning and tool output are excluded.
