@@ -44,6 +44,6 @@ it("fails silently, times out and skips non-Chinese, slash, code and obvious sec
 it("merges without duplicating or displacing the first immediate choice", () => {
   const local = Array.from({length:5},(_,i)=>({label:`local ${i}`,insertText:"term",detail:"",kind:"term" as const,replaceStart:0,replaceEnd:4}));
   const remote = {...local[0],label:"NLP",kind:"rewrite" as const};
-  expect(mergeWritingSuggestions(local,[remote]).map(item=>item.label)).toEqual(["local 0","local 1","local 2","local 3","NLP"]);
+  expect(mergeWritingSuggestions(local,[remote]).map(item=>item.label)).toEqual(["local 0","local 1","local 2","local 3","local 4","NLP"]);
   expect(mergeWritingSuggestions(local,[local[0]])).toEqual(local);
 });

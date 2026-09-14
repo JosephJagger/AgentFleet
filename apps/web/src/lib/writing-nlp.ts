@@ -32,8 +32,8 @@ export function useChineseNLP(owner: string, sessionId: string | undefined, draf
   return enabled && result?.key === key ? result.suggestions : [];
 }
 
-/** Keep immediate choices stable; reserve one slot for a new backend suggestion. */
+/** Append delayed choices so an existing keyboard selection never changes meaning. */
 export function mergeWritingSuggestions(local: PromptCompletion[], remote: PromptCompletion[]) {
   const additions = remote.filter(item => !local.some(existing => existing.label === item.label));
-  return [...local.slice(0, additions.length ? 4 : 5), ...additions].slice(0, 5);
+  return [...local.slice(0, 5), ...additions.slice(0, 2)];
 }
