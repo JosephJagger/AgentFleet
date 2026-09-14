@@ -120,6 +120,8 @@ h1, h2, h3 { font-weight: 650; letter-spacing: -.018em; }
   html[data-keyboard-open] .composer { flex: 0 1 auto; max-height: min(240px, 60%); padding: 4px 10px 6px; overflow-y: auto; }
   html[data-keyboard-open] .composer textarea { min-height: 44px; max-height: clamp(44px, calc(var(--visible-height, 100dvh) * .14), 72px); padding: 10px 12px; overflow-y: auto; }
   html[data-keyboard-open] .prompt-completions { height: 56px; padding-block: 4px; }
+  html[data-keyboard-open] .prompt-completions-shell--rewrite .prompt-completions { height: 122px; }
+  html[data-keyboard-open] .composer:has(.prompt-completions-shell--rewrite) { max-height: 70%; }
   html[data-keyboard-open] .composer-actions > .composer-touch-hint { display: none; }
   html[data-keyboard-open] .composer-actions { padding: 0 6px 6px 12px; }
   html[data-keyboard-open] .runtime-settings-shortcut { display: none; }

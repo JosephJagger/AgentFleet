@@ -241,6 +241,25 @@ describe("会话工作区", () => {
     expect(input.value).toContain("检查令牌过期");
     expect(send).not.toHaveBeenCalled();
   });
+  it("移动端收起键盘后保留表达优化，可以关闭或采用", () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+    try {
+      const send = vi.fn(noop);
+      render(<SessionInspector {...inspectorProps("A")} onSend={send} />);
+      const input = screen.getByLabelText("发送给 Codex 的消息") as HTMLTextAreaElement;
+      fireEvent.change(input, { target: { value: "登陆老掉" } });
+      fireEvent.blur(input);
+      expect(screen.getByRole("option", { name: /表达优化.*排查登录会话/ })).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "收起补全建议" }));
+      expect(screen.queryByRole("listbox")).toBeNull();
+      fireEvent.change(input, { target: { value: "登陆老掉。" } });
+      fireEvent.blur(input);
+      fireEvent.click(screen.getByRole("option", { name: /表达优化.*排查登录会话/ }));
+      expect(input.value).toContain("检查令牌过期");
+      expect(send).not.toHaveBeenCalled();
+    } finally { window.matchMedia = original; }
+  });
   it("中文输入法确认时不触发快捷键提交", () => {
     const send = vi.fn(noop);
     render(<SessionInspector {...inspectorProps("A")} onSend={send} />);

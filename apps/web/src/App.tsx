@@ -862,7 +862,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {imageDraft.processing && <p className="image-draft-notice" role="status">{t("正在处理粘贴的图片…")}</p>}
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
         {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("请先在主机页更新连接服务，才能发送图片") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
-        {completions.length > 0 && <div className="prompt-completions-shell"><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={t("编程提示语补全")}>
+        {completions.length > 0 && <div className={`prompt-completions-shell${completions.some(item => item.kind === "rewrite") ? " prompt-completions-shell--rewrite" : ""}`}><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={t("编程提示语补全")}>
           <div className="prompt-completions__head" role="presentation"><Code2 size={14} aria-hidden="true" /><span>{t("编程补全")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
           {completions.map((completion, index) => <button
             type="button"
@@ -889,7 +889,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           value={prompt}
           onChange={(event) => { setPrompt(event.target.value); setCompletionFocused(true); setCompletionCaret(event.target.selectionStart); setCompletionSelectionEnd(event.target.selectionEnd); setDismissedCompletion(""); }}
           onFocus={() => setCompletionFocused(true)}
-          onBlur={() => setCompletionFocused(false)}
+          onBlur={() => { if (!window.matchMedia?.("(max-width: 900px), (pointer: coarse)").matches) setCompletionFocused(false); }}
           onCompositionStart={() => setComposingPrompt(true)}
           onCompositionEnd={(event) => { setComposingPrompt(false); setCompletionCaret(event.currentTarget.selectionStart); setCompletionSelectionEnd(event.currentTarget.selectionEnd); }}
           onSelect={(event) => { setCompletionCaret(event.currentTarget.selectionStart); setCompletionSelectionEnd(event.currentTarget.selectionEnd); }}
