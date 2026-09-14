@@ -770,7 +770,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
     }
   }
 
-  const aiOptimizeButton = completionPreferences.suggestions && <button type="button" className="button button--secondary composer-ai-button" disabled={aiBusy || busy || !prompt.trim() || Boolean(slashCommand)} onClick={async()=>{
+  const aiOptimizeButton = completionPreferences.suggestions && <button type="button" className="button button--secondary composer-ai-button" title={t("保留原意，让描述更清晰、专业")} disabled={aiBusy || busy || !prompt.trim() || Boolean(slashCommand)} onClick={async()=>{
             const controller = new AbortController(); aiRequest.current?.abort(); aiRequest.current=controller; setAIBusy(true); setAIMessage("");
             try {
               const settings = await api.writingAI();
@@ -780,7 +780,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
               if (!controller.signal.aborted) { setAIResult({session:session.id,draft:prompt,suggestions:result.suggestions}); if(!result.suggestions.length)setAIMessage(t("暂无更合适的表达，保留当前草稿")); }
             } catch (error) { if(!controller.signal.aborted)setAIMessage(writingAIErrorMessage(error)); }
             finally { if(!controller.signal.aborted)setAIBusy(false); }
-          }}>{aiBusy ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}{aiBusy ? t("正在优化…") : t("AI 优化")}</button>;
+          }}>{aiBusy ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}{aiBusy ? t("正在优化…") : t("优化表达")}</button>;
 
   return (
     <aside className="inspector">
@@ -874,7 +874,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>
         <div className="composer-input">
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
-        {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" key={suggestion} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}>{suggestion}<small>{t("点击采用")}</small></button>)}</div>}
+        {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
         {imageDraft.images.length > 0 && <MessageImages images={imageDraft.images} onRemove={imageDraft.remove} disabled={busy || imageDraft.processing} />}
         {imageDraft.processing && <p className="image-draft-notice" role="status">{t("正在处理粘贴的图片…")}</p>}
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}

@@ -28,7 +28,7 @@ export function WritingAISettings() {
   const [message,setMessage] = useState("");
   useEffect(()=>{let active=true;void Promise.resolve().then(()=>api.writingAI()).then(value=>{if(active){setProvider(value.endpoint ? providerFor(value.endpoint) : "deepseek");setEndpoint(value.endpoint || presets.deepseek.endpoint);setModel(value.model || (value.endpoint ? "" : presets.deepseek.model));setSavedModel(value.model);setEnabled(value.enabled);setHasKey(value.hasKey);setReady(true);}}).catch(()=>{if(active)setMessage(t("AI 配置暂不可用，基础补全与学习不受影响"));});return()=>{active=false;};},[]);
   return <section className="settings-block writing-ai-settings"><h2>{t("AI 理解配置")}</h2>
-    <p className="subtle">{t("可选：连接兼容 Chat Completions 的模型服务。未配置时使用基础词库和自动学习；仅点击 AI 优化时发送当前草稿与可用词条，可能产生模型费用。")}</p>
+    <p className="subtle">{t("可选：连接兼容 Chat Completions 的模型服务。未配置时使用基础词库和自动学习；仅点击“优化表达”时发送当前草稿与可用词条，可能产生模型费用。")}</p>
     <form onSubmit={event=>{event.preventDefault();if(busy)return;setBusy(true);setMessage("");void api.saveWritingAI({endpoint,model,apiKey,enabled,clearKey}).then(value=>{setApiKey("");setSavedModel(value.model);setHasKey(value.hasKey);setClearKey(false);setMessage(t("AI 配置已保存"));}).catch(()=>setMessage(t("AI 配置保存失败，请检查地址与模型名称"))).finally(()=>setBusy(false));}}>
       <label className="writing-toggle"><input type="checkbox" checked={enabled} disabled={!ready || busy} onChange={event=>setEnabled(event.target.checked)} />{t("启用 AI 理解")}</label>
       <div className="settings-more" data-expanded={expanded}>

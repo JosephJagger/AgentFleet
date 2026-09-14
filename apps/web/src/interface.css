@@ -336,9 +336,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
 .writing-memory-list small, .writing-memory-list a { font-size: var(--text-caption); margin-right: 8px; }
 .writing-entry-actions { display: flex; gap: 8px; margin-top: 8px; }
 .writing-entry-actions button { background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
-.writing-ai-results { padding: 8px; max-height: 180px; overflow-y: auto; }
-.writing-ai-results button { display: block; background: var(--cobalt-soft); color: var(--ink); border: 0; border-radius: 8px; padding: 10px; margin-bottom: 6px; text-align: left; width: 100%; overflow-wrap: anywhere; }
-.writing-ai-results small { display: block; color: var(--muted); margin-top: 4px; }
+.writing-ai-results.prompt-completions { height: auto; max-height: 180px; overflow-x: hidden; overflow-y: auto; border-bottom: 1px solid var(--line); }
 @media (max-width: 900px), (pointer: coarse) {
   .prompt-completions__head kbd { display: none; }
   .prompt-completions__touch { display: inline; }

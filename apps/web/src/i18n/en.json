@@ -1613,5 +1613,8 @@
   "自定义兼容接口": "Custom compatible API",
   "已预填 DeepSeek 官方地址与模型；表达优化关闭思考，只返回精炼改写。": "Official DeepSeek URL and model are prefilled. Optimization disables thinking and returns one concise rewrite.",
   "已预填 OpenAI 官方地址与快速模型，使用 OpenAI API 密钥；模型可修改。": "Official OpenAI URL and a fast model are prefilled. Use an OpenAI API key; the model is editable.",
-  "填写兼容 Chat Completions 的基础地址与模型名称。": "Enter a Chat Completions compatible base URL and model name."
+  "填写兼容 Chat Completions 的基础地址与模型名称。": "Enter a Chat Completions compatible base URL and model name.",
+  "优化表达": "Improve wording",
+  "保留原意，让描述更清晰、专业": "Make your wording clearer and more professional while preserving your intent.",
+  "可选：连接兼容 Chat Completions 的模型服务。未配置时使用基础词库和自动学习；仅点击“优化表达”时发送当前草稿与可用词条，可能产生模型费用。": "Optional: connect a Chat Completions compatible model service. Built-in vocabulary and automatic learning work without it. Only Improve wording sends the draft and available vocabulary; provider charges may apply."
 }

@@ -714,12 +714,12 @@ it("切换语言保留会话、消息正文和草稿，不发送命令", async (
 it("AI optimization sits immediately before Send or Stop and keeps the shortcut hints",()=>{
  const props=inspectorProps('A');
  const view=render(<SessionInspector {...props}/>);
- let ai=screen.getByRole('button',{name:'AI 优化'});
+ let ai=screen.getByRole('button',{name:'优化表达'});
  expect(ai.nextElementSibling?.textContent).toContain('发送');
  expect(document.querySelector('.composer-keyboard-hint')?.textContent).toContain('Tab');
  const running={...props.detail,session:{...props.detail.session,activeTurnId:'turn',state:{...props.detail.session.state,currentTurn:'in_progress' as const}}};
  view.rerender(<SessionInspector {...props} detail={running}/>);
- ai=screen.getByRole('button',{name:'AI 优化'});
+ ai=screen.getByRole('button',{name:'优化表达'});
  expect(ai.nextElementSibling?.textContent).toContain('停止任务');
  expect(ai.parentElement?.className).toBe('composer-primary-pair');
 });
