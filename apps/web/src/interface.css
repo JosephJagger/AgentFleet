@@ -358,9 +358,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
   .prompt-completions > button { display: flex; flex: 0 0 auto; width: auto; max-width: 240px; min-height: 44px; padding: 5px 12px; border: 1px solid var(--line); background: var(--paper); }
   .prompt-completions code { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .prompt-completions > button[data-kind="rewrite"] .prompt-completion__kind { display: inline-block; flex-shrink: 0; }
-  .prompt-completions-shell--rewrite .prompt-completions { height: 122px; }
+  .prompt-completions-shell--rewrite .prompt-completions { height: auto; }
   .prompt-completions > button[data-kind="rewrite"] { flex: 0 0 100%; max-width: none; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 10px; }
-  .prompt-completions > button[data-kind="rewrite"] code { display: block; -webkit-line-clamp: unset; min-height: 6em; max-height: 6em; overflow-y: auto; overscroll-behavior-y: contain; width: 100%; }
+  .prompt-completions > button[data-kind="rewrite"] code { display: -webkit-box; -webkit-line-clamp: 4; overflow: hidden; width: 100%; }
   .prompt-completions-dismiss { position: static; flex: 0 0 44px; width: 44px; height: 44px; margin-right: 2px; }
 }
 .runtime-settings-shortcut { min-height: 36px; margin: 0 0 6px; padding: 5px 4px; font-size: var(--text-caption); }
