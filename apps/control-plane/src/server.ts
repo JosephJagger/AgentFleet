@@ -1,7 +1,9 @@
 import { createWorldWeather } from "./world-weather.js";
 import { WritingMemory } from "./writing-memory.js";
 import { WritingAI } from "./writing-ai.js";
-import { localChineseSuggestions } from "./writing-nlp.js";
+import { hybridWritingSuggestions } from "./writing-nlp.js";
+import { WritingHistory } from "./writing-history.js";
+import { WritingSemantic } from "./writing-semantic.js";
 import { QuotaRefreshService } from "./quota-refresh.js";
 import { UsageService } from "./usage.js";
 import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
@@ -151,6 +153,8 @@ export async function buildControlPlane(
   const auth = new AuthService(db, config);
   const registry = new RegistryService(db, config);
   const writingMemory = new WritingMemory(db);
+  const writingHistory = new WritingHistory(db, writingMemory);
+  const writingSemantic = new WritingSemantic();
   const writingAI = new WritingAI(db, config.databasePath, writingMemory);
   const startupMachineReconciliation = registry.reconcileControlPlaneRestart();
   const coordination = new CoordinationService(db, config);
@@ -169,6 +173,7 @@ export async function buildControlPlane(
     bodyLimit: 1_100_000,
     requestTimeout: 15_000,
   });
+  app.addHook("onClose", async () => writingSemantic.close());
   const agents = new Map<string, AgentSocketState>();
   const clients = new Map<string, Set<ClientSocketState>>();
 
@@ -777,6 +782,15 @@ export async function buildControlPlane(
     };
   });
   app.get("/api/sessions/:id/writing-memory", { preHandler: authenticate }, async request => writingMemory.read(request.principal as Principal, routeId(request)));
+  app.get("/api/sessions/:id/writing-history", { preHandler: authenticate }, async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    return writingHistory.read(request.principal as Principal, routeId(request));
+  });
+  app.put("/api/sessions/:id/writing-history/:eventId", { preHandler: mutate }, async (request, reply) => {
+    limiter.check(`writing-history:${request.principal!.userId}`, 60, 60_000);
+    reply.header("cache-control", "no-store");
+    return writingHistory.feedback(request.principal as Principal, routeId(request), routeId(request, "eventId"), record(request.body).rating);
+  });
   app.get("/api/settings/writing-ai", { preHandler: authenticate }, async request => writingAI.read(request.principal as Principal));
   app.put("/api/settings/writing-ai", { preHandler: mutate }, async request => writingAI.save(request.principal as Principal, record(request.body)));
   app.post("/api/sessions/:id/writing-suggestions", { preHandler: mutate }, async request => {
@@ -787,7 +801,7 @@ export async function buildControlPlane(
     limiter.check(`writing-nlp:${request.principal!.userId}`, 90, 60_000);
     writingMemory.session(request.principal as Principal, routeId(request));
     reply.header("cache-control", "no-store");
-    return localChineseSuggestions(record(request.body).draft);
+    return { ...await hybridWritingSuggestions(record(request.body).draft, text => writingSemantic.search(text)), semantic: writingSemantic.status() };
   });
   app.put("/api/sessions/:id/writing-memory/preferences", { preHandler: mutate }, async request => writingMemory.configure(request.principal as Principal, routeId(request), record(request.body)));
   app.post("/api/sessions/:id/writing-memory", { preHandler: mutate }, async request => writingMemory.save(request.principal as Principal, routeId(request), record(request.body)));

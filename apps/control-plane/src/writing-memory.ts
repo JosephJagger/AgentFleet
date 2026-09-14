@@ -5,7 +5,7 @@ import { newId, nowIso, sha256 } from "./crypto.js";
 
 type Session = { project_id: string; next_session_seq: number };
 type Learning = { user_id: string; workspace_id: string; enabled: number; scope: string; after_seq: number };
-export type MemoryEntry = { id: string; phrase: string; replacement: string; scope: string; status: string; uses: number; source_session: string | null; source_event: string | null };
+export type MemoryEntry = { id: string; phrase: string; replacement: string; scope: string; status: string; uses: number; source_session: string | null; source_event: string | null; source_role?: string | null };
 
 export function safeWritingText(value: unknown, maximum = 500): value is string {
   return typeof value === "string" && value.trim().length >= 2 && value.length <= maximum
@@ -40,9 +40,21 @@ export class WritingMemory {
   read(principal: Principal, sessionId: string) {
     const session = this.session(principal, sessionId);
     const learning = this.db.get<Learning>("SELECT * FROM writing_learning WHERE user_id=? AND session_id=?", principal.userId, sessionId);
+    // Candidate copies stop being usable when source content is no longer retained.
+    this.db.run(`UPDATE writing_memory SET phrase='',replacement='',status='deleted',source_event=NULL,source_session=NULL
+      WHERE user_id=? AND status='candidate' AND source_event IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM durable_events e JOIN content_blobs b ON b.payload_ref=e.payload_ref JOIN projects p ON p.project_id=e.project_id
+        WHERE e.event_id=writing_memory.source_event AND e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at>? AND p.sync_content=1
+      )`, principal.userId, nowIso());
     const entries = this.db.all<MemoryEntry>(`SELECT id,phrase,replacement,scope,status,uses,source_session,source_event FROM writing_memory
       WHERE workspace_id=? AND user_id=? AND status!='deleted' AND (scope='personal' OR (scope='project' AND target_id=?))
       ORDER BY status,uses DESC,updated_at DESC LIMIT 500`, principal.workspaceId, principal.userId, session.project_id);
+    for (const entry of entries) {
+      const source = entry.source_event ? this.db.get<{body_json:string}>(`SELECT b.body_json FROM durable_events e JOIN content_blobs b ON b.payload_ref=e.payload_ref
+        WHERE e.event_id=? AND e.workspace_id=? AND e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at>?`, entry.source_event, principal.workspaceId, nowIso()) : undefined;
+      try { const type = source ? JSON.parse(source.body_json)?.item?.type : null; entry.source_role = type === "userMessage" ? "user" : type === "agentMessage" ? "assistant" : null; }
+      catch { entry.source_role = null; }
+    }
     return { enabled: learning ? learning.enabled === 1 : true, scope: learning?.scope ?? "project", entries };
   }
 

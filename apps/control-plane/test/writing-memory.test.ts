@@ -91,6 +91,8 @@ test("writing routes require authentication, CSRF, and do not call AI when uncon
   const save={endpoint:"https://provider.test/v1",model:"test-model",enabled:false};
   assert.equal((await app.inject({method:"PUT",url:"/api/settings/writing-ai",headers:{cookie},payload:save})).statusCode,403);
   assert.equal((await app.inject({method:"PUT",url:"/api/settings/writing-ai",headers:{...csrfHeaders(login.json().csrfToken,"http://writing.test"),cookie},payload:save})).statusCode,200);
+  assert.equal((await app.inject({method:"GET",url:"/api/sessions/nlp-session/writing-history"})).statusCode,401);
+  assert.equal((await app.inject({method:"PUT",url:"/api/sessions/nlp-session/writing-history/event",headers:{cookie},payload:{rating:"useful"}})).statusCode,403);
   const url="/api/sessions/nlp-session/writing-nlp";
   const payload={draft:"登录之后过一会儿就自己退出来了"};
   assert.equal((await app.inject({method:"POST",url,payload})).statusCode,401);
@@ -108,4 +110,46 @@ test("writing routes require authentication, CSRF, and do not call AI when uncon
   assert.equal(db.get<{n:number}>("SELECT COUNT(*) n FROM content_blobs")!.n,0);
   for(let i=0;i<89;i++) await app.inject({method:"POST",url,headers,payload});
   assert.equal((await app.inject({method:"POST",url,headers,payload})).statusCode,429);
+});
+
+test("history pairs only matching native turns, records personal feedback, and honors source retention",async t=>{
+  const {WritingHistory}=await import("../src/writing-history.js");
+  const {db,principal,service,event}=fixture();t.after(()=>db.close());
+  const history=new WritingHistory(db,service);
+  event(1,"登录后又让我输入密码","userMessage");event(2,"需要检查会话状态");event(3,"另一轮的回答");event(4,"终止标记");
+  db.run("UPDATE durable_events SET native_thread_id='thread',native_turn_id='turn-1' WHERE event_id IN ('event-1','event-2','event-4')");
+  db.run("UPDATE durable_events SET native_thread_id='thread',native_turn_id='turn-2' WHERE event_id='event-3'");
+  db.run("UPDATE durable_events SET type='turn.failed' WHERE event_id='event-4'");
+  const first=history.read(principal,"a");
+  assert.equal(first.interactions.length,2);
+  const paired=first.interactions.find(item=>item.paired)!;
+  assert.equal(paired.state,"failed");assert.deepEqual(paired.messages.map(item=>item.role),["user","assistant"]);
+  assert.deepEqual(paired.messages.map(item=>item.eventId),["event-1","event-2"]);
+  history.feedback(principal,"a",paired.id,"useful");
+  assert.equal(history.read(principal,"a").interactions.find(item=>item.paired)!.feedback,"useful");
+  assert.equal(history.read({...principal,userId:"another-user"},"a").interactions.find(item=>item.paired)!.feedback,null);
+  assert.equal(history.read(principal,"b").interactions.length,0);
+  assert.throws(()=>history.feedback(principal,"b",paired.id,"useful"));
+  assert.throws(()=>history.feedback(principal,"a","event-3","useful"));
+  assert.throws(()=>history.read({...principal,workspaceId:"another-workspace"},"a"));
+  history.feedback(principal,"a",paired.id,"clear");assert.equal(db.all("SELECT * FROM writing_history_feedback").length,0);
+  db.run("UPDATE content_blobs SET expires_at='2000-01-01' WHERE payload_ref='event-1'");
+  assert.ok(history.read(principal,"a").interactions.every(item=>!item.paired));
+  assert.ok(!JSON.stringify(history.read(principal,"a")).includes("登录后又让我输入密码"));
+  db.run("UPDATE projects SET sync_content=0 WHERE project_id='a'");assert.equal(history.read(principal,"a").interactions.length,0);
+});
+
+test("unknown turn IDs stay unpaired and extracted terms show the source role without promoting assistant claims",async t=>{
+  const {WritingHistory}=await import("../src/writing-history.js");
+  const {db,principal,service,event}=fixture();t.after(()=>db.close());
+  event(1,'"slow input" means "debounce"',"userMessage");event(2,"Use `LocalWidget`");
+  const entries=service.read(principal,"a").entries;
+  assert.equal(entries.find(item=>item.phrase==="slow input")!.source_role,"user");
+  assert.equal(entries.find(item=>item.phrase==="LocalWidget")!.source_role,"assistant");
+  assert.ok(entries.every(item=>item.status==="candidate"));
+  const history=new WritingHistory(db,service);
+  assert.ok(history.read(principal,"a").interactions.every(item=>!item.paired));
+  db.run("UPDATE content_blobs SET deleted_at=? WHERE payload_ref='event-2'",new Date().toISOString());
+  assert.equal(service.read(principal,"a").entries.length,1);
+  assert.equal(db.get<{phrase:string}>("SELECT phrase FROM writing_memory WHERE fingerprint=?", (await import('../src/crypto.js')).sha256('localwidget'))!.phrase,"");
 });

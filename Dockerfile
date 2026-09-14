@@ -10,9 +10,10 @@ RUN npm run build
 FROM node:24-bookworm-slim AS control-plane-build
 WORKDIR /build/apps/control-plane
 COPY apps/control-plane/package.json apps/control-plane/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --no-audit --no-fund
 COPY apps/control-plane/ ./
 RUN npm run build
+RUN node scripts/prepare-writing-model.mjs /build/writing-model
 
 FROM node:24-bookworm-slim AS control-plane-deps
 WORKDIR /build/apps/control-plane
@@ -120,6 +121,8 @@ RUN groupadd --gid 10001 agentfleet \
     && useradd --uid 10001 --gid agentfleet --create-home --home-dir /home/agentfleet agentfleet \
     && mkdir -p /app/data /app/control-plane /app/web /app/runtime-releases \
     && chown -R agentfleet:agentfleet /app /home/agentfleet
+ENV WRITING_MODEL_PATH=/app/writing-model
+COPY --from=control-plane-build --chown=agentfleet:agentfleet /build/writing-model/ /app/writing-model/
 COPY --from=control-plane-build --chown=agentfleet:agentfleet /build/apps/control-plane/package.json ./control-plane/package.json
 COPY --from=control-plane-deps --chown=agentfleet:agentfleet /build/apps/control-plane/node_modules ./control-plane/node_modules
 COPY --from=control-plane-build --chown=agentfleet:agentfleet /build/apps/control-plane/dist ./control-plane/dist

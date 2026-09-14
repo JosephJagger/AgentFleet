@@ -30,6 +30,7 @@ export function WritingMemoryPanel({ sessionId, value, error, refresh }: { sessi
       <label>{t("搜索词库")}<input value={query} onChange={event=>setQuery(event.target.value)} /></label>
       <div className="writing-memory-list">{value.entries.filter(entry=>(entry.phrase+entry.replacement).toLowerCase().includes(query.toLowerCase())).map(entry=><article key={entry.id}>
         <strong>{entry.phrase}</strong><p>{entry.replacement}</p><small>{entry.status === "candidate" ? t("待确认") : t("已确认")} · {entry.scope === "project" ? t("项目词库") : t("个人词库")}</small>
+        {entry.source_role && <small>{entry.source_role === "user" ? t("用户提问") : t("助手回复（未验证）")}</small>}
         {entry.source_session && <a href={sessionPath(entry.source_session)}>{t("来源会话")}</a>}
         <div className="writing-entry-actions"><button type="button" disabled={busy} onClick={()=>{setEditing(entry);setPhrase(entry.phrase);setReplacement(entry.replacement);setScope(entry.scope);}}>{t("编辑")}</button>
         {entry.status === "candidate" && <button type="button" disabled={busy} onClick={()=>void run(()=>api.saveWritingEntry(sessionId,entry,entry.id))}>{t("确认采用")}</button>}

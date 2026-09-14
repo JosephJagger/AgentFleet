@@ -31,8 +31,9 @@ it("debounces requests, hides obsolete responses and aborts on edits, session ch
   expect(api.writingNLP).toHaveBeenCalledTimes(2);
 });
 
-it("fails silently, times out and skips non-Chinese, slash, code and obvious secret drafts", async () => {
-  for (const text of ["use typescript", "/修复登录问题", "页面慢 password=secret", "页面慢 https://example.test", "`页面慢`", "中".repeat(2001)]) expect(eligibleNLPDraft(text)).toBe(false);
+it("fails silently, times out and supports English and skips slash, code and obvious secret drafts", async () => {
+  for (const text of ["/修复登录问题", "页面慢 password=secret", "页面慢 https://example.test", "`页面慢`", "中".repeat(2001)]) expect(eligibleNLPDraft(text)).toBe(false);
+  expect(eligibleNLPDraft("I keep getting logged out")).toBe(true);
   vi.useFakeTimers();
   vi.mocked(api.writingNLP).mockImplementation(() => new Promise(() => {}));
   const {result}=renderHook(() => useChineseNLP("owner","a",draft,true));

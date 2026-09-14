@@ -747,3 +747,6 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .world-clock__city { max-width: 100%; }
 .world-clock__city > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .world-clock__weather { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+.writing-history-message { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 16rem; overflow: auto; }
+.writing-history-panel button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }

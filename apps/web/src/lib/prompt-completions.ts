@@ -1,4 +1,5 @@
 import Fuse from "fuse.js";
+import domainTerms from "./domain-terms.generated.json";
 import softwareTerms from "./software-terms.generated.json";
 
 export type LearnedTerm = { id: string; phrase: string; replacement: string; scope: string; uses: number; status: string };
@@ -59,6 +60,7 @@ const terms: CompletionTerm[] = [
   { label: "并发安全", detail: "避免并发读写冲突", aliases: ["并发安全", "并发安"] },
 ];
 
+terms.push(...domainTerms.filter(term => !terms.some(existing => existing.label.toLowerCase() === term.label.toLowerCase())));
 const curatedLabels = new Set(terms.map(term => term.label.toLowerCase()));
 const dictionary = softwareTerms.filter(term => !curatedLabels.has(term.toLowerCase()));
 const fuzzyTerms = new Fuse([...terms.map(term => term.label), ...dictionary], { threshold: 0.28, ignoreLocation: true, includeScore: true, minMatchCharLength: 3 });

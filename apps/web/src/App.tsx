@@ -84,6 +84,7 @@ import { useCompletionPreferences } from "./lib/completion-preferences";
 import { useWritingMemory } from "./lib/writing-assistance";
 import { mergeWritingSuggestions, useChineseNLP } from "./lib/writing-nlp";
 import { CompletionSurface } from "./components/CompletionSurface";
+import { WritingHistoryPanel } from "./components/WritingHistoryPanel";
 import { WritingMemoryPanel } from "./components/WritingMemoryPanel";
 import { applyPromptCompletion, promptCompletions, type PromptCompletion } from "./lib/prompt-completions";
 import { routeFromPath, routePath, type AppRoute, type View } from "./lib/navigation";
@@ -843,10 +844,11 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         <section className="session-config-section completion-settings" aria-label={t("输入辅助")}>
           <h3>{t("输入辅助")}</h3>
           <p>{t("即时生效，仅保存当前浏览器中此账号、此会话的偏好。")}</p>
-          <label><input type="checkbox" checked={completionPreferences.terms} onChange={event => updateCompletionPreferences({ terms: event.target.checked })} /><span>{t("术语补全")}<small>{t("补全中英文开发术语和技术缩写。")}</small></span></label>
-          <label><input type="checkbox" checked={completionPreferences.suggestions} onChange={event => updateCompletionPreferences({ suggestions: event.target.checked })} /><span>{t("提示语与表达建议")}<small>{t("补充开发指令，或将口语改为专业表达；采用后仍可编辑。")}</small></span></label>
-          <label><input type="checkbox" checked={completionPreferences.nlp} onChange={event => updateCompletionPreferences({ nlp: event.target.checked })} /><span>{t("中文分词建议")}<small>{t("输入停顿后将草稿发送至本站后端匹配中文表达，不保存草稿、不调用外部模型；需同时开启表达建议。")}</small></span></label>
+          <label><input type="checkbox" checked={completionPreferences.terms} onChange={event => updateCompletionPreferences({ terms: event.target.checked })} /><span>{t("术语补全")}<small>{t("补全编程、Agent、办公、工程、游戏与视频的中英文术语。")}</small></span></label>
+          <label><input type="checkbox" checked={completionPreferences.suggestions} onChange={event => updateCompletionPreferences({ suggestions: event.target.checked })} /><span>{t("提示语与表达建议")}<small>{t("补充任务描述，或将口语改为专业表达；采用后仍可编辑。")}</small></span></label>
+          <label><input type="checkbox" checked={completionPreferences.nlp} onChange={event => updateCompletionPreferences({ nlp: event.target.checked })} /><span>{t("本地 NLP 建议")}<small>{t("输入停顿后由本站后端进行中英文分词与语义匹配，不保存草稿、不调用外部 AI 服务；需同时开启表达建议。")}</small></span></label>
         </section>
+        <WritingHistoryPanel key={`history:${draftOwner}:${session.id}`} sessionId={session.id} />
         <WritingMemoryPanel key={`memory:${draftOwner}:${session.id}`} sessionId={session.id} value={writingMemory.value} error={writingMemory.error} refresh={writingMemory.refresh} />
         <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
@@ -869,7 +871,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
         {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("请先在主机页更新连接服务，才能发送图片") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
         {completions.length > 0 && <CompletionSurface anchor={textArea}><div className={`prompt-completions-shell${completions.some(item => item.kind === "rewrite") ? " prompt-completions-shell--rewrite" : ""}`}><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={t("编程提示语补全")}>
-          <div className="prompt-completions__head" role="presentation"><Code2 size={14} aria-hidden="true" /><span>{t("编程补全")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
+          <div className="prompt-completions__head" role="presentation"><Code2 size={14} aria-hidden="true" /><span>{t("输入建议")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
           {completions.map((completion, index) => <button
             type="button"
             role="option"

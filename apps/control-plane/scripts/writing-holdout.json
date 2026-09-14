@@ -1,0 +1,142 @@
+[
+  [
+    "登录没多久就让我再输一遍密码",
+    "session-expiry"
+  ],
+  [
+    "手机上内容互相盖住了",
+    "mobile-layout"
+  ],
+  [
+    "网页打开之后要卡好久才显示",
+    "page-performance"
+  ],
+  [
+    "搜索要等输入停止后才发起",
+    "input-debounce"
+  ],
+  [
+    "表格里客户名字有重复想清理掉",
+    "sheet-dedupe"
+  ],
+  [
+    "把两个工作簿按相同客户号合在一起",
+    "sheet-merge"
+  ],
+  [
+    "每月自动整理一份销售统计报告",
+    "office-report"
+  ],
+  [
+    "智能助手运行到中途掉线了怎么接着做",
+    "agent-resume"
+  ],
+  [
+    "聊了一阵助手就记不住一开始的要求",
+    "agent-context"
+  ],
+  [
+    "想让助手使用网页浏览器完成操作",
+    "agent-tools"
+  ],
+  [
+    "怪物多起来游戏就不流畅",
+    "game-frame"
+  ],
+  [
+    "人物碰到墙却能钻过去",
+    "game-collision"
+  ],
+  [
+    "视频里的说话声和嘴巴动作有延迟",
+    "video-sync"
+  ],
+  [
+    "给这段访谈自动生成带时间的字幕",
+    "video-captions"
+  ],
+  [
+    "仿真里把网格细化后计算结果变化很大",
+    "engineering-mesh"
+  ],
+  [
+    "The app signs me out after a few minutes",
+    "session-expiry"
+  ],
+  [
+    "Combine the customer tables on a common identifier",
+    "sheet-merge"
+  ],
+  [
+    "The assistant forgets the project requirements during a long chat",
+    "agent-context"
+  ],
+  [
+    "Audio lags behind the picture in my edited clip",
+    "video-sync"
+  ],
+  [
+    "The player can pass straight through solid walls",
+    "game-collision"
+  ],
+  [
+    "登录现在很稳定了",
+    null
+  ],
+  [
+    "页面不卡只是颜色不好看",
+    null
+  ],
+  [
+    "游戏音乐很好听",
+    null
+  ],
+  [
+    "帮我翻译这封邮件",
+    null
+  ],
+  [
+    "Excel 的图标怎么换颜色",
+    null
+  ],
+  [
+    "视频里的人穿的什么衣服",
+    null
+  ],
+  [
+    "两个需求：登录老掉并且页面很慢",
+    null
+  ],
+  [
+    "Do not delete duplicate rows",
+    null
+  ],
+  [
+    "The login issue is already resolved",
+    null
+  ],
+  [
+    "What does collision detection mean?",
+    null
+  ],
+  [
+    "The page is not slow",
+    null
+  ],
+  [
+    "我想了解防抖和节流的区别",
+    null
+  ],
+  [
+    "帮我设计一个游戏故事",
+    null
+  ],
+  [
+    "办公室有好几张桌子",
+    null
+  ],
+  [
+    "How do I pronounce idempotency?",
+    null
+  ]
+]

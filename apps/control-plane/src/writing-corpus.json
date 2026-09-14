@@ -1,0 +1,733 @@
+{
+  "version": 1,
+  "license": "CC0-1.0",
+  "intents": [
+    {
+      "id": "session-expiry",
+      "domain": "programming",
+      "terms": {
+        "zh": "会话持久性",
+        "en": "Session persistence"
+      },
+      "goals": {
+        "zh": "排查登录会话意外失效",
+        "en": "Investigate unexpected session expiration"
+      },
+      "examples": {
+        "zh": [
+          "登录老掉",
+          "登陆老掉",
+          "登录后总要重新登录",
+          "登录过一会儿自己退出"
+        ],
+        "en": [
+          "I keep getting logged out",
+          "My login expires unexpectedly",
+          "The app keeps asking me to sign in"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "large-list",
+      "domain": "programming",
+      "terms": {
+        "zh": "列表渲染性能",
+        "en": "List rendering performance"
+      },
+      "goals": {
+        "zh": "排查大数据量列表的渲染性能",
+        "en": "Investigate large-list rendering performance"
+      },
+      "examples": {
+        "zh": [
+          "列表数据太多滑动很卡",
+          "表格上万行就卡住",
+          "长列表滚动不流畅"
+        ],
+        "en": [
+          "Scrolling thousands of rows is slow",
+          "The table freezes with many records"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "page-performance",
+      "domain": "programming",
+      "terms": {
+        "zh": "页面性能",
+        "en": "Page performance"
+      },
+      "goals": {
+        "zh": "排查页面加载与交互性能",
+        "en": "Investigate page loading and interaction performance"
+      },
+      "examples": {
+        "zh": [
+          "页面打开特别慢",
+          "网页加载一直转圈",
+          "界面操作很卡"
+        ],
+        "en": [
+          "The page takes forever to load",
+          "The web interface is sluggish"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "button-response",
+      "domain": "programming",
+      "terms": {
+        "zh": "交互响应",
+        "en": "Interaction response"
+      },
+      "goals": {
+        "zh": "排查点击交互无响应",
+        "en": "Investigate unresponsive click interactions"
+      },
+      "examples": {
+        "zh": [
+          "按钮点了没反应",
+          "按下按钮没有动静",
+          "点一下按钮界面不动"
+        ],
+        "en": [
+          "Clicking the button does nothing",
+          "The button is unresponsive"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "mobile-layout",
+      "domain": "programming",
+      "terms": {
+        "zh": "响应式布局",
+        "en": "Responsive layout"
+      },
+      "goals": {
+        "zh": "修复移动端响应式布局与内容遮挡",
+        "en": "Fix mobile layout and overlapping content"
+      },
+      "examples": {
+        "zh": [
+          "手机上文字和按钮挤在一起",
+          "移动端内容被挡住",
+          "小屏幕界面错位"
+        ],
+        "en": [
+          "Text overlaps buttons on mobile",
+          "The layout is broken on small screens"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "save-failure",
+      "domain": "programming",
+      "terms": {
+        "zh": "数据持久化",
+        "en": "Data persistence"
+      },
+      "goals": {
+        "zh": "排查保存操作失败",
+        "en": "Investigate failed save operations"
+      },
+      "examples": {
+        "zh": [
+          "填写的表单保存不了",
+          "保存数据一直报错",
+          "内容存不上"
+        ],
+        "en": [
+          "The form fails to save",
+          "My changes cannot be saved"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "data-discrepancy",
+      "domain": "office",
+      "terms": {
+        "zh": "数据一致性",
+        "en": "Data consistency"
+      },
+      "goals": {
+        "zh": "核对数据口径与结果一致性",
+        "en": "Reconcile data definitions and inconsistent results"
+      },
+      "examples": {
+        "zh": [
+          "报表数字对不上",
+          "两份统计的数据不一样",
+          "金额统计不准确"
+        ],
+        "en": [
+          "The reports show different totals",
+          "The numbers in these reports do not match"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "input-debounce",
+      "domain": "programming",
+      "terms": {
+        "zh": "防抖",
+        "en": "Debounce"
+      },
+      "goals": {
+        "zh": "为输入查询添加防抖",
+        "en": "Debounce input-triggered searches"
+      },
+      "examples": {
+        "zh": [
+          "等我输完再搜索",
+          "停止打字之后再查询",
+          "搜索框每敲一个字就查一次太频繁"
+        ],
+        "en": [
+          "Search after I finish typing",
+          "Wait until typing stops before searching"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "duplicate-submit",
+      "domain": "programming",
+      "terms": {
+        "zh": "幂等性",
+        "en": "Idempotency"
+      },
+      "goals": {
+        "zh": "检查重复提交与幂等性",
+        "en": "Check duplicate submissions and idempotency"
+      },
+      "examples": {
+        "zh": [
+          "订单点两次提交了两遍",
+          "重复提交生成了多个订单",
+          "连续点击付款导致重复支付"
+        ],
+        "en": [
+          "Double clicking creates duplicate orders",
+          "Submitting twice creates duplicate records"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "api-failure",
+      "domain": "programming",
+      "terms": {
+        "zh": "接口可靠性",
+        "en": "API reliability"
+      },
+      "goals": {
+        "zh": "排查接口请求失败与超时",
+        "en": "Investigate failed or timed-out API requests"
+      },
+      "examples": {
+        "zh": [
+          "接口请求一直超时",
+          "服务器接口连不上",
+          "请求接口失败"
+        ],
+        "en": [
+          "The API request keeps timing out",
+          "Requests to the server fail"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "agent-approval",
+      "domain": "agent",
+      "terms": {
+        "zh": "操作审批",
+        "en": "Action approval"
+      },
+      "goals": {
+        "zh": "为 Agent 的关键操作设置人工确认",
+        "en": "Require human confirmation for critical agent actions"
+      },
+      "examples": {
+        "zh": [
+          "agent删除文件前先问我",
+          "智能体执行危险操作要确认",
+          "让助手改生产环境之前征求同意"
+        ],
+        "en": [
+          "Ask me before the agent deletes files",
+          "Require approval before the agent changes production"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "agent-resume",
+      "domain": "agent",
+      "terms": {
+        "zh": "任务恢复",
+        "en": "Task resumption"
+      },
+      "goals": {
+        "zh": "支持 Agent 中断后的任务恢复",
+        "en": "Resume agent tasks after interruption"
+      },
+      "examples": {
+        "zh": [
+          "agent断了以后接着干",
+          "助手中途退出后从上次继续",
+          "智能体任务断线后续跑"
+        ],
+        "en": [
+          "Let the agent continue after a disconnect",
+          "Resume the interrupted agent task"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "agent-context",
+      "domain": "agent",
+      "terms": {
+        "zh": "上下文管理",
+        "en": "Context management"
+      },
+      "goals": {
+        "zh": "改进 Agent 的上下文与约束保留",
+        "en": "Improve agent context and constraint retention"
+      },
+      "examples": {
+        "zh": [
+          "agent老忘记前面说过的要求",
+          "助手聊久了忘了之前的限制",
+          "智能体记不住项目背景"
+        ],
+        "en": [
+          "The agent forgets my earlier instructions",
+          "The assistant loses project context in long conversations"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "agent-tools",
+      "domain": "agent",
+      "terms": {
+        "zh": "工具调用",
+        "en": "Tool calling"
+      },
+      "goals": {
+        "zh": "为 Agent 接入任务所需的工具",
+        "en": "Connect the agent to tools required for the task"
+      },
+      "examples": {
+        "zh": [
+          "让agent能用浏览器操作网页",
+          "让助手调用公司的工具",
+          "智能体需要连接外部工具"
+        ],
+        "en": [
+          "Let the agent use a browser",
+          "Connect the assistant to our tools"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "agent-parallel",
+      "domain": "agent",
+      "terms": {
+        "zh": "并行任务",
+        "en": "Parallel tasks"
+      },
+      "goals": {
+        "zh": "将可独立执行的任务交给多个 Agent 并行处理",
+        "en": "Run independent tasks with multiple agents in parallel"
+      },
+      "examples": {
+        "zh": [
+          "几个agent分头干活",
+          "让多个助手同时处理不同任务",
+          "智能体一起做能拆开的任务"
+        ],
+        "en": [
+          "Have several agents work on independent tasks",
+          "Split the work across agents in parallel"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "sheet-merge",
+      "domain": "office",
+      "terms": {
+        "zh": "表格合并",
+        "en": "Spreadsheet consolidation"
+      },
+      "goals": {
+        "zh": "按匹配字段合并表格并核对结果",
+        "en": "Merge spreadsheets by matching fields and verify the result"
+      },
+      "examples": {
+        "zh": [
+          "把几个excel按客户编号合成一张",
+          "两张表按姓名对起来",
+          "把多份表格按编号汇总"
+        ],
+        "en": [
+          "Merge spreadsheets by customer ID",
+          "Combine these tables using the matching ID column"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "sheet-dedupe",
+      "domain": "office",
+      "terms": {
+        "zh": "数据去重",
+        "en": "Data deduplication"
+      },
+      "goals": {
+        "zh": "按指定字段识别并处理重复记录",
+        "en": "Identify and handle duplicate records by selected fields"
+      },
+      "examples": {
+        "zh": [
+          "excel里重复的行清一下",
+          "表格里同一个客户出现好多次要合并",
+          "按手机号把重复记录找出来"
+        ],
+        "en": [
+          "Remove duplicate rows from the spreadsheet",
+          "Find duplicate customer records by phone number"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office-report",
+      "domain": "office",
+      "terms": {
+        "zh": "报表自动化",
+        "en": "Report automation"
+      },
+      "goals": {
+        "zh": "自动汇总数据并生成定期报表",
+        "en": "Automate data aggregation and recurring reports"
+      },
+      "examples": {
+        "zh": [
+          "每周自动把数据整理成报表",
+          "每天自动汇总excel生成报告",
+          "定时生成销售周报"
+        ],
+        "en": [
+          "Generate a weekly report automatically",
+          "Automatically summarize sales data every day"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office-files",
+      "domain": "office",
+      "terms": {
+        "zh": "批量文件处理",
+        "en": "Batch file processing"
+      },
+      "goals": {
+        "zh": "按规则批量整理和重命名文件",
+        "en": "Organize and rename files in batches using rules"
+      },
+      "examples": {
+        "zh": [
+          "把这些文件按日期批量改名字",
+          "文件太多要按规则重命名",
+          "自动把下载的文件按月份分类"
+        ],
+        "en": [
+          "Rename these files in bulk by date",
+          "Organize downloaded files into monthly folders"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "office-mail",
+      "domain": "office",
+      "terms": {
+        "zh": "邮件工作流",
+        "en": "Email workflow"
+      },
+      "goals": {
+        "zh": "按条件自动分类邮件并准备回复",
+        "en": "Classify emails and prepare replies using specified criteria"
+      },
+      "examples": {
+        "zh": [
+          "收到客户邮件自动分类再写回复草稿",
+          "邮件自动归类并帮我拟回复",
+          "把咨询邮件分好类准备答复"
+        ],
+        "en": [
+          "Categorize customer emails and draft replies",
+          "Automatically sort incoming mail and prepare responses"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "game-collision",
+      "domain": "games",
+      "terms": {
+        "zh": "碰撞检测",
+        "en": "Collision detection"
+      },
+      "goals": {
+        "zh": "排查游戏对象穿透与碰撞检测",
+        "en": "Investigate object penetration and collision detection"
+      },
+      "examples": {
+        "zh": [
+          "角色跑着跑着穿墙了",
+          "游戏人物能穿过墙壁",
+          "玩家掉到地板下面去了"
+        ],
+        "en": [
+          "The player walks through walls",
+          "The character falls through the floor"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "game-frame",
+      "domain": "games",
+      "terms": {
+        "zh": "帧率稳定性",
+        "en": "Frame-rate stability"
+      },
+      "goals": {
+        "zh": "排查游戏掉帧与帧时间波动",
+        "en": "Investigate frame drops and frame-time spikes"
+      },
+      "examples": {
+        "zh": [
+          "游戏怪一多就掉帧",
+          "打团的时候游戏画面一卡一卡",
+          "游戏帧数忽高忽低"
+        ],
+        "en": [
+          "The game drops frames when many enemies appear",
+          "Frame rate fluctuates during combat"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "game-save",
+      "domain": "games",
+      "terms": {
+        "zh": "存档恢复",
+        "en": "Save-game restoration"
+      },
+      "goals": {
+        "zh": "排查游戏存档恢复与进度丢失",
+        "en": "Investigate save restoration and lost game progress"
+      },
+      "examples": {
+        "zh": [
+          "游戏退出再进进度没了",
+          "存档读回来人物等级不对",
+          "游戏重开后存档丢失"
+        ],
+        "en": [
+          "My game progress disappears after restarting",
+          "Loading a save restores the wrong level"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "video-sync",
+      "domain": "video",
+      "terms": {
+        "zh": "音画同步",
+        "en": "Audio-video synchronization"
+      },
+      "goals": {
+        "zh": "校正音频与画面的时间同步",
+        "en": "Correct audio-video synchronization"
+      },
+      "examples": {
+        "zh": [
+          "视频嘴型和声音对不上",
+          "剪完视频声音比画面慢",
+          "人说话声音提前了"
+        ],
+        "en": [
+          "The audio is out of sync with the video",
+          "The voice does not match the lip movements"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "video-captions",
+      "domain": "video",
+      "terms": {
+        "zh": "自动字幕",
+        "en": "Automatic captions"
+      },
+      "goals": {
+        "zh": "识别语音并生成对齐时间轴的字幕",
+        "en": "Transcribe speech and align captions to the timeline"
+      },
+      "examples": {
+        "zh": [
+          "给视频自动加说话的字幕",
+          "把视频里讲的话变成字幕",
+          "自动识别讲话生成字幕"
+        ],
+        "en": [
+          "Generate subtitles from the speech in this video",
+          "Automatically transcribe and time video captions"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "video-color",
+      "domain": "video",
+      "terms": {
+        "zh": "色彩匹配",
+        "en": "Color matching"
+      },
+      "goals": {
+        "zh": "统一不同镜头的色彩与曝光",
+        "en": "Match color and exposure across shots"
+      },
+      "examples": {
+        "zh": [
+          "几个镜头颜色不一样想调一致",
+          "剪到下一段画面忽然偏黄",
+          "不同机位拍的颜色差很多"
+        ],
+        "en": [
+          "Match the colors across these shots",
+          "The camera angles have inconsistent color and exposure"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "engineering-tolerance",
+      "domain": "engineering",
+      "terms": {
+        "zh": "装配公差",
+        "en": "Assembly tolerances"
+      },
+      "goals": {
+        "zh": "检查零件配合尺寸与公差设置",
+        "en": "Check mating dimensions and assembly tolerances"
+      },
+      "examples": {
+        "zh": [
+          "两个零件装不进去尺寸太紧",
+          "孔和轴配不上需要调间隙",
+          "零件组装后晃动太大"
+        ],
+        "en": [
+          "The shaft does not fit into the hole",
+          "The assembled parts have too much play"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "engineering-mesh",
+      "domain": "engineering",
+      "terms": {
+        "zh": "网格收敛",
+        "en": "Mesh convergence"
+      },
+      "goals": {
+        "zh": "检查仿真结果对网格划分的敏感性",
+        "en": "Check simulation sensitivity to mesh resolution"
+      },
+      "examples": {
+        "zh": [
+          "仿真网格变细结果就不一样",
+          "网格加密之后应力差很多",
+          "有限元换网格结果一直变"
+        ],
+        "en": [
+          "Simulation results change when I refine the mesh",
+          "Stress values vary with mesh density"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "engineering-revision",
+      "domain": "engineering",
+      "terms": {
+        "zh": "图纸版本管理",
+        "en": "Drawing revision management"
+      },
+      "goals": {
+        "zh": "管理图纸版本并追踪设计变更",
+        "en": "Manage drawing revisions and track design changes"
+      },
+      "examples": {
+        "zh": [
+          "图纸改了几版不知道哪份最新",
+          "工程图版本太多搞混了",
+          "设计改动要知道谁改了什么"
+        ],
+        "en": [
+          "We cannot tell which drawing revision is current",
+          "Track who changed the engineering drawings"
+        ]
+      },
+      "source": "AgentFleet authored",
+      "license": "CC0-1.0"
+    }
+  ]
+}

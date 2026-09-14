@@ -271,7 +271,7 @@ describe("会话工作区", () => {
     fireEvent.compositionEnd(input);
     expect(await screen.findByRole("option",{name:/排查登录会话意外失效/})).toBeTruthy();
     fireEvent.click(screen.getByRole("button",{name:"会话配置"}));
-    fireEvent.click(screen.getByRole("checkbox",{name:/中文分词建议/}));
+    fireEvent.click(screen.getByRole("checkbox",{name:/本地 NLP 建议/}));
     expect(screen.queryByRole("option",{name:/排查登录会话意外失效/})).toBeNull();
   });
   it("中文输入法确认时不触发快捷键提交", () => {

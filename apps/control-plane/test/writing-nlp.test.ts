@@ -31,3 +31,30 @@ test("NLP preserves surrounding sentences and declines negation, ambiguity, code
   }
   assert.ok(chineseConcepts("登陆之后过一会儿就退出来").has("auth"));
 });
+
+test("semantic retrieval abstains on weak or ambiguous matches and preserves the original constraints",async()=>{
+  const {hybridWritingSuggestions}=await import("../src/writing-nlp.js");
+  let calls=0;
+  const search=async()=>{calls++;return [{intent:"agent-context",score:.89},{intent:"agent-tools",score:.62}];};
+  const draft="只处理当前项目。助手记不清之前的要求，保持已有接口兼容";
+  const result=await hybridWritingSuggestions(draft,search);
+  assert.equal(result.suggestions[0]!.source,"semantic");
+  assert.equal(draft.slice(0,result.suggestions[0]!.replaceStart),"只处理当前项目。");
+  assert.ok(result.suggestions[0]!.insertText.endsWith("助手记不清之前的要求，保持已有接口兼容"));
+  assert.equal(calls,1);
+  assert.deepEqual((await hybridWritingSuggestions("不要让助手修改文件",search)).suggestions,[]);assert.equal(calls,1);
+  assert.deepEqual((await hybridWritingSuggestions("这是一段普通描述",async()=>[{intent:"agent-context",score:.73}])).suggestions,[]);
+  assert.deepEqual((await hybridWritingSuggestions("这是一段普通描述",async()=>[{intent:"agent-context",score:.85},{intent:"agent-tools",score:.80}])).suggestions,[]);
+  assert.equal((await hybridWritingSuggestions("I keep getting logged out",search)).suggestions[0]!.intent,"session-expiry");
+});
+
+test("curated bilingual corpus covers six domains without duplicate IDs or overlong suggestions",async()=>{
+  const {default:corpus}=await import("../src/writing-corpus.json",{with:{type:"json"}});
+  assert.equal(new Set(corpus.intents.map(item=>item.id)).size,corpus.intents.length);
+  assert.equal(new Set(corpus.intents.map(item=>item.domain)).size,6);
+  for(const intent of corpus.intents) for(const example of [...intent.examples.zh,...intent.examples.en]) {
+    const result=localChineseSuggestions(example).suggestions;
+    assert.equal(result[0]?.intent,intent.id,example);
+    assert.ok(result[0]!.label.length<=500);
+  }
+});

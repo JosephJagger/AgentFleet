@@ -1,3 +1,5 @@
+import corpus from "./writing-corpus.json" with { type: "json" };
+import type { SemanticMatch } from "./writing-semantic.js";
 import { safeWritingText } from "./writing-memory.js";
 
 // ICU word segmentation is supplied by the pinned Node runtime; no remote model.
@@ -7,7 +9,7 @@ const synonyms: Record<string, string[]> = {
   exit: ["退出", "退出来", "掉线", "掉登录", "老掉", "总掉", "失效", "掉了"],
   unexpected: ["自己", "自动", "一会儿", "过一会儿", "总是", "老是", "经常", "老", "总", "莫名其妙", "意外", "老掉", "总掉", "动不动"],
   page: ["页面", "网页", "界面", "首屏", "列表"],
-  slow: ["慢", "卡", "卡顿", "很久", "半天", "转圈", "卡住", "卡死", "不流畅", "迟钝"],
+  slow: ["慢", "很慢", "太慢", "特别慢", "很卡", "太卡", "卡", "卡顿", "很久", "半天", "转圈", "卡住", "卡死", "不流畅", "迟钝"],
   button: ["按钮", "按键", "点击", "点了", "点一下"],
   unresponsive: ["没反应", "没有反应", "无响应", "不响应", "没动静", "没用", "不动", "没变化"],
   mobile: ["手机", "移动端", "小屏幕", "窄屏", "手机上"],
@@ -32,11 +34,12 @@ for (const [concept, aliases] of Object.entries(synonyms)) for (const alias of a
 }
 
 export function chineseConcepts(text: string): Set<string> {
-  const words = [...segmenter.segment(text.normalize("NFKC").toLowerCase())].filter(word => word.isWordLike).map(word => word.segment);
+  const words = [...segmenter.segment(text.normalize("NFKC").toLowerCase())].map(word => word.isWordLike ? word.segment : "|");
   const concepts = new Set<string>();
   for (let start = 0; start < words.length; start++) {
     let phrase = "";
     for (let end = start; end < Math.min(words.length, start + 6); end++) {
+      if (words[end] === "|") break;
       phrase += words[end];
       for (const concept of lexicon.get(phrase) ?? []) concepts.add(concept);
       if (phrase.length > 16) break;
@@ -59,28 +62,54 @@ const intents: Intent[] = [
   { id: "api-failure", groups: [["api"], ["timeout", "failure"]], label: "排查接口请求失败与超时" },
 ];
 
-export type NLPSuggestion = { label: string; insertText: string; replaceStart: number; replaceEnd: number; intent: string };
-const guard = /不要|不想|不希望|不需要|不允许|不用|无需|禁止|避免|防止|并非|不是|不会|别再|已经解决|已经修复|已解决|已修复|恢复正常|没有问题|没有异常|没有掉线|没再|不再|不怎么|不慢|不卡|\b(?:not|never|don't)\b/i;
+export type NLPSuggestion = { label: string; insertText: string; replaceStart: number; replaceEnd: number; intent: string; source?: "lexical" | "semantic"; domain?: string };
+const guard = /不要|不想|不希望|不需要|不允许|不用|无需|禁止|避免|防止|并非|不是|不会|别再|已经修好|已修好|已经解决|已经修复|已解决|已修复|恢复正常|没有问题|没有异常|没有掉线|没再|不再|不怎么|不慢|不卡|\b(?:not(?! (?:match|fit|respond|work)\b)|never|don't)\b/i;
 
-/** Bounded lexical NLP retrieval, not arbitrary semantic understanding.
- * Preserve the user's original sentence, including constraints and details.
- * Results carry offsets so earlier sentences are never replaced.
- */
-export function localChineseSuggestions(draft: unknown): { suggestions: NLPSuggestion[] } {
-  const empty = { suggestions: [] };
-  if (!safeWritingText(draft, 2000) || draft.trimStart().startsWith("/") || !/[\u3400-\u9fff]/.test(draft) || /[`{}]|\b(?:const|import|SELECT)\b/.test(draft)) return empty;
-  // Match only the final sentence. Keep offsets in the original UTF-16 string.
+export function prepareWritingDraft(draft: unknown) {
+  if (!safeWritingText(draft, 2000) || draft.trimStart().startsWith("/") || /[`{}]|\b(?:const|import|SELECT)\b/.test(draft)) return;
   const match = /[^。！？!?\n]+[。！？!?]*\s*$/.exec(draft);
-  if (!match) return empty;
+  if (!match) return;
   const sentence = match[0].trim();
-  if (sentence.length < 4 || sentence.length > 300 || guard.test(sentence)) return empty;
+  if (sentence.length < 4 || sentence.length > 300 || guard.test(sentence)) return;
+  if (corpus.intents.some(intent => sentence.includes(intent.goals.zh) || sentence.includes(intent.goals.en))) return;
+  return { sentence, start: match.index, end: draft.length, language: /[\u3400-\u9fff]/.test(sentence) ? "zh" as const : "en" as const };
+}
+
+export function lexicalIntents(sentence: string): string[] {
   const concepts = chineseConcepts(sentence);
-  const matches = intents.filter(intent => intent.groups.every(group => group.some(tag => concepts.has(tag))));
-  // Multiple distinct issues in one sentence need the user's own context.
-  const ranked = matches.filter(intent => intent.id !== "page-performance" || !matches.some(other => other.id === "large-list"));
-  if (ranked.length !== 1) return empty;
-  const intent = ranked[0]!;
-  if (sentence.includes(intent.label)) return empty;
-  const label = `${intent.label}：${sentence}`;
-  return { suggestions: [{ label, insertText: label, replaceStart: match.index, replaceEnd: draft.length, intent: intent.id }] };
+  const ids = new Set(intents.filter(intent => intent.groups.every(group => group.some(tag => concepts.has(tag)))).map(intent => intent.id));
+  const normalized = sentence.normalize("NFKC").toLowerCase().replace(/[。！？!?.]+$/, "");
+  for (const intent of corpus.intents) if ([...intent.examples.zh, ...intent.examples.en].some(example => normalized === example.normalize("NFKC").toLowerCase())) ids.add(intent.id);
+  if (ids.has("large-list")) ids.delete("page-performance");
+  return [...ids];
+}
+
+function suggestion(prepared: NonNullable<ReturnType<typeof prepareWritingDraft>>, id: string, source: "lexical" | "semantic"): NLPSuggestion | undefined {
+  const intent = corpus.intents.find(item => item.id === id);
+  if (!intent) return;
+  // Preserve every condition and detail; never infer a diagnosis or implementation from similarity.
+  const label = `${intent.goals[prepared.language]}${prepared.language === "zh" ? "：" : ": "}${prepared.sentence}`;
+  return { label, insertText: label, replaceStart: prepared.start, replaceEnd: prepared.end, intent: id, source, domain: intent.domain };
+}
+
+export function localChineseSuggestions(draft: unknown): { suggestions: NLPSuggestion[] } {
+  const prepared = prepareWritingDraft(draft);
+  if (!prepared) return { suggestions: [] };
+  const ids = lexicalIntents(prepared.sentence);
+  const result = ids.length === 1 ? suggestion(prepared, ids[0]!, "lexical") : undefined;
+  return { suggestions: result ? [result] : [] };
+}
+
+export async function hybridWritingSuggestions(draft: unknown, search: (text: string) => Promise<SemanticMatch[]>) {
+  const prepared = prepareWritingDraft(draft);
+  if (!prepared) return { suggestions: [] };
+  const ids = lexicalIntents(prepared.sentence);
+  if (ids.length > 1) return { suggestions: [] };
+  if (ids.length === 1) return localChineseSuggestions(draft);
+  const matches = await search(prepared.sentence);
+  const first = matches[0];
+  // Similarity is not probability. A close second is ambiguity, not a second rewrite.
+  if (!first || first.score < 0.74 || first.score - (matches[1]?.score ?? 0) < 0.08) return { suggestions: [] };
+  const result = suggestion(prepared, first.intent, "semantic");
+  return { suggestions: result ? [result] : [] };
 }

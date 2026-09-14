@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 
-export type WritingEntry = { id: string; phrase: string; replacement: string; scope: "personal" | "project"; status: "candidate" | "active"; uses: number; source_session: string | null; source_event: string | null };
+export type WritingEntry = { id: string; phrase: string; replacement: string; scope: "personal" | "project"; status: "candidate" | "active"; uses: number; source_session: string | null; source_event: string | null; source_role?: string | null };
 export type WritingMemoryState = { enabled: boolean; scope: "personal" | "project"; entries: WritingEntry[] };
 export type WritingAISettings = { endpoint: string; model: string; enabled: boolean; hasKey: boolean; configured: boolean };
 

@@ -1,0 +1,485 @@
+{
+  "model": "paraphrase-multilingual-MiniLM-L12-v2 q8",
+  "threshold": 0.74,
+  "margin": 0.08,
+  "baselineHits": 2,
+  "cases": 35,
+  "hits": 11,
+  "wrong": 0,
+  "abstained": 9,
+  "rejected": 15,
+  "p95Ms": 57,
+  "results": [
+    {
+      "draft": "登录没多久就让我再输一遍密码",
+      "expected": "session-expiry",
+      "actual": null,
+      "top": [
+        {
+          "intent": "session-expiry",
+          "score": 0.644
+        },
+        {
+          "intent": "input-debounce",
+          "score": 0.484
+        }
+      ]
+    },
+    {
+      "draft": "手机上内容互相盖住了",
+      "expected": "mobile-layout",
+      "actual": "mobile-layout",
+      "top": [
+        {
+          "intent": "mobile-layout",
+          "score": 0.794
+        },
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.684
+        }
+      ]
+    },
+    {
+      "draft": "网页打开之后要卡好久才显示",
+      "expected": "page-performance",
+      "actual": "page-performance",
+      "top": []
+    },
+    {
+      "draft": "搜索要等输入停止后才发起",
+      "expected": "input-debounce",
+      "actual": "input-debounce",
+      "top": []
+    },
+    {
+      "draft": "表格里客户名字有重复想清理掉",
+      "expected": "sheet-dedupe",
+      "actual": null,
+      "top": [
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.585
+        },
+        {
+          "intent": "duplicate-submit",
+          "score": 0.524
+        }
+      ]
+    },
+    {
+      "draft": "把两个工作簿按相同客户号合在一起",
+      "expected": "sheet-merge",
+      "actual": null,
+      "top": [
+        {
+          "intent": "sheet-merge",
+          "score": 0.58
+        },
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.546
+        }
+      ]
+    },
+    {
+      "draft": "每月自动整理一份销售统计报告",
+      "expected": "office-report",
+      "actual": "office-report",
+      "top": [
+        {
+          "intent": "office-report",
+          "score": 0.747
+        },
+        {
+          "intent": "office-files",
+          "score": 0.652
+        }
+      ]
+    },
+    {
+      "draft": "智能助手运行到中途掉线了怎么接着做",
+      "expected": "agent-resume",
+      "actual": null,
+      "top": [
+        {
+          "intent": "agent-tools",
+          "score": 0.753
+        },
+        {
+          "intent": "agent-resume",
+          "score": 0.735
+        }
+      ]
+    },
+    {
+      "draft": "聊了一阵助手就记不住一开始的要求",
+      "expected": "agent-context",
+      "actual": "agent-context",
+      "top": [
+        {
+          "intent": "agent-context",
+          "score": 0.765
+        },
+        {
+          "intent": "agent-tools",
+          "score": 0.508
+        }
+      ]
+    },
+    {
+      "draft": "想让助手使用网页浏览器完成操作",
+      "expected": "agent-tools",
+      "actual": "agent-tools",
+      "top": [
+        {
+          "intent": "agent-tools",
+          "score": 0.789
+        },
+        {
+          "intent": "agent-parallel",
+          "score": 0.561
+        }
+      ]
+    },
+    {
+      "draft": "怪物多起来游戏就不流畅",
+      "expected": "game-frame",
+      "actual": "game-frame",
+      "top": [
+        {
+          "intent": "game-frame",
+          "score": 0.767
+        },
+        {
+          "intent": "game-save",
+          "score": 0.651
+        }
+      ]
+    },
+    {
+      "draft": "人物碰到墙却能钻过去",
+      "expected": "game-collision",
+      "actual": "game-collision",
+      "top": [
+        {
+          "intent": "game-collision",
+          "score": 0.809
+        },
+        {
+          "intent": "game-frame",
+          "score": 0.497
+        }
+      ]
+    },
+    {
+      "draft": "视频里的说话声和嘴巴动作有延迟",
+      "expected": "video-sync",
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-sync",
+          "score": 0.717
+        },
+        {
+          "intent": "video-captions",
+          "score": 0.583
+        }
+      ]
+    },
+    {
+      "draft": "给这段访谈自动生成带时间的字幕",
+      "expected": "video-captions",
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-captions",
+          "score": 0.714
+        },
+        {
+          "intent": "video-sync",
+          "score": 0.573
+        }
+      ]
+    },
+    {
+      "draft": "仿真里把网格细化后计算结果变化很大",
+      "expected": "engineering-mesh",
+      "actual": null,
+      "top": [
+        {
+          "intent": "engineering-mesh",
+          "score": 0.729
+        },
+        {
+          "intent": "engineering-revision",
+          "score": 0.536
+        }
+      ]
+    },
+    {
+      "draft": "The app signs me out after a few minutes",
+      "expected": "session-expiry",
+      "actual": null,
+      "top": [
+        {
+          "intent": "session-expiry",
+          "score": 0.71
+        },
+        {
+          "intent": "mobile-layout",
+          "score": 0.43
+        }
+      ]
+    },
+    {
+      "draft": "Combine the customer tables on a common identifier",
+      "expected": "sheet-merge",
+      "actual": null,
+      "top": [
+        {
+          "intent": "sheet-merge",
+          "score": 0.684
+        },
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.533
+        }
+      ]
+    },
+    {
+      "draft": "The assistant forgets the project requirements during a long chat",
+      "expected": "agent-context",
+      "actual": "agent-context",
+      "top": [
+        {
+          "intent": "agent-context",
+          "score": 0.872
+        },
+        {
+          "intent": "agent-resume",
+          "score": 0.506
+        }
+      ]
+    },
+    {
+      "draft": "Audio lags behind the picture in my edited clip",
+      "expected": "video-sync",
+      "actual": "video-sync",
+      "top": [
+        {
+          "intent": "video-sync",
+          "score": 0.778
+        },
+        {
+          "intent": "video-color",
+          "score": 0.491
+        }
+      ]
+    },
+    {
+      "draft": "The player can pass straight through solid walls",
+      "expected": "game-collision",
+      "actual": "game-collision",
+      "top": [
+        {
+          "intent": "game-collision",
+          "score": 0.818
+        },
+        {
+          "intent": "game-frame",
+          "score": 0.381
+        }
+      ]
+    },
+    {
+      "draft": "登录现在很稳定了",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "session-expiry",
+          "score": 0.614
+        },
+        {
+          "intent": "large-list",
+          "score": 0.468
+        }
+      ]
+    },
+    {
+      "draft": "页面不卡只是颜色不好看",
+      "expected": null,
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "游戏音乐很好听",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "game-frame",
+          "score": 0.508
+        },
+        {
+          "intent": "game-collision",
+          "score": 0.409
+        }
+      ]
+    },
+    {
+      "draft": "帮我翻译这封邮件",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-captions",
+          "score": 0.454
+        },
+        {
+          "intent": "office-mail",
+          "score": 0.432
+        }
+      ]
+    },
+    {
+      "draft": "Excel 的图标怎么换颜色",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-color",
+          "score": 0.577
+        },
+        {
+          "intent": "sheet-dedupe",
+          "score": 0.509
+        }
+      ]
+    },
+    {
+      "draft": "视频里的人穿的什么衣服",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-captions",
+          "score": 0.506
+        },
+        {
+          "intent": "video-color",
+          "score": 0.394
+        }
+      ]
+    },
+    {
+      "draft": "两个需求：登录老掉并且页面很慢",
+      "expected": null,
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "Do not delete duplicate rows",
+      "expected": null,
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "The login issue is already resolved",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "session-expiry",
+          "score": 0.647
+        },
+        {
+          "intent": "office-mail",
+          "score": 0.339
+        }
+      ]
+    },
+    {
+      "draft": "What does collision detection mean?",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "agent-approval",
+          "score": 0.386
+        },
+        {
+          "intent": "game-frame",
+          "score": 0.362
+        }
+      ]
+    },
+    {
+      "draft": "The page is not slow",
+      "expected": null,
+      "actual": null,
+      "top": []
+    },
+    {
+      "draft": "我想了解防抖和节流的区别",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "engineering-mesh",
+          "score": 0.3
+        },
+        {
+          "intent": "game-frame",
+          "score": 0.268
+        }
+      ]
+    },
+    {
+      "draft": "帮我设计一个游戏故事",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "game-frame",
+          "score": 0.652
+        },
+        {
+          "intent": "game-collision",
+          "score": 0.575
+        }
+      ]
+    },
+    {
+      "draft": "办公室有好几张桌子",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "agent-parallel",
+          "score": 0.492
+        },
+        {
+          "intent": "large-list",
+          "score": 0.434
+        }
+      ]
+    },
+    {
+      "draft": "How do I pronounce idempotency?",
+      "expected": null,
+      "actual": null,
+      "top": [
+        {
+          "intent": "video-sync",
+          "score": 0.423
+        },
+        {
+          "intent": "video-captions",
+          "score": 0.376
+        }
+      ]
+    }
+  ]
+}

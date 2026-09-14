@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import type { PromptCompletion } from "./prompt-completions";
 
-export type NLPSuggestion = { label: string; insertText: string; replaceStart: number; replaceEnd: number; intent: string };
+export type NLPSuggestion = { label: string; insertText: string; replaceStart: number; replaceEnd: number; intent: string; source?: "lexical" | "semantic"; domain?: string };
 export function eligibleNLPDraft(draft: string) {
-  return draft.length >= 4 && draft.length <= 2000 && /[\u3400-\u9fff]/.test(draft) && !draft.trimStart().startsWith("/")
+  return draft.length >= 4 && draft.length <= 2000 && /[\u3400-\u9fffA-Za-z]/.test(draft) && !draft.trimStart().startsWith("/")
     && !/[`{}]|https?:\/\/|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:api.?key|password|secret|token|密码|密钥)\s*[:=]|\b(?:sk|ghp|gho|xoxb)-[\w-]+|Bearer\s+|-----BEGIN|\b[A-Za-z0-9_+/=-]{32,}\b/i.test(draft);
 }
 
@@ -22,7 +22,7 @@ export function useChineseNLP(owner: string, sessionId: string | undefined, draf
         const suggestions = (Array.isArray(response.suggestions) ? response.suggestions : []).filter(item =>
           typeof item.label === "string" && item.label.length <= 500 && item.insertText === item.label
           && Number.isInteger(item.replaceStart) && item.replaceStart >= 0 && item.replaceStart < draft.length && item.replaceEnd === draft.length
-        ).slice(0, 2).map(item => ({ ...item, detail: "中文分词建议", kind: "rewrite" as const }));
+        ).slice(0, 2).map(item => ({ ...item, detail: item.source === "semantic" ? "本地语义建议" : "本地 NLP 建议", kind: "rewrite" as const }));
         setResult({ key, suggestions });
       }).catch(() => { /* Local completions keep working when the backend is unavailable. */ })
         .finally(() => clearTimeout(timeout));

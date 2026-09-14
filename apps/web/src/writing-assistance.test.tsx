@@ -5,7 +5,7 @@ import { WritingMemoryPanel } from "./components/WritingMemoryPanel";
 import { WritingAISettings } from "./components/WritingAISettings";
 import { api } from "./lib/api";
 import { setLocale } from "./i18n";
-vi.mock("./lib/api",()=>({api:{writingAI:vi.fn(),saveWritingAI:vi.fn(),writingLearning:vi.fn(),saveWritingEntry:vi.fn(),deleteWritingEntry:vi.fn()}}));
+vi.mock("./lib/api",()=>({api:{writingHistory:vi.fn(),writingHistoryFeedback:vi.fn(),writingAI:vi.fn(),saveWritingAI:vi.fn(),writingLearning:vi.fn(),saveWritingEntry:vi.fn(),deleteWritingEntry:vi.fn()}}));
 afterEach(()=>{cleanup();vi.resetAllMocks();setLocale("zh-CN");});
 it("reviews and deletes learned candidates without treating them as confirmed",async()=>{
   const entry={id:"word",phrase:"等我输完再查",replacement:"防抖",scope:"project" as const,status:"candidate" as const,uses:0,source_session:"a",source_event:"event"};
@@ -35,4 +35,18 @@ it("English AI settings remain optional and do not request suggestions on save",
   await screen.findByText("AI settings saved");
   expect(api.saveWritingAI).toHaveBeenCalledWith({endpoint:"https://provider.test/v1",model:"test",apiKey:"test-secret",enabled:true,clearKey:false});
   expect((screen.getByLabelText("API key") as HTMLInputElement).value).toBe("");
+});
+
+it("keeps history feedback separate from vocabulary confirmation",async()=>{
+  const {WritingHistoryPanel}=await import("./components/WritingHistoryPanel");
+  const value={truncated:false,interactions:[{id:"event",paired:true,state:"completed",feedback:null as string|null,messages:[{eventId:"q",role:"user" as const,text:"登录老掉",truncated:false},{eventId:"a",role:"assistant" as const,text:"检查会话状态",truncated:false}]}]};
+  vi.mocked(api.writingHistory).mockResolvedValue(value);
+  vi.mocked(api.writingHistoryFeedback).mockResolvedValue({...value,interactions:[{...value.interactions[0],feedback:"useful"}]});
+  render(<WritingHistoryPanel sessionId="a"/>);
+  fireEvent.click(screen.getByText("问答记录与反馈"));fireEvent.click(screen.getByRole("button",{name:"读取最近问答"}));
+  await screen.findByText("已关联问答");
+  expect(screen.getByText("已结束，效果未验证",{exact:false})).toBeTruthy();
+  fireEvent.click(screen.getByRole("button",{name:"对我有用"}));
+  await waitFor(()=>expect(api.writingHistoryFeedback).toHaveBeenCalledWith("a","event","useful"));
+  expect(api.saveWritingEntry).not.toHaveBeenCalled();
 });

@@ -798,7 +798,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 29) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 30) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1137,6 +1137,17 @@ export class ControlPlaneDatabase {
         endpoint TEXT NOT NULL, model TEXT NOT NULL, encrypted_key TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 0
       ) STRICT;
       PRAGMA user_version=29`);
+    });
+    if (version < 30) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS writing_history_feedback (
+        user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id) ON DELETE CASCADE,
+        source_event TEXT NOT NULL REFERENCES durable_events(event_id) ON DELETE CASCADE,
+        rating TEXT NOT NULL CHECK(rating IN ('useful','unhelpful')), updated_at TEXT NOT NULL,
+        PRIMARY KEY(user_id,source_event)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS writing_history_feedback_session ON writing_history_feedback(user_id,session_id);
+      PRAGMA user_version=30`);
     });
   }
 
