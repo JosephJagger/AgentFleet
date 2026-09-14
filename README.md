@@ -161,14 +161,18 @@ Quota is shared by a Codex account; project and session figures are recorded tok
 | --- | --- | --- |
 | Access | Supported desktop/mobile apps | Your self-hosted web panel |
 | Device identity | Same ChatGPT account **and workspace**, plus device authorization | Independent panel login and one-time host enrollment |
-| Connection | Official relay; SSH is a separate option | Agent on each host connects outward to your control plane |
+| Connection | Authorized devices connect through the official relay | Agent on each host connects outward to your control plane |
 | Continue work | Continue chats and steer active work remotely | Continue native sessions with explicit take-control/release handling |
 | Administration | Official app connection settings | Host/project/session overview, queues, manual unfreeze, retention and supported image cleanup |
 | Operation | Official client setup | You operate HTTPS, storage, backups and updates |
 
-**About “Devices you can control from this computer”:** this is the account-paired Remote Control flow. Matching accounts alone is not enough; devices must also be authorized. SSH uses a separate connection setup with SSH access and authenticated Codex on the target. See the [official connection requirements](https://learn.chatgpt.com/docs/remote-connections). Checked September 9, 2026; labels and availability can change by app version and rollout. Current documentation refers to the ChatGPT desktop app's Codex experience.
+**How do accounts and authorization differ across these three connection methods?**
 
-AgentFleets enrolls hosts using its own credentials; it does not require their Codex logins to match each other or the panel email. Each host still needs its own valid Codex authentication and permissions. This is separate host management, **not account sharing, quota pooling, or a multi-user team permission system**. The current panel uses one administrator account.
+- **Official Remote Control pairs devices.** To control your home computer from your laptop, both apps must use the same ChatGPT account and ChatGPT workspace—not a project folder. Enable remote access on the host and authorize the device pairing. Signing in alone does not grant control.
+- **Official SSH connects to projects on a server.** To use a Linux development server, you need SSH login access and Codex installed and authenticated there, then add a remote project in the desktop app. This uses SSH login rather than device pairing; the official SSH setup does not list matching ChatGPT accounts and workspaces as a requirement. See the [official remote connection guide](https://learn.chatgpt.com/docs/remote-connections).
+- **AgentFleets enrolls hosts in your own web panel.** Install an Agent on each host and pair it using a one-time credential issued by the panel. The panel account manages hosts; each host's Codex account runs its tasks. Those Codex accounts can differ from each other and from the panel email, but every host needs valid Codex authentication and permissions.
+
+AgentFleets currently uses one administrator account. Enrolling multiple hosts does not share Codex accounts, pool quotas, or provide multi-user team permissions.
 
 Use the official app if its remote workflow meets your needs. Choose AgentFleets when you want to operate and customize your own multi-host web panel. Features overlap: remote continuation is not exclusive to AgentFleets. AgentFleets controls sessions where they live; it does not currently migrate a conversation and its Git state between hosts. Release its writer before opening that same native session in another client.
 
