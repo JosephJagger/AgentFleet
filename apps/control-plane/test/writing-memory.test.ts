@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { ControlPlaneDatabase } from "../src/db.js";
 import { loadConfig } from "../src/config.js";
 import { WritingMemory, extractWritingCandidates, safeWritingText } from "../src/writing-memory.js";
-import { WritingAI } from "../src/writing-ai.js";
+import { WritingAI, relevantWritingVocabulary } from "../src/writing-ai.js";
 import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
 
 const config = () => ({ ...loadConfig({ ADMIN_EMAIL:"writing@example.test", ADMIN_PASSWORD:"writing-test-password", PUBLIC_ORIGIN:"http://writing.test", COOKIE_SECURE:"false", LOG_LEVEL:"silent" }), databasePath: ":memory:" });
@@ -210,6 +210,7 @@ test("DeepSeek optimization disables thinking and reports safe actionable failur
   ai.save(principal,{endpoint:'https://api.deepseek.com',model:'deepseek-flash',apiKey:'test-key',enabled:true});
   assert.equal((await ai.suggest(principal,'a','登录老掉')).suggestions.length,1);
   for(const [status,code] of [[401,'WRITING_AI_AUTH'],[402,'WRITING_AI_BALANCE'],[429,'WRITING_AI_RATE_LIMIT'],[400,'WRITING_AI_CONFIG'],[503,'WRITING_AI_FAILED']] as const){
+    ai.save(principal,{endpoint:'https://api.deepseek.com',model:'deepseek-flash',enabled:true});
     response=()=>Response.json({error:{message:'private provider details'}},{status});
     await assert.rejects(()=>ai.suggest(principal,'a','登录老掉'),(e:any)=>e.code===code && !e.message.includes('private'));
   }
@@ -234,4 +235,55 @@ test("OpenAI uses its token parameter while custom providers retain compatible p
   expected=new URL(endpoint).hostname;ai.save(principal,{endpoint,model:'gpt-4.1-mini',enabled:true});
   assert.deepEqual((await ai.suggest(principal,'a','login keeps dropping')).suggestions,['Investigate login session expiry']);
  }
+});
+
+test('AI cache merges concurrent requests, expires, isolates sessions and invalidates on vocabulary or configuration changes', async t => {
+ const {db,principal,service}=fixture();t.after(()=>db.close());
+ let calls=0,now=0,release!:()=>void;
+ const gate=new Promise<void>(resolve=>{release=resolve;});
+ const ai=new WritingAI(db,':memory:',service,async()=>{
+  calls++;await gate;
+  return Response.json({choices:[{message:{content:'{"suggestions":["Investigate login session expiry"]}'}}]});
+ },()=>now);
+ ai.save(principal,{endpoint:'https://provider.test/v1',model:'test',enabled:true});
+ const first=ai.suggest(principal,'a','login keeps dropping');
+ const second=ai.suggest(principal,'a','login keeps dropping');
+ assert.equal(calls,1);release();
+ const results=await Promise.all([first,second]);assert.deepEqual(results[0],results[1]);
+ results[0].suggestions[0]='mutated';
+ assert.equal((await ai.suggest(principal,'a','login keeps dropping')).suggestions[0],'Investigate login session expiry');assert.equal(calls,1);
+ await assert.rejects(()=>ai.suggest({...principal,workspaceId:'other'},'a','login keeps dropping'));assert.equal(calls,1);
+ await ai.suggest(principal,'b','login keeps dropping');assert.equal(calls,2);
+ now=600001;await ai.suggest(principal,'a','login keeps dropping');assert.equal(calls,3);
+ service.save(principal,'a',{phrase:'login',replacement:'登录会话',scope:'project'});
+ await ai.suggest(principal,'a','login keeps dropping');assert.equal(calls,4);
+ ai.save(principal,{endpoint:'https://provider.test/v1',model:'other-model',enabled:true});
+ await ai.suggest(principal,'a','login keeps dropping');assert.equal(calls,5);
+ ai.save(principal,{endpoint:'https://provider.test/v1',model:'other-model',enabled:false});
+ await assert.rejects(()=>ai.suggest(principal,'a','login keeps dropping'),{code:'WRITING_AI_DISABLED'});assert.equal(calls,5);
+});
+
+test('AI failed requests are shared but not cached; unrelated vocabulary is omitted',async t=>{
+ const {db,principal,service}=fixture();t.after(()=>db.close());
+ service.save(principal,'a',{phrase:'rendering',replacement:'视频渲染',scope:'project'});
+ let calls=0;
+ const ai=new WritingAI(db,':memory:',service,async(_url,options)=>{
+  calls++;const body=JSON.parse(String(options?.body));assert.equal(JSON.parse(body.messages[1].content).vocabulary,undefined);
+  if(calls===1)throw new Error('temporary failure');
+  return Response.json({choices:[{message:{content:'{"suggestions":[]}'}}]});
+ });
+ ai.save(principal,{endpoint:'https://provider.test/v1',model:'test',enabled:true});
+ const results=await Promise.allSettled([ai.suggest(principal,'a','login drops'),ai.suggest(principal,'a','login drops')]);
+ assert.ok(results.every(r=>r.status==='rejected'));assert.equal(calls,1);
+ await ai.suggest(principal,'a','login drops');await ai.suggest(principal,'a','login drops');assert.equal(calls,2);
+});
+
+test('vocabulary retrieval matches Chinese and English terms, excludes unrelated terms and caps context at five',()=>{
+ const entries=[{phrase:'登录会话',replacement:'用户身份验证会话',status:'active'},
+ {phrase:'rendering',replacement:'视频渲染',status:'active'},
+ ...Array.from({length:8},(_,i)=>({phrase:`session timeout ${i}`,replacement:'登录会话过期',status:'active'}))];
+ assert.equal(relevantWritingVocabulary('登录会话经常失效',entries)[0]?.phrase,'登录会话');
+ const english=relevantWritingVocabulary('Fix session timeout',entries);
+ assert.equal(english.length,5);assert.ok(english.every(e=>e.phrase.startsWith('session timeout')));
+ assert.deepEqual(relevantWritingVocabulary('make a spreadsheet',entries),[]);
 });
