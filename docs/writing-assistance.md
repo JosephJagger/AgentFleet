@@ -4,17 +4,23 @@ Multi-domain project design and the audited status of question/answer learning: 
 
 The composer combines curated Chinese/English terminology, 3,943 filtered CSpell software terms, and Fuse.js fuzzy matching. CSpell words are a spelling vocabulary, not definitions or a semantic model. Regenerate the pinned dictionary with `npm --prefix apps/web run prepare:terms`; the source package is pinned in the lockfile and its MIT license is distributed at `/software-terms-LICENSE.txt`.
 
-Term completion and wording suggestions can be disabled separately in session configuration. Those display preferences stay in the browser. Mobile users tap suggestions; desktop users can use Tab, arrow keys, and Escape. IME composition and text selections suppress completions.
+Input assistance defaults are configured in Settings; each session can inherit or override individual options. Mobile users tap suggestions; desktop users can use Tab, arrow keys, and Escape. IME composition and text selections suppress completions.
+
+AI optimization sits immediately to the left of Send or Stop in a shared action pair. Shortcut hints occupy their own space and can wrap without overlapping buttons.
 
 Desktop candidates render in a floating surface anchored above the composer, outside its scroll container. Changing candidate count does not resize the input area. Position follows resize and scroll; touch layouts keep the inline candidate strip.
 
-## Automatic learning
+## Input assistance settings and automatic learning
 
-Learning is enabled by default for newly received, successfully persisted `item.completed` user and assistant messages. There is no retrospective scan of conversation history, no access to unsynced native chats or project files, and no background model call. Messages from projects with body sync disabled, expired/deleted bodies, reasoning and tool output are excluded.
+Settings → Input assistance contains four account-wide defaults: terminology, wording suggestions, local NLP, and automatic vocabulary/wording accumulation. Sessions inherit individual options and can override them in the expandable Input assistance group. Restore global defaults removes the session overrides. Preferences are stored on the backend and refresh on navigation/focus; they are no longer browser-only. Old browser session choices are imported when that session has no backend override. Existing disabled learning choices survive migration.
 
-The lexical extractor recognizes inline-code terms and explicit quoted definitions (for example, `“等我输完再查”称为“防抖”` or `"wait until typing stops" means "debounce"`). It skips fenced code and obvious credential/URL/email patterns. This filter reduces accidental collection; it is not a complete sensitive-data classifier. Extracted candidates require confirmation before they affect suggestions. Confirmation, editing and deletion are available in session configuration → Dictionary and automatic learning.
+No dictionary approval or question/answer rating screen is required. Newly persisted user and assistant messages automatically contribute filtered terminology and explicit wording mappings. New entries become active immediately; eligible old pending entries are re-extracted from retained source evidence. The extractor recognizes marked inline terms and explicit quoted definitions. It excludes fenced code, obvious sensitive text and selected negative/speculative wording. This is a conservative lexical filter, not a factual verification engine or arbitrary language learning.
 
-Dictionaries are account-owned. Personal entries apply across projects; project entries apply only to that project. Entries store source session/event identifiers without duplicating complete messages. Candidate source availability is checked on read; unavailable candidates are erased and excluded. Confirmed entries are independently retained until deleted. Source roles are shown when available, with assistant claims marked unverified. Deleted entries are erased except for a scoped fingerprint that prevents automatic relearning. Turning learning off keeps existing entries and skips newly received events; re-enabling does not process the skipped interval. Accepted entries receive a bounded usage counter for ranking, which is not evidence that their meaning is correct. Automatic extraction is capped at 500 records per account, including deletion fingerprints.
+When an assistant explicitly proposes a professional rewrite, its source turn must identify exactly one retained user question in the same session, execution segment, thread and turn. The learned mapping keeps the original question alongside the proposed wording so details are retained. Missing identifiers, multiple questions, code blocks and uncertain examples are skipped. There is no model training or retrospective scan of every chat.
+
+Automatic entries are account-owned and default to the source project. Source event/question references are retained. Expired/deleted or sync-disabled source content removes automatic entries during reads and maintenance. Existing manually saved entries remain independent. Disabling learning stops accumulation, while existing usable entries remain available. Skipped events advance the watermark so re-enabling does not replay them. At the 500-entry account limit, the least-used oldest automatic entries can be replaced; manual entries and deletion fingerprints are preserved. Identical repeated evidence refreshes the source without replacing conflicting meanings.
+
+The retired question/answer feedback API remains available for older clients, but its UI is removed and ratings are not part of automatic learning. Internally retained source events provide provenance; users only select input-assistance options.
 
 ## Local bilingual NLP and semantic suggestions
 
@@ -28,24 +34,16 @@ Suggestions retain the original sentence after an authored professional task goa
 
 Mobile suggestions keep their actual height up to four lines with ellipsis, remain after keyboard dismissal, and edit only the draft. Desktop candidates float without resizing the composer. Delayed choices append after immediate ones.
 
-## Question/answer history
-
-Session configuration → **Questions, answers and feedback** reads retained exchanges on demand. Source events are associated by execution segment and native thread/turn IDs, keeping user questions and assistant replies separate. Missing IDs or roles are explicitly incomplete. Up to 500 retained relevant events and 30 groups are shown, with truncation indicated. Tool and reasoning output are excluded.
-
-Useful/not-helpful feedback belongs to the current account. It is reversible and never automatically promotes an answer to confirmed vocabulary or truth. No transcript copy or historical model training job is created. Expired/deleted or sync-disabled source content is excluded on read; original conversation synchronization remains independent from learning preferences.
-
-References: [ECMA-402 Segmenter specification](https://tc39.es/ecma402/#segmenter-objects), [local model settings](https://huggingface.co/docs/transformers.js/v3.8.1/en/custom_usage), [multilingual model](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2).
-
 ## Optional AI understanding (external service)
 
 Settings → AI understanding accepts a Chat Completions compatible API base URL, an explicit model identifier, optional API key, and enable switch. No provider/model is selected automatically. HTTPS is required except for loopback HTTP. With Docker, loopback refers to the container, not the host.
 
-Clicking Improve with AI sends the current draft and at most 30 confirmed dictionary entries to the configured provider. Nothing is sent on each keystroke or on configuration save. It does not start a Codex turn, execute tools or submit a chat message. Provider charges may apply. Suggestions are complete editable draft alternatives; ambiguous input can produce no suggestion. Generation is bounded by a 12-second timeout, 12 requests per account per minute, and a small response/token limit. Failures leave the draft, dictionary and local completions usable. Editing the draft or changing sessions aborts/discards outdated responses.
+Clicking Improve with AI sends the current draft and at most 30 available dictionary entries to the configured provider. Nothing is sent on each keystroke or on configuration save. It does not start a Codex turn, execute tools or submit a chat message. Provider charges may apply. Suggestions are complete editable draft alternatives; ambiguous input can produce no suggestion. Generation is bounded by a 12-second timeout, 12 requests per account per minute, and a small response/token limit. Failures leave the draft, dictionary and local completions usable. Editing the draft or changing sessions aborts/discards outdated responses.
 
 The provider must accept `POST <base>/chat/completions`, `messages`, `response_format: {type: "json_object"}` and `max_tokens`. Configure a compatible model; support varies among providers. Live model quality cannot be verified without a configured service. Responses are validated and never executed.
 
 API keys are encrypted with AES-256-GCM in SQLite. The random encryption key is stored in `writing-ai.key` alongside the database with mode 0600. Back up both the database and this file. APIs return only whether a key exists; the browser never receives saved keys. Changing provider URL clears the previous key unless a new one is supplied, and redirects are disallowed.
 
-The current release adds schema 30 for account-owned history feedback. Deploy backend + Web using `packaging/Dockerfile.control-plane` with a verified prior image so published Agent downloads remain unchanged. Older binaries cannot read schema 30: rollback requires the corresponding pre-upgrade database backup as well as the previous image, and must account for any new data written after deployment.
+The current release adds schema 31 for account defaults, session overrides and automatic-entry provenance. Deploy backend + Web using `packaging/Dockerfile.control-plane` with a verified prior image so published Agent downloads remain unchanged. Older binaries cannot read schema 31: rollback requires the corresponding pre-upgrade database backup as well as the previous image, and must account for any new data written after deployment.
 
 Sources: [CSpell dictionaries](https://github.com/streetsidesoftware/cspell-dicts), [Fuse.js](https://github.com/krisk/Fuse), [structured model outputs](https://developers.openai.com/api/docs/guides/structured-outputs).

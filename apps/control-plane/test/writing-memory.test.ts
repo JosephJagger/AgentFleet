@@ -35,12 +35,12 @@ test("extracts bilingual definitions and marked terms, skips secrets and code",(
   assert.equal(safeWritingText("Bearer abcdefgh"),false);
 });
 
-test("default learning yields candidates, deduplicates, honors opt out and never relearns deleted terms",t=>{
+test("default learning activates filtered entries, deduplicates, honors opt out and never relearns deleted terms",t=>{
   const {db,principal,service,event}=fixture();t.after(()=>db.close());
   assert.equal(service.read(principal,"a").enabled,true);
   const id=event(1,"Use `ProjectWidget`");service.learnEvent(id);
   assert.equal(service.read(principal,"a").entries.length,1);
-  const entry=service.read(principal,"a").entries[0]!;assert.equal(entry.status,"candidate");assert.equal(entry.source_event,id);
+  const entry=service.read(principal,"a").entries[0]!;assert.equal(entry.status,"active");assert.equal(entry.source_event,id);
   service.save(principal,"a",entry,entry.id);assert.equal(service.read(principal,"a").entries[0]!.status,"active");
   service.remove(principal,"a",entry.id);event(2,"Use `ProjectWidget`");assert.equal(service.read(principal,"a").entries.length,0);
   assert.equal(db.get<{phrase:string}>("SELECT phrase FROM writing_memory WHERE id=?",entry.id)!.phrase,"");
@@ -146,10 +146,52 @@ test("unknown turn IDs stay unpaired and extracted terms show the source role wi
   const entries=service.read(principal,"a").entries;
   assert.equal(entries.find(item=>item.phrase==="slow input")!.source_role,"user");
   assert.equal(entries.find(item=>item.phrase==="LocalWidget")!.source_role,"assistant");
-  assert.ok(entries.every(item=>item.status==="candidate"));
+  assert.ok(entries.every(item=>item.status==="active"));
   const history=new WritingHistory(db,service);
   assert.ok(history.read(principal,"a").interactions.every(item=>!item.paired));
   db.run("UPDATE content_blobs SET deleted_at=? WHERE payload_ref='event-2'",new Date().toISOString());
   assert.equal(service.read(principal,"a").entries.length,1);
-  assert.equal(db.get<{phrase:string}>("SELECT phrase FROM writing_memory WHERE fingerprint=?", (await import('../src/crypto.js')).sha256('localwidget'))!.phrase,"");
+  assert.equal(db.get("SELECT phrase FROM writing_memory WHERE fingerprint=?", (await import('../src/crypto.js')).sha256('localwidget')),undefined);
+});
+
+
+test("writing defaults inherit per option across sessions, isolate accounts, and can be restored",async t=>{
+ const {WritingPreferences}=await import('../src/writing-preferences.js');
+ const {db,principal}=fixture();t.after(()=>db.close());const prefs=new WritingPreferences(db);
+ assert.deepEqual(prefs.read(principal,'a').effective,{terms:true,suggestions:true,nlp:true,learning:true});
+ prefs.save(principal,{settings:{terms:false,learning:false}});
+ assert.equal(prefs.read(principal,'a').effective.terms,false);assert.equal(prefs.read(principal,'b').effective.learning,false);
+ prefs.save(principal,{settings:{terms:true}},'a');
+ prefs.save(principal,{settings:{nlp:false}});
+ assert.equal(prefs.read(principal,'a').effective.terms,true);assert.equal(prefs.read(principal,'a').effective.nlp,false);
+ assert.equal(prefs.read({...principal,userId:'other'},'a').effective.terms,true);
+ prefs.save(principal,{settings:null},'a');assert.equal(prefs.read(principal,'a').effective.terms,false);
+ assert.throws(()=>prefs.save(principal,{settings:{learning:'yes'}}));
+ assert.throws(()=>prefs.read({...principal,workspaceId:'elsewhere'},'a'));
+});
+
+test("global learning opt out skips events and session override resumes without replay",async t=>{
+ const {WritingPreferences}=await import('../src/writing-preferences.js');
+ const {db,principal,service,event}=fixture();t.after(()=>db.close());const prefs=new WritingPreferences(db);
+ prefs.save(principal,{settings:{learning:false}});event(1,'Use `SkippedTerm`');
+ assert.equal(service.read(principal,'a').entries.length,0);
+ prefs.save(principal,{settings:{learning:true}},'a');service.learnEvent('event-1');
+ assert.equal(service.read(principal,'a').entries.length,0);
+ event(2,'Use `AutomaticTerm`');assert.equal(service.read(principal,'a').entries[0]!.status,'active');
+});
+
+test("explicit answer rewrites automatically become scoped suggestions only for the linked question",t=>{
+ const {db,principal,service,event}=fixture();t.after(()=>db.close());
+ event(1,'点两下就出现两条订单','userMessage');
+ db.run("UPDATE durable_events SET native_thread_id='thread',native_turn_id='turn' WHERE event_id='event-1'");
+ event(2,'可以表述为“排查订单重复创建并检查幂等性”');
+ db.run("UPDATE durable_events SET native_thread_id='thread',native_turn_id='turn' WHERE event_id='event-2'");
+ // Build the native event metadata before the one successful learning pass.
+ db.run("DELETE FROM writing_learning");service.learnEvent('event-2');
+ const entries=service.read(principal,'a').entries;
+ assert.equal(entries.length,1);assert.equal(entries[0]!.phrase,'点两下就出现两条订单');
+ assert.equal(entries[0]!.status,'active');assert.ok(entries[0]!.replacement.endsWith('点两下就出现两条订单'));
+ assert.equal(service.read(principal,'b').entries.length,0);
+ db.run("UPDATE content_blobs SET deleted_at='2026-01-01' WHERE payload_ref='event-1'");service.cleanup();
+ assert.equal(service.read(principal,'a').entries.length,0);
 });

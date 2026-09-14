@@ -1,4 +1,4 @@
-import type { WritingHistoryState } from "../components/WritingHistoryPanel";
+import type { CompletionPreferences, WritingPreferencesState } from "./completion-preferences";
 import type { TokenCounts, UsageSummary } from "./usage";
 import type { WritingAISettings, WritingMemoryState } from "./writing-assistance";
 import type { NLPSuggestion } from "./writing-nlp";
@@ -594,6 +594,8 @@ export interface RuntimeReleaseStatus {
 }
 
 export const api = {
+  writingPreferences: (id?:string,signal?:AbortSignal) => request<WritingPreferencesState>(id ? `/api/sessions/${encodeURIComponent(id)}/writing-preferences` : '/api/settings/writing',{signal}),
+  saveWritingPreferences: (settings:Partial<CompletionPreferences>|null,id?:string,signal?:AbortSignal) => request<WritingPreferencesState>(id ? `/api/sessions/${encodeURIComponent(id)}/writing-preferences` : '/api/settings/writing',{method:'PUT',body:JSON.stringify({settings}),signal}),
   writingMemory: (id: string, signal?: AbortSignal) => request<WritingMemoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-memory`, { signal }),
   writingLearning: (id: string, enabled: boolean, scope: string) => request<WritingMemoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-memory/preferences`, { method: "PUT", body: JSON.stringify({enabled,scope}) }),
   saveWritingEntry: (id: string, entry: {phrase:string;replacement:string;scope:string}, entryId?: string) => request<WritingMemoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-memory${entryId ? `/${encodeURIComponent(entryId)}` : ""}`, {method:entryId ? "PUT" : "POST",body:JSON.stringify(entry)}),
@@ -602,8 +604,6 @@ export const api = {
   writingAI: () => request<WritingAISettings>("/api/settings/writing-ai"),
   saveWritingAI: (value: {endpoint:string;model:string;enabled:boolean;apiKey:string;clearKey:boolean}) => request<WritingAISettings>("/api/settings/writing-ai", {method:"PUT",body:JSON.stringify(value)}),
   writingSuggestions: (id: string, draft: string, signal: AbortSignal) => request<{suggestions:string[]}>(`/api/sessions/${encodeURIComponent(id)}/writing-suggestions`, {method:"POST",body:JSON.stringify({draft}),signal}),
-  writingHistory: (id: string) => request<WritingHistoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-history`),
-  writingHistoryFeedback: (id: string, eventId: string, rating: string) => request<WritingHistoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-history/${encodeURIComponent(eventId)}`, {method:"PUT",body:JSON.stringify({rating})}),
   writingNLP: (id: string, draft: string, signal: AbortSignal) => request<{suggestions:NLPSuggestion[]}>(`/api/sessions/${encodeURIComponent(id)}/writing-nlp`, {method:"POST",body:JSON.stringify({draft}),signal}),
   refreshQuota: (id:string) => request<{requested:boolean}>(`/api/machines/${encodeURIComponent(id)}/usage/refresh`,{method:"POST",body:"{}"}),
   usage: (scope: "session" | "project" | "machine", id: string, signal?: AbortSignal) => request<UsageSummary>(`/api/${scope === "session" ? "sessions" : scope === "project" ? "projects" : "machines"}/${encodeURIComponent(id)}/usage`, { signal }),

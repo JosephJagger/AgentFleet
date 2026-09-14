@@ -10,7 +10,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), login: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn() },
+  api: { writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), login: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -67,6 +67,15 @@ it("同账号另一个浏览器的租约不阻止发送，也不展示手动控�
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
 
 beforeEach(() => {
+  const defaults={terms:true,suggestions:true,nlp:true,learning:true};
+  const overrides:Record<string,Partial<typeof defaults>>={};
+  const state=(id?:string)=>({defaults:{...defaults},overrides:id?overrides[id]??null:null,effective:{...defaults,...(id?overrides[id]:{})}});
+  vi.mocked(api.writingPreferences).mockImplementation(async id=>state(id));
+  vi.mocked(api.saveWritingPreferences).mockImplementation(async(settings,id)=>{
+    if(id) {if(settings===null)delete overrides[id];else overrides[id]={...overrides[id],...settings};}
+    else Object.assign(defaults,settings);
+    return state(id);
+  });
   localStorage.clear(); sessionStorage.clear(); history.replaceState(null, "", "/");
   vi.mocked(api.dashboard).mockResolvedValue(dashboard());
   vi.mocked(api.permissions).mockResolvedValue({ profile: "project", source: "default", supported: true, preferences: { machine: { profile: null, revision: 0 }, project: { profile: null, revision: 0 }, session: { profile: null, revision: 0 } } });
@@ -170,12 +179,15 @@ describe("会话工作区", () => {
     fireEvent.change(prompt, { target: { value: "请用 types" } });
     expect(screen.getByRole("option", { name: /TypeScript 类型安全/ })).toBeTruthy();
   });
-  it("输入辅助开关分别生效，按会话保存并跨刷新保留", () => {
+  it("输入辅助开关分别生效，按会话保存并跨刷新保留", async () => {
     HTMLDialogElement.prototype.showModal = function () { this.open = true; };
     HTMLDialogElement.prototype.close = function () { this.open = false; };
     const view = render(<SessionInspector {...inspectorProps("A")} />);
     fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
+    fireEvent.click(screen.getByText("输入辅助",{selector:"summary"}));
+    await waitFor(()=>expect((screen.getByRole("checkbox", {name:/术语补全/}) as HTMLInputElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("checkbox", { name: /术语补全/ }));
+    await waitFor(()=>expect((screen.getByRole("checkbox",{name:/术语补全/}) as HTMLInputElement).checked).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "关闭会话配置" }));
     const input = screen.getByLabelText("发送给 Codex 的消息");
     fireEvent.change(input, { target: { value: "use types" } });
@@ -184,6 +196,7 @@ describe("会话工作区", () => {
     expect(screen.getByRole("option", { name: /表达优化/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
     fireEvent.click(screen.getByRole("checkbox", { name: /提示语与表达建议/ }));
+    await waitFor(()=>expect((screen.getByRole("checkbox",{name:/提示语与表达建议/}) as HTMLInputElement).checked).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "关闭会话配置" }));
     fireEvent.change(input, { target: { value: "网页很卡" } });
     expect(screen.queryByRole("listbox")).toBeNull();
@@ -193,7 +206,8 @@ describe("会话工作区", () => {
     view.unmount();
     render(<SessionInspector {...inspectorProps("A")} />);
     fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
-    expect((screen.getByRole("checkbox", { name: /术语补全/ }) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByText("输入辅助",{selector:"summary"}));
+    await waitFor(()=>expect((screen.getByRole("checkbox", { name: /术语补全/ }) as HTMLInputElement).checked).toBe(false));
     expect((screen.getByRole("checkbox", { name: /提示语与表达建议/ }) as HTMLInputElement).checked).toBe(false);
   });
   it("英文界面支持英文口语改写，点击只更新草稿", () => {
@@ -271,8 +285,9 @@ describe("会话工作区", () => {
     fireEvent.compositionEnd(input);
     expect(await screen.findByRole("option",{name:/排查登录会话意外失效/})).toBeTruthy();
     fireEvent.click(screen.getByRole("button",{name:"会话配置"}));
+    fireEvent.click(screen.getByText("输入辅助",{selector:"summary"}));
     fireEvent.click(screen.getByRole("checkbox",{name:/本地 NLP 建议/}));
-    expect(screen.queryByRole("option",{name:/排查登录会话意外失效/})).toBeNull();
+    await waitFor(()=>expect(screen.queryByRole("option",{name:/排查登录会话意外失效/})).toBeNull());
   });
   it("中文输入法确认时不触发快捷键提交", () => {
     const send = vi.fn(noop);
@@ -694,4 +709,17 @@ it("切换语言保留会话、消息正文和草稿，不发送命令", async (
   expect(api.command).not.toHaveBeenCalled();
   act(() => setLocale("zh-CN"));
   expect((screen.getByRole("textbox", { name: "发送给 Codex 的消息" }) as HTMLTextAreaElement).value).toBe("用户草稿 /model 原样保留");
+});
+
+it("AI optimization sits immediately before Send or Stop and keeps the shortcut hints",()=>{
+ const props=inspectorProps('A');
+ const view=render(<SessionInspector {...props}/>);
+ let ai=screen.getByRole('button',{name:'AI 优化'});
+ expect(ai.nextElementSibling?.textContent).toContain('发送');
+ expect(document.querySelector('.composer-keyboard-hint')?.textContent).toContain('Tab');
+ const running={...props.detail,session:{...props.detail.session,activeTurnId:'turn',state:{...props.detail.session.state,currentTurn:'in_progress' as const}}};
+ view.rerender(<SessionInspector {...props} detail={running}/>);
+ ai=screen.getByRole('button',{name:'AI 优化'});
+ expect(ai.nextElementSibling?.textContent).toContain('停止任务');
+ expect(ai.parentElement?.className).toBe('composer-primary-pair');
 });

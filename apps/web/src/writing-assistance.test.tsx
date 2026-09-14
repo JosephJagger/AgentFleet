@@ -1,26 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { WritingMemoryPanel } from "./components/WritingMemoryPanel";
+import { WritingPreferencesPanel, WritingPreferencesFields } from "./components/WritingPreferencesPanel";
+import { useCompletionPreferences } from "./lib/completion-preferences";
 import { WritingAISettings } from "./components/WritingAISettings";
 import { api } from "./lib/api";
 import { setLocale } from "./i18n";
-vi.mock("./lib/api",()=>({api:{writingHistory:vi.fn(),writingHistoryFeedback:vi.fn(),writingAI:vi.fn(),saveWritingAI:vi.fn(),writingLearning:vi.fn(),saveWritingEntry:vi.fn(),deleteWritingEntry:vi.fn()}}));
+vi.mock("./lib/api",()=>({api:{writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingHistory:vi.fn(),writingHistoryFeedback:vi.fn(),writingAI:vi.fn(),saveWritingAI:vi.fn(),writingLearning:vi.fn(),saveWritingEntry:vi.fn(),deleteWritingEntry:vi.fn()}}));
 afterEach(()=>{cleanup();vi.resetAllMocks();setLocale("zh-CN");});
-it("reviews and deletes learned candidates without treating them as confirmed",async()=>{
-  const entry={id:"word",phrase:"等我输完再查",replacement:"防抖",scope:"project" as const,status:"candidate" as const,uses:0,source_session:"a",source_event:"event"};
-  const value={enabled:true,scope:"project" as const,entries:[entry]};
-  vi.mocked(api.saveWritingEntry).mockResolvedValue(value);vi.mocked(api.deleteWritingEntry).mockResolvedValue({...value,entries:[]});
-  const refresh=vi.fn(async()=>{});
-  render(<WritingMemoryPanel sessionId="a" value={value} error="" refresh={refresh}/>);
-  fireEvent.click(screen.getByText("词库与自动学习"));
-  expect(screen.getByText("待确认",{exact:false})).toBeTruthy();
-  fireEvent.click(screen.getByRole("button",{name:"确认采用"}));
-  await waitFor(()=>expect(refresh).toHaveBeenCalledOnce());
-  expect(api.saveWritingEntry).toHaveBeenCalledWith("a",entry,"word");
-  fireEvent.click(screen.getByRole("button",{name:"删除"}));
-  await waitFor(()=>expect(api.deleteWritingEntry).toHaveBeenCalledWith("a","word"));
-});
 it("English AI settings remain optional and do not request suggestions on save",async()=>{
   setLocale("en");
   vi.mocked(api.writingAI).mockResolvedValue({endpoint:"",model:"",enabled:false,hasKey:false,configured:false});
@@ -37,16 +24,31 @@ it("English AI settings remain optional and do not request suggestions on save",
   expect((screen.getByLabelText("API key") as HTMLInputElement).value).toBe("");
 });
 
-it("keeps history feedback separate from vocabulary confirmation",async()=>{
-  const {WritingHistoryPanel}=await import("./components/WritingHistoryPanel");
-  const value={truncated:false,interactions:[{id:"event",paired:true,state:"completed",feedback:null as string|null,messages:[{eventId:"q",role:"user" as const,text:"登录老掉",truncated:false},{eventId:"a",role:"assistant" as const,text:"检查会话状态",truncated:false}]}]};
-  vi.mocked(api.writingHistory).mockResolvedValue(value);
-  vi.mocked(api.writingHistoryFeedback).mockResolvedValue({...value,interactions:[{...value.interactions[0],feedback:"useful"}]});
-  render(<WritingHistoryPanel sessionId="a"/>);
-  fireEvent.click(screen.getByText("问答记录与反馈"));fireEvent.click(screen.getByRole("button",{name:"读取最近问答"}));
-  await screen.findByText("已关联问答");
-  expect(screen.getByText("已结束，效果未验证",{exact:false})).toBeTruthy();
-  fireEvent.click(screen.getByRole("button",{name:"对我有用"}));
-  await waitFor(()=>expect(api.writingHistoryFeedback).toHaveBeenCalledWith("a","event","useful"));
-  expect(api.saveWritingEntry).not.toHaveBeenCalled();
+
+it("shows only automatic input options and saves account defaults",async()=>{
+ const defaults={terms:true,suggestions:true,nlp:true,learning:true};
+ vi.mocked(api.writingPreferences).mockImplementation(async()=>({defaults,overrides:null,effective:defaults}));
+ vi.mocked(api.saveWritingPreferences).mockImplementation(async value=>{Object.assign(defaults,value);return {defaults,overrides:null,effective:defaults};});
+ render(<WritingPreferencesPanel owner="owner"/>);
+ await waitFor(()=>expect((screen.getByRole('checkbox',{name:/自动积累词库与表达/}) as HTMLInputElement).disabled).toBe(false));
+ expect(screen.queryByText('确认采用')).toBeNull();expect(screen.queryByText('问答记录与反馈')).toBeNull();
+ expect(screen.getAllByRole('checkbox')).toHaveLength(4);
+ fireEvent.click(screen.getByRole('checkbox',{name:/自动积累词库与表达/}));
+ await waitFor(()=>expect(api.saveWritingPreferences).toHaveBeenCalledWith({learning:false},undefined));
+});
+
+it("session options inherit individually and restore global settings",async()=>{
+ const defaults={terms:false,suggestions:true,nlp:true,learning:false};let overrides:Partial<typeof defaults>|null=null;
+ const value=()=>({defaults,overrides,effective:{...defaults,...overrides}});
+ vi.mocked(api.writingPreferences).mockImplementation(async()=>value());
+ vi.mocked(api.saveWritingPreferences).mockImplementation(async next=>{overrides=next===null?null:{...overrides,...next};return value();});
+ function SessionOptions(){const settings=useCompletionPreferences('owner','session');return <WritingPreferencesFields settings={settings} session/>;}
+ render(<SessionOptions/>);
+ await waitFor(()=>expect((screen.getByRole('checkbox',{name:/术语补全/}) as HTMLInputElement).disabled).toBe(false));
+ fireEvent.click(screen.getByRole('checkbox',{name:/术语补全/}));
+ await screen.findByText('会话覆盖');
+ expect((screen.getByRole('checkbox',{name:/自动积累词库与表达/}) as HTMLInputElement).checked).toBe(false);
+ fireEvent.click(screen.getByRole('button',{name:'恢复继承全局设置'}));
+ await waitFor(()=>expect(api.saveWritingPreferences).toHaveBeenLastCalledWith(null,'session'));
+ await waitFor(()=>expect((screen.getByRole('checkbox',{name:/术语补全/}) as HTMLInputElement).checked).toBe(false));
 });

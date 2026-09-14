@@ -48,6 +48,7 @@ import {
   Settings2,
   Share2,
   ShieldCheck,
+  Sparkles,
   Square,
   TerminalSquare,
   Trash2,
@@ -84,8 +85,7 @@ import { useCompletionPreferences } from "./lib/completion-preferences";
 import { useWritingMemory } from "./lib/writing-assistance";
 import { mergeWritingSuggestions, useChineseNLP } from "./lib/writing-nlp";
 import { CompletionSurface } from "./components/CompletionSurface";
-import { WritingHistoryPanel } from "./components/WritingHistoryPanel";
-import { WritingMemoryPanel } from "./components/WritingMemoryPanel";
+import { WritingPreferencesFields } from "./components/WritingPreferencesPanel";
 import { applyPromptCompletion, promptCompletions, type PromptCompletion } from "./lib/prompt-completions";
 import { routeFromPath, routePath, type AppRoute, type View } from "./lib/navigation";
 import type {
@@ -631,7 +631,8 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   onNewSession?: () => void;
 }) {
   const [prompt, setPrompt] = useSessionDraft(draftOwner ?? "preview", detail?.session.id);
-  const [completionPreferences, updateCompletionPreferences] = useCompletionPreferences(draftOwner ?? "preview", detail?.session.id);
+  const writingSettings = useCompletionPreferences(draftOwner ?? "preview", detail?.session.id);
+  const [completionPreferences] = writingSettings;
   const writingMemory = useWritingMemory(draftOwner ?? "preview", detail?.session.id, detail?.events.at(-1)?.id);
   const [aiResult, setAIResult] = useState<{session:string;draft:string;suggestions:string[]}>();
   const [aiBusy, setAIBusy] = useState(false);
@@ -768,6 +769,18 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
     }
   }
 
+  const aiOptimizeButton = completionPreferences.suggestions && <button type="button" className="button button--secondary composer-ai-button" disabled={aiBusy || busy || !prompt.trim() || Boolean(slashCommand)} onClick={async()=>{
+            const controller = new AbortController(); aiRequest.current?.abort(); aiRequest.current=controller; setAIBusy(true); setAIMessage("");
+            try {
+              const settings = await api.writingAI();
+              if (controller.signal.aborted) return;
+              if (!settings.enabled || !settings.configured) { setAIMessage(t("请先在设置中配置 AI 理解；基础补全与自动学习仍可使用")); return; }
+              const result = await api.writingSuggestions(session.id,prompt,controller.signal);
+              if (!controller.signal.aborted) { setAIResult({session:session.id,draft:prompt,suggestions:result.suggestions}); if(!result.suggestions.length)setAIMessage(t("暂无更合适的表达，保留当前草稿")); }
+            } catch { if(!controller.signal.aborted)setAIMessage(t("AI 建议暂不可用，基础补全仍可使用")); }
+            finally { if(!controller.signal.aborted)setAIBusy(false); }
+          }}>{aiBusy ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}{aiBusy ? t("正在优化…") : t("AI 优化")}</button>;
+
   return (
     <aside className="inspector">
       <header className="inspector-head">
@@ -841,15 +854,10 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
         <CodexSettingsPanel key={`${draftOwner}:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />
         <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />
-        <section className="session-config-section completion-settings" aria-label={t("输入辅助")}>
-          <h3>{t("输入辅助")}</h3>
-          <p>{t("即时生效，仅保存当前浏览器中此账号、此会话的偏好。")}</p>
-          <label><input type="checkbox" checked={completionPreferences.terms} onChange={event => updateCompletionPreferences({ terms: event.target.checked })} /><span>{t("术语补全")}<small>{t("补全编程、Agent、办公、工程、游戏与视频的中英文术语。")}</small></span></label>
-          <label><input type="checkbox" checked={completionPreferences.suggestions} onChange={event => updateCompletionPreferences({ suggestions: event.target.checked })} /><span>{t("提示语与表达建议")}<small>{t("补充任务描述，或将口语改为专业表达；采用后仍可编辑。")}</small></span></label>
-          <label><input type="checkbox" checked={completionPreferences.nlp} onChange={event => updateCompletionPreferences({ nlp: event.target.checked })} /><span>{t("本地 NLP 建议")}<small>{t("输入停顿后由本站后端进行中英文分词与语义匹配，不保存草稿、不调用外部 AI 服务；需同时开启表达建议。")}</small></span></label>
-        </section>
-        <WritingHistoryPanel key={`history:${draftOwner}:${session.id}`} sessionId={session.id} />
-        <WritingMemoryPanel key={`memory:${draftOwner}:${session.id}`} sessionId={session.id} value={writingMemory.value} error={writingMemory.error} refresh={writingMemory.refresh} />
+        <details className="session-config-section completion-settings" aria-label={t("输入辅助")}>
+          <summary>{t("输入辅助")}</summary>
+          <WritingPreferencesFields settings={writingSettings} session />
+        </details>
         <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
           <CodexInspectionPanel key={`inspect:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} request={inspectionRequest?.sessionId === session.id ? inspectionRequest : undefined} onChanged={onRefresh} />
@@ -942,30 +950,23 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           }}
         />
         <div className="composer-actions">
-          {completionPreferences.suggestions && <button type="button" className="button button--quiet" disabled={aiBusy || busy || !prompt.trim() || Boolean(slashCommand)} onClick={async()=>{
-            const controller = new AbortController(); aiRequest.current?.abort(); aiRequest.current=controller; setAIBusy(true); setAIMessage("");
-            try {
-              const settings = await api.writingAI();
-              if (controller.signal.aborted) return;
-              if (!settings.enabled || !settings.configured) { setAIMessage(t("请先在设置中配置 AI 理解；基础补全与自动学习仍可使用")); return; }
-              const result = await api.writingSuggestions(session.id,prompt,controller.signal);
-              if (!controller.signal.aborted) { setAIResult({session:session.id,draft:prompt,suggestions:result.suggestions}); if(!result.suggestions.length)setAIMessage(t("暂无更合适的表达，保留当前草稿")); }
-            } catch { if(!controller.signal.aborted)setAIMessage(t("AI 建议暂不可用，基础补全仍可使用")); }
-            finally { if(!controller.signal.aborted)setAIBusy(false); }
-          }}>{aiBusy ? t("正在优化…") : t("AI 优化")}</button>}
+
           <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{detail.writeBlockedReason || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
           <span className="composer-touch-hint">{detail.writeBlockedReason || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
+          <div className="composer-button-group">
           {canQueueOrSteer ? (
             <div className="active-turn-actions">
+              <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" />{t("停止任务")}</button>}
-              <button className="button button--secondary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { await onQueue(prompt.trim(), settings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} />{t("加入队列")}</button>
+              </div><button className="button button--secondary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { await onQueue(prompt.trim(), settings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} />{t("加入队列")}</button>
               <button className="button button--primary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} />{t("追加本轮")}</button>
             </div>
-          ) : canCancel ? (
+          ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" />{t("停止任务")}</button>
           ) : (
             <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
-          )}
+          )}</div>}
+          </div>
         </div>
         </div>
       </form>

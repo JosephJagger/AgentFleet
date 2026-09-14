@@ -798,7 +798,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 30) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 31) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1148,6 +1148,22 @@ export class ControlPlaneDatabase {
       ) STRICT;
       CREATE INDEX IF NOT EXISTS writing_history_feedback_session ON writing_history_feedback(user_id,session_id);
       PRAGMA user_version=30`);
+    });
+    if (version < 31) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS writing_defaults (
+        user_id TEXT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE, settings_json TEXT NOT NULL
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS writing_overrides (
+        user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id) ON DELETE CASCADE,
+        settings_json TEXT NOT NULL, PRIMARY KEY(user_id,session_id)
+      ) STRICT;
+      INSERT OR IGNORE INTO writing_overrides(user_id,session_id,settings_json)
+        SELECT user_id,session_id,'{"learning":false}' FROM writing_learning WHERE enabled=0;`);
+      const columns=new Set(this.all<{name:string}>("PRAGMA table_info(writing_memory)").map(row=>row.name));
+      if (!columns.has("automatic")) this.sqlite.exec("ALTER TABLE writing_memory ADD COLUMN automatic INTEGER NOT NULL DEFAULT 0");
+      if (!columns.has("source_question")) this.sqlite.exec("ALTER TABLE writing_memory ADD COLUMN source_question TEXT");
+      this.sqlite.exec("UPDATE writing_memory SET automatic=1 WHERE status='candidate'; PRAGMA user_version=31");
     });
   }
 

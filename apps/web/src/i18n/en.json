@@ -445,7 +445,7 @@
   "保存失败": "Could not save",
   "主机默认": "Host default",
   "项目默认": "Project default",
-  "会话覆盖": "Session override",
+  "会话覆盖": "Conversation override",
   "Codex 自身配置": "Codex configuration",
   "未保存的选择": "Unsaved changes",
   "继承 Codex": "Inherit model",
@@ -1585,5 +1585,14 @@
   "执行失败": "Failed",
   "输入建议": "Writing suggestions",
   "补全编程、Agent、办公、工程、游戏与视频的中英文术语。": "Complete Chinese and English terms for programming, agents, office work, engineering, games and video.",
-  "补充任务描述，或将口语改为专业表达；采用后仍可编辑。": "Expand task descriptions or suggest professional wording. You can edit after applying."
+  "补充任务描述，或将口语改为专业表达；采用后仍可编辑。": "Expand task descriptions or suggest professional wording. You can edit after applying.",
+  "自动积累词库与表达": "Automatically learn terms and wording",
+  "输入停顿后匹配意思相近的中英文表达，无需配置外部 AI。": "Match similar Chinese and English wording after a pause. No external AI configuration required.",
+  "从已同步的问答中自动提取术语和表达，通过过滤后直接用于输入建议，无需逐条确认。": "Automatically extract terms and wording from synced exchanges. Filtered entries become available without individual review.",
+  "已修改的选项仅用于当前会话，其余继承全局设置。": "Changed options apply only to this conversation. Other options inherit your global settings.",
+  "当前继承全局设置；修改任一选项即可单独覆盖。": "Inheriting global settings. Change any option to override it for this conversation.",
+  "保存到当前账号，所有会话默认继承，可在会话配置中单独修改。": "Saved to your account. Conversations inherit these defaults and can override individual options.",
+  "输入辅助设置暂不可用，请重试": "Writing settings are unavailable. Please retry.",
+  "恢复继承全局设置": "Restore global defaults",
+  "可选：连接兼容 Chat Completions 的模型服务。未配置时使用基础词库和自动学习；仅点击 AI 优化时发送当前草稿与可用词条，可能产生模型费用。": "Optional: connect a Chat Completions compatible model service. Built-in vocabulary and automatic learning work without it. Only Improve with AI sends the draft and available vocabulary; provider charges may apply."
 }

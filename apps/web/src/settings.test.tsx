@@ -8,7 +8,7 @@ vi.mock("./lib/api", () => ({ api: { projects: vi.fn(), clientSessions: vi.fn(),
 afterEach(cleanup);
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.clientSessions).mockResolvedValue({ sessions: [] }); });
 const project = (id: string, machineId = "a"): Project => ({ id, machineId, alias: id, pathHint: `/work/${id}`, syncContent: true, retentionDays: 7 });
-const dashboard = { machines: [{ id: "a", name: "Host A", identity: "paired" }, { id: "b", name: "Host B", identity: "paired" }], serverTime: "one" } as Dashboard;
+const dashboard = { user:{id:"settings-user",email:"test@example.test",displayName:"Test",clientSessionId:"browser"}, machines: [{ id: "a", name: "Host A", identity: "paired" }, { id: "b", name: "Host B", identity: "paired" }], serverTime: "one" } as Dashboard;
 const onUpdated = vi.fn().mockResolvedValue(undefined), onToast = vi.fn();
 
 it("loads all project pages and saves only the selected project after explicit submission", async () => {
