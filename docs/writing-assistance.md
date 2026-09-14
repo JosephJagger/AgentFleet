@@ -1,5 +1,7 @@
 # Writing assistance
 
+Multi-domain project design and the audited status of question/answer learning: [跨领域输入辅助与对话经验库](writing-assistance-project.md). Planned capabilities in that document are not current release features.
+
 The composer combines curated Chinese/English terminology, 3,943 filtered CSpell software terms, and Fuse.js fuzzy matching. CSpell words are a spelling vocabulary, not definitions or a semantic model. Regenerate the pinned dictionary with `npm --prefix apps/web run prepare:terms`; the source package is pinned in the lockfile and its MIT license is distributed at `/software-terms-LICENSE.txt`.
 
 Term completion and wording suggestions can be disabled separately in session configuration. Those display preferences stay in the browser. Mobile users tap suggestions; desktop users can use Tab, arrow keys, and Escape. IME composition and text selections suppress completions.
