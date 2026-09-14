@@ -19,7 +19,7 @@ Keep execution in your own environment.</p>
 
 <p align="center">A self-hosted operations console for Codex CLI across Linux servers and personal computers.<br>Manage native sessions, send images, and track usage from one English or Chinese web interface.</p>
 
-![Castle in the Sky workspace with fictional demo data](docs/assets/themes/daylight-desktop.jpg)
+![Castle in the Sky workspace with fictional demo data](docs/assets/themes/daylight-desktop-en.jpg)
 
 <p align="center"><sub>Actual interface with synthetic demo data. No production accounts, hosts, or conversations are shown.</sub></p>
 
@@ -55,6 +55,19 @@ You should not have to know the exact technical term before asking for help. **W
 Choose your writing assistance defaults once in Settings, then adjust individual conversations when needed. Basic completion and local wording suggestions work without an external AI account; the optional **Improve wording** action uses the provider you configure.
 
 The aim is fewer interruptions and clearer requests for both specialists and people working outside their expertise. Coverage continues to grow; a suggestion is an aid to expression, not a guarantee that every phrase is understood.
+
+### Writing assistance in action
+
+Type part of a term to find the name you need, then choose a suggestion without leaving the conversation.
+
+![English term completion suggesting Ripple edit in a fictional video-editing conversation](docs/assets/features/completion-en.jpg)
+
+| Refine your wording on mobile | Choose the help you want |
+| --- | --- |
+| ![English mobile example showing an AI-labeled rewrite for background music during dialogue](docs/assets/features/rewrite-en.jpg) | ![English writing assistance settings with completion, wording and automatic learning options](docs/assets/features/settings-en.jpg) |
+| **Improve wording** offers a concise alternative. Read it before applying it to your draft. | Set your defaults once. Individual conversations can inherit them or use different choices. |
+
+*Real interface with fictional conversations and simulated suggestions. No production account data or live model responses are shown.*
 
 ## Our vision
 
@@ -127,10 +140,10 @@ On desktop, use the theme control below **Controlled** in the left sidebar. On n
 
 All screenshots use fictional demo data. Browse **[all 17 desktop themes and 6 mobile previews](docs/themes.md)**.
 
-| **Havoc in Heaven**<br>[![Havoc in Heaven demo](docs/assets/themes/wukong-desktop.jpg)](docs/themes.md) | **A Thousand Li of Rivers and Mountains**<br>[![A Thousand Li of Rivers and Mountains demo](docs/assets/themes/jiangshan-desktop.jpg)](docs/themes.md) |
+| **Havoc in Heaven**<br>[![Havoc in Heaven demo](docs/assets/themes/wukong-desktop-en.jpg)](docs/themes.md) | **A Thousand Li of Rivers and Mountains**<br>[![A Thousand Li of Rivers and Mountains demo](docs/assets/themes/jiangshan-desktop-en.jpg)](docs/themes.md) |
 | --- | --- |
-| **Legend of the White Snake**<br>[![Legend of the White Snake demo](docs/assets/themes/whitesnake-desktop.jpg)](docs/themes.md) | **The Matrix**<br>[![The Matrix demo](docs/assets/themes/matrix-desktop.jpg)](docs/themes.md) |
-| **Harry Potter**<br>[![Harry Potter demo](docs/assets/themes/wizard-desktop.jpg)](docs/themes.md) | **Peter Rabbit Garden**<br>[![Peter Rabbit Garden demo](docs/assets/themes/eyecare-desktop.jpg)](docs/themes.md) |
+| **Legend of the White Snake**<br>[![Legend of the White Snake demo](docs/assets/themes/whitesnake-desktop-en.jpg)](docs/themes.md) | **The Matrix**<br>[![The Matrix demo](docs/assets/themes/matrix-desktop-en.jpg)](docs/themes.md) |
+| **Harry Potter**<br>[![Harry Potter demo](docs/assets/themes/wizard-desktop-en.jpg)](docs/themes.md) | **Peter Rabbit Garden**<br>[![Peter Rabbit Garden demo](docs/assets/themes/eyecare-desktop-en.jpg)](docs/themes.md) |
 
 ### Know what is using your quota
 
