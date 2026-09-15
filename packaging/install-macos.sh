@@ -69,7 +69,7 @@ if [ -f "$DATA_ROOT/codex/codex" ] && [ ! -L "$DATA_ROOT/codex/codex" ]; then cp
 download() {
   curl -fLsS --proto '=https' --tlsv1.2 \
     --connect-timeout 20 --max-time 300 --continue-at - \
-    --retry 5 --retry-delay 2 --retry-max-time 900 --retry-all-errors \
+    --retry 5 --retry-delay 2 --retry-max-time 480 --retry-all-errors \
     "$1" -o "$2"
 }
 field() { printf '%s' "$1" | sed -n "s/.*\"$2\":\"\([^\"]*\)\".*/\1/p"; }

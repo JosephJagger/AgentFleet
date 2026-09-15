@@ -16,7 +16,7 @@ try {
  assert.match(result.stdout,/fresh install: 0.154.0, helper: 0.154.0/);console.log(result.stdout);
  const mac=await readFile('packaging/install-macos.sh','utf8');
  assert.match(mac,/--connect-timeout 20 --max-time 300 --continue-at -/);
- assert.match(mac,/--retry 5 --retry-delay 2 --retry-max-time 900 --retry-all-errors/);
+ assert.match(mac,/--retry 5 --retry-delay 2 --retry-max-time 480 --retry-all-errors/);
  const agentManifest=JSON.parse(await readFile(join(release,'manifest.json'),'utf8'));
  const agentAssignment=mac.split('\n').find(line=>line.trim().startsWith('BLOCK='));
  const assignment=mac.split('\n').find(line=>line.trim().startsWith('CODEX_BLOCK='));
