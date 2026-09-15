@@ -15,8 +15,9 @@ try {
  const result=await run('/bin/sh',['-c',script],{timeout:90000,env:{PATH:'/usr/bin:/bin',INSTALL_UID:'0',CODEX_CACHE_DIR:cache,CODEX_CACHE_EXECUTABLE:join(cache,'codex'),TEMP_DIR:stage,CONTROL_URL:'https://fixture.invalid',RELEASE_DIR:release,CODEX_COMPAT_SCHEMA_HASH:'d3eace08be5dca386bfd1f1e8df650058b4113f1e10870a284d775d75517576a',CODEX_BWRAP_SHA256:'77360cb751ccedc5971391444ac86a8a33c15b04d6b4a6fe45f5d25496e62c4c'}});
  assert.match(result.stdout,/fresh install: 0.154.0, helper: 0.154.0/);console.log(result.stdout);
  const mac=await readFile('packaging/install-macos.sh','utf8');
- assert.match(mac,/--connect-timeout 20 --max-time 300 --continue-at -/);
- assert.match(mac,/--retry 5 --retry-delay 2 --retry-max-time 480 --retry-all-errors/);
+ assert.match(mac,/--http1\.1 --proto '=https' --tlsv1\.2/);
+ assert.match(mac,/--connect-timeout 20 --max-time 90 --continue-at -/);
+ assert.match(mac,/while \[ "\$DOWNLOAD_ATTEMPT" -le 6 \]/);
  assert.ok(mac.indexOf('if [ "$MODE" = stage ] || [ "$MODE" = update ]') < mac.indexOf('CODEX_MANIFEST="$TEMP_DIR/codex-manifest.json"'), 'Agent updates must preserve the existing Codex runtime before any Codex download');
  const agentManifest=JSON.parse(await readFile(join(release,'manifest.json'),'utf8'));
  const agentAssignment=mac.split('\n').find(line=>line.trim().startsWith('BLOCK='));

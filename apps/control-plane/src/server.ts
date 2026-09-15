@@ -541,9 +541,22 @@ export async function buildControlPlane(
     const root = resolve(config.runtimeReleaseDir, "public");
     let path: string;
     try { path = realpathSync(resolve(root, file)); } catch { throw new AppError(404, "RUNTIME_NOT_FOUND", "托管安装包不存在"); }
-    invariant(path === resolve(root, file) && statSync(path).isFile(), 404, "RUNTIME_NOT_FOUND", "托管安装包不存在");
-    reply.header("cache-control", "public, max-age=31536000, immutable").header("content-length", statSync(path).size).type("application/octet-stream");
-    return reply.send(createReadStream(path));
+    const stat = statSync(path);
+    invariant(path === resolve(root, file) && stat.isFile(), 404, "RUNTIME_NOT_FOUND", "托管安装包不存在");
+    reply.header("cache-control", "public, max-age=31536000, immutable").header("accept-ranges", "bytes").type("application/octet-stream");
+    const range = request.headers.range;
+    if (!range) return reply.header("content-length", stat.size).send(createReadStream(path));
+    const match = /^bytes=(\d+)-(\d*)$/.exec(range);
+    const start = match ? Number(match[1]) : Number.NaN;
+    const requestedEnd = match?.[2] ? Number(match[2]) : stat.size - 1;
+    const end = Math.min(requestedEnd, stat.size - 1);
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(requestedEnd) || start < 0 || start >= stat.size || end < start) {
+      return reply.code(416).header("content-range", `bytes */${stat.size}`).send();
+    }
+    return reply.code(206)
+      .header("content-range", `bytes ${start}-${end}/${stat.size}`)
+      .header("content-length", end - start + 1)
+      .send(createReadStream(path, { start, end }));
   });
 
   app.post("/api/auth/login", { schema: apiSchemas.login }, async (request, reply) => {

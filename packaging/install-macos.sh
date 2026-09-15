@@ -67,10 +67,18 @@ if [ -f "$RUNTIME_PROFILE" ] && [ ! -L "$RUNTIME_PROFILE" ]; then
 fi
 if [ "$MODE" = onboard ] && [ -f "$DATA_ROOT/codex/codex" ] && [ ! -L "$DATA_ROOT/codex/codex" ]; then cp "$DATA_ROOT/codex/codex" "$TEMP_DIR/codex.previous"; CODEX_EXISTED=yes; fi
 download() {
-  curl -fLsS --proto '=https' --tlsv1.2 \
-    --connect-timeout 20 --max-time 300 --continue-at - \
-    --retry 5 --retry-delay 2 --retry-max-time 480 --retry-all-errors \
-    "$1" -o "$2"
+  DOWNLOAD_ATTEMPT=1
+  while [ "$DOWNLOAD_ATTEMPT" -le 6 ]; do
+    if curl -fLsS --http1.1 --proto '=https' --tlsv1.2 \
+      --connect-timeout 20 --max-time 90 --continue-at - "$1" -o "$2"; then
+      return 0
+    fi
+    DOWNLOAD_ATTEMPT=$((DOWNLOAD_ATTEMPT + 1))
+    [ "$DOWNLOAD_ATTEMPT" -le 6 ] && sleep 2
+  done
+  # Exact manifest size and SHA-256 checks immediately follow artifact downloads.
+  # A complete file can be present even when the peer reset during TLS shutdown.
+  [ -s "$2" ]
 }
 field() { printf '%s' "$1" | sed -n "s/.*\"$2\":\"\([^\"]*\)\".*/\1/p"; }
 

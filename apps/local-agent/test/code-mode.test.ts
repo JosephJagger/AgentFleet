@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -24,21 +24,23 @@ test("Code Mode staging rejects missing, mismatched, oversized and corrupt artif
   assert.throws(() => parseManagedRuntimeTarget({ codeModeHosts: { "linux-x64": artifact } }));
 });
 
-test("Code Mode staging retries a transient network failure and removes partial downloads", async t => {
+test("Code Mode staging resumes an interrupted partial download and removes its partial file", async t => {
   const root = await mkdtemp(join(tmpdir(), "agentfleet-code-mode-retry-")); t.after(() => rm(root, { recursive: true, force: true }));
   const platform = `${process.platform}-${process.arch}`, version = "0.153.4";
-  const bytes = "downloaded-but-not-an-executable";
+  const bytes = "downloaded-but-not-an-executable\n".repeat(4_000);
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   const artifact = { file: `codex-code-mode-host-${platform}-${version}-${sha256.slice(0, 16)}${process.platform === "win32" ? ".exe" : ""}`, sha256, size: bytes.length, format: "raw" as const };
-  let attempts = 0;
-  const fetch = t.mock.method(globalThis, "fetch", async () => {
-    attempts += 1;
-    if (attempts === 1) throw new TypeError("fetch failed: ECONNRESET");
-    return new Response(bytes);
+  let resumedRange: string | null = null;
+  const split = 70_000;
+  await writeFile(join(root, `${codeModeName()}.part`), bytes.slice(0, split));
+  const fetch = t.mock.method(globalThis, "fetch", async (_input: string | URL | Request, init?: RequestInit) => {
+    resumedRange = new Headers(init?.headers).get("range");
+    return new Response(bytes.slice(split), { status: 206, headers: { "content-range": `bytes ${split}-${bytes.length - 1}/${bytes.length}` } });
   });
   await assert.rejects(stageCodeModeHost(root, version, "https://fleet.example", artifact));
-  assert.equal(fetch.mock.callCount(), 2);
-  await assert.rejects(readFile(join(root, `${codeModeName()}.part-1`)), { code: "ENOENT" });
+  assert.equal(fetch.mock.callCount(), 1);
+  assert.equal(resumedRange, `bytes=${split}-`);
+  await assert.rejects(readFile(join(root, `${codeModeName()}.part`)), { code: "ENOENT" });
 });
 
 test("control-plane and local-agent run the same Code Mode execution probe", async () => {

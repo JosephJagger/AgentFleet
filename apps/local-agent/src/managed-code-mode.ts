@@ -41,26 +41,50 @@ function retryableDownloadError(error: unknown): boolean {
 
 async function downloadCodeModeHost(destination: string, url: URL, artifact: CodeModeArtifact, signal?: AbortSignal): Promise<void> {
   let lastError: unknown;
+  const partial = `${destination}.part`;
   for (let attempt = 1; attempt <= CODE_MODE_DOWNLOAD_ATTEMPTS; attempt += 1) {
-    const partial = `${destination}.part-${attempt}`;
     try {
+      let offset = 0;
+      try {
+        const file = await lstat(partial);
+        if (!file.isFile() || file.size > artifact.size) await rm(partial, { force: true });
+        else offset = file.size;
+      } catch { /* The first attempt starts with an empty partial file. */ }
+      if (offset === artifact.size) {
+        if (await digest(partial) !== artifact.sha256) {
+          await rm(partial, { force: true });
+          throw new AgentError("CODE_MODE_CHECKSUM_FAILED", "Code Mode 执行程序摘要不一致，未启用");
+        }
+        await rename(partial, destination);
+        return;
+      }
       const timeout = AbortSignal.timeout(CODE_MODE_DOWNLOAD_TIMEOUT_MS);
       const downloadSignal = signal ? AbortSignal.any([timeout, signal]) : timeout;
-      const response = await fetch(url, { redirect: "error", signal: downloadSignal });
+      const request: RequestInit = { redirect: "error", signal: downloadSignal };
+      if (offset) request.headers = { range: `bytes=${offset}-` };
+      const response = await fetch(url, request);
       if (!response.ok || !response.body) throw new AgentError("CODE_MODE_UNAVAILABLE", `Code Mode 下载失败 HTTP ${response.status}`);
-      let size = 0; const hash = createHash("sha256");
+      if (offset && (response.status !== 206 || !response.headers.get("content-range")?.startsWith(`bytes ${offset}-`))) {
+        await rm(partial, { force: true });
+        offset = 0;
+      }
+      let size = offset; const hash = createHash("sha256");
+      if (offset) for await (const chunk of createReadStream(partial)) hash.update(chunk);
       const bounded = new Transform({ transform(chunk: Buffer, _encoding, callback) { size += chunk.length; if (size > artifact.size) callback(new Error("Code Mode size exceeded")); else { hash.update(chunk); callback(null, chunk); } } });
-      await pipeline(bodyChunks(response.body), bounded, createWriteStream(partial, { flags: "wx", mode: 0o700 }));
+      await pipeline(bodyChunks(response.body), bounded, createWriteStream(partial, { flags: offset ? "a" : "w", mode: 0o700 }));
       if (size !== artifact.size || hash.digest("hex") !== artifact.sha256) throw new AgentError("CODE_MODE_CHECKSUM_FAILED", "Code Mode 执行程序摘要不一致，未启用");
       await rename(partial, destination);
       return;
     } catch (error) {
       lastError = error;
-      await rm(partial, { force: true });
       if (signal?.aborted) throw signal.reason;
-      if (attempt === CODE_MODE_DOWNLOAD_ATTEMPTS || !retryableDownloadError(error)) throw error;
+      if (attempt === CODE_MODE_DOWNLOAD_ATTEMPTS || !retryableDownloadError(error)) {
+        await rm(partial, { force: true });
+        throw error;
+      }
     }
   }
+  await rm(partial, { force: true });
   throw lastError;
 }
 /** Stages only into an owned candidate directory; never modifies self-installed Codex. */

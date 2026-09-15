@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -25,4 +25,13 @@ test("runtime channel controls require login and CSRF; absent targets never beco
   assert.equal((await app.inject({ ...base, headers, payload: { action: "resume" } })).statusCode, 200);
   assert.equal(channelControl(config.runtimeReleaseDir!).paused, false);
   assert.equal((await app.inject({ method: "GET", url: "/downloads/managed-codex/control.json" })).statusCode, 404);
+  const artifact = "codex-code-mode-host-darwin-arm64-0.154.0-0123456789abcdef";
+  await mkdir(join(config.runtimeReleaseDir!, "public"), { recursive: true });
+  await writeFile(join(config.runtimeReleaseDir!, "public", artifact), "0123456789");
+  const full = await app.inject({ method: "GET", url: `/downloads/managed-codex/${artifact}` });
+  assert.equal(full.statusCode, 200); assert.equal(full.headers["accept-ranges"], "bytes"); assert.equal(full.body, "0123456789");
+  const partial = await app.inject({ method: "GET", url: `/downloads/managed-codex/${artifact}`, headers: { range: "bytes=4-7" } });
+  assert.equal(partial.statusCode, 206); assert.equal(partial.headers["content-range"], "bytes 4-7/10"); assert.equal(partial.body, "4567");
+  const invalid = await app.inject({ method: "GET", url: `/downloads/managed-codex/${artifact}`, headers: { range: "bytes=10-" } });
+  assert.equal(invalid.statusCode, 416); assert.equal(invalid.headers["content-range"], "bytes */10");
 });
