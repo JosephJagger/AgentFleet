@@ -1013,6 +1013,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .stack-form label { min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .stack-form input, .stack-form select { min-width: 0; width: 100%; max-width: 100%; }
 .stack-form select { text-overflow: ellipsis; }
+.project-path-preview { display: grid; gap: 6px; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper-solid); }
+.project-path-preview span { color: var(--muted); font-size: var(--text-caption); font-weight: 650; }
+.project-path-preview code { overflow: hidden; color: var(--ink); font-family: var(--font-mono); font-size: var(--text-small); text-overflow: ellipsis; white-space: nowrap; }
 .policy-callout { align-items: flex-start; background: var(--cobalt-soft); border-radius: 8px; color: var(--cobalt-deep); display: flex; font-size: var(--text-caption); gap: 8px; line-height: 1.5; padding: 10px; }
 .policy-callout svg { flex: 0 0 auto; }
 .modal-empty { align-items: center; color: var(--muted); display: flex; flex-direction: column; padding: 54px 20px 38px; text-align: center; }

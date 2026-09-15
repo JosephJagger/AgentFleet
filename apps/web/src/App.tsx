@@ -1087,21 +1087,58 @@ function projectAliasFromPath(path: string): string {
   return leaf.normalize("NFKD").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9]+$/, "").slice(0, 64) || "project";
 }
 
+const CUSTOM_PROJECT_LOCATION = "__custom__";
+
+function projectParentPath(path: string): string | undefined {
+  const trimmed = path.trim().replace(/[\\/]+$/, "");
+  if (!trimmed) return path.trim().startsWith("/") ? "/" : undefined;
+  const boundary = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  if (boundary < 0) return undefined;
+  if (boundary === 0) return trimmed[0];
+  if (boundary === 2 && /^[A-Za-z]:/.test(trimmed)) return trimmed.slice(0, 3);
+  return trimmed.slice(0, boundary);
+}
+
+function projectLocationOptions(machine: Machine | undefined): Array<{ path: string; projects: string[] }> {
+  const choices = new Map<string, string[]>();
+  for (const project of machine?.projects ?? []) {
+    const parent = projectParentPath(project.pathHint);
+    if (!parent) continue;
+    const projects = choices.get(parent) ?? [];
+    if (!projects.includes(project.alias)) projects.push(project.alias);
+    choices.set(parent, projects);
+  }
+  return [...choices].map(([path, projects]) => ({ path, projects }));
+}
+
+function projectPathAt(parent: string, name: string): string {
+  if (!parent) return name;
+  const separator = parent.includes("\\") && !parent.includes("/") ? "\\" : "/";
+  return parent.endsWith("/") || parent.endsWith("\\") ? `${parent}${name}` : `${parent}${separator}${name}`;
+}
+
 function CreateProjectDialog({ open, machines, selectedMachineId, onClose, onCreate, onToast }: { open: boolean; machines: Machine[]; selectedMachineId?: string; onClose: () => void; onCreate: (machineId: string, path: string, alias: string, createDirectory: boolean) => Promise<void>; onToast: (tone: Toast["tone"], message: string) => void }) {
   const writableMachines = machines.filter((machine) => machine.reachability === "live" && machine.compatibility === "compatible" && machine.identity === "paired" && machine.maintenanceCapabilities?.includes("project.add"));
   const [machineId, setMachineId] = useState("");
+  const [location, setLocation] = useState(CUSTOM_PROJECT_LOCATION);
+  const [folderName, setFolderName] = useState("");
   const [path, setPath] = useState("");
   const [alias, setAlias] = useState("");
   const [aliasEdited, setAliasEdited] = useState(false);
   const [createDirectory, setCreateDirectory] = useState(true);
   const [busy, setBusy] = useState(false);
+  const activeMachine = writableMachines.find((machine) => machine.id === machineId);
+  const locations = projectLocationOptions(activeMachine);
+  const effectivePath = location === CUSTOM_PROJECT_LOCATION ? path.trim() : projectPathAt(location, folderName.trim());
   useEffect(() => {
     if (!open) return;
-    setMachineId(writableMachines.find((machine) => machine.id === selectedMachineId)?.id ?? writableMachines[0]?.id ?? "");
-    setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true);
+    const machine = writableMachines.find((item) => item.id === selectedMachineId) ?? writableMachines[0];
+    setMachineId(machine?.id ?? "");
+    setLocation(projectLocationOptions(machine)[0]?.path ?? CUSTOM_PROJECT_LOCATION);
+    setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true);
   }, [open, selectedMachineId]);
   if (!open) return null;
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><div className="modal-head"><div><div className="eyebrow">New project</div><h2 id="new-project-title">{t("创建项目")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有支持创建项目的在线主机")}</h3><p>{t("请先更新并连接主机上的 Agent。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !path.trim() || !alias.trim()) return; setBusy(true); try { await onCreate(machineId, path.trim(), alias.trim(), createDirectory); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => setMachineId(event.target.value)}>{writableMachines.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label><label><span>{t("项目路径")}</span><input value={path} onChange={(event) => { const next = event.target.value; setPath(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} placeholder={t("例如：/home/me/projects/my-app")} required autoFocus /></label><label><span>{t("项目名称")}</span><input value={alias} onChange={(event) => { setAlias(event.target.value); setAliasEdited(true); }} pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}" placeholder="my-app" required /></label><label className="checkbox-row"><input type="checkbox" checked={createDirectory} onChange={(event) => setCreateDirectory(event.target.checked)} /><span>{t("路径不存在时创建目录")}</span></label><p className="subtle">{t("路径必须是主机上的绝对路径；只会创建最后一级目录。")}</p><button className="button button--primary button--full" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <FolderGit2 size={16} />}{busy ? t("正在创建") : t("创建项目")}</button></form>}</section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><div className="modal-head"><div><div className="eyebrow">New project</div><h2 id="new-project-title">{t("创建项目")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有支持创建项目的在线主机")}</h3><p>{t("请先更新并连接主机上的 Agent。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !effectivePath || !alias.trim()) return; setBusy(true); try { await onCreate(machineId, effectivePath, alias.trim(), location === CUSTOM_PROJECT_LOCATION ? createDirectory : true); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { const nextMachine = writableMachines.find((machine) => machine.id === event.target.value); setMachineId(event.target.value); setLocation(projectLocationOptions(nextMachine)[0]?.path ?? CUSTOM_PROJECT_LOCATION); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{writableMachines.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label><label><span>{t("创建位置")}</span><select value={location} title={location === CUSTOM_PROJECT_LOCATION ? t("自定义完整路径") : location} onChange={(event) => { setLocation(event.target.value); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{locations.map((choice) => <option key={choice.path} value={choice.path}>{t("{0}（与 {1} 同级）", choice.path, choice.projects.join("、"))}</option>)}<option value={CUSTOM_PROJECT_LOCATION}>{t("自定义完整路径")}</option></select></label>{location === CUSTOM_PROJECT_LOCATION ? <label><span>{t("项目路径")}</span><input value={path} onChange={(event) => { const next = event.target.value; setPath(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} placeholder={t("例如：/home/me/projects/my-app")} required autoFocus /></label> : <><label><span>{t("新项目文件夹")}</span><input value={folderName} onChange={(event) => { const next = event.target.value; setFolderName(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}" placeholder="my-app" required autoFocus /></label><div className="project-path-preview" aria-live="polite"><span>{t("将创建在")}</span><code>{effectivePath || projectPathAt(location, "my-app")}</code></div></>}<label><span>{t("项目名称")}</span><input value={alias} onChange={(event) => { setAlias(event.target.value); setAliasEdited(true); }} pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}" placeholder="my-app" required /></label>{location === CUSTOM_PROJECT_LOCATION && <label className="checkbox-row"><input type="checkbox" checked={createDirectory} onChange={(event) => setCreateDirectory(event.target.checked)} /><span>{t("路径不存在时创建目录")}</span></label>}<p className="subtle">{location === CUSTOM_PROJECT_LOCATION ? t("路径必须是主机上的绝对路径；只会创建最后一级目录。") : t("新项目会创建在所选目录中，与现有项目位于同一层级。")}</p><button className="button button--primary button--full" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <FolderGit2 size={16} />}{busy ? t("正在创建") : t("创建项目")}</button></form>}</section></div>;
 }
 
 function App() {
