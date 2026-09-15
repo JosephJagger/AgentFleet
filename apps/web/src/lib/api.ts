@@ -655,11 +655,11 @@ export const api = {
     const raw = await request<JsonObject>("/api/release");
     return { build: string(raw.controlPlaneBuild, t("未上报")), schema: integer(raw.dbSchemaVersion), agentVersion: string(raw.agentVersion, t("未发布")), manifestStatus: string(record(raw.agentManifest).status, "unavailable") };
   },
-  async projects(options: { machineId?: string; cursor?: string | null; q?: string; limit?: number }, signal?: AbortSignal): Promise<Page<Project>> {
+  async projects(options: { machineId?: string; cursor?: string | null; q?: string; limit?: number; offset?: number }, signal?: AbortSignal): Promise<Page<Project>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 8) });
     for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
     const raw = await request<JsonObject>(`/api/projects?${query}`, { signal });
-    return { items: list(raw.items ?? raw.projects).map(mapProject), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null };
+    return { items: list(raw.items ?? raw.projects).map(mapProject), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null, total: integer(raw.total) };
   },
   async sessions(options: { machineId?: string; projectId?: string; cursor?: string | null; q?: string; executionState?: string; limit?: number }, signal?: AbortSignal): Promise<Page<FleetSession>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 30) });

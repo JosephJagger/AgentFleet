@@ -3,6 +3,7 @@ import { t, locale, systemText } from "../i18n";
 import { ChevronLeft, ChevronRight, FolderGit2, LoaderCircle, Plus, RefreshCw, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { pageItems } from "../lib/pagination";
 import type { FleetSession, Page, Project } from "../lib/types";
 
 function SessionRows({ sessions, selectedId, onSelect }: { sessions: FleetSession[]; selectedId?: string; onSelect: (id: string) => void }) {
@@ -54,6 +55,7 @@ export function WorkspaceCatalog({ machineId, selectedSession, refreshKey, onSel
   const [filter, setFilter] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
   const [previous, setPrevious] = useState<(string | null)[]>([]);
+  const [projectPage, setProjectPage] = useState(1);
   const [projects, setProjects] = useState<Page<Project>>({ items: [], nextCursor: null });
   const [matches, setMatches] = useState<Page<FleetSession>>({ items: [], nextCursor: null });
   const [expanded, setExpanded] = useState(new Set<string>());
@@ -61,10 +63,10 @@ export function WorkspaceCatalog({ machineId, selectedSession, refreshKey, onSel
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const [loadedKey, setLoadedKey] = useState<string>();
-  const scopeKey = JSON.stringify([machineId, query, filter, cursor]);
+  const scopeKey = JSON.stringify([machineId, query, filter, cursor, projectPage]);
   const loaded = loadedKey === scopeKey;
   const searching = Boolean(query.trim() || filter);
-  useEffect(() => { setCursor(null); setPrevious([]); setExpanded(new Set()); setQuery(""); setFilter(""); }, [machineId]);
+  useEffect(() => { setCursor(null); setPrevious([]); setProjectPage(1); setExpanded(new Set()); setQuery(""); setFilter(""); }, [machineId]);
   useEffect(() => { if (selectedSession) setExpanded((current) => new Set([...current, selectedSession.projectId])); }, [selectedSession?.id]);
   useEffect(() => {
     const controller = new AbortController();
@@ -72,7 +74,7 @@ export function WorkspaceCatalog({ machineId, selectedSession, refreshKey, onSel
     const timer = window.setTimeout(async () => {
       try {
         if (searching) { const next = await api.sessions({ machineId, q: query.trim(), executionState: filter || undefined, cursor, limit: 30 }, controller.signal); if (!controller.signal.aborted) setMatches(next); }
-        else { const next = await api.projects({ machineId, cursor, limit: 8 }, controller.signal); if (!controller.signal.aborted) setProjects(next); }
+        else { const next = await api.projects({ machineId, offset: (projectPage - 1) * 8, limit: 8 }, controller.signal); if (!controller.signal.aborted) setProjects(next); }
         if (!controller.signal.aborted) { setLoadedKey(scopeKey); setError(""); }
       } catch (reason) { if (!controller.signal.aborted) setError((reason as Error).message); }
       finally { if (!controller.signal.aborted) setLoading(false); }
@@ -80,15 +82,20 @@ export function WorkspaceCatalog({ machineId, selectedSession, refreshKey, onSel
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [machineId, query, filter, cursor, refreshKey, retry, scopeKey]);
   const nextCursor = searching ? matches.nextCursor : projects.nextCursor;
+  const totalProjectPages = Math.max(1, Math.ceil((projects.total ?? projects.items.length) / 8));
+  useEffect(() => {
+    if (!searching && projectPage > totalProjectPages) setProjectPage(totalProjectPages);
+  }, [projectPage, searching, totalProjectPages]);
   const visibleProjects = [...projects.items];
   if (selectedSession && selectedSession.machineId === machineId && !visibleProjects.some((project) => project.id === selectedSession.projectId)) visibleProjects.unshift({ id: selectedSession.projectId, machineId, alias: selectedSession.projectAlias, pathHint: t("当前打开的会话项目"), syncContent: true, retentionDays: 7 });
   return <section className="session-list-panel workspace-catalog" aria-busy={loading}>
     <div className="section-heading"><div><div className="eyebrow">{t("当前主机")}</div><h2>{t("项目与会话")}</h2></div><div className="catalog-heading-actions">{onCreateProject && <button type="button" className="button button--quiet" onClick={onCreateProject}><FolderGit2 size={15} />{t("新项目")}</button>}<button type="button" className="button button--quiet" onClick={() => onCreate()}><Plus size={15} />{t("新会话")}</button></div></div>
-    <div className="catalog-search"><label><Search size={15} /><input aria-label={t("搜索项目或会话")} placeholder={t("搜索项目或会话…")} value={query} onChange={(event) => { setQuery(event.target.value); setCursor(null); setPrevious([]); }} /></label><select aria-label={t("筛选会话状态")} value={filter} onChange={(event) => { setFilter(event.target.value); setCursor(null); setPrevious([]); }}><option value="">{t("全部状态")}</option><option value="running">{t("正在执行")}</option><option value="awaiting_approval">{t("等待确认")}</option><option value="idle">{t("空闲")}</option><option value="unknown">{t("待核验")}</option></select></div>
+    <div className="catalog-search"><label><Search size={15} /><input aria-label={t("搜索项目或会话")} placeholder={t("搜索项目或会话…")} value={query} onChange={(event) => { setQuery(event.target.value); setCursor(null); setPrevious([]); setProjectPage(1); }} /></label><select aria-label={t("筛选会话状态")} value={filter} onChange={(event) => { setFilter(event.target.value); setCursor(null); setPrevious([]); setProjectPage(1); }}><option value="">{t("全部状态")}</option><option value="running">{t("正在执行")}</option><option value="awaiting_approval">{t("等待确认")}</option><option value="idle">{t("空闲")}</option><option value="unknown">{t("待核验")}</option></select></div>
     {error && <p className="catalog-error" role="alert">{systemText(error)}<button type="button" onClick={() => setRetry((value) => value + 1)}><RefreshCw size={13} />{t("重试")}</button></p>}
     {loading && !loaded && <div className="catalog-loading"><LoaderCircle className="spin" size={15} />{t("正在更新列表")}</div>}
     {searching ? <SessionRows sessions={matches.items} selectedId={selectedSession?.id} onSelect={onSelect} /> : visibleProjects.map((project) => <ProjectGroup key={project.id} project={project} expanded={expanded.has(project.id)} selectedId={selectedSession?.id} refreshKey={refreshKey} onToggle={() => setExpanded((current) => { const next = new Set(current); if (next.has(project.id)) next.delete(project.id); else next.add(project.id); return next; })} onSelect={onSelect} onCreate={onCreate} />)}
     {loaded && !error && (searching ? matches.items.length === 0 : projects.items.length === 0) && <p className="catalog-empty">{searching ? t("没有匹配的会话，试试其他关键词或状态。") : t("暂无项目。连接主机后会自动发现已有 Codex 项目。")}</p>}
-    {(previous.length > 0 || nextCursor) && <nav className="project-pagination" aria-label={t("项目分页")}><span>{t("第 {0} 页", previous.length + 1)}</span><span className="project-pagination__actions"><button type="button" aria-label={t("上一页")} disabled={!previous.length || loading} onClick={() => { setCursor(previous.at(-1) ?? null); setPrevious((current) => current.slice(0, -1)); }}><ChevronLeft size={15} /></button><button type="button" aria-label={t("下一页")} disabled={!nextCursor || loading} onClick={() => { setPrevious((current) => [...current, cursor]); setCursor(nextCursor); }}><ChevronRight size={15} /></button></span></nav>}
+    {!searching && totalProjectPages > 1 && <nav className="project-pagination" aria-label={t("项目分页")}><span className="project-pagination__range">{t("第 {0} / {1} 页", projectPage, totalProjectPages)}</span><span className="project-pagination__actions"><button type="button" aria-label={t("上一页")} disabled={projectPage === 1 || loading} onClick={() => setProjectPage((page) => Math.max(1, page - 1))}><ChevronLeft size={15} /></button>{pageItems(projectPage, totalProjectPages).map((item, index) => item === "ellipsis" ? <span className="project-pagination__ellipsis" key={`ellipsis-${index}`} aria-hidden="true">…</span> : <button type="button" className="project-pagination__number" key={item} aria-current={item === projectPage ? "page" : undefined} aria-label={t("第 {0} 页", item)} disabled={loading} onClick={() => setProjectPage(item)}>{item}</button>)}<button type="button" aria-label={t("下一页")} disabled={projectPage === totalProjectPages || loading} onClick={() => setProjectPage((page) => Math.min(totalProjectPages, page + 1))}><ChevronRight size={15} /></button></span></nav>}
+    {searching && (previous.length > 0 || nextCursor) && <nav className="project-pagination" aria-label={t("会话分页")}><span className="project-pagination__range">{t("第 {0} 页", previous.length + 1)}</span><span className="project-pagination__actions"><button type="button" aria-label={t("上一页")} disabled={!previous.length || loading} onClick={() => { setCursor(previous.at(-1) ?? null); setPrevious((current) => current.slice(0, -1)); }}><ChevronLeft size={15} /></button><button type="button" aria-label={t("下一页")} disabled={!nextCursor || loading} onClick={() => { setPrevious((current) => [...current, cursor]); setCursor(nextCursor); }}><ChevronRight size={15} /></button></span></nav>}
   </section>;
 }

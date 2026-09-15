@@ -2612,6 +2612,7 @@ export class RegistryService {
   listProjectsPage(principal: Principal, options: ListOptions): { items: ProjectSummary[]; nextCursor: string | null; total: number } {
     const limit = pageLimit(options.limit);
     const scope = JSON.stringify(["projects", principal.workspaceId, options.machineId ?? null, options.q ?? null]);
+    invariant(!(options.cursor && options.offset !== undefined), 400, "INVALID_PAGINATION", "cursor and offset cannot be combined");
     const cursor = parsePageCursor(options.cursor, scope);
     const where = ["p.workspace_id=?", "m.identity_state='active'"];
     const params: Array<string | number> = [principal.workspaceId];
@@ -2620,7 +2621,8 @@ export class RegistryService {
     const total = this.db.get<{ count: number }>(`SELECT count(*) AS count FROM projects p JOIN machines m ON m.machine_id=p.machine_id WHERE ${where.join(" AND ")}`, ...params)!.count;
     if (cursor) { where.push("(p.alias>? OR (p.alias=? AND p.project_id>?))"); params.push(cursor[0]!,cursor[0]!,cursor[1]!); }
     const rows = this.db.all<{ project_id: string; alias: string; machine_id: string; canonical_root: string; identity_hash: string; repo_root: string | null; branch: string | null; dirty: number | null; lease_version: number; last_reported_at: string; sync_content: number; retention_days: 1 | 3 | 7 | 14 | 30 }>(
-      `SELECT p.* FROM projects p JOIN machines m ON m.machine_id=p.machine_id WHERE ${where.join(" AND ")} ORDER BY p.alias,p.project_id LIMIT ?`, ...params,limit+1);
+      `SELECT p.* FROM projects p JOIN machines m ON m.machine_id=p.machine_id WHERE ${where.join(" AND ")} ORDER BY p.alias,p.project_id LIMIT ?${options.offset !== undefined ? " OFFSET ?" : ""}`,
+      ...params, limit + 1, ...(options.offset !== undefined ? [options.offset] : []));
     const visible = rows.slice(0,limit);
     const last = visible.at(-1);
     return { items: visible.map((row) => ({ projectId: row.project_id,machineId: row.machine_id,alias: row.alias,canonicalRoot: row.canonical_root,identityHash: row.identity_hash,repoRoot: row.repo_root,branch: row.branch,dirty: row.dirty===null?null:row.dirty===1,leaseVersion: row.lease_version,lastReportedAt: row.last_reported_at,syncContent: row.sync_content===1,retentionDays: row.retention_days })),

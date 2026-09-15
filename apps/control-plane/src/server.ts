@@ -793,8 +793,14 @@ export async function buildControlPlane(
   });
   app.get("/api/projects", { preHandler: authenticate }, async (request) => {
     const query = request.query as Record<string, unknown>;
-    if (query.limit !== undefined || query.cursor !== undefined || query.q !== undefined) {
-      const page = registry.listProjectsPage(request.principal as Principal,listOptions(query));
+    if (query.limit !== undefined || query.cursor !== undefined || query.q !== undefined || query.offset !== undefined) {
+      const options = listOptions(query);
+      if (query.offset !== undefined) {
+        const offset = Number(query.offset);
+        invariant(Number.isSafeInteger(offset) && offset >= 0 && offset <= 1_000_000, 400, "INVALID_OFFSET", "offset must be between 0 and 1000000");
+        options.offset = offset;
+      }
+      const page = registry.listProjectsPage(request.principal as Principal, options);
       return { ...page, projects: page.items };
     }
     return { projects: registry.listProjects(request.principal as Principal, typeof query.machineId === "string" ? query.machineId : undefined) };

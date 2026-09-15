@@ -248,7 +248,7 @@ export interface SessionDetail {
   historyPage?: { nextBeforeSeq: number | null; projectionEpoch: number; contentEpoch: number; throughSeq: number };
 }
 
-export interface Page<T> { items: T[]; nextCursor: string | null; }
+export interface Page<T> { items: T[]; nextCursor: string | null; total?: number; }
 
 export interface QueuedTurn {
   id: string;

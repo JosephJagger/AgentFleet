@@ -2,6 +2,7 @@ import { invariant } from "./errors.js";
 
 export interface ListOptions {
   limit: number;
+  offset?: number;
   cursor?: string;
   machineId?: string;
   projectId?: string;
