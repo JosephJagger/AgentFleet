@@ -18,7 +18,7 @@ import { inspectCodex, type CodexInspection } from "./codex-inspection.js";
 import { resolveCodexExecutable } from "./service.js";
 import { verifySessionCwd } from "./projects.js";
 import { requestedPermissions, threadPermissionParams, turnPermissionPolicy, type PermissionProfile } from "./permissions.js";
-import { parseModels, readObservedSettings, turnSettingsParams, validateSettings, type CodexCatalog, type CodexSettings, type CodexObservedSettings } from "./codex-settings.js";
+import { parseModels, readObservedSettings, turnSettingsParams, type CodexCatalog, type CodexSettings, type CodexObservedSettings } from "./codex-settings.js";
 import {
   canonicalJson,
   identifier,
@@ -846,7 +846,10 @@ export class CodexAppServer implements AppServerClient {
     const cwd = await verifySessionCwd(project, thread.sessionCwd ?? project.root);
     const result = resultObject(
       await this.request("turn/start", {
-        ...turnSettingsParams(validateSettings(settings, this.codexCatalog)),
+        // Runtime validates settings against the long-lived catalog connection
+        // before selecting this disposable writer. A writer-local model/list can
+        // be temporarily unavailable even though turn/start accepts that model.
+        ...turnSettingsParams(settings),
         threadId: thread.nativeThreadId,
         ...(clientUserMessageId === undefined ? {} : { clientUserMessageId }),
         input: this.imageInputs(prompt, images, settings?.model ?? thread.observedSettings?.model),
