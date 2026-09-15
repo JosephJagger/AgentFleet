@@ -73,7 +73,7 @@ MANIFEST="$TEMP_DIR/manifest.json"
 download "$CONTROL_URL/downloads/manifest.json" "$MANIFEST"
 COMPACT=$(tr -d '\r\n' < "$MANIFEST")
 VERSION=$(field "$COMPACT" version)
-BLOCK=$(printf '%s' "$COMPACT" | sed -n "s/.*\"$PLATFORM\":{\(\"file\":\"codex-$PLATFORM-[^}]*\)}.*/\1/p")
+BLOCK=$(printf '%s' "$COMPACT" | sed -n "s/.*\"$PLATFORM\":{\(\"file\":\"agentfleet-$PLATFORM-[^}]*\)}.*/\1/p")
 FILE=$(field "$BLOCK" file); SHA256=$(field "$BLOCK" sha256)
 SIZE=$(printf '%s' "$BLOCK" | sed -n 's/.*"size":\([0-9]*\).*/\1/p')
 case "$FILE" in "agentfleet-$PLATFORM-$VERSION.tar.gz") ;; *) echo "installer: invalid macOS release manifest" >&2; exit 1 ;; esac

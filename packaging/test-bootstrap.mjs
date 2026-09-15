@@ -15,10 +15,14 @@ try {
  const result=await run('/bin/sh',['-c',script],{timeout:90000,env:{PATH:'/usr/bin:/bin',INSTALL_UID:'0',CODEX_CACHE_DIR:cache,CODEX_CACHE_EXECUTABLE:join(cache,'codex'),TEMP_DIR:stage,CONTROL_URL:'https://fixture.invalid',RELEASE_DIR:release,CODEX_COMPAT_SCHEMA_HASH:'d3eace08be5dca386bfd1f1e8df650058b4113f1e10870a284d775d75517576a',CODEX_BWRAP_SHA256:'77360cb751ccedc5971391444ac86a8a33c15b04d6b4a6fe45f5d25496e62c4c'}});
  assert.match(result.stdout,/fresh install: 0.154.0, helper: 0.154.0/);console.log(result.stdout);
  const mac=await readFile('packaging/install-macos.sh','utf8');
+ const agentManifest=JSON.parse(await readFile(join(release,'manifest.json'),'utf8'));
+ const agentAssignment=mac.split('\n').find(line=>line.trim().startsWith('BLOCK='));
  const assignment=mac.split('\n').find(line=>line.trim().startsWith('CODEX_BLOCK='));
  for(const platform of ['darwin-arm64','darwin-x64']) {
+  const agentParsed=await run('/bin/sh',['-c',agentAssignment+'\nprintf \'%s\' "$BLOCK"'],{env:{PATH:'/usr/bin:/bin',PLATFORM:platform,COMPACT:(await readFile(join(release,'manifest.json'),'utf8')).trim()}});
+  assert.equal(JSON.parse('{'+agentParsed.stdout+'}').file,`agentfleet-${platform}-${agentManifest.version}.tar.gz`);
   const parsed=await run('/bin/sh',['-c',assignment+'\nprintf \'%s\' \"$CODEX_BLOCK\"'],{env:{PATH:'/usr/bin:/bin',PLATFORM:platform,CODEX_COMPACT:(await readFile(join(release,'codex-manifest.json'),'utf8')).trim()}});
   assert.equal(JSON.parse('{'+parsed.stdout+'}').file,`codex-${platform}-0.154.0.tar.gz`);
  }
- console.log('Both macOS selectors choose the main archive, not Code Mode companions.');
+ console.log('Both macOS selectors choose the Agent and Codex main archives, not Code Mode companions.');
 }finally{await rm(root,{recursive:true,force:true});}
