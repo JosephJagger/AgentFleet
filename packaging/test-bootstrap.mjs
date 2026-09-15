@@ -17,6 +17,7 @@ try {
  const mac=await readFile('packaging/install-macos.sh','utf8');
  assert.match(mac,/--connect-timeout 20 --max-time 300 --continue-at -/);
  assert.match(mac,/--retry 5 --retry-delay 2 --retry-max-time 480 --retry-all-errors/);
+ assert.ok(mac.indexOf('if [ "$MODE" = stage ] || [ "$MODE" = update ]') < mac.indexOf('CODEX_MANIFEST="$TEMP_DIR/codex-manifest.json"'), 'Agent updates must preserve the existing Codex runtime before any Codex download');
  const agentManifest=JSON.parse(await readFile(join(release,'manifest.json'),'utf8'));
  const agentAssignment=mac.split('\n').find(line=>line.trim().startsWith('BLOCK='));
  const assignment=mac.split('\n').find(line=>line.trim().startsWith('CODEX_BLOCK='));

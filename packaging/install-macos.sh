@@ -65,7 +65,7 @@ if [ -f "$RUNTIME_PROFILE" ] && [ ! -L "$RUNTIME_PROFILE" ]; then
   EXISTING_CODEX_HOME=$(printf '%s' "$PROFILE_COMPACT" | sed -n 's/.*"codexHome":"\([^"\\]*\)".*/\1/p')
   EXISTING_CODEX_SOURCE=$(printf '%s' "$PROFILE_COMPACT" | sed -n 's/.*"source":"\(host\|managed\)".*/\1/p')
 fi
-if [ -f "$DATA_ROOT/codex/codex" ] && [ ! -L "$DATA_ROOT/codex/codex" ]; then cp "$DATA_ROOT/codex/codex" "$TEMP_DIR/codex.previous"; CODEX_EXISTED=yes; fi
+if [ "$MODE" = onboard ] && [ -f "$DATA_ROOT/codex/codex" ] && [ ! -L "$DATA_ROOT/codex/codex" ]; then cp "$DATA_ROOT/codex/codex" "$TEMP_DIR/codex.previous"; CODEX_EXISTED=yes; fi
 download() {
   curl -fLsS --proto '=https' --tlsv1.2 \
     --connect-timeout 20 --max-time 300 --continue-at - \
@@ -103,6 +103,17 @@ else
 fi
 OLD_TARGET=""
 if [ -L "$CURRENT_LINK" ]; then OLD_TARGET=$(readlink "$CURRENT_LINK"); fi
+if [ "$MODE" = stage ] || [ "$MODE" = update ]; then
+  [ "$PROFILE_EXISTED" = yes ] || { echo "installer: existing runtime profile is required for an update" >&2; exit 1; }
+  if [ -n "$OLD_TARGET" ] && [ "$OLD_TARGET" != "$TARGET/agentfleet" ]; then ln -sfn "$OLD_TARGET" "$PREVIOUS_LINK"; fi
+  ln -sfn "$TARGET/agentfleet" "$CURRENT_LINK"
+  echo "Installed AgentFleet $VERSION. The existing Codex runtime was preserved."
+  if [ "$MODE" = stage ]; then echo "Staged AgentFleet $VERSION; launchd will restart into it."; exit 0; fi
+  if "$CURRENT_LINK" service update --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT"; then exit 0; fi
+  echo "installer: service update failed; restoring the previous binary" >&2
+  if [ -n "$OLD_TARGET" ]; then ln -sfn "$OLD_TARGET" "$CURRENT_LINK"; "$CURRENT_LINK" service update --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT" || true; fi
+  exit 1
+fi
 HOST_CODEX=${EXISTING_CODEX_EXECUTABLE:-}
 HOST_CODEX_VERSION=""
 if [ -n "$HOST_CODEX" ] && [ "${EXISTING_CODEX_SOURCE:-}" = managed ]; then
@@ -148,14 +159,5 @@ if [ -n "$OLD_TARGET" ] && [ "$OLD_TARGET" != "$TARGET/agentfleet" ]; then ln -s
 ln -sfn "$TARGET/agentfleet" "$CURRENT_LINK"
 
 echo "Installed AgentFleet $VERSION with Codex $CODEX_VERSION."
-if [ "$MODE" = update ]; then
-  if "$CURRENT_LINK" service update --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT"; then exit 0; fi
-  echo "installer: service update failed; restoring the previous binary" >&2
-  if [ "$PROFILE_EXISTED" = yes ]; then cp "$TEMP_DIR/runtime-profile.previous" "$RUNTIME_PROFILE"; else rm -f "$RUNTIME_PROFILE"; fi
-  if [ "$CODEX_EXISTED" = yes ]; then cp "$TEMP_DIR/codex.previous" "$DATA_ROOT/codex/codex"; chmod 755 "$DATA_ROOT/codex/codex"; fi
-  if [ -n "$OLD_TARGET" ]; then ln -sfn "$OLD_TARGET" "$CURRENT_LINK"; "$CURRENT_LINK" service update --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT" || true; fi
-  exit 1
-fi
-if [ "$MODE" = stage ]; then echo "Staged AgentFleet $VERSION; launchd will restart into it."; exit 0; fi
 echo "Registering this Mac. Keep the Add Host dialog open until this command finishes."
 exec "$CURRENT_LINK" onboard "$@" --data-dir "$DATA_ROOT" --executable "$CURRENT_LINK"
