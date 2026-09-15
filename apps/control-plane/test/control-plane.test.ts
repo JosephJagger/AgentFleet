@@ -1381,13 +1381,13 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
     inherited = json<{ profile: string; source: string }>((await app.inject({ method: "GET", url: permissionUrl, headers: browserHeaders })).body);
     assert.equal(inherited.source, "project"); assert.equal(inherited.profile, "project");
     assert.equal((await save("project", null, 1)).statusCode, 200);
-    const request = { ...startPayload(session, leases[0]!.leaseId, "permission-snapshot"), payload: { prompt: "fixture", settings: { model: "test-model" } } };
+    const request = { ...startPayload(session, leases[0]!.leaseId, "permission-snapshot"), payload: { prompt: "fixture" } };
     const commandUrl = `/api/sessions/${session.logicalSessionId}/commands`;
     const response = await app.inject({ method: "POST", url: commandUrl, headers: browserHeaders, payload: request });
     assert.equal(response.statusCode, 202, response.body);
     const commandId = json<{ command: { commandId: string } }>(response.body).command.commandId;
     const body = JSON.parse(db.get<{ body_json: string }>("SELECT body_json FROM command_contents WHERE command_id=?", commandId)!.body_json);
-    assert.equal(body.permissionProfile, "network"); assert.equal(body.permissionSource, "machine"); assert.equal(body.sessionTitle, "Concurrent A");
+    assert.deepEqual(body.settings, { model: "test-model" }); assert.equal(body.permissionProfile, "network"); assert.equal(body.permissionSource, "machine"); assert.equal(body.sessionTitle, "Concurrent A");
     const hashes = db.get<{ request_hash: string; payload_hash: string }>("SELECT request_hash,payload_hash FROM commands WHERE command_id=?", commandId)!;
     assert.equal(hashes.request_hash, payloadHash({ type: request.type, precondition: request.precondition, payload: request.payload }));
     assert.equal(hashes.payload_hash, payloadHash({ type: request.type, precondition: request.precondition, payload: body }));

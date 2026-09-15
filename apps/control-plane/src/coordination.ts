@@ -432,7 +432,8 @@ export class CoordinationService {
 
       const session = this.commandSession(principal, logicalSessionId);
       if ((input.type === "turn.start" || input.type === "turn.queue") && payload.settings === undefined) {
-        invariant(!new CodexPreferencesService(this.db).read(principal, logicalSessionId).desired, 409, "CODEX_SETTINGS_REQUIRED", "Saved model defaults exist; reload runtime settings before sending, or clear the saved override");
+        const preferences = new CodexPreferencesService(this.db).read(principal, logicalSessionId);
+        if (preferences.desired) payload.settings = validateCodexSettings(preferences.desired, preferences.catalog);
       }
       if (payload.settings !== undefined) {
         invariant(input.type === "turn.start" || input.type === "turn.queue", 400, "CODEX_SETTINGS_ACTION_DENIED", "Settings can only apply when starting a new turn");
