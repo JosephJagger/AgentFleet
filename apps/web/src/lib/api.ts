@@ -727,6 +727,7 @@ export const api = {
     else if (session.state.unknownFreeze) writeBlockedReason = t("结果待核验，写入已冻结");
     return {
       session,
+      hostOnline: machine?.reachability === "live",
       events: history.events,
       historyPage: { ...history, projectionEpoch: history.projectionEpoch || session.projectionEpoch, contentEpoch: history.contentEpoch || session.contentEpoch },
       approval: approvals.find((approval) => approval.logicalSessionId === id) ?? null,

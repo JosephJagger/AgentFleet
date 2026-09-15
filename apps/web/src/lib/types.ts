@@ -233,6 +233,7 @@ export interface Dashboard {
 }
 
 export interface SessionDetail {
+  hostOnline?: boolean;
   recoverySupported?: boolean;
   commandRecoverySupported?: boolean;
   session: FleetSession;
