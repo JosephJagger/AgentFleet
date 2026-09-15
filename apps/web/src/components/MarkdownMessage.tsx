@@ -1,7 +1,7 @@
-import { Children, isValidElement, memo, useState, type ReactNode } from "react";
-import Markdown, { type Components } from "react-markdown";
+import { Children, isValidElement, memo, useMemo, useState, type ReactNode } from "react";
+import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Download, Eye } from "lucide-react";
 import { t, useLocale } from "../i18n";
 import "./markdown-message.css";
 
@@ -41,16 +41,39 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   </div>;
 }
 
-const components: Components = {
-  pre: CodeBlock,
-  table: ({ children }) => <div className="markdown-table" role="region" aria-label={t("表格")} tabIndex={0}><table>{children}</table></div>,
-  a: ({ node: _node, href, children, ...props }) => href ? <a {...props} href={href} target={href.startsWith("#") ? undefined : "_blank"} rel="noopener noreferrer">{children}</a> : <span>{children}</span>,
-  img: ({ src, alt }) => src ? <a href={src} target="_blank" rel="noopener noreferrer">{alt || t("查看图片")}</a> : <span>{alt}</span>,
-};
+function hostFilePath(href: string): string | undefined {
+  try {
+    if (href.startsWith("file://")) {
+      const url = new URL(href);
+      if (url.hostname && url.hostname !== "localhost") return undefined;
+      const path = decodeURIComponent(url.pathname);
+      return /^\/[A-Za-z]:\//u.test(path) ? path.slice(1) : path;
+    }
+    const decoded = decodeURI(href);
+    if (decoded.startsWith("/") && !decoded.startsWith("//")) return decoded;
+    if (/^[A-Za-z]:[\\/]/u.test(decoded)) return decoded;
+    if (decoded && !decoded.startsWith("#") && !decoded.startsWith("?") && !decoded.startsWith("//") && !/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(decoded)) return decoded;
+  } catch { /* Invalid encoded paths remain inert. */ }
+  return undefined;
+}
+
+function fileUrl(sessionId: string, path: string, download = false): string {
+  return `/api/sessions/${encodeURIComponent(sessionId)}/files?path=${encodeURIComponent(path)}${download ? "&download=1" : ""}`;
+}
+
+function LocalFileLink({ sessionId, path, children }: { sessionId: string; path: string; children?: ReactNode }) {
+  return <span className="markdown-file">
+    <span className="markdown-file__name">{children}</span>
+    <span className="markdown-file__actions">
+      <a href={fileUrl(sessionId, path)} target="_blank" rel="noopener noreferrer" title={t("预览文件")}><Eye size={13} />{t("预览")}</a>
+      <a href={fileUrl(sessionId, path, true)} target="_blank" rel="noopener noreferrer" title={t("下载文件")}><Download size={13} />{t("下载")}</a>
+    </span>
+  </span>;
+}
 
 /** Parse assistant prose only; raw view and execution logs retain their original bytes. */
-export const MarkdownMessage = memo(function MarkdownMessage({ body }: { body: string }) {
-  useLocale();
+export const MarkdownMessage = memo(function MarkdownMessage({ body, sessionId }: { body: string; sessionId?: string }) {
+  const activeLocale = useLocale();
   const [copiedText, setCopiedText] = useState<string>();
   const [failed, setFailed] = useState(false);
   const copied = copiedText === body;
@@ -58,8 +81,18 @@ export const MarkdownMessage = memo(function MarkdownMessage({ body }: { body: s
     try { await copyText(body); setCopiedText(body); setFailed(false); }
     catch { setFailed(true); }
   }
+  const components = useMemo<Components>(() => ({
+    pre: CodeBlock,
+    table: ({ children }) => <div className="markdown-table" role="region" aria-label={t("表格")} tabIndex={0}><table>{children}</table></div>,
+    a: ({ node: _node, href, children, ...props }) => {
+      const path = href ? hostFilePath(href) : undefined;
+      if (path && sessionId) return <LocalFileLink sessionId={sessionId} path={path}>{children}</LocalFileLink>;
+      return href ? <a {...props} href={href} target={href.startsWith("#") ? undefined : "_blank"} rel="noopener noreferrer">{children}</a> : <span>{children}</span>;
+    },
+    img: ({ src, alt }) => src ? <a href={src} target="_blank" rel="noopener noreferrer">{alt || t("查看图片")}</a> : <span>{alt}</span>,
+  }), [activeLocale, sessionId]);
   return <div className="message-markdown">
-    <div className="message-markdown__body"><Markdown remarkPlugins={[remarkGfm]} components={components} skipHtml>{body}</Markdown></div>
+    <div className="message-markdown__body"><Markdown remarkPlugins={[remarkGfm]} components={components} urlTransform={(url) => hostFilePath(url) ? url : defaultUrlTransform(url)} skipHtml>{body}</Markdown></div>
     <div className="message-markdown__actions">
       <button type="button" onClick={() => void copyReply()} aria-label={copied ? t("回复已复制") : t("复制回复")}>
         {copied ? <Check size={14} /> : <Copy size={14} />}{copied ? t("已复制") : t("复制回复")}

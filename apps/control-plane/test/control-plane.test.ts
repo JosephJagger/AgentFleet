@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { generateKeyPairSync, randomBytes, sign } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import type { WebSocket, RawData } from "ws";
 import type { ControlPlaneConfig } from "../src/config.js";
 import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
@@ -212,7 +212,7 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
     producerEpoch: "producer-epoch-1",
     appServerEpoch: "app-server-epoch-1",
     agentVersion: "0.16.2",
-    capabilities: { commandTypes: COMMAND_TYPES, maintenanceTypes: ["diagnostics.collect", "project.add"] },
+    capabilities: { commandTypes: COMMAND_TYPES, maintenanceTypes: ["diagnostics.collect", "project.add"], projectFiles: true },
     codexVersion: "0.154.0",
     schemaHash: "f3487938786b729cb6773dbc9e83a7efab9c78c845db7094e8f539f373cbacc9",
     credentialProtectionLevel: "software_protected",
@@ -368,7 +368,7 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
     producerEpoch: "producer-epoch-1",
     appServerEpoch: "app-server-epoch-1",
     agentVersion: "0.16.2",
-    capabilities: { commandTypes: COMMAND_TYPES },
+    capabilities: { commandTypes: COMMAND_TYPES, projectFiles: true },
     codexVersion: "0.153.4",
     schemaHash: "d3eace08be5dca386bfd1f1e8df650058b4113f1e10870a284d775d75517576a",
     credentialProtectionLevel: "software_protected",
@@ -471,6 +471,36 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   assert.equal(sessionViewBody.session.historyCompleteness, "complete");
   assert.equal(sessionViewBody.session.turnControlVersion, 1);
   assert.equal(sessionViewBody.session.projectLeaseVersion, 1);
+
+  const transfer = async (download: boolean) => {
+    const responsePromise = app.inject({
+      method: "GET",
+      url: `/api/sessions/${session.logicalSessionId}/files?path=${encodeURIComponent("/work/agentfleet/PRD.md")}${download ? "&download=1" : ""}`,
+      headers: { cookie },
+    });
+    const request = await agentInbox.next("file.read");
+    assert.equal(request.logicalSessionId, session.logicalSessionId);
+    assert.equal(request.projectExternalId, "local-project-a");
+    assert.equal(request.path, "/work/agentfleet/PRD.md");
+    const bytes = Buffer.from("# Product requirements\n\nArbitrary file bytes remain exact.\n");
+    agentSocket.send(JSON.stringify({ type: "file.start", requestId: request.requestId, filename: "PRD.md", size: bytes.length }));
+    agentSocket.send(JSON.stringify({ type: "file.chunk", requestId: request.requestId, sequence: 0, data: bytes.toString("base64") }));
+    agentSocket.send(JSON.stringify({
+      type: "file.end", requestId: request.requestId, size: bytes.length, chunks: 1,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    }));
+    return { response: await responsePromise, bytes };
+  };
+  const previewFile = await transfer(false);
+  assert.equal(previewFile.response.statusCode, 200, previewFile.response.body);
+  assert.equal(previewFile.response.body, previewFile.bytes.toString());
+  assert.match(String(previewFile.response.headers["content-type"]), /^text\/markdown/u);
+  assert.match(String(previewFile.response.headers["content-disposition"]), /^inline;/u);
+  assert.equal(previewFile.response.headers["x-content-type-options"], "nosniff");
+  const downloadedFile = await transfer(true);
+  assert.equal(downloadedFile.response.statusCode, 200, downloadedFile.response.body);
+  assert.equal(downloadedFile.response.body, downloadedFile.bytes.toString());
+  assert.match(String(downloadedFile.response.headers["content-disposition"]), /^attachment;/u);
 
   const leaseResponse = await app.inject({
     method: "POST",

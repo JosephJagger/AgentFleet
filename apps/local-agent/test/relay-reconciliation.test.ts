@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { MachineIdentity } from "../src/identity.js";
@@ -8,7 +8,7 @@ import { captureReconciliationStreams, RelayConnection } from "../src/relay.js";
 import type { AgentRuntime, RuntimeCallbacks } from "../src/runtime.js";
 import { selectDurableStreams } from "../src/stream-selection.js";
 import { StateStore } from "../src/store.js";
-import type { PairingCredential, ProjectRecord } from "../src/types.js";
+import type { ManagedThread, PairingCredential, ProjectRecord } from "../src/types.js";
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -439,4 +439,39 @@ test("quota demand is telemetry only and waits for reconciliation",async t=>{
  access.reconciliationReady=true;
  await enqueue(access,socket,{type:"quota.refresh"});assert.equal(runtime.quotaReads,1);
  assert.equal(runtime.commandCalls.length,0);assert.equal(socket.closeCode,undefined);
+});
+
+test("file requests stream exact project bytes without entering the command queue", async (t) => {
+  const { store, runtime, socket, access } = await setup();
+  t.after(() => store.close());
+  const root = store.snapshot().projects[0]!.root;
+  const rootStat = await stat(root);
+  await store.update((state) => {
+    state.projects[0]!.device = rootStat.dev.toString();
+    state.projects[0]!.inode = rootStat.ino.toString();
+  });
+  await store.setManagedThread({
+    nativeThreadId: "native-file", projectId: "project-local", sessionCwd: root,
+    logicalSessionId: "logical-file", executionSegmentId: "segment-file", appServerEpoch: "app-current",
+    policyVersion: "remote-restricted-v1", policyVerified: true, contentEpoch: 1,
+    createdAt: new Date().toISOString(),
+  } satisfies ManagedThread);
+  const expected = Buffer.concat([Buffer.from("spec\0"), Buffer.alloc(220_000, 7)]);
+  const path = join(root, "spec.bin");
+  await writeFile(path, expected);
+  access.reconciliationReady = true;
+  await enqueue(access, socket, { type: "file.read", requestId: "file-1", logicalSessionId: "logical-file", projectExternalId: "project-local", path });
+  const deadline = Date.now() + 2_000;
+  while (!socket.sent.some((message) => message.type === "file.end")) {
+    assert.ok(Date.now() < deadline, "file transfer did not finish");
+    await wait(5);
+  }
+  const start = socket.sent.find((message) => message.type === "file.start");
+  const chunks = socket.sent.filter((message) => message.type === "file.chunk");
+  const end = socket.sent.find((message) => message.type === "file.end");
+  assert.deepEqual({ filename: start?.filename, size: start?.size }, { filename: "spec.bin", size: expected.length });
+  assert.deepEqual(Buffer.concat(chunks.map((message) => Buffer.from(String(message.data), "base64"))), expected);
+  assert.equal(end?.chunks, 2);
+  assert.equal(runtime.commandCalls.length, 0);
+  assert.equal(socket.closeCode, undefined);
 });

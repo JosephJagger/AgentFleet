@@ -1,4 +1,6 @@
 import { createWorldWeather } from "./world-weather.js";
+import { createHash, type Hash } from "node:crypto";
+import { PassThrough } from "node:stream";
 import { WritingMemory } from "./writing-memory.js";
 import { WritingAI } from "./writing-ai.js";
 import { hybridWritingSuggestions } from "./writing-nlp.js";
@@ -23,7 +25,7 @@ import { CoordinationService, type DispatchTarget } from "./coordination.js";
 import { CloudImages } from "./cloud-images.js";
 import { AppError, invariant } from "./errors.js";
 import { apiSchemas, CODEX_COMPATIBILITY_PROFILE, type AgentToServerMessage, type ClientToServerMessage, type CreateCommandRequest } from "./api-schema.js";
-import { canonicalJson, nowIso, sha256 } from "./crypto.js";
+import { canonicalJson, newId, nowIso, sha256 } from "./crypto.js";
 import { pageLimit, type ListOptions } from "./pagination.js";
 import { MaintenanceService } from "./maintenance.js";
 import { CredentialRenewalService } from "./credentials.js";
@@ -46,6 +48,42 @@ interface AgentSocketState {
   reconciliationId?: string;
   reconciliationReady: boolean;
   dispatchPaused?: boolean;
+  projectFiles?: boolean;
+}
+
+interface PendingProjectFile {
+  machineId: string;
+  transportGeneration: number;
+  stream: PassThrough;
+  hash: Hash;
+  received: number;
+  expectedSequence: number;
+  metadata?: { filename: string; size: number };
+  resolveStart: (metadata: { filename: string; size: number }) => void;
+  rejectStart: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const MAX_PROJECT_FILE_BYTES = 50 * 1024 * 1024;
+
+function projectFileMime(filename: string): string {
+  const types: Record<string, string> = {
+    ".avif": "image/avif", ".bmp": "image/bmp", ".css": "text/css; charset=utf-8", ".csv": "text/csv; charset=utf-8",
+    ".gif": "image/gif", ".htm": "text/html; charset=utf-8", ".html": "text/html; charset=utf-8", ".jpeg": "image/jpeg",
+    ".jpg": "image/jpeg", ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
+    ".log": "text/plain; charset=utf-8", ".m4a": "audio/mp4", ".md": "text/markdown; charset=utf-8", ".mov": "video/quicktime",
+    ".mp3": "audio/mpeg", ".mp4": "video/mp4", ".pdf": "application/pdf", ".png": "image/png", ".svg": "image/svg+xml",
+    ".toml": "text/plain; charset=utf-8", ".ts": "text/plain; charset=utf-8", ".tsx": "text/plain; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8", ".webm": "video/webm", ".webp": "image/webp", ".xml": "application/xml; charset=utf-8",
+    ".yaml": "text/yaml; charset=utf-8", ".yml": "text/yaml; charset=utf-8",
+  };
+  return types[extname(filename).toLowerCase()] ?? "application/octet-stream";
+}
+
+function fileDisposition(filename: string, download: boolean): string {
+  const fallback = filename.replace(/[^\x20-\x7e]|["\\]/gu, "_").slice(0, 180) || "file";
+  const encoded = encodeURIComponent(filename).replace(/[!'()*]/gu, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `${download ? "attachment" : "inline"}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
 interface ClientSocketState {
@@ -179,6 +217,30 @@ export async function buildControlPlane(
   app.addHook("onClose", async () => writingSemantic.close());
   const agents = new Map<string, AgentSocketState>();
   const clients = new Map<string, Set<ClientSocketState>>();
+  const projectFiles = new Map<string, PendingProjectFile>();
+
+  const failProjectFile = (requestId: string, error: Error): void => {
+    const transfer = projectFiles.get(requestId);
+    if (!transfer) return;
+    projectFiles.delete(requestId);
+    clearTimeout(transfer.timer);
+    if (transfer.metadata) transfer.stream.destroy(error);
+    else transfer.rejectStart(error);
+  };
+
+  const refreshProjectFileTimeout = (requestId: string, transfer: PendingProjectFile): void => {
+    clearTimeout(transfer.timer);
+    transfer.timer = setTimeout(() => failProjectFile(requestId, new AppError(504, "FILE_TRANSFER_TIMEOUT", "Host did not finish the file transfer")), 60_000);
+    transfer.timer.unref();
+  };
+
+  const cancelMachineFiles = (machineId: string, transportGeneration?: number): void => {
+    for (const [requestId, transfer] of projectFiles) {
+      if (transfer.machineId === machineId && (transportGeneration === undefined || transfer.transportGeneration === transportGeneration)) {
+        failProjectFile(requestId, new AppError(503, "FILE_TRANSPORT_LOST", "Host disconnected during file transfer"));
+      }
+    }
+  };
 
   if (startupAttemptReconciliation.retryable > 0 || startupAttemptReconciliation.unknown > 0) {
     app.log.warn(startupAttemptReconciliation, "reconciled persisted dispatch attempts after Control Plane startup");
@@ -821,6 +883,67 @@ export async function buildControlPlane(
       const summary=usage.read(workspaceId,scope,id);quotaRefresh.request(workspaceId,scope,id);return summary;
     });
   }
+  app.get("/api/sessions/:id/files", { preHandler: authenticate }, async (request, reply) => {
+    const principal = request.principal as Principal;
+    const logicalSessionId = routeId(request);
+    const query = request.query as Record<string, unknown>;
+    const path = requiredString(query.path, "path", 8_192);
+    invariant(query.download === undefined || query.download === "1", 400, "FILE_MODE_INVALID", "download must be 1 when provided");
+    const binding = db.get<{ machine_id: string; external_id: string }>(
+      `SELECT s.machine_id,p.external_id FROM logical_sessions s JOIN projects p ON p.project_id=s.project_id
+       WHERE s.logical_session_id=? AND s.workspace_id=? AND s.deleted_at IS NULL`,
+      logicalSessionId,
+      principal.workspaceId,
+    );
+    invariant(binding, 404, "SESSION_NOT_FOUND", "Logical Session was not found");
+    const agent = agents.get(binding.machine_id);
+    invariant(agent?.reconciliationReady && agent.socket.readyState === WebSocket.OPEN, 409, "FILE_HOST_UNAVAILABLE", "Host must be online and synchronized to read files");
+    invariant(agent.projectFiles === true, 409, "FILE_AGENT_UPDATE_REQUIRED", "Update the host Agent before previewing or downloading files");
+    limiter.check(`project-file:${principal.userId}:${binding.machine_id}`, 30, 60_000);
+    invariant([...projectFiles.values()].filter((item) => item.machineId === binding.machine_id).length < 3, 429, "FILE_TRANSFER_BUSY", "Too many file transfers are active on this host");
+
+    const requestId = newId("file");
+    const stream = new PassThrough({ highWaterMark: 512 * 1024 });
+    stream.on("error", () => undefined);
+    let resolveStart!: PendingProjectFile["resolveStart"];
+    let rejectStart!: PendingProjectFile["rejectStart"];
+    const started = new Promise<{ filename: string; size: number }>((resolve, reject) => {
+      resolveStart = resolve;
+      rejectStart = reject;
+    });
+    const transfer: PendingProjectFile = {
+      machineId: binding.machine_id,
+      transportGeneration: agent.identity.transportGeneration,
+      stream,
+      hash: createHash("sha256"),
+      received: 0,
+      expectedSequence: 0,
+      resolveStart,
+      rejectStart,
+      timer: setTimeout(() => failProjectFile(requestId, new AppError(504, "FILE_TRANSFER_TIMEOUT", "Host did not finish the file transfer")), 60_000),
+    };
+    transfer.timer.unref();
+    projectFiles.set(requestId, transfer);
+    if (!sendJson(agent.socket, { type: "file.read", requestId, logicalSessionId, projectExternalId: binding.external_id, path })) {
+      failProjectFile(requestId, new AppError(503, "FILE_TRANSPORT_LOST", "Host connection was lost before file transfer"));
+    }
+    const metadata = await started;
+    reply.header("cache-control", "private, no-store");
+    reply.header("content-type", projectFileMime(metadata.filename));
+    reply.header("content-length", metadata.size);
+    reply.header("content-disposition", fileDisposition(metadata.filename, query.download === "1"));
+    reply.header("content-security-policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; media-src data:");
+    reply.header("cross-origin-resource-policy", "same-origin");
+    reply.header("x-content-type-options", "nosniff");
+    stream.once("close", () => {
+      const pending = projectFiles.get(requestId);
+      if (!pending) return;
+      const current = agents.get(pending.machineId);
+      if (current?.identity.transportGeneration === pending.transportGeneration) sendJson(current.socket, { type: "file.cancel", requestId });
+      failProjectFile(requestId, new Error("Browser closed the file transfer"));
+    });
+    return reply.send(stream);
+  });
   app.get("/api/sessions/:id", { preHandler: authenticate }, async (request) => {
     const principal = request.principal as Principal;
     const logicalSessionId = routeId(request);
@@ -1127,6 +1250,7 @@ export async function buildControlPlane(
           const message = record(parseWsMessage(data), "WebSocket message must be an object") as unknown as AgentToServerMessage;
           if (message.type === "hello") {
             state.reconciliationReady = false;
+            state.projectFiles = message.capabilities?.projectFiles === true;
             delete state.reconciliationId;
             delete state.producerEpoch;
             delete state.appServerEpoch;
@@ -1191,6 +1315,60 @@ export async function buildControlPlane(
             // introduce an unsolicited acknowledgement: released Agents through
             // 0.20 reject maintenance.ack and can crash while closing the socket.
             broadcastMachine(identity.machineId);
+          } else if (message.type === "file.start") {
+            const requestId = requiredString(message.requestId, "requestId", 256);
+            const transfer = projectFiles.get(requestId);
+            if (!transfer || transfer.machineId !== identity.machineId || transfer.transportGeneration !== identity.transportGeneration) return;
+            const filename = typeof message.filename === "string" ? message.filename : "";
+            if (transfer.metadata || !filename || filename.length > 512 || filename.includes("/") || filename.includes("\\") || !Number.isSafeInteger(message.size) || message.size < 0 || message.size > MAX_PROJECT_FILE_BYTES) {
+              failProjectFile(requestId, new AppError(502, "FILE_METADATA_INVALID", "Host returned invalid file metadata"));
+              return;
+            }
+            transfer.metadata = { filename, size: message.size };
+            refreshProjectFileTimeout(requestId, transfer);
+            transfer.resolveStart(transfer.metadata);
+          } else if (message.type === "file.chunk") {
+            const requestId = requiredString(message.requestId, "requestId", 256);
+            const transfer = projectFiles.get(requestId);
+            if (!transfer || transfer.machineId !== identity.machineId || transfer.transportGeneration !== identity.transportGeneration) return;
+            const encoded = typeof message.data === "string" ? message.data : "";
+            if (!transfer.metadata || !Number.isSafeInteger(message.sequence) || message.sequence !== transfer.expectedSequence || !encoded || encoded.length > 300_000 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(encoded)) {
+              failProjectFile(requestId, new AppError(502, "FILE_CHUNK_INVALID", "Host returned an invalid file chunk"));
+              return;
+            }
+            const chunk = Buffer.from(encoded, "base64");
+            if (chunk.length === 0 || chunk.length > 192 * 1024 || transfer.received + chunk.length > transfer.metadata.size) {
+              failProjectFile(requestId, new AppError(502, "FILE_CHUNK_INVALID", "Host returned an invalid file chunk length"));
+              return;
+            }
+            transfer.hash.update(chunk);
+            transfer.received += chunk.length;
+            transfer.expectedSequence += 1;
+            transfer.stream.write(chunk);
+            refreshProjectFileTimeout(requestId, transfer);
+          } else if (message.type === "file.end") {
+            const requestId = requiredString(message.requestId, "requestId", 256);
+            const transfer = projectFiles.get(requestId);
+            if (!transfer || transfer.machineId !== identity.machineId || transfer.transportGeneration !== identity.transportGeneration) return;
+            if (!transfer.metadata || message.size !== transfer.received || message.size !== transfer.metadata.size || message.chunks !== transfer.expectedSequence) {
+              failProjectFile(requestId, new AppError(502, "FILE_TRANSFER_INCOMPLETE", "Host returned an incomplete file"));
+              return;
+            }
+            const digest = transfer.hash.digest("hex");
+            if (typeof message.sha256 !== "string" || message.sha256 !== digest) {
+              failProjectFile(requestId, new AppError(502, "FILE_TRANSFER_DIGEST_INVALID", "File transfer checksum does not match"));
+              return;
+            }
+            projectFiles.delete(requestId);
+            clearTimeout(transfer.timer);
+            transfer.stream.end();
+          } else if (message.type === "file.error") {
+            const requestId = requiredString(message.requestId, "requestId", 256);
+            const transfer = projectFiles.get(requestId);
+            if (!transfer || transfer.machineId !== identity.machineId || transfer.transportGeneration !== identity.transportGeneration) return;
+            const code = requiredString(message.code, "code", 100);
+            const status = code === "FILE_NOT_FOUND" ? 404 : code === "FILE_OUTSIDE_PROJECT" || code === "FILE_SESSION_BINDING_INVALID" ? 403 : code === "FILE_TOO_LARGE" ? 413 : 409;
+            failProjectFile(requestId, new AppError(status, code, requiredString(message.message, "message", 1_000)));
           } else if (message.type === "event.append") {
             invariant(state.producerEpoch, 409, "AGENT_HELLO_REQUIRED", "Agent must send hello first");
             const result = coordination.appendEvent(identity, message.event);
@@ -1293,6 +1471,7 @@ export async function buildControlPlane(
         }
       });
       socket.on("close", (_code: number, reason: Buffer) => {
+        cancelMachineFiles(identity.machineId, identity.transportGeneration);
         if (agents.get(identity.machineId) === state) agents.delete(identity.machineId);
         if (closing) return;
         coordination.handleConnectionLost(identity);
@@ -1325,6 +1504,7 @@ export async function buildControlPlane(
   app.addHook("onClose", async () => {
     closing = true;
     clearInterval(maintenance);
+    for (const requestId of [...projectFiles.keys()]) failProjectFile(requestId, new Error("Control Plane is stopping"));
     for (const agent of agents.values()) agent.socket.terminate();
     for (const states of clients.values()) for (const state of states) state.socket.terminate();
     agents.clear();

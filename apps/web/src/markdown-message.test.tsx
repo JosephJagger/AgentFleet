@@ -40,4 +40,15 @@ describe("assistant Markdown", () => {
     await waitFor(()=>expect(writeText).toHaveBeenCalledWith(body));
     expect(view.getByRole("button",{name:"回复已复制"})).toBeTruthy();
   });
+  it("turns host file links into scoped preview and download actions", () => {
+    render(<MarkdownMessage sessionId="session/one" body={'PRD 已完成：[PRD.md](/root/douyinapp/PRD.md)\n\n[Windows 文件](C:/work/spec.docx)\n\n[相对文件](docs/plan.pdf)'} />);
+    const preview = screen.getAllByRole("link", { name: "预览" });
+    const download = screen.getAllByRole("link", { name: "下载" });
+    expect(preview).toHaveLength(3);
+    expect(download).toHaveLength(3);
+    expect(preview[0]?.getAttribute("href")).toBe("/api/sessions/session%2Fone/files?path=%2Froot%2Fdouyinapp%2FPRD.md");
+    expect(download[0]?.getAttribute("href")).toBe("/api/sessions/session%2Fone/files?path=%2Froot%2Fdouyinapp%2FPRD.md&download=1");
+    expect(preview[1]?.getAttribute("href")).toContain("path=C%3A%2Fwork%2Fspec.docx");
+    expect(preview[2]?.getAttribute("href")).toContain("path=docs%2Fplan.pdf");
+  });
 });

@@ -20,6 +20,11 @@
 .timeline-event .message-markdown blockquote > :last-child { margin-bottom: 0; }
 .message-markdown a { color: var(--cobalt); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; overflow-wrap: anywhere; }
 .message-markdown a:hover { color: var(--cobalt-deep); }
+.markdown-file { align-items: baseline; display: inline-flex; flex-wrap: wrap; gap: 5px; max-width: 100%; }
+.markdown-file__name { color: var(--ink); font-family: var(--mono); overflow-wrap: anywhere; }
+.markdown-file__actions { display: inline-flex; gap: 4px; white-space: nowrap; }
+.message-markdown .markdown-file__actions a { align-items: center; background: var(--paper-solid); border: 1px solid var(--component-line); border-radius: 6px; color: var(--cobalt-deep); display: inline-flex; font-size: var(--text-caption); gap: 3px; line-height: 1.2; min-height: 26px; padding: 3px 7px; text-decoration: none; }
+.message-markdown .markdown-file__actions a:hover { border-color: var(--cobalt); color: var(--cobalt); }
 .message-markdown code { font-family: var(--mono); font-size: .875em; padding: .15em .35em; border: 1px solid var(--line); border-radius: 5px; background: var(--canvas); overflow-wrap: anywhere; }
 .markdown-code { margin: 16px 0; min-width: 0; border: 1px solid var(--component-line); border-radius: 12px; overflow: hidden; background: var(--terminal); }
 .markdown-code__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--text-caption); }
@@ -49,4 +54,5 @@
   .message-markdown :is(th,td) { padding: 8px 10px; }
   .message-markdown .markdown-code pre { padding: 12px; font-size: var(--text-caption); }
   .message-markdown__actions button { min-height: 40px; }
+  .message-markdown .markdown-file__actions a { min-height: 32px; }
 }

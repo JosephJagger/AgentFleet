@@ -9,6 +9,7 @@ import type { PairingCredential } from "./types.js";
 import { obtainConnectionTicket } from "./ticket.js";
 import { delay, isRecord } from "./util.js";
 import { renewCredential, shouldRenewCredential } from "./credentials.js";
+import { streamProjectFile } from "./project-files.js";
 
 // The WHATWG client (Node's global WebSocket) accepts only 1000 or
 // application codes 3000–4999. Server-only 1008/1009/1011 throw synchronously.
@@ -113,6 +114,7 @@ export class RelayConnection {
   private readonly onMaintenance: ((offer: Record<string, unknown>) => Promise<void>) | undefined;
   private readonly onReady: (() => void) | undefined;
   private renewing = false;
+  private readonly fileTransfers = new Map<string, AbortController>();
 
   constructor(options: {
     runtime: AgentRuntime;
@@ -151,6 +153,8 @@ export class RelayConnection {
         this.logger.warn(`relay disconnected: ${errorMessage(error)}`);
         attempt += 1;
       } finally {
+        for (const transfer of this.fileTransfers.values()) transfer.abort();
+        this.fileTransfers.clear();
         if (this.helloFollowupTimer) clearTimeout(this.helloFollowupTimer);
         this.helloFollowupTimer = undefined;
         this.socket = undefined;
@@ -461,6 +465,55 @@ export class RelayConnection {
       }
       case "quota.refresh": {
         if (this.reconciliationReady) void this.runtime.refreshQuota().catch(error => this.logger.warn(`quota refresh failed: ${errorMessage(error)}`));
+        return;
+      }
+      case "file.read": {
+        const requestId = typeof value.requestId === "string" && value.requestId.length <= 256 ? value.requestId : undefined;
+        const logicalSessionId = typeof value.logicalSessionId === "string" && value.logicalSessionId.length <= 256 ? value.logicalSessionId : undefined;
+        const projectId = typeof value.projectExternalId === "string" && value.projectExternalId.length <= 256 ? value.projectExternalId : undefined;
+        const path = typeof value.path === "string" && value.path.length <= 8_192 ? value.path : undefined;
+        if (!requestId || !logicalSessionId || !projectId || !path) {
+          this.protocolError("file request is malformed");
+          return;
+        }
+        if (!this.reconciliationReady || this.fileTransfers.has(requestId)) {
+          this.send({ type: "file.error", requestId, code: "FILE_TRANSFER_UNAVAILABLE", message: "File transfer is unavailable while the host is synchronizing" });
+          return;
+        }
+        const controller = new AbortController();
+        const sourceSocket = this.socket;
+        this.fileTransfers.set(requestId, controller);
+        void streamProjectFile(this.store, { logicalSessionId, projectId, path }, {
+          signal: controller.signal,
+          onStart: (metadata) => {
+            if (this.socket !== sourceSocket || !this.send({ type: "file.start", requestId, ...metadata })) {
+              throw new AgentError("FILE_TRANSPORT_LOST", "File transfer connection was lost");
+            }
+          },
+          onChunk: async (chunk, sequence) => {
+            if (this.socket !== sourceSocket || !this.send({ type: "file.chunk", requestId, sequence, data: chunk.toString("base64") })) {
+              throw new AgentError("FILE_TRANSPORT_LOST", "File transfer connection was lost");
+            }
+            while (sourceSocket && sourceSocket.bufferedAmount > MAX_WS_FRAME_BYTES && sourceSocket.readyState === WebSocket.OPEN) {
+              await yieldToIO();
+            }
+          },
+        }).then((result) => {
+          if (this.socket === sourceSocket) this.send({ type: "file.end", requestId, ...result });
+        }).catch((error) => {
+          if (this.socket === sourceSocket && !controller.signal.aborted) {
+            const code = error instanceof AgentError ? error.code : "FILE_READ_FAILED";
+            this.send({ type: "file.error", requestId, code, message: errorMessage(error).slice(0, 1_000) });
+          }
+        }).finally(() => this.fileTransfers.delete(requestId));
+        return;
+      }
+      case "file.cancel": {
+        if (typeof value.requestId !== "string" || value.requestId.length > 256) {
+          this.protocolError("file cancellation is malformed");
+          return;
+        }
+        this.fileTransfers.get(value.requestId)?.abort();
         return;
       }
       case "maintenance.offer": {

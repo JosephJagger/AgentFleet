@@ -566,7 +566,7 @@ function EventIcon({ event }: { event: TimelineEvent }) {
   return <Activity size={15} />;
 }
 
-function Timeline({ events }: { events: TimelineEvent[] }) {
+function Timeline({ events, sessionId }: { events: TimelineEvent[]; sessionId: string }) {
   if (events.length === 0) return <div className="timeline-empty"><Clock3 size={19} />{t("发送消息后，Codex 的回复和操作进度会显示在这里。")}</div>;
   return (
     <div className="timeline">
@@ -577,7 +577,7 @@ function Timeline({ events }: { events: TimelineEvent[] }) {
             <strong>{systemText(event.title) || (event.actor === "user" ? t("你") : event.actor === "agent" ? "Codex" : event.type)}{event.type === "turn.completed" && <span className="timeline-event__turn-tokens"> · {event.turnTokens == null ? t("本轮 token 未记录") : t("本轮消耗 {0} tokens", new Intl.NumberFormat(locale()).format(event.turnTokens))} · {event.turnCacheHitRate == null ? t("缓存命中率未记录") : t("缓存命中率 {0}%", new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(event.turnCacheHitRate))}</span>}</strong>
             <time>{new Date(event.occurredAt).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</time>
           </div>
-          {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} /> : <p>{event.body}</p> : null}
+          {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} sessionId={sessionId} /> : <p>{event.body}</p> : null}
           {event.payloadState !== "deleted" && Boolean(event.images?.length) && <MessageImages images={event.images!} />}
           {event.payloadState !== "deleted" && <CommandExecution command={event.command} output={event.output} />}
           {event.diff && <div className="diff-summary"><FileDiff size={14} />{count(event.diff.files, "个文件")} <b>+{event.diff.additions}</b> <i>−{event.diff.deletions}</i></div>}
@@ -833,7 +833,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         </div>
       )}
       {session.state.unknownFreeze && <div className="freeze-banner"><AlertTriangle size={17} /><div><strong>{t("结果不确定，写入已冻结")}</strong><span>{t("可以点击解除冻结核验主机结果；系统不会自动重发原命令。")}</span><SessionRecovery key={`${draftOwner}:${session.id}`} machineId={session.machineId} sessionId={session.id} online={session.state.reachability === "live"} supported={detail.recoverySupported === true} onChanged={onRefresh} /></div></div>}
-      <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? detail.events : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} />}</ConversationViewport>
+      <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? detail.events : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} />}</ConversationViewport>
       {approval?.status === "pending" && (approval.type === "user_input"
         ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} onChanged={onRefresh} />
         : <ApprovalCard approval={approval} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}

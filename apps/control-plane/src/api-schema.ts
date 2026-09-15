@@ -182,6 +182,7 @@ export type SessionActions = Record<SessionAction, ActionAvailability>;
 export interface AgentCapabilities {
   paginatedHistory?: boolean;
   permissionProfiles?: boolean;
+  projectFiles?: boolean;
   commandTypes?: string[];
   methods?: string[];
   maintenanceTypes?: string[];
@@ -346,6 +347,10 @@ export type AgentToServerMessage =
       detail?: Record<string, unknown>;
     }
   | { type: "maintenance.result"; operationId: string; state: "running" | "succeeded" | "failed"; result?: Record<string, unknown>; error?: {code:string;message:string} }
+  | { type: "file.start"; requestId: string; filename: string; size: number }
+  | { type: "file.chunk"; requestId: string; sequence: number; data: string }
+  | { type: "file.end"; requestId: string; sha256: string; size: number; chunks: number }
+  | { type: "file.error"; requestId: string; code: string; message: string }
   | { type: "ping" };
 
 export type ServerToAgentMessage =
@@ -389,6 +394,8 @@ export type ServerToAgentMessage =
       appServerEpoch: string;
       command: Record<string, unknown>;
     }
+  | { type: "file.read"; requestId: string; logicalSessionId: string; projectExternalId: string; path: string }
+  | { type: "file.cancel"; requestId: string }
   | { type: "error"; code: string; message: string };
 
 export type ClientToServerMessage =

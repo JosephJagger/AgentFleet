@@ -427,6 +427,7 @@ export class AgentRuntime {
           : this.canRead() && this.appServer ? ["thread/list", "thread/read"] : [],
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
         maintenanceTypes: ["catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"],
+        projectFiles: true,
         queue: this.isWritable(),
         steer: this.isWritable(),
         shell: false,

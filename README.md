@@ -33,6 +33,7 @@ Think of each enrolled host as a place where Codex executes work, and AgentFleet
 | --- | --- |
 | **Graphical Codex session management** | Browse hosts, projects, and conversations; continue native sessions; adjust model settings and execution permissions in the panel. |
 | **Images from your browser to a remote session** | Paste a screenshot, preview it, and send it with your instructions to Codex on the selected host, without manually copying the image to that server first. |
+| **Host files in conversation results** | Open or download files linked by Codex directly from the message. Bytes stream on demand from the bound host and remain limited to that session's registered project. |
 | **An overview across multiple hosts** | Follow running work, return to completed-but-controlled sessions, queue follow-up messages, and inspect recorded tokens and reported account quota. |
 | **Switchable interface themes** | Choose from 17 themes, with Castle in the Sky as the default for new browsers. Five Chinese classics join illustrated themes with coordinated messages, Markdown, code blocks and composers. |
 
@@ -40,7 +41,7 @@ Think of each enrolled host as a place where Codex executes work, and AgentFleet
 
 For example, paste a screenshot of a broken page on your laptop, select the session on your Linux host, and ask Codex to investigate the project there. The current composer accepts pasted **PNG, JPEG, and WebP images, up to four per message**, with previews and automatic resizing/compression. Submission requires a host runtime and model that support image input.
 
-Codex CLI already supports image inputs through `--image` and interactive paste; AgentFleets makes that workflow accessible through a browser across enrolled hosts. See the [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli). Here, multimodal submission means **text and images**; a general file picker, drag-and-drop uploads, and audio/video submission are not currently provided by the panel.
+Codex CLI already supports image inputs through `--image` and interactive paste; AgentFleets makes that workflow accessible through a browser across enrolled hosts. See the [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli). Here, multimodal submission means **text and images**; a general file picker, drag-and-drop uploads, and audio/video submission are not currently provided by the composer. Files that Codex links in a reply can be previewed or downloaded from the execution host on demand.
 
 ## Say what you need, even without the terminology
 
@@ -231,7 +232,7 @@ docker compose up -d --build
 curl --fail http://127.0.0.1:3215/ready
 ```
 
-7. In the AppleFleets iPhone app, enter your HTTPS origin, such as `https://agentfleets.cn`, and paste the token.
+7. In the AppleFleets iPhone app, enter your HTTPS origin, such as `https://panel.example.com`, and paste the token.
 8. Open a workout and tap **Generate with Linux Codex**. A successful run ends with **Copy received**.
 
 Each request creates an isolated AgentFleets session whose title begins with `AppleFleets`. The token can only submit the fixed workout request and read its corresponding result; it does not grant browser administrator access. Generate a new token, update `.env`, and restart the service to revoke a leaked token.
