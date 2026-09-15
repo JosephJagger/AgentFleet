@@ -213,6 +213,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
 .project-session-group__children .session-list { padding: 0; }
 .project-create-session { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--component-line); border-radius: 10px; background: var(--paper); color: var(--cobalt); font: inherit; font-size: var(--text-small); text-align: left; cursor: pointer; }
 .project-create-session:hover { background: var(--cobalt-soft); border-color: var(--cobalt); }
+.catalog-heading-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.stack-form .checkbox-row { display: flex; align-items: center; gap: 9px; }
+.stack-form .checkbox-row input { flex: 0 0 auto; width: 16px; height: 16px; margin: 0; }
+.stack-form .checkbox-row > span { font-size: var(--text-small); }
 .session-row { padding: 14px 12px; border: 1px solid var(--component-line); border-radius: 12px; margin: 4px 0; }
 .session-row:hover { border-color: var(--cobalt); background: var(--canvas); }
 .session-row--active, .session-row--active:hover { border-color: var(--cobalt); background: var(--cobalt-soft); box-shadow: none; }

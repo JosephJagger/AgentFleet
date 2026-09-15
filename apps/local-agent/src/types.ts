@@ -219,7 +219,7 @@ export interface NativeThreadBinding {
   title?: string;
 }
 
-export type MaintenanceType = "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean";
+export type MaintenanceType = "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add";
 export interface MaintenanceOperation {
   recoveryTarget?: Record<string, unknown>;
   commands?: string[];

@@ -794,6 +794,16 @@ export const api = {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { method: "POST", body: JSON.stringify({ type, clientMutationId, ...(logicalSessionId ? {logicalSessionId} : {}) }) });
     return mapHostOperation(raw.operation);
   },
+  async createProject(machineId: string, path: string, alias: string, createDirectory: boolean): Promise<HostOperation> {
+    const raw = await request<JsonObject>("/api/projects", {
+      method: "POST",
+      body: JSON.stringify({ machineId, path, alias, createDirectory, clientMutationId: crypto.randomUUID() }),
+    });
+    return mapHostOperation(raw.operation);
+  },
+  async readHostOperation(operationId: string): Promise<HostOperation> {
+    return mapHostOperation((await request<JsonObject>(`/api/operations/${encodeURIComponent(operationId)}`)).operation);
+  },
   updateProjectContentPolicy(projectId: string, syncContent: boolean, retentionDays: Project["retentionDays"]) {
     return request<{ project: JsonObject }>(`/api/projects/${encodeURIComponent(projectId)}/content-policy`, {
       method: "PATCH",

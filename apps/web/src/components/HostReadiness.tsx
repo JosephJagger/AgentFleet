@@ -3,7 +3,7 @@ import { AlertTriangle, Check, Circle, LoaderCircle } from "lucide-react";
 import type { DiscoveryProgress, MaintenanceType } from "../lib/types";
 
 const titles: Record<string, string> = localized(() => ({ environment: t("连接服务环境"), runtime: t("面板 Codex"), protocol: t("接口适配"), data: t("原有 Codex 数据"), sandbox: t("工作目录写入隔离"), tools: t("开发工具执行"), server: t("会话服务"), catalog: t("项目与会话扫描") }));
-const actions: Record<MaintenanceType, string> = localized(() => ({ "images.preview": t("预览会话图片"), "images.clean": t("清理会话图片"), "commands.reconcile": t("核验主机回执"), "session.reconcile": t("解除冻结"), "agent.update": t("检查并更新"), "runtime.reconnect": t("重新连接 Codex"), "catalog.refresh": t("重新扫描"), "diagnostics.collect": t("重新自检") }));
+const actions: Record<MaintenanceType, string> = localized(() => ({ "images.preview": t("预览会话图片"), "images.clean": t("清理会话图片"), "commands.reconcile": t("核验主机回执"), "session.reconcile": t("解除冻结"), "agent.update": t("检查并更新"), "runtime.reconnect": t("重新连接 Codex"), "catalog.refresh": t("重新扫描"), "diagnostics.collect": t("重新自检"), "project.add": t("创建项目") }));
 export function HostReadiness({ discovery, online, onAction, disabled, capabilities }: { discovery?: DiscoveryProgress; online: boolean; onAction?: (type: MaintenanceType) => void; disabled?: boolean; capabilities?: string[] }) {
   const checks = discovery?.checks ?? [];
   const failed = checks.some(item => item.state === "failed");

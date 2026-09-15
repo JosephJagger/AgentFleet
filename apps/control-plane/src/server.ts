@@ -737,6 +737,27 @@ export async function buildControlPlane(
     return { project };
   });
 
+  app.post("/api/projects", { preHandler: mutate, schema: apiSchemas.createProject }, async (request, reply) => {
+    const body = record(request.body);
+    const machineId = requiredString(body.machineId, "machineId", 200);
+    const path = requiredString(body.path, "path", 4096).trim();
+    const alias = requiredString(body.alias, "alias", 64).trim();
+    invariant(typeof body.createDirectory === "boolean", 400, "INVALID_INPUT", "createDirectory must be boolean");
+    const operation = machineMaintenance.create(
+      request.principal as Principal,
+      machineId,
+      "project.add",
+      requiredString(body.clientMutationId, "clientMutationId", 200),
+      undefined,
+      undefined,
+      { path, alias, createDirectory: body.createDirectory },
+    );
+    const agent = agents.get(machineId);
+    if (agent?.reconciliationReady) for (const offer of machineMaintenance.offers(machineId)) sendJson(agent.socket, offer);
+    reply.code(202);
+    return { operation };
+  });
+
   app.get("/api/sessions", { preHandler: authenticate }, async (request) => {
     const query=request.query as Record<string,unknown>;
     if(Object.keys(query).length>0) {

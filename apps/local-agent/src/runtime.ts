@@ -28,7 +28,7 @@ import { check } from "./preflight.js";
 import { validateSettings } from "./codex-settings.js";
 import { inputAnswers, inputQuestions } from "./user-input.js";
 import type { MachineIdentity } from "./identity.js";
-import { discoverProjectFromCwd, projectById, verifyProjectIdentity, verifySessionCwd } from "./projects.js";
+import { addProjectFromPanel, discoverProjectFromCwd, projectById, verifyProjectIdentity, verifySessionCwd } from "./projects.js";
 import type { EventInput, StateStore } from "./store.js";
 import { selectDurableStreams } from "./stream-selection.js";
 import type {
@@ -426,7 +426,7 @@ export class AgentRuntime {
           ? ["thread/list", "thread/read", "thread/resume", "thread/unsubscribe", "thread/start", "turn/start", "turn/steer", "turn/interrupt", "approval/reply-once"]
           : this.canRead() && this.appServer ? ["thread/list", "thread/read"] : [],
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
-        maintenanceTypes: ["catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean"],
+        maintenanceTypes: ["catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"],
         queue: this.isWritable(),
         steer: this.isWritable(),
         shell: false,
@@ -571,6 +571,13 @@ export class AgentRuntime {
       // The relay will send the authoritative registry on its next connection;
       // a transient transport write must never stop local recovery.
     }
+  }
+
+  async addProject(path: string, alias: string, createDirectory: boolean): Promise<ProjectRecord> {
+    const project = await addProjectFromPanel(this.store, path, alias, createDirectory);
+    try { await this.refreshCatalog(); }
+    finally { this.notifyRegistryChanged(); }
+    return project;
   }
 
   async handleCommand(value: unknown, deliveryGeneration: number): Promise<void> {

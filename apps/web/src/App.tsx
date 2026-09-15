@@ -1082,6 +1082,28 @@ function CreateSessionDialog({ open, machines, selectedMachineId, initialProject
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-session-title"><div className="modal-head"><div><div className="eyebrow">New conversation</div><h2 id="new-session-title">{t("创建会话")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有可用主机")}</h3><p>{t("连接在线主机并完成项目发现后，可以创建会话。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !projectId || !title.trim()) return; setBusy(true); try { await onCreate(machineId, projectId, title.trim()); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { setMachineId(event.target.value); setProjectId(""); setProjectOptions([]); }}>{writableMachines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label><span>{t("项目")}</span><select value={projectId} title={projectOptions.find((project) => project.id === projectId)?.pathHint} onChange={(event) => setProjectId(event.target.value)} required>{projectOptions.map((project) => <option key={project.id} value={project.id}>{project.alias} · {project.pathHint}</option>)}</select></label><label><span>{t("会话名称")}</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("例如：修复结算页测试")} required autoFocus /></label><p className="subtle">{t("会话在所选主机和项目中执行。")}</p><button className="button button--primary button--full" disabled={busy || !projectId}>{busy ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}{locale() === "en" ? " " : ""}{t("创建会话")}</button></form>}</section></div>;
 }
 
+function projectAliasFromPath(path: string): string {
+  const leaf = path.split(/[\\/]/).filter(Boolean).at(-1) ?? "";
+  return leaf.normalize("NFKD").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9]+$/, "").slice(0, 64) || "project";
+}
+
+function CreateProjectDialog({ open, machines, selectedMachineId, onClose, onCreate, onToast }: { open: boolean; machines: Machine[]; selectedMachineId?: string; onClose: () => void; onCreate: (machineId: string, path: string, alias: string, createDirectory: boolean) => Promise<void>; onToast: (tone: Toast["tone"], message: string) => void }) {
+  const writableMachines = machines.filter((machine) => machine.reachability === "live" && machine.compatibility === "compatible" && machine.identity === "paired" && machine.maintenanceCapabilities?.includes("project.add"));
+  const [machineId, setMachineId] = useState("");
+  const [path, setPath] = useState("");
+  const [alias, setAlias] = useState("");
+  const [aliasEdited, setAliasEdited] = useState(false);
+  const [createDirectory, setCreateDirectory] = useState(true);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    setMachineId(writableMachines.find((machine) => machine.id === selectedMachineId)?.id ?? writableMachines[0]?.id ?? "");
+    setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true);
+  }, [open, selectedMachineId]);
+  if (!open) return null;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><div className="modal-head"><div><div className="eyebrow">New project</div><h2 id="new-project-title">{t("创建项目")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有支持创建项目的在线主机")}</h3><p>{t("请先更新并连接主机上的 Agent。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !path.trim() || !alias.trim()) return; setBusy(true); try { await onCreate(machineId, path.trim(), alias.trim(), createDirectory); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => setMachineId(event.target.value)}>{writableMachines.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label><label><span>{t("项目路径")}</span><input value={path} onChange={(event) => { const next = event.target.value; setPath(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} placeholder={t("例如：/home/me/projects/my-app")} required autoFocus /></label><label><span>{t("项目名称")}</span><input value={alias} onChange={(event) => { setAlias(event.target.value); setAliasEdited(true); }} pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}" placeholder="my-app" required /></label><label className="checkbox-row"><input type="checkbox" checked={createDirectory} onChange={(event) => setCreateDirectory(event.target.checked)} /><span>{t("路径不存在时创建目录")}</span></label><p className="subtle">{t("路径必须是主机上的绝对路径；只会创建最后一级目录。")}</p><button className="button button--primary button--full" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <FolderGit2 size={16} />}{busy ? t("正在创建") : t("创建项目")}</button></form>}</section></div>;
+}
+
 function App() {
   useLocale();
   const [catalogCollapsed, setCatalogCollapsed] = useState(() => {
@@ -1091,6 +1113,7 @@ function App() {
     try { localStorage.setItem(CATALOG_COLLAPSED_KEY, String(catalogCollapsed)); } catch { /* Layout still works when browser storage is unavailable. */ }
   }, [catalogCollapsed]);
   const [dashboard, setDashboard] = useState<Dashboard>();
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [authKnown, setAuthKnown] = useState(false);
   const [route, setRoute] = useState(() => routeFromPath(location.pathname));
   const view = route.view;
@@ -1427,7 +1450,7 @@ function App() {
           <div className="catalog-toggle-bar"><button type="button" className="catalog-toggle" aria-label={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话")} title={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话，让对话更宽")} aria-expanded={!catalogCollapsed} aria-controls="workbench-catalog" onClick={() => setCatalogCollapsed((value) => !value)}>{catalogCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}<span>{catalogCollapsed ? t("展开") : t("收起列表")}</span></button></div>
           <div id="workbench-catalog" className="fleet-catalog-content" role="region" aria-label={t("项目与会话列表")} tabIndex={0}>
           {selectedMachine && <><MachineSummaryHeader machine={selectedMachine} onAliasChange={updateMachineAlias} /><button className="catalog-more" type="button" onClick={() => setView("hosts")}>{t("管理主机与默认设置")}</button>{selectedMachine.discovery?.state !== "ready" && <DiscoveryStatus discovery={selectedMachine.discovery} />}</>}
-          {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} />}
+          {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} />}
           </div>
         </main>
         <SessionInspector detail={displayedSession ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
@@ -1435,6 +1458,19 @@ function App() {
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />
       <CreateSessionDialog open={createOpen} machines={dashboard.machines} selectedMachineId={selectedMachineId} initialProject={createProject} onClose={() => setCreateOpen(false)} onToast={toast} onCreate={async (machineId, projectId, title) => { const result = await api.createSession(machineId, projectId, title); setSelectedMachineId(machineId); selectSession(result.session.id); toast("success", t("受管会话已创建")); await loadDashboard(true); }} />
+      <CreateProjectDialog open={createProjectOpen} machines={dashboard.machines} selectedMachineId={selectedMachineId} onClose={() => setCreateProjectOpen(false)} onToast={toast} onCreate={async (machineId, path, alias, createDirectory) => {
+        let operation = await api.createProject(machineId, path, alias, createDirectory);
+        const deadline = Date.now() + 120_000;
+        while (operation.state === "accepted" || operation.state === "running") {
+          if (Date.now() >= deadline) throw new Error(t("主机仍在处理项目，请稍后刷新项目列表"));
+          await new Promise((resolve) => window.setTimeout(resolve, 500));
+          operation = await api.readHostOperation(operation.id);
+        }
+        if (operation.state !== "succeeded") throw new Error(operation.error?.message ?? t("项目创建未完成，请重试"));
+        setSelectedMachineId(machineId);
+        await loadDashboard(true);
+        toast("success", t("项目 {0} 已添加", alias));
+      }} />
       <div className="toast-stack" aria-live="polite">{toasts.map((item) => <div className={`toast toast--${item.tone}`} key={item.id}>{item.tone === "success" ? <Check size={16} /> : item.tone === "danger" ? <OctagonX size={16} /> : <CircleDot size={16} />}<span>{systemText(item.message)}</span></div>)}</div>
     </div>
   );

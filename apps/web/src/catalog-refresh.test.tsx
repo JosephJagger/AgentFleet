@@ -16,6 +16,13 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
+it("项目列表提供独立的新项目入口", async () => {
+  const onCreateProject = vi.fn();
+  render(<WorkspaceCatalog {...props} refreshKey="create-project" onCreateProject={onCreateProject} />);
+  fireEvent.click(screen.getByRole("button", { name: "新项目" }));
+  expect(onCreateProject).toHaveBeenCalledOnce();
+});
+
 it("后台刷新不插入加载行，保留已有项目和会话 DOM", async () => {
   const { rerender, container } = render(<WorkspaceCatalog {...props} refreshKey="1" />);
   fireEvent.click(await screen.findByRole("button", { name: /测试项目 \/srv/ }));

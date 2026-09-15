@@ -6,7 +6,8 @@ import test from "node:test";
 import { defaultMachineName, defaultProjectAlias } from "../src/cli.js";
 import { REQUIRED_CODEX_SCHEMA_HASH } from "../src/constants.js";
 import { evaluateSupport } from "../src/platform.js";
-import { discoverProjectFromCwd, resolveProject, verifyProjectIdentity } from "../src/projects.js";
+import { addProjectFromPanel, discoverProjectFromCwd, resolveProject, verifyProjectIdentity } from "../src/projects.js";
+import { StateStore } from "../src/store.js";
 
 test("default project aliases support Windows drive roots and directory names", () => {
   for (const drive of ["C", "D"]) {
@@ -111,6 +112,20 @@ test("project authorization canonicalizes a real directory and rejects a symlink
   await assert.doesNotReject(verifyProjectIdentity(project));
   await assert.rejects(resolveProject(link, "linked"), /must not itself be a symlink/);
   await assert.rejects(resolveProject(projectRoot, "bad alias!"), /alias must be/);
+});
+
+test("panel project creation creates only the requested final directory and authorizes it", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "agentfleet-panel-project-"));
+  const store = new StateStore(join(directory, "state"));
+  await store.initialize();
+  t.after(() => store.close());
+  const root = join(directory, "new-project");
+
+  const project = await addProjectFromPanel(store, root, "new-project", true);
+  assert.equal(project.root, root);
+  assert.equal(store.snapshot().projects[0]?.id, project.id);
+  await assert.rejects(addProjectFromPanel(store, "relative-project", "relative", true), /must be absolute/);
+  await assert.rejects(addProjectFromPanel(store, join(directory, "missing", "nested"), "nested", true), /ENOENT/);
 });
 
 test("CLI convenience defaults derive a machine name and Project basename", () => {

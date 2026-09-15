@@ -49,7 +49,7 @@ function ProjectGroup({ project, expanded, selectedId, refreshKey, onToggle, onS
   </section>;
 }
 
-export function WorkspaceCatalog({ machineId, selectedSession, refreshKey, onSelect, onCreate }: { machineId?: string; selectedSession?: FleetSession; refreshKey: string; onSelect: (id: string) => void; onCreate: (project?: Project) => void }) {
+export function WorkspaceCatalog({ machineId, selectedSession, refreshKey, onSelect, onCreate, onCreateProject }: { machineId?: string; selectedSession?: FleetSession; refreshKey: string; onSelect: (id: string) => void; onCreate: (project?: Project) => void; onCreateProject?: () => void }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
@@ -83,7 +83,7 @@ export function WorkspaceCatalog({ machineId, selectedSession, refreshKey, onSel
   const visibleProjects = [...projects.items];
   if (selectedSession && selectedSession.machineId === machineId && !visibleProjects.some((project) => project.id === selectedSession.projectId)) visibleProjects.unshift({ id: selectedSession.projectId, machineId, alias: selectedSession.projectAlias, pathHint: t("当前打开的会话项目"), syncContent: true, retentionDays: 7 });
   return <section className="session-list-panel workspace-catalog" aria-busy={loading}>
-    <div className="section-heading"><div><div className="eyebrow">{t("当前主机")}</div><h2>{t("项目与会话")}</h2></div><button type="button" className="button button--quiet" onClick={() => onCreate()}><Plus size={15} />{t("新会话")}</button></div>
+    <div className="section-heading"><div><div className="eyebrow">{t("当前主机")}</div><h2>{t("项目与会话")}</h2></div><div className="catalog-heading-actions">{onCreateProject && <button type="button" className="button button--quiet" onClick={onCreateProject}><FolderGit2 size={15} />{t("新项目")}</button>}<button type="button" className="button button--quiet" onClick={() => onCreate()}><Plus size={15} />{t("新会话")}</button></div></div>
     <div className="catalog-search"><label><Search size={15} /><input aria-label={t("搜索项目或会话")} placeholder={t("搜索项目或会话…")} value={query} onChange={(event) => { setQuery(event.target.value); setCursor(null); setPrevious([]); }} /></label><select aria-label={t("筛选会话状态")} value={filter} onChange={(event) => { setFilter(event.target.value); setCursor(null); setPrevious([]); }}><option value="">{t("全部状态")}</option><option value="running">{t("正在执行")}</option><option value="awaiting_approval">{t("等待确认")}</option><option value="idle">{t("空闲")}</option><option value="unknown">{t("待核验")}</option></select></div>
     {error && <p className="catalog-error" role="alert">{systemText(error)}<button type="button" onClick={() => setRetry((value) => value + 1)}><RefreshCw size={13} />{t("重试")}</button></p>}
     {loading && !loaded && <div className="catalog-loading"><LoaderCircle className="spin" size={15} />{t("正在更新列表")}</div>}

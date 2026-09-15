@@ -1,4 +1,4 @@
-import { lstat, realpath, stat } from "node:fs/promises";
+import { lstat, mkdir, realpath, rmdir, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { AgentError } from "./errors.js";
 import type { ProjectRecord } from "./types.js";
@@ -93,6 +93,26 @@ export async function addProject(store: StateStore, path: string, alias: string,
   project.source = source;
   await store.addProject(project);
   return store.snapshot().projects.find((entry) => entry.root === project.root) ?? project;
+}
+
+/** Add an absolute host path, optionally creating its final directory first. */
+export async function addProjectFromPanel(store: StateStore, path: string, alias: string, createDirectory: boolean): Promise<ProjectRecord> {
+  if (!isAbsolute(path)) throw new AgentError("PROJECT_PATH_INVALID", "project path must be absolute");
+  const requested = resolve(path);
+  let created = false;
+  try {
+    await lstat(requested);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT" || !createDirectory) throw error;
+    await mkdir(requested);
+    created = true;
+  }
+  try {
+    return await addProject(store, requested, alias);
+  } catch (error) {
+    if (created) await rmdir(requested).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function verifySessionCwd(project: ProjectRecord, cwd = project.root): Promise<string> {

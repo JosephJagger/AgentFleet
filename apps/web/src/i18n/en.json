@@ -2223,5 +2223,18 @@
   "储存能量并在需要时释放使用的系统": "Store energy and release it when needed",
   "监测并管理电池的状态和工作条件": "Monitor and manage battery state and operating conditions",
   "比较数据中心总能耗与信息设备能耗": "Compare total data-center energy use with IT equipment energy use",
-  "衡量页面元素意外移动造成的视觉稳定性变化": "Measure visual stability changes caused by unexpected movement of page elements"
+  "衡量页面元素意外移动造成的视觉稳定性变化": "Measure visual stability changes caused by unexpected movement of page elements",
+  "新项目": "New project",
+  "创建项目": "Create project",
+  "没有支持创建项目的在线主机": "No online host supports project creation",
+  "请先更新并连接主机上的 Agent。": "Update and connect the Agent on the host first.",
+  "项目路径": "Project path",
+  "例如：/home/me/projects/my-app": "For example: /home/me/projects/my-app",
+  "项目名称": "Project name",
+  "路径不存在时创建目录": "Create the directory if it does not exist",
+  "路径必须是主机上的绝对路径；只会创建最后一级目录。": "The path must be absolute on the host. Only the final directory is created.",
+  "正在创建": "Creating",
+  "项目创建未完成，请重试": "Project creation did not complete. Try again.",
+  "项目 {0} 已添加": "Project {0} was added",
+  "主机仍在处理项目，请稍后刷新项目列表": "The host is still processing the project. Refresh the project list shortly."
 }

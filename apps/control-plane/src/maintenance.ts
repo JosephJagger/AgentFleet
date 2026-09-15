@@ -4,19 +4,20 @@ import type { Principal } from "./auth.js";
 import { invariant } from "./errors.js";
 import { futureIso, newId, nowIso } from "./crypto.js";
 
-export const MAINTENANCE_TYPES = ["catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean"] as const;
+export const MAINTENANCE_TYPES = ["catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"] as const;
 export type MaintenanceType = (typeof MAINTENANCE_TYPES)[number];
 
 export class MaintenanceService {
   constructor(private readonly db: ControlPlaneDatabase) {}
 
-  create(principal: Principal, machineId: string, type: string, mutationId: string, logicalSessionId?: string, previewOperationId?: string): Record<string, unknown> {
+  create(principal: Principal, machineId: string, type: string, mutationId: string, logicalSessionId?: string, previewOperationId?: string, projectTarget?: { path: string; alias: string; createDirectory: boolean }): Record<string, unknown> {
     invariant(MAINTENANCE_TYPES.includes(type as MaintenanceType),400,"INVALID_OPERATION","Unsupported machine operation");
     invariant(mutationId.length>=8 && mutationId.length<=200,400,"INVALID_MUTATION_ID","clientMutationId must be between 8 and 200 characters");
     return this.db.transaction(()=>{
       const previous=this.db.get<{operation_id:string;type:string;request_json:string|null}>("SELECT operation_id,type,request_json FROM machine_operations WHERE machine_id=? AND actor_client_session_id=? AND client_mutation_id=?",machineId,principal.clientSessionId,mutationId);
       if(previous) {
-        invariant(previous.type===type && (type!=="images.clean" || JSON.parse(previous.request_json??"{}").previewOperationId===previewOperationId) && (previous.request_json ? JSON.parse(previous.request_json).logicalSessionId : undefined) === logicalSessionId,409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
+        const previousRequest = previous.request_json ? JSON.parse(previous.request_json) : {};
+        invariant(previous.type===type && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
         return this.get(principal,previous.operation_id);
       }
       const machine=this.db.get<{identity_state:string;reachability:string;maintenance_types_json:string}>("SELECT identity_state,reachability,maintenance_types_json FROM machines WHERE machine_id=? AND workspace_id=?",machineId,principal.workspaceId);
@@ -25,7 +26,13 @@ export class MaintenanceService {
       invariant(machine.reachability==="online",409,"MACHINE_OFFLINE","Machine must be online");
       invariant((JSON.parse(machine.maintenance_types_json) as string[]).includes(type),409,"AGENT_CAPABILITY_UNAVAILABLE","Update the connection service to use this operation");
       let target: Record<string,unknown> | null = null;
-      if(type === "images.preview" || type === "images.clean") {
+      if(type === "project.add") {
+        invariant(projectTarget,400,"PROJECT_TARGET_REQUIRED","Project path and alias are required");
+        invariant(projectTarget.path.length > 0 && projectTarget.path.length <= 4096,400,"PROJECT_PATH_INVALID","Project path is required");
+        invariant(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(projectTarget.alias),400,"PROJECT_ALIAS_INVALID","Project alias must use letters, numbers, dot, underscore, or dash");
+        invariant(logicalSessionId === undefined && previewOperationId === undefined,400,"INVALID_OPERATION_TARGET","Project creation does not accept a session target");
+        target=projectTarget;
+      } else if(type === "images.preview" || type === "images.clean") {
         invariant(typeof logicalSessionId === "string",400,"IMAGE_TARGET_REQUIRED","请选择有图会话");
         target=new CloudImages(this.db).target(principal,machineId,logicalSessionId);
         if(type === "images.clean") {
