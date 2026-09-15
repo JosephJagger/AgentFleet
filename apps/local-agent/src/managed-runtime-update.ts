@@ -44,7 +44,7 @@ export async function prepareManagedRuntime(options: { dataDir: string; controlP
   let committed = false;
   try {
     const helperHash = await stageSandboxHelper(options.dataDir, stage, process.platform, process.arch, target.version, options.controlPlaneUrl, target.sandboxHelper);
-    await stageCodeModeHost(stage, target.version, options.controlPlaneUrl, target.codeModeHosts?.[platform]);
+    await stageCodeModeHost(stage, target.version, options.controlPlaneUrl, target.codeModeHosts?.[platform], false, options.signal);
     const signal = AbortSignal.any([AbortSignal.timeout(180_000), ...(options.signal ? [options.signal] : [])]);
     const response = await fetch(new URL(`/downloads/managed-codex/${artifact.file}`, options.controlPlaneUrl), { signal, redirect: "error" });
     if (!response.ok || !response.body) throw new AgentError("RUNTIME_DOWNLOAD_FAILED", `托管运行时下载失败 HTTP ${response.status}`);

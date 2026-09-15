@@ -30,17 +30,45 @@ async function boundedFetch(url: URL, maximum: number): Promise<Buffer> {
   for await (const chunk of bodyChunks(response.body)) { size += chunk.length; if (size > maximum) throw new Error("Code Mode response exceeds limit"); chunks.push(chunk); }
   return Buffer.concat(chunks);
 }
+const CODE_MODE_DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
+const CODE_MODE_DOWNLOAD_ATTEMPTS = 3;
+
+function retryableDownloadError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === "AbortError" || error.name === "TimeoutError" || error.name === "TypeError"
+    || /ECONNRESET|ETIMEDOUT|EPIPE|fetch failed|terminated/i.test(error.message);
+}
+
+async function downloadCodeModeHost(destination: string, url: URL, artifact: CodeModeArtifact, signal?: AbortSignal): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= CODE_MODE_DOWNLOAD_ATTEMPTS; attempt += 1) {
+    const partial = `${destination}.part-${attempt}`;
+    try {
+      const timeout = AbortSignal.timeout(CODE_MODE_DOWNLOAD_TIMEOUT_MS);
+      const downloadSignal = signal ? AbortSignal.any([timeout, signal]) : timeout;
+      const response = await fetch(url, { redirect: "error", signal: downloadSignal });
+      if (!response.ok || !response.body) throw new AgentError("CODE_MODE_UNAVAILABLE", `Code Mode 下载失败 HTTP ${response.status}`);
+      let size = 0; const hash = createHash("sha256");
+      const bounded = new Transform({ transform(chunk: Buffer, _encoding, callback) { size += chunk.length; if (size > artifact.size) callback(new Error("Code Mode size exceeded")); else { hash.update(chunk); callback(null, chunk); } } });
+      await pipeline(bodyChunks(response.body), bounded, createWriteStream(partial, { flags: "wx", mode: 0o700 }));
+      if (size !== artifact.size || hash.digest("hex") !== artifact.sha256) throw new AgentError("CODE_MODE_CHECKSUM_FAILED", "Code Mode 执行程序摘要不一致，未启用");
+      await rename(partial, destination);
+      return;
+    } catch (error) {
+      lastError = error;
+      await rm(partial, { force: true });
+      if (signal?.aborted) throw signal.reason;
+      if (attempt === CODE_MODE_DOWNLOAD_ATTEMPTS || !retryableDownloadError(error)) throw error;
+    }
+  }
+  throw lastError;
+}
 /** Stages only into an owned candidate directory; never modifies self-installed Codex. */
-export async function stageCodeModeHost(stage: string, version: string, url: string, artifact: CodeModeArtifact | undefined, baseline = false): Promise<void> {
+export async function stageCodeModeHost(stage: string, version: string, url: string, artifact: CodeModeArtifact | undefined, baseline = false, signal?: AbortSignal): Promise<void> {
   const platform = `${process.platform}-${process.arch}`;
   if (!artifact || !validCodeModeArtifact(artifact, version, platform)) throw new AgentError("CODE_MODE_UNAVAILABLE", "托管目标缺少经过验证的 Code Mode 执行程序，保留原运行时");
   const destination = join(stage, codeModeName());
-  const response = await fetch(new URL(`/downloads/${baseline ? "" : "managed-codex/"}${artifact.file}`, url), { redirect: "error", signal: AbortSignal.timeout(180_000) });
-  if (!response.ok || !response.body) throw new AgentError("CODE_MODE_UNAVAILABLE", `Code Mode 下载失败 HTTP ${response.status}`);
-  let size = 0; const hash = createHash("sha256");
-  const bounded = new Transform({ transform(chunk: Buffer, _encoding, callback) { size += chunk.length; if (size > artifact.size) callback(new Error("Code Mode size exceeded")); else { hash.update(chunk); callback(null, chunk); } } });
-  await pipeline(bodyChunks(response.body), bounded, createWriteStream(destination, { flags: "wx", mode: 0o700 }));
-  if (size !== artifact.size || hash.digest("hex") !== artifact.sha256) throw new AgentError("CODE_MODE_CHECKSUM_FAILED", "Code Mode 执行程序摘要不一致，未启用");
+  await downloadCodeModeHost(destination, new URL(`/downloads/${baseline ? "" : "managed-codex/"}${artifact.file}`, url), artifact, signal);
   await chmod(destination, 0o700);
   await probeCodeModeHost(destination);
   await writeFile(join(stage, "code-mode-artifact.json"), JSON.stringify({ version, platform, artifact }), { flag: "wx", mode: 0o600 });
