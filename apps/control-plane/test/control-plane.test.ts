@@ -212,7 +212,7 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
     producerEpoch: "producer-epoch-1",
     appServerEpoch: "app-server-epoch-1",
     agentVersion: "0.16.2",
-    capabilities: { commandTypes: COMMAND_TYPES, maintenanceTypes: ["diagnostics.collect"] },
+    capabilities: { commandTypes: COMMAND_TYPES, maintenanceTypes: ["diagnostics.collect", "project.add"] },
     codexVersion: "0.154.0",
     schemaHash: "f3487938786b729cb6773dbc9e83a7efab9c78c845db7094e8f539f373cbacc9",
     credentialProtectionLevel: "software_protected",
@@ -291,6 +291,18 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   agentSocket.send(JSON.stringify({ type: "heartbeat", capacity: "idle", activeTurns: 0, readOnly: false, readOnlyReasons: [], discovery: { state: "ready", readiness: "ready", checks: [{ ...probeCheck, state: "passed" }] } }));
   await agentInbox.next("heartbeat.ack");
   assert.equal(runtimeState().runtime_read_only, 0, "recovery does not require reconnecting the relay");
+
+  const createProject = await app.inject({
+    method: "POST", url: "/api/projects", headers: browserHeaders,
+    payload: { machineId: agentCredential.machineId, path: "/work/new-project", alias: "new-project", createDirectory: true, clientMutationId: "create-project-regression" },
+  });
+  assert.equal(createProject.statusCode, 202, createProject.body);
+  const projectOffer = await agentInbox.next("maintenance.offer");
+  assert.equal(projectOffer.operationType, "project.add");
+  assert.deepEqual(projectOffer.recoveryTarget, { path: "/work/new-project", alias: "new-project", createDirectory: true });
+  agentSocket.send(JSON.stringify({ type: "maintenance.result", operationId: projectOffer.operationId, state: "failed", error: { code: "TEST_ONLY", message: "test completed" } }));
+  agentSocket.send(JSON.stringify({ type: "ping" }));
+  await agentInbox.next("pong");
 
   // Released Agents replay maintenance results but do not understand a
   // maintenance.ack frame. Keep the wire response backwards-compatible.
@@ -1085,7 +1097,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
   await app.ready();
   assert.equal(
     Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    31,
+    32,
   );
 
   const login = await app.inject({

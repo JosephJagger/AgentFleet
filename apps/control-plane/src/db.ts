@@ -798,7 +798,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 31) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 32) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1164,6 +1164,17 @@ export class ControlPlaneDatabase {
       if (!columns.has("automatic")) this.sqlite.exec("ALTER TABLE writing_memory ADD COLUMN automatic INTEGER NOT NULL DEFAULT 0");
       if (!columns.has("source_question")) this.sqlite.exec("ALTER TABLE writing_memory ADD COLUMN source_question TEXT");
       this.sqlite.exec("UPDATE writing_memory SET automatic=1 WHERE status='candidate'; PRAGMA user_version=31");
+    });
+    if (version < 32) this.transaction(() => {
+      const schema = this.get<{ sql: string }>("SELECT sql FROM sqlite_master WHERE type='table' AND name='machine_operations'")!.sql;
+      if (!schema.includes("'project.add'")) {
+        if (!schema.includes("'images.clean'")) throw new Error("Unexpected machine operation schema before project creation migration");
+        this.sqlite.exec("ALTER TABLE machine_operations RENAME TO machine_operations_before_project_add");
+        this.sqlite.exec(schema.replace("'images.clean'", "'images.clean','project.add'"));
+        this.sqlite.exec("INSERT INTO machine_operations SELECT * FROM machine_operations_before_project_add; DROP TABLE machine_operations_before_project_add");
+      }
+      this.sqlite.exec("PRAGMA user_version=32");
+      if (this.all("PRAGMA foreign_key_check").length) throw new Error("Project creation migration violated foreign keys");
     });
   }
 
