@@ -93,6 +93,36 @@ export class AuthService {
     };
   }
 
+  servicePrincipal(name: string): Principal {
+    invariant(/^[a-z0-9_-]{1,40}$/.test(name), 500, "SERVICE_NAME_INVALID", "Service name is invalid");
+    const user = this.db.get<{ user_id: string; workspace_id: string; email: string }>(
+      "SELECT user_id,workspace_id,email FROM users WHERE email=? COLLATE NOCASE",
+      this.config.adminEmail,
+    );
+    invariant(user, 500, "SERVICE_PRINCIPAL_UNAVAILABLE", "Administrator account is unavailable");
+    const clientSessionId = `csess_service_${name}`;
+    const timestamp = nowIso();
+    const expiresAt = "9999-12-31T23:59:59.999Z";
+    const tokenHash = sha256(`internal-service:${name}:${this.config.adminEmail}`);
+    const csrfHash = sha256(`internal-csrf:${name}:${this.config.adminEmail}`);
+    this.db.run(
+      `INSERT INTO client_sessions(client_session_id,workspace_id,user_id,token_hash,csrf_hash,created_at,last_seen_at,expires_at,ip_hash,user_agent_hash)
+       VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(client_session_id) DO UPDATE SET
+       workspace_id=excluded.workspace_id,user_id=excluded.user_id,last_seen_at=excluded.last_seen_at,expires_at=excluded.expires_at,revoked_at=NULL`,
+      clientSessionId,
+      user.workspace_id,
+      user.user_id,
+      tokenHash,
+      csrfHash,
+      timestamp,
+      timestamp,
+      expiresAt,
+      sha256("internal"),
+      sha256(name),
+    );
+    return { userId: user.user_id, workspaceId: user.workspace_id, clientSessionId, email: user.email, csrfHash, expiresAt };
+  }
+
   authenticateToken(token: string | undefined): Principal {
     invariant(token, 401, "AUTH_REQUIRED", "Authentication is required");
     const row = this.db.get<SessionRow>(

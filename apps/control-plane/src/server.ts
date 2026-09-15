@@ -7,6 +7,7 @@ import { WritingHistory } from "./writing-history.js";
 import { WritingSemantic } from "./writing-semantic.js";
 import { QuotaRefreshService } from "./quota-refresh.js";
 import { UsageService } from "./usage.js";
+import { AppleFleetsIntegration } from "./applefleets.js";
 import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
@@ -313,6 +314,35 @@ export async function buildControlPlane(
     }
     return attempt;
   };
+
+  const appleFleets = config.appleFleetsApiToken && config.appleFleetsProject
+    ? new AppleFleetsIntegration({
+        config,
+        db,
+        registry,
+        coordination,
+        dispatch: dispatchCommand,
+        principal: auth.servicePrincipal("applefleets"),
+      })
+    : undefined;
+
+  const authenticateAppleFleets = async (request: FastifyRequest): Promise<void> => {
+    invariant(appleFleets, 404, "APPLEFLEETS_DISABLED", "AppleFleets integration is not configured");
+    const authorization = request.headers.authorization;
+    appleFleets.authenticate(typeof authorization === "string" ? authorization : undefined);
+  };
+
+  app.post("/api/integrations/applefleets/generations", { preHandler: authenticateAppleFleets, bodyLimit: 32_000 }, async (request, reply) => {
+    limiter.check(`applefleets-create:${clientIp(request)}`, 20, 60_000);
+    const result = appleFleets!.create(request.body);
+    reply.code(result.duplicate ? 200 : 202);
+    return result;
+  });
+
+  app.get("/api/integrations/applefleets/generations/:id", { preHandler: authenticateAppleFleets }, async (request) => {
+    limiter.check(`applefleets-read:${clientIp(request)}`, 120, 60_000);
+    return appleFleets!.read(routeId(request));
+  });
 
   const dispatchPendingCommands = (machineId: string, workspaceId: string): void => {
     const eligibility = db.get<{ identity_state: string; security_state: string; compatibility: string; reachability: string }>(

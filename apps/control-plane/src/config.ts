@@ -21,6 +21,8 @@ export interface ControlPlaneConfig {
   ticketTtlSeconds: number;
   heartbeatOfflineSeconds: number;
   logLevel: string;
+  appleFleetsApiToken?: string;
+  appleFleetsProject?: string;
 }
 
 function positiveInt(value: string | undefined, fallback: number, name: string): number {
@@ -77,6 +79,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ControlPlaneCo
       .map((origin) => new URL(origin.trim()).origin),
   );
   const proxyTrust = trustedProxies(env.TRUSTED_PROXIES);
+  const appleFleetsApiToken = env.APPLEFLEETS_API_TOKEN?.trim();
+  const appleFleetsProject = env.APPLEFLEETS_PROJECT?.trim();
+  if (Boolean(appleFleetsApiToken) !== Boolean(appleFleetsProject)) {
+    throw new Error("APPLEFLEETS_API_TOKEN and APPLEFLEETS_PROJECT must be set together");
+  }
+  if (appleFleetsApiToken && appleFleetsApiToken.length < 32) {
+    throw new Error("APPLEFLEETS_API_TOKEN must be at least 32 characters");
+  }
 
   return {
     host: env.HOST ?? "127.0.0.1",
@@ -98,5 +108,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ControlPlaneCo
     ticketTtlSeconds: positiveInt(env.WS_TICKET_TTL_SECONDS, 30, "WS_TICKET_TTL_SECONDS"),
     heartbeatOfflineSeconds: positiveInt(env.HEARTBEAT_OFFLINE_SECONDS, 45, "HEARTBEAT_OFFLINE_SECONDS"),
     logLevel: env.LOG_LEVEL ?? "info",
+    ...(appleFleetsApiToken && appleFleetsProject ? { appleFleetsApiToken, appleFleetsProject } : {}),
   };
 }
