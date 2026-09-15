@@ -16,6 +16,7 @@ import type { ApprovalRecord, ManagedThread, ProjectRecord } from "./types.js";
 import { inputAnswers, inputQuestions, type InputAnswers } from "./user-input.js";
 import { inspectCodex, type CodexInspection } from "./codex-inspection.js";
 import { resolveCodexExecutable } from "./service.js";
+import { codexNetworkEnvironment } from "./system-proxy.js";
 import { verifySessionCwd } from "./projects.js";
 import { requestedPermissions, threadPermissionParams, turnPermissionPolicy, type PermissionProfile } from "./permissions.js";
 import { parseModels, readObservedSettings, turnSettingsParams, type CodexCatalog, type CodexSettings, type CodexObservedSettings } from "./codex-settings.js";
@@ -422,11 +423,12 @@ export class CodexAppServer implements AppServerClient {
   async start(): Promise<void> {
     if (this.child) return;
     this.stopping = false;
-    const codexExecutable = await resolveCodexExecutable(undefined, this.environment);
+    const childEnvironment = await codexNetworkEnvironment(this.environment);
+    const codexExecutable = await resolveCodexExecutable(undefined, childEnvironment);
     const child = spawn(
       codexExecutable,
       appServerLaunchArgs(),
-      { stdio: ["pipe", "pipe", "pipe"], shell: false, env: this.environment },
+      { stdio: ["pipe", "pipe", "pipe"], shell: false, env: childEnvironment },
     );
     this.child = child;
     child.stdout.setEncoding("utf8");
