@@ -7,12 +7,12 @@ export const isInlineImage = (value: unknown): value is string => typeof value =
   && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
 
 function dataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error(t("图片读取失败，请重新复制截图"))); reader.readAsDataURL(blob); });
+  return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error(t("图片读取失败，请重新选择或粘贴"))); reader.readAsDataURL(blob); });
 }
-/** Clipboard rasters are re-encoded to remove metadata and bound transport size. */
+/** Selected and pasted rasters are re-encoded to remove metadata and bound transport size. */
 export async function prepareClipboardImage(file: File): Promise<string> {
-  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) throw new Error(t("请粘贴 PNG、JPEG 或 WebP 图片；不支持网页 HTML 或 SVG"));
-  if (file.size > 20 * 1024 * 1024) throw new Error(t("原图超过 20 MB，请截取需要分析的区域后粘贴"));
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) throw new Error(t("请选择或粘贴 PNG、JPEG 或 WebP 图片；不支持 HTML 或 SVG"));
+  if (file.size > 20 * 1024 * 1024) throw new Error(t("原图超过 20 MB，请裁剪后重新选择或粘贴"));
   const url = URL.createObjectURL(file);
   try {
     const image = new Image(); image.src = url; await image.decode();
@@ -29,7 +29,7 @@ export async function prepareClipboardImage(file: File): Promise<string> {
       }
       scale *= .75;
     }
-    throw new Error(t("图片仍然过大，请截取关键区域后重新粘贴"));
+    throw new Error(t("图片仍然过大，请裁剪关键区域后重试"));
   } finally { URL.revokeObjectURL(url); }
 }
 
@@ -50,19 +50,23 @@ export function useImageDraft(owner: string, session?: string) {
     try { if (next.length) localStorage.setItem(key, JSON.stringify(next)); else localStorage.removeItem(key); }
     catch { setError(t("浏览器存储空间不足：图片暂存在此页面，发送前请不要刷新")); }
   }
-  async function onPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
-    const files = Array.from(event.clipboardData.items).filter(item => item.kind === "file" && item.type.startsWith("image/")).map(item => item.getAsFile()).filter((file): file is File => Boolean(file));
-    if (!files.length) return; // Normal text paste remains native.
-    event.preventDefault();
-    if (pending.current) { setError(t("正在处理上一张图片，请稍候再粘贴")); return; }
+  async function addFiles(files: File[]) {
+    if (!files.length) return;
+    if (pending.current) { setError(t("正在处理上一张图片，请稍候再添加")); return; }
     if (images.length + files.length > MAX_IMAGES) { setError(t("一条消息最多 4 张图片，请先移除多余图片")); return; }
     const current = generation.current; pending.current = true; setProcessing(true); setError("");
     try {
       const next: string[] = [];
       for (const file of files) next.push(await prepareClipboardImage(file));
       if (generation.current === current && active.current === key) save([...images, ...next]);
-    } catch (reason) { if (generation.current === current) setError(reason instanceof Error ? reason.message : t("图片处理失败，请重新粘贴")); }
+    } catch (reason) { if (generation.current === current) setError(reason instanceof Error ? reason.message : t("图片处理失败，请重新选择或粘贴")); }
     finally { if (generation.current === current) { pending.current = false; setProcessing(false); } }
   }
-  return { images, processing, error, onPaste, remove: (index: number) => save(images.filter((_, i) => i !== index)), clear: () => save([]) };
+  async function onPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(event.clipboardData.items).filter(item => item.kind === "file" && item.type.startsWith("image/")).map(item => item.getAsFile()).filter((file): file is File => Boolean(file));
+    if (!files.length) return; // Normal text paste remains native.
+    event.preventDefault();
+    await addFiles(files);
+  }
+  return { images, processing, error, addFiles, onPaste, remove: (index: number) => save(images.filter((_, i) => i !== index)), clear: () => save([]) };
 }

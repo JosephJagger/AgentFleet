@@ -23,23 +23,21 @@ it("项目列表提供独立的新项目入口", async () => {
   expect(onCreateProject).toHaveBeenCalledOnce();
 });
 
-it("项目分页显示总页数并可直接跳到指定页", async () => {
+it("项目分页在左侧显示总页数并通过前后按钮翻页", async () => {
   vi.mocked(api.projects).mockImplementation(async ({ offset }) => ({
     items: [{ ...project, id: offset === 8 ? "p-9" : "p-1", alias: offset === 8 ? "第九个项目" : "第一个项目" }],
     nextCursor: offset === 32 ? null : "next",
     total: 40,
   }));
   render(<WorkspaceCatalog {...props} refreshKey="pages" />);
-  const pager = await screen.findByRole("navigation", { name: "项目分页" });
+  await screen.findByRole("navigation", { name: "项目分页" });
   expect(screen.getByText("第 1 / 5 页")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "第 1 页" }).getAttribute("aria-current")).toBe("page");
-  expect(screen.getByRole("button", { name: "第 5 页" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "第 2 页" }));
+  expect(screen.queryByRole("button", { name: "第 1 页" })).toBeNull();
+  expect(screen.getAllByRole("button", { name: /上一页|下一页/ })).toHaveLength(2);
+  fireEvent.click(screen.getByRole("button", { name: "下一页" }));
   await screen.findByText("第九个项目");
   expect(screen.getByText("第 2 / 5 页")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "第 2 页" }).getAttribute("aria-current")).toBe("page");
   expect(api.projects).toHaveBeenLastCalledWith({ machineId: "m", offset: 8, limit: 8 }, expect.any(AbortSignal));
-  expect(pager).toBeTruthy();
 });
 
 it("后台刷新不插入加载行，保留已有项目和会话 DOM", async () => {

@@ -31,6 +31,7 @@ import {
   FileDiff,
   FolderGit2,
   GitBranch,
+  ImagePlus,
   KeyRound,
   LoaderCircle,
   LockKeyhole,
@@ -657,6 +658,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const [busy, setBusy] = useState(false);
   const [releaseConfirming, setReleaseConfirming] = useState(false);
   const textArea = useRef<HTMLTextAreaElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
   const [completionCaret, setCompletionCaret] = useState(0);
   const [activeCompletion, setActiveCompletion] = useState(0);
   const [dismissedCompletion, setDismissedCompletion] = useState("");
@@ -877,7 +879,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
         {imageDraft.images.length > 0 && <MessageImages images={imageDraft.images} onRemove={imageDraft.remove} disabled={busy || imageDraft.processing} />}
-        {imageDraft.processing && <p className="image-draft-notice" role="status">{t("正在处理粘贴的图片…")}</p>}
+        {imageDraft.processing && <p className="image-draft-notice" role="status">{t("正在处理图片…")}</p>}
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
         {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("请先在主机页更新连接服务，才能发送图片") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
         {completions.length > 0 && <CompletionSurface anchor={textArea}><div className={`prompt-completions-shell${completions.some(item => item.kind === "rewrite") ? " prompt-completions-shell--rewrite" : ""}`}><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={t("编程提示语补全")}>
@@ -952,10 +954,11 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           }}
         />
         <div className="composer-actions">
-
           <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{detail.writeBlockedReason || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
           <span className="composer-touch-hint">{detail.writeBlockedReason || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
           <div className="composer-button-group">
+          <input ref={imageInput} className="composer-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label={t("选择要发送的图片")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void imageDraft.addFiles(files); }} />
+          <button className="button button--secondary composer-image-button" type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => imageInput.current?.click()}><ImagePlus size={16} />{t("添加图片")}</button>
           {canQueueOrSteer ? (
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}

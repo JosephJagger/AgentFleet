@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { useImageDraft, isInlineImage } from "./lib/image-drafts";
 const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
 afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();vi.unstubAllGlobals();});
-function Draft({session="a"}:{session?:string}) {const draft=useImageDraft("user",session); return <><textarea aria-label="paste" onPaste={draft.onPaste}/><span>{draft.processing?"processing":"ready"}</span><output>{JSON.stringify(draft.images)}</output><p>{draft.error}</p><button onClick={()=>draft.remove(0)}>remove</button></>;}
+function Draft({session="a"}:{session?:string}) {const draft=useImageDraft("user",session); return <><textarea aria-label="paste" onPaste={draft.onPaste}/><input aria-label="upload" type="file" onChange={event=>void draft.addFiles(Array.from(event.currentTarget.files??[]))}/><span>{draft.processing?"processing":"ready"}</span><output>{JSON.stringify(draft.images)}</output><p>{draft.error}</p><button onClick={()=>draft.remove(0)}>remove</button></>;}
 function clipboard() {return {items:[{kind:"file",type:"image/png",getAsFile:()=>new File(["fixture"],"clipboard.png",{type:"image/png"})}]};}
 function mocks(decode:()=>Promise<void>=async()=>{}) {
   vi.stubGlobal("Image",class {src="";naturalWidth=1;naturalHeight=1;decode=decode;});
@@ -18,6 +18,12 @@ it("pastes raster bytes, persists preview and removes it without changing text p
   expect(localStorage.getItem("agentfleet.images:user:a")).toContain("data:image/png");
   fireEvent.click(screen.getByText("remove"));expect(localStorage.getItem("agentfleet.images:user:a")).toBeNull();
   expect(fireEvent.paste(screen.getByRole("textbox"),{clipboardData:{items:[]}})).toBe(true);
+});
+it("adds an image selected from a mobile file picker",async()=>{
+  mocks();render(<Draft/>);
+  fireEvent.change(screen.getByLabelText("upload"),{target:{files:[new File(["fixture"],"photo.webp",{type:"image/webp"})]}});
+  await waitFor(()=>expect(screen.getByRole("status").textContent).toContain("data:image/png"));
+  expect(localStorage.getItem("agentfleet.images:user:a")).toContain("data:image/png");
 });
 it("a paste finishing after switching sessions cannot attach to the new conversation",async()=>{
   let finish!:()=>void;mocks(()=>new Promise(resolve=>{finish=resolve;}));
