@@ -157,10 +157,6 @@ async function setup(args: ParsedArgs): Promise<{
   const store = new StateStore(requestedDataDir(args));
   await store.initialize();
   await configureRuntimeProfile(store.dataDir);
-  if (["pair", "onboard"].includes(args.words[0] ?? "")) {
-    const url = option(args, "url") ?? store.snapshot().pairing?.controlPlaneUrl;
-    if (url) await repairManagedCodeMode(store.dataDir, url).catch(() => undefined); // Preflight exposes a failure without blocking pairing.
-  }
   const identity = await loadOrCreateIdentity(store);
   const support = await detectSupport(identity.metadata.credentialProtectionLevel);
   return { store, identity, support };

@@ -152,4 +152,5 @@ if [ "$MODE" = update ]; then
   exit 1
 fi
 if [ "$MODE" = stage ]; then echo "Staged AgentFleet $VERSION; launchd will restart into it."; exit 0; fi
+echo "Registering this Mac. Keep the Add Host dialog open until this command finishes."
 exec "$CURRENT_LINK" onboard "$@" --data-dir "$DATA_ROOT" --executable "$CURRENT_LINK"
