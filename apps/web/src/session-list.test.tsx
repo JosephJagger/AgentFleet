@@ -82,8 +82,8 @@ describe("SessionList", () => {
     expect(select).toHaveBeenCalledWith("b1");
   });
 
-  it("paginates projects and jumps to the selected session project", async () => {
-    const projects: Project[] = Array.from({ length: 9 }, (_, index) => ({
+  it("shows every project page number and jumps to the selected session project", async () => {
+    const projects: Project[] = Array.from({ length: 40 }, (_, index) => ({
       id: `project-${index + 1}`,
       machineId: "machine-1",
       alias: `Project ${index + 1}`,
@@ -105,14 +105,15 @@ describe("SessionList", () => {
       onCreate={() => undefined}
     />);
 
-    expect(screen.getByText("1–8 / 9 个项目")).toBeTruthy();
-    expect(screen.queryByText("Project 1")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
-    expect(screen.getByText("Project 1")).toBeTruthy();
-    expect(screen.queryByText("Session 1")).toBeNull();
-    expect(screen.getByText("9–9 / 9 个项目")).toBeTruthy();
+    const pager = screen.getByRole("navigation", { name: "项目分页" });
+    expect(screen.getByText("1–8 / 40 个项目")).toBeTruthy();
+    expect(within(pager).getAllByRole("button", { name: /第 [1-5] 页/ })).toHaveLength(5);
+    expect(within(pager).getByRole("button", { name: "第 1 页" }).getAttribute("aria-current")).toBe("page");
 
-    fireEvent.click(screen.getByRole("button", { name: "上一页" }));
+    fireEvent.click(within(pager).getByRole("button", { name: "第 2 页" }));
+    expect(screen.getByText("9–16 / 40 个项目")).toBeTruthy();
+    expect(within(pager).getByRole("button", { name: "第 2 页" }).getAttribute("aria-current")).toBe("page");
+
     rerender(<SessionList
       sessions={sessions}
       projects={projects}

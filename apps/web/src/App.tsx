@@ -72,6 +72,7 @@ import { CommandExecution } from "./components/CommandExecution";
 import { MessageImages } from "./components/MessageImages";
 import { useImageDraft } from "./lib/image-drafts";
 import { timelineItems } from "./lib/timeline-items";
+import { pageItems } from "./lib/pagination";
 import { commandMutationId, mergeCommandReceipts, rememberCommandReceipt } from "./lib/command-mutation";
 import { ConversationViewport } from "./components/ConversationViewport";
 import { CodexInputCard } from "./components/CodexInputCard";
@@ -544,9 +545,11 @@ export function SessionList({ sessions, projects, selectedId, machineId, onSelec
             <nav className="project-pagination" aria-label={t("项目分页")}>
               <span className="project-pagination__range">
                 {projectPageStart + 1}–{Math.min(projectPageStart + PROJECTS_PER_PAGE, groups.length)} / {count(groups.length, "个项目")} </span>
-              <span className="project-pagination__page">{t("第 {0} / {1} 页", safeProjectPage + 1, totalProjectPages)}</span>
               <span className="project-pagination__actions">
                 <button type="button" aria-label={t("上一页")} disabled={safeProjectPage === 0} onClick={() => setProjectPage((page) => Math.max(0, page - 1))}><ChevronLeft size={16} /></button>
+                {pageItems(safeProjectPage + 1, totalProjectPages).map((item, index) => item === "ellipsis"
+                  ? <span className="project-pagination__ellipsis" key={`ellipsis-${index}`} aria-hidden="true">…</span>
+                  : <button type="button" className="project-pagination__number" key={item} aria-current={item === safeProjectPage + 1 ? "page" : undefined} aria-label={t("第 {0} 页", item)} onClick={() => setProjectPage(item - 1)}>{item}</button>)}
                 <button type="button" aria-label={t("下一页")} disabled={safeProjectPage >= totalProjectPages - 1} onClick={() => setProjectPage((page) => Math.min(totalProjectPages - 1, page + 1))}><ChevronRight size={16} /></button>
               </span>
             </nav>

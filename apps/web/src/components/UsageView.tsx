@@ -3,21 +3,11 @@ import { BarChart3, RefreshCw } from "lucide-react";
 import { api } from "../lib/api";
 import type { Machine } from "../lib/types";
 import type { UsageBreakdownEntry, UsageSummary } from "../lib/usage";
+import { pageItems } from "../lib/pagination";
 import { locale, t } from "../i18n";
 
 const cacheRate=(input:number|null|undefined,cached:number|null|undefined)=>input&&cached!=null?cached/input*100:null;
 const pageSize=10;
-type PageItem=number|"ellipsis";
-
-function pageItems(current:number,total:number):PageItem[] {
-  if(total<=7)return Array.from({length:total},(_,index)=>index+1);
-  const visible=new Set([1,total,current-1,current,current+1]);
-  if(current<=4)[2,3,4,5].forEach(page=>visible.add(page));
-  if(current>=total-3)[total-4,total-3,total-2,total-1].forEach(page=>visible.add(page));
-  const pages=[...visible].filter(page=>page>=1&&page<=total).sort((a,b)=>a-b);
-  return pages.flatMap((page,index)=>index&&page-pages[index-1]>1?["ellipsis",page]:[page]);
-}
-
 export function UsageView({machines,selectedId,onSelect,onSession}:{machines:Machine[];selectedId?:string;onSelect:(id:string)=>void;onSession:(id:string)=>void}) {
   const machine=machines.find(item=>item.id===selectedId)??machines[0];
   const [data,setData]=useState<UsageSummary>();
