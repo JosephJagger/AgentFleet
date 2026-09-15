@@ -66,7 +66,11 @@ if [ -f "$RUNTIME_PROFILE" ] && [ ! -L "$RUNTIME_PROFILE" ]; then
   EXISTING_CODEX_SOURCE=$(printf '%s' "$PROFILE_COMPACT" | sed -n 's/.*"source":"\(host\|managed\)".*/\1/p')
 fi
 if [ -f "$DATA_ROOT/codex/codex" ] && [ ! -L "$DATA_ROOT/codex/codex" ]; then cp "$DATA_ROOT/codex/codex" "$TEMP_DIR/codex.previous"; CODEX_EXISTED=yes; fi
-download() { curl -fLsS --proto '=https' --tlsv1.2 "$1" -o "$2"; }
+download() {
+  curl -fLsS --proto '=https' --tlsv1.2 \
+    --retry 5 --retry-delay 2 --retry-max-time 900 --retry-all-errors \
+    "$1" -o "$2"
+}
 field() { printf '%s' "$1" | sed -n "s/.*\"$2\":\"\([^\"]*\)\".*/\1/p"; }
 
 MANIFEST="$TEMP_DIR/manifest.json"
