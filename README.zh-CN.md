@@ -211,7 +211,7 @@ Compose 使用命名卷保存控制面数据和已验证的运行时。升级前
 AppleFleets 可以把 Apple Watch 跑步摘要提交给这台 Linux 主机上的 Codex，再把小红书和抖音文案返回手机。手机只上传距离、用时、配速、心率摘要和公里分段，不上传 GPS 坐标。
 
 1. 登录 AgentFleets 网页面板，确认 Linux 主机显示为在线。
-2. 在这台主机下添加一个项目，项目名称填写 `AppleFleets`。可选择任意空目录，例如 `/home/你的用户名/applefleets-content`。
+2. 在这台主机下添加一个项目，项目名称填写 `iwatch`，宿主机目录填写 `/root/iwatch`。
 3. 打开该项目的内容同步。这个开关用于把 Codex 最终回答送回 iPhone。
 4. 在 Linux 终端进入 AgentFleet 项目目录，生成连接令牌：
 
@@ -223,7 +223,7 @@ openssl rand -hex 32
 
 ```dotenv
 APPLEFLEETS_API_TOKEN=刚才生成的64位字符
-APPLEFLEETS_PROJECT=AppleFleets
+APPLEFLEETS_PROJECT=iwatch
 ```
 
 6. 重新构建并启动：

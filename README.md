@@ -209,7 +209,7 @@ Compose persists control-plane data and validated runtime releases in named volu
 AppleFleets can send an Apple Watch workout summary to Codex on an enrolled Linux host and receive structured Xiaohongshu and Douyin copy. It sends distance, duration, pace, heart-rate summary, and kilometer splits; GPS coordinates are excluded.
 
 1. Sign in to AgentFleets and confirm the Linux host is online.
-2. Add a project named `AppleFleets` on that host. An empty directory such as `/home/your-user/applefleets-content` is sufficient.
+2. Add a project named `iwatch` on that host, using `/root/iwatch` as its host directory.
 3. Enable content sync for that project so the final Codex message can return to the phone.
 4. Generate a dedicated token on the server:
 
@@ -221,7 +221,7 @@ openssl rand -hex 32
 
 ```dotenv
 APPLEFLEETS_API_TOKEN=paste-the-64-character-token-here
-APPLEFLEETS_PROJECT=AppleFleets
+APPLEFLEETS_PROJECT=iwatch
 ```
 
 6. Rebuild and restart AgentFleets:
