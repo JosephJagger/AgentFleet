@@ -477,7 +477,7 @@
   "强度未上报": "Reasoning effort not reported",
   "主机上次接受：": "Last accepted by host:",
   "计划模式": "Plan mode",
-  "下次发送 · 计划模式": "Next message · Plan mode",
+  "本次发送 · 计划模式": "This message · Plan mode",
   "默认模式": "Default mode",
   "关闭计划模式": "Turn off Plan mode",
   "执行模式": "Execute mode",

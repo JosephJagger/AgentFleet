@@ -74,11 +74,11 @@ it("计划模式只应用于下一次发送，成功后清除待发送标记", a
   const view = render(<SessionInspector {...props} onSend={send} />);
   fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
   fireEvent.click(screen.getByRole("button", { name: /计划模式.*先分析并制定计划/ }));
-  expect(screen.getByText("下次发送 · 计划模式")).toBeTruthy();
+  expect(screen.getByText("本次发送 · 计划模式")).toBeTruthy();
   fireEvent.change(screen.getByRole("textbox", { name: "发送给 Codex 的消息" }), { target: { value: "先制定方案" } });
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() => expect(send).toHaveBeenCalledWith("先制定方案", { model: "test-model", effort: "medium", mode: "plan" }, undefined));
-  await waitFor(() => expect(screen.queryByText("下次发送 · 计划模式")).toBeNull());
+  await waitFor(() => expect(screen.queryByText("本次发送 · 计划模式")).toBeNull());
 });
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
 
