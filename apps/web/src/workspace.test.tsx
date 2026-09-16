@@ -83,8 +83,8 @@ it("计划模式只应用于下一次发送，成功后清除待发送标记", a
 it("输入 @ 可按插件名部分匹配技能并加入本次发送", async () => {
   const props = inspectorProps("A");
   props.detail = { ...props.detail, session: { ...props.detail.session, pluginSkills: [
-    { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "管理 Shopify 后台数据", path: "/plugins/shopify/admin" },
-    { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Liquid themes", description: "开发 Shopify 主题", path: "/plugins/shopify/liquid" },
+    { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "管理 Shopify 后台数据", path: "/plugins/shopify/admin" },
+    { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify App Builder", name: "Liquid themes", description: "开发 Shopify 主题", path: "/plugins/shopify/liquid" },
     { pluginId: "github", pluginName: "GitHub", name: "Pull requests", description: "管理 Pull Request", path: "/plugins/github/pulls" },
   ] } };
   const send = vi.fn(noop);
@@ -101,7 +101,7 @@ it("输入 @ 可按插件名部分匹配技能并加入本次发送", async () =
   expect((prompt as HTMLTextAreaElement).value).toBe("");
   expect(screen.getByText("Admin GraphQL", { selector: ".attachment-chip span" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
-  await waitFor(() => expect(send).toHaveBeenCalledWith("", undefined, undefined, { pluginSkills: [{ pluginId: "shopify", name: "Admin GraphQL", path: "/plugins/shopify/admin" }] }));
+  await waitFor(() => expect(send).toHaveBeenCalledWith("", undefined, undefined, { pluginSkills: [{ pluginId: "shopify@openai-curated-remote", name: "Admin GraphQL", path: "/plugins/shopify/admin" }] }));
 });
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
 

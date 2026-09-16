@@ -6,8 +6,8 @@ import { applyPromptCompletion, pluginCompletions, promptCompletions, softwareTe
 describe("prompt completions", () => {
   it("matches installed plugin skills from a partial @ mention", () => {
     const skills = [
-      { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "Manage Shopify data", path: "/plugins/shopify/admin" },
-      { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Liquid themes", description: "Build Shopify themes", path: "/plugins/shopify/liquid" },
+      { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "Manage Shopify data", path: "/plugins/shopify/admin" },
+      { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify App Builder", name: "Liquid themes", description: "Build Shopify themes", path: "/plugins/shopify/liquid" },
       { pluginId: "github", pluginName: "GitHub", name: "Pull requests", description: "Manage pull requests", path: "/plugins/github/pulls" },
     ];
     const prompt = "请使用 @shop";
@@ -18,10 +18,11 @@ describe("prompt completions", () => {
     expect(scoped.value).toBe("请使用 @shopify/");
     const capabilities = pluginCompletions(scoped.value, scoped.caret, skills)!;
     expect(capabilities.map(item => item.label)).toEqual(["Admin GraphQL", "Liquid themes"]);
+    expect(capabilities[0].pluginSkill?.pluginId).toBe("shopify@openai-curated-remote");
     expect(applyPromptCompletion(scoped.value, capabilities[0]).value).toBe("请使用 ");
     expect(pluginCompletions("@", 1, skills, [
-      { pluginId: "shopify", name: "Admin GraphQL", path: "/plugins/shopify/admin" },
-      { pluginId: "shopify", name: "Liquid themes", path: "/plugins/shopify/liquid" },
+      { pluginId: "shopify@openai-curated-remote", name: "Admin GraphQL", path: "/plugins/shopify/admin" },
+      { pluginId: "shopify@openai-curated-remote", name: "Liquid themes", path: "/plugins/shopify/liquid" },
     ])?.map(item => item.label)).toEqual(["GitHub"]);
     expect(pluginCompletions("联系 a@shop", 9, skills)).toBeUndefined();
   });

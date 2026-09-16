@@ -17,6 +17,11 @@ export type PromptCompletion = {
 
 export type PluginCompletionSkill = { pluginId: string; pluginName: string; name: string; description: string; path: string };
 
+function pluginMentionId(pluginId: string) {
+  const sourceSeparator = pluginId.lastIndexOf("@");
+  return (sourceSeparator > 0 ? pluginId.slice(0, sourceSeparator) : pluginId).replace(/^@/, "");
+}
+
 type CompletionTerm = {
   label: string;
   detail: string;
@@ -214,7 +219,7 @@ export function pluginCompletions(prompt: string, caret: number, skills: PluginC
   if (slash >= 0) {
     const pluginQuery = query.slice(0, slash);
     const skillQuery = query.slice(slash + 1);
-    const group = skills.filter(skill => skill.pluginId.toLocaleLowerCase() === pluginQuery);
+    const group = skills.filter(skill => pluginMentionId(skill.pluginId).toLocaleLowerCase() === pluginQuery);
     if (!group.length) return [];
     return group.flatMap(skill => {
       if (selectedKeys.has(`${skill.pluginId}\u0000${skill.name}\u0000${skill.path}`)) return [];
@@ -243,11 +248,12 @@ export function pluginCompletions(prompt: string, caret: number, skills: PluginC
     const pluginName = group[0].pluginName;
     const plugin = pluginName.toLocaleLowerCase();
     const id = pluginId.toLocaleLowerCase();
+    const mentionId = pluginMentionId(pluginId).toLocaleLowerCase();
     const skillNames = available.map(skill => skill.name.toLocaleLowerCase());
     const score = !query ? 0
-      : plugin === query || id === query ? 0
-      : plugin.startsWith(query) || id.startsWith(query) ? 1
-      : plugin.includes(query) || id.includes(query) ? 2
+      : plugin === query || id === query || mentionId === query ? 0
+      : plugin.startsWith(query) || id.startsWith(query) || mentionId.startsWith(query) ? 1
+      : plugin.includes(query) || id.includes(query) || mentionId.includes(query) ? 2
       : skillNames.some(name => name.startsWith(query)) ? 3
       : skillNames.some(name => name.includes(query)) ? 4
       : 99;
@@ -255,7 +261,7 @@ export function pluginCompletions(prompt: string, caret: number, skills: PluginC
   }).sort((a, b) => a.score - b.score || a.pluginName.localeCompare(b.pluginName));
   return ranked.slice(0, limit).map(({ pluginId, pluginName }) => ({
     label: pluginName,
-    insertText: `@${pluginId}/`,
+    insertText: `@${pluginMentionId(pluginId)}/`,
     detail: "选择具体插件能力",
     kind: "plugin",
     replaceStart,
