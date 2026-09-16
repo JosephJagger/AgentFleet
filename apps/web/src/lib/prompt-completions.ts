@@ -9,10 +9,13 @@ export type PromptCompletion = {
   label: string;
   insertText: string;
   detail: string;
-  kind: "term" | "phrase" | "rewrite";
+  kind: "term" | "phrase" | "rewrite" | "plugin";
   replaceStart: number;
   replaceEnd: number;
+  pluginSkill?: { pluginId: string; name: string; path: string };
 };
+
+export type PluginCompletionSkill = { pluginId: string; pluginName: string; name: string; description: string; path: string };
 
 type CompletionTerm = {
   label: string;
@@ -197,6 +200,38 @@ export function promptCompletions(prompt: string, caret: number, limit = 5, lear
     .sort((a, b) => a.score - b.score || a.term.label.localeCompare(b.term.label))
     .map(({ term }): PromptCompletion => ({ label: term.label, insertText: term.label, detail: term.detail, kind: "term", replaceStart: fragment.start, replaceEnd: fragment.end }));
   return [...learnedMatches, ...rewrites, ...phrases, ...termMatches, ...dictionaryMatches].filter((item,index,all) => all.findIndex(other => other.label === item.label) === index).slice(0, limit);
+}
+
+export function pluginCompletions(prompt: string, caret: number, skills: PluginCompletionSkill[] = [], selected: Array<{ pluginId: string; name: string; path: string }> = [], limit = 10): PromptCompletion[] | undefined {
+  if (caret < 0 || caret > prompt.length || prompt.trimStart().startsWith("/")) return undefined;
+  const beforeCaret = prompt.slice(0, caret);
+  const match = /(?:^|[\s([{"'，。！？、])@([^\s@]*)$/u.exec(beforeCaret);
+  if (!match) return undefined;
+  const query = match[1].toLocaleLowerCase();
+  const replaceStart = caret - match[1].length - 1;
+  const selectedKeys = new Set(selected.map(item => `${item.pluginId}\u0000${item.name}\u0000${item.path}`));
+  const ranked = skills.flatMap(skill => {
+    if (selectedKeys.has(`${skill.pluginId}\u0000${skill.name}\u0000${skill.path}`)) return [];
+    const plugin = skill.pluginName.toLocaleLowerCase();
+    const name = skill.name.toLocaleLowerCase();
+    const score = !query ? 0
+      : plugin === query || name === query ? 0
+      : plugin.startsWith(query) ? 1
+      : name.startsWith(query) ? 2
+      : plugin.includes(query) ? 3
+      : name.includes(query) ? 4
+      : 99;
+    return score < 99 ? [{ skill, score }] : [];
+  }).sort((a, b) => a.score - b.score || a.skill.pluginName.localeCompare(b.skill.pluginName) || a.skill.name.localeCompare(b.skill.name));
+  return ranked.slice(0, limit).map(({ skill }) => ({
+    label: `${skill.pluginName} · ${skill.name}`,
+    insertText: "",
+    detail: skill.description,
+    kind: "plugin",
+    replaceStart,
+    replaceEnd: caret,
+    pluginSkill: { pluginId: skill.pluginId, name: skill.name, path: skill.path },
+  }));
 }
 
 export function applyPromptCompletion(prompt: string, completion: PromptCompletion) {

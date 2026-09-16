@@ -96,7 +96,7 @@ import { useWritingMemory } from "./lib/writing-assistance";
 import { mergeWritingSuggestions, useChineseNLP } from "./lib/writing-nlp";
 import { CompletionSurface } from "./components/CompletionSurface";
 import { SessionWritingPreferencesPanel } from "./components/WritingPreferencesPanel";
-import { applyPromptCompletion, promptCompletions, type PromptCompletion } from "./lib/prompt-completions";
+import { applyPromptCompletion, pluginCompletions, promptCompletions, type PromptCompletion } from "./lib/prompt-completions";
 import { routeFromPath, routePath, type AppRoute, type View } from "./lib/navigation";
 import type {
   Approval,
@@ -689,7 +689,12 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const completionKey = `${prompt}\u0000${completionCaret}`;
   const completionVisible = !loading && !busy && completionFocused && !composingPrompt && completionSelectionEnd === completionCaret && dismissedCompletion !== completionKey;
   const chineseSuggestions = useChineseNLP(draftOwner ?? "preview", detail?.session.id, prompt, completionVisible && completionCaret === prompt.length && completionPreferences.suggestions && completionPreferences.nlp);
-  const completions = useMemo(() => !completionVisible ? [] : mergeWritingSuggestions(promptCompletions(prompt, completionCaret, 10, writingMemory.value?.entries).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions), chineseSuggestions), [completionVisible, completionCaret, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value, chineseSuggestions]);
+  const completions = useMemo(() => {
+    if (!completionVisible) return [];
+    const plugins = pluginCompletions(prompt, completionCaret, detail?.session.pluginSkills, selectedSkills);
+    if (plugins) return plugins;
+    return mergeWritingSuggestions(promptCompletions(prompt, completionCaret, 10, writingMemory.value?.entries).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions), chineseSuggestions);
+  }, [completionVisible, completionCaret, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value, chineseSuggestions, detail?.session.pluginSkills, selectedSkills]);
   useAutoSizeTextarea(textArea, prompt, `${detail?.session.id ?? ""}:${loading}`);
   useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedSkills([]); setModeOverride(undefined); }, [detail?.session.id, draftOwner]);
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
@@ -711,6 +716,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
 
   function acceptCompletion(completion: PromptCompletion) {
     if (completion.memoryId && detail) void api.acceptWritingEntry(detail.session.id, completion.memoryId).catch(() => undefined);
+    if (completion.pluginSkill) setSelectedSkills(current => current.some(item => item.pluginId === completion.pluginSkill!.pluginId && item.name === completion.pluginSkill!.name && item.path === completion.pluginSkill!.path) ? current : [...current, completion.pluginSkill!]);
     const next = applyPromptCompletion(prompt, completion);
     setPrompt(next.value);
     setCompletionCaret(next.caret);
@@ -928,8 +934,8 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
         {fileDraft.error && <p className="image-draft-notice" role="alert">{systemText(fileDraft.error)}</p>}
         {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("请先在主机页更新连接服务，才能发送图片") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
-        {completions.length > 0 && <CompletionSurface anchor={textArea}><div className={`prompt-completions-shell${completions.some(item => item.kind === "rewrite") ? " prompt-completions-shell--rewrite" : ""}`}><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={t("编程提示语补全")}>
-          <div className="prompt-completions__head" role="presentation"><Code2 size={14} aria-hidden="true" /><span>{t("输入建议")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
+        {completions.length > 0 && <CompletionSurface anchor={textArea}><div className={`prompt-completions-shell${completions.some(item => item.kind === "rewrite") ? " prompt-completions-shell--rewrite" : ""}`}><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={completions[0]?.kind === "plugin" ? t("插件") : t("编程提示语补全")}>
+          <div className="prompt-completions__head" role="presentation">{completions[0]?.kind === "plugin" ? <Puzzle size={14} aria-hidden="true" /> : <Code2 size={14} aria-hidden="true" />}<span>{completions[0]?.kind === "plugin" ? t("插件") : t("输入建议")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
           {completions.map((completion, index) => <button
             type="button"
             role="option"
@@ -943,7 +949,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => acceptCompletion(completion)}
             onMouseEnter={() => setActiveCompletion(index)}
-          ><span className="prompt-completion__kind">{completion.kind === "term" ? t("术语") : completion.kind === "rewrite" ? t("表达优化") : t("提示语")}</span><code>{completion.label}</code><small>{t(completion.detail)}</small></button>)}
+          ><span className="prompt-completion__kind">{completion.kind === "plugin" ? t("插件") : completion.kind === "term" ? t("术语") : completion.kind === "rewrite" ? t("表达优化") : t("提示语")}</span><code>{completion.label}</code><small>{t(completion.detail)}</small></button>)}
         </div><button type="button" className="prompt-completions-dismiss" aria-label={t("收起补全建议")} title={t("收起补全建议")} onMouseDown={event => event.preventDefault()} onClick={() => { setDismissedCompletion(completionKey); textArea.current?.focus(); }}><X size={16} aria-hidden="true" /></button></div></CompletionSurface>}
         <textarea
           ref={textArea}
@@ -976,6 +982,11 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
                 return;
               }
               if (event.key === "Tab" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                event.preventDefault();
+                acceptCompletion(completions[activeCompletion] ?? completions[0]);
+                return;
+              }
+              if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && (completions[activeCompletion] ?? completions[0])?.kind === "plugin") {
                 event.preventDefault();
                 acceptCompletion(completions[activeCompletion] ?? completions[0]);
                 return;

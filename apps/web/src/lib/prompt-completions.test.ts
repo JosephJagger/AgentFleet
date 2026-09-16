@@ -1,9 +1,22 @@
 import { locale, setLocale, t } from "../i18n";
 import domainTerms from "./domain-terms.generated.json";
 import { afterEach, describe, expect, it } from "vitest";
-import { applyPromptCompletion, promptCompletions, softwareTermCount } from "./prompt-completions";
+import { applyPromptCompletion, pluginCompletions, promptCompletions, softwareTermCount } from "./prompt-completions";
 
 describe("prompt completions", () => {
+  it("matches installed plugin skills from a partial @ mention", () => {
+    const skills = [
+      { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "Manage Shopify data", path: "/plugins/shopify/admin" },
+      { pluginId: "github", pluginName: "GitHub", name: "Pull requests", description: "Manage pull requests", path: "/plugins/github/pulls" },
+    ];
+    const prompt = "请使用 @shop";
+    const matches = pluginCompletions(prompt, prompt.length, skills)!;
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({ kind: "plugin", label: "Shopify App Builder · Admin GraphQL", replaceStart: 4, replaceEnd: prompt.length, pluginSkill: { pluginId: "shopify", name: "Admin GraphQL" } });
+    expect(applyPromptCompletion(prompt, matches[0]).value).toBe("请使用 ");
+    expect(pluginCompletions("@", 1, skills, [{ pluginId: "shopify", name: "Admin GraphQL", path: "/plugins/shopify/admin" }])?.map(item => item.label)).toEqual(["GitHub · Pull requests"]);
+    expect(pluginCompletions("联系 a@shop", 9, skills)).toBeUndefined();
+  });
   it.each(["登录老掉", "登陆老掉", "登陆老掉。", "登录经常掉线", "登陆总是退出 "])("recognizes Chinese login wording: %s", prompt => {
     expect(promptCompletions(prompt, prompt.length)[0]).toMatchObject({ kind: "rewrite", label: "排查登录会话意外失效的问题，检查令牌过期、刷新和持久化逻辑" });
   });

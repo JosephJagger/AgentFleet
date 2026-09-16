@@ -80,6 +80,25 @@ it("计划模式只应用于下一次发送，成功后清除待发送标记", a
   await waitFor(() => expect(send).toHaveBeenCalledWith("先制定方案", { model: "test-model", effort: "medium", mode: "plan" }, undefined));
   await waitFor(() => expect(screen.queryByText("本次发送 · 计划模式")).toBeNull());
 });
+it("输入 @ 可按插件名部分匹配技能并加入本次发送", async () => {
+  const props = inspectorProps("A");
+  props.detail = { ...props.detail, session: { ...props.detail.session, pluginSkills: [
+    { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "管理 Shopify 后台数据", path: "/plugins/shopify/admin" },
+    { pluginId: "github", pluginName: "GitHub", name: "Pull requests", description: "管理 Pull Request", path: "/plugins/github/pulls" },
+  ] } };
+  const send = vi.fn(noop);
+  render(<SessionInspector {...props} onSend={send} />);
+  const prompt = screen.getByRole("textbox", { name: "发送给 Codex 的消息" });
+  fireEvent.change(prompt, { target: { value: "@shop" } });
+  const choices = screen.getByRole("listbox", { name: "插件" });
+  expect(within(choices).getByRole("option", { name: /Shopify App Builder · Admin GraphQL/ })).toBeTruthy();
+  expect(within(choices).queryByText(/GitHub · Pull requests/)).toBeNull();
+  fireEvent.keyDown(prompt, { key: "Enter" });
+  expect((prompt as HTMLTextAreaElement).value).toBe("");
+  expect(screen.getByText("Admin GraphQL")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "发送" }));
+  await waitFor(() => expect(send).toHaveBeenCalledWith("", undefined, undefined, { pluginSkills: [{ pluginId: "shopify", name: "Admin GraphQL", path: "/plugins/shopify/admin" }] }));
+});
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
 
 beforeEach(() => {
