@@ -328,6 +328,25 @@ function launchdDomain(uid: number | null): string {
   return uid === 0 ? "system" : `gui/${uid ?? process.pid}`;
 }
 
+export async function bootstrapLaunchdWithRetry(
+  runCommand: CommandRunner,
+  domain: string,
+  path: string,
+  pause: (milliseconds: number) => Promise<void> = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
+): Promise<CommandResult> {
+  let last: CommandResult = { exitCode: 1, stdout: "", stderr: "launchd bootstrap was not attempted" };
+  for (const delay of [0, 250, 500, 1_000, 2_000]) {
+    if (delay) await pause(delay);
+    last = await runCommand("launchctl", ["bootstrap", domain, path]);
+    if (last.exitCode === 0) return last;
+    // launchctl can report bootstrap failure after registering the job. Treat
+    // an exact-domain print as authoritative rather than issuing duplicates.
+    const status = await runCommand("launchctl", ["print", `${domain}/${LAUNCHD_LABEL}`]);
+    if (status.exitCode === 0) return { exitCode: 0, stdout: status.stdout, stderr: "" };
+  }
+  return last;
+}
+
 export function buildLaunchdPlist(options: { launch: string[]; dataDir: string; codexExecutable?: string; codexHome?: string }): string {
   if (options.launch.length === 0 || !options.launch.every(isAbsolute)) {
     throw new AgentError("SERVICE_EXECUTABLE_INVALID", "launchd program paths must be absolute");
@@ -484,7 +503,7 @@ async function writeAndActivateLaunchd(options: {
   const domain = launchdDomain(uid);
   try {
     await runCommand("launchctl", ["bootout", `${domain}/${LAUNCHD_LABEL}`]);
-    const bootstrap = await runCommand("launchctl", ["bootstrap", domain, path]);
+    const bootstrap = await bootstrapLaunchdWithRetry(runCommand, domain, path);
     if (bootstrap.exitCode !== 0) throw commandFailure("launchd bootstrap", bootstrap);
     const enable = await runCommand("launchctl", ["enable", `${domain}/${LAUNCHD_LABEL}`]);
     if (enable.exitCode !== 0) throw commandFailure("launchd enable", enable);
@@ -494,6 +513,14 @@ async function writeAndActivateLaunchd(options: {
   } catch (error) {
     if (priorContents === undefined) await unlink(path).catch(() => undefined);
     else await atomicWrite(path, priorContents);
+    if (priorContents !== undefined) {
+      await runCommand("launchctl", ["bootout", `${domain}/${LAUNCHD_LABEL}`]);
+      const restored = await bootstrapLaunchdWithRetry(runCommand, domain, path);
+      if (restored.exitCode === 0) {
+        await runCommand("launchctl", ["enable", `${domain}/${LAUNCHD_LABEL}`]);
+        await runCommand("launchctl", ["kickstart", "-k", `${domain}/${LAUNCHD_LABEL}`]);
+      }
+    }
     throw error;
   }
 }

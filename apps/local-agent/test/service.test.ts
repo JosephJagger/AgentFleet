@@ -7,6 +7,7 @@ import {
   buildServiceUnit,
   buildLaunchdPlist,
   buildWindowsServiceLauncher,
+  bootstrapLaunchdWithRetry,
   buildUserServiceUnit,
   installUserService,
   quoteSystemdArgument,
@@ -89,6 +90,23 @@ test("macOS launchd and Windows task launchers preserve the fixed service enviro
   assert.match(windows, /AGENTFLEET_AUTO_UPDATE=1/);
   assert.match(windows, /node\.exe/);
   assert.doesNotMatch(windows, /ticket|secret/iu);
+});
+
+test("launchd bootstrap waits for bootout completion and accepts an already registered exact job", async () => {
+  const calls:string[][]=[];let attempts=0;const pauses:number[]=[];
+  const runner:CommandRunner=async(file,args)=>{
+    calls.push([file,...args]);
+    if(args[0]==="bootstrap")return {exitCode:++attempts<3?5:0,stdout:"",stderr:attempts<3?"Bootstrap failed: 5":""};
+    return {exitCode:1,stdout:"",stderr:"not loaded"};
+  };
+  const result=await bootstrapLaunchdWithRetry(runner,"gui/501","/Users/person/Library/LaunchAgents/cn.agentfleets.agent.plist",async milliseconds=>{pauses.push(milliseconds);});
+  assert.equal(result.exitCode,0);assert.deepEqual(pauses,[250,500]);assert.equal(attempts,3);
+  assert.equal(calls.filter(call=>call[1]==="print").length,2);
+
+  const registered:CommandRunner=async(_file,args)=>args[0]==="bootstrap"
+    ? {exitCode:5,stdout:"",stderr:"Bootstrap failed: 5"}
+    : {exitCode:0,stdout:"registered",stderr:""};
+  assert.equal((await bootstrapLaunchdWithRetry(registered,"gui/501","/tmp/job.plist",async()=>{})).exitCode,0);
 });
 
 test("user service install, update, and uninstall use only systemctl --user", async () => {
