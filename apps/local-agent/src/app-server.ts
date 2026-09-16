@@ -76,6 +76,14 @@ interface PendingRpc {
   timer: NodeJS.Timeout;
 }
 
+export function listedPluginDisplayName(plugin: Record<string, unknown>): string | null {
+  const pluginInterface = isRecord(plugin.interface) ? plugin.interface : null;
+  const displayName = pluginInterface && typeof pluginInterface.displayName === "string" ? pluginInterface.displayName.trim() : "";
+  if (displayName) return displayName.slice(0, 256);
+  const name = typeof plugin.name === "string" ? plugin.name.trim() : "";
+  return name ? name.slice(0, 256) : null;
+}
+
 export interface AppEvent {
   type: string;
   payload: Record<string, unknown>;
@@ -491,15 +499,15 @@ export class CodexAppServer implements AppServerClient {
       const pluginSkills: NonNullable<CodexCatalog["pluginSkills"]> = [];
       try {
         const listed = resultObject(await this.request("plugin/list", { forceRefetch: false }), "plugin/list");
-        const installed: Array<{ pluginId: string; pluginName: string; marketplaceName: string; marketplacePath: string | null; remotePluginId: string | null }> = [];
+        const installed: Array<{ pluginId: string; pluginName: string; lookupName: string; marketplaceName: string; marketplacePath: string | null; remotePluginId: string | null }> = [];
         if (Array.isArray(listed.marketplaces)) for (const marketplace of listed.marketplaces.filter(isRecord)) {
           if (typeof marketplace.name !== "string") continue;
           const marketplacePath = typeof marketplace.path === "string" ? marketplace.path : null;
           if (!Array.isArray(marketplace.plugins)) continue;
-          for (const plugin of marketplace.plugins.filter(isRecord)) if (plugin.installed === true && plugin.enabled === true && typeof plugin.id === "string" && typeof plugin.name === "string") installed.push({ pluginId: plugin.id, pluginName: plugin.name, marketplaceName: marketplace.name, marketplacePath, remotePluginId: typeof plugin.remotePluginId === "string" ? plugin.remotePluginId : null });
+          for (const plugin of marketplace.plugins.filter(isRecord)) if (plugin.installed === true && plugin.enabled === true && typeof plugin.id === "string" && typeof plugin.name === "string") installed.push({ pluginId: plugin.id, pluginName: listedPluginDisplayName(plugin) ?? plugin.name.slice(0, 256), lookupName: plugin.name, marketplaceName: marketplace.name, marketplacePath, remotePluginId: typeof plugin.remotePluginId === "string" ? plugin.remotePluginId : null });
         }
         for (const plugin of installed) if (!plugins.some(item => item.pluginId === plugin.pluginId)) plugins.push({ pluginId: plugin.pluginId.slice(0, 256), pluginName: plugin.pluginName.slice(0, 256) });
-        const details = await Promise.allSettled(installed.slice(0, 50).map(plugin => this.request("plugin/read", { pluginName: plugin.pluginName, ...(plugin.marketplacePath ? { marketplacePath: plugin.marketplacePath } : { remoteMarketplaceName: plugin.marketplaceName }) }).then(value => ({ plugin, value }))));
+        const details = await Promise.allSettled(installed.slice(0, 50).map(plugin => this.request("plugin/read", { pluginName: plugin.lookupName, ...(plugin.marketplacePath ? { marketplacePath: plugin.marketplacePath } : { remoteMarketplaceName: plugin.marketplaceName }) }).then(value => ({ plugin, value }))));
         for (const result of details) {
           if (result.status !== "fulfilled") continue;
           const raw = resultObject(result.value.value, "plugin/read");

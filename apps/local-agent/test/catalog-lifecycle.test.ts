@@ -3,13 +3,33 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { CodexAppServer, type AppServerCallbacks } from "../src/app-server.js";
+import { CodexAppServer, listedPluginDisplayName, type AppServerCallbacks } from "../src/app-server.js";
 import { StateStore } from "../src/store.js";
 import type { DiscoveredThread, ManagedThread, ProjectRecord } from "../src/types.js";
 
 const project = { id: "project", root: "/workspace", alias: "fixture", device: "1", inode: "1", identityVersion: 1, addedAt: "2026-09-08T00:00:00Z" } satisfies ProjectRecord;
 const managed = { nativeThreadId: "native", projectId: project.id, sessionCwd: project.root, logicalSessionId: "logical", executionSegmentId: "segment", appServerEpoch: "epoch", policyVersion: "remote-restricted-v1", policyVerified: true, contentEpoch: 1, createdAt: project.addedAt, title: "Original", titleSource: "name", archived: false } satisfies ManagedThread;
 const observed = (archived: boolean, title = "Host title") => ({ externalId: "native", executionSegmentExternalId: "native", nativeThreadId: "native", projectId: project.id, sessionCwd: project.root, title, titleSource: "name", archived, availability: "available", executionState: "idle", historyCompleteness: "partial" } satisfies Omit<DiscoveredThread, "firstSeenAt" | "lastSeenAt" | "lastReconciledAt">);
+
+test("plugin catalog uses the official App display name instead of its internal id", () => {
+  assert.equal(listedPluginDisplayName({ name: "app-69dfa26ad60081919fb9e3a1a50e3e53", interface: { displayName: "Etsy" } }), "Etsy");
+  assert.equal(listedPluginDisplayName({ name: "shopify" }), "shopify");
+  assert.equal(listedPluginDisplayName({ name: "  ", interface: { displayName: "  " } }), null);
+});
+
+test("catalog keeps a listed App display name when remote plugin details are unavailable", async () => {
+  const server = new CodexAppServer({} as AppServerCallbacks);
+  const internal = server as unknown as { request(method: string): Promise<unknown>; refreshCodexCatalog(): Promise<void> };
+  internal.request = async method => {
+    if (method === "model/list") return { data: [], nextCursor: null };
+    if (method === "collaborationMode/list") return { data: [] };
+    if (method === "plugin/list") return { marketplaces: [{ name: "openai-curated-remote", path: null, plugins: [{ id: "app-id@openai-curated-remote", name: "app-id", installed: true, enabled: true, remotePluginId: "plugin_app-id", interface: { displayName: "Etsy" } }] }] };
+    if (method === "plugin/read") throw new Error("remote App has no readable plugin bundle");
+    throw new Error(`unexpected ${method}`);
+  };
+  await internal.refreshCodexCatalog();
+  assert.deepEqual(server.getCodexCatalog().plugins, [{ pluginId: "app-id@openai-curated-remote", pluginName: "Etsy" }]);
+});
 
 async function fixture(t: test.TestContext) {
   const root = await mkdtemp(join(tmpdir(), "agentfleet-catalog-lifecycle-"));
