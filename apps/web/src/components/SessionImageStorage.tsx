@@ -59,24 +59,26 @@ export function SessionImageStorage({ machineId }: { machineId: string }) {
   return <section className="host-image-storage session-image-storage" aria-label={t("按会话清理附件")}>
     <header><div><h2>{t("按会话清理附件")}</h2><p>{t("清理面板上传的图片、文件和文件夹暂存，保留文字、会话名称和原生会话 ID。")}</p></div><button className="button button--quiet" disabled={busy || loading} onClick={() => setRevision(r => r + 1)}>{t("刷新列表")}</button></header>
     <p className="subtle">{t("先预览宿主机，再确认清理。主机暂存文件支持 Linux、macOS 和 Windows；原生历史图片清理当前需要 Linux、Codex 0.153.4 和 Python 3。无法核验时不会删除。")}</p>
-    <div className="session-image-storage__tools"><input aria-label={t("搜索有图会话")} placeholder={t("搜索会话或项目")} value={query} onChange={e => { setQuery(e.target.value); setPage(0); }} />
+    <div className="session-image-storage__tools"><input aria-label={t("搜索有附件会话")} placeholder={t("搜索会话或项目")} value={query} onChange={e => { setQuery(e.target.value); setPage(0); }} />
       <select aria-label={t("会话附件排序")} value={sort} onChange={e => { setSort(e.target.value); setPage(0); }}><option value="cloud">{t("附件占用从大到小")}</option><option value="history">{t("历史大小从大到小（已核验）")}</option><option value="name">{t("会话名称")}</option></select>
       <button className="button button--quiet" disabled={busy || loading || !!error} onClick={() => { setSelected(filtered.map(row => row.logicalSessionId)); setConfirm(false); }}>{t("选择全部匹配会话（{0}）", filtered.length)}</button>
       <button className="button button--quiet" disabled={busy} onClick={() => { setSelected([]); setConfirm(false); }}>{t("清空选择")}</button></div>
-    {loading ? <p role="status">{t("正在读取全部有图会话…")}</p> : <>
+    {loading ? <p role="status">{t("正在读取全部有附件会话…")}</p> : <>
       <div className="session-image-storage__list">{filtered.slice(page * 10, page * 10 + 10).map(row => {
         const operation = operations[row.logicalSessionId]; const result = operation?.result;
         const usage = result?.tokenUsage as {last_token_usage?: {input_tokens?: number; output_tokens?: number; cached_input_tokens?: number}} | undefined;
         return <article key={row.logicalSessionId}>
           <label><input type="checkbox" aria-label={t("选择 {0}", row.title)} checked={selected.includes(row.logicalSessionId)} disabled={busy} onChange={e => { setSelected(ids => e.target.checked ? [...ids, row.logicalSessionId] : ids.filter(id => id !== row.logicalSessionId)); setConfirm(false); }} /><span><strong>{row.title}</strong><small>{row.project}</small></span></label>
-          <div className="session-image-storage__metrics"><span>{row.imageCount} {locale() === "en" ? " " : ""}{t("张图片 · 云端引用")}{locale() === "en" ? " " : ""}{imageSpace(row.cloudBytes)}</span><span>{row.fileCount??0} {locale() === "en" ? " " : ""}{t("个文件 · 主机暂存")}{locale() === "en" ? " " : ""}{imageSpace(row.fileBytes??0)}</span><span>{t("历史文件：")}{locale() === "en" ? " " : ""}{typeof result?.rolloutBytes === "number" ? imageSpace(result.rolloutBytes) : t("预览后核验")}</span>
+          <div className="session-image-storage__metrics"><span>{row.imageCount} {locale() === "en" ? " " : ""}{t("张图片 · 云端引用")}{locale() === "en" ? " " : ""}{imageSpace(row.cloudBytes)}</span><span>{row.fileCount??0} {locale() === "en" ? " " : ""}{t("个文件 · 主机暂存")}{locale() === "en" ? " " : ""}{imageSpace(row.fileBytes??0)}</span>
+            {!!row.fileTypes?.length && <span className="attachment-type-summary">{row.fileTypes.map(item => <small key={item.type}><b>{item.type}</b> {item.count} · {imageSpace(item.bytes)}</small>)}</span>}
+            <span>{t("历史文件：")}{locale() === "en" ? " " : ""}{typeof result?.rolloutBytes === "number" ? imageSpace(result.rolloutBytes) : t("预览后核验")}</span>
             {typeof result?.imageContentBytes === "number" && <small>{t("此次图片内容：")}{locale() === "en" ? " " : ""}{imageSpace(result.imageContentBytes)}{locale() === "en" ? " " : ""}{t("（含历史重复副本）")}</small>}
             {usage?.last_token_usage && <small>{t("最近原生用量：输入")}{locale() === "en" ? " " : ""}{usage.last_token_usage.input_tokens ?? t("未知")} {locale() === "en" ? " " : ""}{t("/ 输出")}{locale() === "en" ? " " : ""}{usage.last_token_usage.output_tokens ?? t("未知")} {locale() === "en" ? " " : ""}{t("token（历史报告）")}</small>}
             {typeof result?.measuredAt === "string" && <small>{t("核验于")}{locale() === "en" ? " " : ""}{new Date(result.measuredAt).toLocaleString(locale())}</small>}</div>
           {errors[row.logicalSessionId] ? <p role="alert">{systemText(errors[row.logicalSessionId])}</p> : operation && <p role="status">{operation.state === "succeeded" ? operation.type === "images.clean" ? result?.imageCleanupSupported===false ? t("已清理 {0} 个主机暂存文件；此系统暂不支持原生历史图片清理，图片保持不变。", Number(result?.filesCleaned??0)) : t("附件已清理：{0} 个主机暂存文件，云端图片释放 {1}；文字和会话 ID 保留。", Number(result?.filesCleaned??0), imageSpace(Number(result?.releasedCloudBytes ?? 0))) : result?.imageCleanupSupported===false ? t("文件已核验；此系统暂不支持原生历史图片清理，确认后只清理主机暂存文件。") : t("预览完成，可确认清理。") : ["accepted", "running"].includes(operation.state) ? t("等待宿主机核验…") : systemText(operation.error?.message) || t("结果待核验")}</p>}
         </article>;
       })}</div>
-      {!filtered.length && <p>{t("没有匹配的有图会话。")}</p>}
+      {!filtered.length && <p>{t("没有匹配的有附件会话。")}</p>}
       {filtered.length > 10 && <div className="session-image-storage__tools"><button disabled={page === 0 || busy} onClick={() => setPage(p => p - 1)}>{t("上一页")}</button><span>{page + 1} / {Math.ceil(filtered.length / 10)}</span><button disabled={(page + 1) * 10 >= filtered.length || busy} onClick={() => setPage(p => p + 1)}>{t("下一页")}</button></div>}
     </>}
     <p className="subtle">{t("共享图片在未选会话中保留，因此各会话云端引用之和可能大于主机配额用量。为保证恢复安全，首版保留历史文件的字节位置，清理图片内容后文件大小不会立即缩小。历史文件大小不等于 token 消耗。")}</p>

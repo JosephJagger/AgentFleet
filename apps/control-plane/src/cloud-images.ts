@@ -9,6 +9,23 @@ export const CLOUD_IMAGE_QUOTA = 50_000_000; // 50 decimal MB, encoded image con
 const PREFIX = "agentfleet-image:";
 const MISSING = "[云端图片已清理或未保存；宿主机原生图片不受影响]";
 type Owner = "command" | "event";
+interface FileTypeUsage { type: string; count: number; bytes: number }
+
+function attachmentType(path: string): string {
+  const name = path.split("/").at(-1)?.toLowerCase() ?? "";
+  const extension = name.includes(".") ? name.split(".").at(-1)! : "";
+  return /^[a-z0-9]{1,12}$/.test(extension) ? extension.toUpperCase() : "FILE";
+}
+
+function summarizeFileTypes(files: Array<{ relativePath: string; size: number }>): FileTypeUsage[] {
+  const types = new Map<string, FileTypeUsage>();
+  for (const file of files) {
+    const type = attachmentType(file.relativePath);
+    const current = types.get(type) ?? { type, count: 0, bytes: 0 };
+    current.count += 1; current.bytes += file.size; types.set(type, current);
+  }
+  return [...types.values()].sort((left, right) => right.bytes - left.bytes || left.type.localeCompare(right.type));
+}
 
 /** Image bytes live only here; command/history JSON keeps bounded, owner-bound references. */
 export class CloudImages {
@@ -33,7 +50,9 @@ export class CloudImages {
     const usage = this.db.get<{ usedBytes: number; imageCount: number }>("SELECT coalesce(sum(size_bytes),0) AS usedBytes,count(*) AS imageCount FROM cloud_images WHERE machine_id=? AND data_url IS NOT NULL", machineId)!;
     const pending = this.db.get<{ count: number }>(`SELECT count(DISTINCT r.owner_id) AS count FROM cloud_image_refs r JOIN command_projection p ON p.command_id=r.owner_id
       WHERE r.machine_id=? AND r.owner_type='command' AND p.state IN ('queued','accepted','dispatching','unknown')`, machineId)!.count;
-    return { machineId, ...usage, quotaBytes: CLOUD_IMAGE_QUOTA, revision: machine.cloud_image_revision,
+    const attachmentGroups = this.attachments(machineId);
+    const files = attachmentGroups.flatMap(group => group.files);
+    return { machineId, ...usage, fileCount: files.length, fileBytes: files.reduce((sum, file) => sum + file.size, 0), fileTypes: summarizeFileTypes(files), quotaBytes: CLOUD_IMAGE_QUOTA, revision: machine.cloud_image_revision,
       level: usage.usedBytes >= CLOUD_IMAGE_QUOTA ? "full" : usage.usedBytes >= CLOUD_IMAGE_QUOTA * .8 ? "warning" : "normal",
       pendingImageCommands: pending, canClear: pending === 0 && usage.imageCount > 0 };
   }
@@ -119,9 +138,10 @@ export class CloudImages {
       LEFT JOIN cloud_images i ON i.machine_id=s.machine_id AND i.image_hash=r.image_hash
       WHERE s.machine_id=? AND s.deleted_at IS NULL AND s.logical_session_id>?
       GROUP BY s.logical_session_id ORDER BY s.logical_session_id LIMIT 51`, machineId,machineId,machineId,machineId,after);
-    const merged=new Map(rows.map(row=>[row.logicalSessionId,{...row,fileCount:0,fileBytes:0}]));
-    for(const upload of this.attachments(machineId)) { const row=merged.get(upload.logicalSessionId)??this.db.get<{logicalSessionId:string;title:string;project:string}>(`SELECT s.logical_session_id AS logicalSessionId,s.title,p.alias AS project FROM logical_sessions s JOIN projects p USING(project_id) WHERE s.logical_session_id=? AND s.machine_id=? AND s.deleted_at IS NULL`,upload.logicalSessionId,machineId);if(!row)continue;const value={cloudBytes:0,imageCount:0,fileCount:0,fileBytes:0,...row};value.fileCount+=upload.files.length;value.fileBytes+=upload.totalBytes;merged.set(upload.logicalSessionId,value); }
-    const all=[...merged.values()].filter(row=>row.logicalSessionId>after).sort((a,b)=>a.logicalSessionId.localeCompare(b.logicalSessionId));
+    type SessionUsage = {logicalSessionId:string;title:string;project:string;cloudBytes:number;imageCount:number;fileCount:number;fileBytes:number;files:Array<{relativePath:string;size:number}>};
+    const merged=new Map<string,SessionUsage>(rows.map(row=>[row.logicalSessionId,{...row,fileCount:0,fileBytes:0,files:[]} ]));
+    for(const upload of this.attachments(machineId)) { const row=merged.get(upload.logicalSessionId)??this.db.get<{logicalSessionId:string;title:string;project:string}>(`SELECT s.logical_session_id AS logicalSessionId,s.title,p.alias AS project FROM logical_sessions s JOIN projects p USING(project_id) WHERE s.logical_session_id=? AND s.machine_id=? AND s.deleted_at IS NULL`,upload.logicalSessionId,machineId);if(!row)continue;const value:SessionUsage=merged.get(upload.logicalSessionId)??{cloudBytes:0,imageCount:0,fileCount:0,fileBytes:0,files:[],...row};value.fileCount+=upload.files.length;value.fileBytes+=upload.totalBytes;value.files.push(...upload.files);merged.set(upload.logicalSessionId,value); }
+    const all=[...merged.values()].filter(row=>row.logicalSessionId>after).sort((a,b)=>a.logicalSessionId.localeCompare(b.logicalSessionId)).map(({files,...row})=>({...row,fileTypes:summarizeFileTypes(files)}));
     return { sessions: all.slice(0,50), nextCursor: all.length>50 ? all[49]!.logicalSessionId : null };
   }
 

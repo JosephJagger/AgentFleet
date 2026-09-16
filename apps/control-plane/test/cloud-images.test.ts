@@ -166,3 +166,18 @@ test("image session list covers all pages and enforces host ownership and pendin
   assert.equal(result.statusCode,409);assert.equal(result.json().error.code,"IMAGE_COMMAND_PENDING");
   assert.equal((await app.inject({url:"/api/machines/image-b/images/sessions",headers})).json().sessions.length,0);
 });
+
+test("attachment storage reports host and session files by actual extension", async t => {
+  const { app, db, headers, store, add } = await imageSessionFixture(t);
+  const session = await add("typed-files");
+  for (const [path, size, hash] of [["reports/guide.pdf", 1200, "a".repeat(64)], ["books/data.xlsx", 3400, "b".repeat(64)], ["src/main.ts", 200, "c".repeat(64)] ] as const) {
+    db.run("INSERT INTO attachment_uploads(machine_id,logical_session_id,execution_segment_id,command_id,relative_path,size_bytes,content_hash) VALUES('image-a',?,?,?,?,?,?)", session.logicalSessionId, session.executionSegmentId, "typed-files", path, size, hash);
+  }
+  const stats = store.stats("image-a");
+  assert.equal(stats.fileCount, 3); assert.equal(stats.fileBytes, 4800);
+  assert.deepEqual(stats.fileTypes, [{type:"XLSX",count:1,bytes:3400},{type:"PDF",count:1,bytes:1200},{type:"TS",count:1,bytes:200}]);
+  const response = await app.inject({method:"GET",url:"/api/machines/image-a/images/sessions",headers});
+  assert.equal(response.statusCode, 200, response.body);
+  const row = response.json().sessions.find((value:{logicalSessionId:string}) => value.logicalSessionId === session.logicalSessionId);
+  assert.deepEqual(row.fileTypes, stats.fileTypes);
+});

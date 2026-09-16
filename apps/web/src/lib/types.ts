@@ -310,10 +310,13 @@ export interface CloudImageUsage {
   usedBytes: number;
   quotaBytes: number;
   imageCount: number;
+  fileCount: number;
+  fileBytes: number;
+  fileTypes: Array<{ type: string; count: number; bytes: number }>;
   revision: number;
   level: "normal" | "warning" | "full";
   pendingImageCommands: number;
   canClear: boolean;
 }
 
-export interface ImageSessionUsage { logicalSessionId: string; title: string; project: string; cloudBytes: number; imageCount: number; fileBytes: number; fileCount: number; }
+export interface ImageSessionUsage { logicalSessionId: string; title: string; project: string; cloudBytes: number; imageCount: number; fileBytes: number; fileCount: number; fileTypes: Array<{ type: string; count: number; bytes: number }>; }

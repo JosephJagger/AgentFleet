@@ -5,7 +5,7 @@ import { SessionImageStorage } from "./components/SessionImageStorage";
 const mocks=vi.hoisted(()=>({imageSessions:vi.fn(),imageOperation:vi.fn(),readImageOperation:vi.fn()}));
 vi.mock("./lib/api",()=>({api:mocks}));
 afterEach(()=>{cleanup();vi.resetAllMocks();});
-const row=(i:number)=>({logicalSessionId:`s${i}`,title:`会话${i}`,project:"项目",cloudBytes:100,imageCount:1,fileBytes:50,fileCount:1});
+const row=(i:number)=>({logicalSessionId:`s${i}`,title:`会话${i}`,project:"项目",cloudBytes:100,imageCount:1,fileBytes:50,fileCount:1,fileTypes:[{type:"PDF",count:1,bytes:50}]});
 it("跨页全选有图会话，空选不派发；逐会话失败跳过，清理需确认",async()=>{
   mocks.imageSessions.mockImplementation(async (_id:string,cursor:string)=>cursor?{sessions:[row(11)],nextCursor:null}:{sessions:Array.from({length:11},(_,i)=>row(i)),nextCursor:"next"});
   mocks.imageOperation.mockImplementation(async (_id:string,sessionId:string,previewId?:string)=>{
@@ -14,6 +14,7 @@ it("跨页全选有图会话，空选不派发；逐会话失败跳过，清理�
   });
   render(<SessionImageStorage machineId="host"/>);
   await screen.findByText("会话0");
+  expect(screen.getAllByText("PDF").length).toBeGreaterThan(0);
   expect((screen.getByRole("button",{name:"预览所选会话"}) as HTMLButtonElement).disabled).toBe(true);
   expect(mocks.imageOperation).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button",{name:"选择全部匹配会话（12）"}));

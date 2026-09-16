@@ -5,9 +5,38 @@ export const MAX_ATTACHMENT_FILE_BYTES = 4 * 1024 * 1024;
 export const MAX_ATTACHMENT_TOTAL_BYTES = 8 * 1024 * 1024;
 const EXTENSIONS = new Set("txt md markdown mdx rst adoc csv tsv json jsonl ndjson yaml yml toml xml html htm css scss sass less svg js jsx mjs cjs ts tsx mts cts py pyi rb php java kt kts go rs c h cc cpp cxx hpp cs swift scala sh bash zsh fish ps1 bat cmd sql graphql gql proto tf tfvars hcl ini cfg conf env properties gradle cmake lock gitignore dockerignore editorconfig npmrc nvmrc".split(" "));
 const NAMES = new Set("readme license copying dockerfile makefile procfile gemfile rakefile".split(" "));
-function validateReadableText(name: string, bytes: Buffer): void {
+const XLSX_REQUIRED = new Set(["[Content_Types].xml", "_rels/.rels", "xl/workbook.xml"]);
+const XLSX_FORBIDDEN = /(^|\/)(?:vbaProject\.bin|activeX\/|embeddings\/|externalLinks\/|oleObject)/i;
+function invalidFormat(name: string): never { invariant(false, 400, "ATTACHMENT_TYPE_UNSUPPORTED", `文件内容与受支持的格式不匹配：${name}`); }
+function validatePdf(name: string, bytes: Buffer): void {
+  if (bytes.length < 12 || !bytes.subarray(0, 5).equals(Buffer.from("%PDF-")) || !bytes.subarray(Math.max(0, bytes.length - 4_096)).includes(Buffer.from("%%EOF"))) invalidFormat(name);
+}
+function validateXlsx(name: string, bytes: Buffer): void {
+  let eocd = -1;
+  for (let index = bytes.length - 22; index >= Math.max(0, bytes.length - 65_557); index -= 1) { if (bytes.readUInt32LE(index) === 0x06054b50) { eocd = index; break; } }
+  if (eocd < 0) invalidFormat(name);
+  const entries = bytes.readUInt16LE(eocd + 10), directorySize = bytes.readUInt32LE(eocd + 12), directoryOffset = bytes.readUInt32LE(eocd + 16);
+  const zipCommentLength = bytes.readUInt16LE(eocd + 20);
+  if (bytes.readUInt16LE(eocd + 4) !== 0 || bytes.readUInt16LE(eocd + 6) !== 0 || bytes.readUInt16LE(eocd + 8) !== entries || eocd + 22 + zipCommentLength !== bytes.length || !entries || entries > 2_000 || entries === 0xffff || directorySize === 0xffffffff || directoryOffset === 0xffffffff || directoryOffset + directorySize !== eocd) invalidFormat(name);
+  const found = new Set<string>(); let offset = directoryOffset, expanded = 0;
+  for (let count = 0; count < entries; count += 1) {
+    if (offset + 46 > eocd || bytes.readUInt32LE(offset) !== 0x02014b50) invalidFormat(name);
+    const flags = bytes.readUInt16LE(offset + 8), compressed = bytes.readUInt32LE(offset + 20), uncompressed = bytes.readUInt32LE(offset + 24);
+    const nameLength = bytes.readUInt16LE(offset + 28), extraLength = bytes.readUInt16LE(offset + 30), commentLength = bytes.readUInt16LE(offset + 32), localOffset = bytes.readUInt32LE(offset + 42), end = offset + 46 + nameLength + extraLength + commentLength;
+    if ((flags & 1) !== 0 || compressed === 0xffffffff || uncompressed === 0xffffffff || localOffset === 0xffffffff || end > eocd || localOffset + 30 > directoryOffset || bytes.readUInt32LE(localOffset) !== 0x04034b50 || uncompressed > 32 * 1024 * 1024 || (compressed === 0 ? uncompressed > 0 : uncompressed / compressed > 200)) invalidFormat(name);
+    const entry = bytes.subarray(offset + 46, offset + 46 + nameLength).toString("utf8");
+    const localNameLength = bytes.readUInt16LE(localOffset + 26), localExtraLength = bytes.readUInt16LE(localOffset + 28), localData = localOffset + 30 + localNameLength + localExtraLength;
+    if (localData + compressed > directoryOffset || !bytes.subarray(localOffset + 30, localOffset + 30 + localNameLength).equals(Buffer.from(entry))) invalidFormat(name);
+    if (!entry || entry.includes("\0") || entry.includes("\\") || entry.startsWith("/") || entry.split("/").some(part => part === "..") || XLSX_FORBIDDEN.test(entry)) invalidFormat(name);
+    found.add(entry); expanded += uncompressed; if (expanded > 64 * 1024 * 1024) invalidFormat(name); offset = end;
+  }
+  if (offset !== directoryOffset + directorySize || [...XLSX_REQUIRED].some(entry => !found.has(entry))) invalidFormat(name);
+}
+function validateAttachment(name: string, bytes: Buffer): void {
   const lower=name.toLowerCase(); const extension=lower.includes(".") ? lower.split(".").at(-1)! : "";
-  invariant(EXTENSIONS.has(extension)||NAMES.has(lower),400,"ATTACHMENT_TYPE_UNSUPPORTED",`不支持此文件类型：${name}。仅支持 UTF-8 文本、源码、配置和结构化数据文件`);
+  if (extension === "pdf") { validatePdf(name, bytes); return; }
+  if (extension === "xlsx") { validateXlsx(name, bytes); return; }
+  invariant(EXTENSIONS.has(extension)||NAMES.has(lower),400,"ATTACHMENT_TYPE_UNSUPPORTED",`不支持此文件类型：${name}。支持 PDF、XLSX、UTF-8 文本、源码、配置和结构化数据文件`);
   try { invariant(!bytes.includes(0),400,"ATTACHMENT_TYPE_UNSUPPORTED",`文件不是可读取的 UTF-8 文本：${name}`); new TextDecoder("utf-8",{fatal:true}).decode(bytes); }
   catch { invariant(false,400,"ATTACHMENT_TYPE_UNSUPPORTED",`文件不是可读取的 UTF-8 文本：${name}`); }
 }
@@ -28,7 +57,7 @@ export function parseAttachments(value: unknown): Array<{ name: string; relative
     invariant(typeof item.data === "string" && item.data.length <= Math.ceil(MAX_ATTACHMENT_FILE_BYTES / 3) * 4 + 4 && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(item.data), 400, "ATTACHMENT_INVALID", "文件内容无效");
     const bytes = Buffer.from(item.data, "base64");
     invariant(bytes.length > 0 && bytes.length <= MAX_ATTACHMENT_FILE_BYTES && bytes.toString("base64") === item.data, 400, "ATTACHMENT_INVALID", `单个文件不能超过 ${MAX_ATTACHMENT_FILE_BYTES / 1024 / 1024} MB`);
-    validateReadableText(item.name,bytes);
+    validateAttachment(item.name,bytes);
     total += bytes.length; invariant(total <= MAX_ATTACHMENT_TOTAL_BYTES, 400, "ATTACHMENT_INVALID", `文件总大小不能超过 ${MAX_ATTACHMENT_TOTAL_BYTES / 1024 / 1024} MB`);
     return { name: item.name, relativePath: item.relativePath, mimeType: item.mimeType, data: item.data };
   });

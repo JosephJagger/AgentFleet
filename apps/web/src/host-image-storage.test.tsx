@@ -5,7 +5,7 @@ import { HostImageStorage } from "./components/HostImageStorage";
 import type { CloudImageUsage } from "./lib/types";
 const mocks = vi.hoisted(() => ({ imageSessions:vi.fn(async()=>({sessions:[],nextCursor:null})),machineImages: vi.fn() }));
 vi.mock("./lib/api", () => ({ api: mocks }));
-const usage: CloudImageUsage = { machineId: "a", usedBytes: 50e6, quotaBytes: 50e6, imageCount: 5, revision: 8, level: "full", pendingImageCommands: 0, canClear: true };
+const usage: CloudImageUsage = { machineId: "a", usedBytes: 50e6, quotaBytes: 50e6, imageCount: 5, fileCount: 3, fileBytes: 6000, fileTypes: [{type:"PDF",count:1,bytes:4000},{type:"XLSX",count:2,bytes:2000}], revision: 8, level: "full", pendingImageCommands: 0, canClear: true };
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 it("显示 50 MB 上限和文字不受影响，使用按会话的两端清理入口", async () => {
   mocks.machineImages.mockResolvedValue(usage);
@@ -14,6 +14,9 @@ it("显示 50 MB 上限和文字不受影响，使用按会话的两端清理入
   expect(screen.getByText("/ 50.0 MB")).toBeTruthy();
   expect(screen.getByRole("alert").textContent).toContain("文字消息不受影响");
   expect(screen.queryByRole("button",{name:"清理云端图片"})).toBeNull();
+  expect(screen.getByText(/3 个主机暂存文件/)).toBeTruthy();
+  expect(screen.getByText("PDF")).toBeTruthy();
+  expect(screen.getByText("XLSX")).toBeTruthy();
   expect(screen.getByRole("region",{name:"按会话清理附件"})).toBeTruthy();
 });
 it("80% 预警和未完成图片命令保护可见", async () => {

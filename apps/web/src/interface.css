@@ -59,6 +59,9 @@
 .session-image-storage__list label input { width:18px; height:18px; flex:0 0 auto; }
 .session-image-storage__list small { display:block; opacity:.75; }
 .session-image-storage__metrics { display:flex; flex-wrap:wrap; gap:6px 20px; margin:8px 0 0 30px; font-variant-numeric:tabular-nums; }
+.attachment-type-summary { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.attachment-type-summary > span, .attachment-type-summary > small { display:inline-flex; align-items:center; gap:5px; margin:0; padding:3px 7px; border:1px solid var(--line); border-radius:999px; background:var(--paper-solid); color:var(--muted); font-size:var(--text-caption); line-height:1.35; }
+.attachment-type-summary b { color:var(--ink); font-size:inherit; }
 .session-image-storage__list article:has(input:checked) { border-color:var(--cobalt); }
 
 .session-config-trigger { flex-shrink:0; white-space:nowrap; }
