@@ -218,7 +218,10 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .host-alias { display: flex; align-items: flex-end; gap: 12px; margin: 22px 0 10px; }
 .host-alias label { flex: 1; display: grid; gap: 6px; font-size: var(--text-caption); }
 .host-alias input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
-.host-operation-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.host-operation-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 14px 12px; margin: 20px 0; }
+.host-operation-action { min-width: 0; }
+.host-operation-action .button { justify-content: center; width: 100%; }
+.host-operation-action small { color: var(--muted); display: block; font-size: var(--text-caption); line-height: 1.45; margin: 6px 4px 0; }
 .host-operation-list { border-top: 1px solid var(--line); padding-top: 12px; }
 .host-operation-list h3 { font-size: var(--text-small); }
 .host-operation { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
