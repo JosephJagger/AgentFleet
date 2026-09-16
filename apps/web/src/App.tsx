@@ -721,7 +721,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
     setPrompt(next.value);
     setCompletionCaret(next.caret);
     setCompletionSelectionEnd(next.caret);
-    setDismissedCompletion(`${next.value}\u0000${next.caret}`);
+    setDismissedCompletion(completion.kind === "plugin" && !completion.pluginSkill ? "" : `${next.value}\u0000${next.caret}`);
     requestAnimationFrame(() => {
       const input = textArea.current;
       if (input?.value === next.value) {
@@ -735,6 +735,12 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   if (!detail) return <aside className="inspector inspector--empty"><MonitorDot size={27} /><h2>{t("选择一个会话")}</h2><p>{t("打开已有会话，或新建会话开始。")}</p></aside>;
 
   const { session, approval } = detail;
+  const pluginGroups = [...(session.pluginSkills ?? []).reduce((groups, skill) => {
+    const group = groups.get(skill.pluginId) ?? { pluginId: skill.pluginId, pluginName: skill.pluginName, skills: [] as NonNullable<FleetSession["pluginSkills"]> };
+    group.skills.push(skill);
+    groups.set(skill.pluginId, group);
+    return groups;
+  }, new Map<string, { pluginId: string; pluginName: string; skills: NonNullable<FleetSession["pluginSkills"]> }>()).values()];
   const rawEvents = rawView ? detail.events.filter(event => event.payloadState !== "deleted" && event.body) : [];
   const visibleEvents = timelineItems(detail.events);
   const lease = session.controlLease;
@@ -1024,7 +1030,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
             <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { setAddMenuOpen(false); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
             {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { if (!settings?.model && !inherited?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !settings?.model && !inherited?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}
-            {(session.pluginSkills?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.pluginSkills!.map(skill => { const selected = selectedSkills.some(item => item.pluginId === skill.pluginId && item.name === skill.name); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={`${skill.pluginId}:${skill.name}:${skill.path}`} onClick={() => setSelectedSkills(current => selected ? current.filter(item => item.pluginId !== skill.pluginId || item.name !== skill.name) : [...current, { pluginId: skill.pluginId, name: skill.name, path: skill.path }])}><Puzzle size={17} /><span><b>{skill.pluginName} · {skill.name}</b><small>{skill.description}</small></span></button>; })}</div></>}
+            {pluginGroups.length > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{pluginGroups.map(group => <details className="composer-plugin-group" key={group.pluginId}><summary><Puzzle size={17} /><span><b>{group.pluginName}</b><small>{t("{0} 个能力", group.skills.length)}</small></span><ChevronRight size={15} /></summary><div>{group.skills.map(skill => { const selected = selectedSkills.some(item => item.pluginId === skill.pluginId && item.name === skill.name && item.path === skill.path); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={`${skill.pluginId}:${skill.name}:${skill.path}`} onClick={() => setSelectedSkills(current => selected ? current.filter(item => item.pluginId !== skill.pluginId || item.name !== skill.name || item.path !== skill.path) : [...current, { pluginId: skill.pluginId, name: skill.name, path: skill.path }])}><span><b>{skill.name}</b><small>{skill.description}</small></span></button>; })}</div></details>)}</div></>}
           </div></details>
           {canQueueOrSteer ? (
             <div className="active-turn-actions">

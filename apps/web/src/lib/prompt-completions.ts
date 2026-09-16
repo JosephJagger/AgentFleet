@@ -210,27 +210,56 @@ export function pluginCompletions(prompt: string, caret: number, skills: PluginC
   const query = match[1].toLocaleLowerCase();
   const replaceStart = caret - match[1].length - 1;
   const selectedKeys = new Set(selected.map(item => `${item.pluginId}\u0000${item.name}\u0000${item.path}`));
-  const ranked = skills.flatMap(skill => {
-    if (selectedKeys.has(`${skill.pluginId}\u0000${skill.name}\u0000${skill.path}`)) return [];
-    const plugin = skill.pluginName.toLocaleLowerCase();
-    const name = skill.name.toLocaleLowerCase();
+  const slash = query.indexOf("/");
+  if (slash >= 0) {
+    const pluginQuery = query.slice(0, slash);
+    const skillQuery = query.slice(slash + 1);
+    const group = skills.filter(skill => skill.pluginId.toLocaleLowerCase() === pluginQuery);
+    if (!group.length) return [];
+    return group.flatMap(skill => {
+      if (selectedKeys.has(`${skill.pluginId}\u0000${skill.name}\u0000${skill.path}`)) return [];
+      const name = skill.name.toLocaleLowerCase();
+      const score = !skillQuery ? 0 : name === skillQuery ? 0 : name.startsWith(skillQuery) ? 1 : name.includes(skillQuery) ? 2 : 99;
+      return score < 99 ? [{ skill, score }] : [];
+    }).sort((a, b) => a.score - b.score || a.skill.name.localeCompare(b.skill.name)).slice(0, limit).map(({ skill }) => ({
+      label: skill.name,
+      insertText: "",
+      detail: skill.description,
+      kind: "plugin",
+      replaceStart,
+      replaceEnd: caret,
+      pluginSkill: { pluginId: skill.pluginId, name: skill.name, path: skill.path },
+    }));
+  }
+  const groups = new Map<string, PluginCompletionSkill[]>();
+  for (const skill of skills) {
+    const current = groups.get(skill.pluginId) ?? [];
+    current.push(skill);
+    groups.set(skill.pluginId, current);
+  }
+  const ranked = [...groups.entries()].flatMap(([pluginId, group]) => {
+    const available = group.filter(skill => !selectedKeys.has(`${skill.pluginId}\u0000${skill.name}\u0000${skill.path}`));
+    if (!available.length) return [];
+    const pluginName = group[0].pluginName;
+    const plugin = pluginName.toLocaleLowerCase();
+    const id = pluginId.toLocaleLowerCase();
+    const skillNames = available.map(skill => skill.name.toLocaleLowerCase());
     const score = !query ? 0
-      : plugin === query || name === query ? 0
-      : plugin.startsWith(query) ? 1
-      : name.startsWith(query) ? 2
-      : plugin.includes(query) ? 3
-      : name.includes(query) ? 4
+      : plugin === query || id === query ? 0
+      : plugin.startsWith(query) || id.startsWith(query) ? 1
+      : plugin.includes(query) || id.includes(query) ? 2
+      : skillNames.some(name => name.startsWith(query)) ? 3
+      : skillNames.some(name => name.includes(query)) ? 4
       : 99;
-    return score < 99 ? [{ skill, score }] : [];
-  }).sort((a, b) => a.score - b.score || a.skill.pluginName.localeCompare(b.skill.pluginName) || a.skill.name.localeCompare(b.skill.name));
-  return ranked.slice(0, limit).map(({ skill }) => ({
-    label: `${skill.pluginName} · ${skill.name}`,
-    insertText: "",
-    detail: skill.description,
+    return score < 99 ? [{ pluginId, pluginName, available, score }] : [];
+  }).sort((a, b) => a.score - b.score || a.pluginName.localeCompare(b.pluginName));
+  return ranked.slice(0, limit).map(({ pluginId, pluginName }) => ({
+    label: pluginName,
+    insertText: `@${pluginId}/`,
+    detail: "选择具体插件能力",
     kind: "plugin",
     replaceStart,
     replaceEnd: caret,
-    pluginSkill: { pluginId: skill.pluginId, name: skill.name, path: skill.path },
   }));
 }
 

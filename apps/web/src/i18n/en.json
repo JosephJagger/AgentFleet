@@ -2275,6 +2275,8 @@
   "选择模型后可开启": "Choose a model to enable it",
   "请先选择模型，再开启计划模式。": "Choose a model before enabling Plan mode.",
   "插件": "Plugins",
+  "选择具体插件能力": "Choose a plugin capability",
+  "{0} 个能力": "{0} capabilities",
   "选择要发送的文件": "Choose files to send",
   "选择要发送的文件夹": "Choose a folder to send",
   "待发送附件": "Attachments ready to send",

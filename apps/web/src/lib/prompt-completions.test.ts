@@ -7,14 +7,22 @@ describe("prompt completions", () => {
   it("matches installed plugin skills from a partial @ mention", () => {
     const skills = [
       { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "Manage Shopify data", path: "/plugins/shopify/admin" },
+      { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Liquid themes", description: "Build Shopify themes", path: "/plugins/shopify/liquid" },
       { pluginId: "github", pluginName: "GitHub", name: "Pull requests", description: "Manage pull requests", path: "/plugins/github/pulls" },
     ];
     const prompt = "请使用 @shop";
     const matches = pluginCompletions(prompt, prompt.length, skills)!;
     expect(matches).toHaveLength(1);
-    expect(matches[0]).toMatchObject({ kind: "plugin", label: "Shopify App Builder · Admin GraphQL", replaceStart: 4, replaceEnd: prompt.length, pluginSkill: { pluginId: "shopify", name: "Admin GraphQL" } });
-    expect(applyPromptCompletion(prompt, matches[0]).value).toBe("请使用 ");
-    expect(pluginCompletions("@", 1, skills, [{ pluginId: "shopify", name: "Admin GraphQL", path: "/plugins/shopify/admin" }])?.map(item => item.label)).toEqual(["GitHub · Pull requests"]);
+    expect(matches[0]).toMatchObject({ kind: "plugin", label: "Shopify App Builder", replaceStart: 4, replaceEnd: prompt.length });
+    const scoped = applyPromptCompletion(prompt, matches[0]);
+    expect(scoped.value).toBe("请使用 @shopify/");
+    const capabilities = pluginCompletions(scoped.value, scoped.caret, skills)!;
+    expect(capabilities.map(item => item.label)).toEqual(["Admin GraphQL", "Liquid themes"]);
+    expect(applyPromptCompletion(scoped.value, capabilities[0]).value).toBe("请使用 ");
+    expect(pluginCompletions("@", 1, skills, [
+      { pluginId: "shopify", name: "Admin GraphQL", path: "/plugins/shopify/admin" },
+      { pluginId: "shopify", name: "Liquid themes", path: "/plugins/shopify/liquid" },
+    ])?.map(item => item.label)).toEqual(["GitHub"]);
     expect(pluginCompletions("联系 a@shop", 9, skills)).toBeUndefined();
   });
   it.each(["登录老掉", "登陆老掉", "登陆老掉。", "登录经常掉线", "登陆总是退出 "])("recognizes Chinese login wording: %s", prompt => {

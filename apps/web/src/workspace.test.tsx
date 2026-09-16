@@ -84,6 +84,7 @@ it("输入 @ 可按插件名部分匹配技能并加入本次发送", async () =
   const props = inspectorProps("A");
   props.detail = { ...props.detail, session: { ...props.detail.session, pluginSkills: [
     { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "管理 Shopify 后台数据", path: "/plugins/shopify/admin" },
+    { pluginId: "shopify", pluginName: "Shopify App Builder", name: "Liquid themes", description: "开发 Shopify 主题", path: "/plugins/shopify/liquid" },
     { pluginId: "github", pluginName: "GitHub", name: "Pull requests", description: "管理 Pull Request", path: "/plugins/github/pulls" },
   ] } };
   const send = vi.fn(noop);
@@ -91,11 +92,14 @@ it("输入 @ 可按插件名部分匹配技能并加入本次发送", async () =
   const prompt = screen.getByRole("textbox", { name: "发送给 Codex 的消息" });
   fireEvent.change(prompt, { target: { value: "@shop" } });
   const choices = screen.getByRole("listbox", { name: "插件" });
-  expect(within(choices).getByRole("option", { name: /Shopify App Builder · Admin GraphQL/ })).toBeTruthy();
-  expect(within(choices).queryByText(/GitHub · Pull requests/)).toBeNull();
+  expect(within(choices).getByRole("option", { name: /Shopify App Builder/ })).toBeTruthy();
+  expect(within(choices).queryByText(/GitHub/)).toBeNull();
+  fireEvent.keyDown(prompt, { key: "Enter" });
+  expect((prompt as HTMLTextAreaElement).value).toBe("@shopify/");
+  expect(screen.getByRole("option", { name: /Admin GraphQL/ })).toBeTruthy();
   fireEvent.keyDown(prompt, { key: "Enter" });
   expect((prompt as HTMLTextAreaElement).value).toBe("");
-  expect(screen.getByText("Admin GraphQL")).toBeTruthy();
+  expect(screen.getByText("Admin GraphQL", { selector: ".attachment-chip span" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() => expect(send).toHaveBeenCalledWith("", undefined, undefined, { pluginSkills: [{ pluginId: "shopify", name: "Admin GraphQL", path: "/plugins/shopify/admin" }] }));
 });
