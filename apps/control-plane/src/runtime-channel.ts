@@ -36,7 +36,7 @@ export const channelControl = (directory: string) => readChannelJson<RuntimeChan
 export const channelState = (directory: string) => readChannelJson<RuntimeChannelState>(directory, "state.json", emptyChannel());
 export function channelProfile(directory?: string) {
   const target = directory ? channelState(directory).target : undefined;
-  return target ? { ...CODEX_COMPATIBILITY_PROFILE, managedCodexVersion: target.version, lastValidatedAt: target.validatedAt, profileVersion: `auto-${target.revision}` } : CODEX_COMPATIBILITY_PROFILE;
+  return target ? { ...CODEX_COMPATIBILITY_PROFILE, managedCodexVersion: target.version, schemaHash: target.schemaHash, lastValidatedAt: target.validatedAt, profileVersion: `auto-${target.revision}` } : CODEX_COMPATIBILITY_PROFILE;
 }
 export function channelStatus(directory?: string) {
   if (!directory) return { configured: false, ...emptyChannel(), paused: true, workerOnline: false };

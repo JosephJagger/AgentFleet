@@ -5,9 +5,23 @@ import { join } from "node:path";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { RuntimePromotion, RUNTIME_PLATFORMS, CODE_MODE_PLATFORMS, stableRelease } from "../src/runtime-promotion.js";
-import { channelState, writeChannelJson, emptyChannel, type RuntimeTarget } from "../src/runtime-channel.js";
-import { CODEX_COMPATIBILITY_PROFILE } from "../src/api-schema.js";
+import { channelProfile, channelState, writeChannelJson, emptyChannel, type RuntimeTarget } from "../src/runtime-channel.js";
+import { CODEX_COMPATIBILITY_PROFILE, validatedCodexSchemaHash } from "../src/api-schema.js";
 const target = (version: string): RuntimeTarget => ({ schemaVersion: 1, revision: randomUUID(), version, schemaHash: CODEX_COMPATIBILITY_PROFILE.schemaHash, validatedAt: new Date().toISOString(), artifacts: {} });
+test("compatibility profile uses the published target's schema and follows rollback", async t => {
+  const directory = await mkdtemp(join(tmpdir(), "runtime-profile-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  assert.deepEqual(channelProfile(directory), CODEX_COMPATIBILITY_PROFILE);
+  for (const version of ["0.154.0", "0.153.4"]) {
+    const published = { ...target(version), schemaHash: validatedCodexSchemaHash(version) };
+    writeChannelJson(directory, "state.json", { ...emptyChannel(), target: published });
+    const profile = channelProfile(directory);
+    assert.equal(profile.managedCodexVersion, published.version);
+    assert.equal(profile.schemaHash, published.schemaHash);
+    assert.equal(profile.lastValidatedAt, published.validatedAt);
+    assert.equal(profile.profileVersion, `auto-${published.revision}`);
+  }
+});
 const release = (version = "0.153.4") => ({ tag_name: `rust-v${version}`, draft: false, prerelease: false, assets: [...Object.values(RUNTIME_PLATFORMS), ...Object.values(CODE_MODE_PLATFORMS), "bwrap-x86_64-unknown-linux-musl"].map(name => ({ name: `${name}.tar.gz`, size: 100, digest: `sha256:${"a".repeat(64)}` })) });
 test("stable discovery rejects previews, missing platforms and unverified digests", () => {
   assert.equal(stableRelease(release()).version, "0.153.4");
