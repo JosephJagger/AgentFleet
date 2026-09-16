@@ -2321,5 +2321,14 @@
   "确认清理附件": "Clean attachments",
   "支持 .txt/.md/.json/.csv、常见源码与配置（UTF-8）": "Supports .txt/.md/.json/.csv, common source files, and configs (UTF-8)",
   "已清理 {0} 个主机暂存文件；此系统暂不支持原生历史图片清理，图片保持不变。": "Cleaned {0} staged host files. Native-history image cleanup is not supported on this system, so images were left unchanged.",
-  "文件已核验；此系统暂不支持原生历史图片清理，确认后只清理主机暂存文件。": "Files verified. Native-history image cleanup is not supported on this system; confirmation will remove staged host files only."
+  "文件已核验；此系统暂不支持原生历史图片清理，确认后只清理主机暂存文件。": "Files verified. Native-history image cleanup is not supported on this system; confirmation will remove staged host files only.",
+  "{0} 张图片 · 云端 {1} / {2}": "{0} images · {1} / {2} cloud storage",
+  "查看用量并按会话清理附件": "View usage and clean attachments by session",
+  "存储用量": "Storage usage",
+  "查看需要处理的项目": "View items that need attention",
+  "查看详细检查记录": "View detailed check results",
+  "{0} / {1} 项已通过": "{0} of {1} checks passed",
+  "最近 {0} 条": "Latest {0}",
+  "暂无记录": "No history",
+  "{0} · 当前目标 {1}": "{0} · Current target {1}"
 }

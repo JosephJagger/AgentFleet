@@ -36,6 +36,7 @@ function profileValue(profile: Record<string, unknown> | undefined, ...keys: str
 export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, onChanged, renderCompatibility }: { machines: Machine[]; selectedId?: string; onSelect: (id: string) => void; onPair: () => void; onRemove: (machine: Machine) => void; onChanged: () => Promise<void>; renderCompatibility: (machine: Machine) => ReactNode }) {
   const machine = selectedId ? machines.find((item) => item.id === selectedId) : machines[0];
   const [operations, setOperations] = useState<HostOperation[]>([]);
+  const [operationsOpen, setOperationsOpen] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [alias, setAlias] = useState(machine?.name ?? "");
@@ -45,7 +46,7 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
   const mutationRef = useRef(new Map<string, string>());
   const generation = useRef(0);
   useEffect(() => { void api.release().then(setRelease).catch(() => undefined); }, []);
-  useEffect(() => { setAlias(machine?.name ?? ""); setSaved(false); setCopied(false); setOperations([]); }, [machine?.id, machine?.name]);
+  useEffect(() => { setAlias(machine?.name ?? ""); setSaved(false); setCopied(false); setOperations([]); setOperationsOpen(false); }, [machine?.id, machine?.name]);
   useEffect(() => {
     if (!machine) return;
     const current = ++generation.current;
@@ -55,6 +56,7 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
     return () => { controller.abort(); window.clearInterval(timer); };
   }, [machine?.id]);
   const pending = operations.some((operation) => ["accepted", "running"].includes(operation.state));
+  useEffect(() => { if (pending) setOperationsOpen(true); }, [pending]);
   async function operate(type: MaintenanceType) {
     if (!machine) return;
     const hostId = machine.id;
@@ -80,7 +82,7 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
       <div className="host-operation-buttons">{(["diagnostics.collect", "catalog.refresh", "agent.update", "runtime.reconnect"] as MaintenanceType[]).map((type) => <div className="host-operation-action" key={type}><button type="button" className="button button--quiet" disabled={busy || pending || machine.reachability !== "live" || !machine.maintenanceCapabilities?.includes(type)} title={!machine.maintenanceCapabilities?.includes(type) ? t("当前 Agent 尚未提供此操作") : operationDescriptions[type]} aria-describedby={`host-operation-help-${type}`} onClick={() => void operate(type)}>{type === "agent.update" ? <Download size={15} /> : type === "diagnostics.collect" ? <Stethoscope size={15} /> : type === "runtime.reconnect" ? <Unplug size={15} /> : <RefreshCw size={15} />}{operationNames[type]}</button><small id={`host-operation-help-${type}`}>{operationDescriptions[type]}</small></div>)}</div>
       {(!machine.maintenanceCapabilities?.length || machine.reachability !== "live") && <details className="repair-command"><summary>{machine.reachability !== "live" ? t("主机离线时的修复命令") : t("旧版 Agent 升级命令")}</summary><p>{t("在这台主机安装 AgentFleets 的原账号中执行后，会保留已有连接并修复服务。")}</p><code>{repair}</code><button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(repair); setCopied(true); } catch { setError(t("复制失败，请手动选中命令复制")); } }}><Copy size={14} />{copied ? t("已复制") : t("复制命令")}</button></details>}
       {error && <p className="catalog-error" role="alert">{systemText(error)}</p>}
-      <section className="host-operation-list" aria-label={t("主机操作记录")}><h3>{t("操作记录")}</h3>{operations.length === 0 ? <p className="subtle">{t("还没有维护操作。")}</p> : operations.map((operation) => <article key={operation.id} className={`host-operation host-operation--${operation.state}`}>{["accepted", "running"].includes(operation.state) ? <LoaderCircle className="spin" size={16} /> : operation.state === "succeeded" ? <Check size={16} /> : <AlertTriangle size={16} />}<div><strong>{operationNames[operation.type]}<span>{operationStates[operation.state]}</span></strong>{operation.error && <p>{systemText(operation.error.message)}</p>}{operation.state === "unknown" && <p>{t("等待核验实际主机状态，请勿重复提交。")}</p>}<small>{new Date(operation.updatedAt).toLocaleString(locale())}</small>{operation.result && <details><summary>{t("主机返回详情")}</summary><pre>{JSON.stringify(operation.result, null, 2)}</pre></details>}</div></article>)}</section>
+      <details className="host-operation-list" aria-label={t("主机操作记录")} open={operationsOpen} onToggle={event => setOperationsOpen(event.currentTarget.open)}><summary><span>{t("操作记录")}</span><small>{operations.length ? t("最近 {0} 条", operations.length) : t("暂无记录")}</small></summary><div className="host-operation-list__body">{operations.length === 0 ? <p className="subtle">{t("还没有维护操作。")}</p> : operations.map((operation) => <article key={operation.id} className={`host-operation host-operation--${operation.state}`}>{["accepted", "running"].includes(operation.state) ? <LoaderCircle className="spin" size={16} /> : operation.state === "succeeded" ? <Check size={16} /> : <AlertTriangle size={16} />}<div><strong>{operationNames[operation.type]}<span>{operationStates[operation.state]}</span></strong>{operation.error && <p>{systemText(operation.error.message)}</p>}{operation.state === "unknown" && <p>{t("等待核验实际主机状态，请勿重复提交。")}</p>}<small>{new Date(operation.updatedAt).toLocaleString(locale())}</small>{operation.result && <details><summary>{t("主机返回详情")}</summary><pre>{JSON.stringify(operation.result, null, 2)}</pre></details>}</div></article>)}</div></details>
     </section><section className="settings-block host-runtime"><h2>{t("运行状态")}</h2>
       <HostReadiness discovery={machine.discovery} online={machine.reachability === "live"} onAction={type => void operate(type)} disabled={busy || pending} capabilities={machine.maintenanceCapabilities} />
       <dl><div><dt>{t("面板使用的 Codex")}</dt><dd>{!machine.codexVersion || machine.codexVersion === "unknown" ? t("等待主机报告") : machine.codexVersion}</dd></div><div><dt>{t("连接服务版本")}</dt><dd>{machine.agentVersion}</dd></div></dl>

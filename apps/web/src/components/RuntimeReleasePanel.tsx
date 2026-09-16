@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
 import { api, type RuntimeReleaseStatus } from "../lib/api";
 import type { Machine } from "../lib/types";
+import { HostDisclosure } from "./HostDisclosure";
 
 const phases: Record<string, string> = localized(() => ({ idle: t("已检查"), checking: t("查找新版"), downloading: t("校验安装包"), validating: t("隔离验证中"), promoted: t("已晋升"), blocked: t("需要适配"), failed: t("检查未通过"), paused: t("自动晋升已暂停") }));
 const date = (value?: string) => value ? new Date(value).toLocaleString(locale()) : t("尚未检查");
@@ -28,8 +29,10 @@ export function RuntimeReleasePanel({ machine }: { machine: Machine }) {
   const running = ["checking", "downloading", "validating"].includes(data?.phase ?? "");
   const target = data?.target?.version;
   const rollout = profile?.source === "host" ? t("使用自装 Codex，不参与托管切换") : !latestAgent ? t("请先点击本机「检查并更新」，升级连接服务后可自动跟随托管目标") : machine.reachability !== "live" ? t("等待主机连接") : profile?.runtimeUpdateState === "rolled_back" ? t("本机更新失败，已自动回退：{0}", String(profile.runtimeUpdateError ?? t("等待修复版本"))) : profile?.runtimeUpdateState === "failed" ? t("本机更新未完成，原运行时保留：{0}", String(profile.runtimeUpdateError ?? t("请检查连接"))) : machine.codexVersion === target ? t("已运行当前托管目标") : ["busy", "saturated"].includes(machine.capacity) ? t("等待当前任务结束后更新") : t("等待主机检查更新；也可点击本机「检查并更新」");
-  return <section className="runtime-release-panel" aria-label={t("托管 Codex 自动升级")}>
-    <header><div><span className="eyebrow">Managed Codex</span><h2>{t("托管 Codex 自动升级")}</h2></div><span className={`runtime-release-phase${running ? " is-running" : ""}`}>{data ? phases[data.phase] ?? data.phase : t("读取状态中")}</span></header>
+  const phase = data ? phases[data.phase] ?? data.phase : t("读取状态中");
+  const description = data?.target?.version ? t("{0} · 当前目标 {1}", phase, data.target.version) : phase;
+  return <HostDisclosure className={`runtime-release-disclosure${running ? " is-running" : ""}`} title={t("托管 Codex 自动升级")} description={description} icon={<RefreshCw size={21} />}>
+    <section className="runtime-release-panel" aria-label={t("托管 Codex 自动升级")}>
     <p>{t("只更新 AgentFleets 独立管理的程序，不修改你自装的 Codex。以下验证与晋升设置适用于所有主机。")}</p>
     {data && <>
       <div className="runtime-release-versions"><div><span>{t("当前托管目标")}</span><strong>{target ?? t("正在准备基线")}</strong></div><ArrowRight aria-hidden="true" size={20} /><div><span>{t("官方最新稳定版")}</span><strong>{data.latestVersion ?? t("尚未发现")}</strong></div></div>
@@ -48,5 +51,6 @@ export function RuntimeReleasePanel({ machine }: { machine: Machine }) {
       {data.history.length > 0 && <details className="runtime-release-history"><summary>{t("验证与晋升记录")}</summary>{data.history.map((item, index) => <article key={`${item.at}:${index}`}><strong>{item.version} · {item.result === "promoted" ? t("已晋升") : item.result === "rollback" ? t("已回退") : t("未晋升")}</strong><time>{date(item.at)}</time><p>{systemText(item.message)}</p></article>)}</details>}
     </>}
     {notice && <p role="status">{systemText(notice)}</p>}{error && <p role="alert" className="catalog-error">{systemText(error)}</p>}
-  </section>;
+    </section>
+  </HostDisclosure>;
 }
