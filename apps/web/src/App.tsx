@@ -678,6 +678,8 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const imageInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
+  const addMenu = useRef<HTMLDetailsElement>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [completionCaret, setCompletionCaret] = useState(0);
   const [activeCompletion, setActiveCompletion] = useState(0);
   const [dismissedCompletion, setDismissedCompletion] = useState("");
@@ -693,6 +695,19 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
   useEffect(() => { setActiveCompletion(current => Math.min(current, Math.max(0, completions.length - 1))); }, [completions.length]);
   useEffect(() => { setCompletionFocused(false); setComposingPrompt(false); setCompletionCaret(0); setCompletionSelectionEnd(0); }, [detail?.session.id, draftOwner, loading]);
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    const dismissOutside = (event: PointerEvent) => { if (!addMenu.current?.contains(event.target as Node)) setAddMenuOpen(false); };
+    const dismissWithKeyboard = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setAddMenuOpen(false);
+      addMenu.current?.querySelector<HTMLElement>("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", dismissOutside);
+    document.addEventListener("keydown", dismissWithKeyboard);
+    return () => { document.removeEventListener("pointerdown", dismissOutside); document.removeEventListener("keydown", dismissWithKeyboard); };
+  }, [addMenuOpen]);
 
   function acceptCompletion(completion: PromptCompletion) {
     if (completion.memoryId && detail) void api.acceptWritingEntry(detail.session.id, completion.memoryId).catch(() => undefined);
@@ -898,7 +913,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {!configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
         {canQueueOrSteer && <div className="composer-mode"><Activity size={14} />{t("Codex 正在处理：可补充当前任务，或排到下一轮")}</div>}
-        <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>
+        <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} modeOverride={modeOverride === "plan" ? "plan" : undefined} onClearMode={() => setModeOverride("default")} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>
         <div className="composer-input">
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
@@ -990,11 +1005,11 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           <input ref={imageInput} className="composer-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label={t("选择要发送的图片")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void imageDraft.addFiles(files); }} />
           <input ref={fileInput} className="composer-image-input" type="file" multiple aria-label={t("选择要发送的文件")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
           <input ref={(node) => { folderInput.current = node; if (node) node.setAttribute("webkitdirectory", ""); }} className="composer-image-input" type="file" multiple aria-label={t("选择要发送的文件夹")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
-          <details className="composer-add-menu"><summary className="button button--secondary composer-add-trigger" aria-label={t("添加内容")} title={t("添加内容")}><Plus size={19} /></summary><div className="composer-add-popover">
+          <details ref={addMenu} open={addMenuOpen} onToggle={event => setAddMenuOpen(event.currentTarget.open)} className="composer-add-menu"><summary className="button button--secondary composer-add-trigger" aria-label={t("添加内容")} aria-expanded={addMenuOpen} title={t("添加内容")}><Plus size={19} /></summary><div className="composer-add-popover">
             <strong>{t("添加")}</strong>
-            <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => fileInput.current?.click()}><FileUp size={17} /><span><b>{t("文件")}</b><small>{t("添加 Codex 可读取的文件")}</small></span></button>
-            <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => folderInput.current?.click()}><FolderOpen size={17} /><span><b>{t("文件夹")}</b><small>{t("保留目录结构，最多 32 个文件")}</small></span></button>
-            <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => imageInput.current?.click()}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
+            <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { setAddMenuOpen(false); fileInput.current?.click(); }}><FileUp size={17} /><span><b>{t("文件")}</b><small>{t("添加 Codex 可读取的文件")}</small></span></button>
+            <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { setAddMenuOpen(false); folderInput.current?.click(); }}><FolderOpen size={17} /><span><b>{t("文件夹")}</b><small>{t("保留目录结构，最多 32 个文件")}</small></span></button>
+            <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { setAddMenuOpen(false); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
             {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { if (!settings?.model && !inherited?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? "default" : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !settings?.model && !inherited?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}
             {(session.pluginSkills?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.pluginSkills!.map(skill => { const selected = selectedSkills.some(item => item.pluginId === skill.pluginId && item.name === skill.name); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={`${skill.pluginId}:${skill.name}:${skill.path}`} onClick={() => setSelectedSkills(current => selected ? current.filter(item => item.pluginId !== skill.pluginId || item.name !== skill.name) : [...current, { pluginId: skill.pluginId, name: skill.name, path: skill.path }])}><Puzzle size={17} /><span><b>{skill.pluginName} · {skill.name}</b><small>{skill.description}</small></span></button>; })}</div></>}

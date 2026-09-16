@@ -1,9 +1,9 @@
-import { Settings2, ChevronRight } from "lucide-react";
+import { Settings2, ChevronRight, Lightbulb, X } from "lucide-react";
 import { t } from "../i18n";
 import type { RuntimeSettings } from "../lib/codex-settings";
 import type { RuntimeSummary } from "./CodexSettingsPanel";
 
-export function RuntimeSettingsShortcut({sessionId,summary,observed,running,activeTurnId,onOpen}:{sessionId:string;summary?:RuntimeSummary;observed?:RuntimeSettings|null;running:boolean;activeTurnId?:string|null;onOpen:()=>void}) {
+export function RuntimeSettingsShortcut({sessionId,summary,observed,running,activeTurnId,modeOverride,onClearMode,onOpen}:{sessionId:string;summary?:RuntimeSummary;observed?:RuntimeSettings|null;running:boolean;activeTurnId?:string|null;modeOverride?:"plan";onClearMode?:()=>void;onOpen:()=>void}) {
   const current=summary?.sessionId===sessionId?summary:undefined;
   const native=observed?.accepted && (!observed.observed || Date.parse(observed.accepted.acceptedAt)>Date.parse(observed.observed.observedAt))?observed.accepted:observed?.observed;
   const model=current?.settings?.model??native?.model;
@@ -16,5 +16,5 @@ export function RuntimeSettingsShortcut({sessionId,summary,observed,running,acti
   const accepted=activeTurnId && observed?.accepted?.nativeTurnId===activeTurnId?observed.accepted:undefined;
   const same=Boolean(current?.loaded && current.settings && accepted && current.settings.model===accepted.model && current.settings.effort===accepted.effort);
   const activeText=accepted?`${accepted.model} · ${accepted.effort??t("强度未确认")}`:t("未确认");
-  return <button type="button" className="runtime-settings-shortcut" aria-label={t("快速配置模型与推理强度")} aria-haspopup="dialog" title={title} onClick={onOpen}><Settings2 size={13}/><span className="runtime-settings-lines">{running?<><span className="runtime-settings-line" title={t("当前任务显示主机已接受的配置，不代表供应商最终模型确认。")}><small>{t("当前任务")}</small><span>{activeText}</span></span>{!same&&<span className="runtime-settings-line"><small>{t("后续任务")}</small><span>{text}</span></span>}</>:<span className="runtime-settings-line"><small>{t("发送使用")}</small><span>{text}</span></span>}</span><ChevronRight size={13}/></button>;
+  return <div className="runtime-settings-bar"><button type="button" className="runtime-settings-shortcut" aria-label={t("快速配置模型与推理强度")} aria-haspopup="dialog" title={title} onClick={onOpen}><Settings2 size={13}/><span className="runtime-settings-lines">{running?<><span className="runtime-settings-line" title={t("当前任务显示主机已接受的配置，不代表供应商最终模型确认。")}><small>{t("当前任务")}</small><span>{activeText}</span></span>{!same&&<span className="runtime-settings-line"><small>{t("后续任务")}</small><span>{text}</span></span>}</>:<span className="runtime-settings-line"><small>{t("发送使用")}</small><span>{text}</span></span>}</span><ChevronRight size={13}/></button>{modeOverride === "plan" && <span className="runtime-mode-chip"><Lightbulb size={12}/><span>{t("计划模式")}</span><button type="button" aria-label={t("关闭计划模式")} title={t("关闭计划模式")} onClick={onClearMode}><X size={12}/></button></span>}</div>;
 }

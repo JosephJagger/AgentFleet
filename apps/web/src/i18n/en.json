@@ -477,6 +477,7 @@
   "强度未上报": "Reasoning effort not reported",
   "主机上次接受：": "Last accepted by host:",
   "计划模式": "Plan mode",
+  "关闭计划模式": "Turn off Plan mode",
   "执行模式": "Execute mode",
   "（不代表提供方绝无模型回退）": "(The provider may still fall back to another model.)",
   "上次接受的服务档位：": "Last accepted service tier:",

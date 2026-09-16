@@ -65,3 +65,10 @@ it("hides duplicate follow-up settings and switches to send settings when the tu
  view.rerender(<RuntimeSettingsShortcut {...props} running={false}/>);
  expect(screen.getByText("发送使用")).toBeTruthy();expect(screen.queryByText("当前任务")).toBeNull();
 });
+it("shows a removable Plan mode indicator beside the runtime settings",()=>{
+ const clear=vi.fn();
+ render(<RuntimeSettingsShortcut sessionId="s" summary={{sessionId:"s",settings:{model:"example-model"},changed:false,loaded:true}} running={false} modeOverride="plan" onClearMode={clear} onOpen={()=>{}}/>);
+ expect(screen.getByText("计划模式")).toBeTruthy();
+ fireEvent.click(screen.getByRole("button",{name:"关闭计划模式"}));
+ expect(clear).toHaveBeenCalledOnce();
+});
