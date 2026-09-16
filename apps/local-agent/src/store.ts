@@ -629,6 +629,50 @@ export class StateStore {
       Object.keys(state.projectReservations).length === 0;
   }
 
+  /**
+   * Repair a turn/start whose synchronous response was lost after Codex had
+   * already created and finished the turn.  The project reservation proves
+   * exclusive ownership, and the native UUIDv7 timestamp fences the terminal
+   * turn to the invocation window.  Ambiguous matches remain frozen.
+   */
+  async recoverLateTerminalTurn(commandId: string): Promise<boolean> {
+    return this.update((state) => {
+      const journal = state.commandJournal[commandId];
+      if (!journal || journal.commandType !== "turn.start" || journal.state !== "unknown" || !journal.invokingAt) return false;
+      const reservation = Object.values(state.projectReservations).find(candidate => candidate.commandId === commandId && candidate.state === "unknown");
+      if (!reservation) return false;
+      const lower = Date.parse(journal.invokingAt);
+      const upper = Date.parse(journal.updatedAt) + 5 * 60_000;
+      if (!Number.isFinite(lower) || !Number.isFinite(upper)) return false;
+      const candidates = Object.values(state.managedThreads).filter(thread => {
+        if (thread.projectId !== reservation.projectId || thread.activeTurnId !== undefined || !thread.lastTurnId || !["completed", "failed", "interrupted"].includes(thread.lastTurnStatus ?? "")) return false;
+        const compact = thread.lastTurnId.replaceAll("-", "");
+        if (!/^[0-9a-fA-F]{32}$/.test(compact) || compact[12] !== "7") return false;
+        const createdAt = Number.parseInt(compact.slice(0, 12), 16);
+        return Number.isSafeInteger(createdAt) && createdAt >= lower && createdAt <= upper;
+      });
+      if (candidates.length !== 1) return false;
+      const thread = candidates[0]!;
+      const response = { nativeThreadId: thread.nativeThreadId, nativeTurnId: thread.lastTurnId!, status: thread.lastTurnStatus! };
+      const timestamp = nowIso();
+      journal.state = "applied";
+      journal.response = response;
+      delete journal.error;
+      journal.updatedAt = timestamp;
+      for (const entry of Object.values(state.inbox)) {
+        if (entry.commandId !== commandId) continue;
+        entry.state = "applied";
+        entry.response = response;
+        delete entry.error;
+        entry.updatedAt = timestamp;
+      }
+      for (const [projectId, item] of Object.entries(state.projectReservations)) {
+        if (item.commandId === commandId) delete state.projectReservations[projectId];
+      }
+      return true;
+    });
+  }
+
   async addProject(project: ProjectRecord): Promise<void> {
     await this.update((state) => {
       const sameAlias = state.projects.find(

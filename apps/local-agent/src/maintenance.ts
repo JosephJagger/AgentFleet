@@ -109,11 +109,14 @@ export class AgentMaintenance {
         if (!operation.recoveryTarget || typeof operation.recoveryTarget !== "object" || Array.isArray(operation.recoveryTarget)) throw new AgentError("RECOVERY_TARGET_INVALID", "缺少会话核验目标");
         result = await this.options.runtime.recoverFrozenSession(operation.recoveryTarget);
       } else if (operationType === "commands.reconcile") {
-        // Read journal evidence only. Never pass these IDs into command execution.
+        // Reconcile durable journal evidence only. Never pass these IDs into
+        // command execution. A late terminal turn may complete an invocation
+        // whose synchronous turn/start response timed out.
         const requests = offer.commands ?? previous?.commands;
         if (!Array.isArray(requests) || requests.length > 20 || requests.some(id => typeof id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(id))) {
           throw new AgentError("RECOVERY_REQUEST_INVALID", "请重新发起主机回执核验");
         }
+        for (const commandId of requests) await this.options.store.recoverLateTerminalTurn(commandId);
         const state = this.options.store.snapshot();
         const commands = requests.map(commandId => {
           const journal = state.commandJournal[commandId];

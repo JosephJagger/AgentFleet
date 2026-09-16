@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createPublicKey, verify } from "node:crypto";
-import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -192,4 +192,45 @@ test("project reservation is owner-fenced and uncertainty survives exits and res
     reopened.reserveProjectCommand({ ...owner, commandId: other.commandId, attemptId: other.attemptId, envelopeHash: "sha256:other", appServerEpoch: "app-epoch-3" }),
     /uncertain outcome/,
   );
+});
+
+test("a terminal native turn inside the invocation window safely repairs a timed-out turn start", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "agentfleet-late-turn-test-"));
+  const store = new StateStore(directory); await store.initialize();
+  t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+  const command = testCommand(); const envelopeHash = "sha256:late-terminal";
+  await store.claimCommand(command, envelopeHash);
+  const owner = { projectId: command.projectId, commandId: command.commandId, attemptId: command.attemptId, envelopeHash, appServerEpoch: "app-epoch" };
+  await store.reserveProjectCommand(owner);
+  await store.transitionCommand(command.attemptId, "claimed", "invoking");
+  const milliseconds = Date.now() + 10;
+  const prefix = milliseconds.toString(16).padStart(12, "0");
+  const nativeTurnId = `${prefix.slice(0,8)}-${prefix.slice(8)}-7abc-8def-0123456789ab`;
+  await store.setManagedThread({ nativeThreadId:"native-thread",projectId:command.projectId,logicalSessionId:command.logicalSessionId,executionSegmentId:command.executionSegmentId,
+    appServerEpoch:"app-epoch",policyVersion:"remote-restricted-v1",policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),lastTurnId:nativeTurnId,lastTurnStatus:"completed" });
+  await store.markCommandUnknown(command.attemptId,{code:"APP_SERVER_TIMEOUT",message:"turn/start did not respond in time"});
+  assert.equal(store.canSafelyRestart(),false);
+  assert.equal(await store.recoverLateTerminalTurn(command.commandId),true);
+  const state=store.snapshot();
+  assert.equal(state.commandJournal[command.commandId]?.state,"applied");
+  assert.deepEqual(state.commandJournal[command.commandId]?.response,{nativeThreadId:"native-thread",nativeTurnId,status:"completed"});
+  assert.equal(state.projectReservations[command.projectId],undefined);
+  assert.equal(store.canSafelyRestart(),true);
+  assert.equal(await store.recoverLateTerminalTurn(command.commandId),false,"terminal repair is idempotent");
+});
+
+test("late-turn repair keeps ambiguous or out-of-window evidence frozen", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "agentfleet-ambiguous-turn-test-"));
+  const store = new StateStore(directory); await store.initialize();
+  t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+  const command=testCommand();const envelopeHash="sha256:ambiguous";
+  await store.claimCommand(command,envelopeHash);
+  await store.reserveProjectCommand({projectId:command.projectId,commandId:command.commandId,attemptId:command.attemptId,envelopeHash,appServerEpoch:"epoch"});
+  await store.transitionCommand(command.attemptId,"claimed","invoking");
+  const old="018cc251-f400-7abc-8def-0123456789ab";
+  await store.setManagedThread({nativeThreadId:"old",projectId:command.projectId,appServerEpoch:"epoch",policyVersion:"remote-restricted-v1",policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),lastTurnId:old,lastTurnStatus:"completed"});
+  await store.markCommandUnknown(command.attemptId,{code:"APP_SERVER_TIMEOUT",message:"timeout"});
+  assert.equal(await store.recoverLateTerminalTurn(command.commandId),false);
+  assert.equal(store.snapshot().commandJournal[command.commandId]?.state,"unknown");
+  assert.equal(store.canSafelyRestart(),false);
 });
