@@ -44,3 +44,14 @@ export function parsePluginSkills(value: unknown): Array<{ pluginId: string; nam
     return { pluginId: item.pluginId, name: item.name, path: item.path };
   });
 }
+
+export function parsePlugins(value: unknown): Array<{ pluginId: string; pluginName: string }> {
+  if (value === undefined) return [];
+  invariant(Array.isArray(value) && value.length <= 4, 400, "PLUGIN_INVALID", "一次最多添加 4 个插件");
+  return value.map(raw => {
+    invariant(raw && typeof raw === "object" && !Array.isArray(raw), 400, "PLUGIN_INVALID", "插件格式无效");
+    const item = raw as Record<string, unknown>;
+    invariant(Object.keys(item).every(key => ["pluginId", "pluginName"].includes(key)) && typeof item.pluginId === "string" && typeof item.pluginName === "string" && item.pluginId.length > 0 && item.pluginId.length <= 256 && item.pluginName.length > 0 && item.pluginName.length <= 256 && !item.pluginId.includes("\0") && !item.pluginName.includes("\0"), 400, "PLUGIN_INVALID", "插件格式无效");
+    return { pluginId: item.pluginId, pluginName: item.pluginName };
+  });
+}

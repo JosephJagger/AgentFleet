@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -14,6 +14,7 @@ import type {
 } from "../src/app-server.js";
 import { AgentError } from "../src/errors.js";
 import type { CodexSettings, CodexCatalog } from "../src/codex-settings.js";
+import type { TurnExtras } from "../src/attachments.js";
 import type { MachineIdentity } from "../src/identity.js";
 import { discoverProjectFromCwd, resolveProject } from "../src/projects.js";
 import {
@@ -78,6 +79,8 @@ class FakeAppServer implements AppServerClient {
   unsubscribeCount = 0;
   histories = new Map<string, ThreadHistorySnapshot>();
   receivedSettings: CodexSettings | undefined;
+  receivedExtras: TurnExtras | undefined;
+  catalog: CodexCatalog = { models: [{ model: "host-model", displayName: "Host", efforts: ["low", "high"], defaultEffort: "low" }], modes: ["default"], fetchedAt: new Date().toISOString() };
   inputCalls: unknown[] = [];
   nativeCalls: string[] = [];
   async stopBackgroundTerminals(thread: ManagedThread): Promise<void> { this.nativeCalls.push(`stop:${thread.nativeThreadId}`); }
@@ -87,7 +90,7 @@ class FakeAppServer implements AppServerClient {
     return action === "rename" ? { title: name } : { archived: action === "archive" };
   }
   async startNativeTurn(_thread: ManagedThread, action: "compact" | "review"): Promise<TurnStartResult> { this.nativeCalls.push(action); return { nativeTurnId: `native-${action}`, status: "inProgress" }; }
-  getCodexCatalog(): CodexCatalog { return { models: [{ model: "host-model", displayName: "Host", efforts: ["low", "high"], defaultEffort: "low" }], modes: ["default"], fetchedAt: new Date().toISOString() }; }
+  getCodexCatalog(): CodexCatalog { return this.catalog; }
 
   constructor(appServerEpoch: string, callbacks: AppServerCallbacks, startError?: Error) {
     this.appServerEpoch = appServerEpoch;
@@ -156,8 +159,9 @@ class FakeAppServer implements AppServerClient {
     this.unsubscribeCount += 1;
   }
 
-  async startTurn(thread: ManagedThread, project: ProjectRecord, _prompt?: string, _messageId?: string, settings?: CodexSettings): Promise<TurnStartResult> {
+  async startTurn(thread: ManagedThread, project: ProjectRecord, _prompt?: string, _messageId?: string, settings?: CodexSettings, _images?: string[], extras?: TurnExtras): Promise<TurnStartResult> {
     this.receivedSettings = settings;
+    this.receivedExtras = extras;
     this.startTurnCount += 1;
     if (this.startTurnHook) return this.startTurnHook(thread, project);
     return { nativeTurnId: `turn-${this.appServerEpoch}-${this.startTurnCount}`, status: "inProgress" };
@@ -461,6 +465,31 @@ test("host validates model settings before creating a thread and journals accept
   assert.equal(store.snapshot().commandJournal[valid.commandId]?.state, "applied");
   const reopened = new StateStore(join(directory, "state")); await reopened.initialize();
   assert.equal(Object.values(reopened.snapshot().managedThreads)[0]?.acceptedSettings?.effort, "high");
+});
+
+test("whole-plugin selection becomes one small routing skill instead of every bundled skill", async (t) => {
+  const { store, projects } = await fixture();
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: callbacks => (server = new FakeAppServer("epoch-plugin", callbacks)) });
+  runtime.setTransportGeneration(1); captureCallbacks(runtime);
+  await runtime.initialize(); t.after(() => runtime.shutdown());
+  server.catalog = {
+    models: [{ model: "host-model", displayName: "Host", efforts: ["low"], defaultEffort: "low" }], modes: ["default"], fetchedAt: new Date().toISOString(),
+    plugins: [{ pluginId: "shopify@openai-curated-remote", pluginName: "Shopify" }],
+    pluginSkills: [
+      { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify", name: "Admin GraphQL", description: "admin", path: "/skills/admin/SKILL.md" },
+      { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify", name: "Liquid", description: "themes", path: "/skills/liquid/SKILL.md" },
+    ],
+  };
+  const selected = command(projects[0]!, "attempt-plugin", "command-plugin", "session-plugin", "epoch-plugin");
+  selected.payload.plugins = [{ pluginId: "shopify@openai-curated-remote", pluginName: "Shopify" }];
+  await runtime.handleCommand(selected, 1);
+  assert.equal(server.receivedExtras?.pluginSkills?.length, 1);
+  assert.equal(server.receivedExtras?.pluginSkills?.[0]?.name, "Shopify");
+  const router = await readFile(server.receivedExtras!.pluginSkills![0]!.path, "utf8");
+  assert.match(router, /explicitly selected.*Shopify/);
+  assert.match(router, /Admin GraphQL/);
+  assert.match(router, /do not load every bundled skill/);
 });
 
 test("terminal command replays a legal new-attempt lifecycle after process reopen without invoking", async () => {

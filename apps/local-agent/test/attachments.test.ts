@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseAttachments, parsePluginSkills } from "../src/attachments.js";
+import { parseAttachments, parsePlugins, parsePluginSkills } from "../src/attachments.js";
 
 test("accepts bounded files and preserves folder paths", () => {
   const result = parseAttachments([{ name: "a.txt", relativePath: "docs/a.txt", mimeType: "text/plain", data: Buffer.from("hello").toString("base64") }]);
@@ -17,6 +17,11 @@ test("rejects traversal, duplicate paths, and malformed base64", () => {
 test("only accepts bounded plugin skill references", () => {
   assert.deepEqual(parsePluginSkills([{ pluginId: "p", name: "skill", path: "/skills/skill/SKILL.md" }])[0]?.name, "skill");
   assert.throws(() => parsePluginSkills([{ pluginId: "p", name: "skill", path: "" }]), /格式/);
+});
+
+test("accepts whole-plugin references without exposing internal skills", () => {
+  assert.deepEqual(parsePlugins([{ pluginId: "shopify@remote", pluginName: "Shopify" }]), [{ pluginId: "shopify@remote", pluginName: "Shopify" }]);
+  assert.throws(() => parsePlugins([{ pluginId: "shopify@remote", pluginName: "" }]), /格式/);
 });
 
 test("rejects unsupported extensions and binary content before host materialization",()=>{

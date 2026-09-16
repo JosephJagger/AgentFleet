@@ -3,7 +3,7 @@ import { nativeImageCleanup } from "./native-image-cleanup.js";
 import { randomUUID } from "node:crypto";
 import { setImmediate as yieldToIO } from "node:timers/promises";
 import { parseImages } from "./images.js";
-import { parseAttachments, parsePluginSkills, type MaterializedAttachment, type PluginSkillReference } from "./attachments.js";
+import { parseAttachments, parsePlugins, parsePluginSkills, type MaterializedAttachment, type PluginReference, type PluginSkillReference } from "./attachments.js";
 import { lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { permissionProfile } from "./permissions.js";
@@ -102,6 +102,40 @@ async function materializePluginSkills(project: ProjectRecord, commandId: string
     try { await writeFile(destination, content, { flag: "wx", mode: 0o600 }); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST" || !(await readFile(destination)).equals(content)) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "插件技能落盘失败"); }
     result.push({ ...skill, path: destination });
+  }
+  return result;
+}
+
+async function materializePlugins(project: ProjectRecord, commandId: string, plugins: PluginReference[], server: AppServerClient): Promise<PluginSkillReference[]> {
+  if (!plugins.length) return [];
+  const catalog = server.getCodexCatalog?.();
+  const base = resolve(project.root, ".agentfleets"); const root = join(base, "plugin-selections");
+  await ensurePlainDirectory(base); await ensurePlainDirectory(root);
+  const result: PluginSkillReference[] = [];
+  for (const plugin of plugins) {
+    const catalogPlugin = catalog?.plugins?.find(item => item.pluginId === plugin.pluginId && item.pluginName === plugin.pluginName);
+    if (!catalogPlugin) throw new AgentError("PLUGIN_UNAVAILABLE", "所选插件已变化，请刷新后重选");
+    const capabilityNames = [...new Set(catalog?.pluginSkills?.filter(skill => skill.pluginId === plugin.pluginId).map(skill => skill.name) ?? [])].slice(0, 100);
+    const skillDir = join(root, sha256(`${commandId}:${plugin.pluginId}`).slice(0, 24));
+    await ensurePlainDirectory(skillDir);
+    const destination = join(skillDir, "SKILL.md");
+    const content = Buffer.from([
+      "---",
+      `name: ${JSON.stringify(`agentfleets-plugin-${sha256(plugin.pluginId).slice(0, 12)}`)}`,
+      `description: ${JSON.stringify(`Routes this turn through the explicitly selected ${plugin.pluginName} plugin.`)}`,
+      "---",
+      "",
+      `# Selected plugin: ${plugin.pluginName.replace(/[\r\n]/g, " ")}`,
+      "",
+      `The user explicitly selected the installed plugin ${JSON.stringify(plugin.pluginName)} (${JSON.stringify(plugin.pluginId)}) for this turn.`,
+      "Use this plugin's relevant connected tools, apps, or bundled skills to complete the request.",
+      "Choose only the capabilities needed for the task; do not load every bundled skill.",
+      ...(capabilityNames.length ? ["", `Bundled skill names: ${capabilityNames.map(name => JSON.stringify(name.replace(/[\r\n]/g, " "))).join(", ")}.`] : []),
+      "",
+    ].join("\n"), "utf8");
+    try { await writeFile(destination, content, { flag: "wx", mode: 0o600 }); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST" || !(await readFile(destination)).equals(content)) throw new AgentError("PLUGIN_UNAVAILABLE", "插件选择落盘失败"); }
+    result.push({ pluginId: plugin.pluginId, name: plugin.pluginName, path: destination });
   }
   return result;
 }
@@ -1442,11 +1476,13 @@ export class AgentRuntime {
         if (nativeAction && (!boundThread || !server.startNativeTurn || Object.keys(command.payload).length !== 0)) throw new AgentError("PRECONDITION_INVALID", "Native turn requires an existing thread and an empty payload");
         const images = parseImages(command.payload.images);
         const rawAttachments = parseAttachments(command.payload.attachments);
+        const plugins = parsePlugins(command.payload.plugins);
         const pluginSkills = parsePluginSkills(command.payload.pluginSkills);
         const goal = command.payload.goal === undefined ? undefined : requireString(command.payload.goal, "payload.goal", { maxLength: 2_000 });
         const catalog = server.getCodexCatalog?.();
+        if (plugins.some(selected => !catalog?.plugins?.some(plugin => plugin.pluginId === selected.pluginId && plugin.pluginName === selected.pluginName))) throw new AgentError("PLUGIN_UNAVAILABLE", "所选插件已变化，请刷新后重选");
         if (pluginSkills.some(selected => !catalog?.pluginSkills?.some(skill => skill.pluginId === selected.pluginId && skill.name === selected.name && skill.path === selected.path))) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "所选插件技能已变化，请刷新后重选");
-        const prompt = nativeAction ? "" : requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
+        const prompt = nativeAction ? "" : requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
         const settings = validateSettings(command.payload.settings, server.getCodexCatalog?.());
         const profile = permissionProfile(command.payload.permissionProfile);
         if (command.precondition.executionSegmentId !== command.executionSegmentId) {
@@ -1538,9 +1574,10 @@ export class AgentRuntime {
         const clientUserMessageId = optionalString(command.payload.clientUserMessageId, "payload.clientUserMessageId");
         const materialized = nativeAction ? [] : await materializeAttachments(project, command.commandId, rawAttachments);
         const materializedSkills = nativeAction ? [] : await materializePluginSkills(project, command.commandId, pluginSkills, server);
+        const materializedPlugins = nativeAction ? [] : await materializePlugins(project, command.commandId, plugins, server);
         const result = nativeAction
           ? await server.startNativeTurn!(thread, nativeAction, { type: "uncommittedChanges" })
-          : await server.startTurn(thread, project, prompt, clientUserMessageId, settings, images, { attachments: materialized, pluginSkills: materializedSkills, ...(goal ? { goal } : {}) });
+          : await server.startTurn(thread, project, prompt, clientUserMessageId, settings, images, { attachments: materialized, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(goal ? { goal } : {}) });
         let completedBeforeResponse = false;
         const updated = await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => {
           candidate.acceptedPermissions = { profile, source: typeof command.payload.permissionSource === "string" ? command.payload.permissionSource : "default", acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
@@ -1598,11 +1635,13 @@ export class AgentRuntime {
         const turnId = requireString(command.precondition.nativeTurnId, "precondition.nativeTurnId", { maxLength: 256 });
         const images = parseImages(command.payload.images);
         const rawAttachments = parseAttachments(command.payload.attachments);
+        const plugins = parsePlugins(command.payload.plugins);
         const pluginSkills = parsePluginSkills(command.payload.pluginSkills);
         const goal = command.payload.goal === undefined ? undefined : requireString(command.payload.goal, "payload.goal", { maxLength: 2_000 });
         const catalog = server.getCodexCatalog?.();
+        if (plugins.some(selected => !catalog?.plugins?.some(plugin => plugin.pluginId === selected.pluginId && plugin.pluginName === selected.pluginName))) throw new AgentError("PLUGIN_UNAVAILABLE", "所选插件已变化，请刷新后重选");
         if (pluginSkills.some(selected => !catalog?.pluginSkills?.some(skill => skill.pluginId === selected.pluginId && skill.name === selected.name && skill.path === selected.path))) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "所选插件技能已变化，请刷新后重选");
-        const prompt = requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
+        const prompt = requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
         const thread = Object.values(this.store.snapshot().managedThreads).find(
           (candidate) => candidate.logicalSessionId === command.logicalSessionId,
         );
@@ -1621,7 +1660,8 @@ export class AgentRuntime {
         const clientUserMessageId = optionalString(command.payload.clientUserMessageId, "payload.clientUserMessageId");
         const materialized = await materializeAttachments(project, command.commandId, rawAttachments);
         const materializedSkills = await materializePluginSkills(project, command.commandId, pluginSkills, server);
-        const result = await server.steerTurn(thread, turnId, prompt, clientUserMessageId, images, { attachments: materialized, pluginSkills: materializedSkills, ...(goal ? { goal } : {}) });
+        const materializedPlugins = await materializePlugins(project, command.commandId, plugins, server);
+        const result = await server.steerTurn(thread, turnId, prompt, clientUserMessageId, images, { attachments: materialized, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(goal ? { goal } : {}) });
         await this.emitForThread(thread, {
           type: "turn.steered",
           nativeThreadId: thread.nativeThreadId,

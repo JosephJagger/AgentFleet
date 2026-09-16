@@ -4,27 +4,18 @@ import { afterEach, describe, expect, it } from "vitest";
 import { applyPromptCompletion, pluginCompletions, promptCompletions, softwareTermCount } from "./prompt-completions";
 
 describe("prompt completions", () => {
-  it("matches installed plugin skills from a partial @ mention", () => {
-    const skills = [
-      { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "Manage Shopify data", path: "/plugins/shopify/admin" },
-      { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify App Builder", name: "Liquid themes", description: "Build Shopify themes", path: "/plugins/shopify/liquid" },
-      { pluginId: "github", pluginName: "GitHub", name: "Pull requests", description: "Manage pull requests", path: "/plugins/github/pulls" },
+  it("matches and selects an installed plugin from a partial @ mention", () => {
+    const plugins = [
+      { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify" },
+      { pluginId: "github", pluginName: "GitHub" },
     ];
     const prompt = "请使用 @shop";
-    const matches = pluginCompletions(prompt, prompt.length, skills)!;
+    const matches = pluginCompletions(prompt, prompt.length, plugins)!;
     expect(matches).toHaveLength(1);
-    expect(matches[0]).toMatchObject({ kind: "plugin", label: "Shopify App Builder", replaceStart: 4, replaceEnd: prompt.length });
-    const scoped = applyPromptCompletion(prompt, matches[0]);
-    expect(scoped.value).toBe("请使用 @shopify/");
-    const capabilities = pluginCompletions(scoped.value, scoped.caret, skills)!;
-    expect(capabilities.map(item => item.label)).toEqual(["Admin GraphQL", "Liquid themes"]);
-    expect(capabilities[0].pluginSkill?.pluginId).toBe("shopify@openai-curated-remote");
-    expect(applyPromptCompletion(scoped.value, capabilities[0]).value).toBe("请使用 ");
-    expect(pluginCompletions("@", 1, skills, [
-      { pluginId: "shopify@openai-curated-remote", name: "Admin GraphQL", path: "/plugins/shopify/admin" },
-      { pluginId: "shopify@openai-curated-remote", name: "Liquid themes", path: "/plugins/shopify/liquid" },
-    ])?.map(item => item.label)).toEqual(["GitHub"]);
-    expect(pluginCompletions("联系 a@shop", 9, skills)).toBeUndefined();
+    expect(matches[0]).toMatchObject({ kind: "plugin", label: "Shopify", replaceStart: 4, replaceEnd: prompt.length, plugin: { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify" } });
+    expect(applyPromptCompletion(prompt, matches[0]).value).toBe("请使用 ");
+    expect(pluginCompletions("@", 1, plugins, [{ pluginId: "shopify@openai-curated-remote", pluginName: "Shopify" }])?.map(item => item.label)).toEqual(["GitHub"]);
+    expect(pluginCompletions("联系 a@shop", 9, plugins)).toBeUndefined();
   });
   it.each(["登录老掉", "登陆老掉", "登陆老掉。", "登录经常掉线", "登陆总是退出 "])("recognizes Chinese login wording: %s", prompt => {
     expect(promptCompletions(prompt, prompt.length)[0]).toMatchObject({ kind: "rewrite", label: "排查登录会话意外失效的问题，检查令牌过期、刷新和持久化逻辑" });

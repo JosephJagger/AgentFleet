@@ -626,7 +626,7 @@ function ApprovalCard({ approval, onDecide, busy }: { approval: Approval; onDeci
 
 type TurnAdditions = {
   attachments?: Array<{ name: string; relativePath: string; mimeType: string; data: string }>;
-  pluginSkills?: Array<{ pluginId: string; name: string; path: string }>;
+  plugins?: Array<{ pluginId: string; pluginName: string }>;
   goal?: string;
 };
 
@@ -661,7 +661,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   useEffect(() => () => aiRequest.current?.abort(), []);
   const imageDraft = useImageDraft(draftOwner ?? "preview", detail?.session.id);
   const fileDraft = useFileDraft(detail?.session.id);
-  const [selectedSkills, setSelectedSkills] = useState<Array<{ pluginId: string; name: string; path: string }>>([]);
+  const [selectedPlugins, setSelectedPlugins] = useState<Array<{ pluginId: string; pluginName: string }>>([]);
   const [goal, setGoal] = useSessionDraft(draftOwner ?? "preview", detail?.session.id, "goal");
   const [modeOverride, setModeOverride] = useState<"default" | "plan">();
   const [configuration, setConfiguration] = useState<ConfigurationRequest>();
@@ -691,12 +691,12 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const chineseSuggestions = useChineseNLP(draftOwner ?? "preview", detail?.session.id, prompt, completionVisible && completionCaret === prompt.length && completionPreferences.suggestions && completionPreferences.nlp);
   const completions = useMemo(() => {
     if (!completionVisible) return [];
-    const plugins = pluginCompletions(prompt, completionCaret, detail?.session.pluginSkills, selectedSkills);
+    const plugins = pluginCompletions(prompt, completionCaret, detail?.session.plugins, selectedPlugins);
     if (plugins) return plugins;
     return mergeWritingSuggestions(promptCompletions(prompt, completionCaret, 10, writingMemory.value?.entries).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions), chineseSuggestions);
-  }, [completionVisible, completionCaret, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value, chineseSuggestions, detail?.session.pluginSkills, selectedSkills]);
+  }, [completionVisible, completionCaret, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value, chineseSuggestions, detail?.session.plugins, selectedPlugins]);
   useAutoSizeTextarea(textArea, prompt, `${detail?.session.id ?? ""}:${loading}`);
-  useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedSkills([]); setModeOverride(undefined); }, [detail?.session.id, draftOwner]);
+  useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedPlugins([]); setModeOverride(undefined); }, [detail?.session.id, draftOwner]);
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
   useEffect(() => { setActiveCompletion(current => Math.min(current, Math.max(0, completions.length - 1))); }, [completions.length]);
   useEffect(() => { setCompletionFocused(false); setComposingPrompt(false); setCompletionCaret(0); setCompletionSelectionEnd(0); }, [detail?.session.id, draftOwner, loading]);
@@ -716,12 +716,12 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
 
   function acceptCompletion(completion: PromptCompletion) {
     if (completion.memoryId && detail) void api.acceptWritingEntry(detail.session.id, completion.memoryId).catch(() => undefined);
-    if (completion.pluginSkill) setSelectedSkills(current => current.some(item => item.pluginId === completion.pluginSkill!.pluginId && item.name === completion.pluginSkill!.name && item.path === completion.pluginSkill!.path) ? current : [...current, completion.pluginSkill!]);
+    if (completion.plugin) setSelectedPlugins(current => current.some(item => item.pluginId === completion.plugin!.pluginId) ? current : [...current, completion.plugin!]);
     const next = applyPromptCompletion(prompt, completion);
     setPrompt(next.value);
     setCompletionCaret(next.caret);
     setCompletionSelectionEnd(next.caret);
-    setDismissedCompletion(completion.kind === "plugin" && !completion.pluginSkill ? "" : `${next.value}\u0000${next.caret}`);
+    setDismissedCompletion(`${next.value}\u0000${next.caret}`);
     requestAnimationFrame(() => {
       const input = textArea.current;
       if (input?.value === next.value) {
@@ -735,12 +735,6 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   if (!detail) return <aside className="inspector inspector--empty"><MonitorDot size={27} /><h2>{t("选择一个会话")}</h2><p>{t("打开已有会话，或新建会话开始。")}</p></aside>;
 
   const { session, approval } = detail;
-  const pluginGroups = [...(session.pluginSkills ?? []).reduce((groups, skill) => {
-    const group = groups.get(skill.pluginId) ?? { pluginId: skill.pluginId, pluginName: skill.pluginName, skills: [] as NonNullable<FleetSession["pluginSkills"]> };
-    group.skills.push(skill);
-    groups.set(skill.pluginId, group);
-    return groups;
-  }, new Map<string, { pluginId: string; pluginName: string; skills: NonNullable<FleetSession["pluginSkills"]> }>()).values()];
   const rawEvents = rawView ? detail.events.filter(event => event.payloadState !== "deleted" && event.body) : [];
   const visibleEvents = timelineItems(detail.events);
   const lease = session.controlLease;
@@ -753,8 +747,8 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const canCancel = !pendingCommand && (session.actions?.cancel?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.currentTurn === "in_progress" && session.activeTurnId));
   const canQueueOrSteer = Boolean(detail.writable && session.state.currentTurn === "in_progress" && session.activeTurnId);
   const slashCommand = parseCodexCommand(prompt);
-  const additions: TurnAdditions | undefined = fileDraft.files.length || selectedSkills.length || goal.trim() ? { ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(selectedSkills.length ? { pluginSkills: selectedSkills } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
-  const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedSkills.length);
+  const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() ? { ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
+  const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length);
   const imageBlocked = imageDraft.processing || fileDraft.processing || (imageDraft.images.length > 0 && (!session.imageInputSupported || Boolean(slashCommand))) || (fileDraft.files.length > 0 && (!session.fileInputSupported || Boolean(slashCommand)));
   const inherited = session.runtimeSettings?.accepted ?? session.runtimeSettings?.observed;
   const sendSettings = modeOverride && inherited?.model ? { model: inherited.model, ...(inherited.effort ? { effort: inherited.effort } : {}), ...(settings ?? {}), mode: modeOverride } satisfies CodexSettings : settings;
@@ -818,7 +812,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
       setCommandMessage("");
       setPrompt("");
       imageDraft.clear();
-      fileDraft.clear(); setSelectedSkills([]);
+      fileDraft.clear(); setSelectedPlugins([]);
       setModeOverride(undefined);
       textArea.current?.focus();
     } catch (error) {
@@ -931,9 +925,9 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
         {imageDraft.images.length > 0 && <MessageImages images={imageDraft.images} onRemove={imageDraft.remove} disabled={busy || imageDraft.processing} />}
-        {(fileDraft.files.length > 0 || selectedSkills.length > 0) && <div className="attachment-drafts" aria-label={t("待发送附件")}>
+        {(fileDraft.files.length > 0 || selectedPlugins.length > 0) && <div className="attachment-drafts" aria-label={t("待发送附件")}>
           {fileDraft.files.map(file => <span className="attachment-chip" key={file.id}><Paperclip size={14} /><span title={file.relativePath}>{file.relativePath}</span><small>{Math.max(1, Math.ceil(file.size / 1024))} KB</small><button type="button" aria-label={t("移除 {0}", file.relativePath)} onClick={() => fileDraft.remove(file.id)}><X size={13} /></button></span>)}
-          {selectedSkills.map(skill => <span className="attachment-chip attachment-chip--plugin" key={`${skill.pluginId}:${skill.name}`}><Puzzle size={14} /><span>{skill.name}</span><button type="button" aria-label={t("移除 {0}", skill.name)} onClick={() => setSelectedSkills(current => current.filter(item => item.pluginId !== skill.pluginId || item.name !== skill.name))}><X size={13} /></button></span>)}
+          {selectedPlugins.map(plugin => <span className="attachment-chip attachment-chip--plugin" key={plugin.pluginId}><Puzzle size={14} /><span>{plugin.pluginName}</span><button type="button" aria-label={t("移除 {0}", plugin.pluginName)} onClick={() => setSelectedPlugins(current => current.filter(item => item.pluginId !== plugin.pluginId))}><X size={13} /></button></span>)}
         </div>}
         {imageDraft.processing && <p className="image-draft-notice" role="status">{t("正在处理图片…")}</p>}
         {fileDraft.processing && <p className="image-draft-notice" role="status">{t("正在读取文件…")}</p>}
@@ -1030,14 +1024,14 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
             <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { setAddMenuOpen(false); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
             {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { if (!settings?.model && !inherited?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !settings?.model && !inherited?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}
-            {pluginGroups.length > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{pluginGroups.map(group => <details className="composer-plugin-group" key={group.pluginId}><summary><Puzzle size={17} /><span><b>{group.pluginName}</b><small>{t("{0} 个能力", group.skills.length)}</small></span><ChevronRight size={15} /></summary><div>{group.skills.map(skill => { const selected = selectedSkills.some(item => item.pluginId === skill.pluginId && item.name === skill.name && item.path === skill.path); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={`${skill.pluginId}:${skill.name}:${skill.path}`} onClick={() => setSelectedSkills(current => selected ? current.filter(item => item.pluginId !== skill.pluginId || item.name !== skill.name || item.path !== skill.path) : [...current, { pluginId: skill.pluginId, name: skill.name, path: skill.path }])}><span><b>{skill.name}</b><small>{skill.description}</small></span></button>; })}</div></details>)}</div></>}
+            {(session.plugins?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.plugins!.map(plugin => { const selected = selectedPlugins.some(item => item.pluginId === plugin.pluginId); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={plugin.pluginId} onClick={() => setSelectedPlugins(current => selected ? current.filter(item => item.pluginId !== plugin.pluginId) : [...current, plugin])}><Puzzle size={17} /><span><b>{plugin.pluginName}</b></span></button>; })}</div></>}
           </div></details>
           {canQueueOrSteer ? (
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" />{t("停止任务")}</button>}
-              </div><button className="button button--secondary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedSkills([]); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} />{t("加入队列")}</button>
-              <button className="button button--primary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined, additions); else await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedSkills([]); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} />{t("追加本轮")}</button>
+              </div><button className="button button--secondary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} />{t("加入队列")}</button>
+              <button className="button button--primary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined, additions); else await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} />{t("追加本轮")}</button>
             </div>
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" />{t("停止任务")}</button>

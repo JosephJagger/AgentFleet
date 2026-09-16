@@ -15,6 +15,7 @@ export interface UploadedAttachment {
 }
 
 export interface PluginSkillReference { pluginId: string; name: string; path: string }
+export interface PluginReference { pluginId: string; pluginName: string }
 export interface MaterializedAttachment { name: string; path: string }
 export interface TurnExtras { attachments?: MaterializedAttachment[]; pluginSkills?: PluginSkillReference[]; goal?: string }
 
@@ -58,5 +59,16 @@ export function parsePluginSkills(value: unknown): PluginSkillReference[] {
     const item = raw as Record<string, unknown>;
     if (Object.keys(item).some(key => !["pluginId", "name", "path"].includes(key)) || typeof item.pluginId !== "string" || typeof item.name !== "string" || typeof item.path !== "string" || !item.pluginId || !item.name || !item.path || item.pluginId.length > 256 || item.name.length > 256 || item.path.length > 8_192 || item.path.includes("\0")) throw new AgentError("PLUGIN_SKILL_INVALID", "插件技能格式无效");
     return { pluginId: item.pluginId, name: item.name, path: item.path };
+  });
+}
+
+export function parsePlugins(value: unknown): PluginReference[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 4) throw new AgentError("PLUGIN_INVALID", "一次最多添加 4 个插件");
+  return value.map(raw => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new AgentError("PLUGIN_INVALID", "插件格式无效");
+    const item = raw as Record<string, unknown>;
+    if (Object.keys(item).some(key => !["pluginId", "pluginName"].includes(key)) || typeof item.pluginId !== "string" || typeof item.pluginName !== "string" || !item.pluginId || !item.pluginName || item.pluginId.length > 256 || item.pluginName.length > 256 || item.pluginId.includes("\0") || item.pluginName.includes("\0")) throw new AgentError("PLUGIN_INVALID", "插件格式无效");
+    return { pluginId: item.pluginId, pluginName: item.pluginName };
   });
 }

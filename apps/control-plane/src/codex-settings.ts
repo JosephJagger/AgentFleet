@@ -3,6 +3,7 @@ import { invariant } from "./errors.js";
 export interface CodexCatalog {
   imageInput?: boolean;
   fileInput?: boolean;
+  plugins?: Array<{ pluginId: string; pluginName: string }>;
   pluginSkills?: Array<{ pluginId: string; pluginName: string; name: string; description: string; path: string }>;
   models: Array<{ model: string; displayName: string; efforts: string[]; defaultEffort: string; serviceTiers?: { id: string; name: string }[]; supportsPersonality?: boolean; inputModalities?: string[] }>;
   modes: string[];
@@ -32,7 +33,8 @@ export function parseCodexCatalog(value: unknown): CodexCatalog | null {
       ...(typeof model.supportsPersonality === "boolean" ? { supportsPersonality: model.supportsPersonality } : {}) };
   });
   const pluginSkills = Array.isArray(raw.pluginSkills) ? raw.pluginSkills.slice(0, 200).map(entry => { const skill = object(entry); return { pluginId: text(skill.pluginId), pluginName: text(skill.pluginName), name: text(skill.name), description: text(skill.description, 1_000), path: text(skill.path, 8_192) }; }) : [];
-  return { ...(raw.imageInput === true ? { imageInput: true } : {}), ...(raw.fileInput === true ? { fileInput: true } : {}), ...(pluginSkills.length ? { pluginSkills } : {}), models, modes: raw.modes.map((mode) => text(mode, 32)).filter((mode) => ["default", "plan"].includes(mode)), fetchedAt: text(raw.fetchedAt, 64), ...(raw.error === undefined ? {} : { error: text(raw.error, 500) }), ...(raw.modeNotice === undefined ? {} : { modeNotice: text(raw.modeNotice, 500) }) };
+  const plugins = Array.isArray(raw.plugins) ? raw.plugins.slice(0, 100).map(entry => { const plugin = object(entry); return { pluginId: text(plugin.pluginId), pluginName: text(plugin.pluginName) }; }) : [];
+  return { ...(raw.imageInput === true ? { imageInput: true } : {}), ...(raw.fileInput === true ? { fileInput: true } : {}), ...(plugins.length ? { plugins } : {}), ...(pluginSkills.length ? { pluginSkills } : {}), models, modes: raw.modes.map((mode) => text(mode, 32)).filter((mode) => ["default", "plan"].includes(mode)), fetchedAt: text(raw.fetchedAt, 64), ...(raw.error === undefined ? {} : { error: text(raw.error, 500) }), ...(raw.modeNotice === undefined ? {} : { modeNotice: text(raw.modeNotice, 500) }) };
 }
 export function validateCodexSettings(value: unknown, catalog: CodexCatalog | null): CodexSettings | undefined {
   if (value === undefined) return undefined;

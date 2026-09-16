@@ -487,6 +487,7 @@ export class CodexAppServer implements AppServerClient {
         const raw = resultObject(await this.request("collaborationMode/list", {}), "collaborationMode/list");
         if (Array.isArray(raw.data)) modes = [...new Set(raw.data.filter(isRecord).map((item) => item.mode).filter((mode): mode is string => mode === "default" || mode === "plan"))];
       } catch { /* Experimental mode support is independently optional. */ }
+      const plugins: NonNullable<CodexCatalog["plugins"]> = [];
       const pluginSkills: NonNullable<CodexCatalog["pluginSkills"]> = [];
       try {
         const listed = resultObject(await this.request("plugin/list", { forceRefetch: false }), "plugin/list");
@@ -497,19 +498,24 @@ export class CodexAppServer implements AppServerClient {
           if (!Array.isArray(marketplace.plugins)) continue;
           for (const plugin of marketplace.plugins.filter(isRecord)) if (plugin.installed === true && plugin.enabled === true && typeof plugin.id === "string" && typeof plugin.name === "string") installed.push({ pluginId: plugin.id, pluginName: plugin.name, marketplaceName: marketplace.name, marketplacePath, remotePluginId: typeof plugin.remotePluginId === "string" ? plugin.remotePluginId : null });
         }
+        for (const plugin of installed) if (!plugins.some(item => item.pluginId === plugin.pluginId)) plugins.push({ pluginId: plugin.pluginId.slice(0, 256), pluginName: plugin.pluginName.slice(0, 256) });
         const details = await Promise.allSettled(installed.slice(0, 50).map(plugin => this.request("plugin/read", { pluginName: plugin.pluginName, ...(plugin.marketplacePath ? { marketplacePath: plugin.marketplacePath } : { remoteMarketplaceName: plugin.marketplaceName }) }).then(value => ({ plugin, value }))));
         for (const result of details) {
           if (result.status !== "fulfilled") continue;
           const raw = resultObject(result.value.value, "plugin/read");
           const detail = resultObject(raw.plugin, "plugin/read plugin");
+          const pluginInterface = isRecord(detail.interface) ? detail.interface : null;
+          const displayName = pluginInterface && typeof pluginInterface.displayName === "string" && pluginInterface.displayName ? pluginInterface.displayName.slice(0, 256) : result.value.plugin.pluginName;
+          const catalogPlugin = plugins.find(item => item.pluginId === result.value.plugin.pluginId);
+          if (catalogPlugin) catalogPlugin.pluginName = displayName;
           if (!Array.isArray(detail.skills)) continue;
           for (const skill of detail.skills.filter(isRecord)) if (skill.enabled === true && typeof skill.name === "string") {
             const path = typeof skill.path === "string" ? skill.path : result.value.plugin.remotePluginId ? `remote-plugin://${encodeURIComponent(result.value.plugin.marketplaceName)}/${encodeURIComponent(result.value.plugin.remotePluginId)}/${encodeURIComponent(skill.name)}` : null;
-            if (path) pluginSkills.push({ pluginId: result.value.plugin.pluginId, pluginName: result.value.plugin.pluginName, name: skill.name.slice(0, 256), description: (typeof skill.shortDescription === "string" ? skill.shortDescription : typeof skill.description === "string" ? skill.description : "").slice(0, 1_000), path });
+            if (path) pluginSkills.push({ pluginId: result.value.plugin.pluginId, pluginName: displayName, name: skill.name.slice(0, 256), description: (typeof skill.shortDescription === "string" ? skill.shortDescription : typeof skill.description === "string" ? skill.description : "").slice(0, 1_000), path });
           }
         }
       } catch { /* Plugins are optional and must never make the model catalog unusable. */ }
-      this.codexCatalog = { models: [...models.values()], modes, pluginSkills, fetchedAt: nowIso() };
+      this.codexCatalog = { models: [...models.values()], modes, plugins, pluginSkills, fetchedAt: nowIso() };
     } catch (error) {
       this.codexCatalog = { models: [], modes: [], fetchedAt: nowIso(), error: errorMessage(error).slice(0, 500) };
     }

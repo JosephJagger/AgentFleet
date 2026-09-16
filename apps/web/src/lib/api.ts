@@ -293,6 +293,7 @@ function mapSession(
     controlLeaseVersion: integer(raw.controlLeaseVersion),
     imageInputSupported: raw.imageInputSupported === true,
     fileInputSupported: raw.fileInputSupported === true,
+    plugins: Array.isArray(raw.plugins) ? raw.plugins as FleetSession["plugins"] : [],
     pluginSkills: Array.isArray(raw.pluginSkills) ? raw.pluginSkills as FleetSession["pluginSkills"] : [],
     collaborationModes: Array.isArray(raw.collaborationModes) ? raw.collaborationModes.filter(value => value === "default" || value === "plan") as string[] : [],
     cloudImageRevision: integer(raw.cloudImageRevision),

@@ -80,28 +80,24 @@ it("计划模式只应用于下一次发送，成功后清除待发送标记", a
   await waitFor(() => expect(send).toHaveBeenCalledWith("先制定方案", { model: "test-model", effort: "medium", mode: "plan" }, undefined));
   await waitFor(() => expect(screen.queryByText("本次发送 · 计划模式")).toBeNull());
 });
-it("输入 @ 可按插件名部分匹配技能并加入本次发送", async () => {
+it("输入 @ 可按插件名部分匹配并将整个插件加入本次发送", async () => {
   const props = inspectorProps("A");
-  props.detail = { ...props.detail, session: { ...props.detail.session, pluginSkills: [
-    { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify App Builder", name: "Admin GraphQL", description: "管理 Shopify 后台数据", path: "/plugins/shopify/admin" },
-    { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify App Builder", name: "Liquid themes", description: "开发 Shopify 主题", path: "/plugins/shopify/liquid" },
-    { pluginId: "github", pluginName: "GitHub", name: "Pull requests", description: "管理 Pull Request", path: "/plugins/github/pulls" },
+  props.detail = { ...props.detail, session: { ...props.detail.session, plugins: [
+    { pluginId: "shopify@openai-curated-remote", pluginName: "Shopify" },
+    { pluginId: "github", pluginName: "GitHub" },
   ] } };
   const send = vi.fn(noop);
   render(<SessionInspector {...props} onSend={send} />);
   const prompt = screen.getByRole("textbox", { name: "发送给 Codex 的消息" });
   fireEvent.change(prompt, { target: { value: "@shop" } });
   const choices = screen.getByRole("listbox", { name: "插件" });
-  expect(within(choices).getByRole("option", { name: /Shopify App Builder/ })).toBeTruthy();
+  expect(within(choices).getByRole("option", { name: /Shopify/ })).toBeTruthy();
   expect(within(choices).queryByText(/GitHub/)).toBeNull();
   fireEvent.keyDown(prompt, { key: "Enter" });
-  expect((prompt as HTMLTextAreaElement).value).toBe("@shopify/");
-  expect(screen.getByRole("option", { name: /Admin GraphQL/ })).toBeTruthy();
-  fireEvent.keyDown(prompt, { key: "Enter" });
   expect((prompt as HTMLTextAreaElement).value).toBe("");
-  expect(screen.getByText("Admin GraphQL", { selector: ".attachment-chip span" })).toBeTruthy();
+  expect(screen.getByText("Shopify", { selector: ".attachment-chip span" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
-  await waitFor(() => expect(send).toHaveBeenCalledWith("", undefined, undefined, { pluginSkills: [{ pluginId: "shopify@openai-curated-remote", name: "Admin GraphQL", path: "/plugins/shopify/admin" }] }));
+  await waitFor(() => expect(send).toHaveBeenCalledWith("", undefined, undefined, { plugins: [{ pluginId: "shopify@openai-curated-remote", pluginName: "Shopify" }] }));
 });
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
 

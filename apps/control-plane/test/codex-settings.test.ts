@@ -21,6 +21,12 @@ test("control plane gates service tiers and personality and preserves accepted n
   assert.deepEqual(parseRuntimeSettings({ accepted: { model: "test", serviceTier: null, personality: "friendly", secret: "omit" } }), { accepted: { model: "test", serviceTier: null, personality: "friendly" } });
 });
 
+test("control plane preserves installed plugins separately from their skills", () => {
+  const catalog = parseCodexCatalog({ models: [], modes: [], fetchedAt: "2026-09-16", plugins: [{ pluginId: "shopify@remote", pluginName: "Shopify" }], pluginSkills: [{ pluginId: "shopify@remote", pluginName: "Shopify", name: "Admin", description: "Admin API", path: "/skills/admin/SKILL.md" }] });
+  assert.deepEqual(catalog?.plugins, [{ pluginId: "shopify@remote", pluginName: "Shopify" }]);
+  assert.equal(catalog?.pluginSkills?.length, 1);
+});
+
 test("inspection projection only permits known sections and display fields", () => {
   const result = sanitizeInspection({ cwd: "/project", observedAt: "2026-09-05", secret: "omit", sections: { account: { available: true, rows: [{ name: "Account", detail: "ChatGPT", status: "ready", accessToken: "omit" }], truncated: false, raw: "omit" }, unknown: { secret: "omit" } } });
   assert.ok(result);

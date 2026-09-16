@@ -140,6 +140,7 @@ export interface LogicalSessionSummary {
   weeklyBoundaryIncomplete?: boolean;
   imageInputSupported?: boolean;
   fileInputSupported?: boolean;
+  plugins?: Array<{ pluginId: string; pluginName: string }>;
   pluginSkills?: Array<{ pluginId: string; pluginName: string; name: string; description: string; path: string }>;
   collaborationModes?: string[];
   cloudImageRevision?: number;

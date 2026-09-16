@@ -2,7 +2,7 @@ import { UsageService } from "./usage.js";
 import type { ControlPlaneConfig } from "./config.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
 import { parseImages } from "./images.js";
-import { parseAttachments, parsePluginSkills } from "./attachments.js";
+import { parseAttachments, parsePlugins, parsePluginSkills } from "./attachments.js";
 import { CloudImages } from "./cloud-images.js";
 import { canonicalJson, futureIso, newId, nowIso, payloadHash as hashPayload } from "./crypto.js";
 import { PermissionPreferencesService } from "./permission-preferences.js";
@@ -459,9 +459,10 @@ export class CoordinationService {
       let images: string[];
       try { images = parseImages(payload.images); } catch (error) { throw new AppError(400, "INVALID_IMAGES", (error as Error).message); }
       const attachments = parseAttachments(payload.attachments);
+      const plugins = parsePlugins(payload.plugins);
       const pluginSkills = parsePluginSkills(payload.pluginSkills);
-      const hasRichInput = images.length > 0 || attachments.length > 0 || pluginSkills.length > 0;
-      if (attachments.length || pluginSkills.length || payload.goal !== undefined) invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "ATTACHMENTS_NOT_ALLOWED", "此操作不能附带文件、插件或目标");
+      const hasRichInput = images.length > 0 || attachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0;
+      if (attachments.length || plugins.length || pluginSkills.length || payload.goal !== undefined) invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "ATTACHMENTS_NOT_ALLOWED", "此操作不能附带文件、插件或目标");
       if (payload.goal !== undefined) invariant(typeof payload.goal === "string" && payload.goal.trim().length > 0 && payload.goal.length <= 2_000 && !payload.goal.includes("\0"), 400, "GOAL_INVALID", "目标需要为 1–2000 个字符");
       if (attachments.length) {
         const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
@@ -471,6 +472,11 @@ export class CoordinationService {
         const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
         const catalog = parseCodexCatalog(raw?.codex_catalog_json ? JSON.parse(raw.codex_catalog_json) : null);
         invariant(pluginSkills.every(selected => catalog?.pluginSkills?.some(skill => skill.pluginId === selected.pluginId && skill.name === selected.name && skill.path === selected.path)), 409, "PLUGIN_SKILL_UNAVAILABLE", "所选插件技能已变化，请刷新后重选");
+      }
+      if (plugins.length) {
+        const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
+        const catalog = parseCodexCatalog(raw?.codex_catalog_json ? JSON.parse(raw.codex_catalog_json) : null);
+        invariant(plugins.every(selected => catalog?.plugins?.some(plugin => plugin.pluginId === selected.pluginId && plugin.pluginName === selected.pluginName)), 409, "PLUGIN_UNAVAILABLE", "所选插件已变化，请刷新后重选");
       }
       if (images.length) {
         invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "IMAGES_NOT_ALLOWED", "此操作不能附带图片");

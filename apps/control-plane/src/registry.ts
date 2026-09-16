@@ -2812,6 +2812,7 @@ export class RegistryService {
       machineId: row.machine_id,
       imageInputSupported: machineCatalog?.imageInput === true,
       fileInputSupported: machineCatalog?.fileInput === true,
+      plugins: machineCatalog?.plugins ?? [],
       pluginSkills: machineCatalog?.pluginSkills ?? [],
       collaborationModes: machineCatalog?.modes ?? [],
       cloudImageRevision: this.db.get<{ cloud_image_revision: number }>("SELECT cloud_image_revision FROM machines WHERE machine_id=?", row.machine_id)?.cloud_image_revision ?? 0,

@@ -783,16 +783,6 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .composer-add-field input { width: 100%; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); color: var(--text); }
 .composer-add-section { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 12px !important; }
 .composer-plugin-list { display: grid; gap: 2px; }
-.composer-plugin-group { border-radius: 12px; }
-.composer-plugin-group > summary { width: 100%; display: grid; grid-template-columns: 22px minmax(0,1fr) auto; align-items: center; gap: 9px; padding: 10px 9px; border-radius: 12px; color: var(--text); cursor: pointer; list-style: none; }
-.composer-plugin-group > summary::-webkit-details-marker { display: none; }
-.composer-plugin-group > summary:hover { background: var(--surface-hover); }
-.composer-plugin-group > summary span, .composer-plugin-group > div > button span { min-width: 0; display: grid; gap: 2px; }
-.composer-plugin-group > summary > svg:last-child { color: var(--text-muted); transition: transform .16s ease; }
-.composer-plugin-group[open] > summary > svg:last-child { transform: rotate(90deg); }
-.composer-plugin-group > div { display: grid; gap: 2px; padding: 0 0 4px 25px; }
-.composer-plugin-group > div > button { width: 100%; display: block; padding: 9px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--text); text-align: left; }
-.composer-plugin-group > div > button:hover, .composer-plugin-group > div > button.selected { background: var(--surface-hover); }
 .attachment-drafts { display: flex; flex-wrap: wrap; gap: 6px; padding: 9px 12px 0; }
 .attachment-chip { display: inline-flex; align-items: center; min-width: 0; max-width: min(100%, 360px); gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-subtle); font-size: .78rem; }
 .attachment-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
