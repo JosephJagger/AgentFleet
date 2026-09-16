@@ -960,7 +960,7 @@ export class CoordinationService {
         this.setCommandState(evidence.commandId,evidence.state === "rejected" ? "invalidated" : "applied",detail);
         this.releaseProjectTurnReservationForCommand(evidence.commandId,"host_journal_recovery",timestamp);
         if (!failed && startsTurn) this.db.run(
-          "UPDATE logical_sessions SET active_turn_id=NULL,execution_state=?,turn_control_version=turn_control_version+1,updated_at=? WHERE logical_session_id=? AND active_turn_id=?",
+          "UPDATE logical_sessions SET active_turn_id=NULL,execution_state=?,turn_control_version=turn_control_version+1,updated_at=? WHERE logical_session_id=? AND (active_turn_id IS NULL OR active_turn_id=?)",
           terminal,timestamp,command.logical_session_id,response.nativeTurnId);
         this.db.audit({workspaceId:operation.workspace_id,machineId,logicalSessionId:command.logical_session_id,action:"command.recovered",outcome:failed?"failed":"succeeded",metadata:{operationId,commandId:evidence.commandId,attemptId:evidence.attemptId,source:"host_journal"}});
         changed.add(command.logical_session_id);

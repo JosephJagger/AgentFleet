@@ -284,6 +284,7 @@ test("cold start reconciles persisted reachability and dispatch attempts", async
     assert.deepEqual(service.recoverCommandResults(machineId,operationId),["session_recovery_responded"]);
     assert.equal(handle.db.get<{state:string}>("SELECT state FROM command_projection WHERE command_id=?",evidence.commandId)?.state,"applied");
     assert.equal(handle.db.get("SELECT 1 FROM project_turn_reservations WHERE command_id=?",evidence.commandId),undefined);
+    assert.deepEqual({...handle.db.get<{execution_state:string;active_turn_id:string|null}>("SELECT execution_state,active_turn_id FROM logical_sessions WHERE logical_session_id='session_recovery_responded'")!},{execution_state:"completed",active_turn_id:null});
     assert.deepEqual(service.recoverCommandResults(machineId,operationId),[]);
     assert.equal(handle.db.get<{n:number}>("SELECT count(*) n FROM dispatch_attempts")!.n,attempts,"no new execution attempt");
     assert.equal(handle.db.get<{state:string}>("SELECT state FROM command_projection WHERE command_id='command_recovery_invoking'")?.state,"unknown","unproven commands stay frozen");
