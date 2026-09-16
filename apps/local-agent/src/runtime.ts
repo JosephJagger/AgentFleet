@@ -3,6 +3,9 @@ import { nativeImageCleanup } from "./native-image-cleanup.js";
 import { randomUUID } from "node:crypto";
 import { setImmediate as yieldToIO } from "node:timers/promises";
 import { parseImages } from "./images.js";
+import { parseAttachments, parsePluginSkills, type MaterializedAttachment, type PluginSkillReference } from "./attachments.js";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { join, resolve, sep } from "node:path";
 import { permissionProfile } from "./permissions.js";
 import {
   AGENT_VERSION,
@@ -43,6 +46,59 @@ import type {
   SupportReport,
 } from "./types.js";
 import { canonicalJson, delay, isRecord, nowIso, requireString, sha256 } from "./util.js";
+
+async function ensurePlainDirectory(path: string): Promise<void> {
+  try { const stat = await lstat(path); if (!stat.isDirectory() || stat.isSymbolicLink()) throw new AgentError("ATTACHMENT_PATH_UNSAFE", "项目附件目录不是普通文件夹"); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; await mkdir(path); }
+}
+
+async function materializeAttachments(project: ProjectRecord, commandId: string, value: unknown): Promise<MaterializedAttachment[]> {
+  const attachments = parseAttachments(value);
+  if (!attachments.length) return [];
+  const base = resolve(project.root, ".agentfleets");
+  const uploads = join(base, "uploads");
+  const commandDir = join(uploads, sha256(commandId).slice(0, 24));
+  await ensurePlainDirectory(base); await ensurePlainDirectory(uploads); await ensurePlainDirectory(commandDir);
+  for (const attachment of attachments) {
+    const destination = resolve(commandDir, ...attachment.relativePath.split("/"));
+    if (!destination.startsWith(`${commandDir}${sep}`)) throw new AgentError("ATTACHMENT_PATH_UNSAFE", "文件路径越出附件目录");
+    const relativeParts = attachment.relativePath.split("/").slice(0, -1);
+    let parent = commandDir;
+    for (const part of relativeParts) { parent = join(parent, part); await ensurePlainDirectory(parent); }
+    const content = Buffer.from(attachment.data, "base64");
+    try { await writeFile(destination, content, { flag: "wx", mode: 0o600 }); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const existing = await readFile(destination);
+      if (!existing.equals(content)) throw new AgentError("ATTACHMENT_PATH_UNSAFE", "附件目录中已有不同内容的文件");
+    }
+  }
+  const mentions = new Map<string, MaterializedAttachment>();
+  for (const attachment of attachments) {
+    const top = attachment.relativePath.split("/")[0]!;
+    const folder = attachment.relativePath.includes("/");
+    const key = folder ? top : attachment.relativePath;
+    mentions.set(key, { name: key, path: join(commandDir, key) });
+  }
+  return [...mentions.values()];
+}
+
+async function materializePluginSkills(project: ProjectRecord, commandId: string, skills: PluginSkillReference[], server: AppServerClient): Promise<PluginSkillReference[]> {
+  const result: PluginSkillReference[] = [];
+  for (const skill of skills) {
+    if (!skill.path.startsWith("remote-plugin://")) { result.push(skill); continue; }
+    if (!server.readPluginSkill) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "当前连接服务不能读取远程插件技能");
+    const contents = await server.readPluginSkill(skill);
+    const base = resolve(project.root, ".agentfleets"); const root = join(base, "plugin-skills");
+    const skillDir = join(root, sha256(`${commandId}:${skill.pluginId}:${skill.name}`).slice(0, 24));
+    await ensurePlainDirectory(base); await ensurePlainDirectory(root); await ensurePlainDirectory(skillDir);
+    const destination = join(skillDir, "SKILL.md"); const content = Buffer.from(contents, "utf8");
+    try { await writeFile(destination, content, { flag: "wx", mode: 0o600 }); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST" || !(await readFile(destination)).equals(content)) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "插件技能落盘失败"); }
+    result.push({ ...skill, path: destination });
+  }
+  return result;
+}
 
 export interface RuntimeCallbacks {
   onOutboxChanged(): void;
@@ -1359,7 +1415,12 @@ export class AgentRuntime {
         const nativeAction = command.type === "turn.compact" ? "compact" : command.type === "turn.review" ? "review" : undefined;
         if (nativeAction && (!boundThread || !server.startNativeTurn || Object.keys(command.payload).length !== 0)) throw new AgentError("PRECONDITION_INVALID", "Native turn requires an existing thread and an empty payload");
         const images = parseImages(command.payload.images);
-        const prompt = nativeAction ? "" : requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0, maxLength: 200_000 });
+        const rawAttachments = parseAttachments(command.payload.attachments);
+        const pluginSkills = parsePluginSkills(command.payload.pluginSkills);
+        const goal = command.payload.goal === undefined ? undefined : requireString(command.payload.goal, "payload.goal", { maxLength: 2_000 });
+        const catalog = server.getCodexCatalog?.();
+        if (pluginSkills.some(selected => !catalog?.pluginSkills?.some(skill => skill.pluginId === selected.pluginId && skill.name === selected.name && skill.path === selected.path))) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "所选插件技能已变化，请刷新后重选");
+        const prompt = nativeAction ? "" : requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
         const settings = validateSettings(command.payload.settings, server.getCodexCatalog?.());
         const profile = permissionProfile(command.payload.permissionProfile);
         if (command.precondition.executionSegmentId !== command.executionSegmentId) {
@@ -1449,9 +1510,11 @@ export class AgentRuntime {
         }
         if (thread.activeTurnId !== undefined) throw new AgentError("THREAD_BUSY", "thread still has an active turn");
         const clientUserMessageId = optionalString(command.payload.clientUserMessageId, "payload.clientUserMessageId");
+        const materialized = nativeAction ? [] : await materializeAttachments(project, command.commandId, rawAttachments);
+        const materializedSkills = nativeAction ? [] : await materializePluginSkills(project, command.commandId, pluginSkills, server);
         const result = nativeAction
           ? await server.startNativeTurn!(thread, nativeAction, { type: "uncommittedChanges" })
-          : await server.startTurn(thread, project, prompt, clientUserMessageId, settings, images);
+          : await server.startTurn(thread, project, prompt, clientUserMessageId, settings, images, { attachments: materialized, pluginSkills: materializedSkills, ...(goal ? { goal } : {}) });
         let completedBeforeResponse = false;
         const updated = await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => {
           candidate.acceptedPermissions = { profile, source: typeof command.payload.permissionSource === "string" ? command.payload.permissionSource : "default", acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
@@ -1508,7 +1571,12 @@ export class AgentRuntime {
       case "turn.steer": {
         const turnId = requireString(command.precondition.nativeTurnId, "precondition.nativeTurnId", { maxLength: 256 });
         const images = parseImages(command.payload.images);
-        const prompt = requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0, maxLength: 200_000 });
+        const rawAttachments = parseAttachments(command.payload.attachments);
+        const pluginSkills = parsePluginSkills(command.payload.pluginSkills);
+        const goal = command.payload.goal === undefined ? undefined : requireString(command.payload.goal, "payload.goal", { maxLength: 2_000 });
+        const catalog = server.getCodexCatalog?.();
+        if (pluginSkills.some(selected => !catalog?.pluginSkills?.some(skill => skill.pluginId === selected.pluginId && skill.name === selected.name && skill.path === selected.path))) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "所选插件技能已变化，请刷新后重选");
+        const prompt = requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
         const thread = Object.values(this.store.snapshot().managedThreads).find(
           (candidate) => candidate.logicalSessionId === command.logicalSessionId,
         );
@@ -1525,7 +1593,9 @@ export class AgentRuntime {
           throw new AgentError("PRECONDITION_INVALID", "steer requires turnControlVersion");
         }
         const clientUserMessageId = optionalString(command.payload.clientUserMessageId, "payload.clientUserMessageId");
-        const result = await server.steerTurn(thread, turnId, prompt, clientUserMessageId, images);
+        const materialized = await materializeAttachments(project, command.commandId, rawAttachments);
+        const materializedSkills = await materializePluginSkills(project, command.commandId, pluginSkills, server);
+        const result = await server.steerTurn(thread, turnId, prompt, clientUserMessageId, images, { attachments: materialized, pluginSkills: materializedSkills, ...(goal ? { goal } : {}) });
         await this.emitForThread(thread, {
           type: "turn.steered",
           nativeThreadId: thread.nativeThreadId,

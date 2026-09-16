@@ -139,6 +139,9 @@ export interface LogicalSessionSummary {
   weeklyTokens?: number | null;
   weeklyBoundaryIncomplete?: boolean;
   imageInputSupported?: boolean;
+  fileInputSupported?: boolean;
+  pluginSkills?: Array<{ pluginId: string; pluginName: string; name: string; description: string; path: string }>;
+  collaborationModes?: string[];
   cloudImageRevision?: number;
   runtimeSettings?: Record<string, unknown> | null;
   logicalSessionId: string;

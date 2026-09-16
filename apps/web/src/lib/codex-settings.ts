@@ -1,5 +1,8 @@
 export interface CodexSettings { model: string; effort?: string; mode?: "default" | "plan"; serviceTier?: string | null; personality?: "none" | "friendly" | "pragmatic" }
 export interface CodexCatalog {
+  imageInput?: boolean;
+  fileInput?: boolean;
+  pluginSkills?: Array<{ pluginId: string; pluginName: string; name: string; description: string; path: string }>;
   models: Array<{ model: string; displayName: string; efforts: string[]; defaultEffort: string; serviceTiers?: { id: string; name: string }[]; supportsPersonality?: boolean }>;
   modes: string[];
   fetchedAt: string;

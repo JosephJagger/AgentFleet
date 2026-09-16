@@ -759,9 +759,39 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .composer-button-group { display: flex; flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; gap: 8px; max-width: 100%; }
 .composer-image-input { display: none; }
 .composer-image-button { white-space: nowrap; }
+.composer-add-menu { position: relative; }
+.composer-add-menu > summary { list-style: none; cursor: pointer; }
+.composer-add-menu > summary::-webkit-details-marker { display: none; }
+.composer-add-trigger { width: 40px; padding: 0 !important; justify-content: center; }
+.composer-add-menu[open] > .composer-add-trigger { color: var(--mint); border-color: color-mix(in srgb, var(--mint) 55%, var(--line)); background: color-mix(in srgb, var(--mint) 10%, var(--canvas)); }
+.composer-add-popover { position: absolute; z-index: 30; left: 0; bottom: calc(100% + 10px); width: min(420px, calc(100vw - 32px)); max-height: min(560px, 70vh); overflow: auto; padding: 12px; border: 1px solid var(--line-strong); border-radius: 18px; background: color-mix(in srgb, var(--panel) 96%, transparent); box-shadow: 0 18px 50px rgba(0,0,0,.35); backdrop-filter: blur(18px); }
+.composer-add-popover > strong { display: block; padding: 3px 8px 8px; color: var(--text-muted); font-size: .76rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.composer-add-popover > button, .composer-plugin-list > button, .composer-add-field { width: 100%; display: grid; grid-template-columns: 22px minmax(0,1fr) auto; align-items: start; gap: 9px; padding: 10px 9px; border: 0; border-radius: 12px; background: transparent; color: var(--text); text-align: left; }
+.composer-add-popover > button:hover, .composer-plugin-list > button:hover, .composer-plugin-list > button.selected { background: var(--surface-hover); }
+.composer-add-popover button:disabled { opacity: .42; }
+.composer-add-popover button span, .composer-add-field > span { min-width: 0; display: grid; gap: 2px; }
+.composer-add-popover b { font-size: .9rem; font-weight: 650; }
+.composer-add-popover small { overflow: hidden; color: var(--text-muted); font-size: .76rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.composer-add-popover i { align-self: center; width: 28px; height: 17px; border-radius: 999px; background: var(--line-strong); position: relative; }
+.composer-add-popover i::after { content: ""; position: absolute; width: 11px; height: 11px; left: 3px; top: 3px; border-radius: 50%; background: var(--text-muted); transition: transform .16s ease; }
+.composer-add-popover i.active { background: color-mix(in srgb, var(--mint) 45%, var(--line)); }
+.composer-add-popover i.active::after { transform: translateX(11px); background: var(--mint); }
+.composer-add-field input { width: 100%; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); color: var(--text); }
+.composer-add-section { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 12px !important; }
+.composer-plugin-list { display: grid; gap: 2px; }
+.attachment-drafts { display: flex; flex-wrap: wrap; gap: 6px; padding: 9px 12px 0; }
+.attachment-chip { display: inline-flex; align-items: center; min-width: 0; max-width: min(100%, 360px); gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-subtle); font-size: .78rem; }
+.attachment-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-chip small { color: var(--text-muted); white-space: nowrap; }
+.attachment-chip button { display: grid; place-items: center; padding: 2px; border: 0; background: transparent; color: var(--text-muted); }
+.attachment-chip--plugin { border-color: color-mix(in srgb, var(--magenta) 45%, var(--line)); }
 .composer-primary-pair { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
 .composer-button-group .active-turn-actions { align-items: center; gap: 6px; }
 .composer-actions > .composer-keyboard-hint { flex: 1 1 260px; min-width: 0; }
+
+@media (max-width: 700px) {
+  .composer-add-popover { position: fixed; left: 12px; right: 12px; bottom: 84px; width: auto; max-height: 68vh; }
+}
 .composer-ai-button { white-space: nowrap; }
 @media (max-width: 900px), (pointer: coarse) {
   .composer-button-group { flex-shrink: 1; }

@@ -119,6 +119,9 @@ export interface FleetSession {
   weeklyTokens?: number | null;
   weeklyBoundaryIncomplete?: boolean;
   imageInputSupported?: boolean;
+  fileInputSupported?: boolean;
+  pluginSkills?: Array<{ pluginId: string; pluginName: string; name: string; description: string; path: string }>;
+  collaborationModes?: string[];
   cloudImageRevision?: number;
   runtimeSettings?: import("./codex-settings").RuntimeSettings | null;
   id: string;

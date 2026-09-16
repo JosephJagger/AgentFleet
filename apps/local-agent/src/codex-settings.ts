@@ -19,6 +19,8 @@ export interface CodexModel {
 }
 export interface CodexCatalog {
   imageInput?: boolean;
+  fileInput?: boolean;
+  pluginSkills?: Array<{ pluginId: string; pluginName: string; name: string; description: string; path: string }>;
   models: CodexModel[];
   modes: string[];
   fetchedAt: string;

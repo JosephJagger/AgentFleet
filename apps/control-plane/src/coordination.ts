@@ -2,6 +2,7 @@ import { UsageService } from "./usage.js";
 import type { ControlPlaneConfig } from "./config.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
 import { parseImages } from "./images.js";
+import { parseAttachments, parsePluginSkills } from "./attachments.js";
 import { CloudImages } from "./cloud-images.js";
 import { canonicalJson, futureIso, newId, nowIso, payloadHash as hashPayload } from "./crypto.js";
 import { PermissionPreferencesService } from "./permission-preferences.js";
@@ -456,6 +457,20 @@ export class CoordinationService {
       invariant(supportsCommand(session.command_types_json, input.type), 409, "AGENT_CAPABILITY_UNAVAILABLE", "Agent has not reported support for this operation; update the connection service");
       let images: string[];
       try { images = parseImages(payload.images); } catch (error) { throw new AppError(400, "INVALID_IMAGES", (error as Error).message); }
+      const attachments = parseAttachments(payload.attachments);
+      const pluginSkills = parsePluginSkills(payload.pluginSkills);
+      const hasRichInput = images.length > 0 || attachments.length > 0 || pluginSkills.length > 0;
+      if (attachments.length || pluginSkills.length || payload.goal !== undefined) invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "ATTACHMENTS_NOT_ALLOWED", "此操作不能附带文件、插件或目标");
+      if (payload.goal !== undefined) invariant(typeof payload.goal === "string" && payload.goal.trim().length > 0 && payload.goal.length <= 2_000 && !payload.goal.includes("\0"), 400, "GOAL_INVALID", "目标需要为 1–2000 个字符");
+      if (attachments.length) {
+        const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
+        invariant(parseCodexCatalog(raw?.codex_catalog_json ? JSON.parse(raw.codex_catalog_json) : null)?.fileInput === true, 409, "AGENT_FILE_UNSUPPORTED", "请先更新这台主机的连接服务，当前版本不能接收文件");
+      }
+      if (pluginSkills.length) {
+        const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
+        const catalog = parseCodexCatalog(raw?.codex_catalog_json ? JSON.parse(raw.codex_catalog_json) : null);
+        invariant(pluginSkills.every(selected => catalog?.pluginSkills?.some(skill => skill.pluginId === selected.pluginId && skill.name === selected.name && skill.path === selected.path)), 409, "PLUGIN_SKILL_UNAVAILABLE", "所选插件技能已变化，请刷新后重选");
+      }
       if (images.length) {
         invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "IMAGES_NOT_ALLOWED", "此操作不能附带图片");
         const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
@@ -543,7 +558,7 @@ export class CoordinationService {
         invariant(precondition.threadControlVersion === session.thread_control_version, 409, "THREAD_VERSION_CONFLICT", "threadControlVersion changed", { currentVersion: session.thread_control_version });
         invariant(Object.hasOwn(precondition, "expectedActiveTurnId") && precondition.expectedActiveTurnId === null && session.active_turn_id === null, 409, "ACTIVE_TURN_CONFLICT", "expectedActiveTurnId must be null and the session must be idle", { activeTurnId: session.active_turn_id });
         invariant(precondition.projectLeaseVersion === session.project_lease_version, 409, "PROJECT_VERSION_CONFLICT", "projectLeaseVersion changed", { currentVersion: session.project_lease_version });
-        if (input.type === "turn.start") invariant(typeof payload.prompt === "string" && (payload.prompt.trim().length > 0 || images.length > 0) && Buffer.byteLength(payload.prompt) <= 200_000, 400, "INVALID_PROMPT", "请填写消息或粘贴图片，文字不能超过 200 KB");
+        if (input.type === "turn.start") invariant(typeof payload.prompt === "string" && (payload.prompt.trim().length > 0 || hasRichInput) && Buffer.byteLength(payload.prompt) <= 200_000, 400, "INVALID_PROMPT", "请填写消息或添加附件，文字不能超过 200 KB");
         else invariant(session.native_thread_id && Object.keys(payload).length === 0, 400, "INVALID_NATIVE_PAYLOAD", "Native turns require an existing thread and an empty payload");
       } else if (input.type === "turn.queue") {
         invariant(session.sync_content === 1, 409, "QUEUE_REQUIRES_CONTENT_SYNC", "Queue is unavailable while Project content sync is disabled");
@@ -554,13 +569,13 @@ export class CoordinationService {
         invariant(precondition.expectedActiveTurnId === session.active_turn_id, 409, "ACTIVE_TURN_CONFLICT", "active turn changed", { activeTurnId: session.active_turn_id });
         invariant(precondition.projectLeaseVersion === session.project_lease_version, 409, "PROJECT_VERSION_CONFLICT", "projectLeaseVersion changed", { currentVersion: session.project_lease_version });
         invariant(precondition.queueVersion === session.queue_version, 409, "QUEUE_VERSION_CONFLICT", "queueVersion changed", { currentVersion: session.queue_version });
-        invariant(typeof payload.prompt === "string" && (payload.prompt.trim().length > 0 || images.length > 0) && Buffer.byteLength(payload.prompt) <= 200_000, 400, "INVALID_PROMPT", "请填写消息或粘贴图片，文字不能超过 200 KB");
+        invariant(typeof payload.prompt === "string" && (payload.prompt.trim().length > 0 || hasRichInput) && Buffer.byteLength(payload.prompt) <= 200_000, 400, "INVALID_PROMPT", "请填写消息或添加附件，文字不能超过 200 KB");
       } else if (input.type === "turn.steer") {
         invariant(!input.controlLeaseId, 400, "STEER_LEASE_FORBIDDEN", "Steer uses turnControlVersion instead of a Control Lease");
         invariant(session.active_turn_id !== null, 409, "NO_ACTIVE_TURN", "Session has no active turn");
         invariant(precondition.nativeTurnId === session.active_turn_id, 409, "ACTIVE_TURN_CONFLICT", "nativeTurnId changed", { activeTurnId: session.active_turn_id });
         invariant(precondition.turnControlVersion === session.turn_control_version, 409, "TURN_VERSION_CONFLICT", "turnControlVersion changed", { currentVersion: session.turn_control_version });
-        invariant(typeof payload.prompt === "string" && (payload.prompt.trim().length > 0 || images.length > 0) && Buffer.byteLength(payload.prompt) <= 200_000, 400, "INVALID_PROMPT", "请填写消息或粘贴图片，文字不能超过 200 KB");
+        invariant(typeof payload.prompt === "string" && (payload.prompt.trim().length > 0 || hasRichInput) && Buffer.byteLength(payload.prompt) <= 200_000, 400, "INVALID_PROMPT", "请填写消息或添加附件，文字不能超过 200 KB");
       } else if (input.type === "turn.cancel") {
         this.requireLease(principal, logicalSessionId, input.controlLeaseId);
         invariant(session.active_turn_id !== null, 409, "NO_ACTIVE_TURN", "Session has no active turn");

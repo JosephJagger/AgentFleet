@@ -3,6 +3,7 @@ import { previewNativeDeletion, type DeletionPreview } from "./native-deletion.j
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { parseImages, validImageUrl, MAX_IMAGES } from "./images.js";
+import type { TurnExtras } from "./attachments.js";
 import { createInterface } from "node:readline";
 import { AgentError, errorMessage } from "./errors.js";
 import {
@@ -52,7 +53,7 @@ const APP_SERVER_METHODS = new Set([
   "turn/start",
   "thread/compact/start",
   "review/start",
-  "account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list",
+  "account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "plugin/read", "plugin/skill/read", "thread/goal/set",
   "permissionProfile/list", "experimentalFeature/list", "thread/goal/get", "thread/backgroundTerminals/list", "thread/backgroundTerminals/clean",
   "turn/steer",
   "turn/interrupt",
@@ -164,6 +165,7 @@ export interface AppServerClient {
   previewDeletion?(thread:ManagedThread,project:ProjectRecord):Promise<DeletionPreview>;
   deleteThread?(thread:ManagedThread,project:ProjectRecord,preview:DeletionPreview):Promise<void>;
   getCodexCatalog?(): CodexCatalog;
+  readPluginSkill?(reference: { name: string; path: string }): Promise<string>;
   inspectEnvironment?(cwd: string, threadId?: string): Promise<CodexInspection>;
   threadAction?(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string): Promise<Record<string, unknown>>;
   startNativeTurn?(thread: ManagedThread, action: "compact" | "review", target?: Record<string, unknown>): Promise<TurnStartResult>;
@@ -186,6 +188,7 @@ export interface AppServerClient {
     clientUserMessageId?: string,
     settings?: CodexSettings,
     images?: string[],
+    extras?: TurnExtras,
   ): Promise<TurnStartResult>;
   steerTurn(
     thread: ManagedThread,
@@ -193,6 +196,7 @@ export interface AppServerClient {
     prompt: string,
     clientUserMessageId?: string,
     images?: string[],
+    extras?: TurnExtras,
   ): Promise<TurnStartResult>;
   interruptTurn(threadId: string, turnId: string): Promise<Record<string, unknown>>;
   stopBackgroundTerminals?(thread: ManagedThread, project: ProjectRecord): Promise<void>;
@@ -389,7 +393,7 @@ export class CodexAppServer implements AppServerClient {
   private nextRequestId = 1;
   private initialized = false;
   private codexCatalog: CodexCatalog = { models: [], modes: [], fetchedAt: nowIso(), error: "尚未读取模型列表" };
-  getCodexCatalog(): CodexCatalog { return { ...structuredClone(this.codexCatalog), imageInput: true }; }
+  getCodexCatalog(): CodexCatalog { return { ...structuredClone(this.codexCatalog), imageInput: true, fileInput: true }; }
   private stopping = false;
   private pending = new Map<JsonId, PendingRpc>();
   private approvalTimers = new Map<string, NodeJS.Timeout>();
@@ -483,7 +487,29 @@ export class CodexAppServer implements AppServerClient {
         const raw = resultObject(await this.request("collaborationMode/list", {}), "collaborationMode/list");
         if (Array.isArray(raw.data)) modes = [...new Set(raw.data.filter(isRecord).map((item) => item.mode).filter((mode): mode is string => mode === "default" || mode === "plan"))];
       } catch { /* Experimental mode support is independently optional. */ }
-      this.codexCatalog = { models: [...models.values()], modes, fetchedAt: nowIso() };
+      const pluginSkills: NonNullable<CodexCatalog["pluginSkills"]> = [];
+      try {
+        const listed = resultObject(await this.request("plugin/list", { forceRefetch: false }), "plugin/list");
+        const installed: Array<{ pluginId: string; pluginName: string; marketplaceName: string; marketplacePath: string | null; remotePluginId: string | null }> = [];
+        if (Array.isArray(listed.marketplaces)) for (const marketplace of listed.marketplaces.filter(isRecord)) {
+          if (typeof marketplace.name !== "string") continue;
+          const marketplacePath = typeof marketplace.path === "string" ? marketplace.path : null;
+          if (!Array.isArray(marketplace.plugins)) continue;
+          for (const plugin of marketplace.plugins.filter(isRecord)) if (plugin.installed === true && plugin.enabled === true && typeof plugin.id === "string" && typeof plugin.name === "string") installed.push({ pluginId: plugin.id, pluginName: plugin.name, marketplaceName: marketplace.name, marketplacePath, remotePluginId: typeof plugin.remotePluginId === "string" ? plugin.remotePluginId : null });
+        }
+        const details = await Promise.allSettled(installed.slice(0, 50).map(plugin => this.request("plugin/read", { pluginName: plugin.pluginName, ...(plugin.marketplacePath ? { marketplacePath: plugin.marketplacePath } : { remoteMarketplaceName: plugin.marketplaceName }) }).then(value => ({ plugin, value }))));
+        for (const result of details) {
+          if (result.status !== "fulfilled") continue;
+          const raw = resultObject(result.value.value, "plugin/read");
+          const detail = resultObject(raw.plugin, "plugin/read plugin");
+          if (!Array.isArray(detail.skills)) continue;
+          for (const skill of detail.skills.filter(isRecord)) if (skill.enabled === true && typeof skill.name === "string") {
+            const path = typeof skill.path === "string" ? skill.path : result.value.plugin.remotePluginId ? `remote-plugin://${encodeURIComponent(result.value.plugin.marketplaceName)}/${encodeURIComponent(result.value.plugin.remotePluginId)}/${encodeURIComponent(skill.name)}` : null;
+            if (path) pluginSkills.push({ pluginId: result.value.plugin.pluginId, pluginName: result.value.plugin.pluginName, name: skill.name.slice(0, 256), description: (typeof skill.shortDescription === "string" ? skill.shortDescription : typeof skill.description === "string" ? skill.description : "").slice(0, 1_000), path });
+          }
+        }
+      } catch { /* Plugins are optional and must never make the model catalog unusable. */ }
+      this.codexCatalog = { models: [...models.values()], modes, pluginSkills, fetchedAt: nowIso() };
     } catch (error) {
       this.codexCatalog = { models: [], modes: [], fetchedAt: nowIso(), error: errorMessage(error).slice(0, 500) };
     }
@@ -512,6 +538,16 @@ export class CodexAppServer implements AppServerClient {
         resolve();
       });
     });
+  }
+
+  async readPluginSkill(reference: { name: string; path: string }): Promise<string> {
+    const match = /^remote-plugin:\/\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(reference.path);
+    if (!match) throw new AgentError("PLUGIN_SKILL_INVALID", "插件技能不是可读取的远程技能");
+    const marketplace = decodeURIComponent(match[1]!); const remotePluginId = decodeURIComponent(match[2]!); const skillName = decodeURIComponent(match[3]!);
+    if (skillName !== reference.name) throw new AgentError("PLUGIN_SKILL_INVALID", "插件技能名称不匹配");
+    const raw = resultObject(await this.request("plugin/skill/read", { remoteMarketplaceName: marketplace, remotePluginId, skillName }), "plugin/skill/read");
+    if (typeof raw.contents !== "string" || !raw.contents || Buffer.byteLength(raw.contents) > 512_000) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "插件技能内容不可用或过大");
+    return raw.contents;
   }
 
   async createThread(project: ProjectRecord, profile: PermissionProfile = "project", name?: string): Promise<ThreadStartResult> {
@@ -831,21 +867,22 @@ export class CodexAppServer implements AppServerClient {
     }
   }
 
-  private imageInputs(prompt: string, value: unknown, modelName?: string): Record<string, unknown>[] {
+  private imageInputs(prompt: string, value: unknown, modelName?: string, extras?: TurnExtras): Record<string, unknown>[] {
     const images = parseImages(value);
     const model = this.codexCatalog.models.find(entry => entry.model === modelName);
     if (images.length && model?.inputModalities && !model.inputModalities.includes("image"))
       throw new AgentError("MODEL_IMAGE_UNSUPPORTED", "当前模型不支持图片，请选择支持图片的模型后重试");
-    if (!prompt.trim() && !images.length) throw new AgentError("EMPTY_INPUT", "请填写消息或粘贴图片");
-    return [...(prompt ? [{ type: "text", text: prompt, text_elements: [] }] : []), ...images.map(url => ({ type: "image", url }))];
+    if (!prompt.trim() && !images.length && !extras?.attachments?.length && !extras?.pluginSkills?.length) throw new AgentError("EMPTY_INPUT", "请填写消息或添加附件");
+    return [...(prompt ? [{ type: "text", text: prompt, text_elements: [] }] : []), ...images.map(url => ({ type: "image", url })), ...(extras?.attachments ?? []).map(file => ({ type: "mention", name: file.name, path: file.path })), ...(extras?.pluginSkills ?? []).map(skill => ({ type: "skill", name: skill.name, path: skill.path }))];
   }
 
-  async startTurn(thread: ManagedThread, project: ProjectRecord, prompt: string, clientUserMessageId?: string, settings?: CodexSettings, images?: string[]): Promise<TurnStartResult> {
+  async startTurn(thread: ManagedThread, project: ProjectRecord, prompt: string, clientUserMessageId?: string, settings?: CodexSettings, images?: string[], extras?: TurnExtras): Promise<TurnStartResult> {
     this.assertInitialized();
     if (thread.appServerEpoch !== this.appServerEpoch || !thread.policyVerified) {
       throw new AgentError("THREAD_READ_ONLY", "thread policy or app-server ownership cannot be proven");
     }
     const cwd = await verifySessionCwd(project, thread.sessionCwd ?? project.root);
+    if (extras?.goal) await this.request("thread/goal/set", { threadId: thread.nativeThreadId, objective: extras.goal });
     const result = resultObject(
       await this.request("turn/start", {
         // Runtime validates settings against the long-lived catalog connection
@@ -854,7 +891,7 @@ export class CodexAppServer implements AppServerClient {
         ...turnSettingsParams(settings),
         threadId: thread.nativeThreadId,
         ...(clientUserMessageId === undefined ? {} : { clientUserMessageId }),
-        input: this.imageInputs(prompt, images, settings?.model ?? thread.observedSettings?.model),
+        input: this.imageInputs(prompt, images, settings?.model ?? thread.observedSettings?.model, extras),
         cwd,
         approvalPolicy: thread.permissionProfile === "full" ? "never" : "on-request",
         approvalsReviewer: "user",
@@ -875,16 +912,18 @@ export class CodexAppServer implements AppServerClient {
     prompt: string,
     clientUserMessageId?: string,
     images?: string[],
+    extras?: TurnExtras,
   ): Promise<TurnStartResult> {
     this.assertInitialized();
     if (thread.activeTurnId !== turnId) {
       throw new AgentError("TURN_PRECONDITION_FAILED", "the expected active turn is no longer current");
     }
+    if (extras?.goal) await this.request("thread/goal/set", { threadId: thread.nativeThreadId, objective: extras.goal });
     const result = resultObject(
       await this.request("turn/steer", {
         threadId: thread.nativeThreadId,
         expectedTurnId: turnId,
-        input: this.imageInputs(prompt, images, thread.acceptedSettings?.model ?? thread.observedSettings?.model),
+        input: this.imageInputs(prompt, images, thread.acceptedSettings?.model ?? thread.observedSettings?.model, extras),
         clientUserMessageId: clientUserMessageId ?? null,
       }),
       "turn/steer",
@@ -941,7 +980,7 @@ export class CodexAppServer implements AppServerClient {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new AgentError("APP_SERVER_TIMEOUT", `${method} did not respond in time`));
-      }, method === "initialize" ? 15_000 : ["model/list", "collaborationMode/list"].includes(method) ? 5_000 : ["account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "permissionProfile/list", "experimentalFeature/list", "thread/goal/get", "thread/backgroundTerminals/list"].includes(method) ? 10_000 : 60_000);
+      }, method === "initialize" ? 15_000 : ["model/list", "collaborationMode/list"].includes(method) ? 5_000 : ["account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "plugin/read", "plugin/skill/read", "permissionProfile/list", "experimentalFeature/list", "thread/goal/get", "thread/backgroundTerminals/list"].includes(method) ? 15_000 : 60_000);
       this.pending.set(id, { method, resolve, reject, timer });
     });
     try {

@@ -211,7 +211,7 @@ export async function buildControlPlane(
     logger: { level: config.logLevel },
     trustProxy: config.trustedProxies?.length ? config.trustedProxies : false,
     forceCloseConnections: true,
-    bodyLimit: 1_100_000,
+    bodyLimit: 12 * 1024 * 1024,
     requestTimeout: 15_000,
   });
   app.addHook("onClose", async () => writingSemantic.close());
@@ -250,7 +250,7 @@ export async function buildControlPlane(
   }
 
   await app.register(cookie);
-  await app.register(websocket, { options: { maxPayload: 8 * 1024 * 1024, perMessageDeflate: false } });
+  await app.register(websocket, { options: { maxPayload: 16 * 1024 * 1024, perMessageDeflate: false } });
 
   app.addHook("onSend", async (request, reply, payload) => {
     reply.header("x-content-type-options", "nosniff");

@@ -17,7 +17,7 @@
 Follow conversations across your machines. Continue the same native session.<br>
 Keep execution in your own environment.</p>
 
-<p align="center">A self-hosted operations console for Codex CLI across Linux servers and personal computers.<br>Manage native sessions, send images, and track usage from one English or Chinese web interface.</p>
+<p align="center">A self-hosted operations console for Codex CLI across Linux servers and personal computers.<br>Manage native sessions, send files and images, use installed plugin skills, and track usage from one English or Chinese web interface.</p>
 
 ![Castle in the Sky workspace with fictional demo data](docs/assets/themes/daylight-desktop-en.jpg)
 
@@ -32,7 +32,8 @@ Think of each enrolled host as a place where Codex executes work, and AgentFleet
 | Available today | What it makes easier |
 | --- | --- |
 | **Graphical Codex session management** | Browse hosts, projects, and conversations; continue native sessions; adjust model settings and execution permissions in the panel. |
-| **Images from your browser to a remote session** | Paste a screenshot, preview it, and send it with your instructions to Codex on the selected host, without manually copying the image to that server first. |
+| **Files, folders, and images sent to a remote session** | Use one attachment menu to paste images or upload bounded files and folders. AgentFleets safely stages files on the selected host and sends native Codex references. |
+| **Native goals, Plan mode, and plugin skills** | Set a persistent session goal, switch the next turn to a host-advertised collaboration mode, and select skills from installed, enabled Codex plugins. |
 | **Host files in conversation results** | Open or download files linked by Codex directly from the message. Bytes stream on demand from the bound host and remain limited to that session's registered project. |
 | **An overview across multiple hosts** | Follow running work, return to completed-but-controlled sessions, queue follow-up messages, and inspect recorded tokens and reported account quota. |
 | **Switchable interface themes** | Choose from 17 themes, with Castle in the Sky as the default for new browsers. Five Chinese classics join illustrated themes with coordinated messages, Markdown, code blocks and composers. |
@@ -41,7 +42,7 @@ Think of each enrolled host as a place where Codex executes work, and AgentFleet
 
 For example, paste a screenshot of a broken page on your laptop, select the session on your Linux host, and ask Codex to investigate the project there. The current composer accepts pasted **PNG, JPEG, and WebP images, up to four per message**, with previews and automatic resizing/compression. Submission requires a host runtime and model that support image input.
 
-Codex CLI already supports image inputs through `--image` and interactive paste; AgentFleets makes that workflow accessible through a browser across enrolled hosts. See the [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli). Here, multimodal submission means **text and images**; a general file picker, drag-and-drop uploads, and audio/video submission are not currently provided by the composer. Files that Codex links in a reply can be previewed or downloaded from the execution host on demand.
+Codex CLI already supports image and local-path inputs; AgentFleets makes those workflows accessible through a browser across enrolled hosts. See the [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli). The `+` menu accepts images, up to 32 files with a combined 8 MB limit, or a folder while preserving its relative structure. Files are staged under the selected project and passed to Codex as native path references. Audio/video-specific input is not provided. Files that Codex links in a reply can also be previewed or downloaded from the execution host on demand.
 
 ## Say what you need, even without the terminology
 
@@ -82,7 +83,7 @@ Today, AgentFleets manages native Codex sessions on supported Linux, macOS, and 
 
 - **A consistent operations entry point:** extend the workflow from individual coding sessions toward everyday application and system maintenance across operating systems.
 - **Coordinated work across hosts:** move toward explicit multi-host workflows with task dependencies and progress tracking. Today's panel manages sessions on each host; it does not automatically schedule one job across the fleet or migrate its conversation and Git state.
-- **Richer remote inputs:** make more attachment and visual workflows convenient from the browser, beyond the current text-and-image composer.
+- **Richer remote inputs:** expand beyond the current bounded file, folder, image, goal, Plan mode, and installed-plugin workflows while retaining host-side validation.
 
 These are future directions, not shipped features or a delivery schedule. Universal operating-system support and a complete interface for every computer operation remain goals. AgentFleets currently provides Codex session operations, not a general server monitoring, patch management, or multi-user access-control system.
 

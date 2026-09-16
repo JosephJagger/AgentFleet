@@ -2,6 +2,8 @@ import { invariant } from "./errors.js";
 
 export interface CodexCatalog {
   imageInput?: boolean;
+  fileInput?: boolean;
+  pluginSkills?: Array<{ pluginId: string; pluginName: string; name: string; description: string; path: string }>;
   models: Array<{ model: string; displayName: string; efforts: string[]; defaultEffort: string; serviceTiers?: { id: string; name: string }[]; supportsPersonality?: boolean; inputModalities?: string[] }>;
   modes: string[];
   fetchedAt: string;
@@ -29,7 +31,8 @@ export function parseCodexCatalog(value: unknown): CodexCatalog | null {
       ...(Array.isArray(model.serviceTiers) ? { serviceTiers: model.serviceTiers.slice(0, 16).map((entry) => { const tier = object(entry); return { id: text(tier.id, 64), name: text(tier.name, 128) }; }) } : {}),
       ...(typeof model.supportsPersonality === "boolean" ? { supportsPersonality: model.supportsPersonality } : {}) };
   });
-  return { ...(raw.imageInput === true ? { imageInput: true } : {}), models, modes: raw.modes.map((mode) => text(mode, 32)).filter((mode) => ["default", "plan"].includes(mode)), fetchedAt: text(raw.fetchedAt, 64), ...(raw.error === undefined ? {} : { error: text(raw.error, 500) }), ...(raw.modeNotice === undefined ? {} : { modeNotice: text(raw.modeNotice, 500) }) };
+  const pluginSkills = Array.isArray(raw.pluginSkills) ? raw.pluginSkills.slice(0, 200).map(entry => { const skill = object(entry); return { pluginId: text(skill.pluginId), pluginName: text(skill.pluginName), name: text(skill.name), description: text(skill.description, 1_000), path: text(skill.path, 8_192) }; }) : [];
+  return { ...(raw.imageInput === true ? { imageInput: true } : {}), ...(raw.fileInput === true ? { fileInput: true } : {}), ...(pluginSkills.length ? { pluginSkills } : {}), models, modes: raw.modes.map((mode) => text(mode, 32)).filter((mode) => ["default", "plan"].includes(mode)), fetchedAt: text(raw.fetchedAt, 64), ...(raw.error === undefined ? {} : { error: text(raw.error, 500) }), ...(raw.modeNotice === undefined ? {} : { modeNotice: text(raw.modeNotice, 500) }) };
 }
 export function validateCodexSettings(value: unknown, catalog: CodexCatalog | null): CodexSettings | undefined {
   if (value === undefined) return undefined;

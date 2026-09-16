@@ -4,6 +4,7 @@ import { AgentError } from "./errors.js";
 import type { ApprovalRecord, ManagedThread, ProjectRecord } from "./types.js";
 import type { CodexSettings } from "./codex-settings.js";
 import type { InputAnswers } from "./user-input.js";
+import type { TurnExtras } from "./attachments.js";
 
 type Writer = { client: AppServerClient; token: string; threadId?: string; live: boolean };
 type Factory = (callbacks: AppServerCallbacks, epoch: string) => AppServerClient;
@@ -67,6 +68,7 @@ export class SessionAppServer implements AppServerClient {
   }
   getQuotaSnapshot() { return this.catalog.getQuotaSnapshot?.(); }
   getCodexCatalog() { return this.catalog.getCodexCatalog!(); }
+  readPluginSkill(reference: { name: string; path: string }) { return this.catalog.readPluginSkill!(reference); }
   listThreads() { return this.catalog.listThreads(); }
   listThreadPage(cursor: string | null, options?: { useStateDbOnly: boolean }) { return this.catalog.listThreadPage!(cursor, options); }
   readTurnOutcome(id: string, turnId: string) { return this.catalog.readTurnOutcome!(id, turnId); }
@@ -159,13 +161,13 @@ export class SessionAppServer implements AppServerClient {
       // It makes no assertion about another CLI/desktop process's ownership.
     });
   }
-  startTurn(thread: ManagedThread, project: ProjectRecord, prompt: string, messageId?: string, settings?: CodexSettings, images?: string[]) {
-    return this.serial(thread.nativeThreadId, () => this.writer(thread.nativeThreadId).client.startTurn(thread, project, prompt, messageId, settings, images));
+  startTurn(thread: ManagedThread, project: ProjectRecord, prompt: string, messageId?: string, settings?: CodexSettings, images?: string[], extras?: TurnExtras) {
+    return this.serial(thread.nativeThreadId, () => this.writer(thread.nativeThreadId).client.startTurn(thread, project, prompt, messageId, settings, images, extras));
   }
   startNativeTurn(thread: ManagedThread, action: "compact" | "review", target?: Record<string, unknown>) {
     return this.serial(thread.nativeThreadId, () => this.writer(thread.nativeThreadId).client.startNativeTurn!(thread, action, target));
   }
-  steerTurn(thread: ManagedThread, turnId: string, prompt: string, messageId?: string, images?: string[]) { return this.writer(thread.nativeThreadId).client.steerTurn(thread, turnId, prompt, messageId, images); }
+  steerTurn(thread: ManagedThread, turnId: string, prompt: string, messageId?: string, images?: string[], extras?: TurnExtras) { return this.writer(thread.nativeThreadId).client.steerTurn(thread, turnId, prompt, messageId, images, extras); }
   interruptTurn(id: string, turnId: string) { return this.writer(id).client.interruptTurn(id, turnId); }
   async stopBackgroundTerminals(thread: ManagedThread, project: ProjectRecord) {
     await this.writer(thread.nativeThreadId).client.stopBackgroundTerminals!(thread, project);

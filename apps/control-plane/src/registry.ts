@@ -2803,13 +2803,17 @@ export class RegistryService {
     );
     invariant(row, 404, "SESSION_NOT_FOUND", "Logical Session was not found");
     const usageCycle = new UsageService(this.db).read(principal.workspaceId,"session",logicalSessionId).quotaCycle;
+    const machineCatalog = parseCodexCatalog(JSON.parse(this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", row.machine_id)?.codex_catalog_json ?? "null"));
     return {
       weeklyTokens: usageCycle?.recordedTokens ?? null,
       weeklyBoundaryIncomplete: usageCycle?.boundaryIncomplete ?? false,
       logicalSessionId: row.logical_session_id,
       recordedTokens: row.recorded_tokens,
       machineId: row.machine_id,
-      imageInputSupported: JSON.parse(this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", row.machine_id)?.codex_catalog_json ?? "null")?.imageInput === true,
+      imageInputSupported: machineCatalog?.imageInput === true,
+      fileInputSupported: machineCatalog?.fileInput === true,
+      pluginSkills: machineCatalog?.pluginSkills ?? [],
+      collaborationModes: machineCatalog?.modes ?? [],
       cloudImageRevision: this.db.get<{ cloud_image_revision: number }>("SELECT cloud_image_revision FROM machines WHERE machine_id=?", row.machine_id)?.cloud_image_revision ?? 0,
       projectId: row.project_id,
       executionSegmentId: row.execution_segment_id,

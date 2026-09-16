@@ -4,6 +4,7 @@ import { hasLiveTransport, onlineFirst } from "./lib/machine-order";
 import { MarkdownMessage } from "./components/MarkdownMessage";
 import { SessionActions } from "./components/SessionActions";
 import { useMobileViewport } from "./lib/mobile-viewport";
+import { useFileDraft } from "./lib/file-drafts";
 import { RuntimeSettingsShortcut } from "./components/RuntimeSettingsShortcut";
 import type { RuntimeSummary } from "./components/CodexSettingsPanel";
 import { UsageButton } from "./components/UsageButton";
@@ -30,8 +31,14 @@ import {
   Copy,
   FileDiff,
   FolderGit2,
+  FolderOpen,
+  FileUp,
   GitBranch,
   ImagePlus,
+  Lightbulb,
+  Paperclip,
+  Puzzle,
+  Target,
   KeyRound,
   LoaderCircle,
   LockKeyhole,
@@ -617,6 +624,12 @@ function ApprovalCard({ approval, onDecide, busy }: { approval: Approval; onDeci
   );
 }
 
+type TurnAdditions = {
+  attachments?: Array<{ name: string; relativePath: string; mimeType: string; data: string }>;
+  pluginSkills?: Array<{ pluginId: string; name: string; path: string }>;
+  goal?: string;
+};
+
 export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, historyLoading, onRefresh, onClaim, onReleaseManagement,  onSend, onQueue, onSteer, onCancelQueued, onCancel, onApproval, onClose, onNewSession }: {
   detail?: SessionDetail;
   loading: boolean;
@@ -627,9 +640,9 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   onClaim: () => Promise<void>;
   onContinueManaged: () => Promise<void>;
   onReleaseManagement: () => Promise<void>;
-  onSend: (prompt: string, settings?: CodexSettings, images?: string[]) => Promise<void>;
-  onQueue: (prompt: string, settings?: CodexSettings, images?: string[]) => Promise<void>;
-  onSteer: (prompt: string, images?: string[]) => Promise<void>;
+  onSend: (prompt: string, settings?: CodexSettings, images?: string[], additions?: TurnAdditions) => Promise<void>;
+  onQueue: (prompt: string, settings?: CodexSettings, images?: string[], additions?: TurnAdditions) => Promise<void>;
+  onSteer: (prompt: string, images?: string[], additions?: TurnAdditions) => Promise<void>;
   onCancelQueued: (queueItemId: string) => Promise<void>;
   onCancel: () => Promise<void>;
   onApproval: (decision: "accept" | "decline") => Promise<void>;
@@ -647,6 +660,10 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   useEffect(() => { aiRequest.current?.abort(); setAIBusy(false); setAIResult(undefined); setAIMessage(""); }, [prompt, draftOwner, detail?.session.id, completionPreferences.suggestions]);
   useEffect(() => () => aiRequest.current?.abort(), []);
   const imageDraft = useImageDraft(draftOwner ?? "preview", detail?.session.id);
+  const fileDraft = useFileDraft(detail?.session.id);
+  const [selectedSkills, setSelectedSkills] = useState<Array<{ pluginId: string; name: string; path: string }>>([]);
+  const [goal, setGoal] = useState("");
+  const [modeOverride, setModeOverride] = useState<"default" | "plan">();
   const [configuration, setConfiguration] = useState<ConfigurationRequest>();
   const [runtimeChoice, setRuntimeChoice] = useState<RuntimeChoice>();
   const [runtimeSummary, setRuntimeSummary] = useState<RuntimeSummary>();
@@ -659,6 +676,8 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const [releaseConfirming, setReleaseConfirming] = useState(false);
   const textArea = useRef<HTMLTextAreaElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement>(null);
   const [completionCaret, setCompletionCaret] = useState(0);
   const [activeCompletion, setActiveCompletion] = useState(0);
   const [dismissedCompletion, setDismissedCompletion] = useState("");
@@ -670,7 +689,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const chineseSuggestions = useChineseNLP(draftOwner ?? "preview", detail?.session.id, prompt, completionVisible && completionCaret === prompt.length && completionPreferences.suggestions && completionPreferences.nlp);
   const completions = useMemo(() => !completionVisible ? [] : mergeWritingSuggestions(promptCompletions(prompt, completionCaret, 10, writingMemory.value?.entries).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions), chineseSuggestions), [completionVisible, completionCaret, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value, chineseSuggestions]);
   useAutoSizeTextarea(textArea, prompt, `${detail?.session.id ?? ""}:${loading}`);
-  useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); }, [detail?.session.id, draftOwner]);
+  useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedSkills([]); setGoal(""); setModeOverride(undefined); }, [detail?.session.id, draftOwner]);
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
   useEffect(() => { setActiveCompletion(current => Math.min(current, Math.max(0, completions.length - 1))); }, [completions.length]);
   useEffect(() => { setCompletionFocused(false); setComposingPrompt(false); setCompletionCaret(0); setCompletionSelectionEnd(0); }, [detail?.session.id, draftOwner, loading]);
@@ -707,8 +726,11 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const canCancel = !pendingCommand && (session.actions?.cancel?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.currentTurn === "in_progress" && session.activeTurnId));
   const canQueueOrSteer = Boolean(detail.writable && session.state.currentTurn === "in_progress" && session.activeTurnId);
   const slashCommand = parseCodexCommand(prompt);
-  const hasInput = Boolean(prompt.trim() || imageDraft.images.length);
-  const imageBlocked = imageDraft.processing || (imageDraft.images.length > 0 && (!session.imageInputSupported || Boolean(slashCommand)));
+  const additions: TurnAdditions | undefined = fileDraft.files.length || selectedSkills.length || goal.trim() ? { ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(selectedSkills.length ? { pluginSkills: selectedSkills } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
+  const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedSkills.length);
+  const imageBlocked = imageDraft.processing || fileDraft.processing || (imageDraft.images.length > 0 && (!session.imageInputSupported || Boolean(slashCommand))) || (fileDraft.files.length > 0 && (!session.fileInputSupported || Boolean(slashCommand)));
+  const inherited = session.runtimeSettings?.accepted ?? session.runtimeSettings?.observed;
+  const sendSettings = modeOverride && inherited?.model ? { model: inherited.model, ...(inherited.effort ? { effort: inherited.effort } : {}), ...(settings ?? {}), mode: modeOverride } satisfies CodexSettings : settings;
   async function runSlash(name: string, args = "") {
     setCommandMessage("");
     const command = codexCommands.find((item) => item.name === name);
@@ -764,10 +786,12 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
     if (!hasInput || !canSend) return;
     setBusy(true);
     try {
-      await onSend(prompt.trim(), settings, imageDraft.images.length ? imageDraft.images : undefined);
+      if (additions) await onSend(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions);
+      else await onSend(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined);
       setCommandMessage("");
       setPrompt("");
       imageDraft.clear();
+      fileDraft.clear(); setSelectedSkills([]);
       textArea.current?.focus();
     } catch (error) {
       setCommandMessage(errorMessage(error));
@@ -879,8 +903,14 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
         {imageDraft.images.length > 0 && <MessageImages images={imageDraft.images} onRemove={imageDraft.remove} disabled={busy || imageDraft.processing} />}
+        {(fileDraft.files.length > 0 || selectedSkills.length > 0) && <div className="attachment-drafts" aria-label={t("待发送附件")}>
+          {fileDraft.files.map(file => <span className="attachment-chip" key={file.id}><Paperclip size={14} /><span title={file.relativePath}>{file.relativePath}</span><small>{Math.max(1, Math.ceil(file.size / 1024))} KB</small><button type="button" aria-label={t("移除 {0}", file.relativePath)} onClick={() => fileDraft.remove(file.id)}><X size={13} /></button></span>)}
+          {selectedSkills.map(skill => <span className="attachment-chip attachment-chip--plugin" key={`${skill.pluginId}:${skill.name}`}><Puzzle size={14} /><span>{skill.name}</span><button type="button" aria-label={t("移除 {0}", skill.name)} onClick={() => setSelectedSkills(current => current.filter(item => item.pluginId !== skill.pluginId || item.name !== skill.name))}><X size={13} /></button></span>)}
+        </div>}
         {imageDraft.processing && <p className="image-draft-notice" role="status">{t("正在处理图片…")}</p>}
+        {fileDraft.processing && <p className="image-draft-notice" role="status">{t("正在读取文件…")}</p>}
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
+        {fileDraft.error && <p className="image-draft-notice" role="alert">{systemText(fileDraft.error)}</p>}
         {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("请先在主机页更新连接服务，才能发送图片") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
         {completions.length > 0 && <CompletionSurface anchor={textArea}><div className={`prompt-completions-shell${completions.some(item => item.kind === "rewrite") ? " prompt-completions-shell--rewrite" : ""}`}><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={t("编程提示语补全")}>
           <div className="prompt-completions__head" role="presentation"><Code2 size={14} aria-hidden="true" /><span>{t("输入建议")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
@@ -958,13 +988,23 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           <span className="composer-touch-hint">{detail.writeBlockedReason || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
           <div className="composer-button-group">
           <input ref={imageInput} className="composer-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label={t("选择要发送的图片")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void imageDraft.addFiles(files); }} />
-          <button className="button button--secondary composer-image-button" type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => imageInput.current?.click()}><ImagePlus size={16} />{t("添加图片")}</button>
+          <input ref={fileInput} className="composer-image-input" type="file" multiple aria-label={t("选择要发送的文件")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
+          <input ref={(node) => { folderInput.current = node; if (node) node.setAttribute("webkitdirectory", ""); }} className="composer-image-input" type="file" multiple aria-label={t("选择要发送的文件夹")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
+          <details className="composer-add-menu"><summary className="button button--secondary composer-add-trigger" aria-label={t("添加内容")} title={t("添加内容")}><Plus size={19} /></summary><div className="composer-add-popover">
+            <strong>{t("添加")}</strong>
+            <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => fileInput.current?.click()}><FileUp size={17} /><span><b>{t("文件")}</b><small>{t("添加 Codex 可读取的文件")}</small></span></button>
+            <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => folderInput.current?.click()}><FolderOpen size={17} /><span><b>{t("文件夹")}</b><small>{t("保留目录结构，最多 32 个文件")}</small></span></button>
+            <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => imageInput.current?.click()}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
+            <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
+            {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { if (!settings?.model && !inherited?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? "default" : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !settings?.model && !inherited?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}
+            {(session.pluginSkills?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.pluginSkills!.map(skill => { const selected = selectedSkills.some(item => item.pluginId === skill.pluginId && item.name === skill.name); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={`${skill.pluginId}:${skill.name}:${skill.path}`} onClick={() => setSelectedSkills(current => selected ? current.filter(item => item.pluginId !== skill.pluginId || item.name !== skill.name) : [...current, { pluginId: skill.pluginId, name: skill.name, path: skill.path }])}><Puzzle size={17} /><span><b>{skill.pluginName} · {skill.name}</b><small>{skill.description}</small></span></button>; })}</div></>}
+          </div></details>
           {canQueueOrSteer ? (
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" />{t("停止任务")}</button>}
-              </div><button className="button button--secondary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { await onQueue(prompt.trim(), settings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} />{t("加入队列")}</button>
-              <button className="button button--primary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} />{t("追加本轮")}</button>
+              </div><button className="button button--secondary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedSkills([]); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} />{t("加入队列")}</button>
+              <button className="button button--primary" type="button" disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined, additions); else await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedSkills([]); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} />{t("追加本轮")}</button>
             </div>
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" />{t("停止任务")}</button>
@@ -1462,9 +1502,9 @@ function App() {
       throw error;
     }
   }
-  async function sendPrompt(prompt: string, settings?: CodexSettings, images?: string[]) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) return; try { await submitCommand({ type: "turn.start", payload: { prompt, ...(images?.length ? { images } : {}), ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: null, projectLeaseVersion: detail.session.projectLeaseVersion } }); toast("info", t("消息已提交，等待主机处理")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
-  async function queuePrompt(prompt: string, settings?: CodexSettings, images?: string[]) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.queue", payload: { prompt, ...(images?.length ? { images } : {}), ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), expiresInSeconds: 3600, precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: detail.session.activeTurnId, projectLeaseVersion: detail.session.projectLeaseVersion, queueVersion: detail.session.queueVersion } }); toast("info", t("排队请求已提交，请查看操作进度")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
-  async function steerPrompt(prompt: string, images?: string[]) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.steer", payload: { prompt, ...(images?.length ? { images } : {}) }, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("追加请求已提交，等待主机确认")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function sendPrompt(prompt: string, settings?: CodexSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) return; try { await submitCommand({ type: "turn.start", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: null, projectLeaseVersion: detail.session.projectLeaseVersion } }); toast("info", t("消息已提交，等待主机处理")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function queuePrompt(prompt: string, settings?: CodexSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.queue", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), expiresInSeconds: 3600, precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: detail.session.activeTurnId, projectLeaseVersion: detail.session.projectLeaseVersion, queueVersion: detail.session.queueVersion } }); toast("info", t("排队请求已提交，请查看操作进度")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function steerPrompt(prompt: string, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.steer", payload: { prompt, ...(images?.length ? { images } : {}), ...additions }, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("追加请求已提交，等待主机确认")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function cancelQueuedTurn(queueItemId: string) { if (!detail) return; try { await api.cancelQueuedTurn(detail.session.id, queueItemId); toast("info", t("队列项已取消")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function cancelTurn() { if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.cancel", payload: {}, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("停止请求已提交，等待主机确认")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function decideApproval(decision: "accept" | "decline") { const approval = detail?.approval; if (!approval) return; try { await api.decideApproval(approval.id, { decision, approvalVersion: approval.approvalVersion, actionHash: approval.actionHash }); toast(decision === "accept" ? "success" : "info", decision === "accept" ? t("已仅本次允许") : t("已拒绝操作")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
