@@ -10,12 +10,12 @@ export function sessionPath(sessionId?: string): string {
   return sessionId ? `/sessions/${encodeURIComponent(sessionId)}` : "/";
 }
 
-export function draftKey(userId: string, sessionId: string): string {
-  return `agentfleet.draft:${encodeURIComponent(userId)}:${encodeURIComponent(sessionId)}`;
+export function draftKey(userId: string, sessionId: string, namespace="draft"): string {
+  return `agentfleet.${namespace}:${encodeURIComponent(userId)}:${encodeURIComponent(sessionId)}`;
 }
 
-export function useSessionDraft(userId: string | undefined, sessionId: string | undefined) {
-  const key = userId && sessionId ? draftKey(userId, sessionId) : undefined;
+export function useSessionDraft(userId: string | undefined, sessionId: string | undefined, namespace="draft") {
+  const key = userId && sessionId ? draftKey(userId, sessionId, namespace) : undefined;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   let stored = "";
   if (key) {

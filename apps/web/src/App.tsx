@@ -662,7 +662,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const imageDraft = useImageDraft(draftOwner ?? "preview", detail?.session.id);
   const fileDraft = useFileDraft(detail?.session.id);
   const [selectedSkills, setSelectedSkills] = useState<Array<{ pluginId: string; name: string; path: string }>>([]);
-  const [goal, setGoal] = useState("");
+  const [goal, setGoal] = useSessionDraft(draftOwner ?? "preview", detail?.session.id, "goal");
   const [modeOverride, setModeOverride] = useState<"default" | "plan">();
   const [configuration, setConfiguration] = useState<ConfigurationRequest>();
   const [runtimeChoice, setRuntimeChoice] = useState<RuntimeChoice>();
@@ -691,7 +691,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const chineseSuggestions = useChineseNLP(draftOwner ?? "preview", detail?.session.id, prompt, completionVisible && completionCaret === prompt.length && completionPreferences.suggestions && completionPreferences.nlp);
   const completions = useMemo(() => !completionVisible ? [] : mergeWritingSuggestions(promptCompletions(prompt, completionCaret, 10, writingMemory.value?.entries).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions), chineseSuggestions), [completionVisible, completionCaret, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value, chineseSuggestions]);
   useAutoSizeTextarea(textArea, prompt, `${detail?.session.id ?? ""}:${loading}`);
-  useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedSkills([]); setGoal(""); setModeOverride(undefined); }, [detail?.session.id, draftOwner]);
+  useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedSkills([]); setModeOverride(undefined); }, [detail?.session.id, draftOwner]);
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
   useEffect(() => { setActiveCompletion(current => Math.min(current, Math.max(0, completions.length - 1))); }, [completions.length]);
   useEffect(() => { setCompletionFocused(false); setComposingPrompt(false); setCompletionCaret(0); setCompletionSelectionEnd(0); }, [detail?.session.id, draftOwner, loading]);
