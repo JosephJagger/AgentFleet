@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { setImmediate as yieldToIO } from "node:timers/promises";
 import { parseImages } from "./images.js";
 import { parseAttachments, parsePluginSkills, type MaterializedAttachment, type PluginSkillReference } from "./attachments.js";
-import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { permissionProfile } from "./permissions.js";
 import {
@@ -50,6 +50,12 @@ import { canonicalJson, delay, isRecord, nowIso, requireString, sha256 } from ".
 async function ensurePlainDirectory(path: string): Promise<void> {
   try { const stat = await lstat(path); if (!stat.isDirectory() || stat.isSymbolicLink()) throw new AgentError("ATTACHMENT_PATH_UNSAFE", "项目附件目录不是普通文件夹"); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; await mkdir(path); }
+}
+
+async function plainFiles(root:string,current=root):Promise<string[]>{
+  const result:string[]=[];
+  for(const entry of await readdir(current)){const path=join(current,entry);const stat=await lstat(path);if(stat.isSymbolicLink())throw new AgentError("ATTACHMENT_SCOPE_CHANGED","主机暂存目录包含符号链接，拒绝清理");if(stat.isDirectory())result.push(...await plainFiles(root,path));else if(stat.isFile())result.push(path.slice(root.length+1).split(sep).join("/"));else throw new AgentError("ATTACHMENT_SCOPE_CHANGED","主机暂存目录包含非普通文件，拒绝清理");}
+  return result.sort();
 }
 
 async function materializeAttachments(project: ProjectRecord, commandId: string, value: unknown): Promise<MaterializedAttachment[]> {
@@ -308,10 +314,25 @@ export class AgentRuntime {
     const binding = state.nativeThreadBindings[id];
     if (!server || !binding || binding.codexProfileId !== this.support.codexProfile?.id || binding.logicalSessionId !== target.logicalSessionId || binding.executionSegmentId !== target.executionSegmentId || binding.contentEpoch !== target.contentEpoch) throw new AgentError("IMAGE_TARGET_CHANGED", "会话身份已变化，请重新预览");
     if (thread?.activeTurnId || state.projectReservations[binding.projectId] || Object.values(state.approvals).some(a => a.nativeThreadId === id && a.state === "pending")) throw new AgentError("THREAD_BUSY", "会话仍在运行、冻结或等待回复，请结束后清理");
-    if (!Array.isArray(target.uploads) || !target.uploads.length || target.uploads.length > 100) throw new AgentError("IMAGE_SCOPE_INVALID", "图片来源记录不完整");
+    const attachmentUploads=target.attachments===undefined?[]:target.attachments;
+    if (!Array.isArray(target.uploads) || !Array.isArray(attachmentUploads) || (!target.uploads.length && !attachmentUploads.length) || target.uploads.length + attachmentUploads.length > 100) throw new AgentError("IMAGE_SCOPE_INVALID", "附件来源记录不完整");
     if (this.historySyncJobs.has(id) || this.imageMaintenanceSessions.has(String(target.logicalSessionId)) || Object.values(state.inbox).some(e => ["received", "invoking"].includes(e.state))) throw new AgentError("THREAD_BUSY", "主机正在派发操作，请稍后预览");
     this.imageMaintenanceSessions.add(String(target.logicalSessionId));
     try {
+    const attachmentTargets:Array<{commandId:string;files:Array<{relativePath:string;size:number;hash:string}>}>=[];
+    const attachmentDirs:string[]=[];
+    const project=attachmentUploads.length?state.projects.find(value=>value.id===binding.projectId):undefined;
+    if(attachmentUploads.length&&!project)throw new AgentError("IMAGE_TARGET_CHANGED","项目身份已变化，请重新预览");
+    for(const value of attachmentUploads){
+      if(!isRecord(value)||typeof value.commandId!=="string"||!Array.isArray(value.files)||!value.files.length)throw new AgentError("IMAGE_SCOPE_INVALID","文件来源记录不完整");
+      const journal=state.commandJournal[value.commandId];
+      if(journal?.state!=="applied"||!["turn.start","turn.queue","turn.steer"].includes(journal.commandType))throw new AgentError("IMAGE_ORIGIN_UNPROVEN","缺少宿主机文件发送回执");
+      const commandDir=join(resolve(project!.root,".agentfleets","uploads"),sha256(value.commandId).slice(0,24));
+      const files:Array<{relativePath:string;size:number;hash:string}>=[];
+      for(const raw of value.files){if(!isRecord(raw)||typeof raw.relativePath!=="string"||typeof raw.size!=="number"||typeof raw.hash!=="string")throw new AgentError("IMAGE_SCOPE_INVALID","文件标识不完整");const path=resolve(commandDir,...raw.relativePath.split("/"));if(!path.startsWith(`${commandDir}${sep}`))throw new AgentError("ATTACHMENT_PATH_UNSAFE","文件路径越出附件目录");const stat=await lstat(path);if(!stat.isFile()||stat.isSymbolicLink()||stat.size!==raw.size)throw new AgentError("ATTACHMENT_SCOPE_CHANGED","主机暂存文件已变化，请重新预览");const content=await readFile(path);if(sha256(content).slice(7)!==raw.hash)throw new AgentError("ATTACHMENT_SCOPE_CHANGED","主机暂存文件已变化，请重新预览");files.push({relativePath:raw.relativePath,size:raw.size,hash:raw.hash});}
+      if(JSON.stringify(await plainFiles(commandDir))!==JSON.stringify(files.map(file=>file.relativePath).sort()))throw new AgentError("ATTACHMENT_SCOPE_CHANGED","主机暂存目录内容已变化，请重新预览");
+      attachmentTargets.push({commandId:value.commandId,files});attachmentDirs.push(commandDir);
+    }
     const turns = new Map<string, Set<string>>();
     for (const value of target.uploads) {
       if (!isRecord(value) || typeof value.commandId !== "string" || !Array.isArray(value.hashes) || value.hashes.some(h => typeof h !== "string" || !/^[a-f0-9]{64}$/.test(h))) throw new AgentError("IMAGE_SCOPE_INVALID", "图片标识不完整");
@@ -321,7 +342,9 @@ export class AgentRuntime {
       for (const hash of value.hashes) hashes.add(String(hash));
       turns.set(journal.response.nativeTurnId, hashes);
     }
+    let result:Record<string,unknown>={threadId:id,targets:[],byteOffsetsPreserved:true};
     // Stop only this idle panel writer. External CLI writers are fenced by native flock.
+    if(turns.size){
     await server.unsubscribeThread(id);
     if (thread) await this.store.updateManagedThread(id, t => { t.subscribed = false; t.policyVerified = false; t.metadataRevision = (t.metadataRevision ?? 0) + 1; });
     const snapshot = await server.readThread(id, true);
@@ -329,9 +352,12 @@ export class AgentRuntime {
     // Pending durable payloads may still contain these bytes. Wait for acknowledgement instead of changing event hashes.
     if (this.store.snapshot().outbox.some(e => e.nativeThreadId === id)) throw new AgentError("IMAGE_SYNC_PENDING", "此会话仍有历史等待同步，请稍后重新预览");
     const targets = [...turns].map(([turnId, hashes]) => ({ turnId, hashes: [...hashes] }));
-    const result = await nativeImageCleanup({ home: this.support.codexProfile?.codexHome, version: this.support.codexVersion?.replace(/^codex(?:-cli)?\s+/, ""), rollout: snapshot.rolloutPath,
-      threadId: id, targets, preview: !clean, expectedDigest: target.expectedDigest });
-    return { ...result, logicalSessionId: target.logicalSessionId, targets, cleaned: clean };
+    try { result = await nativeImageCleanup({ home: this.support.codexProfile?.codexHome, version: this.support.codexVersion?.replace(/^codex(?:-cli)?\s+/, ""), rollout: snapshot.rolloutPath,
+      threadId: id, targets, preview: !clean, expectedDigest: target.expectedDigest }); }
+    catch(error){if(!(error instanceof AgentError)||error.code!=="IMAGE_CLEANUP_UNSUPPORTED"||!attachmentTargets.length)throw error;result={threadId:id,targets:[],byteOffsetsPreserved:false,imageCleanupSupported:false,imageCleanupReason:error.message};turns.clear();}
+    }
+    if(clean)for(const directory of attachmentDirs)await rm(directory,{recursive:true,force:false});
+    return { ...result, logicalSessionId: target.logicalSessionId, attachmentTargets, attachmentBytes:attachmentTargets.flatMap(value=>value.files).reduce((sum,file)=>sum+file.size,0), targets:[...turns].map(([turnId, hashes]) => ({ turnId, hashes: [...hashes] })), cleaned: clean };
     } finally { this.imageMaintenanceSessions.delete(String(target.logicalSessionId)); }
   }
 

@@ -39,8 +39,8 @@ export class MaintenanceService {
           const preview=this.db.get<{request_json:string;result_json:string;expires_at:string}>("SELECT request_json,result_json,expires_at FROM machine_operations WHERE operation_id=? AND machine_id=? AND workspace_id=? AND type='images.preview' AND state='succeeded'",previewOperationId??"",machineId,principal.workspaceId);
           invariant(preview && Date.parse(preview.expires_at)>Date.now(),409,"IMAGE_PREVIEW_REQUIRED","请先预览，再确认清理");
           const request=JSON.parse(preview.request_json);const result=JSON.parse(preview.result_json);
-          invariant(JSON.stringify(request)===JSON.stringify(target) && result.threadId===target.nativeThreadId && Array.isArray(result.targets) && typeof result.beforeSha256==="string",409,"IMAGE_SCOPE_CHANGED","会话图片已变化，请重新预览");
-          target={...target,expectedDigest:result.beforeSha256,turns:result.targets,previewOperationId};
+          invariant(JSON.stringify(request)===JSON.stringify(target) && result.threadId===target.nativeThreadId && Array.isArray(result.targets) && (Array.isArray(result.attachmentTargets) || !(target.attachments as unknown[])?.length) && (!result.targets.length || typeof result.beforeSha256==="string"),409,"IMAGE_SCOPE_CHANGED","会话附件已变化，请重新预览");
+          target={...target,...(typeof result.beforeSha256==="string"?{expectedDigest:result.beforeSha256}:{}),turns:result.targets,previewOperationId};
         }
       } else if(type === "session.reconcile") {
         invariant(typeof logicalSessionId === "string",400,"RECOVERY_TARGET_REQUIRED","Choose a session to recover");

@@ -72,3 +72,8 @@ it("shows a removable Plan mode indicator beside the runtime settings",()=>{
  fireEvent.click(screen.getByRole("button",{name:"关闭计划模式"}));
  expect(clear).toHaveBeenCalledOnce();
 });
+it("shows a removable goal beside runtime settings",()=>{
+ const clear=vi.fn();
+ render(<RuntimeSettingsShortcut sessionId="s" summary={{sessionId:"s",settings:{model:"example-model"},changed:false,loaded:true}} running={false} goal="完成发布" onClearGoal={clear} onOpen={()=>{}}/>);
+ expect(screen.getByText("目标：完成发布")).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:"关闭目标"}));expect(clear).toHaveBeenCalledOnce();
+});

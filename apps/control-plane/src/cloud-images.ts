@@ -3,6 +3,7 @@ import type { ControlPlaneDatabase } from "./db.js";
 import type { Principal } from "./auth.js";
 import { invariant } from "./errors.js";
 import { validImageUrl } from "./images.js";
+import type { SQLInputValue } from "node:sqlite";
 
 export const CLOUD_IMAGE_QUOTA = 50_000_000; // 50 decimal MB, encoded image content, per machine.
 const PREFIX = "agentfleet-image:";
@@ -12,6 +13,19 @@ type Owner = "command" | "event";
 /** Image bytes live only here; command/history JSON keeps bounded, owner-bound references. */
 export class CloudImages {
   constructor(private readonly db: ControlPlaneDatabase) {}
+
+  private attachments(machineId:string, logicalSessionId?:string, executionSegmentId?:string) {
+    const params:SQLInputValue[]=[machineId];if(logicalSessionId)params.push(logicalSessionId);if(executionSegmentId)params.push(executionSegmentId);
+    const persisted=this.db.all<{commandId:string;logicalSessionId:string;relativePath:string;size:number;hash:string}>(`SELECT command_id AS commandId,logical_session_id AS logicalSessionId,relative_path AS relativePath,size_bytes AS size,content_hash AS hash FROM attachment_uploads WHERE machine_id=? AND cleaned_at IS NULL ${logicalSessionId?"AND logical_session_id=?":""} ${executionSegmentId?"AND execution_segment_id=?":""} ORDER BY command_id,relative_path`,...params);
+    const grouped=new Map<string,{commandId:string;logicalSessionId:string;files:Array<{relativePath:string;size:number;hash:string}>;totalBytes:number}>();
+    for(const row of persisted){const key=`${row.logicalSessionId}\0${row.commandId}`;const value=grouped.get(key)??{commandId:row.commandId,logicalSessionId:row.logicalSessionId,files:[],totalBytes:0};value.files.push({relativePath:row.relativePath,size:row.size,hash:row.hash});value.totalBytes+=row.size;grouped.set(key,value);}
+    const rows=this.db.all<{commandId:string;logicalSessionId:string;body:string}>(`SELECT c.command_id AS commandId,c.logical_session_id AS logicalSessionId,cc.body_json AS body
+      FROM command_contents cc JOIN commands c USING(command_id) JOIN logical_sessions s USING(logical_session_id)
+      WHERE s.machine_id=? AND cc.deleted_at IS NULL ${logicalSessionId?"AND c.logical_session_id=?":""} ${executionSegmentId?"AND c.execution_segment_id=?":""} AND cc.body_json LIKE '%\"attachments\"%'`,...params);
+    const known=new Set(persisted.map(row=>`${row.logicalSessionId}\0${row.commandId}`));
+    const legacy=rows.flatMap(row=>{if(known.has(`${row.logicalSessionId}\0${row.commandId}`))return [];try{const body=JSON.parse(row.body);const values=Array.isArray(body?.attachments)?body.attachments:[];const files=values.flatMap((value:unknown)=>{if(!value||typeof value!=="object"||Array.isArray(value))return [];const item=value as Record<string,unknown>;if(typeof item.relativePath!=="string"||typeof item.data!=="string")return [];const bytes=Buffer.from(item.data,"base64");return [{relativePath:item.relativePath,size:bytes.length,hash:createHash("sha256").update(bytes).digest("hex")}];});return files.length?[{commandId:row.commandId,logicalSessionId:row.logicalSessionId,files,totalBytes:files.reduce((sum:number,file:{size:number})=>sum+file.size,0)}]:[];}catch{return [];}});
+    return [...grouped.values(),...legacy];
+  }
 
   stats(machineId: string, principal?: Principal) {
     const machine = this.db.get<{ workspace_id: string; cloud_image_revision: number }>("SELECT workspace_id,cloud_image_revision FROM machines WHERE machine_id=?", machineId);
@@ -105,7 +119,10 @@ export class CloudImages {
       LEFT JOIN cloud_images i ON i.machine_id=s.machine_id AND i.image_hash=r.image_hash
       WHERE s.machine_id=? AND s.deleted_at IS NULL AND s.logical_session_id>?
       GROUP BY s.logical_session_id ORDER BY s.logical_session_id LIMIT 51`, machineId,machineId,machineId,machineId,after);
-    return { sessions: rows.slice(0,50), nextCursor: rows.length>50 ? rows[49]!.logicalSessionId : null };
+    const merged=new Map(rows.map(row=>[row.logicalSessionId,{...row,fileCount:0,fileBytes:0}]));
+    for(const upload of this.attachments(machineId)) { const row=merged.get(upload.logicalSessionId)??this.db.get<{logicalSessionId:string;title:string;project:string}>(`SELECT s.logical_session_id AS logicalSessionId,s.title,p.alias AS project FROM logical_sessions s JOIN projects p USING(project_id) WHERE s.logical_session_id=? AND s.machine_id=? AND s.deleted_at IS NULL`,upload.logicalSessionId,machineId);if(!row)continue;const value={cloudBytes:0,imageCount:0,fileCount:0,fileBytes:0,...row};value.fileCount+=upload.files.length;value.fileBytes+=upload.totalBytes;merged.set(upload.logicalSessionId,value); }
+    const all=[...merged.values()].filter(row=>row.logicalSessionId>after).sort((a,b)=>a.logicalSessionId.localeCompare(b.logicalSessionId));
+    return { sessions: all.slice(0,50), nextCursor: all.length>50 ? all[49]!.logicalSessionId : null };
   }
 
   target(principal: Principal, machineId: string, logicalSessionId: string) {
@@ -118,13 +135,19 @@ export class CloudImages {
     const rows=this.db.all<{commandId:string;hash:string}>("SELECT command_id AS commandId,image_hash AS hash FROM image_uploads WHERE machine_id=? AND logical_session_id=? AND execution_segment_id=? AND cleaned_at IS NULL ORDER BY command_id,image_hash",machineId,logicalSessionId,session.executionSegmentId);
     const uploads: {commandId:string;hashes:string[]}[]=[];
     for(const row of rows) { let upload=uploads.find(u=>u.commandId===row.commandId);if(!upload){upload={commandId:row.commandId,hashes:[]};uploads.push(upload);}upload.hashes.push(row.hash); }
-    invariant(uploads.length>0 && uploads.length<=50,409,"IMAGE_ORIGIN_UNPROVEN","缺少可核验的面板上传记录，或记录超过单次安全上限 50 条");
-    return {logicalSessionId,...session,uploads};
+    const attachments=this.attachments(machineId,logicalSessionId,session.executionSegmentId).map(item=>({commandId:item.commandId,files:item.files}));
+    invariant((uploads.length>0||attachments.length>0) && uploads.length+attachments.length<=50,409,"IMAGE_ORIGIN_UNPROVEN","缺少可核验的面板上传记录，或记录超过单次安全上限 50 条");
+    return {logicalSessionId,...session,uploads,attachments};
   }
 
   complete(machineId: string, target: Record<string, unknown>, proof: Record<string, unknown>) {
-    invariant(proof.cleaned===true && proof.threadId===target.nativeThreadId && proof.logicalSessionId===target.logicalSessionId && proof.beforeSha256===target.expectedDigest && proof.byteOffsetsPreserved===true && Array.isArray(proof.targets),409,"IMAGE_PROOF_INVALID","主机清理回执与确认范围不符，云端图片保持保留");
-    const expected=target.turns as {turnId:string;hashes:string[]}[];
+    invariant(proof.cleaned===true && proof.threadId===target.nativeThreadId && proof.logicalSessionId===target.logicalSessionId,409,"IMAGE_PROOF_INVALID","主机清理回执与确认范围不符，云端附件保持保留");
+    const attachmentTargets=(target.attachments??[]) as Array<{commandId:string;files:Array<{relativePath:string;size:number;hash:string}>}>;
+    invariant(JSON.stringify(proof.attachmentTargets??[])===JSON.stringify(attachmentTargets),409,"IMAGE_PROOF_INVALID","主机文件清理范围与预览不符");
+    for(const upload of attachmentTargets){this.db.run("UPDATE attachment_uploads SET cleaned_at=? WHERE machine_id=? AND command_id=?",new Date().toISOString(),machineId,upload.commandId);const row=this.db.get<{body:string}>("SELECT body_json AS body FROM command_contents WHERE command_id=? AND deleted_at IS NULL",upload.commandId);if(!row)continue;const body=JSON.parse(row.body);body.attachments=[];this.db.run("UPDATE command_contents SET body_json=? WHERE command_id=?",JSON.stringify(body),upload.commandId);}
+    const expected=(target.turns??[]) as {turnId:string;hashes:string[]}[];
+    if(!expected.length)return {...proof,cloudCleaned:false,releasedCloudBytes:0,filesCleaned:attachmentTargets.reduce((n,u)=>n+u.files.length,0)};
+    invariant(proof.beforeSha256===target.expectedDigest && proof.byteOffsetsPreserved===true && Array.isArray(proof.targets),409,"IMAGE_PROOF_INVALID","主机图片清理回执与确认范围不符，云端图片保持保留");
     invariant(JSON.stringify(proof.targets)===JSON.stringify(expected),409,"IMAGE_PROOF_INVALID","主机清理轮次与预览不符");
     const before=this.stats(machineId).usedBytes;
     for(const turn of expected) for(const hash of turn.hashes) {
@@ -139,7 +162,7 @@ export class CloudImages {
     this.db.run(`UPDATE cloud_images SET data_url=NULL,size_bytes=0,deleted_at=? WHERE machine_id=? AND data_url IS NOT NULL AND NOT EXISTS
       (SELECT 1 FROM cloud_image_refs r WHERE r.machine_id=cloud_images.machine_id AND r.image_hash=cloud_images.image_hash)`,new Date().toISOString(),machineId);
     this.db.run("UPDATE machines SET cloud_image_revision=cloud_image_revision+1 WHERE machine_id=?",machineId);
-    return {...proof,cloudCleaned:true,releasedCloudBytes:before-this.stats(machineId).usedBytes};
+    return {...proof,cloudCleaned:true,releasedCloudBytes:before-this.stats(machineId).usedBytes,filesCleaned:attachmentTargets.reduce((n,u)=>n+u.files.length,0)};
   }
 
   /** Retention and content-policy removal must release images too. Keep hashes as replay tombstones. */

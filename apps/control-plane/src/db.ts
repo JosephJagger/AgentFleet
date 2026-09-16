@@ -4,6 +4,7 @@ import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import type { ControlPlaneConfig } from "./config.js";
 import { hashPassword, newId, nowIso } from "./crypto.js";
 import { CloudImages } from "./cloud-images.js";
+import { createHash } from "node:crypto";
 
 const MIGRATION_1 = `
 CREATE TABLE workspaces (
@@ -798,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 32) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 33) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1175,6 +1176,17 @@ export class ControlPlaneDatabase {
       }
       this.sqlite.exec("PRAGMA user_version=32");
       if (this.all("PRAGMA foreign_key_check").length) throw new Error("Project creation migration violated foreign keys");
+    });
+    if (version < 33) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS attachment_uploads (
+        machine_id TEXT NOT NULL, logical_session_id TEXT NOT NULL, execution_segment_id TEXT NOT NULL,
+        command_id TEXT NOT NULL, relative_path TEXT NOT NULL, size_bytes INTEGER NOT NULL, content_hash TEXT NOT NULL,
+        cleaned_at TEXT, PRIMARY KEY(machine_id,command_id,relative_path)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS attachment_uploads_session ON attachment_uploads(machine_id,logical_session_id,cleaned_at);
+      PRAGMA user_version=33`);
+      const rows=this.all<{machine_id:string;logical_session_id:string;execution_segment_id:string;command_id:string;body_json:string}>(`SELECT s.machine_id,c.logical_session_id,c.execution_segment_id,c.command_id,cc.body_json FROM command_contents cc JOIN commands c USING(command_id) JOIN logical_sessions s USING(logical_session_id) WHERE cc.deleted_at IS NULL AND cc.body_json LIKE '%"attachments"%'`);
+      for(const row of rows){try{const body=JSON.parse(row.body_json);if(!Array.isArray(body?.attachments))continue;for(const value of body.attachments){if(!value||typeof value.relativePath!=="string"||typeof value.data!=="string")continue;const bytes=Buffer.from(value.data,"base64");this.run("INSERT OR IGNORE INTO attachment_uploads(machine_id,logical_session_id,execution_segment_id,command_id,relative_path,size_bytes,content_hash) VALUES(?,?,?,?,?,?,?)",row.machine_id,row.logical_session_id,row.execution_segment_id,row.command_id,value.relativePath,bytes.length,createHash("sha256").update(bytes).digest("hex"));}}catch{continue;}}
     });
   }
 

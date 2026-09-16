@@ -315,4 +315,4 @@ export interface CloudImageUsage {
   canClear: boolean;
 }
 
-export interface ImageSessionUsage { logicalSessionId: string; title: string; project: string; cloudBytes: number; imageCount: number; }
+export interface ImageSessionUsage { logicalSessionId: string; title: string; project: string; cloudBytes: number; imageCount: number; fileBytes: number; fileCount: number; }

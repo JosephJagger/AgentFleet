@@ -39,3 +39,15 @@ test("runtime image operation fences original binding, dispatch, pending sync, t
   const preserved=after.trim().split("\n").map(line=>JSON.parse(line));assert.equal(preserved[0].payload.id,id);assert.equal(preserved[2].payload.content[0].text,"保持文字 🦊\n保持换行");assert.equal(preserved[2].payload.id,"item-id");
   await assert.rejects(nativeImageCleanup({home,rollout:file,threadId:id,version:"0.153.2",preview:true,targets:[{turnId:turn,hashes:[digest(png)]}]}),/0.153.4/);
 });
+
+test("runtime verifies and removes only the exact staged attachment directory",async t=>{
+  const root=await mkdtemp(join(tmpdir(),"agentfleet-attachment-cleanup-"));t.after(()=>rm(root,{recursive:true,force:true}));
+  const id=randomUUID(),commandId="upload-file",content=Buffer.from("safe text\n"),relativePath="docs/readme.md";
+  const commandDir=join(root,".agentfleets","uploads",(`sha256:${digest(commandId)}`).slice(0,24));await mkdir(join(commandDir,"docs"),{recursive:true});await writeFile(join(commandDir,relativePath),content);
+  const binding={nativeThreadId:id,logicalSessionId:"session",executionSegmentId:"segment",contentEpoch:1,codexProfileId:"default",projectId:"p"};
+  const state={projects:[{id:"p",root}],managedThreads:{},nativeThreadBindings:{[id]:binding},projectReservations:{},approvals:{},inbox:{},outbox:[],commandJournal:{[commandId]:{state:"applied",commandType:"turn.start"}}};
+  const runtime=Object.assign(Object.create(AgentRuntime.prototype) as object,{imageMaintenanceSessions:new Set(),historySyncJobs:new Set(),support:{codexProfile:{id:"default"}},store:{snapshot:()=>state},appServer:{}}) as unknown as AgentRuntime;
+  const target={...binding,uploads:[],attachments:[{commandId,files:[{relativePath,size:content.length,hash:digest(content.toString())}]}]};
+  const preview=await runtime.manageSessionImages(target,false);assert.equal(preview.attachmentBytes,content.length);assert.equal(await readFile(join(commandDir,relativePath),"utf8"),content.toString());
+  const cleaned=await runtime.manageSessionImages(target,true);assert.equal(cleaned.cleaned,true);await assert.rejects(readFile(commandDir),/ENOENT|EISDIR/);
+});

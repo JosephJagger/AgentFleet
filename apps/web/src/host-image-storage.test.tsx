@@ -14,7 +14,7 @@ it("显示 50 MB 上限和文字不受影响，使用按会话的两端清理入
   expect(screen.getByText("/ 50.0 MB")).toBeTruthy();
   expect(screen.getByRole("alert").textContent).toContain("文字消息不受影响");
   expect(screen.queryByRole("button",{name:"清理云端图片"})).toBeNull();
-  expect(screen.getByRole("region",{name:"按会话清理图片"})).toBeTruthy();
+  expect(screen.getByRole("region",{name:"按会话清理附件"})).toBeTruthy();
 });
 it("80% 预警和未完成图片命令保护可见", async () => {
   mocks.machineImages.mockResolvedValue({ ...usage, usedBytes: 40e6, level: "warning", pendingImageCommands: 1, canClear: false });

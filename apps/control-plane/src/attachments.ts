@@ -3,6 +3,14 @@ import { invariant } from "./errors.js";
 export const MAX_ATTACHMENT_FILES = 32;
 export const MAX_ATTACHMENT_FILE_BYTES = 4 * 1024 * 1024;
 export const MAX_ATTACHMENT_TOTAL_BYTES = 8 * 1024 * 1024;
+const EXTENSIONS = new Set("txt md markdown mdx rst adoc csv tsv json jsonl ndjson yaml yml toml xml html htm css scss sass less svg js jsx mjs cjs ts tsx mts cts py pyi rb php java kt kts go rs c h cc cpp cxx hpp cs swift scala sh bash zsh fish ps1 bat cmd sql graphql gql proto tf tfvars hcl ini cfg conf env properties gradle cmake lock gitignore dockerignore editorconfig npmrc nvmrc".split(" "));
+const NAMES = new Set("readme license copying dockerfile makefile procfile gemfile rakefile".split(" "));
+function validateReadableText(name: string, bytes: Buffer): void {
+  const lower=name.toLowerCase(); const extension=lower.includes(".") ? lower.split(".").at(-1)! : "";
+  invariant(EXTENSIONS.has(extension)||NAMES.has(lower),400,"ATTACHMENT_TYPE_UNSUPPORTED",`不支持此文件类型：${name}。仅支持 UTF-8 文本、源码、配置和结构化数据文件`);
+  try { invariant(!bytes.includes(0),400,"ATTACHMENT_TYPE_UNSUPPORTED",`文件不是可读取的 UTF-8 文本：${name}`); new TextDecoder("utf-8",{fatal:true}).decode(bytes); }
+  catch { invariant(false,400,"ATTACHMENT_TYPE_UNSUPPORTED",`文件不是可读取的 UTF-8 文本：${name}`); }
+}
 
 export function parseAttachments(value: unknown): Array<{ name: string; relativePath: string; mimeType: string; data: string }> {
   if (value === undefined) return [];
@@ -20,6 +28,7 @@ export function parseAttachments(value: unknown): Array<{ name: string; relative
     invariant(typeof item.data === "string" && item.data.length <= Math.ceil(MAX_ATTACHMENT_FILE_BYTES / 3) * 4 + 4 && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(item.data), 400, "ATTACHMENT_INVALID", "文件内容无效");
     const bytes = Buffer.from(item.data, "base64");
     invariant(bytes.length > 0 && bytes.length <= MAX_ATTACHMENT_FILE_BYTES && bytes.toString("base64") === item.data, 400, "ATTACHMENT_INVALID", `单个文件不能超过 ${MAX_ATTACHMENT_FILE_BYTES / 1024 / 1024} MB`);
+    validateReadableText(item.name,bytes);
     total += bytes.length; invariant(total <= MAX_ATTACHMENT_TOTAL_BYTES, 400, "ATTACHMENT_INVALID", `文件总大小不能超过 ${MAX_ATTACHMENT_TOTAL_BYTES / 1024 / 1024} MB`);
     return { name: item.name, relativePath: item.relativePath, mimeType: item.mimeType, data: item.data };
   });

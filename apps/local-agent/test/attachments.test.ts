@@ -18,3 +18,9 @@ test("only accepts bounded plugin skill references", () => {
   assert.deepEqual(parsePluginSkills([{ pluginId: "p", name: "skill", path: "/skills/skill/SKILL.md" }])[0]?.name, "skill");
   assert.throws(() => parsePluginSkills([{ pluginId: "p", name: "skill", path: "" }]), /格式/);
 });
+
+test("rejects unsupported extensions and binary content before host materialization",()=>{
+  const data=Buffer.from("hello").toString("base64");
+  assert.throws(()=>parseAttachments([{name:"archive.zip",relativePath:"archive.zip",mimeType:"text/plain",data}]),/不支持/);
+  assert.throws(()=>parseAttachments([{name:"binary.md",relativePath:"binary.md",mimeType:"text/markdown",data:Buffer.from([0,255]).toString("base64")}]),/UTF-8/);
+});

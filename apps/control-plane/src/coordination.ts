@@ -18,6 +18,7 @@ import type {
 } from "./api-schema.js";
 import { COMMAND_TYPES } from "./api-schema.js";
 import type { Principal } from "./auth.js";
+import { createHash } from "node:crypto";
 import type { AgentConnectionIdentity } from "./registry.js";
 import { supportsCommand } from "./capabilities.js";
 import { validateInputAnswers } from "./user-input.js";
@@ -665,6 +666,7 @@ export class CoordinationService {
         timestamp,
         futureIso(session.sync_content === 1 ? session.retention_days * 24 * 60 * 60 : 5 * 60),
       );
+      for(const attachment of attachments){const bytes=Buffer.from(attachment.data,"base64");this.db.run(`INSERT INTO attachment_uploads(machine_id,logical_session_id,execution_segment_id,command_id,relative_path,size_bytes,content_hash) VALUES(?,?,?,?,?,?,?)`,session.machine_id,logicalSessionId,executionSegmentId,commandId,attachment.relativePath,bytes.length,createHash("sha256").update(bytes).digest("hex"));}
       const initialState = input.type === "turn.queue" ? "queued" : "accepted";
       this.db.run("INSERT INTO command_projection(command_id,state,updated_at) VALUES(?,?,?)", commandId, initialState, timestamp);
       this.db.run(
