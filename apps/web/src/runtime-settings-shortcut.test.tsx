@@ -50,9 +50,9 @@ it("shows unavailable rather than indefinite loading after configuration fetch f
  expect(screen.getByText("模型配置暂不可用")).toBeTruthy();
 });
 
-it("separates the active turn receipt from newly selected settings",()=>{
- render(<RuntimeSettingsShortcut sessionId="s" activeTurnId="turn-current" running summary={{sessionId:"s",source:"session",settings:{model:"next-model",effort:"high"},changed:true,loaded:true}} observed={{accepted:{nativeTurnId:"turn-current",acceptedAt:"2026-09-10T00:00:00Z",model:"current-model",effort:"low"}}} onOpen={()=>{}}/>);
- expect(screen.getByText("current-model · low")).toBeTruthy();expect(screen.getByText("本次 · next-model · high")).toBeTruthy();expect(screen.getByText("后续任务")).toBeTruthy();
+it("separates the active turn receipt and its accepted mode from newly selected settings",()=>{
+ render(<RuntimeSettingsShortcut sessionId="s" activeTurnId="turn-current" running summary={{sessionId:"s",source:"session",settings:{model:"next-model",effort:"high"},changed:true,loaded:true}} observed={{accepted:{nativeTurnId:"turn-current",acceptedAt:"2026-09-10T00:00:00Z",model:"current-model",effort:"low",mode:"plan"}}} onOpen={()=>{}}/>);
+ expect(screen.getByText("current-model · low · 计划模式")).toBeTruthy();expect(screen.getByText("本次 · next-model · high")).toBeTruthy();expect(screen.getByText("后续任务")).toBeTruthy();
 });
 it("does not present a previous turn receipt or unbound observation as the current model",()=>{
  render(<RuntimeSettingsShortcut sessionId="s" activeTurnId="new-turn" running summary={{sessionId:"s",settings:{model:"next-model"},changed:false,loaded:true}} observed={{accepted:{nativeTurnId:"old-turn",acceptedAt:"2026-09-10T00:00:00Z",model:"old-model"},observed:{model:"observed-model",observedAt:"2026-09-10T01:00:00Z"}}} onOpen={()=>{}}/>);
@@ -61,14 +61,14 @@ it("does not present a previous turn receipt or unbound observation as the curre
 it("hides duplicate follow-up settings and switches to send settings when the turn ends",()=>{
  const props={sessionId:"s",activeTurnId:"turn",summary:{sessionId:"s",settings:{model:"same-model",effort:"low"},changed:false,loaded:true},observed:{accepted:{nativeTurnId:"turn",acceptedAt:"2026-09-10T00:00:00Z",model:"same-model",effort:"low"}},onOpen:()=>{}};
  const view=render(<RuntimeSettingsShortcut {...props} running/>);
- expect(screen.queryByText("后续任务")).toBeNull();expect(screen.getByText("当前任务")).toBeTruthy();
+ expect(screen.queryByText("后续任务")).toBeNull();expect(screen.getByText("当前任务")).toBeTruthy();expect(screen.getByText("same-model · low · 默认模式")).toBeTruthy();
  view.rerender(<RuntimeSettingsShortcut {...props} running={false}/>);
  expect(screen.getByText("发送使用")).toBeTruthy();expect(screen.queryByText("当前任务")).toBeNull();
 });
 it("shows a removable Plan mode indicator beside the runtime settings",()=>{
  const clear=vi.fn();
  render(<RuntimeSettingsShortcut sessionId="s" summary={{sessionId:"s",settings:{model:"example-model"},changed:false,loaded:true}} running={false} modeOverride="plan" onClearMode={clear} onOpen={()=>{}}/>);
- expect(screen.getByText("计划模式")).toBeTruthy();
+ expect(screen.getByText("下次发送 · 计划模式")).toBeTruthy();
  fireEvent.click(screen.getByRole("button",{name:"关闭计划模式"}));
  expect(clear).toHaveBeenCalledOnce();
 });
