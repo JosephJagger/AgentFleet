@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { codexNetworkEnvironment, parseMacSystemProxy } from "../src/system-proxy.js";
+import { codexNetworkEnvironment, parseMacSystemProxy, parseWindowsSystemProxy } from "../src/system-proxy.js";
 
 const macProxy = `<dictionary> {
   HTTPEnable : 1
@@ -31,7 +31,32 @@ test("passes the active macOS system proxy to Codex", async () => {
   assert.equal(environment.NO_PROXY, "localhost,127.0.0.1,::1");
 });
 
-test("preserves explicit proxy configuration and leaves other platforms unchanged", async () => {
+test("reads an enabled Windows manual proxy for the scheduled Agent", async () => {
+  assert.deepEqual(parseWindowsSystemProxy('{"proxyEnable":1,"proxyServer":"127.0.0.1:7890"}'), {
+    HTTP_PROXY: "http://127.0.0.1:7890",
+    HTTPS_PROXY: "http://127.0.0.1:7890",
+  });
+  assert.deepEqual(parseWindowsSystemProxy('{"proxyEnable":1,"proxyServer":"http=127.0.0.1:8080;https=127.0.0.1:7890"}'), {
+    HTTP_PROXY: "http://127.0.0.1:8080",
+    HTTPS_PROXY: "http://127.0.0.1:7890",
+  });
+  assert.deepEqual(parseWindowsSystemProxy('{"proxyEnable":0,"proxyServer":"127.0.0.1:7890"}'), {});
+  assert.deepEqual(parseWindowsSystemProxy('{"proxyEnable":1,"proxyServer":"bad host"}'), {});
+});
+
+test("passes the active Windows system proxy to Codex", async () => {
+  const calls: string[] = [];
+  const environment = await codexNetworkEnvironment({ CODEX_HOME: "C:\\codex" }, "win32", async (file, args) => {
+    calls.push(file, ...args);
+    return { stdout: '{"proxyEnable":1,"proxyServer":"127.0.0.1:7890"}' };
+  });
+  assert.equal(calls[0], "powershell.exe");
+  assert.equal(environment.HTTP_PROXY, "http://127.0.0.1:7890");
+  assert.equal(environment.HTTPS_PROXY, "http://127.0.0.1:7890");
+  assert.equal(environment.NO_PROXY, "localhost,127.0.0.1,::1");
+});
+
+test("preserves explicit proxy configuration and leaves unsupported platforms unchanged", async () => {
   let calls = 0;
   const runner = async () => { calls += 1; return { stdout: macProxy }; };
   const explicit = await codexNetworkEnvironment({ HTTPS_PROXY: "http://proxy.example:8080", NO_PROXY: "localhost" }, "darwin", runner);
