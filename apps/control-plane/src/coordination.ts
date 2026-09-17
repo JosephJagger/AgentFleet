@@ -54,6 +54,11 @@ export interface EventNack {
   expectedHostSeq?: number;
 }
 
+export interface InactiveTakeoverReleaseResult {
+  scanned: number;
+  scheduled: number;
+}
+
 interface SessionCommandRow {
   paginated_history: number;
   logical_session_id: string;
@@ -405,6 +410,105 @@ export class CoordinationService {
         state: "released",
       };
     });
+  }
+
+  /**
+   * Releases takeovers that have had no recorded token use for three days.
+   *
+   * This deliberately creates a normal thread.release command instead of
+   * changing the projection directly: the host remains the authority that
+   * releases the native writer and confirms the result.
+   */
+  releaseInactiveTakeovers(referenceTime = Date.now()): InactiveTakeoverReleaseResult {
+    const cutoff = new Date(referenceTime - 72 * 60 * 60 * 1_000).toISOString();
+    const now = new Date(referenceTime).toISOString();
+    const candidates = this.db.all<{
+      logical_session_id: string;
+      workspace_id: string;
+      last_token_at: string | null;
+      managed_at: string | null;
+      created_at: string;
+    }>(
+      `SELECT s.logical_session_id,s.workspace_id,
+        (SELECT MAX(ui.ends_at) FROM usage_intervals ui WHERE ui.logical_session_id=s.logical_session_id) AS last_token_at,
+        (SELECT MAX(e.occurred_at) FROM durable_events e
+          WHERE e.logical_session_id=s.logical_session_id AND e.type IN ('thread.claimed','thread.started')) AS managed_at,
+        s.created_at
+       FROM logical_sessions s
+       JOIN machines m ON m.machine_id=s.machine_id
+       JOIN execution_segments es ON es.logical_session_id=s.logical_session_id AND es.ended_at IS NULL
+       WHERE s.managed=1 AND s.deleted_at IS NULL AND es.native_thread_id IS NOT NULL
+         AND s.execution_state IN ('idle','completed','failed','interrupted') AND s.active_turn_id IS NULL
+         AND s.reachability='live' AND m.identity_state='active' AND m.security_state='normal'
+         AND m.compatibility='compatible' AND m.reachability='online' AND m.runtime_read_only=0
+         AND NOT EXISTS(SELECT 1 FROM approvals a WHERE a.logical_session_id=s.logical_session_id AND a.state='pending')
+         AND NOT EXISTS(SELECT 1 FROM turn_queue q WHERE q.logical_session_id=s.logical_session_id AND q.state IN ('queued','dispatching','unknown'))
+         AND NOT EXISTS(SELECT 1 FROM commands c JOIN command_projection cp ON cp.command_id=c.command_id
+           WHERE c.logical_session_id=s.logical_session_id AND cp.state IN ('accepted','dispatching','unknown'))
+         AND NOT EXISTS(SELECT 1 FROM control_leases l WHERE l.logical_session_id=s.logical_session_id AND l.state='active' AND l.expires_at>?)`,
+      now,
+    ).filter(candidate => (candidate.last_token_at ?? candidate.managed_at ?? candidate.created_at) <= cutoff);
+
+    let scheduled = 0;
+    for (const candidate of candidates) {
+      try {
+        const owner = this.db.get<{ user_id: string; client_session_id: string; email: string }>(
+          `SELECT u.user_id,cs.client_session_id,u.email FROM client_sessions cs
+           JOIN users u ON u.user_id=cs.user_id
+           WHERE cs.workspace_id=? AND cs.revoked_at IS NULL
+           ORDER BY cs.last_seen_at DESC LIMIT 1`,
+          candidate.workspace_id,
+        );
+        if (!owner) continue;
+        const principal: Principal = {
+          workspaceId: candidate.workspace_id,
+          userId: owner.user_id,
+          clientSessionId: owner.client_session_id,
+          email: owner.email,
+          csrfHash: "",
+          expiresAt: "",
+        };
+        const session = this.commandSession(principal, candidate.logical_session_id);
+        const lease = this.acquireLease(principal, candidate.logical_session_id, session.control_lease_version, 120);
+        const result = this.createCommand(principal, candidate.logical_session_id, {
+          type: "thread.release",
+          clientMutationId: `auto-release-${candidate.logical_session_id}-${Math.floor(referenceTime / 3_600_000)}`,
+          controlLeaseId: lease.leaseId,
+          expiresInSeconds: 300,
+          precondition: {
+            nativeThreadId: session.native_thread_id!,
+            threadControlVersion: session.thread_control_version,
+            projectLeaseVersion: session.project_lease_version,
+            expectedActiveTurnId: null,
+          },
+          payload: {},
+        });
+        if (!result.duplicate) {
+          this.db.audit({
+            workspaceId: candidate.workspace_id,
+            actorUserId: owner.user_id,
+            actorClientSessionId: owner.client_session_id,
+            machineId: session.machine_id,
+            projectId: session.project_id,
+            logicalSessionId: candidate.logical_session_id,
+            controlLeaseId: lease.leaseId,
+            action: "thread.auto_release.inactive",
+            metadata: {
+              thresholdHours: 72,
+              lastTokenAt: candidate.last_token_at,
+              managedAt: candidate.managed_at,
+              commandId: result.command.commandId,
+            },
+          });
+          scheduled += 1;
+        }
+      } catch {
+        // A concurrent user operation, an expired client session, or a host
+        // state change makes this candidate ineligible. The next sweep will
+        // reconsider it from its latest authoritative state.
+      }
+    }
+    return { scanned: candidates.length, scheduled };
   }
 
   createCommand(principal: Principal, logicalSessionId: string, input: CreateCommandRequest): {

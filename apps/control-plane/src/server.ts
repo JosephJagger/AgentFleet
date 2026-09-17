@@ -97,7 +97,7 @@ export interface ControlPlaneHandle {
   app: FastifyInstance;
   db: ControlPlaneDatabase;
   config: ControlPlaneConfig;
-  runMaintenance: () => { offlineMachines: string[]; expiredContent: number; expiredAudit: number };
+  runMaintenance: () => { offlineMachines: string[]; expiredContent: number; expiredAudit: number; inactiveTakeoversReleased: number };
 }
 
 class FixedWindowLimiter {
@@ -1500,7 +1500,8 @@ export async function buildControlPlane(
     },
   );
 
-  const runMaintenance = (): { offlineMachines: string[]; expiredContent: number; expiredAudit: number } => {
+  let nextInactiveTakeoverSweepAt = 0;
+  const runMaintenance = (): { offlineMachines: string[]; expiredContent: number; expiredAudit: number; inactiveTakeoversReleased: number } => {
     db.expireTransientState();
     coordination.expireUndispatchedCommands();
     const offlineMachines = registry.sweepOffline();
@@ -1509,7 +1510,12 @@ export async function buildControlPlane(
     const expiredContent = coordination.purgeExpiredContent();
     writingMemory.cleanup();
     const expiredAudit = coordination.purgeExpiredAudit();
-    return { offlineMachines, expiredContent, expiredAudit };
+    let inactiveTakeoversReleased = 0;
+    if (Date.now() >= nextInactiveTakeoverSweepAt) {
+      nextInactiveTakeoverSweepAt = Date.now() + 60 * 60 * 1_000;
+      inactiveTakeoversReleased = coordination.releaseInactiveTakeovers().scheduled;
+    }
+    return { offlineMachines, expiredContent, expiredAudit, inactiveTakeoversReleased };
   };
   const maintenance = setInterval(() => {
     try {
