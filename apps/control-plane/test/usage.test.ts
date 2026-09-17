@@ -56,7 +56,7 @@ test("new counter baseline is explicit, malformed values cannot corrupt accounti
 test("shared account quota selects one newest snapshot without summing percentages or retaining secrets",t=>{
  const {db,workspaceId,service,at}=fixture();t.after(()=>db.close());const key="a".repeat(64);
  const snapshot={accountKey:key,observedAt:at,windows:[{bucket:"codex",window:"secondary",windowMinutes:10080,usedPercent:40,resetsAt:1900000000}],credits:{balance:"2350.5",hasCredits:true,unlimited:false},accessToken:"must-not-persist"};
- service.quota("a",snapshot);service.quota("b",{...snapshot,observedAt:new Date(Date.now()+1000).toISOString(),windows:[{...snapshot.windows[0],usedPercent:60}]});
+ service.quota("a",snapshot);service.quota("b",{...snapshot,observedAt:new Date(Date.now()+1000).toISOString(),windows:[{...snapshot.windows[0],usedPercent:60}],credits:null});
  const value=service.read(workspaceId,"machine","a");assert.equal(value.accounts.length,1);assert.equal(value.accounts[0]?.windows[0].remainingPercent,40);
  assert.deepEqual(value.accounts[0]?.credits,{balance:"2350.5",hasCredits:true,unlimited:false});
  assert.equal(value.accounts[0]?.sourceMachine,"b");assert.ok(!JSON.stringify(db.all("SELECT * FROM machine_usage")).includes("must-not-persist"));
