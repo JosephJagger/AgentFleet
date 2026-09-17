@@ -55,17 +55,18 @@ test("new counter baseline is explicit, malformed values cannot corrupt accounti
 });
 test("shared account quota selects one newest snapshot without summing percentages or retaining secrets",t=>{
  const {db,workspaceId,service,at}=fixture();t.after(()=>db.close());const key="a".repeat(64);
- const snapshot={accountKey:key,observedAt:at,windows:[{bucket:"codex",window:"secondary",windowMinutes:10080,usedPercent:40,resetsAt:1900000000}],accessToken:"must-not-persist"};
+ const snapshot={accountKey:key,observedAt:at,windows:[{bucket:"codex",window:"secondary",windowMinutes:10080,usedPercent:40,resetsAt:1900000000}],credits:{balance:"2350.5",hasCredits:true,unlimited:false},accessToken:"must-not-persist"};
  service.quota("a",snapshot);service.quota("b",{...snapshot,observedAt:new Date(Date.now()+1000).toISOString(),windows:[{...snapshot.windows[0],usedPercent:60}]});
  const value=service.read(workspaceId,"machine","a");assert.equal(value.accounts.length,1);assert.equal(value.accounts[0]?.windows[0].remainingPercent,40);
+ assert.deepEqual(value.accounts[0]?.credits,{balance:"2350.5",hasCredits:true,unlimited:false});
  assert.equal(value.accounts[0]?.sourceMachine,"b");assert.ok(!JSON.stringify(db.all("SELECT * FROM machine_usage")).includes("must-not-persist"));
  service.quota("a",null);assert.equal(service.read(workspaceId,"machine","a").accounts.length,0);
  service.quota("a",{...snapshot,accountKey:"unknown",observedAt:"2000-01-01T00:00:00Z"});
  assert.equal(service.read(workspaceId,"machine","a").accounts[0]?.stale,true);
 });
-test("usage routes require authentication and migration creates version 33",async t=>{
+test("usage routes require authentication and migration creates version 34",async t=>{
  const {app,db}=await buildControlPlane(config());t.after(()=>app.close());
- assert.equal(db.get<{user_version:number}>("PRAGMA user_version")?.user_version,33);
+ assert.equal(db.get<{user_version:number}>("PRAGMA user_version")?.user_version,34);
  for(const path of ["sessions","projects","machines"])assert.equal((await app.inject({method:"GET",url:`/api/${path}/missing/usage`})).statusCode,401);
 });
 

@@ -19,8 +19,16 @@ export function quotaSnapshot(value: unknown, identity?: unknown): Record<string
   if (!isRecord(value)) return;
   const buckets = isRecord(value.rateLimitsByLimitId) ? Object.values(value.rateLimitsByLimitId) : [value.rateLimits];
   const windows: Record<string, unknown>[] = [];
+  let credits: { balance: string | null; hasCredits: boolean; unlimited: boolean } | null = null;
   for (const bucket of buckets.slice(0, 16)) {
     if (!isRecord(bucket)) continue;
+    const candidate = bucket.credits;
+    if (credits === null && isRecord(candidate) && typeof candidate.hasCredits === "boolean" && typeof candidate.unlimited === "boolean") {
+      const balance = candidate.balance;
+      if (balance === null || (typeof balance === "string" && /^-?\d+(?:\.\d+)?$/u.test(balance) && balance.length <= 64)) {
+        credits = { balance, hasCredits: candidate.hasCredits, unlimited: candidate.unlimited };
+      }
+    }
     for (const key of ["primary", "secondary"]) {
       const window = bucket[key]; if (!isRecord(window)) continue;
       if (typeof window.usedPercent !== "number" || !Number.isFinite(window.usedPercent) || window.usedPercent < 0 || window.usedPercent > 100) continue;
@@ -35,5 +43,5 @@ export function quotaSnapshot(value: unknown, identity?: unknown): Record<string
   const email = typeof account?.email === "string" ? account.email.trim().toLowerCase() : "";
   const key = typeof value.accountId === "string" && value.accountId && email
     ? sha256(JSON.stringify(["agentfleets-usage", value.accountId, email])).replace(/^sha256:/, "") : undefined;
-  return { observedAt: nowIso(), windows, ...(key ? { accountKey: key } : {}) };
+  return { observedAt: nowIso(), windows, credits, ...(key ? { accountKey: key } : {}) };
 }

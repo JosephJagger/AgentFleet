@@ -8,7 +8,7 @@ import type { UsageSummary } from "./lib/usage";
 import { setLocale } from "./i18n";
 vi.mock("./lib/api",()=>({api:{usage:vi.fn(),hostOperation:vi.fn(),refreshQuota:vi.fn()}}));
 const counts={inputTokens:800,outputTokens:200,cachedInputTokens:300,reasoningOutputTokens:100,totalTokens:1000};
-const data:UsageSummary={scope:"project",recorded:counts,quotaCycle:null,observedSessions:1,totalSessions:3,firstObservedAt:"2026-09-10T00:00:00Z",lastObservedAt:"2026-09-10T00:00:00Z",coverage:"observed-only",discontinuities:0,last:null,nativeTotal:null,modelContextWindow:null,topWeeklyProjects:null,topWeeklySessions:null,topProjects:[],topSessions:[{id:"s1",title:"Example task",totalTokens:1000}],accounts:[{sourceMachine:"Demo host",identityKnown:true,observedAt:new Date().toISOString(),stale:false,windows:[{bucket:"codex",window:"secondary",windowMinutes:10080,usedPercent:62,remainingPercent:38,resetsAt:1900000000}]}]};
+const data:UsageSummary={scope:"project",recorded:counts,quotaCycle:null,observedSessions:1,totalSessions:3,firstObservedAt:"2026-09-10T00:00:00Z",lastObservedAt:"2026-09-10T00:00:00Z",coverage:"observed-only",discontinuities:0,last:null,nativeTotal:null,modelContextWindow:null,topWeeklyProjects:null,topWeeklySessions:null,topProjects:[],topSessions:[{id:"s1",title:"Example task",totalTokens:1000}],accounts:[{sourceMachine:"Demo host",identityKnown:true,observedAt:new Date().toISOString(),stale:false,credits:{balance:"2350.5",hasCredits:true,unlimited:false},windows:[{bucket:"codex",window:"secondary",windowMinutes:10080,usedPercent:62,remainingPercent:38,resetsAt:1900000000}]}]};
 beforeEach(()=>{
  setLocale("zh-CN");
  if(!HTMLDialogElement.prototype.showModal)Object.defineProperty(HTMLDialogElement.prototype,"showModal",{configurable:true,writable:true,value:function(){}});
@@ -21,6 +21,7 @@ it("separates shared remaining quota from measured project tokens and opens the 
  vi.mocked(api.usage).mockResolvedValue(data);const select=vi.fn();render(<UsageButton scope="project" id="p1" onSession={select}/>);
  fireEvent.click(await screen.findByRole("button",{name:/总消耗/}));
  expect(await screen.findByRole("dialog",{name:"用量与剩余额度"})).toBeTruthy();
+ expect(screen.getByText("2,350.5 点")).toBeTruthy();
  expect(screen.getByText("已用 62% · 剩余 38%")).toBeTruthy();expect(screen.getByText("已获取 1 / 3 个会话")).toBeTruthy();
  fireEvent.click(screen.getByRole("button",{name:"Example task"}));expect(select).toHaveBeenCalledWith("s1");
 });

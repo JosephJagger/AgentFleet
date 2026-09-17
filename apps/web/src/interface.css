@@ -439,7 +439,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
 .usage-toolbar label { display: grid; gap: 7px; min-width: min(360px, 100%); }
 .usage-toolbar label span { color: var(--muted); font-size: var(--text-caption); }
 .usage-toolbar select { min-height: 42px; }
-.usage-overview-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 4px 0 34px; }
+.usage-overview-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 4px 0 34px; }
 .usage-overview-cards article { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 8px; min-height: 132px; padding: 18px; }
 .usage-overview-cards span, .usage-overview-cards small { color: var(--muted); font-size: var(--text-caption); }
 .usage-overview-cards strong { color: var(--ink); font-family: var(--mono); font-size: 1.55rem; font-variant-numeric: tabular-nums; font-weight: 550; overflow-wrap: anywhere; }

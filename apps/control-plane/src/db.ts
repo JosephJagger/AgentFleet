@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 33) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 34) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1187,6 +1187,11 @@ export class ControlPlaneDatabase {
       PRAGMA user_version=33`);
       const rows=this.all<{machine_id:string;logical_session_id:string;execution_segment_id:string;command_id:string;body_json:string}>(`SELECT s.machine_id,c.logical_session_id,c.execution_segment_id,c.command_id,cc.body_json FROM command_contents cc JOIN commands c USING(command_id) JOIN logical_sessions s USING(logical_session_id) WHERE cc.deleted_at IS NULL AND cc.body_json LIKE '%"attachments"%'`);
       for(const row of rows){try{const body=JSON.parse(row.body_json);if(!Array.isArray(body?.attachments))continue;for(const value of body.attachments){if(!value||typeof value.relativePath!=="string"||typeof value.data!=="string")continue;const bytes=Buffer.from(value.data,"base64");this.run("INSERT OR IGNORE INTO attachment_uploads(machine_id,logical_session_id,execution_segment_id,command_id,relative_path,size_bytes,content_hash) VALUES(?,?,?,?,?,?,?)",row.machine_id,row.logical_session_id,row.execution_segment_id,row.command_id,value.relativePath,bytes.length,createHash("sha256").update(bytes).digest("hex"));}}catch{continue;}}
+    });
+    if (version < 34) this.transaction(() => {
+      const columns=new Set(this.all<{name:string}>("PRAGMA table_info(machine_usage)").map(column=>column.name));
+      if(!columns.has("credits_json"))this.sqlite.exec("ALTER TABLE machine_usage ADD COLUMN credits_json TEXT");
+      this.sqlite.exec("PRAGMA user_version=34");
     });
   }
 

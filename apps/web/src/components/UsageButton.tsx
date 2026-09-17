@@ -29,8 +29,11 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
   const number=(n:number)=>new Intl.NumberFormat(locale(),{maximumFractionDigits:0}).format(n);
   const short=(n:number)=>new Intl.NumberFormat(locale(),{notation:"compact",maximumFractionDigits:1}).format(n);
   const date=(s:string)=>new Date(s).toLocaleString(locale());
+  const creditBalance=(value:string)=>{const parsed=Number(value);return Number.isFinite(parsed)?new Intl.NumberFormat(locale(),{maximumFractionDigits:20}).format(parsed):value;};
+  const creditText=(credits:UsageSummary["accounts"][number]["credits"])=>credits?.unlimited?t("不限"):credits?.balance!=null?t("{0} 点",creditBalance(credits.balance)):credits?.hasCredits===false?t("无可用点数"):t("未提供");
   const weekly=data?.accounts.flatMap(a=>a.windows.filter(w=>w.windowMinutes===10080 && w.bucket==="codex").map(w=>({w,a})))??[];
   const fiveHour=data?.accounts.flatMap(a=>a.windows.filter(w=>w.windowMinutes===300&&w.bucket==="codex"))??[];
+  const accountCredits=data?.accounts.length===1?data.accounts[0]?.credits:null;
   const label=scope!=="machine"?t("总消耗 {0} tokens",data?.recorded?short(data.recorded.totalTokens):"—"):scope==="machine"&&weekly.length===1?t("周额度剩余 {0}%",weekly[0].w.remainingPercent):scope==="machine"&&!!data?.accounts.some(a=>a.windows.length)?t("用量与剩余额度"):data?.recorded?t("总消耗 {0} tokens",short(data.recorded.totalTokens)):t("用量未上报");
   const showWeeklyReset=scope==="machine"&&weekly.length===1&&!failed;
   const resetAt=showWeeklyReset?weekly[0].w.resetsAt:null;
@@ -38,7 +41,7 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
   const weeklyCacheRate=cacheRate(data?.quotaCycle?.inputTokens,data?.quotaCycle?.cachedInputTokens);
   const rate=(value:number|null)=>value==null?t("未记录"):t("{0}%",new Intl.NumberFormat(locale(),{maximumFractionDigits:1}).format(value));
   return <>
-    <button type="button" className="button button--quiet usage-trigger" onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",date(data.accounts.map(a=>a.observedAt).sort().at(-1)!))}</small>:null}{scope!=="machine"&&!failed&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",fiveHour[0].remainingPercent)}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></button>
+    <button type="button" className="button button--quiet usage-trigger" onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",date(data.accounts.map(a=>a.observedAt).sort().at(-1)!))}</small>:null}{scope!=="machine"&&!failed&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",fiveHour[0].remainingPercent)}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></button>
     <dialog ref={dialog} className="modal usage-dialog" aria-label={t("用量与剩余额度")} onCancel={()=>setOpen(false)} onClose={()=>setOpen(false)}>
       <header className="modal-head"><div><h2>{t("用量与剩余额度")}</h2><p>{t("账号看额度，项目和会话看已记录 token")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setOpen(false)}><X size={18}/></button></header>
       <div className="usage-body">
@@ -49,6 +52,7 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
           {!data?.accounts.length&&<p>{t("账号额度未上报；需要支持额度查询的 Codex 认证。")}</p>}
           {data?.accounts.map((account,i)=><div className="usage-account" key={i}>
             <p>{account.sourceMachine} · {t("更新于 {0}",date(account.observedAt))}{(account.stale||Date.now()-Date.parse(account.observedAt)>180_000)&&<strong> · {t("数据已过期")}</strong>}</p>
+            <div className="usage-credit"><strong>{t("点数余额")}</strong><span>{creditText(account.credits)}</span></div>
             {!account.windows.length&&<p>{t("当前认证未返回额度窗口。")}</p>}
             {account.windows.map(w=><div className="usage-window" key={`${w.bucket}:${w.window}`}><div><strong>{w.windowMinutes===10080?t("周额度"):w.windowMinutes===300?t("5 小时额度"):t("{0} 分钟额度",w.windowMinutes)} · {w.bucket}</strong><span>{t("已用 {0}% · 剩余 {1}%",w.usedPercent,w.remainingPercent)}</span></div><progress max={100} value={w.usedPercent} aria-label={t("额度已用比例")}/><small>{w.resetsAt?t("重置于 {0}",date(new Date(w.resetsAt*1000).toISOString())):t("重置时间未上报")}</small></div>)}
             {!account.identityKnown&&<small>{t("账号身份未上报，此处仅展示来源主机快照，不与其他主机相加。")}</small>}

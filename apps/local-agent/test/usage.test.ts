@@ -7,9 +7,15 @@ test("usage allowlist rejects unsafe counters and never relays account credentia
  assert.equal(tokenUsage({total:{...counts,inputTokens:-1},last:counts}),undefined);
  assert.equal(tokenUsage({total:{...counts,totalTokens:Infinity},last:counts}),undefined);
  const parsed=tokenUsage({total:counts,last:counts,secret:"drop",modelContextWindow:10000});assert.ok(parsed);assert.ok(!JSON.stringify(parsed).includes("secret"));
- const quota=quotaSnapshot({accountId:"synthetic-account",accessToken:"never-relay",rateLimitsByLimitId:{codex:{secondary:{usedPercent:64,windowDurationMins:10080,resetsAt:1900000000}}}}, {account:{email:"demo@example.test"}})!;
+ const quota=quotaSnapshot({accountId:"synthetic-account",accessToken:"never-relay",rateLimitsByLimitId:{codex:{credits:{balance:"2350.5",hasCredits:true,unlimited:false,secret:"drop"},secondary:{usedPercent:64,windowDurationMins:10080,resetsAt:1900000000}}}}, {account:{email:"demo@example.test"}})!;
  assert.equal((quota.windows as Record<string,unknown>[])[0]?.windowMinutes,10080);
+ assert.deepEqual(quota.credits,{balance:"2350.5",hasCredits:true,unlimited:false});
  assert.match(String(quota.accountKey),/^[a-f0-9]{64}$/);assert.ok(!JSON.stringify(quota).includes("synthetic-account"));assert.ok(!JSON.stringify(quota).includes("never-relay"));
+});
+test("quota credits preserve official decimal strings and reject malformed balances",()=>{
+ assert.deepEqual(quotaSnapshot({rateLimits:{credits:{balance:"-1.25",hasCredits:true,unlimited:false}}})?.credits,{balance:"-1.25",hasCredits:true,unlimited:false});
+ assert.equal(quotaSnapshot({rateLimits:{credits:{balance:"1 point",hasCredits:true,unlimited:false}}})?.credits,null);
+ assert.deepEqual(quotaSnapshot({rateLimits:{credits:{balance:null,hasCredits:false,unlimited:false}}})?.credits,{balance:null,hasCredits:false,unlimited:false});
 });
 test("native usage notifications use durable events and never request a turn or resume",async()=>{
  const events:AppEvent[]=[];

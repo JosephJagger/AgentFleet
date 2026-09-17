@@ -1201,6 +1201,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .usage-body section + section { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 14px; }
 .usage-body h3 { font-size: 0.9375rem; margin-bottom: 12px; }
 .usage-account { margin-block: 14px; }
+.usage-credit { align-items: baseline; background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; display: flex; justify-content: space-between; gap: 12px; margin-block: 12px; padding: 12px; }
+.usage-credit span { color: var(--cobalt); font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .usage-window { margin-block: 14px; }
 .usage-window > div { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .usage-window progress { width: 100%; height: 8px; accent-color: var(--cobalt); }

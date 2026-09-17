@@ -1132,7 +1132,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
   await app.ready();
   assert.equal(
     Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    33,
+    34,
   );
 
   const login = await app.inject({
