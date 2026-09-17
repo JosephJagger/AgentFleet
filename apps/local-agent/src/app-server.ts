@@ -1346,6 +1346,11 @@ export class CodexAppServer implements AppServerClient {
       }
     } else if (method === "error" && typeof params.threadId === "string" && typeof params.turnId === "string") {
       const error = isRecord(params.error) ? safeText(params.error.message, 32_000)?.text : undefined;
+      // Codex emits one of these for every transient cloud retry (for example
+      // "Reconnecting... 2/5"). It explicitly says that the turn will retry,
+      // so persisting it as a terminal-looking chat error only creates noisy
+      // false failures. A final error or turn completion is still forwarded.
+      if (params.willRetry === true) return;
       event = {
         type: "turn.error",
         nativeThreadId: params.threadId,
