@@ -19,7 +19,7 @@ Keep execution in your own environment.</p>
 
 <p align="center">A self-hosted operations console for Codex CLI across Linux servers and personal computers.<br>Manage native sessions, send files and images, use installed plugin skills, and track usage from one English or Chinese web interface.</p>
 
-![Castle in the Sky workspace with fictional demo data](docs/assets/themes/daylight-desktop-en.jpg)
+![AgentFleets workspace showing native quota, credit balance, session usage and a running Codex conversation with fictional demo data](docs/assets/workspace-en.png)
 
 <p align="center"><sub>Actual interface with synthetic demo data. No production accounts, hosts, or conversations are shown.</sub></p>
 
@@ -42,7 +42,7 @@ Think of each enrolled host as a place where Codex executes work, and AgentFleet
 
 For example, paste a screenshot of a broken page on your laptop, select the session on your Linux host, and ask Codex to investigate the project there. The current composer accepts pasted **PNG, JPEG, and WebP images, up to four per message**, with previews and automatic resizing/compression. Submission requires a host runtime and model that support image input.
 
-Codex CLI already supports image and local-path inputs; AgentFleets makes those workflows accessible through a browser across enrolled hosts. See the [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli). The `+` menu accepts images and up to 32 files with a combined 8 MB limit, or a folder while preserving its relative structure. Direct file upload is deliberately limited to UTF-8 text, common source code, configuration, and structured-data formats. AgentFleets checks the filename allowlist, UTF-8 decoding, and binary markers in the browser, control plane, and host Agent; renaming a binary file does not bypass validation. PDF, Office documents, archives, audio, video, and executables are rejected by this path. Accepted files are staged under the selected project and passed to Codex as native path references. Files that Codex links in a reply can also be previewed or downloaded from the execution host on demand.
+Codex CLI already supports image and local-path inputs; AgentFleets makes those workflows accessible through a browser across enrolled hosts. See the [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli). The `+` menu accepts images and up to 32 files, with a 4 MB per-file and 8 MB combined limit, or a folder while preserving its relative structure. Supported inputs include structurally checked PDF and macro-free XLSX files, UTF-8 text, common source code, configuration, and structured data. Validation runs in the browser, control plane, and host Agent; changing a binary file's extension does not bypass it. Other Office formats, archives, audio, video, and executables are rejected. Accepted files are staged under the selected project and passed to Codex as native path references. Files that Codex links in a reply can also be previewed or downloaded from the execution host on demand.
 
 ## Say what you need, even without the terminology
 
@@ -97,8 +97,13 @@ These are future directions, not shipped features or a delivery schedule. Univer
 </tr>
 <tr>
 <td valign="top"><h3>Recover deliberately</h3>Unknown outcomes freeze writes. Verify the host and unfreeze manually, with no automatic replay of uncertain actions.</td>
-<td valign="top"><h3>See what you store</h3>Inspect image storage by session. Preview supported cleanup before confirming it, with text and session identity preserved.</td>
+<td valign="top"><h3>See what you store</h3>Inspect staged files by type and session. Preview supported cleanup before confirming it, with conversation text and native session identity preserved.</td>
 <td valign="top"><h3>Keep your model preferences</h3>Inherit Codex model and reasoning-effort settings, set host defaults once, and override individual sessions when needed. Avoid configuring every conversation from scratch.</td>
+</tr>
+<tr>
+<td valign="top"><h3>Read native account limits</h3>Show weekly and five-hour quota windows plus the current credit balance reported by Codex on the host.</td>
+<td valign="top"><h3>Trace recorded token cost</h3>Compare total and current-cycle usage by project and session, including per-turn and weekly cache hit rates.</td>
+<td valign="top"><h3>Add richer turn context</h3>Attach supported files, folders and images; select installed plugins with <code>+</code> or <code>@</code>; keep goals and Plan mode visible in the composer.</td>
 </tr>
 </table>
 
@@ -134,6 +139,12 @@ The save button tracks the selected target scope. It is disabled when the form a
 
 Together with direct access to running and completed-but-controlled sessions, native-session continuity, message queues, and explicit recovery, these are the workflows AgentFleets focuses on making easier. They are practical product strengths, not claims that other Codex clients lack similar features.
 
+### Keep long native sessions usable
+
+AgentFleets continues the same native Codex thread, including its history and identity. Codex performs its own automatic context management as a conversation grows. When you want explicit control, the session tools can request native context compaction without creating a replacement conversation. The panel labels the request and its result separately because acceptance does not mean compaction has already finished.
+
+The composer keeps the active goal, Plan mode, installed plugin selection, model and reasoning effort close to the message. Plugins can be selected from the `+` menu or found by typing `@`; only capabilities advertised by the connected host are offered.
+
 ### Themes for different working environments
 
 Choose from **17 themes**, with Castle in the Sky as the default for new browsers. Five Chinese classics join Cyberpunk, The Matrix, Frozen and other illustrated themes. Each coordinates scene artwork, component borders, message bubbles, Markdown tables and quotations, code blocks and the composer.
@@ -149,9 +160,17 @@ All screenshots use fictional demo data. Browse **[all 17 desktop themes and 6 m
 
 ### Know what is using your quota
 
-Open usage from a host, project, or session to see the account's reported **used and remaining quota**, reset times, and recorded **token consumption**. Host details rank the busiest projects; project details rank sessions and let you jump straight to them. Weekly and five-hour limits appear when Codex reports those windows.
+![Usage dashboard with fictional quota, credit, token and cache data](docs/assets/features/usage-en.png)
 
-Quota is shared by a Codex account; project and session figures are recorded tokens, not an allocation of the account's percentage. Agent 0.30.1 starts collecting native usage notifications from managed sessions. Earlier history and standalone CLI activity are not backfilled. Missing or stale data is labeled explicitly. From Agent 0.30.2, quota updates are event-driven with an initial query and an explicit host refresh; the panel refreshes cached data every 30 seconds. See [usage accounting](docs/usage.md) for coverage and counting rules.
+Open **Usage** or the summary on a host, project, or session to see three related views:
+
+- **Official account limits:** weekly and five-hour quota windows, reset times, and the current credit balance, read from native Codex on the host. Hosts that report the same account are deduplicated instead of having their limits added together.
+- **Recorded token usage:** total and current weekly-cycle tokens by machine, project, and session. Session timelines also show the tokens used by each completed turn when Codex reports them.
+- **Cache efficiency:** per-turn and weekly cache hit rates, calculated as cached input tokens divided by input tokens. Rankings show which projects and sessions account for the recorded usage, with pagination for longer lists.
+
+Quota and credits are shared by a Codex account; project and session figures are recorded observations, not an allocation of the account's official percentage or credit balance. Collection starts with managed-session notifications and does not reconstruct earlier history or standalone CLI work. Missing, partial, and stale data are labeled explicitly. Account limits update from native events, an initial connection query, and manual refresh; the browser reads the stored snapshot without polling every host each minute. See [usage accounting](docs/usage.md) for coverage and counting rules.
+
+*The dashboard above is the real interface populated only with fictional hosts, projects, sessions, quota and credit values.*
 
 ## How it compares to Codex
 
