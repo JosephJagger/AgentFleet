@@ -13,6 +13,18 @@ const categories = localized(() => ([
   { id: "managed", label: t("已接管"), title: t("已接管的会话"), icon: Layers3 },
 ] as const));
 
+function sessionActivity(session: FleetSession, machines: Machine[]): string {
+  const machine = machines.find(candidate => candidate.id === session.machineId);
+  if (!machine || !hasLiveTransport(machine)) return t("等待主机连接");
+  if (!session.nativeThreadId) return t("待建立 · 发送第一条消息后可继续");
+  if (session.state.unknownFreeze) return t("结果待核验");
+  if (session.state.reachability !== "live") return t("等待主机连接");
+  if (session.state.waitReason === "approval") return t("等待确认");
+  if (session.state.waitReason === "user_input") return t("等待回答");
+  if (session.state.currentTurn === "in_progress") return t("任务运行中");
+  return t("已接管 · 可打开会话");
+}
+
 export function FleetStatus({ machines, sessions, connected, onSession, onMachine, utility }: {
   machines: Machine[]; sessions: FleetSession[]; connected: boolean;
   onSession: (id: string) => void; onMachine: (id: string) => void; utility?: ReactNode;
@@ -67,7 +79,7 @@ export function FleetStatus({ machines, sessions, connected, onSession, onMachin
             </button>;
           }) : visible.map(session => <button className="activity-item" type="button" key={session.id} onClick={() => { close(); onSession(session.id); }}>
             <span className={`activity-item__icon${session.state.currentTurn === "in_progress" && session.state.reachability === "live" ? " activity-item__icon--running" : ""}`}><Activity size={20} /></span>
-            <span className="activity-item__copy"><strong>{session.title}</strong><small>{session.machineName} · {session.projectAlias}</small><em>{session.state.unknownFreeze ? t("结果待核验") : session.state.reachability !== "live" ? t("等待主机连接") : session.state.waitReason === "approval" ? t("等待确认") : session.state.waitReason === "user_input" ? t("等待回答") : session.state.currentTurn === "in_progress" ? t("任务运行中") : t("已接管 · 可打开会话")}</em></span><ArrowUpRight size={17} aria-hidden="true" />
+            <span className="activity-item__copy"><strong>{session.title}</strong><small>{session.machineName} · {session.projectAlias}</small><em>{sessionActivity(session, machines)}</em></span><ArrowUpRight size={17} aria-hidden="true" />
           </button>)}
           {counts[selected.id] === 0 && <div className="activity-empty"><selected.icon size={30} /><h3>{category === "hosts" ? t("暂无在线主机") : category === "running" ? t("暂无运行中的会话") : t("暂无已接管的会话")}</h3><p>{category === "hosts" ? t("主机连接后会显示在这里。") : category === "running" ? t("开始任务后，可从这里快速回到会话。") : t("在会话中点击接管，即可在这里集中访问。")}</p></div>}
         </div>

@@ -578,6 +578,7 @@
   "等待主机连接": "Waiting for host connection",
   "任务运行中": "Task running",
   "已接管 · 可打开会话": "Controlled · Open session",
+  "待建立 · 发送第一条消息后可继续": "Waiting for first message · Continue after creating the host session",
   "暂无在线主机": "No online hosts",
   "暂无运行中的会话": "No running sessions",
   "暂无已接管的会话": "No controlled sessions",
