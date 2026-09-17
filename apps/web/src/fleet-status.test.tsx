@@ -51,12 +51,11 @@ it("键盘焦点留在列表内，退出时不触发会话操作",()=>{
  fireEvent.keyDown(document,{key:"Tab"});expect(document.activeElement).toBe(buttons[0]);
  fireEvent.keyDown(document,{key:"Escape"});expect(onSession).not.toHaveBeenCalled();
 });
-it("快捷列表明确区分离线主机与尚未创建的原生会话",()=>{
- const pending={...session("pending"),nativeThreadId:null};
- const onSession=vi.fn();
- const view=render(<FleetStatus machines={[host]} sessions={[pending]} connected onSession={onSession} onMachine={vi.fn()}/>);
- fireEvent.click(screen.getByRole("button",{name:"查看已接管的会话（1）"}));
- expect(screen.getByText("待建立 · 发送第一条消息后可继续")).toBeTruthy();
- view.rerender(<FleetStatus machines={[{...host,reachability:"unreachable"}]} sessions={[pending]} connected onSession={onSession} onMachine={vi.fn()}/>);
- expect(screen.getByText("等待主机连接")).toBeTruthy();
+it("快捷列表只显示已经建立原生会话的接管记录",()=>{
+  const pending={...session("pending"),nativeThreadId:null};
+  const onSession=vi.fn();
+  const view=render(<FleetStatus machines={[host]} sessions={[pending]} connected onSession={onSession} onMachine={vi.fn()}/>);
+ fireEvent.click(screen.getByRole("button",{name:"查看已接管的会话（0）"}));
+ expect(screen.getByText("暂无已接管的会话")).toBeTruthy();
+ view.unmount();
 });

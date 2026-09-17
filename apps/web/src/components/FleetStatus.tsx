@@ -34,7 +34,10 @@ export function FleetStatus({ machines, sessions, connected, onSession, onMachin
   const trigger = useRef<HTMLButtonElement | null>(null);
   const online = machines.filter(hasLiveTransport);
   const running = sessions.filter(session => session.state.currentTurn === "in_progress");
-  const managed = sessions.filter(session => session.state.ownership === "agentfleet_owned");
+  // A panel-created draft is owned by AgentFleets so its first prompt can be
+  // sent safely, but it has no native writer yet. Keep it in its project list
+  // and exclude it from the quick list of established controlled sessions.
+  const managed = sessions.filter(session => session.state.ownership === "agentfleet_owned" && Boolean(session.nativeThreadId));
   const counts = { hosts: online.length, running: running.length, managed: managed.length };
   const close = () => { setCategory(undefined); trigger.current?.focus(); };
   const open = category !== undefined;
