@@ -192,7 +192,23 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
 .machine-summary__facts { gap: 8px 12px; font-size: var(--text-caption); justify-content: flex-start; }
 .machine-summary__actions { align-items: flex-start; width: min(520px, 100%); }
 .machine-summary__actions > .usage-trigger { box-sizing: border-box; justify-content: flex-start; width: 100%; }
-.machine-summary__actions > .usage-trigger .usage-trigger-text { display: grid; flex: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; row-gap: 3px; width: 100%; }
+.machine-summary__actions > .usage-trigger .usage-trigger-text { flex: 1; width: 100%; }
+.machine-summary__actions > .usage-trigger--machine-rich { align-items: stretch; background: var(--paper); border-color: var(--component-line); border-radius: 16px; box-shadow: 0 8px 24px rgba(31, 43, 36, .06); gap: 12px; overflow: hidden; padding: 12px; }
+.usage-trigger--machine-rich:hover { border-color: var(--cobalt); box-shadow: 0 10px 28px rgba(31, 43, 36, .1); transform: translateY(-1px); }
+.host-quota-icon { align-items: center; align-self: stretch; background: var(--cobalt-soft); border: 1px solid var(--line); border-radius: 11px; color: var(--cobalt); display: flex; flex: 0 0 40px; justify-content: center; }
+.host-quota-summary { display: grid; flex: 1; gap: 10px; min-width: 0; }
+.host-quota-metrics { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
+.host-quota-metric { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 11px; box-shadow: inset 3px 0 0 var(--teal); display: grid; gap: 4px; min-width: 0; padding: 9px 11px 8px 13px; text-align: left; }
+.host-quota-metric--credits { box-shadow: inset 3px 0 0 var(--amber); }
+.host-quota-metric small { color: var(--muted); font-size: var(--text-usage); font-weight: 600; letter-spacing: .02em; }
+.host-quota-metric strong { color: var(--ink); font-family: var(--mono); font-size: 1.125rem; font-variant-numeric: tabular-nums; font-weight: 650; line-height: 1.25; overflow-wrap: anywhere; }
+.host-quota-metric--credits strong { color: var(--amber); }
+.host-quota-metric em { color: var(--muted); font-size: .6875rem; font-style: normal; line-height: 1.35; }
+.host-quota-meter { background: var(--line); border-radius: 999px; height: 3px; overflow: hidden; width: 100%; }
+.host-quota-meter i { background: var(--teal); border-radius: inherit; display: block; height: 100%; min-width: 2px; }
+.host-quota-updated { align-items: center; color: var(--muted); display: flex; font-size: .6875rem; gap: 7px; line-height: 1.3; padding: 0 2px; text-align: left; }
+.host-quota-updated > i { background: var(--teal); border-radius: 50%; box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent); height: 6px; width: 6px; }
+.host-quota-updated > b { color: var(--cobalt); font-size: .875rem; font-weight: 500; margin-left: auto; }
 .fleet-catalog-content > .catalog-more { text-align: left; background: transparent; padding: 0 0 16px; font-size: var(--text-caption); }
 .session-list-panel { border: 1px solid var(--component-line); border-radius: 18px; box-shadow: none; }
 .session-list-panel > .section-heading { padding: 18px 16px 12px; gap: 8px; }
@@ -708,12 +724,14 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
   .inspector-context { max-width: 100%; }
 }
 @media (max-width: 660px) {
-  .machine-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 8px 0; }
+  .machine-summary { display: flex; align-items: stretch; padding: 8px 0; }
   .machine-summary .machine-os, .machine-summary__facts { display: none; }
   .machine-summary h1 { font-size: 1.0625rem; }
-  .machine-summary__actions { max-width: 145px; }
+  .machine-summary__actions { max-width: none; width: 100%; }
   .machine-summary__actions .usage-trigger { padding: 6px; }
-  .machine-summary__actions > .usage-trigger .usage-trigger-text { display: flex; }
+  .machine-summary__actions > .usage-trigger--machine-rich { gap: 8px; padding: 9px; }
+  .host-quota-icon { display: none; }
+  .host-quota-metrics { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
   .machine-name-line { gap: 2px; }
   .catalog-search { flex-wrap: nowrap; }
   .catalog-search label { flex: 1 1 0; min-width: 0; }

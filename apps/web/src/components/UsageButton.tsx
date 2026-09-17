@@ -37,11 +37,25 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
   const label=scope!=="machine"?t("总消耗 {0} tokens",data?.recorded?short(data.recorded.totalTokens):"—"):scope==="machine"&&weekly.length===1?t("周额度剩余 {0}%",weekly[0].w.remainingPercent):scope==="machine"&&!!data?.accounts.some(a=>a.windows.length)?t("用量与剩余额度"):data?.recorded?t("总消耗 {0} tokens",short(data.recorded.totalTokens)):t("用量未上报");
   const showWeeklyReset=scope==="machine"&&weekly.length===1&&!failed;
   const resetAt=showWeeklyReset?weekly[0].w.resetsAt:null;
+  const richMachineSummary=scope==="machine"&&!failed&&data?.accounts.length===1&&(weekly.length===1||fiveHour.length===1||accountCredits);
+  const updatedAt=data?.accounts.length?data.accounts.map(a=>a.observedAt).sort().at(-1):null;
   const periodTokens=data?.quotaCycle?.recordedTokens;
   const weeklyCacheRate=cacheRate(data?.quotaCycle?.inputTokens,data?.quotaCycle?.cachedInputTokens);
   const rate=(value:number|null)=>value==null?t("未记录"):t("{0}%",new Intl.NumberFormat(locale(),{maximumFractionDigits:1}).format(value));
   return <>
-    <button type="button" className="button button--quiet usage-trigger" onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",date(data.accounts.map(a=>a.observedAt).sort().at(-1)!))}</small>:null}{scope!=="machine"&&!failed&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",fiveHour[0].remainingPercent)}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></button>
+    <button type="button" className={`button button--quiet usage-trigger${richMachineSummary?" usage-trigger--machine-rich":""}`} onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>
+      {richMachineSummary?<>
+        <span className="host-quota-icon" aria-hidden="true"><BarChart3 size={18}/></span>
+        <span className="host-quota-summary">
+          <span className="host-quota-metrics">
+            {weekly.length===1&&<span className="host-quota-metric host-quota-metric--weekly"><small>{t("周额度")}</small><strong>{weekly[0].w.remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${weekly[0].w.remainingPercent}%`}}/></span><em>{weekly[0].w.resetsAt?t("下次重置：{0}",date(new Date(weekly[0].w.resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
+            {fiveHour.length===1&&<span className="host-quota-metric host-quota-metric--five-hour"><small>{t("5 小时额度")}</small><strong>{fiveHour[0].remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${fiveHour[0].remainingPercent}%`}}/></span><em>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
+            <span className="host-quota-metric host-quota-metric--credits"><small>{t("点数余额")}</small><strong>{creditText(accountCredits)}</strong><em>{t("由原生 Codex 上报")}</em></span>
+          </span>
+          {updatedAt&&<span className="host-quota-updated"><i aria-hidden="true"/>{t("更新于 {0}",date(updatedAt))}<b aria-hidden="true">→</b></span>}
+        </span>
+      </>:<><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope!=="machine"&&!failed&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",fiveHour[0].remainingPercent)}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
+    </button>
     <dialog ref={dialog} className="modal usage-dialog" aria-label={t("用量与剩余额度")} onCancel={()=>setOpen(false)} onClose={()=>setOpen(false)}>
       <header className="modal-head"><div><h2>{t("用量与剩余额度")}</h2><p>{t("账号看额度，项目和会话看已记录 token")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setOpen(false)}><X size={18}/></button></header>
       <div className="usage-body">
