@@ -50,7 +50,7 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
           <span className="host-quota-metrics">
             {weekly.length===1&&<span className="host-quota-metric host-quota-metric--weekly"><small>{t("周额度")}</small><strong>{weekly[0].w.remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${weekly[0].w.remainingPercent}%`}}/></span><em>{weekly[0].w.resetsAt?t("下次重置：{0}",date(new Date(weekly[0].w.resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
             {fiveHour.length===1&&<span className="host-quota-metric host-quota-metric--five-hour"><small>{t("5 小时额度")}</small><strong>{fiveHour[0].remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${fiveHour[0].remainingPercent}%`}}/></span><em>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
-            <span className="host-quota-metric host-quota-metric--credits"><small>{t("点数余额")}</small><strong>{creditText(accountCredits)}</strong><em>{t("由原生 Codex 上报")}</em></span>
+            <span className="host-quota-metric host-quota-metric--credits"><small>{t("点数余额")}</small><strong>{accountCredits?.balance!=null&&!accountCredits.unlimited?<>{creditBalance(accountCredits.balance)} <b>{t("点")}</b></>:creditText(accountCredits)}</strong><em>{t("由原生 Codex 上报")}</em></span>
           </span>
           {updatedAt&&<span className="host-quota-updated"><i aria-hidden="true"/>{t("更新于 {0}",date(updatedAt))}<b aria-hidden="true">→</b></span>}
         </span>

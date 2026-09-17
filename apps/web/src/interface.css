@@ -203,6 +203,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
 .host-quota-metric small { color: var(--muted); font-size: var(--text-usage); font-weight: 600; letter-spacing: .02em; }
 .host-quota-metric strong { color: var(--ink); font-family: var(--mono); font-size: 1.125rem; font-variant-numeric: tabular-nums; font-weight: 650; line-height: 1.25; overflow-wrap: anywhere; }
 .host-quota-metric--credits strong { color: var(--amber); }
+.host-quota-metric--credits strong b { font-family: inherit; font-size: .6875rem; font-weight: 650; }
 .host-quota-metric em { color: var(--muted); font-size: .6875rem; font-style: normal; line-height: 1.35; }
 .host-quota-meter { background: var(--line); border-radius: 999px; height: 3px; overflow: hidden; width: 100%; }
 .host-quota-meter i { background: var(--teal); border-radius: inherit; display: block; height: 100%; min-width: 2px; }

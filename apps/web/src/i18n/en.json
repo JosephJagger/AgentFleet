@@ -1054,6 +1054,7 @@
   "点数余额": "Credit balance",
   "点数余额 {0}": "Credit balance: {0}",
   "{0} 点": "{0} credits",
+  "点": "credits",
   "无可用点数": "No credits available",
   "不限": "Unlimited",
   "未提供": "Not provided",
