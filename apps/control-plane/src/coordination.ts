@@ -2465,7 +2465,7 @@ export class CoordinationService {
       const revision = payload?.managementRevision;
       if (revision !== undefined && (!Number.isSafeInteger(revision) || Number(revision) < 1)) return;
       if (typeof revision === "number" && revision < current.management_revision) return;
-      if (revision === current.management_revision && current.managed !== (event.type === "thread.claimed" ? 1 : 0)) return;
+      if (revision === current.management_revision && current.managed === (event.type === "thread.claimed" ? 1 : 0)) return;
       this.db.run("UPDATE logical_sessions SET management_revision=? WHERE logical_session_id=?",
         typeof revision === "number" ? revision : current.management_revision + 1, event.logicalSessionId);
     }

@@ -1004,7 +1004,12 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
     commandId: managementReleaseCommand.commandId,
     hostThreadPreserved: true,
     hostHistoryPreserved: true,
+    managementRevision: 2,
   };
+  // A concurrent hello can publish the new revision before its management
+  // state is projected. The authoritative event must repair that equal-revision
+  // mismatch instead of being mistaken for a duplicate.
+  db.run("UPDATE logical_sessions SET management_revision=2 WHERE logical_session_id=?", session.logicalSessionId);
   restartedSocket.send(JSON.stringify({
     type: "event.append",
     event: {
