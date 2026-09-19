@@ -113,6 +113,9 @@ it("移动端选择插件或计划模式后立即收起添加菜单", () => {
     const menu = view.container.querySelector(".composer-add-menu") as HTMLDetailsElement;
     fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
     expect(menu.open).toBe(true);
+    fireEvent.click(view.container.querySelector(".composer-add-popover__close")!);
+    expect(menu.open).toBe(false);
+    fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
     fireEvent.click(screen.getByRole("button", { name: "Shopify" }));
     expect(menu.open).toBe(false);
     expect(screen.getByText("Shopify", { selector: ".attachment-chip span" })).toBeTruthy();

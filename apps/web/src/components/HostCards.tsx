@@ -18,7 +18,7 @@ export function hostCardState(machine: Machine) {
 
 export function HostCards({ machines, selectedId, onSelect }: { machines: Machine[]; selectedId?: string; onSelect: (id: string) => void }) {
   return <section className="host-overview" aria-label={t("主机概览")}>
-    <div className="host-overview__heading"><h2>{t("选择主机")}</h2><span>{count(machines.length, "台主机")} </span></div>
+    <div className="host-overview__heading"><h2>{t("选择主机")}</h2><span>{count(machines.length, "台主机")}<small className="host-overview__swipe"> · {t("左右滑动")}</small></span></div>
     <div className="host-cards" role="group" aria-label={t("选择主机")}>
       {onlineFirst(machines).map(machine => {
         const state = hostCardState(machine);

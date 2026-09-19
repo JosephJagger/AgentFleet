@@ -1,4 +1,4 @@
-.settings-view .settings-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 20px; }
+.settings-view .settings-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 20px; }
 .settings-layout > .settings-block { min-width: 0; }
 .settings-view .settings-block > h2 { display: flex; align-items: center; gap: 8px; line-height: 1.5; min-height: 27px; }
 .settings-layout > .completion-settings, .settings-layout > .writing-ai-settings { min-height: 360px; }
@@ -21,7 +21,7 @@
 .settings-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
 .settings-pagination > span { color: var(--muted); font-size: var(--text-caption); font-variant-numeric: tabular-nums; }
 .settings-pagination .button { min-height: 40px; }
-.browser-settings-block { display: flex; flex-direction: column; }
+.browser-settings-block { display: flex; flex-direction: column; min-height: 0; }
 .browser-settings-block .settings-pagination { margin-top: auto; }
 .settings-view .client-session-row { min-height: 96px; }
 @media (max-width: 800px) {

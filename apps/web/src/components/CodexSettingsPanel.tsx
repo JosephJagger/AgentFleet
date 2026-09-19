@@ -91,7 +91,6 @@ export function CodexSettingsPanel({ sessionId = "", machineId, observed, onChan
     <button type="button" className="catalog-more" disabled={busy} onClick={() => setRetry((value) => value + 1)}>{t("重新读取配置")}</button>
   </>;
   return machineId ? <section className="codex-settings-panel host-default-settings" aria-label={t("主机默认配置")}>
-    <header className="host-default-settings__heading"><div><div className="eyebrow">Codex defaults</div><h2>{t("主机默认配置")}</h2></div><span>{t("统一配置 · 会话可单独覆盖")}</span></header>
-    <div className="host-default-settings__current">{summary}</div>{content}
+    <details className="host-config-disclosure"><summary><span><span className="eyebrow">Codex defaults</span><strong>{t("主机默认配置")}</strong><small>{summary}</small></span><i>{t("统一配置 · 会话可单独覆盖")}</i></summary><div className="host-config-disclosure__body">{content}</div></details>
   </section> : <details className="codex-settings-panel session-config-section"><summary><span>{t("运行配置")}<small>{summary}</small></span></summary>{content}</details>;
 }

@@ -794,7 +794,10 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .composer-add-trigger { width: 40px; padding: 0 !important; justify-content: center; }
 .composer-add-menu[open] > .composer-add-trigger { color: var(--mint); border-color: color-mix(in srgb, var(--mint) 55%, var(--line)); background: color-mix(in srgb, var(--mint) 10%, var(--canvas)); }
 .composer-add-popover { position: absolute; z-index: 30; right: 0; bottom: calc(100% + 10px); width: min(420px, calc(100vw - 32px)); max-height: min(560px, 70vh); overflow: auto; padding: 12px; border: 1px solid var(--line-strong); border-radius: 18px; background: color-mix(in srgb, var(--panel) 96%, transparent); box-shadow: 0 18px 50px rgba(0,0,0,.35); backdrop-filter: blur(18px); }
-.composer-add-popover > strong { display: block; padding: 3px 8px 8px; color: var(--text-muted); font-size: .76rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.composer-add-popover__head { display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 2px 4px 8px; }
+.composer-add-popover__head > strong { color: var(--text-muted); font-size: .76rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.composer-add-popover__close { display: none; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; color: var(--text-muted); background: transparent; cursor: pointer; }
+.composer-add-popover__close:hover { color: var(--text); background: var(--surface-hover); }
 .composer-add-popover > button, .composer-plugin-list > button, .composer-add-field { width: 100%; display: grid; grid-template-columns: 22px minmax(0,1fr) auto; align-items: start; gap: 9px; padding: 10px 9px; border: 0; border-radius: 12px; background: transparent; color: var(--text); text-align: left; }
 .composer-add-popover > button:hover, .composer-plugin-list > button:hover, .composer-plugin-list > button.selected { background: var(--surface-hover); }
 .composer-add-popover button:disabled { opacity: .42; }
@@ -822,12 +825,55 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 
 @media (max-width: 700px) {
   .composer-add-popover { position: fixed; left: 12px; right: 12px; bottom: 84px; width: auto; max-height: 68vh; }
+  .composer-add-popover__close { display: grid; }
 }
 .composer-ai-button { white-space: nowrap; }
-@media (max-width: 900px), (pointer: coarse) {
+@media (max-width: 900px) {
   .composer-button-group { flex-shrink: 1; }
   .composer-button-group .active-turn-actions { gap: 6px; }
   .composer-action-label--full { display: none; }
   .composer-action-label--compact { display: inline; }
   .composer-actions .active-turn-actions { flex-wrap: nowrap; }
+}
+
+/* Configuration-heavy host sections stay compact until the operator needs them. */
+.host-default-settings.codex-settings-panel, .permission-panel--host { padding: 0; overflow: hidden; }
+.permission-panel--host { margin-block: 0 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); }
+.host-config-disclosure > summary { display: flex; align-items: center; gap: 14px; min-height: 84px; padding: 18px 22px; list-style: none; cursor: pointer; }
+.host-config-disclosure > summary::-webkit-details-marker { display: none; }
+.host-config-disclosure > summary > span { display: grid; flex: 1; min-width: 0; gap: 4px; }
+.host-config-disclosure > summary strong { color: var(--ink); font-size: 1.125rem; }
+.host-config-disclosure > summary small { color: var(--muted); font-size: var(--text-caption); font-weight: 450; overflow-wrap: anywhere; }
+.host-config-disclosure > summary > i { color: var(--cobalt-deep); padding: 7px 10px; border-radius: 8px; background: var(--cobalt-soft); font-size: var(--text-caption); font-style: normal; }
+.host-config-disclosure > summary::after { content: "⌄"; flex: 0 0 auto; color: var(--muted); font-size: 1.2rem; transition: transform .16s ease; }
+.host-config-disclosure[open] > summary { border-bottom: 1px solid var(--line); }
+.host-config-disclosure[open] > summary::after { transform: rotate(180deg); }
+.host-config-disclosure__body { padding: 4px 22px 22px; }
+.host-config-disclosure__body > .codex-settings-fields { margin-top: 18px; }
+.host-overview__swipe { display: none; font: inherit; color: inherit; }
+
+@media (max-width: 900px) {
+  html { scroll-padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+  .wide-view { padding-bottom: calc(148px + env(safe-area-inset-bottom)); }
+  .settings-view :is(input, select, button), .hosts-view :is(input, select, button, summary) { scroll-margin-bottom: calc(112px + env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 660px) {
+  .hosts-view .host-overview { margin-inline: -16px; }
+  .hosts-view .host-overview__heading, .hosts-view .host-overview__hint { margin-inline: 16px; }
+  .hosts-view .host-overview__swipe { display: inline; }
+  .hosts-view .host-cards { display: flex; gap: 10px; overflow-x: auto; padding: 2px 16px 10px; scroll-padding-inline: 16px; scroll-snap-type: x proximity; scrollbar-width: none; }
+  .hosts-view .host-cards::-webkit-scrollbar { display: none; }
+  .hosts-view .host-card { flex: 0 0 min(82vw, 320px); scroll-snap-align: start; }
+  .host-config-disclosure > summary { min-height: 76px; padding: 15px 16px; }
+  .host-config-disclosure > summary > i { display: none; }
+  .host-config-disclosure__body { padding: 2px 16px 18px; }
+  .theme-settings-block .theme-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .theme-settings-block .theme-option { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 58px auto; align-items: start; min-height: 104px; padding: 8px; gap: 7px; }
+  .theme-settings-block .theme-option__preview { width: 100%; height: 58px; }
+  .theme-settings-block .theme-option__copy strong { padding-inline: 2px 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .theme-settings-block .theme-option__copy small { display: none; }
+  .theme-settings-block .theme-option__check { position: absolute; right: 9px; bottom: 8px; }
+  .host-disclosure > summary, .repair-command > summary, .host-technical > summary, .settings-explanation > summary { min-height: 44px; display: flex; align-items: center; }
+  .timeline-copy, .runtime-settings-shortcut { min-height: 44px; }
 }
