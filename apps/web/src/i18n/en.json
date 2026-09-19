@@ -2340,5 +2340,10 @@
   "{0} / {1} 项已通过": "{0} of {1} checks passed",
   "最近 {0} 条": "Latest {0}",
   "暂无记录": "No history",
-  "{0} · 当前目标 {1}": "{0} · Current target {1}"
+  "{0} · 当前目标 {1}": "{0} · Current target {1}",
+  "排队": "Queue",
+  "追加": "Add",
+  "优化": "Polish",
+  "优化中": "Polishing",
+  "停止": "Stop"
 }

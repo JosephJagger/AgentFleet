@@ -99,6 +99,29 @@ it("输入 @ 可按插件名部分匹配并将整个插件加入本次发送", a
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() => expect(send).toHaveBeenCalledWith("", undefined, undefined, { plugins: [{ pluginId: "shopify@openai-curated-remote", pluginName: "Shopify" }] }));
 });
+it("移动端选择插件或计划模式后立即收起添加菜单", () => {
+  const original = window.matchMedia;
+  window.matchMedia = vi.fn().mockReturnValue({ matches: true } as MediaQueryList);
+  try {
+    const props = inspectorProps("A");
+    props.detail = { ...props.detail, session: { ...props.detail.session,
+      collaborationModes: ["default", "plan"],
+      plugins: [{ pluginId: "shopify", pluginName: "Shopify" }],
+      runtimeSettings: { observed: { model: "test-model", effort: "medium", observedAt: "2026-09-16T00:00:00Z" } },
+    } };
+    const view = render(<SessionInspector {...props} />);
+    const menu = view.container.querySelector(".composer-add-menu") as HTMLDetailsElement;
+    fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
+    expect(menu.open).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Shopify" }));
+    expect(menu.open).toBe(false);
+    expect(screen.getByText("Shopify", { selector: ".attachment-chip span" })).toBeTruthy();
+    fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
+    fireEvent.click(screen.getByRole("button", { name: /计划模式.*先分析并制定计划/ }));
+    expect(menu.open).toBe(false);
+    expect(screen.getByText("本次发送 · 计划模式")).toBeTruthy();
+  } finally { window.matchMedia = original; }
+});
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
 
 beforeEach(() => {
@@ -762,4 +785,15 @@ it("AI optimization sits immediately before Send or Stop and keeps the shortcut 
  ai=screen.getByRole('button',{name:'优化表达'});
  expect(ai.nextElementSibling?.textContent).toContain('停止任务');
  expect(ai.parentElement?.className).toBe('composer-primary-pair');
+});
+
+it("运行中操作为移动端提供紧凑标签，同时保留完整无障碍名称",()=>{
+ const props=inspectorProps('A');
+ const running={...props.detail,session:{...props.detail.session,activeTurnId:'turn',state:{...props.detail.session.state,currentTurn:'in_progress' as const}}};
+ const view=render(<SessionInspector {...props} detail={running}/>);
+ expect(screen.getByRole('button',{name:'加入队列'}).querySelector('.composer-action-label--compact')?.textContent).toBe('排队');
+ expect(screen.getByRole('button',{name:'追加本轮'}).querySelector('.composer-action-label--compact')?.textContent).toBe('追加');
+ expect(screen.getByRole('button',{name:'优化表达'}).querySelector('.composer-action-label--compact')?.textContent).toBe('优化');
+ expect(screen.getByRole('button',{name:'停止任务'}).querySelector('.composer-action-label--compact')?.textContent).toBe('停止');
+ expect(view.container.querySelector('.active-turn-actions')).toBeTruthy();
 });

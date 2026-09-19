@@ -816,6 +816,8 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .attachment-chip--plugin { border-color: color-mix(in srgb, var(--magenta) 45%, var(--line)); }
 .composer-primary-pair { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
 .composer-button-group .active-turn-actions { align-items: center; gap: 6px; }
+.composer-action-label { white-space: nowrap; }
+.composer-action-label--compact { display: none; }
 .composer-actions > .composer-keyboard-hint { flex: 1 1 260px; min-width: 0; }
 
 @media (max-width: 700px) {
@@ -825,4 +827,7 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 @media (max-width: 900px), (pointer: coarse) {
   .composer-button-group { flex-shrink: 1; }
   .composer-button-group .active-turn-actions { gap: 6px; }
+  .composer-action-label--full { display: none; }
+  .composer-action-label--compact { display: inline; }
+  .composer-actions .active-turn-actions { flex-wrap: nowrap; }
 }
