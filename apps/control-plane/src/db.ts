@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 34) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 35) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1192,6 +1192,16 @@ export class ControlPlaneDatabase {
       const columns=new Set(this.all<{name:string}>("PRAGMA table_info(machine_usage)").map(column=>column.name));
       if(!columns.has("credits_json"))this.sqlite.exec("ALTER TABLE machine_usage ADD COLUMN credits_json TEXT");
       this.sqlite.exec("PRAGMA user_version=34");
+    });
+    if (version < 35) this.transaction(() => {
+      const schema=this.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE type='table' AND name='machine_operations'")!.sql;
+      if(!schema.includes("'connection.repair'")) {
+        this.sqlite.exec("ALTER TABLE machine_operations RENAME TO machine_operations_before_connection_repair");
+        this.sqlite.exec(schema.replace("'catalog.refresh'", "'connection.repair','catalog.refresh'"));
+        this.sqlite.exec("INSERT INTO machine_operations SELECT * FROM machine_operations_before_connection_repair; DROP TABLE machine_operations_before_connection_repair");
+      }
+      this.sqlite.exec("PRAGMA user_version=35");
+      if(this.all("PRAGMA foreign_key_check").length)throw new Error("Connection repair migration violated foreign keys");
     });
   }
 

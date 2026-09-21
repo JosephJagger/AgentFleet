@@ -435,6 +435,31 @@ export class AgentRuntime {
     return this.getDiscoveryStatus();
   }
 
+  async repairConnection(target: Record<string, unknown>): Promise<Record<string, unknown>> {
+    await this.refreshDiagnostics();
+    const sessions = Array.isArray(target.sessions) && target.sessions.length <= 50 ? target.sessions : [];
+    const recovered: Record<string, unknown>[] = [];
+    for (const value of sessions) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+      try {
+        recovered.push(await this.recoverFrozenSession({ ...(value as Record<string, unknown>), appServerEpoch: this.appServer?.appServerEpoch }));
+      } catch (error) {
+        const failure=publicError(error);
+        recovered.push({ recovered:false, reason:failure.message, code:failure.code });
+      }
+    }
+    let reconnected = false;
+    let reconnectSkipped: string | undefined;
+    try { await this.reconnectRuntime(); reconnected = true; }
+    catch (error) {
+      const failure=publicError(error);
+      if(failure.code!=="MACHINE_BUSY") throw error;
+      reconnectSkipped=failure.message;
+    }
+    const discovery = await this.refreshCatalog();
+    return { repaired:true,reconnected,...(reconnectSkipped?{reconnectSkipped}:{}),recoveredCount:recovered.filter(item=>item.recovered===true).length,checkedSessions:recovered.length,recoveries:recovered,discovery };
+  }
+
   async reconnectRuntime(): Promise<void> {
     if (!this.store.canSafelyRestart()) throw new AgentError("MACHINE_BUSY", "wait for active and uncertain work before reconnecting Codex");
     const server = this.appServer;
@@ -547,7 +572,7 @@ export class AgentRuntime {
           ? ["thread/list", "thread/read", "thread/resume", "thread/unsubscribe", "thread/start", "turn/start", "turn/steer", "turn/interrupt", "approval/reply-once"]
           : this.canRead() && this.appServer ? ["thread/list", "thread/read"] : [],
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
-        maintenanceTypes: ["catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"],
+        maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"],
         projectFiles: true,
         queue: this.isWritable(),
         steer: this.isWritable(),

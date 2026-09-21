@@ -8,7 +8,7 @@ import { readUpdateTransaction, workerHealthDiagnostics } from "./supervisor.js"
 import { collectServiceDiagnostics } from "./service-diagnostics.js";
 import { delay } from "./util.js";
 
-const TYPES: readonly MaintenanceType[] = ["catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"];
+const TYPES: readonly MaintenanceType[] = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"];
 
 export class AgentMaintenance {
   private readonly active = new Set<string>();
@@ -89,13 +89,20 @@ export class AgentMaintenance {
       await this.options.store.recordMaintenance(operation);
       this.report(operation);
     };
-    if (["session.reconcile", "images.preview", "images.clean", "project.add"].includes(operationType)) operation.recoveryTarget = previous?.recoveryTarget ?? (offer.recoveryTarget as Record<string, unknown>);
+    if (["connection.repair", "session.reconcile", "images.preview", "images.clean", "project.add"].includes(operationType)) operation.recoveryTarget = previous?.recoveryTarget ?? (offer.recoveryTarget as Record<string, unknown>);
     if (operationType === "commands.reconcile" && Array.isArray(offer.commands) && offer.commands.length <= 20 && offer.commands.every(id => typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id))) operation.commands = offer.commands;
     await progress({ phase: "running" });
     let staged = false;
     try {
       let result: Record<string, unknown>;
-      if (operationType === "project.add") {
+      if (operationType === "connection.repair") {
+        const target=operation.recoveryTarget;
+        if(!target) throw new AgentError("RECOVERY_TARGET_INVALID","缺少主机恢复目标");
+        const commands=Array.isArray(target.commands)&&target.commands.length<=20&&target.commands.every(id=>typeof id==="string"&&/^[A-Za-z0-9_-]{1,128}$/.test(id))?target.commands as string[]:[];
+        await this.options.store.setMaintenanceDrain(operationId);
+        for(const commandId of commands)await this.options.store.recoverLateTerminalTurn(commandId);
+        result={...await this.options.runtime.repairConnection(target),reconciledCommands:commands.length};
+      } else if (operationType === "project.add") {
         const target = operation.recoveryTarget;
         if (!target || typeof target.path !== "string" || typeof target.alias !== "string" || typeof target.createDirectory !== "boolean") {
           throw new AgentError("PROJECT_TARGET_INVALID", "project path, alias, and directory option are required");

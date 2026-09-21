@@ -236,6 +236,16 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .host-operation-action { min-width: 0; }
 .host-operation-action .button { justify-content: center; width: 100%; }
 .host-operation-action small { color: var(--muted); display: block; font-size: var(--text-caption); line-height: 1.45; margin: 6px 4px 0; }
+.host-repair-primary { align-items: center; background: color-mix(in srgb, var(--accent) 9%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line)); border-radius: var(--radius-md); display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) auto; margin: 20px 0 12px; padding: 18px; }
+.host-repair-primary strong, .host-repair-primary small { display: block; }
+.host-repair-primary strong { color: var(--text); font-size: var(--text-body); margin-bottom: 5px; }
+.host-repair-primary small { color: var(--muted); line-height: 1.55; }
+.host-repair-primary .button { min-width: 172px; }
+.host-operation-tools { border-top: 1px solid var(--line); color: var(--muted); margin-bottom: 18px; padding-top: 12px; }
+.host-operation-tools > summary { cursor: pointer; font-weight: 650; }
+.host-operation-tools > p { font-size: var(--text-caption); margin: 7px 0 0; }
+.host-operation-tools .host-operation-buttons { margin-bottom: 4px; margin-top: 14px; }
+@media (max-width: 640px) { .host-repair-primary { grid-template-columns: 1fr; } .host-repair-primary .button { min-width: 0; width: 100%; } }
 .host-operation-list { border-top: 1px solid var(--line); margin-top: 14px; }
 .host-operation-list__body { padding-bottom: 2px; }
 .host-operation { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }

@@ -4,7 +4,7 @@ import type { Principal } from "./auth.js";
 import { invariant } from "./errors.js";
 import { futureIso, newId, nowIso } from "./crypto.js";
 
-export const MAINTENANCE_TYPES = ["catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"] as const;
+export const MAINTENANCE_TYPES = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"] as const;
 export type MaintenanceType = (typeof MAINTENANCE_TYPES)[number];
 
 export class MaintenanceService {
@@ -26,7 +26,19 @@ export class MaintenanceService {
       invariant(machine.reachability==="online",409,"MACHINE_OFFLINE","Machine must be online");
       invariant((JSON.parse(machine.maintenance_types_json) as string[]).includes(type),409,"AGENT_CAPABILITY_UNAVAILABLE","Update the connection service to use this operation");
       let target: Record<string,unknown> | null = null;
-      if(type === "project.add") {
+      if(type === "connection.repair") {
+        invariant(logicalSessionId === undefined && previewOperationId === undefined,400,"INVALID_OPERATION_TARGET","Connection repair does not accept a session target");
+        const connection = this.db.get<{app_server_epoch:string}>("SELECT app_server_epoch FROM agent_connections WHERE machine_id=? AND disconnected_at IS NULL AND app_server_epoch IS NOT NULL ORDER BY transport_generation DESC LIMIT 1",machineId);
+        invariant(connection,409,"MACHINE_RECONNECTING","Wait for the host to finish reconnecting");
+        const sessions=this.db.all<{logical_session_id:string;content_epoch:number;execution_segment_id:string;native_thread_id:string;native_turn_id:string;bound_app_server_epoch:string}>(`SELECT s.logical_session_id,s.content_epoch,e.execution_segment_id,e.native_thread_id,r.native_turn_id,r.bound_app_server_epoch
+          FROM project_turn_reservations r JOIN logical_sessions s ON s.logical_session_id=r.logical_session_id
+          JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL
+          WHERE s.machine_id=? AND r.binding_state='bound' AND r.native_turn_id IS NOT NULL AND r.bound_app_server_epoch IS NOT NULL
+            AND r.bound_app_server_epoch<>? ORDER BY r.updated_at LIMIT 50`,machineId,connection.app_server_epoch);
+        const commands=this.db.all<{command_id:string}>(`SELECT c.command_id FROM commands c JOIN command_projection p USING(command_id)
+          JOIN logical_sessions s USING(logical_session_id) WHERE s.machine_id=? AND p.state='unknown' ORDER BY c.created_at LIMIT 20`,machineId).map(row=>row.command_id);
+        target={appServerEpoch:connection.app_server_epoch,commands,sessions:sessions.map(row=>({logicalSessionId:row.logical_session_id,contentEpoch:row.content_epoch,executionSegmentId:row.execution_segment_id,nativeThreadId:row.native_thread_id,nativeTurnId:row.native_turn_id,previousAppServerEpoch:row.bound_app_server_epoch}))};
+      } else if(type === "project.add") {
         invariant(projectTarget,400,"PROJECT_TARGET_REQUIRED","Project path and alias are required");
         invariant(projectTarget.path.length > 0 && projectTarget.path.length <= 4096,400,"PROJECT_PATH_INVALID","Project path is required");
         invariant(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(projectTarget.alias),400,"PROJECT_ALIAS_INVALID","Project alias must use letters, numbers, dot, underscore, or dash");
@@ -54,7 +66,7 @@ export class MaintenanceService {
         target={appServerEpoch:connection.app_server_epoch,logicalSessionId:session.logical_session_id,contentEpoch:session.content_epoch,executionSegmentId:session.execution_segment_id,nativeThreadId:session.native_thread_id,...(recoverableReservation?{nativeTurnId:reservation.native_turn_id,previousAppServerEpoch:reservation.bound_app_server_epoch}:{})};
       } else invariant(logicalSessionId === undefined,400,"INVALID_OPERATION_TARGET","This operation does not accept a session target");
       const timestamp=nowIso();const operationId=newId("op");
-      this.db.run("INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,'accepted',?,?,?)",operationId,machineId,principal.workspaceId,principal.clientSessionId,mutationId,type,timestamp,timestamp,futureIso(["session.reconcile","images.preview","images.clean"].includes(type) ? 300 : 3600));
+      this.db.run("INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,'accepted',?,?,?)",operationId,machineId,principal.workspaceId,principal.clientSessionId,mutationId,type,timestamp,timestamp,futureIso(["connection.repair","session.reconcile","images.preview","images.clean"].includes(type) ? 300 : 3600));
       if(target) this.db.run("UPDATE machine_operations SET request_json=? WHERE operation_id=?",JSON.stringify(target),operationId);
       this.db.audit({workspaceId:principal.workspaceId,actorUserId:principal.userId,actorClientSessionId:principal.clientSessionId,machineId,action:"machine.operation.request",metadata:{operationId,type}});
       return this.get(principal,operationId);
@@ -127,6 +139,22 @@ export class MaintenanceService {
             this.db.run("UPDATE logical_sessions SET execution_state=?,active_turn_id=NULL,turn_control_version=turn_control_version+1,updated_at=? WHERE logical_session_id=?",String(proof.status),nowIso(),target.logicalSessionId);
             this.db.audit({workspaceId:row.workspace_id,machineId,logicalSessionId:target.logicalSessionId,action:"session.manually_recovered",outcome:String(proof.status),metadata:{operationId,nativeTurnId:proof.nativeTurnId,source:"native_turn_history"}});
           } else persistedResult=JSON.stringify({...proof,recovered:false,reason:"会话状态已变化或仍有未确认操作，继续保持冻结，请刷新后核验"});
+        }
+      }
+      if(row.type==="connection.repair"&&state==="succeeded"&&row.request_json&&result&&typeof result==="object"){
+        const request=JSON.parse(row.request_json) as {sessions?:Record<string,unknown>[]};const proof=result as {recoveries?:Record<string,unknown>[]};
+        for(const recovery of Array.isArray(proof.recoveries)?proof.recoveries:[]){
+          if(recovery.recovered!==true)continue;
+          const target=request.sessions?.find(value=>value.nativeThreadId===recovery.nativeThreadId&&value.nativeTurnId===recovery.nativeTurnId);
+          if(!target||typeof target.logicalSessionId!=="string"||typeof target.contentEpoch!=="number"||typeof target.executionSegmentId!=="string"||typeof target.nativeThreadId!=="string"||typeof target.nativeTurnId!=="string"||typeof recovery.nativeTurnId!=="string")continue;
+          const session=this.db.get<{project_id:string;active_turn_id:string|null}>(`SELECT s.project_id,s.active_turn_id FROM logical_sessions s JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL WHERE s.logical_session_id=? AND s.machine_id=? AND s.workspace_id=? AND s.content_epoch=? AND e.execution_segment_id=? AND e.native_thread_id=?`,target.logicalSessionId,machineId,row.workspace_id,target.contentEpoch,target.executionSegmentId,target.nativeThreadId);
+          const pending=this.db.get("SELECT 1 FROM commands c JOIN command_projection p USING(command_id) WHERE c.logical_session_id=? AND p.state IN ('unknown','accepted','dispatching') LIMIT 1",target.logicalSessionId);
+          const reservation=session?this.db.get<{logical_session_id:string;native_turn_id:string|null;bound_app_server_epoch:string|null;binding_state:string}>("SELECT logical_session_id,native_turn_id,bound_app_server_epoch,binding_state FROM project_turn_reservations WHERE project_id=?",session.project_id):undefined;
+          const valid=session&&!pending&&reservation&&["completed","failed","interrupted"].includes(String(recovery.status))&&(!session.active_turn_id||session.active_turn_id===recovery.nativeTurnId)&&reservation.logical_session_id===target.logicalSessionId&&reservation.native_turn_id===recovery.nativeTurnId&&reservation.binding_state==="bound"&&reservation.bound_app_server_epoch===recovery.previousAppServerEpoch;
+          if(!valid)continue;
+          this.db.run("DELETE FROM project_turn_reservations WHERE project_id=? AND logical_session_id=? AND native_turn_id=?",session.project_id,target.logicalSessionId,recovery.nativeTurnId);
+          this.db.run("UPDATE logical_sessions SET execution_state=?,active_turn_id=NULL,turn_control_version=turn_control_version+1,updated_at=? WHERE logical_session_id=?",String(recovery.status),nowIso(),target.logicalSessionId);
+          this.db.audit({workspaceId:row.workspace_id,machineId,logicalSessionId:String(target.logicalSessionId),action:"session.manually_recovered",outcome:String(recovery.status),metadata:{operationId,nativeTurnId:recovery.nativeTurnId,source:"connection_repair"}});
         }
       }
       this.db.run("UPDATE machine_operations SET state=?,result_json=?,error_json=?,updated_at=? WHERE operation_id=?",state,persistedResult,safeError?JSON.stringify(safeError):null,nowIso(),operationId);

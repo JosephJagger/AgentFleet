@@ -2346,5 +2346,13 @@
   "优化": "Polish",
   "优化中": "Polishing",
   "停止": "Stop",
-  "左右滑动": "Swipe"
+  "左右滑动": "Swipe",
+  "一键恢复连接": "Restore connection",
+  "自动检查连接、核验旧任务、重连 Codex 并同步项目与会话。不会重发原命令。": "Checks the connection, verifies previous turns, reconnects Codex, and syncs projects and sessions. It never resends the original command.",
+  "连接异常时从这里恢复": "Restore this host",
+  "主机离线，需先在主机启动 AgentFleets 连接服务。": "The host is offline. Start the AgentFleets connection service on the host first.",
+  "连接服务更新后即可使用": "Update the connection service to use this action.",
+  "正在恢复": "Restoring",
+  "高级维护工具": "Advanced maintenance tools",
+  "仅在需要单独诊断某一步时使用。": "Use these only when you need to diagnose one step separately."
 }

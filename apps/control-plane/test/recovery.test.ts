@@ -337,7 +337,7 @@ test("v7 enrollment schema upgrades with explicit credential recovery fields", (
   });
   assert.equal(
     Number((upgraded.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    34,
+    35,
   );
   const columns = upgraded.all<{ name: string }>("PRAGMA table_info(enrollment_transactions)").map((column) => column.name);
   assert.ok(columns.includes("credential_id"));
@@ -491,7 +491,7 @@ test("v4 through v8 migration freezes a Project with multiple legacy active Sess
   });
   assert.equal(
     Number((upgraded.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    34,
+    35,
   );
   const reservation = upgraded.get<{
     state: string;
@@ -832,7 +832,7 @@ test("manual recovery stays frozen until scoped request and authenticated termin
  const db=new ControlPlaneDatabase(":memory:");const owner=db.bootstrap(config(":memory:"));const now=new Date().toISOString();
  try {
   insertMachine(db,owner.workspaceId,"manual-host",now);
-  db.run("UPDATE machines SET maintenance_types_json=? WHERE machine_id='manual-host'",JSON.stringify(["session.reconcile","catalog.refresh"]));
+  db.run("UPDATE machines SET maintenance_types_json=? WHERE machine_id='manual-host'",JSON.stringify(["connection.repair","session.reconcile","catalog.refresh"]));
   db.run("INSERT INTO client_sessions(client_session_id,workspace_id,user_id,token_hash,csrf_hash,created_at,last_seen_at,expires_at) VALUES('manual-client',?,?, 'manual-token','manual-csrf',?,?,?)",owner.workspaceId,owner.userId,now,now,new Date(Date.now()+60000).toISOString());
   db.run("INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,lease_version,created_at,last_reported_at) VALUES('manual-project',?,'manual-host','project','Project','/work','identity',1,?,?)",owner.workspaceId,now,now);
   for(const id of ["manual-session","unrelated-session"]){
@@ -858,6 +858,14 @@ test("manual recovery stays frozen until scoped request and authenticated termin
   assert.equal(db.get("SELECT 1 FROM project_turn_reservations WHERE project_id='manual-project'"),undefined);
   const audits=db.get<{n:number}>("SELECT COUNT(*) n FROM audit_entries WHERE action='session.manually_recovered'");assert.equal(audits?.n,1);
   service.result("manual-host",String(operation.operationId),"succeeded",{recovered:true},undefined);assert.equal(state(),"interrupted");
+  db.run("UPDATE logical_sessions SET execution_state='unknown' WHERE logical_session_id='manual-session'");
+  db.run("INSERT INTO project_turn_reservations(project_id,logical_session_id,native_turn_id,state,version,reserved_at,updated_at,bound_producer_epoch,bound_app_server_epoch,binding_state) VALUES('manual-project','manual-session','older-turn','active',2,?,?,'old-producer','older-runtime','bound')",now,now);
+  const repair=service.create(principal,"manual-host","connection.repair","repair-all");
+  const repairOffer=service.offers("manual-host").find(item=>item.operationId===repair.operationId)!;
+  const repairTarget=repairOffer.recoveryTarget as {sessions:Record<string,unknown>[]};
+  assert.equal(repairTarget.sessions.length,1);assert.equal(repairTarget.sessions[0]?.nativeTurnId,"older-turn");
+  service.result("manual-host",String(repair.operationId),"succeeded",{repaired:true,recoveries:[{recovered:true,nativeThreadId:"manual-session-native",nativeTurnId:"older-turn",previousAppServerEpoch:"older-runtime",status:"completed"}]},undefined);
+  assert.equal(state(),"completed");assert.equal(db.get("SELECT 1 FROM project_turn_reservations WHERE project_id='manual-project'"),undefined);
  } finally {db.close();}
 });
 

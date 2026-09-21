@@ -186,7 +186,7 @@ function mapDiscovery(rawValue: unknown): DiscoveryProgress | undefined {
       const value = record(item);
       if (!["passed", "failed", "checking", "skipped"].includes(string(value.state)) || !string(value.id)) return [];
       return [{ id: string(value.id), state: value.state as NonNullable<DiscoveryProgress["checks"]>[number]["state"], code: string(value.code), message: string(value.message), checkedAt: string(value.checkedAt),
-        action: ["catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect"].includes(string(value.action)) ? value.action as MaintenanceType : undefined }];
+        action: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect"].includes(string(value.action)) ? value.action as MaintenanceType : undefined }];
     }),
   };
 }
