@@ -406,7 +406,7 @@ export class AgentRuntime {
     const previousAppServerEpoch = typeof target.previousAppServerEpoch === "string" ? target.previousAppServerEpoch : thread.appServerEpoch;
     if (!nativeTurnId) return { recovered: false, reason: "没有待核验的旧轮次；请继续核对未知操作的主机回执" };
     const retainedOldTurn = thread.activeTurnId === nativeTurnId && thread.appServerEpoch === previousAppServerEpoch;
-    const clearedDuringReconnect = thread.activeTurnId === undefined && thread.lastTurnId === nativeTurnId && thread.appServerEpoch === server.appServerEpoch && !["completed", "failed", "interrupted"].includes(thread.lastTurnStatus ?? "");
+    const clearedDuringReconnect = thread.activeTurnId === undefined && thread.appServerEpoch === server.appServerEpoch;
     if (!retainedOldTurn && !clearedDuringReconnect) return { recovered: false, reason: "待核验轮次已经变化，请刷新后重试" };
     if (previousAppServerEpoch === server.appServerEpoch) return { recovered: false, reason: "此轮任务仍属于当前执行进程，请等待它结束" };
     if (this.store.snapshot().projectReservations[thread.projectId]) return { recovered: false, reason: "项目仍有结果未知的操作，尚不能解除冻结" };

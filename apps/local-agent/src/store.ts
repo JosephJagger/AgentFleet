@@ -1067,7 +1067,7 @@ export class StateStore {
     return this.update(state => {
       const current = state.managedThreads[expected.nativeThreadId];
       const retainedOldTurn = current?.activeTurnId === event.nativeTurnId && current?.appServerEpoch === previousAppServerEpoch;
-      const clearedDuringReconnect = current?.activeTurnId === undefined && current?.lastTurnId === event.nativeTurnId && current?.appServerEpoch === event.appServerEpoch && !["completed", "failed", "interrupted"].includes(current?.lastTurnStatus ?? "");
+      const clearedDuringReconnect = current?.activeTurnId === undefined && current?.appServerEpoch === event.appServerEpoch;
       if (!current || !event.nativeTurnId || !event.appServerEpoch || !["completed", "failed", "interrupted"].includes(status) ||
           previousAppServerEpoch === event.appServerEpoch || (!retainedOldTurn && !clearedDuringReconnect) ||
           current.contentEpoch !== expected.contentEpoch || current.logicalSessionId !== expected.logicalSessionId ||
@@ -1075,8 +1075,13 @@ export class StateStore {
           current.sessionCwd !== expected.sessionCwd || state.projectReservations[current.projectId]) return false;
       // Persist the proof and projection together, so a crash cannot lose the terminal event.
       appendEventToState(state, event);
-      current.lastTurnId = event.nativeTurnId;
-      current.lastTurnStatus = status;
+      // Catalog reconciliation may already have advanced the thread to a newer
+      // terminal turn. Preserve that projection while still emitting proof for
+      // the exact older turn held by the control-plane reservation.
+      if (!current.lastTurnId || current.lastTurnId === event.nativeTurnId || !["completed", "failed", "interrupted"].includes(current.lastTurnStatus ?? "")) {
+        current.lastTurnId = event.nativeTurnId;
+        current.lastTurnStatus = status;
+      }
       delete current.activeTurnId;
       current.appServerEpoch = event.appServerEpoch;
       current.policyVerified = false;
