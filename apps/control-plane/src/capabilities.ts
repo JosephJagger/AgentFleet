@@ -37,7 +37,21 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
         AND state='active' AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY acquired_at DESC LIMIT 1) AS holder,
       (SELECT count(*) FROM approvals WHERE logical_session_id=s.logical_session_id AND state='pending') AS pending_approvals,
       (SELECT count(*) FROM turn_queue WHERE logical_session_id=s.logical_session_id AND state IN ('queued','dispatching','unknown')) AS queued,
-      EXISTS(SELECT 1 FROM project_turn_reservations WHERE project_id=s.project_id AND state IN ('unknown','migration_conflict')) AS frozen
+      EXISTS(
+        SELECT 1 FROM project_turn_reservations r
+        WHERE r.project_id=s.project_id AND (
+          r.state IN ('unknown','migration_conflict') OR (
+            r.state='active' AND r.logical_session_id=s.logical_session_id
+            AND r.native_turn_id IS NOT NULL AND r.binding_state='bound'
+            AND r.bound_app_server_epoch IS NOT NULL
+            AND r.bound_app_server_epoch<>(
+              SELECT a.app_server_epoch FROM agent_connections a
+              WHERE a.machine_id=s.machine_id AND a.disconnected_at IS NULL
+              ORDER BY a.transport_generation DESC LIMIT 1
+            )
+          )
+        )
+      ) AS frozen
     FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id
     JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL
     WHERE s.logical_session_id=? ORDER BY e.created_at DESC LIMIT 1`, sessionId);

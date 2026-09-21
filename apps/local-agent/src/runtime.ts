@@ -402,21 +402,24 @@ export class AgentRuntime {
     if (server && server.appServerEpoch !== target.appServerEpoch) throw new AgentError("RECOVERY_RUNTIME_CHANGED", "主机刚刚重连，请重新点击解除冻结");
     if (!server?.readTurnOutcome || !thread) throw new AgentError("RECOVERY_UNAVAILABLE", "主机暂时无法核验此会话");
     if (thread.logicalSessionId !== target.logicalSessionId || thread.executionSegmentId !== target.executionSegmentId || thread.contentEpoch !== target.contentEpoch) throw new AgentError("RECOVERY_TARGET_CHANGED", "会话已变化，请刷新后重新解除冻结");
-    if (!thread.activeTurnId) return { recovered: false, reason: "没有待核验的旧轮次；请继续核对未知操作的主机回执" };
-    if (thread.appServerEpoch === server.appServerEpoch) return { recovered: false, reason: "此轮任务仍属于当前执行进程，请等待它结束" };
+    const nativeTurnId = typeof target.nativeTurnId === "string" ? target.nativeTurnId : thread.activeTurnId;
+    const previousAppServerEpoch = typeof target.previousAppServerEpoch === "string" ? target.previousAppServerEpoch : thread.appServerEpoch;
+    if (!nativeTurnId) return { recovered: false, reason: "没有待核验的旧轮次；请继续核对未知操作的主机回执" };
+    if (thread.activeTurnId !== nativeTurnId || thread.appServerEpoch !== previousAppServerEpoch) return { recovered: false, reason: "待核验轮次已经变化，请刷新后重试" };
+    if (previousAppServerEpoch === server.appServerEpoch) return { recovered: false, reason: "此轮任务仍属于当前执行进程，请等待它结束" };
     if (this.store.snapshot().projectReservations[thread.projectId]) return { recovered: false, reason: "项目仍有结果未知的操作，尚不能解除冻结" };
-    const outcome = await server.readTurnOutcome(thread.nativeThreadId, thread.activeTurnId);
+    const outcome = await server.readTurnOutcome(thread.nativeThreadId, nativeTurnId);
     const project = this.store.snapshot().projects.find(p => p.id === thread.projectId);
     if (!outcome || !project || outcome.cwd !== (thread.sessionCwd ?? project.root) || !["completed", "failed", "interrupted"].includes(outcome.status) || this.appServer !== server) return { recovered: false, reason: "主机尚未提供该轮任务的明确结束记录，继续保持冻结" };
     const recovered = await this.store.recoverPreviousRuntimeTurn(thread, {
       machineId: this.pairing.machineId, producerEpoch: this.producerEpoch, appServerEpoch: server.appServerEpoch,
       projectId: thread.projectId, logicalSessionId: thread.logicalSessionId!, executionSegmentId: thread.executionSegmentId!,
-      contentEpoch: thread.contentEpoch, nativeThreadId: thread.nativeThreadId, nativeTurnId: thread.activeTurnId,
+      contentEpoch: thread.contentEpoch, nativeThreadId: thread.nativeThreadId, nativeTurnId,
       type: outcome.status === "completed" ? "turn.completed" : outcome.status === "failed" ? "turn.failed" : "turn.interrupted",
-      payload: { turn: { id: thread.activeTurnId, status: outcome.status }, recoveredFromHost: true, previousAppServerEpoch: thread.appServerEpoch },
+      payload: { turn: { id: nativeTurnId, status: outcome.status }, recoveredFromHost: true, previousAppServerEpoch },
     }, outcome.status);
     if (recovered) { this.callbacks.onOutboxChanged(); this.notifyRegistryChanged(); }
-    return { recovered, previousAppServerEpoch: thread.appServerEpoch, nativeThreadId: thread.nativeThreadId, nativeTurnId: thread.activeTurnId, status: outcome.status,
+    return { recovered, previousAppServerEpoch, nativeThreadId: thread.nativeThreadId, nativeTurnId, status: outcome.status,
       reason: recovered ? "已核验结束记录并解除冻结；原命令没有重发" : "核验期间会话状态发生变化，请刷新后重试" };
   }
 

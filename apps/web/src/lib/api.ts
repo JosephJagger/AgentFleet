@@ -250,6 +250,8 @@ function mapSession(
   const historyCompleteness = string(raw.historyCompleteness, "unknown");
   const historyMode = raw.historyMode === "legacy" || raw.historyMode === "paginated" ? raw.historyMode : "unknown";
   const managed = boolean(raw.managed);
+  const actions = raw.actions && typeof raw.actions === "object" ? raw.actions as FleetSession["actions"] : undefined;
+  const outcomeNeedsRecovery = actions?.start?.reasonCode === "PROJECT_OUTCOME_UNKNOWN";
   const history = historyCompleteness === "complete"
     ? "complete"
     : historyCompleteness === "partial"
@@ -280,7 +282,7 @@ function mapSession(
       waitReason: executionState === "awaiting_approval" ? "approval" : "none",
       reachability,
       history,
-      unknownFreeze: executionState === "unknown" || machine?.compatibility === "degraded_read_only",
+      unknownFreeze: executionState === "unknown" || machine?.compatibility === "degraded_read_only" || outcomeNeedsRecovery,
     },
     lastActivityAt: string(raw.updatedAt, new Date(0).toISOString()),
     sessionSeq: integer(raw.latestSessionSeq),
@@ -300,7 +302,7 @@ function mapSession(
     queueVersion: integer(raw.queueVersion),
     activeTurnId: typeof raw.activeTurnId === "string" ? raw.activeTurnId : null,
     controlLease: mapLease(raw.controlLease, clientSessionId),
-    ...(raw.actions && typeof raw.actions === "object" ? { actions: raw.actions as FleetSession["actions"] } : {}),
+    ...(actions ? { actions } : {}),
   };
 }
 

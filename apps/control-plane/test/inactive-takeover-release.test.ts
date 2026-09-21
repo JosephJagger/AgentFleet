@@ -15,7 +15,7 @@ test("three days without recorded token use schedules a safe native takeover rel
     LOG_LEVEL: "silent",
   });
   const owner = db.bootstrap(config);
-  const now = Date.parse("2026-09-17T12:00:00.000Z");
+  const now = Date.now();
   const at = (hours: number) => new Date(now + hours * 60 * 60 * 1_000).toISOString();
   db.run(
     "INSERT INTO client_sessions(client_session_id,workspace_id,user_id,token_hash,csrf_hash,created_at,last_seen_at,expires_at) VALUES('client-auto',?,?,?,?,?,?,?)",

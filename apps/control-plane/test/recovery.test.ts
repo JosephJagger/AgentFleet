@@ -12,6 +12,7 @@ import type { Principal } from "../src/auth.js";
 import { AppError } from "../src/errors.js";
 import { RegistryService, type AgentConnectionIdentity } from "../src/registry.js";
 import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
+import { sessionActions } from "../src/capabilities.js";
 
 function config(databasePath: string): ControlPlaneConfig {
   return {
@@ -839,18 +840,22 @@ test("manual recovery stays frozen until scoped request and authenticated termin
    db.run("INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,external_id,native_thread_id,created_at) VALUES(?,?,'manual-host','manual-project',?,?,?)",id+"-segment",id,id+"-segment",id+"-native",now);
   }
   db.run("INSERT INTO agent_connections(connection_id,machine_id,transport_generation,producer_epoch,app_server_epoch,connected_at) VALUES('manual-connection','manual-host',1,'producer','new-runtime',?)",now);
+  db.run("INSERT INTO project_turn_reservations(project_id,logical_session_id,native_turn_id,state,version,reserved_at,updated_at,bound_producer_epoch,bound_app_server_epoch,binding_state) VALUES('manual-project','manual-session','old-turn','active',1,?,?,'old-producer','old-runtime','bound')",now,now);
   const principal={workspaceId:owner.workspaceId,userId:owner.userId,clientSessionId:"manual-client",email:"admin@example.test",csrfHash:"manual-csrf",expiresAt:new Date(Date.now()+60000).toISOString()} as Principal;
   const service=new MaintenanceService(db);const state=(id="manual-session")=>db.get<{execution_state:string}>("SELECT execution_state FROM logical_sessions WHERE logical_session_id=?",id)!.execution_state;
   assert.equal(state(),"unknown");assert.equal(service.offers("manual-host").length,0);
+  assert.equal(sessionActions(db,"manual-session","manual-client").start.reasonCode,"PROJECT_OUTCOME_UNKNOWN","an active reservation from an exited runtime is recoverable frozen work");
   assert.throws(()=>service.create(principal,"manual-host","session.reconcile","missing-target"),/Choose a session/);
   assert.throws(()=>service.create(principal,"manual-host","session.reconcile","wrong-target","absent"),/not found/);
   const operation=service.create(principal,"manual-host","session.reconcile","manual-click","manual-session");
   assert.equal(state(),"unknown","Click alone cannot bypass proof");
   assert.throws(()=>service.create(principal,"manual-host","session.reconcile","manual-click","unrelated-session"),/another operation/);
-  const offer=service.offers("manual-host")[0]!;assert.equal((offer.recoveryTarget as Record<string,unknown>).logicalSessionId,"manual-session");
+  const offer=service.offers("manual-host")[0]!;const recoveryTarget=offer.recoveryTarget as Record<string,unknown>;
+  assert.equal(recoveryTarget.logicalSessionId,"manual-session");assert.equal(recoveryTarget.nativeTurnId,"old-turn");assert.equal(recoveryTarget.previousAppServerEpoch,"old-runtime");
   assert.throws(()=>service.result("wrong-host",String(operation.operationId),"succeeded",{recovered:true},undefined),/does not belong/);
   service.result("manual-host",String(operation.operationId),"succeeded",{recovered:true,nativeThreadId:"manual-session-native",nativeTurnId:"old-turn",previousAppServerEpoch:"old-runtime",status:"interrupted"},undefined);
   assert.equal(state(),"interrupted");assert.equal(state("unrelated-session"),"unknown");
+  assert.equal(db.get("SELECT 1 FROM project_turn_reservations WHERE project_id='manual-project'"),undefined);
   const audits=db.get<{n:number}>("SELECT COUNT(*) n FROM audit_entries WHERE action='session.manually_recovered'");assert.equal(audits?.n,1);
   service.result("manual-host",String(operation.operationId),"succeeded",{recovered:true},undefined);assert.equal(state(),"interrupted");
  } finally {db.close();}
