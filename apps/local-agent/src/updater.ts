@@ -15,6 +15,19 @@ type FetchLike = typeof fetch;
 
 export type UpdateCheckResult = "current" | "busy" | "staged";
 
+export function windowsUpdateRestartScript(): string {
+  return "$ErrorActionPreference='SilentlyContinue'; for($i=0;$i -lt 24;$i++){ Start-Sleep -Seconds 5; $task=Get-ScheduledTask -TaskName 'AgentFleet-Background' -ErrorAction SilentlyContinue; if($task -and $task.State -ne 'Running'){ Start-ScheduledTask -TaskName 'AgentFleet-Background'; exit 0 } }; exit 1";
+}
+
+export function scheduleWindowsUpdateRestart(): void {
+  if (process.platform !== "win32") return;
+  const encoded = Buffer.from(windowsUpdateRestartScript(), "utf16le").toString("base64");
+  const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encoded], {
+    detached: true, windowsHide: true, stdio: "ignore",
+  });
+  child.unref();
+}
+
 export function compareReleaseVersions(left: string, right: string): number {
   const parse = (value: string): number[] => {
     if (!/^\d+\.\d+\.\d+$/.test(value)) {

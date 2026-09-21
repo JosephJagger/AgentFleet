@@ -29,7 +29,7 @@ import {
   stageWindowsBackgroundService,
 } from "./service.js";
 import { StateStore } from "./store.js";
-import { AgentAutoUpdater } from "./updater.js";
+import { AgentAutoUpdater, scheduleWindowsUpdateRestart } from "./updater.js";
 import { configureRuntimeProfile } from "./runtime-profile.js";
 import { repairManagedCodeMode } from "./managed-code-mode.js";
 import { superviseAgent, writeWorkerHealth, readUpdateTransaction, workerStopExitCode } from "./supervisor.js";
@@ -320,6 +320,7 @@ async function run(args: ParsedArgs): Promise<void> {
           onStaged: (version) => {
             updateStagedVersion = version;
             logger.info(`AgentFleet update staged; restarting the service with verified Agent ${version} and runtime.`);
+            scheduleWindowsUpdateRestart();
             abort.abort(new AgentError("UPDATE_STAGED", "automatic update staged"));
           },
           logger,

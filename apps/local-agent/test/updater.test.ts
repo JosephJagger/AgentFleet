@@ -3,7 +3,15 @@ import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { AgentAutoUpdater, compareReleaseVersions, stageAgentUpdate } from "../src/updater.js";
+import { AgentAutoUpdater, compareReleaseVersions, stageAgentUpdate, windowsUpdateRestartScript } from "../src/updater.js";
+
+test("Windows update handoff retries the background task after the current task exits", () => {
+  const script=windowsUpdateRestartScript();
+  assert.match(script,/AgentFleet-Background/);
+  assert.match(script,/State -ne 'Running'/);
+  assert.match(script,/Start-ScheduledTask/);
+  assert.match(script,/Start-Sleep -Seconds 5/);
+});
 
 test("release comparison is numeric and rejects non-release versions", () => {
   assert.equal(compareReleaseVersions("0.10.0", "0.9.9"), 1);
