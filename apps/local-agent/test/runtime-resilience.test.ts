@@ -1470,7 +1470,7 @@ test("sending immediately after a rename resumes the same thread after writer re
   assert.equal(store.snapshot().managedThreads[nativeThreadId]?.logicalSessionId, "session-rename");
 });
 
-for (const mode of ["interrupted", "completed", "failed", "inProgress", "missing", "wrong-cwd", "changed-turn"] as const) test(`restart recovery requires exact persisted terminal evidence: ${mode}`, async t => {
+for (const mode of ["interrupted", "completed", "failed", "inProgress", "missing", "wrong-cwd", "changed-turn", "cleared-on-reconnect"] as const) test(`restart recovery requires exact persisted terminal evidence: ${mode}`, async t => {
   const { store, projects } = await fixture(); const project = projects[0]!;
   const old: ManagedThread = { nativeThreadId:"reboot-native", logicalSessionId:"reboot-session", executionSegmentId:"reboot-segment", projectId:project.id, sessionCwd:project.root, appServerEpoch:"old-runtime", policyVersion:"remote-restricted-v1", policyVerified:true, contentEpoch:1, createdAt:"2026-09-08T00:00:00Z", activeTurnId:"old-turn", lastTurnId:"old-turn", lastTurnStatus:"inProgress" };
   await store.setManagedThread(old);
@@ -1479,20 +1479,21 @@ for (const mode of ["interrupted", "completed", "failed", "inProgress", "missing
     readTurnOutcome:async(id:string,turnId:string)=>{
       reads++; assert.equal(id,old.nativeThreadId); assert.equal(turnId,old.activeTurnId);
       if(mode==="changed-turn") await store.updateManagedThread(id,t=>{t.activeTurnId="new-turn";});
-      return mode==="missing"?null:{cwd:mode==="wrong-cwd"?"/wrong":project.root,status:mode==="changed-turn"?"completed":mode};
+      return mode==="missing"?null:{cwd:mode==="wrong-cwd"?"/wrong":project.root,status:["changed-turn","cleared-on-reconnect"].includes(mode)?"completed":mode};
     }
   })});
   captureCallbacks(runtime); await runtime.initialize(); t.after(()=>runtime.shutdown());
+  if(mode==="cleared-on-reconnect") await store.updateManagedThread(old.nativeThreadId,t=>{delete t.activeTurnId;t.appServerEpoch="new-runtime";});
   assert.equal(reads,0,"Startup must preserve the freeze without user action");
   await runtime.refreshCatalog(); assert.equal(reads,0,"Catalog refresh must not unfreeze");
-  await runtime.recoverFrozenSession({appServerEpoch:"new-runtime",nativeThreadId:old.nativeThreadId,logicalSessionId:old.logicalSessionId,executionSegmentId:old.executionSegmentId,contentEpoch:old.contentEpoch});
+  await runtime.recoverFrozenSession({appServerEpoch:"new-runtime",nativeThreadId:old.nativeThreadId,nativeTurnId:old.activeTurnId,previousAppServerEpoch:old.appServerEpoch,logicalSessionId:old.logicalSessionId,executionSegmentId:old.executionSegmentId,contentEpoch:old.contentEpoch});
   assert.equal(reads,1);
-  const recovered=["interrupted","completed","failed"].includes(mode);
+  const recovered=["interrupted","completed","failed","cleared-on-reconnect"].includes(mode);
   const thread=store.snapshot().managedThreads[old.nativeThreadId]!;
   assert.equal(thread.activeTurnId,recovered?undefined:mode==="changed-turn"?"new-turn":"old-turn");
   const events=store.snapshot().outbox.filter(e=>e.payload.recoveredFromHost===true);
   assert.equal(events.length,recovered?1:0);
-  if(recovered){assert.equal(thread.lastTurnStatus,mode);assert.equal(thread.policyVerified,false);assert.equal(events[0]?.nativeTurnId,"old-turn");}
+  if(recovered){assert.equal(thread.lastTurnStatus,mode==="cleared-on-reconnect"?"completed":mode);assert.equal(thread.policyVerified,false);assert.equal(events[0]?.nativeTurnId,"old-turn");}
   assert.equal(Object.keys(store.snapshot().commandJournal).length,0,"Recovery never creates or replays a command");
 });
 

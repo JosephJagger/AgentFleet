@@ -405,7 +405,9 @@ export class AgentRuntime {
     const nativeTurnId = typeof target.nativeTurnId === "string" ? target.nativeTurnId : thread.activeTurnId;
     const previousAppServerEpoch = typeof target.previousAppServerEpoch === "string" ? target.previousAppServerEpoch : thread.appServerEpoch;
     if (!nativeTurnId) return { recovered: false, reason: "没有待核验的旧轮次；请继续核对未知操作的主机回执" };
-    if (thread.activeTurnId !== nativeTurnId || thread.appServerEpoch !== previousAppServerEpoch) return { recovered: false, reason: "待核验轮次已经变化，请刷新后重试" };
+    const retainedOldTurn = thread.activeTurnId === nativeTurnId && thread.appServerEpoch === previousAppServerEpoch;
+    const clearedDuringReconnect = thread.activeTurnId === undefined && thread.lastTurnId === nativeTurnId && thread.appServerEpoch === server.appServerEpoch && !["completed", "failed", "interrupted"].includes(thread.lastTurnStatus ?? "");
+    if (!retainedOldTurn && !clearedDuringReconnect) return { recovered: false, reason: "待核验轮次已经变化，请刷新后重试" };
     if (previousAppServerEpoch === server.appServerEpoch) return { recovered: false, reason: "此轮任务仍属于当前执行进程，请等待它结束" };
     if (this.store.snapshot().projectReservations[thread.projectId]) return { recovered: false, reason: "项目仍有结果未知的操作，尚不能解除冻结" };
     const outcome = await server.readTurnOutcome(thread.nativeThreadId, nativeTurnId);
@@ -417,7 +419,7 @@ export class AgentRuntime {
       contentEpoch: thread.contentEpoch, nativeThreadId: thread.nativeThreadId, nativeTurnId,
       type: outcome.status === "completed" ? "turn.completed" : outcome.status === "failed" ? "turn.failed" : "turn.interrupted",
       payload: { turn: { id: nativeTurnId, status: outcome.status }, recoveredFromHost: true, previousAppServerEpoch },
-    }, outcome.status);
+    }, outcome.status, previousAppServerEpoch);
     if (recovered) { this.callbacks.onOutboxChanged(); this.notifyRegistryChanged(); }
     return { recovered, previousAppServerEpoch, nativeThreadId: thread.nativeThreadId, nativeTurnId, status: outcome.status,
       reason: recovered ? "已核验结束记录并解除冻结；原命令没有重发" : "核验期间会话状态发生变化，请刷新后重试" };

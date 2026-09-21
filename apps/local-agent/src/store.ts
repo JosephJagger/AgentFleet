@@ -1063,25 +1063,26 @@ export class StateStore {
     });
   }
 
-  async recoverPreviousRuntimeTurn(expected: ManagedThread, event: EventInput, status: string): Promise<boolean> {
+  async recoverPreviousRuntimeTurn(expected: ManagedThread, event: EventInput, status: string, previousAppServerEpoch = expected.appServerEpoch): Promise<boolean> {
     return this.update(state => {
       const current = state.managedThreads[expected.nativeThreadId];
-      if (!current || !event.appServerEpoch || !["completed", "failed", "interrupted"].includes(status) ||
-          current.appServerEpoch !== expected.appServerEpoch || current.appServerEpoch === event.appServerEpoch ||
-          !current.activeTurnId || current.activeTurnId !== expected.activeTurnId ||
+      const retainedOldTurn = current?.activeTurnId === event.nativeTurnId && current?.appServerEpoch === previousAppServerEpoch;
+      const clearedDuringReconnect = current?.activeTurnId === undefined && current?.lastTurnId === event.nativeTurnId && current?.appServerEpoch === event.appServerEpoch && !["completed", "failed", "interrupted"].includes(current?.lastTurnStatus ?? "");
+      if (!current || !event.nativeTurnId || !event.appServerEpoch || !["completed", "failed", "interrupted"].includes(status) ||
+          previousAppServerEpoch === event.appServerEpoch || (!retainedOldTurn && !clearedDuringReconnect) ||
           current.contentEpoch !== expected.contentEpoch || current.logicalSessionId !== expected.logicalSessionId ||
           current.executionSegmentId !== expected.executionSegmentId || current.projectId !== expected.projectId ||
           current.sessionCwd !== expected.sessionCwd || state.projectReservations[current.projectId]) return false;
       // Persist the proof and projection together, so a crash cannot lose the terminal event.
       appendEventToState(state, event);
-      current.lastTurnId = current.activeTurnId;
+      current.lastTurnId = event.nativeTurnId;
       current.lastTurnStatus = status;
       delete current.activeTurnId;
       current.appServerEpoch = event.appServerEpoch;
       current.policyVerified = false;
       current.subscribed = false;
       for (const approval of Object.values(state.approvals)) {
-        if (approval.nativeThreadId === current.nativeThreadId && approval.appServerEpoch === expected.appServerEpoch && approval.state === "pending") approval.state = "invalidated";
+        if (approval.nativeThreadId === current.nativeThreadId && approval.appServerEpoch === previousAppServerEpoch && approval.state === "pending") approval.state = "invalidated";
       }
       return true;
     });
