@@ -862,8 +862,9 @@ test("manual recovery stays frozen until scoped request and authenticated termin
   db.run("INSERT INTO project_turn_reservations(project_id,logical_session_id,native_turn_id,state,version,reserved_at,updated_at,bound_producer_epoch,bound_app_server_epoch,binding_state) VALUES('manual-project','manual-session','older-turn','active',2,?,?,'old-producer','older-runtime','bound')",now,now);
   const repair=service.create(principal,"manual-host","connection.repair","repair-all");
   const repairOffer=service.offers("manual-host").find(item=>item.operationId===repair.operationId)!;
-  const repairTarget=repairOffer.recoveryTarget as {sessions:Record<string,unknown>[]};
+  const repairTarget=repairOffer.recoveryTarget as {sessions:Record<string,unknown>[];supersededMaintenanceOperationIds:string[]};
   assert.equal(repairTarget.sessions.length,1);assert.equal(repairTarget.sessions[0]?.nativeTurnId,"older-turn");
+  assert.ok(repairTarget.supersededMaintenanceOperationIds.includes(String(operation.operationId)));
   service.result("manual-host",String(repair.operationId),"succeeded",{repaired:true,recoveries:[{recovered:true,nativeThreadId:"manual-session-native",nativeTurnId:"older-turn",previousAppServerEpoch:"older-runtime",status:"completed"}]},undefined);
   assert.equal(state(),"completed");assert.equal(db.get("SELECT 1 FROM project_turn_reservations WHERE project_id='manual-project'"),undefined);
  } finally {db.close();}

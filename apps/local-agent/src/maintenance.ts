@@ -99,6 +99,14 @@ export class AgentMaintenance {
         const target=operation.recoveryTarget;
         if(!target) throw new AgentError("RECOVERY_TARGET_INVALID","缺少主机恢复目标");
         const commands=Array.isArray(target.commands)&&target.commands.length<=20&&target.commands.every(id=>typeof id==="string"&&/^[A-Za-z0-9_-]{1,128}$/.test(id))?target.commands as string[]:[];
+        const superseded=Array.isArray(target.supersededMaintenanceOperationIds)&&target.supersededMaintenanceOperationIds.length<=50&&target.supersededMaintenanceOperationIds.every(id=>typeof id==="string"&&/^[A-Za-z0-9_-]{1,128}$/.test(id))?target.supersededMaintenanceOperationIds as string[]:[];
+        const drain=this.options.store.snapshot().maintenanceDrain;
+        if(drain&&drain.operationId!==operationId){
+          const owner=this.options.store.snapshot().maintenanceOperations[drain.operationId];
+          const ownerExpired=owner?.expiresAt!==undefined&&Number.isFinite(Date.parse(owner.expiresAt))&&Date.parse(owner.expiresAt)<=Date.now();
+          if(!superseded.includes(drain.operationId)||owner?.state==="running"&&!ownerExpired)throw new AgentError("MAINTENANCE_BUSY","another maintenance operation is draining the agent");
+          await this.options.store.setMaintenanceDrain(undefined);
+        }
         await this.options.store.setMaintenanceDrain(operationId);
         for(const commandId of commands)await this.options.store.recoverLateTerminalTurn(commandId);
         result={...await this.options.runtime.repairConnection(target),reconciledCommands:commands.length};

@@ -41,10 +41,12 @@ test("connection diagnostics refreshes the host inventory before reporting it", 
   assert.equal(support.codexProfile.hostCodexVersion, "0.153.4");
 });
 
-test("one-click connection repair is durable and never repeats on duplicate delivery",async t=>{
+test("one-click connection repair safely supersedes an expired maintenance drain and never repeats",async t=>{
   const directory=await mkdtemp(join(tmpdir(),"agentfleet-connection-repair-"));const store=new StateStore(directory);await store.initialize();
   t.after(async()=>{store.close();await rm(directory,{recursive:true,force:true});});
-  const target={appServerEpoch:"current",commands:[],sessions:[{logicalSessionId:"session",nativeThreadId:"thread",nativeTurnId:"turn"}]};let calls=0;const reports:Record<string,unknown>[]=[];
+  await store.recordMaintenance({operationId:"expired-update",operationType:"agent.update",state:"running",createdAt:"2026-01-01T00:00:00Z",updatedAt:"2026-01-01T00:00:00Z",expiresAt:"2026-01-01T01:00:00Z"});
+  await store.setMaintenanceDrain("expired-update");
+  const target={appServerEpoch:"current",commands:[],supersededMaintenanceOperationIds:["expired-update"],sessions:[{logicalSessionId:"session",nativeThreadId:"thread",nativeTurnId:"turn"}]};let calls=0;const reports:Record<string,unknown>[]=[];
   const runtime={repairConnection:async(actual:Record<string,unknown>)=>{calls++;assert.deepEqual(actual,target);return {repaired:true,reconnected:true,recoveredCount:1};}} as unknown as AgentRuntime;
   const maintenance=new AgentMaintenance({store,runtime,signal:new AbortController().signal,report:result=>reports.push(result)});
   const offer={operationId:"repair-connection",operationType:"connection.repair",recoveryTarget:target,expiresAt:new Date(Date.now()+60_000).toISOString()};

@@ -37,7 +37,9 @@ export class MaintenanceService {
             AND r.bound_app_server_epoch<>? ORDER BY r.updated_at LIMIT 50`,machineId,connection.app_server_epoch);
         const commands=this.db.all<{command_id:string}>(`SELECT c.command_id FROM commands c JOIN command_projection p USING(command_id)
           JOIN logical_sessions s USING(logical_session_id) WHERE s.machine_id=? AND p.state='unknown' ORDER BY c.created_at LIMIT 20`,machineId).map(row=>row.command_id);
-        target={appServerEpoch:connection.app_server_epoch,commands,sessions:sessions.map(row=>({logicalSessionId:row.logical_session_id,contentEpoch:row.content_epoch,executionSegmentId:row.execution_segment_id,nativeThreadId:row.native_thread_id,nativeTurnId:row.native_turn_id,previousAppServerEpoch:row.bound_app_server_epoch}))};
+        const supersededMaintenanceOperationIds=this.db.all<{operation_id:string}>(`SELECT operation_id FROM machine_operations
+          WHERE machine_id=? AND state IN ('succeeded','failed','unknown','expired') ORDER BY updated_at DESC LIMIT 50`,machineId).map(row=>row.operation_id);
+        target={appServerEpoch:connection.app_server_epoch,commands,supersededMaintenanceOperationIds,sessions:sessions.map(row=>({logicalSessionId:row.logical_session_id,contentEpoch:row.content_epoch,executionSegmentId:row.execution_segment_id,nativeThreadId:row.native_thread_id,nativeTurnId:row.native_turn_id,previousAppServerEpoch:row.bound_app_server_epoch}))};
       } else if(type === "project.add") {
         invariant(projectTarget,400,"PROJECT_TARGET_REQUIRED","Project path and alias are required");
         invariant(projectTarget.path.length > 0 && projectTarget.path.length <= 4096,400,"PROJECT_PATH_INVALID","Project path is required");
