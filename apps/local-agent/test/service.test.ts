@@ -89,6 +89,8 @@ test("macOS launchd and Windows task launchers preserve the fixed service enviro
   });
   assert.match(windows, /AGENTFLEET_AUTO_UPDATE=1/);
   assert.match(windows, /node\.exe/);
+  assert.match(windows, /timeout \/t 5[\s\S]*goto agentfleet_restart/);
+  assert.doesNotMatch(windows, /AGENTFLEET_EXIT%"=="0"/);
   assert.doesNotMatch(windows, /ticket|secret/iu);
 });
 

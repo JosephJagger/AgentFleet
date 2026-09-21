@@ -418,10 +418,11 @@ export function buildWindowsServiceLauncher(options: { launch: string[]; dataDir
     ":agentfleet_restart",
     invoke,
     'set "AGENTFLEET_EXIT=%errorlevel%"',
-    'if "%AGENTFLEET_EXIT%"=="0" exit /b 0',
+    // The scheduled task itself is the service boundary. A worker or supervisor
+    // may exit zero during a handoff, so keep the wrapper alive until Windows
+    // explicitly stops the task.
     'timeout /t 5 /nobreak >nul',
     "goto agentfleet_restart",
-    "exit /b %AGENTFLEET_EXIT%",
     "",
   ].join("\r\n");
 }
