@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { AgentAutoUpdater, compareReleaseVersions, stageAgentUpdate, windowsUpdateRestartScript } from "../src/updater.js";
+import { readFileSync } from "node:fs";
 
 test("Windows update handoff retries the background task after the current task exits", () => {
   const script=windowsUpdateRestartScript();
@@ -11,6 +12,14 @@ test("Windows update handoff retries the background task after the current task 
   assert.match(script,/State -ne 'Running'/);
   assert.match(script,/Start-ScheduledTask/);
   assert.match(script,/Start-Sleep -Seconds 5/);
+});
+
+test("the Windows installer schedules a handoff that does not depend on the old Agent binary", () => {
+  const installer = readFileSync(new URL("../../../../packaging/install.ps1", import.meta.url), "utf8");
+  assert.match(installer, /Register-AgentFleetUpdateHandoff/);
+  assert.match(installer, /AgentFleet-Update-Handoff/);
+  assert.match(installer, /Start-ScheduledTask -TaskName 'AgentFleet-Background'/);
+  assert.match(installer, /New-ScheduledTaskTrigger -Once/);
 });
 
 test("release comparison is numeric and rejects non-release versions", () => {

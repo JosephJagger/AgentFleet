@@ -40,6 +40,20 @@ function Invoke-AgentFleetWebRequest([string]$Uri, [string]$OutFile) {
   if ($DownloadProxy) { $parameters.Proxy = $DownloadProxy }
   Invoke-WebRequest @parameters
 }
+function Register-AgentFleetUpdateHandoff {
+  # The installer can be launched by an older Agent whose task wrapper exits
+  # with the worker. A separate one-shot task starts the stable background task
+  # after that old process tree has finished, independent of old Agent code.
+  $handoffName = 'AgentFleet-Update-Handoff'
+  $handoffScript = "`$ErrorActionPreference='SilentlyContinue'; Start-ScheduledTask -TaskName 'AgentFleet-Background'; Start-Sleep -Seconds 2; Unregister-ScheduledTask -TaskName '$handoffName' -Confirm:`$false"
+  $encodedHandoff = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($handoffScript))
+  $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $action = New-ScheduledTaskAction -Execute (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $encodedHandoff"
+  $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
+  $principal = New-ScheduledTaskPrincipal -UserId $sid -LogonType Interactive -RunLevel Limited
+  $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::FromMinutes(5)) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+  Register-ScheduledTask -TaskName $handoffName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+}
 
 if ($Mode -eq 'Rollback') {
   if (-not (Test-Path $StableLauncher -PathType Leaf)) { throw 'installer: no managed installation to roll back' }
@@ -192,6 +206,7 @@ try {
   if ($Mode -eq 'Stage') {
     & $StableLauncher service stage-background --executable $StableLauncher --data-dir $StateRoot
     if ($LASTEXITCODE -ne 0) { throw 'Could not schedule background service migration' }
+    Register-AgentFleetUpdateHandoff
     Write-Host "Staged AgentFleet $($manifest.version); the task will restart into it."; exit 0 }
   $args = @('onboard','--url',$BaseUrl,'--ticket',$Ticket,'--name',$Name,'--project',$Project,'--data-dir',$StateRoot,'--executable',$StableLauncher)
   if ($Alias) { $args += @('--alias',$Alias) }
