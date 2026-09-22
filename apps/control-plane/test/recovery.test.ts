@@ -1048,10 +1048,13 @@ test("dashboard shortcuts include old managed/running sessions beyond recent and
       db.run("INSERT INTO logical_sessions(logical_session_id,workspace_id,machine_id,project_id,external_id,title,managed,execution_state,reachability,created_at,updated_at) VALUES(?,?,'queue-host','queue-project',?,?,? ,?,'live',?,?)",id,owner.workspaceId,id,id,i===0?1:0,i===1?"running":"idle",now,i<2?"2020-01-01T00:00:00.000Z":now);
       db.run("INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,external_id,native_thread_id,created_at) VALUES(?,?,'queue-host','queue-project',?,?,?)",id+"-seg",id,id+"-seg",id+"-native",now);
     }
+    db.run(`INSERT INTO durable_events(event_id,payload_hash,source_kind,workspace_id,logical_session_id,execution_segment_id,machine_id,project_id,session_seq,projection_epoch,type,schema_version,occurred_at,received_at,payload_state,content_epoch)
+      VALUES('activity-terminal','hash','agent',?,'activity-0','activity-0-seg','queue-host','queue-project',1,1,'turn.completed','v1','2026-09-08T10:00:00.000Z','2026-09-08T10:00:00.000Z','suppressed',1)`,owner.workspaceId);
     const registry = new RegistryService(db,config(":memory:"));
     const result=registry.dashboard(principal);
-    const activity=result.activitySessions as Array<{logicalSessionId:string}>;
+    const activity=result.activitySessions as Array<{logicalSessionId:string;lastTurnEndedAt:string|null}>;
     assert.deepEqual(activity.map(s=>s.logicalSessionId).sort(),["activity-0","activity-1","queue-session"]);
+    assert.equal(activity.find(session=>session.logicalSessionId==="activity-0")?.lastTurnEndedAt,"2026-09-08T10:00:00.000Z");
     assert.equal((result.recentSessions as unknown[]).length,20);
     assert.equal(registry.listSessionsPage(principal,{limit:100}).items.some(s=>s.logicalSessionId==="activity-0"),false);
   } finally {db.close();}

@@ -135,6 +135,7 @@ export interface FleetSession {
   historyMode: "legacy" | "paginated" | "unknown";
   state: SessionState;
   lastActivityAt: string;
+  lastTurnEndedAt?: string | null;
   sessionSeq: number;
   projectionEpoch: number;
   contentEpoch: number;

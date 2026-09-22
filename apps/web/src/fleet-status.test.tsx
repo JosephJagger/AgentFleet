@@ -59,3 +59,13 @@ it("快捷列表只显示已经建立原生会话的接管记录",()=>{
  expect(screen.getByText("暂无已接管的会话")).toBeTruthy();
  view.unmount();
 });
+it("已接管列表按最近结束时间倒序显示，不受通用更新时间影响，也不改变接管数量",()=>{
+ const older={...session("older"),lastActivityAt:"2026-09-08T12:00:00Z",lastTurnEndedAt:"2026-09-08T08:00:00Z"};
+ const newest={...session("newest"),lastActivityAt:"2026-09-08T10:00:00Z",lastTurnEndedAt:"2026-09-08T10:00:00Z"};
+ const middle={...session("middle"),lastActivityAt:"2026-09-08T11:00:00Z",lastTurnEndedAt:"2026-09-08T09:00:00Z"};
+ render(<FleetStatus machines={[host]} sessions={[older,newest,middle]} connected onSession={vi.fn()} onMachine={vi.fn()}/>);
+ fireEvent.click(screen.getByRole("button",{name:"查看已接管的会话（3）"}));
+ const names=Array.from(screen.getByRole("dialog").querySelectorAll(".activity-item strong"),node=>node.textContent);
+ expect(names).toEqual(["会话 newest","会话 middle","会话 older"]);
+ expect(screen.getByRole("button",{name:"查看已接管的会话（3）"})).toBeTruthy();
+});

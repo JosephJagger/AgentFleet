@@ -167,6 +167,7 @@ export interface LogicalSessionSummary {
   queueVersion: number;
   controlLease: ControlLeaseView | null;
   updatedAt: string;
+  lastTurnEndedAt?: string | null;
   managementRevision: number;
   codexProfileId: string;
   sessionCwd: string | null;

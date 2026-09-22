@@ -2780,6 +2780,7 @@ export class RegistryService {
       content_epoch: number;
       queue_version: number;
       updated_at: string;
+      last_turn_ended_at: string | null;
       execution_segment_id: string;
       native_thread_id: string | null;
       history_completeness: "complete" | "partial" | "unknown";
@@ -2793,6 +2794,8 @@ export class RegistryService {
       recorded_tokens: number | null;
     }>(
       `SELECT s.*,e.execution_segment_id,e.native_thread_id,e.history_completeness,e.history_mode,
+        (SELECT MAX(de.occurred_at) FROM durable_events de WHERE de.logical_session_id=s.logical_session_id
+          AND de.type IN ('turn.completed','turn.failed','turn.interrupted')) AS last_turn_ended_at,
         p.lease_version AS project_lease_version,p.alias AS project_alias,p.canonical_root,json_extract(u.recorded_json,'$.totalTokens') AS recorded_tokens FROM logical_sessions s
        JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL
        JOIN projects p ON p.project_id=s.project_id
@@ -2836,6 +2839,7 @@ export class RegistryService {
       queueVersion: row.queue_version,
       controlLease: lease,
       updatedAt: row.updated_at,
+      lastTurnEndedAt: row.last_turn_ended_at,
       managementRevision: row.management_revision,
       codexProfileId: row.codex_profile_id,
       sessionCwd: row.session_cwd,

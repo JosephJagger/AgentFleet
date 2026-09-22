@@ -25,6 +25,14 @@ function sessionActivity(session: FleetSession, machines: Machine[]): string {
   return t("已接管 · 可打开会话");
 }
 
+function recentActivityFirst(sessions: FleetSession[]): FleetSession[] {
+  return [...sessions].sort((left, right) => {
+    const leftTime = Date.parse(left.lastTurnEndedAt ?? left.lastActivityAt);
+    const rightTime = Date.parse(right.lastTurnEndedAt ?? right.lastActivityAt);
+    return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+  });
+}
+
 export function FleetStatus({ machines, sessions, connected, onSession, onMachine, utility }: {
   machines: Machine[]; sessions: FleetSession[]; connected: boolean;
   onSession: (id: string) => void; onMachine: (id: string) => void; utility?: ReactNode;
@@ -37,7 +45,9 @@ export function FleetStatus({ machines, sessions, connected, onSession, onMachin
   // A panel-created draft is owned by AgentFleets so its first prompt can be
   // sent safely, but it has no native writer yet. Keep it in its project list
   // and exclude it from the quick list of established controlled sessions.
-  const managed = sessions.filter(session => session.state.ownership === "agentfleet_owned" && Boolean(session.nativeThreadId));
+  // Keep recently finished or otherwise active sessions closest to the top.
+  // This is presentation-only and does not change ownership or auto-release.
+  const managed = recentActivityFirst(sessions.filter(session => session.state.ownership === "agentfleet_owned" && Boolean(session.nativeThreadId)));
   const counts = { hosts: online.length, running: running.length, managed: managed.length };
   const close = () => { setCategory(undefined); trigger.current?.focus(); };
   const open = category !== undefined;

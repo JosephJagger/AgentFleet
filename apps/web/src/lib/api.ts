@@ -285,6 +285,7 @@ function mapSession(
       unknownFreeze: executionState === "unknown" || machine?.compatibility === "degraded_read_only" || outcomeNeedsRecovery,
     },
     lastActivityAt: string(raw.updatedAt, new Date(0).toISOString()),
+    lastTurnEndedAt: typeof raw.lastTurnEndedAt === "string" ? raw.lastTurnEndedAt : null,
     sessionSeq: integer(raw.latestSessionSeq),
     projectionEpoch: integer(raw.projectionEpoch, 1),
     contentEpoch: integer(raw.contentEpoch, 1),
