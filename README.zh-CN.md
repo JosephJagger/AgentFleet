@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/gongqiankun/AgentFleet/actions/workflows/ci.yml"><img src="https://github.com/gongqiankun/AgentFleet/actions/workflows/ci.yml/badge.svg" alt="Build and test status"></a>
+  <a href="https://github.com/JosephJagger/AgentFleet/actions/workflows/ci.yml"><img src="https://github.com/JosephJagger/AgentFleet/actions/workflows/ci.yml/badge.svg" alt="Build and test status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-55def2?labelColor=111e35" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/deployment-self--hosted-a18bff?labelColor=111e35" alt="Self-hosted">
 </p>
@@ -199,33 +199,88 @@ AgentFleets 当前使用单一管理员账号；接入多台主机不代表共�
 
 ## 自行部署
 
-需要 Docker、Compose、HTTPS 反向代理，以及安装了受支持 Codex 的宿主机。源码构建会下载依赖和各平台运行时，需要网络访问。写入能力由操作系统、凭据保护和 App Server 协议检查共同决定，不能仅凭版本号判断兼容。
+AgentFleets 使用 Docker Compose 运行。开始前需要：
+
+- 一台安装了 Git、Docker 和 Docker Compose 的 Linux 服务器
+- 供其他设备访问时使用的 HTTPS 域名
+- 至少一台已经登录 Codex 的 Linux、macOS 或 Windows 主机
+
+源码构建会下载依赖和各平台运行时，因此部署服务器需要能够访问网络。
+
+### 1. 下载项目
 
 ```sh
-git clone https://github.com/gongqiankun/AgentFleet.git
+git clone https://github.com/JosephJagger/AgentFleet.git
 cd AgentFleet
 cp .env.example .env
 ```
 
-启动前修改 `.env`：
+### 2. 配置面板
 
-- `ADMIN_EMAIL` 填自己的邮箱；`ADMIN_PASSWORD` 设置至少 12 位的独立密码，没有预设密码。
-- `PUBLIC_ORIGIN` 和 `ALLOWED_ORIGINS` 填自己的 HTTPS 地址，不带末尾斜杠。
-- HTTPS 保持 `COOKIE_SECURE=true`；反向代理位于同机时保持 `PUBLISH_HOST=127.0.0.1`。
-- 使用转发头时，`TRUSTED_PROXIES` 只配置已核验的直接代理地址。
+打开 `.env`，至少修改下面几项：
+
+```dotenv
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=设置一个至少12位的独立密码
+PUBLIC_ORIGIN=https://panel.example.com
+ALLOWED_ORIGINS=https://panel.example.com
+COOKIE_SECURE=true
+PUBLISH_HOST=127.0.0.1
+```
+
+将邮箱、密码和示例域名换成自己的值。两个 origin 都不要包含路径或末尾斜杠。系统没有默认管理员密码，`.env` 已被 Git 忽略，不会随代码提交。
+
+如果反向代理会转发客户端地址，只把已经核实的直接代理地址填入 `TRUSTED_PROXIES`；不需要识别真实客户端地址时可以不设置。
+
+### 3. 构建并启动
 
 ```sh
 docker compose up -d --build
 curl --fail http://127.0.0.1:3215/ready
 ```
 
-将自己的 HTTPS 地址反向代理到 `127.0.0.1:3215`，开启 WebSocket 升级支持。访问自己的地址，用自己配置的账号密码登录，在面板中添加主机，并在目标主机运行生成的一次性安装命令。不要分享配对票据。
+健康检查成功时会返回包含 `"status":"ok"` 的 JSON。查看服务状态和日志：
 
-仅在本机回环地址体验时，可将两个 origin 都设为 `http://127.0.0.1:3215`，并设置 `COOKIE_SECURE=false`。不要把这套 HTTP 配置用于公开部署。
+```sh
+docker compose ps
+docker compose logs -f control-plane
+```
 
-托管 Codex 支持自动升级：通过兼容性检查后，在主机空闲时更新。
+### 4. 配置 HTTPS
 
-Compose 使用命名卷保存控制面数据和已验证的运行时。升级前备份配置及数据卷；`docker compose down -v` 会删除数据卷，请勿作为普通升级步骤。仅更新网页的方式见[发布说明](docs/web-only-release.md)。
+将 HTTPS 反向代理指向 `http://127.0.0.1:3215`，并开启 WebSocket 代理。以 Caddy 为例，只需：
+
+```caddyfile
+panel.example.com {
+    reverse_proxy 127.0.0.1:3215
+}
+```
+
+打开 `PUBLIC_ORIGIN` 配置的地址，使用 `ADMIN_EMAIL` 和 `ADMIN_PASSWORD` 登录。
+
+只在服务器本机试用且没有域名时，可把两个 origin 都设为 `http://127.0.0.1:3215`，并设置 `COOKIE_SECURE=false`，然后从本机打开该地址。不要把这套 HTTP 配置暴露到局域网或公网。
+
+### 5. 连接 Codex 主机
+
+1. 在 Linux、macOS 或 Windows 主机上，用实际拥有项目和原生会话的系统账号登录 Codex。
+2. 在 AgentFleets 点击**添加主机**，选择对应操作系统。
+3. 复制面板生成的一次性安装命令，仍用同一个系统账号在目标主机执行。
+4. 回到面板；主机上线后，添加或选择项目，即可打开原有会话或创建新会话。
+
+配对票据只能使用一次且有效期很短，请勿分享。Agent 主动向控制面发起连接，因此日常使用不需要在 Codex 主机上开放入站端口。只有通过操作系统、凭据保护和 Codex 协议检查后，面板才会开放写入能力。
+
+### 6. 更新与备份
+
+拉取最新代码并重新构建容器：
+
+```sh
+git pull --ff-only
+docker compose up -d --build
+```
+
+Compose 使用 `agentfleet-data` 和 `agentfleet-runtime-releases` 两个命名卷保存控制面数据和已验证运行时。升级前请备份 `.env` 和这两个数据卷。除非确定要清空数据，否则不要执行 `docker compose down -v`。已连接的 Agent 可在面板通过兼容性检查后更新，并会等待主机空闲再重启。
+
+需要在升级网页的同时保留现有 Agent 下载文件时，请查看[发布说明](docs/web-only-release.md)。
 
 ### 连接 AppleFleets iPhone App
 

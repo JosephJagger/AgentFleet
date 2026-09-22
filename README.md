@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/gongqiankun/AgentFleet/actions/workflows/ci.yml"><img src="https://github.com/gongqiankun/AgentFleet/actions/workflows/ci.yml/badge.svg" alt="Build and test status"></a>
+  <a href="https://github.com/JosephJagger/AgentFleet/actions/workflows/ci.yml"><img src="https://github.com/JosephJagger/AgentFleet/actions/workflows/ci.yml/badge.svg" alt="Build and test status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-55def2?labelColor=111e35" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/deployment-self--hosted-a18bff?labelColor=111e35" alt="Self-hosted">
 </p>
@@ -199,31 +199,88 @@ Use the official app if its remote workflow meets your needs. Choose AgentFleets
 
 ## Self-host
 
-You need Docker with Compose, an HTTPS reverse proxy, and hosts with a supported Codex installation. Source builds download dependencies and platform runtime artifacts, so internet access is required. Host write access depends on operating-system, credential protection, and App Server protocol checks; a version number alone does not guarantee compatibility.
+AgentFleets runs as a Docker Compose application. You need:
+
+- A Linux server with Git, Docker, and Docker Compose
+- A domain name with HTTPS for access from other devices
+- At least one Linux, macOS, or Windows host signed in to Codex
+
+Source builds download dependencies and platform runtime artifacts, so the deployment server needs internet access.
+
+### 1. Download the project
 
 ```sh
-git clone https://github.com/gongqiankun/AgentFleet.git
+git clone https://github.com/JosephJagger/AgentFleet.git
 cd AgentFleet
 cp .env.example .env
 ```
 
-Edit `.env` before starting:
+### 2. Configure the panel
 
-- Set `ADMIN_EMAIL` to your own address and `ADMIN_PASSWORD` to a unique password of at least 12 characters. There is no preset password.
-- Set `PUBLIC_ORIGIN` and `ALLOWED_ORIGINS` to your own HTTPS origin, without a trailing slash.
-- Keep `COOKIE_SECURE=true` for HTTPS and `PUBLISH_HOST=127.0.0.1` when the proxy runs on the same host.
-- If using forwarded headers, configure `TRUSTED_PROXIES` with only the verified immediate proxy addresses.
+Open `.env` and set these values:
+
+```dotenv
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=choose-a-unique-password-of-at-least-12-characters
+PUBLIC_ORIGIN=https://panel.example.com
+ALLOWED_ORIGINS=https://panel.example.com
+COOKIE_SECURE=true
+PUBLISH_HOST=127.0.0.1
+```
+
+Replace the email, password, and example domain with your own values. Do not add a path or trailing slash to either origin. There is no default administrator password, and `.env` is excluded from Git.
+
+If the reverse proxy passes client-address headers, add only its verified direct address to `TRUSTED_PROXIES`. Leave that setting unset when you do not need forwarded client addresses.
+
+### 3. Build and start
 
 ```sh
 docker compose up -d --build
 curl --fail http://127.0.0.1:3215/ready
 ```
 
-Forward your HTTPS origin to `127.0.0.1:3215`, including WebSocket upgrade support. Open **your own origin**, sign in with the credentials you configured, and use the panel's host enrollment flow. Run the generated one-time installation command on each intended host; do not share enrollment tickets.
+A successful health check returns JSON with `"status":"ok"`. View service status and logs with:
 
-For loopback-only evaluation, set both origins to `http://127.0.0.1:3215` and `COOKIE_SECURE=false`. Do not use that configuration for a public deployment.
+```sh
+docker compose ps
+docker compose logs -f control-plane
+```
 
-Compose persists control-plane data and validated runtime releases in named volumes. Back up your configuration and volumes before upgrades; do not use `docker compose down -v` unless you intend to delete them. See [release guidance](docs/web-only-release.md) for updates that preserve existing Agent downloads.
+### 4. Add HTTPS
+
+Point your HTTPS reverse proxy at `http://127.0.0.1:3215`. WebSocket proxying must be enabled. For example, Caddy needs only:
+
+```caddyfile
+panel.example.com {
+    reverse_proxy 127.0.0.1:3215
+}
+```
+
+Open the address configured in `PUBLIC_ORIGIN` and sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+
+For a same-machine trial without a domain, set both origins to `http://127.0.0.1:3215`, set `COOKIE_SECURE=false`, and open that address locally. Do not expose this HTTP configuration to a network or the internet.
+
+### 5. Connect a Codex host
+
+1. Sign in to Codex on the Linux, macOS, or Windows host using the operating-system account whose projects and native sessions you want to manage.
+2. In AgentFleets, click **Add host** and select the host operating system.
+3. Copy the generated one-time installation command and run it on that host under the same operating-system account.
+4. Return to the panel. When the host is online, add or select a project and open an existing session or create a new one.
+
+The enrollment ticket is single-use and short-lived; do not share it. The Agent connects outward to the control plane, so routine use does not require an inbound port on the Codex host. Write capability is enabled only after the host passes its operating-system, credential-protection, and Codex protocol checks.
+
+### 6. Update and back up
+
+Pull the latest code and rebuild the containers:
+
+```sh
+git pull --ff-only
+docker compose up -d --build
+```
+
+Compose keeps control-plane data and validated runtimes in the `agentfleet-data` and `agentfleet-runtime-releases` named volumes. Back up `.env` and these volumes before an upgrade. Do not run `docker compose down -v` unless you intend to erase the stored data. Enrolled Agents can update from the panel after compatibility checks and wait for the host to become idle before restarting.
+
+See [release guidance](docs/web-only-release.md) for deployments that must preserve an existing set of Agent downloads.
 
 ### Connect the AppleFleets iPhone app
 
