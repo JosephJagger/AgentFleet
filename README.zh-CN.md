@@ -269,16 +269,44 @@ panel.example.com {
 
 配对票据只能使用一次且有效期很短，请勿分享。Agent 主动向控制面发起连接，因此日常使用不需要在 Codex 主机上开放入站端口。只有通过操作系统、凭据保护和 Codex 协议检查后，面板才会开放写入能力。
 
-### 6. 更新与备份
+### 6. 更新、排错与备份
 
-拉取最新代码并重新构建容器：
+如果搭建时遇到的问题已经在 GitHub 修复，不需要重新克隆项目。在原项目目录执行：
 
 ```sh
+cd AgentFleet
+git status --short
+git rev-parse --short HEAD
+git pull --ff-only
+docker compose up -d --build
+curl --fail http://127.0.0.1:3215/ready
+```
+
+`git pull` 只更新 Git 管理的项目文件，不会替换已被忽略的 `.env`，也不会清空 Docker 命名卷。`docker compose up -d --build` 会用刚拉取的源码重新构建，并只重建需要更新的容器。
+
+如果 `git pull --ff-only` 提示存在本地代码改动，先安全暂存再更新：
+
+```sh
+git stash push -u -m "before AgentFleets update"
 git pull --ff-only
 docker compose up -d --build
 ```
 
-Compose 使用 `agentfleet-data` 和 `agentfleet-runtime-releases` 两个命名卷保存控制面数据和已验证运行时。升级前请备份 `.env` 和这两个数据卷。除非确定要清空数据，否则不要执行 `docker compose down -v`。已连接的 Agent 可在面板通过兼容性检查后更新，并会等待主机空闲再重启。
+使用 `git stash list` 和 `git stash show -p` 查看暂存内容。确认仍然需要时再执行 `git stash pop`；旧代码改动可能与新版本冲突。被 Git 忽略的 `.env` 不会被这条暂存命令收走。
+
+更新后检查实际代码版本、容器状态和日志：
+
+```sh
+git rev-parse --short HEAD
+docker compose ps
+docker compose logs --tail=200 control-plane
+```
+
+健康检查仍然失败时，可以把这些结果用于反馈问题，但应先删除密码、配对票据、令牌、私有主机名和会话正文。
+
+面板源码更新和宿主机 Agent 更新是两件事。上面的命令更新控制面和网页；面板恢复正常后，再进入对应主机使用更新或恢复功能升级 Agent。Agent 已经离线时，可能需要在该主机本地执行面板给出的修复命令。
+
+Compose 使用 `agentfleet-data` 和 `agentfleet-runtime-releases` 两个命名卷保存控制面数据和已验证运行时。升级前请备份 `.env` 和这两个数据卷。除非确定要清空数据，否则不要执行 `docker compose down -v`。
 
 需要在升级网页的同时保留现有 Agent 下载文件时，请查看[发布说明](docs/web-only-release.md)。
 

@@ -269,16 +269,44 @@ For a same-machine trial without a domain, set both origins to `http://127.0.0.1
 
 The enrollment ticket is single-use and short-lived; do not share it. The Agent connects outward to the control plane, so routine use does not require an inbound port on the Codex host. Write capability is enabled only after the host passes its operating-system, credential-protection, and Codex protocol checks.
 
-### 6. Update and back up
+### 6. Update, recover, and back up
 
-Pull the latest code and rebuild the containers:
+When a setup problem has been fixed in GitHub, update the existing installation instead of cloning it again:
 
 ```sh
+cd AgentFleet
+git status --short
+git rev-parse --short HEAD
+git pull --ff-only
+docker compose up -d --build
+curl --fail http://127.0.0.1:3215/ready
+```
+
+`git pull` updates the tracked project files. It does not replace the ignored `.env` file or erase the Docker named volumes. `docker compose up -d --build` rebuilds the application from the newly downloaded source and recreates only the containers that need changing.
+
+If `git pull --ff-only` reports local tracked changes, preserve them before updating:
+
+```sh
+git stash push -u -m "before AgentFleets update"
 git pull --ff-only
 docker compose up -d --build
 ```
 
-Compose keeps control-plane data and validated runtimes in the `agentfleet-data` and `agentfleet-runtime-releases` named volumes. Back up `.env` and these volumes before an upgrade. Do not run `docker compose down -v` unless you intend to erase the stored data. Enrolled Agents can update from the panel after compatibility checks and wait for the host to become idle before restarting.
+Use `git stash list` and `git stash show -p` to review the saved changes. Apply them later with `git stash pop` only if they are still needed; old source changes may conflict with the new version. The ignored `.env` file is not included by this command.
+
+After an update, check the running revision and logs:
+
+```sh
+git rev-parse --short HEAD
+docker compose ps
+docker compose logs --tail=200 control-plane
+```
+
+If the health check still fails, include those outputs when reporting the problem, after removing passwords, enrollment tickets, tokens, private hostnames, and conversation content.
+
+Panel source updates and host Agent updates are separate. The commands above update the control plane and web interface. Once the panel is healthy, open the affected host and use its update or recovery action to update the installed Agent; an offline Agent may require the repair command shown by the panel to be run locally.
+
+Compose keeps control-plane data and validated runtimes in the `agentfleet-data` and `agentfleet-runtime-releases` named volumes. Back up `.env` and these volumes before an upgrade. Do not run `docker compose down -v` unless you intend to erase the stored data.
 
 See [release guidance](docs/web-only-release.md) for deployments that must preserve an existing set of Agent downloads.
 
