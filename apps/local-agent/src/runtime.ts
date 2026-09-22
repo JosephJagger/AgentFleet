@@ -1,4 +1,4 @@
-import { readNativeUsage } from "./native-usage.js";
+import { readNativeSessionCwd, readNativeUsage } from "./native-usage.js";
 import { nativeImageCleanup } from "./native-image-cleanup.js";
 import { randomUUID } from "node:crypto";
 import { setImmediate as yieldToIO } from "node:timers/promises";
@@ -1102,8 +1102,13 @@ export class AgentRuntime {
         for (const thread of threads) {
           this.discoverySeen.add(thread.nativeThreadId);
           try {
+            const currentState = this.store.snapshot();
+            const priorThread = currentState.managedThreads[thread.nativeThreadId] ?? currentState.discoveredThreads[thread.nativeThreadId];
+            const sessionCwd = await readNativeSessionCwd(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId)
+              ?? priorThread?.sessionCwd
+              ?? thread.cwd;
             const project = await discoverProjectFromCwd(
-              thread.cwd,
+              sessionCwd,
               [...knownProjects, ...discoveredProjects.values()],
             );
             discoveredProjects.set(project.root, project);
@@ -1116,7 +1121,7 @@ export class AgentRuntime {
               executionSegmentExternalId: thread.nativeThreadId,
               nativeThreadId: thread.nativeThreadId,
               projectId: project.id,
-              sessionCwd: thread.cwd,
+              sessionCwd,
               codexProfileId: "default",
               title: thread.title,
               ...(thread.titleSource ? { titleSource: thread.titleSource } : {}),

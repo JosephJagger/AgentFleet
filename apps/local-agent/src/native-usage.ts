@@ -3,22 +3,46 @@ import { relative, isAbsolute, join, resolve } from "node:path";
 import { tokenUsage } from "./usage.js";
 import { isRecord } from "./util.js";
 
+async function openVerifiedRollout(home: string | undefined, path: string | undefined) {
+  if (!home || !path) return;
+  const root = await realpath(home), target = await realpath(path);
+  const allowed = [join(root, "sessions"), join(root, "archived_sessions")].some(dir => {
+    const child = relative(dir, target);
+    return child !== "" && child !== ".." && !child.startsWith(".." + (process.platform === "win32" ? "\\" : "/")) && !isAbsolute(child);
+  });
+  const comparable = (value: string) => process.platform === "win32" ? value.toLowerCase() : value;
+  if (!allowed || comparable(target) !== comparable(resolve(path))) return;
+  const file = await open(target, "r");
+  const stat = await file.stat();
+  if (!stat.isFile() || stat.nlink !== 1) { await file.close(); return; }
+  return { file, stat };
+}
+
+/** The immutable rollout header is the authoritative cwd when thread/list briefly reports another thread's cwd. */
+export async function readNativeSessionCwd(home: string | undefined, path: string | undefined, threadId: string): Promise<string | undefined> {
+  try {
+    const verified = await openVerifiedRollout(home, path);
+    if (!verified) return;
+    try {
+      const head = Buffer.alloc(Math.min(verified.stat.size, 64 * 1024));
+      const read = await verified.file.read(head, 0, head.length, 0);
+      const firstLine = head.subarray(0, read.bytesRead).toString("utf8").split("\n")[0];
+      const meta: unknown = JSON.parse(firstLine!);
+      if (!isRecord(meta) || meta.type !== "session_meta" || !isRecord(meta.payload) || meta.payload.id !== threadId || typeof meta.payload.cwd !== "string") return;
+      return meta.payload.cwd;
+    } finally { await verified.file.close(); }
+  } catch { return; }
+}
+
 // Read only native counters; never resume the thread or acquire its writer lock.
 // Bound reads even when a rollout contains large inline images or a partial append.
 export async function readNativeUsage(home: string | undefined, path: string | undefined, threadId: string): Promise<{ usage: Record<string, unknown>; occurredAt: string } | undefined> {
   if (!home || !path) return;
   try {
-    const root = await realpath(home), target = await realpath(path);
-    const allowed = [join(root, "sessions"), join(root, "archived_sessions")].some(dir => {
-      const child = relative(dir, target);
-      return child !== "" && child !== ".." && !child.startsWith(".." + (process.platform === "win32" ? "\\" : "/")) && !isAbsolute(child);
-    });
-    const comparable = (value: string) => process.platform === "win32" ? value.toLowerCase() : value;
-    if (!allowed || comparable(target) !== comparable(resolve(path))) return;
-    const file = await open(target, "r");
+    const verified = await openVerifiedRollout(home, path);
+    if (!verified) return;
+    const { file, stat } = verified;
     try {
-      const stat = await file.stat();
-      if (!stat.isFile() || stat.nlink !== 1) return;
       const head = Buffer.alloc(Math.min(stat.size, 64 * 1024));
       const headRead = await file.read(head, 0, head.length, 0);
       const firstLine = head.subarray(0, headRead.bytesRead).toString("utf8").split("\n")[0];

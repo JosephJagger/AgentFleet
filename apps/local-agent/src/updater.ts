@@ -6,6 +6,7 @@ import { AgentError } from "./errors.js";
 import type { StateStore } from "./store.js";
 import { prepareUpdateTransaction, readUpdateTransaction, restoreUpdateTransaction, writeUpdateTransaction } from "./supervisor.js";
 import { parseManagedRuntimeTarget, prepareManagedRuntime } from "./managed-runtime-update.js";
+import { codexNetworkEnvironment } from "./system-proxy.js";
 
 const MAX_MANIFEST_BYTES = 64 * 1_024;
 const MAX_INSTALLER_BYTES = 512 * 1_024;
@@ -96,7 +97,7 @@ export async function stageAgentUpdate(options: {
       await runInstaller("powershell.exe", [
         "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
         "-File", installerPath, "-Mode", "Stage", "-Url", options.controlPlaneUrl,
-      ], undefined, options.signal);
+      ], undefined, options.signal, await codexNetworkEnvironment(process.env));
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
@@ -112,10 +113,11 @@ async function runInstaller(
   args: string[],
   stdin: string | undefined,
   signal?: AbortSignal,
+  environment: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(executable, args, {
-      env: process.env,
+      env: environment,
       stdio: [stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     });
     let output = "";

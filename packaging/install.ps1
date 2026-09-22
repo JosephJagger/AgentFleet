@@ -16,6 +16,31 @@ $PreviousFile = Join-Path $BinRoot 'previous.txt'
 $StableLauncher = Join-Path $StateRoot 'agentfleet.cmd'
 $RuntimeProfile = Join-Path $StateRoot 'runtime-profile.json'
 
+# Windows PowerShell 5 does not consistently honor HTTPS_PROXY for its web
+# cmdlets. The background Agent detects the enabled Windows proxy and passes it
+# through the environment, so apply that proxy explicitly during downloads.
+$DownloadProxy = $null
+foreach ($candidate in @($env:HTTPS_PROXY, $env:HTTP_PROXY, $env:https_proxy, $env:http_proxy)) {
+  if (-not $candidate) { continue }
+  try {
+    $candidateUri = [Uri]$candidate
+    if (($candidateUri.Scheme -eq 'http' -or $candidateUri.Scheme -eq 'https') -and -not $candidateUri.UserInfo) {
+      $DownloadProxy = $candidateUri.AbsoluteUri
+      break
+    }
+  } catch { }
+}
+function Invoke-AgentFleetRestMethod([string]$Uri) {
+  $parameters = @{ Uri = $Uri }
+  if ($DownloadProxy) { $parameters.Proxy = $DownloadProxy }
+  Invoke-RestMethod @parameters
+}
+function Invoke-AgentFleetWebRequest([string]$Uri, [string]$OutFile) {
+  $parameters = @{ Uri = $Uri; OutFile = $OutFile }
+  if ($DownloadProxy) { $parameters.Proxy = $DownloadProxy }
+  Invoke-WebRequest @parameters
+}
+
 if ($Mode -eq 'Rollback') {
   if (-not (Test-Path $StableLauncher -PathType Leaf)) { throw 'installer: no managed installation to roll back' }
   & $StableLauncher service rollback --data-dir $StateRoot
@@ -56,7 +81,7 @@ try {
     try { $existingProfile = Get-Content -Raw -LiteralPath $RuntimeProfile | ConvertFrom-Json } catch { $existingProfile = $null }
   }
   if ($hadManagedCodex) { Copy-Item -LiteralPath $managedCodexPath -Destination $codexBackup }
-  $manifest = Invoke-RestMethod "$BaseUrl/downloads/manifest.json"
+  $manifest = Invoke-AgentFleetRestMethod "$BaseUrl/downloads/manifest.json"
   $artifact = $manifest.artifacts.'win32-x64'
   if ($manifest.schemaVersion -ne 1 -or -not $artifact) { throw 'installer: invalid Windows release manifest' }
   $expectedName = "agentfleet-win32-x64-$($manifest.version).tar.gz"
@@ -64,7 +89,7 @@ try {
   $archive = Join-Path $temp $artifact.file
   # Key CDN downloads by the verified digest so an earlier cached 404 cannot
   # hide a newly published immutable release.
-  Invoke-WebRequest "$BaseUrl/downloads/$($artifact.file)?sha256=$($artifact.sha256)" -OutFile $archive
+  Invoke-AgentFleetWebRequest "$BaseUrl/downloads/$($artifact.file)?sha256=$($artifact.sha256)" $archive
   if ((Get-Item $archive).Length -ne [long]$artifact.size) { throw 'installer: release size mismatch' }
   if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne $artifact.sha256) { throw 'installer: release SHA-256 mismatch' }
   $entries = & tar.exe -tzf $archive
@@ -106,11 +131,11 @@ try {
     $codexSourceKind = 'managed'
     Write-Host "Reusing verified AgentFleet Codex $codexVersion. Your own Codex and session data remain unchanged."
   } else {
-    $codexManifest = Invoke-RestMethod "$BaseUrl/downloads/codex-manifest.json"
+    $codexManifest = Invoke-AgentFleetRestMethod "$BaseUrl/downloads/codex-manifest.json"
     $codexArtifact = $codexManifest.artifacts.'win32-x64'
     if (-not $codexArtifact) { throw 'installer: invalid Windows Codex manifest' }
     $codexArchive = Join-Path $temp $codexArtifact.file
-    Invoke-WebRequest "$BaseUrl/downloads/$($codexArtifact.file)" -OutFile $codexArchive
+    Invoke-AgentFleetWebRequest "$BaseUrl/downloads/$($codexArtifact.file)" $codexArchive
     if ((Get-Item $codexArchive).Length -ne [long]$codexArtifact.size) { throw 'installer: Codex size mismatch' }
     if ((Get-FileHash -Algorithm SHA256 $codexArchive).Hash.ToLowerInvariant() -ne $codexArtifact.sha256) { throw 'installer: Codex SHA-256 mismatch' }
     $codexTemp = Join-Path $temp 'codex'
