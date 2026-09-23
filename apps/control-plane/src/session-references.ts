@@ -112,10 +112,24 @@ export class SessionReferences {
       if (!pieces.length) {
         job.done = 0; job.total = Math.ceil(totalChars / CHUNK_CHARS);
         let chunk = "";
+        const summarizePart = async (part: string, depth = 0): Promise<void> => {
+          if (job.controller.signal.aborted) return;
+          try {
+            pieces.push(await this.ai.summarizeHistory(principal, `Part of the synchronized user and Codex conversation. Return a concise handoff, not a transcript. Do not infer omitted reasoning or command output:\n${part}`, job.controller.signal));
+            job.done++;
+          } catch (error) {
+            if (!(error instanceof AppError && ["REFERENCE_CONTEXT_LIMIT", "REFERENCE_AI_TRUNCATED"].includes(error.code)) || part.length < 4_000 || depth >= 6) throw error;
+            // A long individual message or an unexpectedly verbose answer can
+            // exceed the provider's limits even after ordinary chunking.
+            const middle = Math.floor(part.length / 2);
+            job.total++;
+            await summarizePart(part.slice(0, middle), depth + 1);
+            await summarizePart(part.slice(middle), depth + 1);
+          }
+        };
         const summarizeChunk = async () => {
           if (!chunk || job.controller.signal.aborted) return;
-          pieces.push(await this.ai.summarizeHistory(principal, `Part ${job.done + 1}/${job.total} of the synchronized user and Codex conversation. Do not infer the contents of omitted reasoning or command output:\n${chunk}`, job.controller.signal));
-          job.done++;
+          await summarizePart(chunk);
           chunk = "";
         };
         for (const cursor of chronologicalCursors) {
@@ -140,9 +154,23 @@ export class SessionReferences {
         const next: string[] = [];
         for (let index = 0; index < summaries.length; index += 6) {
           if (job.controller.signal.aborted) return;
-          next.push(await this.ai.summarizeHistory(principal, `Combine these ordered conversation summaries into one handoff summary. Do not invent details from omitted reasoning or command logs:\n${summaries.slice(index, index + 6).map((s, i) => `Part ${index + i + 1}: ${s}`).join("\n\n")}`, job.controller.signal));
-          job.done++;
+          const combine = async (parts: string[]): Promise<void> => {
+            if (job.controller.signal.aborted) return;
+            if (parts.length === 1) { next.push(parts[0]!); job.done++; return; }
+            try {
+              next.push(await this.ai.summarizeHistory(principal, `Combine these ordered conversation summaries into one concise handoff. Do not invent details from omitted reasoning or command logs:\n${parts.map((s, i) => `Part ${i + 1}: ${s}`).join("\n\n")}`, job.controller.signal));
+              job.done++;
+            } catch (error) {
+              if (!(error instanceof AppError && ["REFERENCE_CONTEXT_LIMIT", "REFERENCE_AI_TRUNCATED"].includes(error.code)) || parts.length <= 2) throw error;
+              const middle = Math.floor(parts.length / 2);
+              job.total++;
+              await combine(parts.slice(0, middle));
+              await combine(parts.slice(middle));
+            }
+          };
+          await combine(summaries.slice(index, index + 6));
         }
+        invariant(next.length < summaries.length, 502, "REFERENCE_AI_TRUNCATED", "Summary model could not combine the partial summaries");
         summaries = next;
       }
       if (job.controller.signal.aborted) return;

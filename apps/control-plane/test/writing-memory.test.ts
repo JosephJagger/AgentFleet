@@ -237,6 +237,22 @@ test("OpenAI uses its token parameter while custom providers retain compatible p
  }
 });
 
+test("session summaries give DeepSeek enough output budget and classify truncated responses", async t => {
+ const {db,principal,service}=fixture();t.after(()=>db.close());
+ let finishReason='stop';
+ const ai=new WritingAI(db,':memory:',service,async(_url,options)=>{
+  const body=JSON.parse(String(options?.body));
+  assert.equal(body.model,'deepseek-flash');
+  assert.equal(body.max_tokens,8000);
+  assert.deepEqual(body.thinking,{type:'disabled'});
+  return Response.json({choices:[{finish_reason:finishReason,message:{content:'Concise handoff'}}]});
+ });
+ ai.save(principal,{endpoint:'https://api.deepseek.com',model:'deepseek-flash',apiKey:'test-key',enabled:true});
+ assert.equal(await ai.summarizeHistory(principal,'A conversation',new AbortController().signal),'Concise handoff');
+ finishReason='length';
+ await assert.rejects(()=>ai.summarizeHistory(principal,'A conversation',new AbortController().signal),{code:'REFERENCE_AI_TRUNCATED'});
+});
+
 test('AI cache merges concurrent requests, expires, isolates sessions and invalidates on vocabulary or configuration changes', async t => {
  const {db,principal,service}=fixture();t.after(()=>db.close());
  let calls=0,now=0,release!:()=>void;

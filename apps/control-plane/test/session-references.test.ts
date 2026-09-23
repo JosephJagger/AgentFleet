@@ -119,3 +119,39 @@ test("falls back to parts only when the provider rejects the single-call context
   assert.equal(result.state, "ready");
   assert.equal(modelCalls, 4); // rejected single call, two parts, one merge
 });
+
+test("splits a truncated source part again and still combines every ordered part", async () => {
+  const seen: string[] = [];
+  const db = { get: () => ({ name: "Host" }) } as unknown as ControlPlaneDatabase;
+  const registry = { getSession: () => ({ machineId: "host", projectAlias: "Project", title: "Conversation", projectionEpoch: 1, contentEpoch: 1, latestSessionSeq: 1, historyCompleteness: "complete" }) } as unknown as RegistryService;
+  const coordination = { historyPage: () => ({ items: [item("A".repeat(120_000), 1)], nextBeforeSeq: null, throughSeq: 1 }) } as unknown as CoordinationService;
+  const ai = { read: () => ({ enabled: true, configured: true }), referenceConfigurationVersion: () => "model-v1", summarizeHistory: async (_: unknown, input: string) => {
+    if (input.startsWith("Part of") && input.length > 25_000) throw new AppError(502, "REFERENCE_AI_TRUNCATED", "Summary was truncated");
+    if (input.startsWith("Part of")) { seen.push(input); return `summary ${seen.length}`; }
+    return "combined";
+  } } as unknown as WritingAI;
+  const refs = new SessionReferences(db, registry, coordination, ai);
+  const result = await finished(refs, refs.start(principal, "source").id);
+  assert.equal(result.state, "ready");
+  assert.equal(seen.length, 7); // Six split parts plus the source message prefix.
+  assert.ok(seen.every(part => part.length < 25_000));
+  assert.match(result.summary!, /combined/);
+});
+
+test("reduces combine group size when a provider truncates a large merge", async () => {
+  const db = { get: () => ({ name: "Host" }) } as unknown as ControlPlaneDatabase;
+  const registry = { getSession: () => ({ machineId: "host", projectAlias: "Project", title: "Conversation", projectionEpoch: 1, contentEpoch: 1, latestSessionSeq: 1, historyCompleteness: "complete" }) } as unknown as RegistryService;
+  const coordination = { historyPage: () => ({ items: [item("A".repeat(160_000), 1)], nextBeforeSeq: null, throughSeq: 1 }) } as unknown as CoordinationService;
+  let merges = 0;
+  const ai = { read: () => ({ enabled: true, configured: true }), referenceConfigurationVersion: () => "model-v1", summarizeHistory: async (_: unknown, input: string) => {
+    if (input.startsWith("Part of")) return "partial";
+    merges++;
+    if ((input.match(/Part \d+:/g) ?? []).length > 2) throw new AppError(502, "REFERENCE_AI_TRUNCATED", "Summary was truncated");
+    return "merged";
+  } } as unknown as WritingAI;
+  const refs = new SessionReferences(db, registry, coordination, ai);
+  const result = await finished(refs, refs.start(principal, "source").id);
+  assert.equal(result.state, "ready");
+  assert.ok(merges >= 4);
+  assert.match(result.summary!, /merged/);
+});
