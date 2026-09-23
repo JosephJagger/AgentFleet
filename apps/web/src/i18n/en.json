@@ -2409,5 +2409,17 @@
   "搜索": "Search",
   "正在处理…": "Working…",
   "管理分类": "Administration sections",
-  "托管升级": "Managed upgrades"
+  "托管升级": "Managed upgrades",
+  "恢复主机连接": "Restore host connection",
+  "主机不可达时，在主机本地重置 AgentFleets 连接服务。": "When this host is unreachable, reset its AgentFleets connection service locally.",
+  "先确认主机已开机并联网，登录安装 AgentFleets 时使用的系统账号。": "Make sure the host is powered on and connected to the internet. Sign in with the OS account used to install AgentFleets.",
+  "在该主机打开 PowerShell，粘贴下方命令并执行。": "Open PowerShell on that host, paste the command below and run it.",
+  "在该主机打开终端，粘贴下方命令并执行。": "Open a terminal on that host, paste the command below and run it.",
+  "执行完成后，面板收到主机连接会自动更新状态。": "The panel updates automatically when the host reconnects.",
+  "命令会下载连接服务并重新注册、启动后台服务，保留配对、项目和会话数据。若主机仍有任务运行，请先等待任务结束。": "The command downloads the connection service, registers it again and starts it. Pairing, projects and session data are retained. Wait for any running tasks on the host to finish first.",
+  "连接修复命令": "Connection repair command",
+  "已复制，到主机执行": "Copied — run on the host",
+  "复制修复命令": "Copy repair command",
+  "主机离线时，网页无法代替你在主机执行命令。": "The panel cannot run this command remotely while the host is offline.",
+  "命令已复制，尚未执行修复。请到对应主机粘贴运行。": "Command copied. No repair has run yet. Paste and run it on the selected host."
 }

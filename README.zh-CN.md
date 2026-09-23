@@ -397,3 +397,6 @@ npm run build
 <a href="LICENSE">MIT 开源</a> · <a href="THIRD_PARTY_NOTICES.md">第三方声明</a> · <a href="CONTRIBUTING.md">欢迎贡献</a></p>
 
 <sub>本项目独立开发，并非 OpenAI 官方产品。请自行部署并使用自己的 Codex 凭据；不提供共享站点或默认登录账号。</sub>
+
+主机不可达时，主机页会显示**恢复主机连接**卡片，按 Windows、macOS、Linux 提供修复命令。请在故障主机上使用原安装账号执行；修复保留配对和会话数据，复制命令不等于远程执行。关机、断网或系统自身故障仍需在本机处理。
+

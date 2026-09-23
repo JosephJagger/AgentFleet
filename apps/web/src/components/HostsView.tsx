@@ -1,3 +1,5 @@
+import { HostRecovery, repairCommand } from "./HostRecovery";
+export { repairCommand } from "./HostRecovery";
 import { t, locale, localized, systemText } from "../i18n";
 import { AlertTriangle, Check, Copy, Download, LoaderCircle, RefreshCw, RotateCcw, Stethoscope, Trash2, Unplug } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
@@ -22,10 +24,6 @@ const operationDescriptions: Partial<Record<MaintenanceType, string>> = localize
   "runtime.reconnect": t("重启 Codex 会话服务并重新读取运行状态。"),
 }));
 
-export function repairCommand(machine: Machine, origin: string): string {
-  const installer = /windows/i.test(machine.os) ? "/install.ps1" : /darwin|macos/i.test(machine.os) ? "/install-macos" : "/install";
-  return installer.endsWith("ps1") ? `$i=Join-Path $env:TEMP 'agentfleet-install.ps1'; Invoke-WebRequest '${origin}/install.ps1' -OutFile $i; & $i -Mode Update -Url '${origin}'` : `curl -fsSL '${origin}${installer}' | sh -s -- --update-only --url '${origin}'`;
-}
 
 function profileValue(profile: Record<string, unknown> | undefined, ...keys: string[]): string {
   for (const key of keys) { const value = profile?.[key]; if (typeof value === "string" && value) return value; }
@@ -69,6 +67,7 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
   const repair = repairCommand(machine, location.origin);
   return <section className="wide-view hosts-view"><div className="wide-view__heading"><div><h1>{t("主机")}</h1><p>{t("选择一台主机，设置默认模型、修改名称或检查连接。")}</p></div><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></div>
     <HostCards machines={machines} selectedId={machine.id} onSelect={onSelect} />
+    {machine.reachability !== "live" && <HostRecovery key={machine.id} machine={machine} />}
     <CodexSettingsPanel key={machine.id} machineId={machine.id} />
     <PermissionPanel key={`permissions:${machine.id}`} machineId={machine.id} />
     <HostImageStorage key={`images:${machine.id}`} machineId={machine.id} name={machine.name} />
@@ -77,7 +76,7 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
       <DiscoveryStatus discovery={machine.discovery} />
       <div className="host-repair-primary"><div><strong>{t("连接异常时从这里恢复")}</strong><small>{machine.reachability === "live" ? operationDescriptions["connection.repair"] : t("主机离线，需先在主机启动 AgentFleets 连接服务。")}</small></div><button type="button" className="button button--primary" disabled={busy || pending || machine.reachability !== "live" || !machine.maintenanceCapabilities?.includes("connection.repair")} title={!machine.maintenanceCapabilities?.includes("connection.repair") ? t("连接服务更新后即可使用") : operationDescriptions["connection.repair"]} onClick={() => void operate("connection.repair")}><RotateCcw className={pending ? "spin" : undefined} size={17} />{pending ? t("正在恢复") : t("一键恢复连接")}</button></div>
       <details className="host-operation-tools"><summary>{t("高级维护工具")}</summary><p>{t("仅在需要单独诊断某一步时使用。")}</p><div className="host-operation-buttons">{(["diagnostics.collect", "catalog.refresh", "agent.update", "runtime.reconnect"] as MaintenanceType[]).map((type) => <div className="host-operation-action" key={type}><button type="button" className="button button--quiet" disabled={busy || pending || machine.reachability !== "live" || !machine.maintenanceCapabilities?.includes(type)} title={!machine.maintenanceCapabilities?.includes(type) ? t("当前 Agent 尚未提供此操作") : operationDescriptions[type]} aria-describedby={`host-operation-help-${type}`} onClick={() => void operate(type)}>{type === "agent.update" ? <Download size={15} /> : type === "diagnostics.collect" ? <Stethoscope size={15} /> : type === "runtime.reconnect" ? <Unplug size={15} /> : <RefreshCw size={15} />}{operationNames[type]}</button><small id={`host-operation-help-${type}`}>{operationDescriptions[type]}</small></div>)}</div></details>
-      {(!machine.maintenanceCapabilities?.length || machine.reachability !== "live") && <details className="repair-command"><summary>{machine.reachability !== "live" ? t("主机离线时的修复命令") : t("旧版 Agent 升级命令")}</summary><p>{t("在这台主机安装 AgentFleets 的原账号中执行后，会保留已有连接并修复服务。")}</p><code>{repair}</code><button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(repair); setCopied(true); } catch { setError(t("复制失败，请手动选中命令复制")); } }}><Copy size={14} />{copied ? t("已复制") : t("复制命令")}</button></details>}
+      {(!machine.maintenanceCapabilities?.length && machine.reachability === "live") && <details className="repair-command"><summary>{t("旧版 Agent 升级命令")}</summary><p>{t("在这台主机安装 AgentFleets 的原账号中执行后，会保留已有连接并修复服务。")}</p><code>{repair}</code><button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(repair); setCopied(true); } catch { setError(t("复制失败，请手动选中命令复制")); } }}><Copy size={14} />{copied ? t("已复制") : t("复制命令")}</button></details>}
       {error && <p className="catalog-error" role="alert">{systemText(error)}</p>}
       <details className="host-operation-list" aria-label={t("主机操作记录")} open={operationsOpen} onToggle={event => setOperationsOpen(event.currentTarget.open)}><summary><span>{t("操作记录")}</span><small>{operations.length ? t("最近 {0} 条", operations.length) : t("暂无记录")}</small></summary><div className="host-operation-list__body">{operations.length === 0 ? <p className="subtle">{t("还没有维护操作。")}</p> : operations.map((operation) => <article key={operation.id} className={`host-operation host-operation--${operation.state}`}>{["accepted", "running"].includes(operation.state) ? <LoaderCircle className="spin" size={16} /> : operation.state === "succeeded" ? <Check size={16} /> : <AlertTriangle size={16} />}<div><strong>{operationNames[operation.type]}<span>{operationStates[operation.state]}</span></strong>{operation.error && <p>{systemText(operation.error.message)}</p>}{operation.state === "unknown" && <p>{t("等待核验实际主机状态，请勿重复提交。")}</p>}<small>{new Date(operation.updatedAt).toLocaleString(locale())}</small>{operation.result && <details><summary>{t("主机返回详情")}</summary><pre>{JSON.stringify(operation.result, null, 2)}</pre></details>}</div></article>)}</div></details>
     </section><section className="settings-block host-runtime"><h2>{t("运行状态")}</h2>

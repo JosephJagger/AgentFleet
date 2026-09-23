@@ -2,8 +2,10 @@
 set -eu
 
 MODE=onboard
+SERVICE_ACTION=update
 case "${1:-}" in
   --update-only) MODE=update; shift ;;
+  --repair) MODE=update; SERVICE_ACTION=install; shift ;;
   --stage-only) MODE=stage; shift ;;
   --rollback) MODE=rollback; shift ;;
   --uninstall) MODE=uninstall; shift ;;
@@ -117,7 +119,7 @@ if [ "$MODE" = stage ] || [ "$MODE" = update ]; then
   ln -sfn "$TARGET/agentfleet" "$CURRENT_LINK"
   echo "Installed AgentFleet $VERSION. The existing Codex runtime was preserved."
   if [ "$MODE" = stage ]; then echo "Staged AgentFleet $VERSION; launchd will restart into it."; exit 0; fi
-  if "$CURRENT_LINK" service update --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT"; then exit 0; fi
+  if "$CURRENT_LINK" service "$SERVICE_ACTION" --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT"; then exit 0; fi
   echo "installer: service update failed; restoring the previous binary" >&2
   if [ -n "$OLD_TARGET" ]; then ln -sfn "$OLD_TARGET" "$CURRENT_LINK"; "$CURRENT_LINK" service update --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT" || true; fi
   exit 1

@@ -403,3 +403,6 @@ See [contributing](CONTRIBUTING.md), [security reporting](SECURITY.md), and [pac
 <a href="LICENSE">MIT licensed</a> · <a href="THIRD_PARTY_NOTICES.md">Third-party notices</a> · <a href="CONTRIBUTING.md">Contributions welcome</a></p>
 
 <sub>Independent project, not an official OpenAI product. Deploy your own instance and use your own Codex credentials. No shared service or default login is provided.</sub>
+
+Unreachable hosts show a **Restore host connection** card with a repair command matched to Windows, macOS or Linux. Run it on that host using the original installation account. Repair retains pairing and session data; copying a command does not run it remotely. Power, network or operating-system failures still require local attention.
+

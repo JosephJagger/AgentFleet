@@ -2,8 +2,10 @@
 set -eu
 
 MODE=onboard
+SERVICE_ACTION=update
 case "${1:-}" in
   --update-only) MODE=update; shift ;;
+  --repair) MODE=update; SERVICE_ACTION=install; shift ;;
   --stage-only) MODE=stage; shift ;;
   --rollback) MODE=rollback; shift ;;
   --uninstall) MODE=uninstall; shift ;;
@@ -770,10 +772,10 @@ esac
 if [ "$MODE" = "update" ]; then
   if [ -n "$SERVICE_DATA_DIR" ]; then
     UPDATE_RESULT=failed
-    if "$CURRENT_LINK" service update --executable "$CURRENT_LINK" --data-dir "$SERVICE_DATA_DIR"; then UPDATE_RESULT=ok; fi
+    if "$CURRENT_LINK" service "$SERVICE_ACTION" --executable "$CURRENT_LINK" --data-dir "$SERVICE_DATA_DIR"; then UPDATE_RESULT=ok; fi
   else
     UPDATE_RESULT=failed
-    if "$CURRENT_LINK" service update --executable "$CURRENT_LINK"; then UPDATE_RESULT=ok; fi
+    if "$CURRENT_LINK" service "$SERVICE_ACTION" --executable "$CURRENT_LINK"; then UPDATE_RESULT=ok; fi
   fi
   if [ "$UPDATE_RESULT" = ok ]; then
     ACTIVATION_PENDING=no
