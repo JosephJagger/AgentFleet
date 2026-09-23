@@ -44,20 +44,21 @@ function Register-AgentFleetUpdateHandoff {
   # An older task wrapper may exit after this installer returns. Keep the
   # handoff independent of that wrapper until the new worker verifies itself.
   # A single Start-ScheduledTask can be ignored while the old task is still
-  # Running; repeating the check closes that handoff race.
+  # Running. One hidden task process keeps checking without opening a new
+  # interactive PowerShell window every minute.
   $handoffName = 'AgentFleet-Update-Handoff'
   $escapedRoot = $StateRoot.Replace("'", "''")
   $handoffScript = @"
 `$ErrorActionPreference = 'SilentlyContinue'
 `$root = '$escapedRoot'
 `$log = Join-Path `$root 'update-handoff.log'
+for (`$attempt = 0; `$attempt -lt 60; `$attempt++) {
 `$task = Get-ScheduledTask -TaskName 'AgentFleet-Background' -ErrorAction SilentlyContinue
 `$state = `$null
 try { `$state = Get-Content -Raw -LiteralPath (Join-Path `$root 'update-state.json') | ConvertFrom-Json } catch { }
 if (`$state.phase -in @('succeeded','rolled_back','failed') -and `$task -and `$task.State -eq 'Running') {
   Add-Content -LiteralPath `$log -Value "`$(Get-Date -Format o) completed: `$(`$state.phase)"
-  Unregister-ScheduledTask -TaskName '$handoffName' -Confirm:`$false
-  exit 0
+  break
 }
 if (`$task -and `$task.State -ne 'Running') {
   Start-ScheduledTask -TaskName 'AgentFleet-Background'
@@ -76,13 +77,16 @@ if (`$task -and `$task.State -ne 'Running') {
     }
   }
 }
+Start-Sleep -Seconds 60
+}
+Unregister-ScheduledTask -TaskName '$handoffName' -Confirm:`$false
 "@
   $encodedHandoff = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($handoffScript))
   $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
   $action = New-ScheduledTaskAction -Execute (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $encodedHandoff"
-  $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Hours 1)
+  $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
   $principal = New-ScheduledTaskPrincipal -UserId $sid -LogonType Interactive -RunLevel Limited
-  $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::FromMinutes(5)) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+  $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::FromMinutes(65)) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
   Register-ScheduledTask -TaskName $handoffName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
 }
 
