@@ -1,3 +1,4 @@
+import { retryUpdateDownload } from "./update-network.js";
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
@@ -21,7 +22,7 @@ export interface ManagedRuntimeTarget {
 export function parseManagedRuntimeTarget(value: unknown): ManagedRuntimeTarget | null {
   if (value === null || value === undefined) return null;
   const target = value as ManagedRuntimeTarget;
-  if (target.schemaVersion !== 1 || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(target.revision) || !/^\d+\.\d+\.\d+$/.test(target.version) || (target.rollback !== undefined && typeof target.rollback !== "boolean") || target.schemaHash !== expectedCodexSchemaHash(target.version) || !target.artifacts || typeof target.artifacts !== "object") throw new AgentError("RUNTIME_TARGET_INVALID", "托管目标版本或协议未通过本 Agent 的兼容检查");
+  if (target.schemaVersion !== 1 || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(target.revision) || !/^\d+\.\d+\.\d+$/.test(target.version) || (target.rollback !== undefined && typeof target.rollback !== "boolean") || (!/^[a-f0-9]{64}$/.test(target.schemaHash) || target.schemaHash !== expectedCodexSchemaHash(target.version)) || !target.artifacts || typeof target.artifacts !== "object") throw new AgentError("RUNTIME_TARGET_INVALID", "托管目标版本或协议未通过本 Agent 的兼容检查");
   for (const [platform, asset] of Object.entries(target.artifacts)) {
     if (!["linux-x64", "darwin-arm64", "darwin-x64", "win32-x64"].includes(platform) || asset.format !== "raw" || !/^[a-f0-9]{64}$/.test(asset.sha256) || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > 512 * 1024 * 1024 || asset.file !== `codex-${platform}-${target.version}-${asset.sha256.slice(0, 16)}${platform === "win32-x64" ? ".exe" : ""}`) throw new AgentError("RUNTIME_TARGET_INVALID", "托管目标安装包信息不完整或路径无效");
   }
@@ -45,6 +46,8 @@ export async function prepareManagedRuntime(options: { dataDir: string; controlP
   try {
     const helperHash = await stageSandboxHelper(options.dataDir, stage, process.platform, process.arch, target.version, options.controlPlaneUrl, target.sandboxHelper);
     await stageCodeModeHost(stage, target.version, options.controlPlaneUrl, target.codeModeHosts?.[platform], false, options.signal);
+    await retryUpdateDownload(async () => {
+      await rm(executable, { force: true });
     const signal = AbortSignal.any([AbortSignal.timeout(180_000), ...(options.signal ? [options.signal] : [])]);
     const response = await fetch(new URL(`/downloads/managed-codex/${artifact.file}`, options.controlPlaneUrl), { signal, redirect: "error" });
     if (!response.ok || !response.body) throw new AgentError("RUNTIME_DOWNLOAD_FAILED", `托管运行时下载失败 HTTP ${response.status}`);
@@ -53,6 +56,7 @@ export async function prepareManagedRuntime(options: { dataDir: string; controlP
     const chunks = async function* () { const reader = response.body!.getReader(); try { while (true) { const next = await reader.read(); if (next.done) break; yield next.value; } } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); } };
     await pipeline(chunks(), bounded, createWriteStream(executable, { flags: "wx", mode: 0o700 }));
     if (bytes !== artifact.size || hash.digest("hex") !== artifact.sha256) throw new AgentError("RUNTIME_CHECKSUM_FAILED", "托管程序 SHA-256 不一致，已保留原运行时");
+    }, options.signal);
     await chmod(executable, 0o700);
     const env = { ...process.env, CODEX_HOME: join(stage, "validation-home") };
     await mkdir(env.CODEX_HOME, { mode: 0o700 });

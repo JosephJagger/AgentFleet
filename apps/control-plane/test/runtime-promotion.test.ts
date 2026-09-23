@@ -65,3 +65,17 @@ test("a published version with missing execution dependencies is repaired withou
   assert.equal(prepared, 1); assert.notEqual(channelState(directory).target?.revision, initial.revision);
   await worker.run(true); assert.equal(prepared, 1, "a complete same-version target is not rebuilt repeatedly");
 });
+
+test("unknown releases wait for adapter review before downloading and retain the working target", async t => {
+  const directory = await mkdtemp(join(tmpdir(), "runtime-unreviewed-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const initial = target("0.154.0");
+  writeChannelJson(directory, "state.json", { ...emptyChannel(), target: initial });
+  await new RuntimePromotion(directory, directory, { discover: async () => release("0.157.0") }).run(true);
+  const state = channelState(directory);
+  assert.equal(state.phase, "blocked");
+  assert.match(state.message, /尚未进入已验证兼容清单/);
+  assert.deepEqual(state.target, initial);
+  assert.equal(validatedCodexSchemaHash("0.157.0"), "unreviewed");
+  assert.equal(validatedCodexSchemaHash("0.156.0"), "995fc3b8f8c469f6787e8fc5be4038c4f31359025edd8480b862e83355f3bf3b");
+});

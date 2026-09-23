@@ -1,3 +1,4 @@
+import { REVIEWED_CODEX_SCHEMAS } from "./reviewed-codex-schemas.js";
 /**
  * Stable P0a/P0b wire vocabulary shared by the dashboard and local Agent.
  * JSON schemas are deliberately dependency-free so callers can feed them to
@@ -489,5 +490,5 @@ export const apiSchemas = {
 
 /** Exact release/schema pair reviewed against the native adapter regression suite. */
 export function validatedCodexSchemaHash(version: string | null): string {
-  return version === "0.154.0" ? "f3487938786b729cb6773dbc9e83a7efab9c78c845db7094e8f539f373cbacc9" : CODEX_COMPATIBILITY_PROFILE.schemaHash;
+  return version == null ? CODEX_COMPATIBILITY_PROFILE.schemaHash : REVIEWED_CODEX_SCHEMAS[version] ?? "unreviewed";
 }

@@ -97,6 +97,8 @@ export class RuntimePromotion {
     }
   }
   private async prepare(version: string, assets: OfficialRelease["assets"], progress: (phase: RuntimeChannelState["phase"], message: string) => void, baseline?: { artifacts: Record<string, { file: string; sha256: string }>; codeModeHosts?: Record<string, { file: string; sha256: string }> }): Promise<RuntimeTarget> {
+    const reviewedHash = validatedCodexSchemaHash(version);
+    if (reviewedHash === "unreviewed") throw new Error(`需要适配：Codex ${version} 尚未进入已验证兼容清单；保留当前版本，等待包含适配的新 AgentFleets 发布。无需重复下载安装包。`);
     await mkdir(join(this.directory, "staging"), { recursive: true, mode: 0o700 });
     await mkdir(join(this.directory, "public"), { recursive: true, mode: 0o700 });
     const stage = await mkdtemp(join(this.directory, "staging", "runtime-"));

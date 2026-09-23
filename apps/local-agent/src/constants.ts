@@ -1,4 +1,5 @@
-export const AGENT_VERSION = "0.30.44";
+import { REVIEWED_CODEX_SCHEMAS } from "./reviewed-codex-schemas.js";
+export const AGENT_VERSION = "0.30.45";
 export const FLEET_PROTOCOL_VERSION = "1.0";
 export const STATE_SCHEMA_VERSION = 2;
 export const POLICY_VERSION = "remote-restricted-v1";
@@ -43,7 +44,7 @@ export type AllowedCommandType = (typeof ALLOWED_COMMAND_TYPES)[number];
 export function expectedCodexSchemaHash(version?: string | null): string {
   const developmentOverride = process.env.AGENTFLEET_CODEX_SCHEMA_HASH;
   if (developmentOverride && process.env.NODE_ENV !== "production") return developmentOverride;
-  return version === "0.154.0" ? "f3487938786b729cb6773dbc9e83a7efab9c78c845db7094e8f539f373cbacc9" : REQUIRED_CODEX_SCHEMA_HASH;
+  return version == null ? REQUIRED_CODEX_SCHEMA_HASH : REVIEWED_CODEX_SCHEMAS[version] ?? "unreviewed";
 }
 
 export function isSupportedCodexVersion(value: string): boolean {

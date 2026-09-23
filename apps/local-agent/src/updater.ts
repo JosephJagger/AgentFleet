@@ -1,3 +1,4 @@
+import { retryUpdateDownload } from "./update-network.js";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -51,11 +52,11 @@ async function fetchBoundedText(
   maximumBytes: number,
   signal?: AbortSignal,
 ): Promise<string> {
-  const response = await fetchImpl(url, {
-    ...(signal === undefined ? {} : { signal }),
+  const response = await retryUpdateDownload(() => fetchImpl(url, {
+    signal: AbortSignal.any([AbortSignal.timeout(30_000), ...(signal ? [signal] : [])]),
     redirect: "error",
     headers: { accept: "application/json, text/plain;q=0.9" },
-  });
+  }), signal);
   if (!response.ok) throw new AgentError("UPDATE_DOWNLOAD_FAILED", `update download returned HTTP ${response.status}`);
   const contents = await response.text();
   if (Buffer.byteLength(contents, "utf8") > maximumBytes) {
@@ -266,13 +267,14 @@ export class AgentAutoUpdater {
 
   private async performRuntimeCheck(signal?: AbortSignal): Promise<UpdateCheckResult> {
     if (this.options.runtimeSource !== "managed" || !this.options.currentRuntimeVersion || !this.options.store) return "current";
-    const response = await this.fetchImpl(`${this.options.controlPlaneUrl.replace(/\/$/, "")}/api/runtime-release/target`, { redirect: "error", signal: signal ?? AbortSignal.timeout(15_000) });
+    const response = await retryUpdateDownload(() => this.fetchImpl(`${this.options.controlPlaneUrl.replace(/\/$/, "")}/api/runtime-release/target`, { redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(15_000), ...(signal ? [signal] : [])]) }), signal);
     if (response.status === 404) return "current";
     if (!response.ok) throw new AgentError("RUNTIME_TARGET_UNAVAILABLE", `托管目标检查失败 HTTP ${response.status}`);
     const contents = await response.text(); if (contents.length > MAX_MANIFEST_BYTES) throw new AgentError("RUNTIME_TARGET_INVALID", "托管目标信息超限");
     const target = parseManagedRuntimeTarget(JSON.parse(contents).target);
     if (!target || (target.version === this.options.currentRuntimeVersion && !this.options.needsRuntimeRepair?.()) || (!target.rollback && compareReleaseVersions(target.version, this.options.currentRuntimeVersion) < 0)) {
       if (this.options.store.snapshot().maintenanceDrain?.operationId.startsWith("runtime-update-")) await this.options.store.setMaintenanceDrain(undefined);
+      this.options.onPhase?.("current", this.options.currentRuntimeVersion);
       return "current";
     }
     const failed = await readUpdateTransaction(this.options.dataDir);
