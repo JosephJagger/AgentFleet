@@ -19,14 +19,16 @@ export function quotaSnapshot(value: unknown, identity?: unknown): Record<string
   if (!isRecord(value)) return;
   const buckets = isRecord(value.rateLimitsByLimitId) ? Object.values(value.rateLimitsByLimitId) : [value.rateLimits];
   const windows: Record<string, unknown>[] = [];
-  let credits: { balance: string | null; hasCredits: boolean; unlimited: boolean } | null = null;
+  let credits: { balance: string | null; hasCredits: boolean; unlimited: boolean; resetCardsAvailable: number | null } | null = null;
   for (const bucket of buckets.slice(0, 16)) {
     if (!isRecord(bucket)) continue;
     const candidate = bucket.credits;
     if (credits === null && isRecord(candidate) && typeof candidate.hasCredits === "boolean" && typeof candidate.unlimited === "boolean") {
       const balance = candidate.balance;
       if (balance === null || (typeof balance === "string" && /^-?\d+(?:\.\d+)?$/u.test(balance) && balance.length <= 64)) {
-        credits = { balance, hasCredits: candidate.hasCredits, unlimited: candidate.unlimited };
+        const cards = isRecord(value.rateLimitResetCredits) ? value.rateLimitResetCredits.availableCount : null;
+        credits = { balance, hasCredits: candidate.hasCredits, unlimited: candidate.unlimited,
+          resetCardsAvailable: Number.isSafeInteger(cards) && Number(cards) >= 0 ? Number(cards) : null };
       }
     }
     for (const key of ["primary", "secondary"]) {

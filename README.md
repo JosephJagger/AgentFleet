@@ -238,6 +238,8 @@ Replace the email, sender and example domain with your own values. Generate the 
 
 If the reverse proxy passes client-address headers, add only its verified direct address to `TRUSTED_PROXIES`. Leave that setting unset when you do not need forwarded client addresses.
 
+The host usage dialog can show a tentative **temporary Codex quota reset** forecast based on explicit public announcements. To enable its hourly check, set `AGENTFLEET_X_BEARER_TOKEN` in the private `.env` to an X API bearer token and restart the control plane. Without a usable source it shows **No forecast yet**. The forecast is unofficial; normal weekly resets are shown separately, and reset-card grants cannot be predicted. Available reset cards, when reported by the native Codex account API, appear in the same dialog. The public-signal approach is inspired by [Codex Reset Radar](https://github.com/JosephJagger/Codex-Reset-Radar).
+
 ### 3. Build and start
 
 ```sh
@@ -405,4 +407,3 @@ See [contributing](CONTRIBUTING.md), [security reporting](SECURITY.md), and [pac
 <sub>Independent project, not an official OpenAI product. Deploy your own instance and use your own Codex credentials. No shared service or default login is provided.</sub>
 
 Unreachable hosts show a **Restore host connection** card with a repair command matched to Windows, macOS or Linux. Run it on that host using the original installation account. Repair retains pairing and session data; copying a command does not run it remotely. Power, network or operating-system failures still require local attention.
-

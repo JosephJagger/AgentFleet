@@ -72,6 +72,12 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
             {!account.identityKnown&&<small>{t("账号身份未上报，此处仅展示来源主机快照，不与其他主机相加。")}</small>}
           </div>)}
           <p className="usage-note">{t("账号额度由同账号的多个设备和会话共享，不能按 token 比例归属到某个项目。")}</p>
+          {scope==="machine"&&<div className="usage-reset-forecast" aria-live="polite">
+            <strong>{t("临时重置预测")}</strong>
+            {data?.resetPrediction?<p>{t("可能于 {0} 前临时重置",date(data.resetPrediction.expectedAt))} · {t("预测概率 {0}%",data.resetPrediction.probability)} <a href={data.resetPrediction.sourceUrl} target="_blank" rel="noopener noreferrer">{t("查看依据")}</a></p>:<p>{t("暂无预测")}</p>}
+            {data?.accounts.length===1&&data.accounts[0].credits?.resetCardsAvailable!=null&&<small>{t("可用重置卡 {0} 张",data.accounts[0].credits.resetCardsAvailable)}</small>}
+            <small>{t("重置卡发放暂无可靠预测；到账数量来自原生 Codex。")}</small>
+          </div>}
         </section>
         <section><h3>{t("已记录 token 消耗")}</h3>
           {data?.recorded?<><dl className="usage-totals"><div><dt>{t("已记录总量")}</dt><dd>{number(data.recorded.totalTokens)}</dd></div><div><dt>{t("本轮周额度内已记录")}</dt><dd>{data.quotaCycle?.recordedTokens == null ? "—" : number(data.quotaCycle.recordedTokens)}</dd></div><div><dt>{t("周缓存命中率")}</dt><dd>{rate(weeklyCacheRate)}</dd></div><div><dt>{t("输入 token")}</dt><dd>{number(data.recorded.inputTokens)}</dd></div><div><dt>{t("输出 token")}</dt><dd>{number(data.recorded.outputTokens)}</dd></div><div><dt>{t("缓存输入（包含于输入）")}</dt><dd>{number(data.recorded.cachedInputTokens)}</dd></div><div><dt>{t("推理输出（包含于输出）")}</dt><dd>{number(data.recorded.reasoningOutputTokens)}</dd></div></dl>

@@ -62,7 +62,8 @@ export class UsageService {
     const balance=creditValue?.balance;
     const credits=creditValue && typeof creditValue.hasCredits==="boolean" && typeof creditValue.unlimited==="boolean" &&
       (balance===null || (typeof balance==="string" && /^-?\d+(?:\.\d+)?$/u.test(balance) && balance.length<=64))
-      ? {balance,hasCredits:creditValue.hasCredits,unlimited:creditValue.unlimited}:null;
+      ? {balance,hasCredits:creditValue.hasCredits,unlimited:creditValue.unlimited,
+        resetCardsAvailable:Number.isSafeInteger(creditValue.resetCardsAvailable)&&Number(creditValue.resetCardsAvailable)>=0?creditValue.resetCardsAvailable:null}:null;
     this.db.run(`INSERT INTO machine_usage(machine_id,account_key,observed_at,windows_json,credits_json) VALUES(?,?,?,?,?)
       ON CONFLICT(machine_id) DO UPDATE SET account_key=excluded.account_key,observed_at=excluded.observed_at,windows_json=excluded.windows_json,credits_json=excluded.credits_json WHERE excluded.observed_at>=machine_usage.observed_at`,machineId,accountKey,new Date(at).toISOString(),JSON.stringify(windows),credits===null?null:JSON.stringify(credits));
   }

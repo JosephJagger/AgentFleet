@@ -10,6 +10,7 @@ import { WritingHistory } from "./writing-history.js";
 import { WritingSemantic } from "./writing-semantic.js";
 import { QuotaRefreshService } from "./quota-refresh.js";
 import { UsageService } from "./usage.js";
+import { ResetRadar } from "./reset-radar.js";
 import { AppleFleetsIntegration } from "./applefleets.js";
 import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
@@ -203,6 +204,7 @@ export async function buildControlPlane(
   const startupMachineReconciliation = registry.reconcileControlPlaneRestart();
   const coordination = new CoordinationService(db, config);
   const usage = new UsageService(db);
+  const resetRadar = new ResetRadar();
   const codexPreferences = new CodexPreferencesService(db);
   const machineMaintenance = new MaintenanceService(db);
   const credentials = new CredentialRenewalService(db);
@@ -931,7 +933,13 @@ export async function buildControlPlane(
   for (const [path,scope] of [["sessions","session"],["projects","project"],["machines","machine"]] as const) {
     app.get(`/api/${path}/:id/usage`, { preHandler: authenticate }, async request => {
       const workspaceId=(request.principal as Principal).workspaceId,id=routeId(request);
-      const summary=usage.read(workspaceId,scope,id);quotaRefresh.request(workspaceId,scope,id);return summary;
+      const summary=usage.read(workspaceId,scope,id);quotaRefresh.request(workspaceId,scope,id);
+      if(scope!=="machine")return summary;
+      const account=summary.accounts.length===1?summary.accounts[0]:null;
+      const weekly=account?.windows.find((window:{bucket:string;windowMinutes:number;remainingPercent:number})=>window.bucket==="codex"&&window.windowMinutes===10080);
+      const resetPrediction=await resetRadar.read(`${workspaceId}:${id}`,
+        weekly?{remainingPercent:weekly.remainingPercent,resetCardsAvailable:account?.credits?.resetCardsAvailable??null}:null);
+      return {...summary,resetPrediction};
     });
   }
   app.get("/api/sessions/:id/files", { preHandler: authenticate }, async (request, reply) => {
