@@ -329,6 +329,7 @@
   "可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行": "Paste up to 4 images. Tab to complete; Enter to send; Ctrl / ⌘ + Enter for a new line.",
   "Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行": "Tab to complete · Enter to send · Ctrl / ⌘ + Enter for a new line",
   "请先检查会话连接与执行状态": "Check the session connection and task status first",
+  "计划模式需要先确认模型配置": "Select a model before sending in Plan mode",
   "加入队列": "Add to queue",
   "追加本轮": "Add to this turn",
   "停止任务": "Stop task",

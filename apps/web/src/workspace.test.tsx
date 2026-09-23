@@ -11,7 +11,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -80,6 +80,38 @@ it("计划模式只应用于下一次发送，成功后清除待发送标记", a
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() => expect(send).toHaveBeenCalledWith("先制定方案", { model: "test-model", effort: "medium", mode: "plan" }, undefined));
   await waitFor(() => expect(screen.queryByText("本次发送 · 计划模式")).toBeNull());
+});
+it("只从已保存配置取得模型时仍把计划模式发送给主机", async () => {
+  vi.mocked(api.codexPreferences).mockResolvedValue({
+    catalog: { models: [{ model: "saved-model", displayName: "Saved", efforts: ["medium"], defaultEffort: "medium" }], modes: ["default", "plan"], fetchedAt: "2026-09-23T00:00:00Z" },
+    preferences: { machine: { settings: { model: "saved-model", effort: "medium" }, revision: 1 }, project: { settings: null, revision: 0 }, session: { settings: null, revision: 0 } },
+    source: "machine", desired: { model: "saved-model", effort: "medium" },
+  });
+  const props = inspectorProps("A");
+  props.detail = { ...props.detail, session: { ...props.detail.session, collaborationModes: ["default", "plan"] } };
+  const send = vi.fn(noop);
+  const view = render(<SessionInspector {...props} onSend={send} />);
+  await waitFor(() => expect(screen.getByText(/saved-model · medium/)).toBeTruthy());
+  fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
+  fireEvent.click(screen.getByRole("button", { name: /计划模式.*先分析并制定计划/ }));
+  view.rerender(<SessionInspector {...props} detail={undefined} loading={true} onSend={send} />);
+  view.rerender(<SessionInspector {...props} onSend={send} />);
+  expect(screen.getByText("本次发送 · 计划模式")).toBeTruthy();
+  await waitFor(() => expect(screen.getByText(/saved-model · medium/)).toBeTruthy());
+  fireEvent.change(screen.getByRole("textbox", { name: "发送给 Codex 的消息" }), { target: { value: "只规划" } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "发送" }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "发送" }));
+  await waitFor(() => expect(send).toHaveBeenCalledWith("只规划", { model: "saved-model", effort: "medium", mode: "plan" }, undefined));
+});
+it("会话核验期间不提供追加本轮入口，草稿保留", () => {
+  const props = inspectorProps("A");
+  props.detail = { ...props.detail, session: { ...props.detail.session,
+    activeTurnId: "turn-1", state: { ...props.detail.session.state, currentTurn: "in_progress", threadRuntime: "active", reachability: "reconciling" },
+  } };
+  render(<SessionInspector {...props} />);
+  fireEvent.change(screen.getByRole("textbox", { name: "发送给 Codex 的消息" }), { target: { value: "稍后追加" } });
+  expect(screen.queryByRole("button", { name: "追加本轮" })).toBeNull();
+  expect((screen.getByRole("textbox", { name: "发送给 Codex 的消息" }) as HTMLTextAreaElement).value).toBe("稍后追加");
 });
 it("当前任务没有明确模式回执时不会显示默认模式", () => {
   const observed = { accepted: { model: "test-model", effort: "medium", acceptedAt: "2026-09-16T00:00:00Z", nativeTurnId: "turn-1" } };

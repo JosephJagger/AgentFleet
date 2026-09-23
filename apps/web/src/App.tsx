@@ -765,7 +765,13 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
     return mergeWritingSuggestions(promptCompletions(prompt, completionCaret, 10, writingMemory.value?.entries).filter(item => item.kind === "term" ? completionPreferences.terms : completionPreferences.suggestions), chineseSuggestions);
   }, [completionVisible, completionCaret, prompt, completionPreferences.terms, completionPreferences.suggestions, writingMemory.value, chineseSuggestions, detail?.session.plugins, selectedPlugins]);
   useAutoSizeTextarea(textArea, prompt, `${detail?.session.id ?? ""}:${loading}`);
-  useEffect(() => { setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedPlugins([]); setModeOverride(undefined); }, [detail?.session.id, draftOwner]);
+  const lastSessionId = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const nextId = detail?.session.id;
+    if (!nextId || nextId === lastSessionId.current) return;
+    lastSessionId.current = nextId;
+    setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedPlugins([]); setModeOverride(undefined);
+  }, [detail?.session.id, draftOwner]);
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
   useEffect(() => { setActiveCompletion(current => Math.min(current, Math.max(0, completions.length - 1))); }, [completions.length]);
   useEffect(() => { setCompletionFocused(false); setComposingPrompt(false); setCompletionCaret(0); setCompletionSelectionEnd(0); }, [detail?.session.id, draftOwner, loading]);
@@ -814,7 +820,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const canReleaseManagement = !pendingCommand && (session.actions?.release?.allowed ?? Boolean(detail.releaseManagementSupported && session.nativeThreadId && detail.writable && (!lease || lease.isMine) && session.state.threadRuntime === "idle" && !session.activeTurnId && approval?.status !== "pending" && !queueBusy && !session.state.unknownFreeze));
   const canSend = !pendingCommand && (session.actions?.start?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.threadRuntime === "idle" && !session.state.unknownFreeze));
   const canCancel = !pendingCommand && (session.actions?.cancel?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.currentTurn === "in_progress" && session.activeTurnId));
-  const canQueueOrSteer = Boolean(detail.writable && session.state.currentTurn === "in_progress" && session.activeTurnId);
+  const canQueueOrSteer = Boolean(detail.writable && session.state.reachability === "live" && session.state.currentTurn === "in_progress" && session.activeTurnId);
   const slashCommand = parseCodexCommand(prompt);
   const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() || referenceCards.length ? { ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(referenceCards.length ? { references: referenceCards.filter(card => card.identity).map(card => ({ id: card.sourceId, version: card.identity!.version })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
   const referencesBlocked = referenceCards.some(card => card.error || !card.identity) || (referenceCards.length > 0 && !prompt.trim());
@@ -822,7 +828,10 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length);
   const imageBlocked = imageDraft.processing || fileDraft.processing || (imageDraft.images.length > 0 && (!session.imageInputSupported || Boolean(slashCommand))) || (fileDraft.files.length > 0 && (!session.fileInputSupported || Boolean(slashCommand)));
   const inherited = session.runtimeSettings?.accepted ?? session.runtimeSettings?.observed;
-  const sendSettings = modeOverride && inherited?.model ? { model: inherited.model, ...(inherited.effort ? { effort: inherited.effort } : {}), ...(settings ?? {}), mode: modeOverride } satisfies CodexSettings : settings;
+  const baseSettings = settings ?? (runtimeSummary?.sessionId === session.id ? runtimeSummary.settings ?? undefined : undefined);
+  const modeBase = baseSettings ?? (inherited?.model ? { model: inherited.model, ...(inherited.effort ? { effort: inherited.effort } : {}) } : undefined);
+  const sendSettings = modeOverride === "plan" && modeBase ? { ...modeBase, mode: "plan" } satisfies CodexSettings : baseSettings;
+  const modeBlocked = modeOverride === "plan" && !modeBase;
   async function runSlash(name: string, args = "") {
     setCommandMessage("");
     const command = codexCommands.find((item) => item.name === name);
@@ -872,7 +881,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (imageBlocked || busy || referencesBlocked) return;
+    if (imageBlocked || busy || referencesBlocked || modeBlocked) return;
     if (prompt.trim() === "/") return;
     if (slashCommand) { await runSlash(slashCommand.name, slashCommand.args); return; }
     if (!hasInput || !canSend) return;
@@ -1099,8 +1108,8 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           }}
         />
         <div className="composer-actions">
-          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
-          <span className="composer-touch-hint">{(referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(modeBlocked ? t("计划模式需要先确认模型配置") : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-touch-hint">{(modeBlocked ? t("计划模式需要先确认模型配置") : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
           <div className="composer-button-group">
           <input ref={imageInput} className="composer-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label={t("选择要发送的图片")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void imageDraft.addFiles(files); }} />
           <input ref={fileInput} className="composer-image-input" type="file" accept={ATTACHMENT_ACCEPT} multiple aria-label={t("选择要发送的文件")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
@@ -1112,20 +1121,20 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t("添加会话引用，由 Codex 按需查阅")}</small></span></button>
             <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { closeAddMenu(); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
-            {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { closeAddMenuAfterTouchChoice(); if (!settings?.model && !inherited?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !settings?.model && !inherited?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}
+            {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { closeAddMenuAfterTouchChoice(); if (!modeBase?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !modeBase?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}
             {(session.plugins?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.plugins!.map(plugin => { const selected = selectedPlugins.some(item => item.pluginId === plugin.pluginId); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={plugin.pluginId} onClick={() => { setSelectedPlugins(current => selected ? current.filter(item => item.pluginId !== plugin.pluginId) : [...current, plugin]); closeAddMenuAfterTouchChoice(); }}><Puzzle size={17} /><span><b>{plugin.pluginName}</b></span></button>; })}</div></>}
           </div></details>
           {canQueueOrSteer ? (
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>}
-              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
+              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || modeBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
               <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, additions); else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>
             </div>
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>
           ) : (
-            <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || referencesBlocked || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
+            <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
           )}</div>}
           </div>
         </div>
