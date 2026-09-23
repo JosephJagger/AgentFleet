@@ -75,11 +75,16 @@ export class WritingAI {
       ], ...(new URL(profile.endpoint).hostname === "api.openai.com" ? { max_completion_tokens: 1800 } : { max_tokens: 1800 }),
       ...(new URL(profile.endpoint).hostname === "api.deepseek.com" ? { thinking: { type: "disabled" } } : {}) }),
     });
-    if (!response.ok) { await response.body?.cancel(); throw new AppError(502, "REFERENCE_AI_FAILED", `Summary model returned HTTP ${response.status}`); }
+    if (!response.ok) {
+      const reason = (await response.text()).slice(0, 4000);
+      const contextLimit = response.status === 413 || response.status === 400 && /context|too long|maximum.{0,30}token|input.{0,30}token|length/i.test(reason);
+      throw new AppError(502, contextLimit ? "REFERENCE_CONTEXT_LIMIT" : "REFERENCE_AI_FAILED", `Summary model returned HTTP ${response.status}`);
+    }
     const raw = await response.text();
     invariant(raw.length < 100_000, 502, "REFERENCE_AI_FAILED", "Summary response is too large");
     const choice = JSON.parse(raw)?.choices?.[0];
-    invariant(choice?.finish_reason !== "length" && typeof choice?.message?.content === "string" && choice.message.content.trim(), 502, "REFERENCE_AI_FAILED", "Summary was incomplete");
+    invariant(choice?.finish_reason !== "length", 502, "REFERENCE_AI_TRUNCATED", "Summary was truncated");
+    invariant(typeof choice?.message?.content === "string" && choice.message.content.trim(), 502, "REFERENCE_AI_FAILED", "Summary was incomplete");
     return choice.message.content.trim();
   }
   save(principal: Principal, body: Record<string, unknown>) {

@@ -32,7 +32,7 @@ Think of each enrolled host as a place where Codex executes work, and AgentFleet
 | Available today | What it makes easier |
 | --- | --- |
 | **Graphical Codex session management** | Browse hosts, projects, and conversations; continue native sessions; adjust model settings and execution permissions in the panel. |
-| **Reuse a session in another task** | Copy a session link or choose one from the composer. With a configured panel AI model, AgentFleets summarizes its synced readable history in parts and sends a fixed summary snapshot with the next message. Missing history is labeled; this does not share live context or permissions. |
+| **Reuse a session in another task** | Copy a session link or choose one from the composer. With a configured panel AI model, AgentFleets summarizes synced user messages, Codex replies, and plans, then sends a fixed snapshot with the next message. Reasoning and command execution logs stay in the linked source session; this does not share live context or permissions. |
 | **Files, folders, and images sent to a remote session** | Use one attachment menu to paste images or upload bounded files and folders. AgentFleets safely stages files on the selected host and sends native Codex references. |
 | **Native goals, Plan mode, and plugin skills** | Set a persistent session goal, switch the next turn to a host-advertised collaboration mode, and select skills from installed, enabled Codex plugins. |
 | **Host files in conversation results** | Open or download files linked by Codex directly from the message. Bytes stream on demand from the bound host and remain limited to that session's registered project. |

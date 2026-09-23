@@ -14,7 +14,7 @@ export function referencePrompt(draft: string, jobs: SessionReferenceJob[], orig
   if (jobs.some(job => job.state !== "ready" || !job.summary)) throw new Error("Session summaries must finish before sending");
   const blocks = jobs.map(job => {
     const source = job.identity;
-    return `[Referenced Codex session — fixed summary snapshot]\nHost: ${source.host}\nProject: ${source.project}\nSession: ${source.title}\nSession ID: ${source.id}\nLink: ${new URL(source.link, origin).href}\nSource content version: ${source.version}\nHistory: ${source.incomplete ? "Some history was not synchronized or readable" : "Synchronized readable history"}\nSummary:\n${job.summary}\n[/Referenced Codex session]`;
+    return `[Referenced Codex session — fixed summary snapshot]\nHost: ${source.host}\nProject: ${source.project}\nSession: ${source.title}\nSession ID: ${source.id}\nLink: ${new URL(source.link, origin).href}\nSource content version: ${source.version}\nHistory: ${source.incomplete ? "Some history was not synchronized or readable" : "Synchronized conversation history"}\nScope: User messages, Codex replies and plans; reasoning and command execution excluded.\nSummary:\n${job.summary}\n[/Referenced Codex session]`;
   });
   return `${draft.trim()}${draft.trim() ? "\n\n" : ""}${blocks.join("\n\n")}`;
 }

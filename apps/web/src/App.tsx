@@ -970,6 +970,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           {referenceCards.map(card => { const source = card.job?.identity; const candidate = referenceCandidates.find(item => item.id === card.sourceId); const failed = Boolean(card.error || card.job?.state === "failed"); const ready = card.job?.state === "ready"; return <article className="session-reference-card" key={card.key}>
             <div className="session-reference-card__head"><strong>{source?.title ?? candidate?.title ?? card.sourceId}</strong><button type="button" aria-label={t("删除引用卡片")} onClick={() => removeReference(card.key)}><X size={15} /></button></div>
             <small>{source ? `${source.host} · ${source.project}` : candidate ? `${candidate.machineName} · ${candidate.projectAlias}` : t("正在读取会话")}</small>
+            <small>{t("仅摘要用户消息、Codex 回复与计划；不含推理摘要和命令执行")}</small>
             {failed ? <p role="alert">{card.error || card.job?.error || t("摘要失败")}</p> : ready ? <details><summary>{t("摘要已就绪 · 展开预览")}</summary><pre>{card.job?.summary}</pre></details> : <><span role="status">{card.job?.state === "combining" ? t("正在合并摘要") : card.job?.state === "summarizing" ? t("正在分段总结") : t("正在读取同步历史")} · {card.job?.done ?? 0}/{card.job?.total ?? 1}</span><progress value={card.job?.done ?? 0} max={card.job?.total || 1} /></>}
             {failed && <button type="button" className="button button--secondary" onClick={() => retryReference(card.key)}>{t("重试摘要")}</button>}
           </article>; })}

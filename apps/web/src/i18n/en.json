@@ -2433,6 +2433,7 @@
   "主机离线时，网页无法代替你在主机执行命令。": "The panel cannot run this command remotely while the host is offline.",
   "命令已复制，尚未执行修复。请到对应主机粘贴运行。": "Command copied. No repair has run yet. Paste and run it on the selected host.",
   "复用会话": "Reuse session",
+  "仅摘要用户消息、Codex 回复与计划；不含推理摘要和命令执行": "Summarizes user messages, Codex replies, and plans; excludes reasoning and command execution",
   "选择会话并自动生成摘要": "Select a session and generate a summary",
   "复用的会话": "Referenced sessions",
   "删除引用卡片": "Remove reference",
