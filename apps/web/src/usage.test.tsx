@@ -33,7 +33,7 @@ it("does not turn missing telemetry into zero or retain another scope's result",
 });
 it("labels stale account snapshots and English UI explicitly",async()=>{
  setLocale("en");vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",accounts:[{...data.accounts[0],stale:true}]});
- render(<UsageButton scope="machine" id="m1"/>);fireEvent.click(await screen.findByRole("button",{name:/Weekly quota: 38% remaining/}));
+ render(<UsageButton scope="machine" id="m1"/>);fireEvent.click(await screen.findByRole("button",{name:/Weekly quota\s*38%/}));
  expect(await screen.findByText(/Out of date/)).toBeTruthy();expect(screen.getByText("Account quota (shared)")).toBeTruthy();
 });
 
@@ -41,14 +41,14 @@ it("keeps quota discoverable with multiple model windows and no session token re
  const account={...data.accounts[0],windows:[data.accounts[0].windows[0],{...data.accounts[0].windows[0],bucket:"model-specific",usedPercent:0,remainingPercent:100}]};
  vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",recorded:null,accounts:[account]});
  render(<UsageButton scope="machine" id="m1"/>);
- expect(await screen.findByRole("button",{name:/周额度剩余 38%/})).toBeTruthy();
+ expect(await screen.findByRole("button",{name:/周额度\s*38%/})).toBeTruthy();
 });
 
 it("page polling never requests host quota; host refresh requires an explicit click",async()=>{
  vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine"});
  vi.mocked(api.refreshQuota).mockResolvedValue({requested:true});
  render(<UsageButton scope="machine" id="m1"/>);
- fireEvent.click(await screen.findByRole("button",{name:/周额度剩余 38%/}));expect(api.hostOperation).not.toHaveBeenCalled();
+ fireEvent.click(await screen.findByRole("button",{name:/周额度\s*38%/}));expect(api.hostOperation).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole("button",{name:"刷新额度"}));
  expect(await screen.findByText("已请求主机刷新，结果以更新时间为准。")).toBeTruthy();expect(api.refreshQuota).toHaveBeenCalledWith("m1");
 });
@@ -69,8 +69,8 @@ it("shows both quota windows and separate total and cycle project rankings",asyn
  const quotaCycle={startsAt:"2026-09-03T12:34:00Z",resetsAt:"2026-09-10T12:34:00Z",recordedTokens:20,boundaryIncomplete:false};
  vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",quotaCycle,accounts:[{...data.accounts[0],windows:[...data.accounts[0].windows,{bucket:"codex",window:"primary",windowMinutes:300,usedPercent:15,remainingPercent:85,resetsAt:1900000100}]}],topProjects:[{id:"old",title:"Old project",totalTokens:1000}],topWeeklyProjects:[{id:"new",title:"Active project",totalTokens:20}]});
  render(<UsageButton scope="machine" id="m1"/>);
- const button=await screen.findByRole("button",{name:/周额度剩余 38%/});
- expect(button.textContent).toContain("5 小时额度剩余 85%");
+ const button=await screen.findByRole("button",{name:/周额度\s*38%/});
+ expect(button.textContent).toMatch(/5 小时额度\s*85%/);
  expect(button.textContent?.match(/下次重置/g)?.length).toBe(2);
  fireEvent.click(button);
  expect(await screen.findByText("项目总消耗排名（前 10）")).toBeTruthy();

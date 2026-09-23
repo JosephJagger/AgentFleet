@@ -1,5 +1,5 @@
 import { t, locale, localized, systemText } from "../i18n";
-import { AlertTriangle, Check, Copy, Download, Info, LoaderCircle, RefreshCw, RotateCcw, Stethoscope, Trash2, Unplug } from "lucide-react";
+import { AlertTriangle, Check, Copy, Download, LoaderCircle, RefreshCw, RotateCcw, Stethoscope, Trash2, Unplug } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { HostOperation, Machine, MaintenanceType } from "../lib/types";
@@ -8,9 +8,7 @@ import { CodexSettingsPanel } from "./CodexSettingsPanel";
 import { PermissionPanel } from "./PermissionPanel";
 import { CodexCommandGuide } from "./CodexCommandGuide";
 import { HostCards } from "./HostCards";
-import { HostDisclosure } from "./HostDisclosure";
 import { HostCodexInventory } from "./HostCodexInventory";
-import { RuntimeReleasePanel } from "./RuntimeReleasePanel";
 import { HostReadiness } from "./HostReadiness";
 import { HostImageStorage } from "./HostImageStorage";
 
@@ -43,10 +41,8 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
   const [alias, setAlias] = useState(machine?.name ?? "");
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [release, setRelease] = useState<Awaited<ReturnType<typeof api.release>>>();
   const mutationRef = useRef(new Map<string, string>());
   const generation = useRef(0);
-  useEffect(() => { void api.release().then(setRelease).catch(() => undefined); }, []);
   useEffect(() => { setAlias(machine?.name ?? ""); setSaved(false); setCopied(false); setOperations([]); setOperationsOpen(false); }, [machine?.id, machine?.name]);
   useEffect(() => {
     if (!machine) return;
@@ -72,7 +68,6 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
   if (!machine) return <section className="wide-view"><h1>{selectedId ? t("该主机不存在或已移除") : t("连接你的 Codex 主机")}</h1><p>{selectedId ? t("请选择其他主机，或添加新主机。") : t("一条命令连接，自动发现已有项目和会话。")}</p><HostCards machines={machines} onSelect={onSelect} /><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></section>;
   const repair = repairCommand(machine, location.origin);
   return <section className="wide-view hosts-view"><div className="wide-view__heading"><div><h1>{t("主机")}</h1><p>{t("选择一台主机，设置默认模型、修改名称或检查连接。")}</p></div><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></div>
-    {release?.manifestStatus !== undefined && release.manifestStatus !== "ready" && <p className="catalog-error" role="alert">{t("安装文件暂不可用，添加或更新主机可能失败。")}</p>}
     <HostCards machines={machines} selectedId={machine.id} onSelect={onSelect} />
     <CodexSettingsPanel key={machine.id} machineId={machine.id} />
     <PermissionPanel key={`permissions:${machine.id}`} machineId={machine.id} />
@@ -92,8 +87,6 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
       <p className="host-help">{t("Codex 版本是程序版本，不是模型名称。模型在上方「主机默认配置」中选择，单个会话仍可独立修改。")}</p>
       <details className="host-technical" key={`technical:${machine.id}`}><summary>{t("版本与兼容性详情")}</summary><dl><div><dt>{t("运行账号")}</dt><dd>{profileValue(machine.codexProfile, "account", "username", "osAccount")}</dd></div><div><dt>{t("Codex 数据目录")}</dt><dd>{profileValue(machine.codexProfile, "codexHome")}</dd></div><div><dt>{t("宿主机程序路径")}</dt><dd>{profileValue(machine.codexProfile, "hostCodexPath", "hostPath")}</dd></div><div><dt>{t("面板程序路径")}</dt><dd>{profileValue(machine.codexProfile, "runtimePath", "executablePath", "servicePath")}</dd></div></dl><p className="subtle">{t("面板和主机自装的 Codex 可以使用不同版本，以上均为主机报告的实际值。")}</p>{renderCompatibility(machine)}</details>
     </section></div>
-    <RuntimeReleasePanel machine={machine} />
     <CodexCommandGuide key={`commands:${machine.id}`} spacious />
-    {release && <HostDisclosure title={t("后台版本信息")} description={t("查看面板构建与已发布的连接服务版本")} icon={<Info size={21} />}><dl className="host-release-facts"><div><dt>{t("当前面板构建")}</dt><dd><code>{release.build}</code></dd></div><div><dt>{t("已发布连接服务")}</dt><dd>{release.agentVersion}</dd></div><div><dt>{t("数据库版本")}</dt><dd>{release.schema}</dd></div></dl></HostDisclosure>}
   </section>;
 }

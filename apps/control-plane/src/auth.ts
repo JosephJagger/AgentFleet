@@ -21,6 +21,7 @@ interface SessionRow {
   csrf_hash: string;
   expires_at: string;
   revoked_at: string | null;
+  disabled_at: string | null;
 }
 
 export interface SessionCredentials {
@@ -79,8 +80,12 @@ export class AuthService {
     return this.createSession(user, ip, userAgent);
   }
 
+  isPlatformAdmin(principal: Pick<Principal, "email">): boolean {
+    return principal.email.toLowerCase() === this.config.adminEmail.toLowerCase();
+  }
+
   requirePlatformAdmin(principal: Principal): void {
-    invariant(principal.email.toLowerCase() === this.config.adminEmail.toLowerCase(), 403, "ADMIN_REQUIRED", "Platform administrator access is required");
+    invariant(this.isPlatformAdmin(principal), 403, "ADMIN_REQUIRED", "Platform administrator access is required");
   }
 
   private createSession(user: { user_id: string; workspace_id: string; email: string }, ip: string, userAgent: string): SessionCredentials {
@@ -92,6 +97,8 @@ export class AuthService {
     const ipHash = sha256(ip);
     const userAgentHash = sha256(userAgent);
     this.db.transaction(() => {
+      const status = this.db.get<{ disabled_at: string | null }>("SELECT disabled_at FROM users WHERE user_id=?", user.user_id);
+      invariant(status && !status.disabled_at, 403, "ACCOUNT_DISABLED", "This account is disabled. Contact the administrator.");
       this.db.run(
         `INSERT INTO client_sessions(
           client_session_id,workspace_id,user_id,token_hash,csrf_hash,created_at,last_seen_at,
@@ -164,11 +171,11 @@ export class AuthService {
   authenticateToken(token: string | undefined): Principal {
     invariant(token, 401, "AUTH_REQUIRED", "Authentication is required");
     const row = this.db.get<SessionRow>(
-      `SELECT s.user_id,s.workspace_id,s.client_session_id,u.email,s.csrf_hash,s.expires_at,s.revoked_at
+      `SELECT s.user_id,s.workspace_id,s.client_session_id,u.email,u.disabled_at,s.csrf_hash,s.expires_at,s.revoked_at
        FROM client_sessions s JOIN users u ON u.user_id=s.user_id WHERE s.token_hash=?`,
       sha256(token),
     );
-    invariant(row && !row.revoked_at && row.expires_at > nowIso(), 401, "SESSION_INVALID", "Session is expired or revoked");
+    invariant(row && !row.disabled_at && !row.revoked_at && row.expires_at > nowIso(), 401, "SESSION_INVALID", "Session is expired or revoked");
     this.db.run("UPDATE client_sessions SET last_seen_at=? WHERE client_session_id=?", nowIso(), row.client_session_id);
     return {
       userId: row.user_id,
@@ -229,7 +236,7 @@ export class AuthService {
       }));
   }
 
-  revokeSession(principal: Principal, targetClientSessionId: string): void {
+  revokeSession(principal: Principal, targetClientSessionId: string, auditActor: Principal = principal): void {
     this.db.transaction(() => {
       const target = this.db.get<{ client_session_id: string; revoked_at: string | null }>(
         "SELECT client_session_id,revoked_at FROM client_sessions WHERE client_session_id=? AND user_id=?",
@@ -271,8 +278,8 @@ export class AuthService {
         );
         this.db.audit({
           workspaceId: principal.workspaceId,
-          actorUserId: principal.userId,
-          actorClientSessionId: principal.clientSessionId,
+          actorUserId: auditActor.userId,
+          actorClientSessionId: auditActor.clientSessionId,
           logicalSessionId: lease.logical_session_id,
           controlLeaseId: lease.control_lease_id,
           action: "control_lease.revoke",
@@ -282,8 +289,8 @@ export class AuthService {
       for (const enrollment of enrollments) {
         this.db.audit({
           workspaceId: principal.workspaceId,
-          actorUserId: principal.userId,
-          actorClientSessionId: principal.clientSessionId,
+          actorUserId: auditActor.userId,
+          actorClientSessionId: auditActor.clientSessionId,
           action: "machine.enrollment.cancel",
           metadata: {
             enrollmentId: enrollment.enrollment_id,
@@ -294,8 +301,8 @@ export class AuthService {
       }
       this.db.audit({
         workspaceId: principal.workspaceId,
-        actorUserId: principal.userId,
-        actorClientSessionId: principal.clientSessionId,
+        actorUserId: auditActor.userId,
+        actorClientSessionId: auditActor.clientSessionId,
         action: "client_session.revoke",
         metadata: { targetClientSessionId },
       });

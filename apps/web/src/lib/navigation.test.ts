@@ -7,6 +7,7 @@ describe("页面与主机路由", () => {
     ["/workbench/host-2", { view: "fleet", machineId: "host-2" }],
     ["/hosts", { view: "hosts" }],
     ["/hosts/host-2/", { view: "hosts", machineId: "host-2" }],
+    ["/admin", { view: "admin" }],
     ["/settings", { view: "security" }],
     ["/approvals", { view: "approvals" }],
     ["/sessions/session-2", { view: "fleet", sessionId: "session-2" }],

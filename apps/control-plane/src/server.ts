@@ -1,3 +1,4 @@
+import { AdministrationService } from "./administration.js";
 import { createWorldWeather } from "./world-weather.js";
 import { createHash, type Hash } from "node:crypto";
 import { PassThrough } from "node:stream";
@@ -506,7 +507,22 @@ export async function buildControlPlane(
       } catch { /* Report invalid packaged metadata without exposing filesystem paths. */ }
     }
   }
-  app.get("/api/release",{preHandler:authenticate},async()=>({
+  const authenticateAdmin = async (request: FastifyRequest) => { await authenticate(request); auth.requirePlatformAdmin(request.principal!); };
+  const mutateAdmin = async (request: FastifyRequest) => { await mutate(request); auth.requirePlatformAdmin(request.principal!); };
+  const administration = new AdministrationService(db, auth);
+  app.get("/api/admin/users", { preHandler: authenticateAdmin }, async request => {
+    const query = request.query as Record<string, unknown>;
+    return administration.users(request.principal!, query.page === undefined ? 1 : Number(query.page), typeof query.search === "string" ? query.search.trim() : "");
+  });
+  app.post("/api/admin/users/:id/actions", { preHandler: mutateAdmin }, async request => {
+    const sessions = administration.change(request.principal!, routeId(request), record(request.body).action);
+    for (const id of sessions) closeClientSession(id);
+    return { ok: true };
+  });
+  app.get("/api/admin/system", { preHandler: authenticateAdmin }, async () => ({
+    authMode: config.authMode, registration: config.authMode === "email" ? "email-verification" : "administrator-provisioned",
+  }));
+  app.get("/api/release",{preHandler:authenticateAdmin},async()=>({
     controlPlaneBuild:/^[a-f0-9]{7,40}$/.test(process.env.AGENTFLEET_BUILD_SHA??"")?process.env.AGENTFLEET_BUILD_SHA:"development",
     dbSchemaVersion:Number((db.sqlite.prepare("PRAGMA user_version").get() as {user_version:number}).user_version),
     agentVersion:agentManifestVersion,
@@ -514,7 +530,7 @@ export async function buildControlPlane(
     compatibilityProfile:channelProfile(config.runtimeReleaseDir),
   }));
 
-  app.get("/api/runtime-release", { preHandler: authenticate }, async request => ({ ...channelStatus(config.runtimeReleaseDir), canControl: request.principal!.email.toLowerCase() === config.adminEmail.toLowerCase() }));
+  app.get("/api/runtime-release", { preHandler: authenticateAdmin }, async () => ({ ...channelStatus(config.runtimeReleaseDir), canControl: true }));
   app.post("/api/runtime-release/control", { preHandler: mutate }, async request => {
     auth.requirePlatformAdmin(request.principal as Principal);
     invariant(config.runtimeReleaseDir, 409, "RUNTIME_CHANNEL_DISABLED", "自动验证服务尚未配置");
@@ -569,7 +585,7 @@ export async function buildControlPlane(
       sameSite: "strict", maxAge: config.sessionTtlSeconds,
     });
     return {
-      user: { userId: credentials.principal.userId, email: credentials.principal.email, workspaceId: credentials.principal.workspaceId },
+      user: { userId: credentials.principal.userId, email: credentials.principal.email, workspaceId: credentials.principal.workspaceId, platformAdmin: auth.isPlatformAdmin(credentials.principal) },
       clientSessionId: credentials.principal.clientSessionId,
       csrfToken: credentials.csrfToken, expiresAt: credentials.principal.expiresAt,
     };
@@ -613,7 +629,7 @@ export async function buildControlPlane(
       const principal = auth.authenticateRequest(request);
       return {
         authenticated: true,
-        user: { userId: principal.userId, email: principal.email, workspaceId: principal.workspaceId },
+        user: { userId: principal.userId, email: principal.email, workspaceId: principal.workspaceId, platformAdmin: auth.isPlatformAdmin(principal) },
         clientSessionId: principal.clientSessionId,
         expiresAt: principal.expiresAt,
       };
@@ -626,7 +642,7 @@ export async function buildControlPlane(
   app.get("/api/auth/me", { preHandler: authenticate }, async (request) => {
     const principal = request.principal as Principal;
     return {
-      user: { userId: principal.userId, email: principal.email, workspaceId: principal.workspaceId },
+      user: { userId: principal.userId, email: principal.email, workspaceId: principal.workspaceId, platformAdmin: auth.isPlatformAdmin(principal) },
       clientSessionId: principal.clientSessionId,
       expiresAt: principal.expiresAt,
     };

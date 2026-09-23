@@ -802,3 +802,19 @@ it("运行中操作为移动端提供紧凑标签，同时保留完整无障碍�
  expect(screen.getByRole('button',{name:'停止任务'}).querySelector('.composer-action-label--compact')?.textContent).toBe('停止');
  expect(view.container.querySelector('.active-turn-actions')).toBeTruthy();
 });
+
+it("普通用户看不到管理入口，直接访问管理路由也不会加载管理数据", async () => {
+  history.replaceState(null, "", "/admin");
+  render(<App />);
+  await screen.findByText("无权访问管理页面");
+  expect(screen.queryByRole("button", { name: "管理" })).toBeNull();
+  expect(screen.queryByText("用户管理")).toBeNull();
+  expect(api.release).not.toHaveBeenCalled();
+});
+
+it("管理员可见管理入口，普通设置仍独立保留", async () => {
+  vi.mocked(api.dashboard).mockResolvedValue({ ...dashboard(), user: { ...dashboard().user, platformAdmin: true } });
+  render(<App />);
+  expect(await screen.findByRole("button", { name: "管理" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "设置" })).toBeTruthy();
+});

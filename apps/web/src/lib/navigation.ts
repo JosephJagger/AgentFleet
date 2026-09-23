@@ -1,11 +1,12 @@
 import { sessionFromPath, sessionPath } from "./session-workspace";
 
-export type View = "fleet" | "hosts" | "approvals" | "usage" | "security";
+export type View = "fleet" | "hosts" | "approvals" | "usage" | "security" | "admin";
 export interface AppRoute { view: View; machineId?: string; sessionId?: string }
 
 export function routeFromPath(pathname: string): AppRoute {
   const sessionId = sessionFromPath(pathname);
   if (sessionId) return { view: "fleet", sessionId };
+  if (/^\/admin\/?$/.test(pathname)) return { view: "admin" };
   if (/^\/settings\/?$/.test(pathname)) return { view: "security" };
   if (/^\/approvals\/?$/.test(pathname)) return { view: "approvals" };
   const match = /^\/(hosts|workbench|usage)(?:\/([^/]+))?\/?$/.exec(pathname);
@@ -18,6 +19,7 @@ export function routeFromPath(pathname: string): AppRoute {
 }
 
 export function routePath(route: AppRoute): string {
+  if (route.view === "admin") return "/admin";
   if (route.view === "security") return "/settings";
   if (route.view === "approvals") return "/approvals";
   if (route.view === "usage") return route.machineId ? `/usage/${encodeURIComponent(route.machineId)}` : "/usage";

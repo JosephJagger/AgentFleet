@@ -569,6 +569,7 @@ async function loadDashboard(): Promise<Dashboard> {
   const dashboard: Dashboard = {
     user: {
       id: string(me.userId),
+      platformAdmin: boolean(me.platformAdmin),
       email,
       displayName: email.split("@")[0] || "Admin",
       clientSessionId,
@@ -631,6 +632,9 @@ export const api = {
   },
   machineImages: (id: string, signal?: AbortSignal) => request<import("./types").CloudImageUsage>(`/api/machines/${encodeURIComponent(id)}/images`, { signal }),
   clearMachineImages: (id: string, revision: number) => request<import("./types").CloudImageUsage>(`/api/machines/${encodeURIComponent(id)}/images/clear`, { method: "POST", body: JSON.stringify({ revision, confirmCloudOnly: true }) }),
+  adminUsers: (page: number, search: string, signal?: AbortSignal) => request<{ page: number; pages: number; total: number; users: AdminUser[] }>(`/api/admin/users?page=${page}&search=${encodeURIComponent(search)}`, { signal }),
+  adminUserAction: (id: string, action: "disable" | "enable" | "revoke-sessions") => request<{ ok: boolean }>(`/api/admin/users/${encodeURIComponent(id)}/actions`, { method: "POST", body: JSON.stringify({ action }) }),
+  adminSystem: () => request<{ authMode: string; registration: string }>("/api/admin/system"),
   runtimeRelease: (signal?: AbortSignal) => request<RuntimeReleaseStatus>("/api/runtime-release", { signal }),
   runtimeReleaseControl: (action: "check" | "pause" | "resume" | "rollback") => request<RuntimeReleaseStatus>("/api/runtime-release/control", { method: "POST", body: JSON.stringify({ action }) }),
   codexPreferences: (id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(`/api/sessions/${encodeURIComponent(id)}/codex-settings`, { signal }),
@@ -1009,3 +1013,5 @@ export function subscribeToFleet(
     socket?.close();
   };
 }
+
+export interface AdminUser { id: string; email: string; platformAdmin: boolean; disabled: boolean; createdAt: string; lastLoginAt: string | null; machineCount: number }

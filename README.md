@@ -193,7 +193,7 @@ Quota and credits are shared by a Codex account; project and session figures are
 - **Official SSH connects to projects on a server.** To use a Linux development server, you need SSH login access and Codex installed and authenticated there, then add a remote project in the desktop app. This uses SSH login rather than device pairing; the official SSH setup does not list matching ChatGPT accounts and workspaces as a requirement. See the [official remote connection guide](https://learn.chatgpt.com/docs/remote-connections).
 - **AgentFleets enrolls hosts in your own web panel.** Install an Agent on each host and pair it using a one-time credential issued by the panel. The panel account manages hosts; each host's Codex account runs its tasks. Those Codex accounts can differ from each other and from the panel email, but every host needs valid Codex authentication and permissions.
 
-AgentFleets supports multiple users through Django and Resend email verification. First sign-in creates a private workspace; machines, projects and sessions are isolated per user. Codex accounts and quotas remain on each host. Shared team permissions are not provided.
+AgentFleets supports multiple users through Django and Resend email verification. First sign-in creates a private workspace; machines, projects and sessions are isolated per user. Codex accounts and quotas remain on each host. Shared team permissions are not provided. The administrator-only **Admin** tab contains user management, managed upgrades and system information. Users retain control of their own hosts and sessions. See [permissions and account administration](docs/administration.md).
 
 Use the official app if its remote workflow meets your needs. Choose AgentFleets when you want to operate and customize your own multi-host web panel. Features overlap: remote continuation is not exclusive to AgentFleets. AgentFleets controls sessions where they live; it does not currently migrate a conversation and its Git state between hosts. Release its writer before opening that same native session in another client.
 
@@ -262,7 +262,7 @@ panel.example.com {
 }
 ```
 
-Open the address configured in `PUBLIC_ORIGIN` and sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+Open the address configured in `PUBLIC_ORIGIN` and sign in with the verification code sent to your email. The account configured by `ADMIN_EMAIL` has access to the Admin tab; other verified emails receive their own private workspaces.
 
 For a same-machine trial without a domain, set both origins to `http://127.0.0.1:3215`, set `COOKIE_SECURE=false`, and open that address locally. Do not expose this HTTP configuration to a network or the internet.
 

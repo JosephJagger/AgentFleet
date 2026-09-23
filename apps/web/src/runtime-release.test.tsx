@@ -6,7 +6,7 @@ import { api, type RuntimeReleaseStatus } from "./lib/api";
 import type { Machine } from "./lib/types";
 vi.mock("./lib/api", () => ({ api: { runtimeRelease: vi.fn(), runtimeReleaseControl: vi.fn() } }));
 const machine: Machine = { id: "work", name: "工作机器", hostname: "work", os: "Linux", arch: "x64", identity: "paired", compatibility: "compatible", credentialProtectionLevel: "software_protected", projects: [], agentVersion: "0.21.0", codexVersion: "0.153.2", reachability: "live", capacity: "busy", codexProfile: { source: "managed" } };
-const state: RuntimeReleaseStatus = { configured: true, paused: false, workerOnline: true, phase: "blocked", message: "需要适配：协议不兼容，原目标未改变", latestVersion: "0.153.4", target: { version: "0.153.2" }, previous: { version: "0.153.1" }, checks: [{ name: "协议验证", state: "failed", detail: "SHA-256 不一致" }], history: [] };
+const state: RuntimeReleaseStatus = { canControl: true, configured: true, paused: false, workerOnline: true, phase: "blocked", message: "需要适配：协议不兼容，原目标未改变", latestVersion: "0.153.4", target: { version: "0.153.2" }, previous: { version: "0.153.1" }, checks: [{ name: "协议验证", state: "failed", detail: "SHA-256 不一致" }], history: [] };
 beforeEach(() => { vi.mocked(api.runtimeRelease).mockResolvedValue(state); vi.mocked(api.runtimeReleaseControl).mockResolvedValue({ ...state, paused: true }); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 it("shows why a release was blocked instead of claiming the latest version is running", async () => {
@@ -25,4 +25,12 @@ it("rollback requires an in-page confirmation and invokes the rollback action on
 it("self-installed runtimes are never described as pending managed upgrades", async () => {
   render(<RuntimeReleasePanel machine={{ ...machine, codexProfile: { source: "host" } }} />);
   expect(await screen.findByText(/使用自装 Codex，不参与托管切换/)).toBeTruthy();
+});
+
+it("missing admin capability never exposes global controls", async () => {
+  vi.mocked(api.runtimeRelease).mockResolvedValue({ ...state, canControl: undefined });
+  render(<RuntimeReleasePanel />);
+  await screen.findByText(state.message);
+  expect(screen.queryByRole("button", { name: "回退托管目标" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "暂停自动晋升" })).toBeNull();
 });

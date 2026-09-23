@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 36) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 37) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1208,6 +1208,12 @@ export class ControlPlaneDatabase {
         this.sqlite.exec("ALTER TABLE users ADD COLUMN identity_id TEXT");
       }
       this.sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_identity_idx ON users(identity_id); PRAGMA user_version=36");
+    });
+    if (version < 37) this.transaction(() => {
+      if (!this.all<{ name: string }>("PRAGMA table_info(users)").some(column => column.name === "disabled_at")) {
+        this.sqlite.exec("ALTER TABLE users ADD COLUMN disabled_at TEXT");
+      }
+      this.sqlite.exec("PRAGMA user_version=37");
     });
   }
 

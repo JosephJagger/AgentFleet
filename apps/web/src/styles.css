@@ -1232,3 +1232,17 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .usage-trigger-text small { font-size: var(--text-caption); font-weight: 400; line-height: 1.4; opacity: .75; }
 
 .login-code-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: space-between; }
+
+/* Administration uses the same theme tokens and settings surfaces. */
+.admin-view { display: grid; gap: 24px; align-content: start; }
+.admin-users h2 { display: flex; gap: 10px; align-items: center; }
+.admin-search { display: flex; gap: 10px; margin-block: 20px; }
+.admin-search input { flex: 1; min-width: 0; }
+.admin-user { display: flex; justify-content: space-between; gap: 20px; padding-block: 18px; border-bottom: 1px solid var(--line); }
+.admin-user__identity { display: grid; gap: 6px; min-width: 0; }
+.admin-user__identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-user__identity small { opacity: .75; }
+.admin-user__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+@media (max-width: 680px) { .admin-user { flex-direction: column; gap: 12px; } .admin-user__actions { flex-wrap: wrap; } }
+
+.admin-sections { display: flex; gap: 10px; flex-wrap: wrap; }

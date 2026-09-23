@@ -216,6 +216,7 @@ export interface Approval {
 }
 
 export interface CurrentUser {
+  platformAdmin?: boolean;
   id: string;
   email: string;
   displayName: string;
