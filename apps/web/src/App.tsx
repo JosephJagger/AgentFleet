@@ -638,7 +638,18 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const [referenceCards, setReferenceCards] = useState<ReferenceCard[]>([]);
   const [referencePicker, setReferencePicker] = useState(false);
   const [referenceSearch, setReferenceSearch] = useState("");
+  const [referencePage, setReferencePage] = useState(1);
+  const [referenceCursors, setReferenceCursors] = useState<Array<string | null>>([null]);
+  const [referenceItems, setReferenceItems] = useState<FleetSession[]>([]);
+  const [referenceTotal, setReferenceTotal] = useState(0);
+  const [referenceNextCursor, setReferenceNextCursor] = useState<string | null>(null);
+  const [referenceLoading, setReferenceLoading] = useState(false);
+  const [referenceError, setReferenceError] = useState("");
+  const [referenceLink, setReferenceLink] = useState("");
+  const [referenceLinkError, setReferenceLinkError] = useState("");
   const referencePickerRef = useRef<HTMLDivElement | null>(null);
+  const referenceListRef = useRef<HTMLDivElement | null>(null);
+  const referencePages = Math.max(1, Math.ceil(referenceTotal / 10));
   const referenceSources = useRef(new Set<string>());
   const referenceControllers = useRef(new Map<string, AbortController>());
   const referenceActive = useRef(new Set<string>());
@@ -657,6 +668,18 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
     document.addEventListener("keydown", escape);
     return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", escape); };
   }, [referencePicker]);
+  useEffect(() => {
+    if (!referencePicker) return;
+    const controller = new AbortController();
+    setReferenceLoading(true); setReferenceError(""); setReferenceItems([]); setReferenceTotal(0); setReferenceNextCursor(null);
+    const timer = window.setTimeout(() => {
+      void api.sessions({ q: referenceSearch.trim() || undefined, cursor: referenceCursors[referencePage - 1], limit: 10 }, controller.signal)
+        .then(page => { if (!controller.signal.aborted) { setReferenceItems(page.items); setReferenceTotal(page.total ?? page.items.length); setReferenceNextCursor(page.nextCursor); } })
+        .catch(error => { if (!controller.signal.aborted) setReferenceError(errorMessage(error)); })
+        .finally(() => { if (!controller.signal.aborted) setReferenceLoading(false); });
+    }, referenceSearch ? 180 : 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [referencePicker, referenceSearch, referencePage, referenceCursors]);
   async function addReference(sourceId: string) {
     if (referenceSources.current.has(sourceId)) return;
     referenceSources.current.add(sourceId);
@@ -695,6 +718,19 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
     removeReference(key);
     // Let the deleted card leave state before adding a replacement.
     window.setTimeout(() => void addReference(card.sourceId), 0);
+  }
+  function addReferenceLink(value = referenceLink) {
+    const sourceId = referenceIdFromText(value, window.location.origin);
+    if (!sourceId) { setReferenceLinkError(t("请输入本站的会话链接")); return; }
+    setReferenceLink("");
+    setReferenceLinkError("");
+    setReferencePicker(false);
+    void addReference(sourceId);
+  }
+  function changeReferencePage(page: number) {
+    if (page > referencePage && referenceNextCursor) setReferenceCursors(current => [...current.slice(0, referencePage), referenceNextCursor]);
+    setReferencePage(page);
+    if (referenceListRef.current) referenceListRef.current.scrollTop = 0;
   }
 
   const [modeOverride, setModeOverride] = useState<"default" | "plan">();
@@ -975,7 +1011,13 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             {failed && <button type="button" className="button button--secondary" onClick={() => retryReference(card.key)}>{t("重试摘要")}</button>}
           </article>; })}
         </div>}
-        {referencePicker && <div ref={referencePickerRef} className="session-reference-picker" role="dialog" aria-label={t("复用会话")}><div><strong>{t("复用会话")}</strong><button type="button" aria-label={t("关闭")} onClick={() => setReferencePicker(false)}><X size={17}/></button></div><input aria-label={t("搜索会话")} value={referenceSearch} onChange={event => setReferenceSearch(event.target.value)} placeholder={t("搜索主机、项目或会话")}/><div className="session-reference-picker__list">{referenceCandidates.filter(item => `${item.title} ${item.projectAlias} ${item.machineName}`.toLowerCase().includes(referenceSearch.toLowerCase())).map(item => <button type="button" key={item.id} onClick={() => { setReferencePicker(false); void addReference(item.id); }}><b>{item.title}</b><small>{item.machineName} · {item.projectAlias}</small></button>)}</div></div>}
+        {referencePicker && <div ref={referencePickerRef} className="session-reference-picker" role="dialog" aria-label={t("复用会话")}>
+          <div className="session-reference-picker__head"><div><strong>{t("复用会话")}</strong><small>{t("选择会话或粘贴链接，生成引用摘要")}</small></div><button type="button" aria-label={t("关闭")} onClick={() => setReferencePicker(false)}><X size={18}/></button></div>
+          <div className="session-reference-picker__search"><label htmlFor="reference-session-search">{t("浏览会话")}</label><input id="reference-session-search" aria-label={t("搜索会话")} value={referenceSearch} onChange={event => { setReferenceSearch(event.target.value); setReferencePage(1); setReferenceCursors([null]); referenceListRef.current && (referenceListRef.current.scrollTop = 0); }} placeholder={t("搜索主机、项目或会话")}/></div>
+          <div ref={referenceListRef} className="session-reference-picker__list" role="group" aria-label={t("会话列表")}>{referenceLoading ? <p role="status">{t("正在加载会话")}</p> : referenceError ? <p role="alert">{referenceError}</p> : referenceItems.length ? referenceItems.map(item => <button type="button" key={item.id} onClick={() => { setReferencePicker(false); void addReference(item.id); }}><b title={item.title}>{item.title}</b><small>{item.machineName} · {item.projectAlias}</small></button>) : <p>{t("没有匹配的会话")}</p>}</div>
+          <div className="session-reference-picker__footer"><span>{t("共 {0} 个会话", referenceTotal)}{referencePages > 1 && <> · {t("第 {0} / {1} 页", referencePage, referencePages)}</>}</span>{referencePages > 1 && <div><button type="button" aria-label={t("上一页")} disabled={referenceLoading || referencePage === 1} onClick={() => changeReferencePage(referencePage - 1)}><ChevronLeft size={17}/></button><button type="button" aria-label={t("下一页")} disabled={referenceLoading || !referenceNextCursor} onClick={() => changeReferencePage(referencePage + 1)}><ChevronRight size={17}/></button></div>}</div>
+          <div className="session-reference-picker__link"><label htmlFor="reference-session-link">{t("粘贴会话链接")}</label><div><input id="reference-session-link" value={referenceLink} onChange={event => { setReferenceLink(event.target.value); setReferenceLinkError(""); }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addReferenceLink(); } }} placeholder={`${window.location.origin}/sessions/…`} aria-invalid={Boolean(referenceLinkError)} aria-describedby={referenceLinkError ? "reference-session-link-error" : undefined}/><button type="button" disabled={!referenceLink.trim()} onClick={() => addReferenceLink()}>{t("添加引用")}</button></div>{referenceLinkError && <small id="reference-session-link-error" role="alert">{referenceLinkError}</small>}</div>
+        </div>}
         <div className="composer-input">
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
@@ -1076,7 +1118,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             <div className="composer-add-popover__head"><strong>{t("添加")}</strong><button type="button" className="composer-add-popover__close" aria-label={t("关闭")} onClick={closeAddMenu}><X size={19} /></button></div>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); fileInput.current?.click(); }}><FileUp size={17} /><span><b>{t("文件")}</b><small>{t("支持 PDF、XLSX、UTF-8 文本、源码与配置")}</small></span></button>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); folderInput.current?.click(); }}><FolderOpen size={17} /><span><b>{t("文件夹")}</b><small>{t("逐个校验支持类型，最多 32 个文件")}</small></span></button>
-            <button type="button" onClick={() => { closeAddMenu(); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t("选择会话并自动生成摘要")}</small></span></button>
+            <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t("选择会话并自动生成摘要")}</small></span></button>
             <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { closeAddMenu(); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
             {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { closeAddMenuAfterTouchChoice(); if (!settings?.model && !inherited?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !settings?.model && !inherited?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}

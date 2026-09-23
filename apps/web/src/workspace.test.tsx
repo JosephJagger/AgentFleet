@@ -832,6 +832,7 @@ it("管理员可见管理入口，普通设置仍独立保留", async () => {
 const readyReference = { id: "job-a", state: "ready" as const, done: 1, total: 1, identity: { id: "B", host: "主机2", project: "项目2", title: "会话B", link: "/sessions/B", version: "1:1:4", incomplete: false }, summary: "已完成接口检查；下一步验证部署。" };
 it("粘贴会话链接和加号选择生成同种摘要卡片，发送固定快照", async () => {
   vi.mocked(api.createSessionReference).mockResolvedValue(readyReference);
+  vi.mocked(api.sessions).mockResolvedValue({ items: sessions, nextCursor: null, total: 2 });
   const send = vi.fn(async (_prompt: string) => undefined);
   const props = inspectorProps("A");
   const view = render(<SessionInspector {...props} referenceCandidates={sessions} onSend={send} />);
@@ -846,8 +847,38 @@ it("粘贴会话链接和加号选择生成同种摘要卡片，发送固定快�
   expect(send.mock.calls[0][0]).toContain("Session ID: B");
   fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
   fireEvent.click(screen.getByRole("button", { name: /复用会话.*选择会话并自动生成摘要/ }));
-  fireEvent.click(screen.getByRole("button", { name: /会话B.*主机2/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /会话B.*主机2/ }));
   await waitFor(() => expect(screen.getByText("摘要已就绪 · 展开预览")).toBeTruthy());
+});
+it("复用会话弹窗可滚动分页、搜索并粘贴链接", async () => {
+  vi.mocked(api.createSessionReference).mockResolvedValue(readyReference);
+  const candidates = Array.from({ length: 23 }, (_, index) => session(`S${String(index + 1).padStart(2, "0")}`, "1"));
+  vi.mocked(api.sessions).mockImplementation(async ({ q, cursor }) => {
+    const filtered = q ? candidates.filter(item => item.title.includes(q)) : candidates;
+    const start = Number(cursor ?? 0);
+    return { items: filtered.slice(start, start + 10), nextCursor: start + 10 < filtered.length ? String(start + 10) : null, total: filtered.length };
+  });
+  const view = render(<SessionInspector {...inspectorProps("A")} referenceCandidates={candidates} />);
+  fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
+  fireEvent.click(screen.getByRole("button", { name: /复用会话.*选择会话并自动生成摘要/ }));
+  const picker = screen.getByRole("dialog", { name: "复用会话" });
+  expect(await within(picker).findByText("共 23 个会话 · 第 1 / 3 页")).toBeTruthy();
+  expect(within(picker).getByRole("button", { name: /会话S10/ })).toBeTruthy();
+  expect(within(picker).queryByRole("button", { name: /会话S11/ })).toBeNull();
+  fireEvent.click(within(picker).getByRole("button", { name: "下一页" }));
+  expect(await within(picker).findByRole("button", { name: /会话S11/ })).toBeTruthy();
+  expect(within(picker).getByText("共 23 个会话 · 第 2 / 3 页")).toBeTruthy();
+  fireEvent.change(within(picker).getByRole("textbox", { name: "搜索会话" }), { target: { value: "S23" } });
+  expect(await within(picker).findByText("共 1 个会话")).toBeTruthy();
+  expect(within(picker).queryByRole("button", { name: "下一页" })).toBeNull();
+  const link = within(picker).getByRole("textbox", { name: "粘贴会话链接" });
+  fireEvent.change(link, { target: { value: "https://wrong.example/sessions/S22" } });
+  fireEvent.click(within(picker).getByRole("button", { name: "添加引用" }));
+  expect(within(picker).getByRole("alert").textContent).toContain("请输入本站的会话链接");
+  fireEvent.change(link, { target: { value: `${window.location.origin}/sessions/S22` } });
+  fireEvent.keyDown(link, { key: "Enter" });
+  await waitFor(() => expect(api.createSessionReference).toHaveBeenCalledWith("S22"));
+  expect(screen.queryByRole("dialog", { name: "复用会话" })).toBeNull();
 });
 it("摘要中和失败时禁止发送，删除失败卡片保留草稿且迟到结果不复活", async () => {
   let resolve!: (value: typeof readyReference) => void;

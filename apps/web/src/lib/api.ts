@@ -686,7 +686,7 @@ export const api = {
     for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
     const raw = await request<JsonObject>(`/api/sessions?${query}`, { signal });
     const cached = dashboardCache;
-    return { items: list(raw.items ?? raw.sessions).map((item) => mapSession(item, cached?.machines ?? [], cached?.machines.flatMap((machine) => machine.projects) ?? [], cached?.user.clientSessionId ?? "")), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null };
+    return { items: list(raw.items ?? raw.sessions).map((item) => mapSession(item, cached?.machines ?? [], cached?.machines.flatMap((machine) => machine.projects) ?? [], cached?.user.clientSessionId ?? "")), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null, total: integer(raw.total) };
   },
   async history(id: string, beforeSeq?: number | null, signal?: AbortSignal) {
     const query = new URLSearchParams({ limit: "100" });
