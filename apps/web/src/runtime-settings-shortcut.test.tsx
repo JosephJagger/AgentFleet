@@ -65,6 +65,17 @@ it("hides duplicate follow-up settings and switches to send settings when the tu
  view.rerender(<RuntimeSettingsShortcut {...props} running={false}/>);
  expect(screen.getByText("发送使用")).toBeTruthy();expect(screen.queryByText("当前任务")).toBeNull();
 });
+it("does not invent a future configuration change when the current mode is unconfirmed",()=>{
+ render(<RuntimeSettingsShortcut sessionId="s" activeTurnId="turn" running summary={{sessionId:"s",source:"session",settings:{model:"same-model",effort:"medium"},changed:false,loaded:true}} observed={{accepted:{nativeTurnId:"turn",acceptedAt:"2026-09-10T00:00:00Z",model:"same-model",effort:"medium"}}} onOpen={()=>{}}/>);
+ expect(screen.getByText("当前任务")).toBeTruthy();
+ expect(screen.getByText("same-model · medium · 模式未确认")).toBeTruthy();
+ expect(screen.queryByText("后续任务")).toBeNull();
+});
+it("does not repeat inherited settings for an active turn",()=>{
+ render(<RuntimeSettingsShortcut sessionId="s" activeTurnId="turn" running summary={{sessionId:"s",source:"codex",changed:false,loaded:true}} observed={{accepted:{nativeTurnId:"turn",acceptedAt:"2026-09-10T00:00:00Z",model:"inherited-model",effort:"medium"}}} onOpen={()=>{}}/>);
+ expect(screen.getByText("inherited-model · medium · 模式未确认")).toBeTruthy();
+ expect(screen.queryByText("后续任务")).toBeNull();
+});
 it("shows a removable Plan mode indicator beside the runtime settings",()=>{
  const clear=vi.fn();
  render(<RuntimeSettingsShortcut sessionId="s" summary={{sessionId:"s",settings:{model:"example-model"},changed:false,loaded:true}} running={false} modeOverride="plan" onClearMode={clear} onOpen={()=>{}}/>);
