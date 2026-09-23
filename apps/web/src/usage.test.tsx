@@ -51,6 +51,26 @@ it("shows a temporary reset forecast only when supplied, and displays native res
  expect(screen.getByText("可用重置卡 2 张")).toBeTruthy();
  expect(screen.getByRole("link",{name:"查看依据"}).getAttribute("href")).toBe("https://x.com/thsottiaux/status/123");
 });
+it("host card shows positive credits before a forecast, then the forecast when credits reach zero",async()=>{
+ const prediction={kind:"temporary-reset" as const,probability:92,expectedAt:"2026-09-24T12:00:00Z",observedAt:"2026-09-23T12:00:00Z",sourceUrl:"https://example.test/forecast"};
+ vi.mocked(api.usage).mockResolvedValueOnce({...data,scope:"machine",resetPrediction:prediction}).mockResolvedValue({...data,scope:"machine",resetPrediction:prediction,accounts:[{...data.accounts[0],credits:{balance:"0",hasCredits:false,unlimited:false}}]});
+ const view=render(<UsageButton scope="machine" id="m1"/>);
+ const card=await screen.findByRole("button",{name:/周额度\s*38%/});
+ expect(within(card).getByText("2,350.5")).toBeTruthy();
+ expect(within(card).queryByText("临时重置预测")).toBeNull();
+ document.dispatchEvent(new Event("visibilitychange"));
+ await waitFor(()=>expect(within(card).getByText("临时重置预测")).toBeTruthy());
+ expect(within(card).getByText(/预测概率 92%/)).toBeTruthy();
+ expect(within(card).queryByText("点数余额")).toBeNull();
+ view.unmount();
+});
+it("host card states that no forecast is available when credits are zero or unreported",async()=>{
+ vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",accounts:[{...data.accounts[0],credits:{balance:"0",hasCredits:false,unlimited:false}}]});
+ const view=render(<UsageButton scope="machine" id="m1"/>);
+ const card=await screen.findByRole("button",{name:/周额度\s*38%/});
+ expect(within(card).getByText("暂无预测")).toBeTruthy();
+ view.unmount();
+});
 
 it("page polling never requests host quota; host refresh requires an explicit click",async()=>{
  vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine"});

@@ -200,8 +200,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
 .host-quota-metrics { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
 .host-quota-metric { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 11px; box-shadow: inset 3px 0 0 var(--teal); display: grid; gap: 4px; min-width: 0; padding: 9px 11px 8px 13px; text-align: left; }
 .host-quota-metric--credits { box-shadow: inset 3px 0 0 var(--amber); }
+.host-quota-metric--forecast { box-shadow: inset 3px 0 0 var(--cobalt); }
 .host-quota-metric small { color: var(--muted); font-size: var(--text-usage); font-weight: 600; letter-spacing: .02em; }
 .host-quota-metric strong { color: var(--ink); font-family: var(--mono); font-size: 1.125rem; font-variant-numeric: tabular-nums; font-weight: 650; line-height: 1.25; overflow-wrap: anywhere; }
+.host-quota-metric--forecast strong { color: var(--cobalt); font-size: 1rem; }
 .host-quota-metric--credits strong { color: var(--amber); }
 .host-quota-metric--credits strong b { font-family: inherit; font-size: .6875rem; font-weight: 650; }
 .host-quota-metric em { color: var(--muted); font-size: .6875rem; font-style: normal; line-height: 1.35; }

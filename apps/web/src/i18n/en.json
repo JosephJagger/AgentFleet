@@ -1493,6 +1493,8 @@
   "预测概率 {0}%": "Forecast confidence {0}%",
   "查看依据": "View source",
   "暂无预测": "No forecast yet",
+  "可能于该时间前临时重置 · 预测概率 {0}%": "Possible temporary reset by this time · {0}% confidence",
+  "点数不足时显示预测": "Forecast appears when credits are unavailable",
   "可用重置卡 {0} 张": "{0} reset cards available",
   "重置卡发放暂无可靠预测；到账数量来自原生 Codex。": "Reset card grants cannot be forecast reliably; available cards are reported by Codex.",
   "已记录总量": "Recorded total",
