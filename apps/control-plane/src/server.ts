@@ -1046,6 +1046,8 @@ export async function buildControlPlane(
     limiter.check(`session-reference:${request.principal!.userId}`, 20, 60_000);
     return sessionReferences.start(request.principal as Principal, requiredString(record(request.body).sourceId, "sourceId", 200));
   });
+  app.post("/api/session-references/identity", { preHandler: mutate }, async request =>
+    sessionReferences.identify(request.principal as Principal, requiredString(record(request.body).sourceId, "sourceId", 200)));
   app.get("/api/session-references/:id", { preHandler: authenticate }, async request => sessionReferences.status(request.principal as Principal, routeId(request)));
   app.delete("/api/session-references/:id", { preHandler: mutate }, async request => sessionReferences.cancel(request.principal as Principal, routeId(request)));
   app.post("/api/sessions/:id/writing-nlp", { preHandler: mutate, bodyLimit: 12_000 }, async (request, reply) => {

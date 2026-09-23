@@ -2457,5 +2457,14 @@
   "请等待会话摘要完成；失败时重试或删除卡片": "Wait for the summary; retry or remove a failed card",
   "已复制会话链接": "Session link copied",
   "浏览器未允许复制会话链接": "Browser denied copying the session link",
-  "复制会话链接": "Copy session link"
+  "复制会话链接": "Copy session link",
+  "添加会话引用，由 Codex 按需查阅": "Reference a session for Codex to inspect as needed",
+  "选择会话或粘贴链接，添加引用卡片": "Choose a session or paste a link to add a reference card",
+  "发送后由 Codex 按任务查阅可读历史；不预先生成摘要": "Codex will inspect relevant readable history after sending; no summary is generated beforehand",
+  "引用已就绪": "Reference ready",
+  "部分历史未同步": "Some history is not synced",
+  "正在核验会话": "Checking session access",
+  "请写明任务并等待引用核验；失败时重试或删除卡片": "Describe the task and wait for reference validation; retry or remove a failed card",
+  "重试": "Retry",
+  "一次最多引用两个会话": "You can reference up to two sessions at a time"
 }

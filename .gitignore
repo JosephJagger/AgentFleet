@@ -25,6 +25,7 @@ data/
 
 # Local Agent identity/state
 .agentfleet/
+.agentfleets/
 agentfleet-state/
 
 # Test and browser artifacts

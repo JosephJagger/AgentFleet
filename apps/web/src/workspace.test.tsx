@@ -11,7 +11,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -829,29 +829,29 @@ it("管理员可见管理入口，普通设置仍独立保留", async () => {
   expect(screen.getByRole("button", { name: "设置" })).toBeTruthy();
 });
 
-const readyReference = { id: "job-a", state: "ready" as const, done: 1, total: 1, identity: { id: "B", host: "主机2", project: "项目2", title: "会话B", link: "/sessions/B", version: "1:1:4", incomplete: false }, summary: "已完成接口检查；下一步验证部署。" };
-it("粘贴会话链接和加号选择生成同种摘要卡片，发送固定快照", async () => {
-  vi.mocked(api.createSessionReference).mockResolvedValue(readyReference);
+const readyReference = { id: "B", host: "主机2", project: "项目2", title: "会话B", link: "/sessions/B", version: "1:1:4", incomplete: false };
+it("粘贴会话链接和加号选择生成同种引用卡片，发送任务和源版本", async () => {
+  vi.mocked(api.sessionReferenceIdentity).mockResolvedValue(readyReference);
   vi.mocked(api.sessions).mockResolvedValue({ items: sessions, nextCursor: null, total: 2 });
-  const send = vi.fn(async (_prompt: string) => undefined);
+  const send = vi.fn(async (_prompt: string, _settings?: unknown, _images?: string[], _additions?: unknown) => undefined);
   const props = inspectorProps("A");
   const view = render(<SessionInspector {...props} referenceCandidates={sessions} onSend={send} />);
   const input = screen.getByRole("textbox", { name: "发送给 Codex 的消息" });
   fireEvent.paste(input, { clipboardData: { getData: () => `${window.location.origin}/sessions/B` } });
-  await waitFor(() => expect(screen.getByText("摘要已就绪 · 展开预览")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("引用已就绪")).toBeTruthy());
   expect((input as HTMLTextAreaElement).value).toBe("");
   fireEvent.change(input, { target: { value: "请继续" } });
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() => expect(send).toHaveBeenCalled());
-  expect(send.mock.calls[0][0]).toContain("已完成接口检查；下一步验证部署。");
-  expect(send.mock.calls[0][0]).toContain("Session ID: B");
+  expect(send.mock.calls[0][0]).toBe("请继续");
+  expect(send.mock.calls[0][3]).toMatchObject({ references: [{ id: "B", version: "1:1:4" }] });
   fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
-  fireEvent.click(screen.getByRole("button", { name: /复用会话.*选择会话并自动生成摘要/ }));
+  fireEvent.click(screen.getByRole("button", { name: /复用会话.*添加会话引用/ }));
   fireEvent.click(await screen.findByRole("button", { name: /会话B.*主机2/ }));
-  await waitFor(() => expect(screen.getByText("摘要已就绪 · 展开预览")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("引用已就绪")).toBeTruthy());
 });
 it("复用会话弹窗可滚动分页、搜索并粘贴链接", async () => {
-  vi.mocked(api.createSessionReference).mockResolvedValue(readyReference);
+  vi.mocked(api.sessionReferenceIdentity).mockResolvedValue(readyReference);
   const candidates = Array.from({ length: 23 }, (_, index) => session(`S${String(index + 1).padStart(2, "0")}`, "1"));
   vi.mocked(api.sessions).mockImplementation(async ({ q, cursor }) => {
     const filtered = q ? candidates.filter(item => item.title.includes(q)) : candidates;
@@ -860,7 +860,7 @@ it("复用会话弹窗可滚动分页、搜索并粘贴链接", async () => {
   });
   const view = render(<SessionInspector {...inspectorProps("A")} referenceCandidates={candidates} />);
   fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
-  fireEvent.click(screen.getByRole("button", { name: /复用会话.*选择会话并自动生成摘要/ }));
+  fireEvent.click(screen.getByRole("button", { name: /复用会话.*添加会话引用/ }));
   const picker = screen.getByRole("dialog", { name: "复用会话" });
   expect(await within(picker).findByText("共 23 个会话 · 第 1 / 3 页")).toBeTruthy();
   expect(within(picker).getByRole("button", { name: /会话S10/ })).toBeTruthy();
@@ -877,12 +877,12 @@ it("复用会话弹窗可滚动分页、搜索并粘贴链接", async () => {
   expect(within(picker).getByRole("alert").textContent).toContain("请输入本站的会话链接");
   fireEvent.change(link, { target: { value: `${window.location.origin}/sessions/S22` } });
   fireEvent.keyDown(link, { key: "Enter" });
-  await waitFor(() => expect(api.createSessionReference).toHaveBeenCalledWith("S22"));
+  await waitFor(() => expect(api.sessionReferenceIdentity).toHaveBeenCalledWith("S22", expect.anything()));
   expect(screen.queryByRole("dialog", { name: "复用会话" })).toBeNull();
 });
-it("摘要中和失败时禁止发送，删除失败卡片保留草稿且迟到结果不复活", async () => {
+it("引用核验中禁止发送，删除卡片保留草稿且迟到结果不复活", async () => {
   let resolve!: (value: typeof readyReference) => void;
-  vi.mocked(api.createSessionReference).mockImplementation(() => new Promise(result => { resolve = result; }));
+  vi.mocked(api.sessionReferenceIdentity).mockImplementation(() => new Promise(result => { resolve = result; }));
   const send = vi.fn(noop);
   const props = inspectorProps("A");
   render(<SessionInspector {...props} referenceCandidates={sessions} onSend={send} />);
@@ -892,15 +892,13 @@ it("摘要中和失败时禁止发送，删除失败卡片保留草稿且迟到�
   expect((screen.getByRole("button", { name: "发送" }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "删除引用卡片" }));
   await act(async () => resolve(readyReference));
-  expect(screen.queryByText("摘要已就绪 · 展开预览")).toBeNull();
+  expect(screen.queryByText("引用已就绪")).toBeNull();
   expect((input as HTMLTextAreaElement).value).toBe("保留这段文字");
   expect((screen.getByRole("button", { name: "发送" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
-it("失败卡片可重试；运行中的排队和追加在摘要期间均不可用", async () => {
-  const failed = { ...readyReference, state: "failed" as const, error: "模型暂不可用", summary: undefined };
-  vi.mocked(api.createSessionReference).mockResolvedValueOnce(failed).mockResolvedValueOnce(readyReference);
-  vi.mocked(api.cancelSessionReference).mockResolvedValue({ cancelled: true });
+it("核验失败卡片可重试；运行中的排队和追加在核验期间均不可用", async () => {
+  vi.mocked(api.sessionReferenceIdentity).mockRejectedValueOnce(new Error("会话暂不可用")).mockResolvedValueOnce(readyReference);
   const props = inspectorProps("A");
   props.detail = { ...props.detail, session: { ...props.detail.session, activeTurnId: "turn-a", state: { ...props.detail.session.state, threadRuntime: "active", currentTurn: "in_progress" } } };
   render(<SessionInspector {...props} referenceCandidates={sessions} />);
@@ -909,10 +907,10 @@ it("失败卡片可重试；运行中的排队和追加在摘要期间均不可�
   fireEvent.paste(input, { clipboardData: { getData: () => `${window.location.origin}/sessions/B` } });
   expect((screen.getByRole("button", { name: "加入队列" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByRole("button", { name: "追加本轮" }) as HTMLButtonElement).disabled).toBe(true);
-  await waitFor(() => expect(screen.getByText("模型暂不可用")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("会话暂不可用")).toBeTruthy());
   expect((screen.getByRole("button", { name: "加入队列" }) as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "重试摘要" }));
-  await waitFor(() => expect(screen.getByText("摘要已就绪 · 展开预览")).toBeTruthy());
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await waitFor(() => expect(screen.getByText("引用已就绪")).toBeTruthy());
   expect((screen.getByRole("button", { name: "加入队列" }) as HTMLButtonElement).disabled).toBe(false);
   expect((screen.getByRole("button", { name: "追加本轮" }) as HTMLButtonElement).disabled).toBe(false);
 });

@@ -3,7 +3,7 @@ import type { TokenCounts, UsageSummary } from "./usage";
 import type { WritingAISettings, WritingMemoryState } from "./writing-assistance";
 import type { NLPSuggestion } from "./writing-nlp";
 import { t } from "../i18n";
-import type { SessionReferenceJob } from "./session-references";
+import type { SessionReferenceIdentity, SessionReferenceJob } from "./session-references";
 import type {
   Approval,
   ClientSessionInfo,
@@ -621,6 +621,7 @@ export const api = {
   saveWritingAI: (value: {endpoint:string;model:string;enabled:boolean;apiKey:string;clearKey:boolean}) => request<WritingAISettings>("/api/settings/writing-ai", {method:"PUT",body:JSON.stringify(value)}),
   writingSuggestions: (id: string, draft: string, signal: AbortSignal) => request<{suggestions:string[]}>(`/api/sessions/${encodeURIComponent(id)}/writing-suggestions`, {method:"POST",body:JSON.stringify({draft}),signal}),
   createSessionReference: (sourceId: string, signal?: AbortSignal) => request<SessionReferenceJob>("/api/session-references", { method: "POST", body: JSON.stringify({ sourceId }), signal }),
+  sessionReferenceIdentity: (sourceId: string, signal?: AbortSignal) => request<SessionReferenceIdentity>("/api/session-references/identity", { method: "POST", body: JSON.stringify({ sourceId }), signal }),
   sessionReference: (id: string, signal?: AbortSignal) => request<SessionReferenceJob>(`/api/session-references/${encodeURIComponent(id)}`, { signal }),
   cancelSessionReference: (id: string) => request<{cancelled:boolean}>(`/api/session-references/${encodeURIComponent(id)}`, { method: "DELETE" }),
   writingNLP: (id: string, draft: string, signal: AbortSignal) => request<{suggestions:NLPSuggestion[]}>(`/api/sessions/${encodeURIComponent(id)}/writing-nlp`, {method:"POST",body:JSON.stringify({draft}),signal}),

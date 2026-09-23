@@ -92,7 +92,7 @@ import type { CodexSettings } from "./lib/codex-settings";
 import { codexCommands, coverageLabels, initInstructions, parseCodexCommand } from "./lib/codex-commands";
 import { CodexCommandGuide } from "./components/CodexCommandGuide";
 import { sessionPath, useSessionDraft } from "./lib/session-workspace";
-import { referenceIdFromText, referencePrompt, type SessionReferenceJob } from "./lib/session-references";
+import { referenceIdFromText, type SessionReferenceIdentity } from "./lib/session-references";
 import { useAutoSizeTextarea } from "./lib/auto-size-textarea";
 import { useCompletionPreferences } from "./lib/completion-preferences";
 import { useWritingMemory } from "./lib/writing-assistance";
@@ -596,6 +596,7 @@ function ApprovalCard({ approval, onDecide, busy }: { approval: Approval; onDeci
 
 type TurnAdditions = {
   attachments?: Array<{ name: string; relativePath: string; mimeType: string; data: string }>;
+  references?: Array<{ id: string; version: string }>;
   plugins?: Array<{ pluginId: string; pluginName: string }>;
   goal?: string;
 };
@@ -634,7 +635,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const fileDraft = useFileDraft(detail?.session.id);
   const [selectedPlugins, setSelectedPlugins] = useState<Array<{ pluginId: string; pluginName: string }>>([]);
   const [goal, setGoal] = useSessionDraft(draftOwner ?? "preview", detail?.session.id, "goal");
-  type ReferenceCard = { key: string; sourceId: string; job?: SessionReferenceJob; error?: string };
+  type ReferenceCard = { key: string; sourceId: string; identity?: SessionReferenceIdentity; error?: string };
   const [referenceCards, setReferenceCards] = useState<ReferenceCard[]>([]);
   const [referencePicker, setReferencePicker] = useState(false);
   const [referenceSearch, setReferenceSearch] = useState("");
@@ -682,6 +683,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   }, [referencePicker, referenceSearch, referencePage, referenceCursors]);
   async function addReference(sourceId: string) {
     if (referenceSources.current.has(sourceId)) return;
+    if (referenceSources.current.size >= 2) { setCommandMessage(t("一次最多引用两个会话")); return; }
     referenceSources.current.add(sourceId);
     const key = crypto.randomUUID();
     const controller = new AbortController();
@@ -689,17 +691,8 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
     referenceActive.current.add(key);
     setReferenceCards(current => [...current, { key, sourceId }]);
     try {
-      // Keep the short creation request alive so a deleted card can cancel a job
-      // even when the server replies after the user removes it.
-      let job = await api.createSessionReference(sourceId);
-      if (!referenceActive.current.has(key) || controller.signal.aborted) { void api.cancelSessionReference(job.id).catch(() => undefined); return; }
-      while (referenceActive.current.has(key) && !controller.signal.aborted) {
-        setReferenceCards(current => current.map(card => card.key === key ? { ...card, job } : card));
-        if (job.state === "ready" || job.state === "failed") break;
-        await new Promise<void>(resolve => { const timer = window.setTimeout(resolve, 850); controller.signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true }); });
-        if (!referenceActive.current.has(key) || controller.signal.aborted) break;
-        job = await api.sessionReference(job.id, controller.signal);
-      }
+      const identity = await api.sessionReferenceIdentity(sourceId, controller.signal);
+      if (referenceActive.current.has(key) && !controller.signal.aborted) setReferenceCards(current => current.map(card => card.key === key ? { ...card, identity } : card));
     } catch (error) {
       if (referenceActive.current.has(key) && !controller.signal.aborted) setReferenceCards(current => current.map(card => card.key === key ? { ...card, error: errorMessage(error) } : card));
     } finally { referenceControllers.current.delete(key); }
@@ -709,7 +702,6 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
     referenceControllers.current.get(key)?.abort();
     const card = referenceCards.find(item => item.key === key);
     if (card) referenceSources.current.delete(card.sourceId);
-    if (card?.job?.id) void api.cancelSessionReference(card.job.id).catch(() => undefined);
     setReferenceCards(current => current.filter(item => item.key !== key));
   }
   function retryReference(key: string) {
@@ -824,11 +816,10 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const canCancel = !pendingCommand && (session.actions?.cancel?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.currentTurn === "in_progress" && session.activeTurnId));
   const canQueueOrSteer = Boolean(detail.writable && session.state.currentTurn === "in_progress" && session.activeTurnId);
   const slashCommand = parseCodexCommand(prompt);
-  const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() ? { ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
-  const referencesBlocked = referenceCards.some(card => card.error || !card.job || card.job.state !== "ready");
-  const completedReferences = referenceCards.map(card => card.job).filter((job): job is SessionReferenceJob => Boolean(job));
-  const sendText = () => referencePrompt(prompt, completedReferences, window.location.origin);
-  const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length || referenceCards.length);
+  const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() || referenceCards.length ? { ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(referenceCards.length ? { references: referenceCards.filter(card => card.identity).map(card => ({ id: card.sourceId, version: card.identity!.version })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
+  const referencesBlocked = referenceCards.some(card => card.error || !card.identity) || (referenceCards.length > 0 && !prompt.trim());
+  const sendText = () => prompt.trim();
+  const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length);
   const imageBlocked = imageDraft.processing || fileDraft.processing || (imageDraft.images.length > 0 && (!session.imageInputSupported || Boolean(slashCommand))) || (fileDraft.files.length > 0 && (!session.fileInputSupported || Boolean(slashCommand)));
   const inherited = session.runtimeSettings?.accepted ?? session.runtimeSettings?.observed;
   const sendSettings = modeOverride && inherited?.model ? { model: inherited.model, ...(inherited.effort ? { effort: inherited.effort } : {}), ...(settings ?? {}), mode: modeOverride } satisfies CodexSettings : settings;
@@ -1003,16 +994,16 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         {canQueueOrSteer && <div className="composer-mode"><Activity size={14} />{t("Codex 正在处理：可补充当前任务，或排到下一轮")}</div>}
         <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} modeOverride={modeOverride === "plan" ? "plan" : undefined} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onClearMode={() => setModeOverride(undefined)} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>
         {referenceCards.length > 0 && <div className="session-reference-cards" aria-label={t("复用的会话")}>
-          {referenceCards.map(card => { const source = card.job?.identity; const candidate = referenceCandidates.find(item => item.id === card.sourceId); const failed = Boolean(card.error || card.job?.state === "failed"); const ready = card.job?.state === "ready"; return <article className="session-reference-card" key={card.key}>
+          {referenceCards.map(card => { const source = card.identity; const candidate = referenceCandidates.find(item => item.id === card.sourceId); const failed = Boolean(card.error); return <article className="session-reference-card" key={card.key}>
             <div className="session-reference-card__head"><strong>{source?.title ?? candidate?.title ?? card.sourceId}</strong><button type="button" aria-label={t("删除引用卡片")} onClick={() => removeReference(card.key)}><X size={15} /></button></div>
             <small>{source ? `${source.host} · ${source.project}` : candidate ? `${candidate.machineName} · ${candidate.projectAlias}` : t("正在读取会话")}</small>
-            <small>{t("仅摘要用户消息、Codex 回复与计划；不含推理摘要和命令执行")}</small>
-            {failed ? <p role="alert">{card.error || card.job?.error || t("摘要失败")}</p> : ready ? <details><summary>{t("摘要已就绪 · 展开预览")}</summary><pre>{card.job?.summary}</pre></details> : <><span role="status">{card.job?.state === "combining" ? t("正在合并摘要") : card.job?.state === "summarizing" ? t("正在分段总结") : t("正在读取同步历史")} · {card.job?.done ?? 0}/{card.job?.total ?? 1}</span><progress value={card.job?.done ?? 0} max={card.job?.total || 1} /></>}
-            {failed && <button type="button" className="button button--secondary" onClick={() => retryReference(card.key)}>{t("重试摘要")}</button>}
+            <small>{t("发送后由 Codex 按任务查阅可读历史；不预先生成摘要")}</small>
+            {failed ? <p role="alert">{card.error}</p> : source ? <span role="status">{t("引用已就绪")}{source.incomplete ? ` · ${t("部分历史未同步")}` : ""}</span> : <span role="status">{t("正在核验会话")}</span>}
+            {failed && <button type="button" className="button button--secondary" onClick={() => retryReference(card.key)}>{t("重试")}</button>}
           </article>; })}
         </div>}
         {referencePicker && <div ref={referencePickerRef} className="session-reference-picker" role="dialog" aria-label={t("复用会话")}>
-          <div className="session-reference-picker__head"><div><strong>{t("复用会话")}</strong><small>{t("选择会话或粘贴链接，生成引用摘要")}</small></div><button type="button" aria-label={t("关闭")} onClick={() => setReferencePicker(false)}><X size={18}/></button></div>
+          <div className="session-reference-picker__head"><div><strong>{t("复用会话")}</strong><small>{t("选择会话或粘贴链接，添加引用卡片")}</small></div><button type="button" aria-label={t("关闭")} onClick={() => setReferencePicker(false)}><X size={18}/></button></div>
           <div className="session-reference-picker__search"><label htmlFor="reference-session-search">{t("浏览会话")}</label><input id="reference-session-search" aria-label={t("搜索会话")} value={referenceSearch} onChange={event => { setReferenceSearch(event.target.value); setReferencePage(1); setReferenceCursors([null]); referenceListRef.current && (referenceListRef.current.scrollTop = 0); }} placeholder={t("搜索主机、项目或会话")}/></div>
           <div ref={referenceListRef} className="session-reference-picker__list" role="group" aria-label={t("会话列表")}>{referenceLoading ? <p role="status">{t("正在加载会话")}</p> : referenceError ? <p role="alert">{referenceError}</p> : referenceItems.length ? referenceItems.map(item => <button type="button" key={item.id} onClick={() => { setReferencePicker(false); void addReference(item.id); }}><b title={item.title}>{item.title}</b><small>{item.machineName} · {item.projectAlias}</small></button>) : <p>{t("没有匹配的会话")}</p>}</div>
           <div className="session-reference-picker__footer"><span>{t("共 {0} 个会话", referenceTotal)}{referencePages > 1 && <> · {t("第 {0} / {1} 页", referencePage, referencePages)}</>}</span>{referencePages > 1 && <div><button type="button" aria-label={t("上一页")} disabled={referenceLoading || referencePage === 1} onClick={() => changeReferencePage(referencePage - 1)}><ChevronLeft size={17}/></button><button type="button" aria-label={t("下一页")} disabled={referenceLoading || !referenceNextCursor} onClick={() => changeReferencePage(referencePage + 1)}><ChevronRight size={17}/></button></div>}</div>
@@ -1108,8 +1099,8 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           }}
         />
         <div className="composer-actions">
-          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(referencesBlocked ? t("请等待会话摘要完成；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
-          <span className="composer-touch-hint">{(referencesBlocked ? t("请等待会话摘要完成；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-touch-hint">{(referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
           <div className="composer-button-group">
           <input ref={imageInput} className="composer-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label={t("选择要发送的图片")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void imageDraft.addFiles(files); }} />
           <input ref={fileInput} className="composer-image-input" type="file" accept={ATTACHMENT_ACCEPT} multiple aria-label={t("选择要发送的文件")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
@@ -1118,7 +1109,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             <div className="composer-add-popover__head"><strong>{t("添加")}</strong><button type="button" className="composer-add-popover__close" aria-label={t("关闭")} onClick={closeAddMenu}><X size={19} /></button></div>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); fileInput.current?.click(); }}><FileUp size={17} /><span><b>{t("文件")}</b><small>{t("支持 PDF、XLSX、UTF-8 文本、源码与配置")}</small></span></button>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); folderInput.current?.click(); }}><FolderOpen size={17} /><span><b>{t("文件夹")}</b><small>{t("逐个校验支持类型，最多 32 个文件")}</small></span></button>
-            <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t("选择会话并自动生成摘要")}</small></span></button>
+            <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t("添加会话引用，由 Codex 按需查阅")}</small></span></button>
             <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { closeAddMenu(); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
             {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { closeAddMenuAfterTouchChoice(); if (!settings?.model && !inherited?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !settings?.model && !inherited?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}

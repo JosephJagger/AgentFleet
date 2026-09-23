@@ -36,6 +36,9 @@ export class SessionReferences {
     const version = `${session.projectionEpoch}:${session.contentEpoch}:${session.latestSessionSeq}`;
     return { id: sourceId, host: host?.name || session.machineId, project: session.projectAlias, title: session.title, link: `/sessions/${encodeURIComponent(sourceId)}`, version, incomplete: session.historyCompleteness !== "complete" };
   }
+  identify(principal: Principal, sourceId: string): Identity {
+    return this.identity(principal, sourceId);
+  }
   start(principal: Principal, sourceId: string) {
     const identity = this.identity(principal, sourceId);
     invariant(this.ai.read(principal).enabled && this.ai.read(principal).configured, 409, "REFERENCE_AI_UNAVAILABLE", "Configure and enable the panel AI model to summarize a session");
