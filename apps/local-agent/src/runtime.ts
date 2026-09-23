@@ -28,7 +28,7 @@ import { CatalogSyncScheduler, CodexCatalogWatcher, CATALOG_RECONCILE_MS } from 
 import { detectHostCodex } from "./host-codex.js";
 import { refreshEnvironmentChecks } from "./platform.js";
 import { check } from "./preflight.js";
-import { validateSettings } from "./codex-settings.js";
+import { settingsAfterPlan, validateSettings } from "./codex-settings.js";
 import { inputAnswers, inputQuestions } from "./user-input.js";
 import type { MachineIdentity } from "./identity.js";
 import { addProjectFromPanel, discoverProjectFromCwd, projectById, verifyProjectIdentity, verifySessionCwd } from "./projects.js";
@@ -1606,17 +1606,18 @@ export class AgentRuntime {
           await this.syncManagedHistory(thread, resumed.history, false);
         }
         if (thread.activeTurnId !== undefined) throw new AgentError("THREAD_BUSY", "thread still has an active turn");
+        const turnSettings = nativeAction ? settings : settingsAfterPlan(settings, thread.acceptedSettings, server.getCodexCatalog?.());
         const clientUserMessageId = optionalString(command.payload.clientUserMessageId, "payload.clientUserMessageId");
         const materialized = nativeAction ? [] : await materializeAttachments(project, command.commandId, rawAttachments);
         const materializedSkills = nativeAction ? [] : await materializePluginSkills(project, command.commandId, pluginSkills, server);
         const materializedPlugins = nativeAction ? [] : await materializePlugins(project, command.commandId, plugins, server);
         const result = nativeAction
           ? await server.startNativeTurn!(thread, nativeAction, { type: "uncommittedChanges" })
-          : await server.startTurn(thread, project, prompt, clientUserMessageId, settings, images, { attachments: materialized, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(goal ? { goal } : {}) });
+          : await server.startTurn(thread, project, prompt, clientUserMessageId, turnSettings, images, { attachments: materialized, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(goal ? { goal } : {}) });
         let completedBeforeResponse = false;
         const updated = await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => {
           candidate.acceptedPermissions = { profile, source: typeof command.payload.permissionSource === "string" ? command.payload.permissionSource : "default", acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
-          if (settings) candidate.acceptedSettings = { ...settings, acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
+          if (turnSettings) candidate.acceptedSettings = { ...turnSettings, acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
           if (
             candidate.lastTurnId === result.nativeTurnId &&
             ["completed", "interrupted", "failed"].includes(candidate.lastTurnStatus ?? "")
@@ -1633,7 +1634,7 @@ export class AgentRuntime {
             type: "turn.started",
             nativeThreadId: thread.nativeThreadId,
             nativeTurnId: result.nativeTurnId,
-            payload: { commandId: command.commandId, status: result.status, queued: command.type === "turn.queue", settings: settings ?? null },
+            payload: { commandId: command.commandId, status: result.status, queued: command.type === "turn.queue", settings: turnSettings ?? null },
           });
         }
         this.notifyRegistryChanged();
@@ -1641,7 +1642,7 @@ export class AgentRuntime {
           nativeThreadId: thread.nativeThreadId,
           nativeTurnId: result.nativeTurnId,
           status: completedBeforeResponse ? updated.lastTurnStatus ?? result.status : result.status,
-          ...(settings && updated.acceptedSettings ? { acceptedSettings: updated.acceptedSettings } : {}),
+          ...(turnSettings && updated.acceptedSettings ? { acceptedSettings: updated.acceptedSettings } : {}),
         };
       }
       case "turn.cancel": {

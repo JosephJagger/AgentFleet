@@ -479,6 +479,7 @@
   "计划模式": "Plan mode",
   "本次发送 · 计划模式": "This message · Plan mode",
   "默认模式": "Default mode",
+  "模式未确认": "Mode unconfirmed",
   "关闭计划模式": "Turn off Plan mode",
   "执行模式": "Execute mode",
   "（不代表提供方绝无模型回退）": "(The provider may still fall back to another model.)",

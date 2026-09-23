@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App, { ApprovalsView, SessionInspector } from "./App";
 import { OperationReceipts, receiptStatus } from "./components/OperationReceipts";
+import { RuntimeSettingsShortcut } from "./components/RuntimeSettingsShortcut";
 import { api, subscribeToFleet } from "./lib/api";
 import { draftKey } from "./lib/session-workspace";
 import { setLocale } from "./i18n";
@@ -79,6 +80,15 @@ it("计划模式只应用于下一次发送，成功后清除待发送标记", a
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() => expect(send).toHaveBeenCalledWith("先制定方案", { model: "test-model", effort: "medium", mode: "plan" }, undefined));
   await waitFor(() => expect(screen.queryByText("本次发送 · 计划模式")).toBeNull());
+});
+it("当前任务没有明确模式回执时不会显示默认模式", () => {
+  const observed = { accepted: { model: "test-model", effort: "medium", acceptedAt: "2026-09-16T00:00:00Z", nativeTurnId: "turn-1" } };
+  const props = { sessionId: "A", summary: { sessionId: "A", loaded: true, changed: false, settings: { model: "test-model", effort: "medium" } }, observed, running: true, activeTurnId: "turn-1", onOpen: vi.fn() };
+  const view = render(<RuntimeSettingsShortcut {...props} />);
+  expect(screen.getByText(/模式未确认/)).toBeTruthy();
+  expect(screen.queryByText(/默认模式/)).toBeNull();
+  view.rerender(<RuntimeSettingsShortcut {...props} observed={{ accepted: { ...observed.accepted, mode: "default" } }} />);
+  expect(screen.getByText(/默认模式/)).toBeTruthy();
 });
 it("输入 @ 可按插件名部分匹配并将整个插件加入本次发送", async () => {
   const props = inspectorProps("A");

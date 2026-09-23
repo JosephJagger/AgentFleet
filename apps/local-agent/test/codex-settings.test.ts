@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseModels, validateSettings, turnSettingsParams, readObservedSettings, type CodexCatalog } from "../src/codex-settings.js";
+import { parseModels, validateSettings, turnSettingsParams, readObservedSettings, settingsAfterPlan, type CodexCatalog } from "../src/codex-settings.js";
 
 const catalog: CodexCatalog = { models: [{ model: "model-a", displayName: "A", efforts: ["low", "high"], defaultEffort: "low" }], modes: ["default", "plan"], fetchedAt: new Date().toISOString() };
 test("service tier and personality are capability-gated typed parameters, including explicit reset", () => {
@@ -26,6 +26,16 @@ test("plan uses typed collaborationMode, never a text prompt or arbitrary instru
   });
   assert.deepEqual(turnSettingsParams(undefined), {});
   assert.deepEqual(turnSettingsParams({ model: "model-a" }), { model: "model-a" });
+});
+test("a one-turn plan is explicitly reset on the next turn without overriding a saved plan", () => {
+  const previous = { model: "model-a", effort: "high", mode: "plan" } as const;
+  const reset = settingsAfterPlan(undefined, previous, catalog);
+  assert.deepEqual(reset, { model: "model-a", effort: "high", mode: "default" });
+  assert.equal((turnSettingsParams(reset).collaborationMode as { mode: string }).mode, "default");
+  assert.deepEqual(settingsAfterPlan({ model: "model-a", effort: "low" }, previous, catalog), { model: "model-a", effort: "low", mode: "default" });
+  assert.deepEqual(settingsAfterPlan({ model: "model-a", mode: "plan" }, previous, catalog), { model: "model-a", mode: "plan" });
+  assert.equal(settingsAfterPlan(undefined, { model: "model-a", mode: "default" }, catalog), undefined);
+  assert.throws(() => settingsAfterPlan(undefined, previous, { ...catalog, models: [] }), { code: "CODEX_MODEL_UNAVAILABLE" });
 });
 test("model discovery filters hidden entries and extracts only displayable fields", () => {
   assert.deepEqual(parseModels({ data: [{ model: "model-a", displayName: "A", defaultReasoningEffort: "low", supportedReasoningEfforts: [{ reasoningEffort: "low" }], secret: "must not be copied" }, { hidden: true }] }), [{ model: "model-a", displayName: "A", defaultEffort: "low", efforts: ["low"] }]);

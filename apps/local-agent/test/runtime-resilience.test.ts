@@ -467,6 +467,22 @@ test("host validates model settings before creating a thread and journals accept
   assert.equal(Object.values(reopened.snapshot().managedThreads)[0]?.acceptedSettings?.effort, "high");
 });
 
+test("host explicitly resets a previous plan before the next panel turn and persists the receipt", async (t) => {
+  const { directory, store, projects } = await fixture();
+  const project = projects[0]!;
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: callbacks => (server = new FakeAppServer("epoch-plan-reset", callbacks)) });
+  runtime.setTransportGeneration(1); captureCallbacks(runtime);
+  await runtime.initialize(); t.after(() => runtime.shutdown());
+  await store.setManagedThread({ nativeThreadId: "thread-plan-reset", projectId: project.id, logicalSessionId: "session-plan-reset", executionSegmentId: "segment-session-plan-reset", appServerEpoch: server.appServerEpoch, policyVerified: true, policyVersion: "remote-restricted-v1", contentEpoch: 1, createdAt: new Date().toISOString(), sessionCwd: project.root,
+    acceptedSettings: { model: "host-model", effort: "high", mode: "plan", acceptedAt: new Date().toISOString(), nativeTurnId: "prior-plan-turn" } });
+  await runtime.handleCommand(command(project, "attempt-plan-reset", "command-plan-reset", "session-plan-reset", server.appServerEpoch), 1);
+  assert.deepEqual(server.receivedSettings, { model: "host-model", effort: "high", mode: "default" });
+  assert.equal(store.snapshot().managedThreads["thread-plan-reset"]?.acceptedSettings?.mode, "default");
+  const reopened = new StateStore(join(directory, "state")); await reopened.initialize();
+  assert.equal(reopened.snapshot().managedThreads["thread-plan-reset"]?.acceptedSettings?.mode, "default");
+});
+
 test("whole-plugin selection becomes one small routing skill instead of every bundled skill", async (t) => {
   const { store, projects } = await fixture();
   let server!: FakeAppServer;

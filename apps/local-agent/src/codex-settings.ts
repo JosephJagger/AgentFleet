@@ -78,6 +78,12 @@ export function validateSettings(value: unknown, catalog: CodexCatalog | undefin
     ...(value.serviceTier === undefined ? {} : { serviceTier: value.serviceTier as string | null }), ...(value.personality === undefined ? {} : { personality: value.personality as NonNullable<CodexSettings["personality"]> }) };
 }
 
+export function settingsAfterPlan(settings: CodexSettings | undefined, previous: CodexSettings | undefined, catalog: CodexCatalog | undefined): CodexSettings | undefined {
+  if (settings?.mode || previous?.mode !== "plan") return settings;
+  const base = settings ?? { model: previous.model, ...(previous.effort ? { effort: previous.effort } : {}) };
+  return validateSettings({ ...base, mode: "default" }, catalog);
+}
+
 export function turnSettingsParams(settings: CodexSettings | undefined): Record<string, unknown> {
   if (!settings) return {};
   return { model: settings.model, ...(settings.effort ? { effort: settings.effort } : {}),
