@@ -75,7 +75,7 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
           {scope==="machine"&&<div className="usage-reset-forecast" aria-live="polite">
             <strong>{t("临时重置预测")}</strong>
             {data?.resetPrediction?<p>{t("可能于 {0} 前临时重置",date(data.resetPrediction.expectedAt))} · {t("预测概率 {0}%",data.resetPrediction.probability)} <a href={data.resetPrediction.sourceUrl} target="_blank" rel="noopener noreferrer">{t("查看依据")}</a></p>:<p>{t("暂无预测")}</p>}
-            {data?.accounts.length===1&&data.accounts[0].credits?.resetCardsAvailable!=null&&<small>{t("可用重置卡 {0} 张",data.accounts[0].credits.resetCardsAvailable)}</small>}
+            {data?.accounts.length===1&&data.accounts[0].resetCardsAvailable!=null&&<small>{t("可用重置卡 {0} 张",data.accounts[0].resetCardsAvailable)}</small>}
             <small>{t("重置卡发放暂无可靠预测；到账数量来自原生 Codex。")}</small>
           </div>}
         </section>

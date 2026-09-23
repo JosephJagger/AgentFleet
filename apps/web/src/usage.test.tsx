@@ -44,7 +44,7 @@ it("keeps quota discoverable with multiple model windows and no session token re
  expect(await screen.findByRole("button",{name:/周额度\s*38%/})).toBeTruthy();
 });
 it("shows a temporary reset forecast only when supplied, and displays native reset cards",async()=>{
- vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",resetPrediction:{kind:"temporary-reset",probability:92,expectedAt:"2026-09-24T12:00:00Z",observedAt:"2026-09-23T12:00:00Z",sourceUrl:"https://x.com/thsottiaux/status/123"},accounts:[{...data.accounts[0],credits:{...data.accounts[0].credits!,resetCardsAvailable:2}}]});
+ vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",resetPrediction:{kind:"temporary-reset",probability:92,expectedAt:"2026-09-24T12:00:00Z",observedAt:"2026-09-23T12:00:00Z",sourceUrl:"https://x.com/thsottiaux/status/123"},accounts:[{...data.accounts[0],resetCardsAvailable:2}]});
  render(<UsageButton scope="machine" id="m1"/>);
  fireEvent.click(await screen.findByRole("button",{name:/周额度\s*38%/}));
  expect(await screen.findByText(/预测概率 92%/)).toBeTruthy();

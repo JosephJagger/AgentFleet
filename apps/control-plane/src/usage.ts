@@ -58,14 +58,14 @@ export class UsageService {
         resetsAt:Number.isSafeInteger(w.resetsAt) && Number(w.resetsAt)>0 && Number(w.resetsAt)<1e11 ? w.resetsAt : null }];
     });
     const accountKey=typeof raw.accountKey === "string" && /^[a-f0-9]{64}$/.test(raw.accountKey) ? raw.accountKey : null;
+    const cardCount=Number.isSafeInteger(raw.resetCardsAvailable)&&Number(raw.resetCardsAvailable)>=0?Number(raw.resetCardsAvailable):null;
     const creditValue=object(raw.credits);
     const balance=creditValue?.balance;
     const credits=creditValue && typeof creditValue.hasCredits==="boolean" && typeof creditValue.unlimited==="boolean" &&
       (balance===null || (typeof balance==="string" && /^-?\d+(?:\.\d+)?$/u.test(balance) && balance.length<=64))
-      ? {balance,hasCredits:creditValue.hasCredits,unlimited:creditValue.unlimited,
-        resetCardsAvailable:Number.isSafeInteger(creditValue.resetCardsAvailable)&&Number(creditValue.resetCardsAvailable)>=0?creditValue.resetCardsAvailable:null}:null;
-    this.db.run(`INSERT INTO machine_usage(machine_id,account_key,observed_at,windows_json,credits_json) VALUES(?,?,?,?,?)
-      ON CONFLICT(machine_id) DO UPDATE SET account_key=excluded.account_key,observed_at=excluded.observed_at,windows_json=excluded.windows_json,credits_json=excluded.credits_json WHERE excluded.observed_at>=machine_usage.observed_at`,machineId,accountKey,new Date(at).toISOString(),JSON.stringify(windows),credits===null?null:JSON.stringify(credits));
+      ? {balance,hasCredits:creditValue.hasCredits,unlimited:creditValue.unlimited}:null;
+    this.db.run(`INSERT INTO machine_usage(machine_id,account_key,observed_at,windows_json,credits_json,reset_cards_available) VALUES(?,?,?,?,?,?)
+      ON CONFLICT(machine_id) DO UPDATE SET account_key=excluded.account_key,observed_at=excluded.observed_at,windows_json=excluded.windows_json,credits_json=excluded.credits_json,reset_cards_available=excluded.reset_cards_available WHERE excluded.observed_at>=machine_usage.observed_at`,machineId,accountKey,new Date(at).toISOString(),JSON.stringify(windows),credits===null?null:JSON.stringify(credits),cardCount);
   }
   read(workspaceId: string, scope: "session" | "project" | "machine", id: string) {
     const table=scope==="session"?"logical_sessions":scope==="project"?"projects":"machines";
@@ -76,10 +76,11 @@ export class UsageService {
     const recorded=zero(); for(const row of rows) { const c=counts(JSON.parse(row.recorded_json))!; for(const key of keys) recorded[key]+=c[key]; }
     const machineIds=new Set(sessions.map(s=>s.machine_id)); if(scope==="machine")machineIds.add(id);
     if(scope==="project") { const project=this.db.get<{machine_id:string}>("SELECT machine_id FROM projects WHERE project_id=?",id); if(project)machineIds.add(project.machine_id); }
-    const quotaRows=this.db.all<{machine_id:string;name:string;account_key:string|null;observed_at:string;windows_json:string;credits_json:string|null}>(`SELECT u.*,m.name FROM machine_usage u JOIN machines m USING(machine_id) WHERE m.workspace_id=? AND m.identity_state='active' ORDER BY u.observed_at DESC`,workspaceId);
+    const quotaRows=this.db.all<{machine_id:string;name:string;account_key:string|null;observed_at:string;windows_json:string;credits_json:string|null;reset_cards_available:number|null}>(`SELECT u.*,m.name FROM machine_usage u JOIN machines m USING(machine_id) WHERE m.workspace_id=? AND m.identity_state='active' ORDER BY u.observed_at DESC`,workspaceId);
     const targetKeys=new Set(quotaRows.filter(r=>machineIds.has(r.machine_id)).map(r=>r.account_key??r.machine_id));
     const creditByKey=new Map<string,string>();for(const r of quotaRows){const key=r.account_key??r.machine_id;if(r.credits_json&&!creditByKey.has(key))creditByKey.set(key,r.credits_json);}
-    const seen=new Set<string>();const accounts=quotaRows.flatMap(r=>{const key=r.account_key??r.machine_id;if(!targetKeys.has(key)||seen.has(key))return [];seen.add(key);const credits=creditByKey.get(key);return [{sourceMachine:r.name,identityKnown:r.account_key!==null,observedAt:r.observed_at,stale:Date.now()-Date.parse(r.observed_at)>180_000,windows:JSON.parse(r.windows_json),credits:credits?JSON.parse(credits):null}];});
+    const cardsByKey=new Map<string,number>();for(const r of quotaRows){const key=r.account_key??r.machine_id;if(r.reset_cards_available!==null&&!cardsByKey.has(key))cardsByKey.set(key,r.reset_cards_available);}
+    const seen=new Set<string>();const accounts=quotaRows.flatMap(r=>{const key=r.account_key??r.machine_id;if(!targetKeys.has(key)||seen.has(key))return [];seen.add(key);const credits=creditByKey.get(key);return [{sourceMachine:r.name,identityKnown:r.account_key!==null,observedAt:r.observed_at,stale:Date.now()-Date.parse(r.observed_at)>180_000,windows:JSON.parse(r.windows_json),credits:credits?JSON.parse(credits):null,resetCardsAvailable:cardsByKey.get(key)??null}];});
     const weekly = accounts.flatMap(account => account.windows.filter((w: { bucket: string; windowMinutes: number; resetsAt: number | null }) =>
       w.bucket === "codex" && w.windowMinutes === 10080 && w.resetsAt !== null && w.resetsAt * 1000 > Date.now() && w.resetsAt * 1000 - 10080 * 60_000 <= Date.now()));
     let quotaCycle: { startsAt: string; resetsAt: string; recordedTokens: number | null; inputTokens: number | null; cachedInputTokens: number | null; boundaryIncomplete: boolean } | null = null;

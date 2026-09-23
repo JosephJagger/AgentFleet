@@ -19,16 +19,16 @@ export function quotaSnapshot(value: unknown, identity?: unknown): Record<string
   if (!isRecord(value)) return;
   const buckets = isRecord(value.rateLimitsByLimitId) ? Object.values(value.rateLimitsByLimitId) : [value.rateLimits];
   const windows: Record<string, unknown>[] = [];
-  let credits: { balance: string | null; hasCredits: boolean; unlimited: boolean; resetCardsAvailable: number | null } | null = null;
+  let credits: { balance: string | null; hasCredits: boolean; unlimited: boolean } | null = null;
+  const cardCount = isRecord(value.rateLimitResetCredits) ? value.rateLimitResetCredits.availableCount : null;
+  const resetCardsAvailable = Number.isSafeInteger(cardCount) && Number(cardCount) >= 0 ? Number(cardCount) : null;
   for (const bucket of buckets.slice(0, 16)) {
     if (!isRecord(bucket)) continue;
     const candidate = bucket.credits;
     if (credits === null && isRecord(candidate) && typeof candidate.hasCredits === "boolean" && typeof candidate.unlimited === "boolean") {
       const balance = candidate.balance;
       if (balance === null || (typeof balance === "string" && /^-?\d+(?:\.\d+)?$/u.test(balance) && balance.length <= 64)) {
-        const cards = isRecord(value.rateLimitResetCredits) ? value.rateLimitResetCredits.availableCount : null;
-        credits = { balance, hasCredits: candidate.hasCredits, unlimited: candidate.unlimited,
-          resetCardsAvailable: Number.isSafeInteger(cards) && Number(cards) >= 0 ? Number(cards) : null };
+        credits = { balance, hasCredits: candidate.hasCredits, unlimited: candidate.unlimited };
       }
     }
     for (const key of ["primary", "secondary"]) {
@@ -45,5 +45,5 @@ export function quotaSnapshot(value: unknown, identity?: unknown): Record<string
   const email = typeof account?.email === "string" ? account.email.trim().toLowerCase() : "";
   const key = typeof value.accountId === "string" && value.accountId && email
     ? sha256(JSON.stringify(["agentfleets-usage", value.accountId, email])).replace(/^sha256:/, "") : undefined;
-  return { observedAt: nowIso(), windows, credits, ...(key ? { accountKey: key } : {}) };
+  return { observedAt: nowIso(), windows, credits, resetCardsAvailable, ...(key ? { accountKey: key } : {}) };
 }

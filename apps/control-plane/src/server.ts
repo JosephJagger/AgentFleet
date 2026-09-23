@@ -938,7 +938,7 @@ export async function buildControlPlane(
       const account=summary.accounts.length===1?summary.accounts[0]:null;
       const weekly=account?.windows.find((window:{bucket:string;windowMinutes:number;remainingPercent:number})=>window.bucket==="codex"&&window.windowMinutes===10080);
       const resetPrediction=await resetRadar.read(`${workspaceId}:${id}`,
-        weekly?{remainingPercent:weekly.remainingPercent,resetCardsAvailable:account?.credits?.resetCardsAvailable??null}:null);
+        weekly?{remainingPercent:weekly.remainingPercent,resetCardsAvailable:account?.resetCardsAvailable??null}:null);
       return {...summary,resetPrediction};
     });
   }

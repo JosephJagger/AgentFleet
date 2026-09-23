@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 37) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 38) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1214,6 +1214,12 @@ export class ControlPlaneDatabase {
         this.sqlite.exec("ALTER TABLE users ADD COLUMN disabled_at TEXT");
       }
       this.sqlite.exec("PRAGMA user_version=37");
+    });
+    if (version < 38) this.transaction(() => {
+      if (!this.all<{ name: string }>("PRAGMA table_info(machine_usage)").some(column => column.name === "reset_cards_available")) {
+        this.sqlite.exec("ALTER TABLE machine_usage ADD COLUMN reset_cards_available INTEGER CHECK(reset_cards_available IS NULL OR reset_cards_available >= 0)");
+      }
+      this.sqlite.exec("PRAGMA user_version=38");
     });
   }
 
