@@ -92,6 +92,7 @@ import type { CodexSettings } from "./lib/codex-settings";
 import { codexCommands, coverageLabels, initInstructions, parseCodexCommand } from "./lib/codex-commands";
 import { CodexCommandGuide } from "./components/CodexCommandGuide";
 import { sessionPath, useSessionDraft } from "./lib/session-workspace";
+import { referenceIdFromText, referencePrompt, type SessionReferenceJob } from "./lib/session-references";
 import { useAutoSizeTextarea } from "./lib/auto-size-textarea";
 import { useCompletionPreferences } from "./lib/completion-preferences";
 import { useWritingMemory } from "./lib/writing-assistance";
@@ -599,10 +600,11 @@ type TurnAdditions = {
   goal?: string;
 };
 
-export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, historyLoading, onRefresh, onClaim, onReleaseManagement,  onSend, onQueue, onSteer, onCancelQueued, onCancel, onApproval, onClose, onNewSession }: {
+export function SessionInspector({ detail, loading, draftOwner, referenceCandidates = [], onLoadHistory, historyLoading, onRefresh, onClaim, onReleaseManagement,  onSend, onQueue, onSteer, onCancelQueued, onCancel, onApproval, onClose, onNewSession }: {
   detail?: SessionDetail;
   loading: boolean;
   draftOwner?: string;
+  referenceCandidates?: FleetSession[];
   onLoadHistory?: () => void;
   historyLoading?: boolean;
   onRefresh: () => void;
@@ -632,6 +634,69 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const fileDraft = useFileDraft(detail?.session.id);
   const [selectedPlugins, setSelectedPlugins] = useState<Array<{ pluginId: string; pluginName: string }>>([]);
   const [goal, setGoal] = useSessionDraft(draftOwner ?? "preview", detail?.session.id, "goal");
+  type ReferenceCard = { key: string; sourceId: string; job?: SessionReferenceJob; error?: string };
+  const [referenceCards, setReferenceCards] = useState<ReferenceCard[]>([]);
+  const [referencePicker, setReferencePicker] = useState(false);
+  const [referenceSearch, setReferenceSearch] = useState("");
+  const referencePickerRef = useRef<HTMLDivElement | null>(null);
+  const referenceSources = useRef(new Set<string>());
+  const referenceControllers = useRef(new Map<string, AbortController>());
+  const referenceActive = useRef(new Set<string>());
+  useEffect(() => {
+    const controllers = referenceControllers.current;
+    const active = referenceActive.current;
+    setReferenceCards([]);
+    setReferencePicker(false);
+    return () => { for (const controller of controllers.values()) controller.abort(); controllers.clear(); active.clear(); referenceSources.current.clear(); };
+  }, [detail?.session.id]);
+  useEffect(() => {
+    if (!referencePicker) return;
+    const dismiss = (event: PointerEvent) => { if (!referencePickerRef.current?.contains(event.target as Node)) setReferencePicker(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setReferencePicker(false); };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", escape); };
+  }, [referencePicker]);
+  async function addReference(sourceId: string) {
+    if (referenceSources.current.has(sourceId)) return;
+    referenceSources.current.add(sourceId);
+    const key = crypto.randomUUID();
+    const controller = new AbortController();
+    referenceControllers.current.set(key, controller);
+    referenceActive.current.add(key);
+    setReferenceCards(current => [...current, { key, sourceId }]);
+    try {
+      // Keep the short creation request alive so a deleted card can cancel a job
+      // even when the server replies after the user removes it.
+      let job = await api.createSessionReference(sourceId);
+      if (!referenceActive.current.has(key) || controller.signal.aborted) { void api.cancelSessionReference(job.id).catch(() => undefined); return; }
+      while (referenceActive.current.has(key) && !controller.signal.aborted) {
+        setReferenceCards(current => current.map(card => card.key === key ? { ...card, job } : card));
+        if (job.state === "ready" || job.state === "failed") break;
+        await new Promise<void>(resolve => { const timer = window.setTimeout(resolve, 850); controller.signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true }); });
+        if (!referenceActive.current.has(key) || controller.signal.aborted) break;
+        job = await api.sessionReference(job.id, controller.signal);
+      }
+    } catch (error) {
+      if (referenceActive.current.has(key) && !controller.signal.aborted) setReferenceCards(current => current.map(card => card.key === key ? { ...card, error: errorMessage(error) } : card));
+    } finally { referenceControllers.current.delete(key); }
+  }
+  function removeReference(key: string) {
+    referenceActive.current.delete(key);
+    referenceControllers.current.get(key)?.abort();
+    const card = referenceCards.find(item => item.key === key);
+    if (card) referenceSources.current.delete(card.sourceId);
+    if (card?.job?.id) void api.cancelSessionReference(card.job.id).catch(() => undefined);
+    setReferenceCards(current => current.filter(item => item.key !== key));
+  }
+  function retryReference(key: string) {
+    const card = referenceCards.find(item => item.key === key);
+    if (!card) return;
+    removeReference(key);
+    // Let the deleted card leave state before adding a replacement.
+    window.setTimeout(() => void addReference(card.sourceId), 0);
+  }
+
   const [modeOverride, setModeOverride] = useState<"default" | "plan">();
   const [configuration, setConfiguration] = useState<ConfigurationRequest>();
   const [runtimeChoice, setRuntimeChoice] = useState<RuntimeChoice>();
@@ -724,7 +789,10 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
   const canQueueOrSteer = Boolean(detail.writable && session.state.currentTurn === "in_progress" && session.activeTurnId);
   const slashCommand = parseCodexCommand(prompt);
   const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() ? { ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
-  const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length);
+  const referencesBlocked = referenceCards.some(card => card.error || !card.job || card.job.state !== "ready");
+  const completedReferences = referenceCards.map(card => card.job).filter((job): job is SessionReferenceJob => Boolean(job));
+  const sendText = () => referencePrompt(prompt, completedReferences, window.location.origin);
+  const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length || referenceCards.length);
   const imageBlocked = imageDraft.processing || fileDraft.processing || (imageDraft.images.length > 0 && (!session.imageInputSupported || Boolean(slashCommand))) || (fileDraft.files.length > 0 && (!session.fileInputSupported || Boolean(slashCommand)));
   const inherited = session.runtimeSettings?.accepted ?? session.runtimeSettings?.observed;
   const sendSettings = modeOverride && inherited?.model ? { model: inherited.model, ...(inherited.effort ? { effort: inherited.effort } : {}), ...(settings ?? {}), mode: modeOverride } satisfies CodexSettings : settings;
@@ -777,18 +845,18 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (imageBlocked || busy) return;
+    if (imageBlocked || busy || referencesBlocked) return;
     if (prompt.trim() === "/") return;
     if (slashCommand) { await runSlash(slashCommand.name, slashCommand.args); return; }
     if (!hasInput || !canSend) return;
     setBusy(true);
     try {
-      if (additions) await onSend(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions);
-      else await onSend(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined);
+      if (additions) await onSend(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions);
+      else await onSend(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined);
       setCommandMessage("");
       setPrompt("");
       imageDraft.clear();
-      fileDraft.clear(); setSelectedPlugins([]);
+      fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key));
       setModeOverride(undefined);
       textArea.current?.focus();
     } catch (error) {
@@ -825,6 +893,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         <div className="inspector-head__actions">
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span>{t("会话配置")}</span></button>
           <SessionActions>
+            <button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(new URL(sessionPath(session.id), window.location.origin).href); setCommandMessage(t("已复制会话链接")); } catch { setCommandMessage(t("浏览器未允许复制会话链接")); } }}><Copy size={16} />{t("复制会话链接")}</button>
             <button type="button" className="button button--quiet" onClick={onRefresh}><RefreshCw size={16} />{t("刷新会话")}</button>
             <NativeSessionDeletion key={`delete:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} pending={pendingCommand} onChanged={onRefresh} />
           </SessionActions>
@@ -897,6 +966,15 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
         {canQueueOrSteer && <div className="composer-mode"><Activity size={14} />{t("Codex 正在处理：可补充当前任务，或排到下一轮")}</div>}
         <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} modeOverride={modeOverride === "plan" ? "plan" : undefined} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onClearMode={() => setModeOverride(undefined)} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>
+        {referenceCards.length > 0 && <div className="session-reference-cards" aria-label={t("复用的会话")}>
+          {referenceCards.map(card => { const source = card.job?.identity; const candidate = referenceCandidates.find(item => item.id === card.sourceId); const failed = Boolean(card.error || card.job?.state === "failed"); const ready = card.job?.state === "ready"; return <article className="session-reference-card" key={card.key}>
+            <div className="session-reference-card__head"><strong>{source?.title ?? candidate?.title ?? card.sourceId}</strong><button type="button" aria-label={t("删除引用卡片")} onClick={() => removeReference(card.key)}><X size={15} /></button></div>
+            <small>{source ? `${source.host} · ${source.project}` : candidate ? `${candidate.machineName} · ${candidate.projectAlias}` : t("正在读取会话")}</small>
+            {failed ? <p role="alert">{card.error || card.job?.error || t("摘要失败")}</p> : ready ? <details><summary>{t("摘要已就绪 · 展开预览")}</summary><pre>{card.job?.summary}</pre></details> : <><span role="status">{card.job?.state === "combining" ? t("正在合并摘要") : card.job?.state === "summarizing" ? t("正在分段总结") : t("正在读取同步历史")} · {card.job?.done ?? 0}/{card.job?.total ?? 1}</span><progress value={card.job?.done ?? 0} max={card.job?.total || 1} /></>}
+            {failed && <button type="button" className="button button--secondary" onClick={() => retryReference(card.key)}>{t("重试摘要")}</button>}
+          </article>; })}
+        </div>}
+        {referencePicker && <div ref={referencePickerRef} className="session-reference-picker" role="dialog" aria-label={t("复用会话")}><div><strong>{t("复用会话")}</strong><button type="button" aria-label={t("关闭")} onClick={() => setReferencePicker(false)}><X size={17}/></button></div><input aria-label={t("搜索会话")} value={referenceSearch} onChange={event => setReferenceSearch(event.target.value)} placeholder={t("搜索主机、项目或会话")}/><div className="session-reference-picker__list">{referenceCandidates.filter(item => `${item.title} ${item.projectAlias} ${item.machineName}`.toLowerCase().includes(referenceSearch.toLowerCase())).map(item => <button type="button" key={item.id} onClick={() => { setReferencePicker(false); void addReference(item.id); }}><b>{item.title}</b><small>{item.machineName} · {item.projectAlias}</small></button>)}</div></div>}
         <div className="composer-input">
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
@@ -941,7 +1019,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           onCompositionStart={() => setComposingPrompt(true)}
           onCompositionEnd={(event) => { setComposingPrompt(false); setCompletionCaret(event.currentTarget.selectionStart); setCompletionSelectionEnd(event.currentTarget.selectionEnd); }}
           onSelect={(event) => { setCompletionCaret(event.currentTarget.selectionStart); setCompletionSelectionEnd(event.currentTarget.selectionEnd); }}
-          onPaste={event => { if (!busy) void imageDraft.onPaste(event); }}
+          onPaste={event => { if (busy) return; const value = event.clipboardData.getData("text/plain").trim(); const sourceId = referenceIdFromText(value, window.location.origin); if (sourceId) { event.preventDefault(); void addReference(sourceId); } else void imageDraft.onPaste(event); }}
           disabled={busy}
           rows={1}
           onKeyDown={(event) => {
@@ -987,8 +1065,8 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
           }}
         />
         <div className="composer-actions">
-          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{detail.writeBlockedReason || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
-          <span className="composer-touch-hint">{detail.writeBlockedReason || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(referencesBlocked ? t("请等待会话摘要完成；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-touch-hint">{(referencesBlocked ? t("请等待会话摘要完成；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
           <div className="composer-button-group">
           <input ref={imageInput} className="composer-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label={t("选择要发送的图片")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void imageDraft.addFiles(files); }} />
           <input ref={fileInput} className="composer-image-input" type="file" accept={ATTACHMENT_ACCEPT} multiple aria-label={t("选择要发送的文件")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
@@ -997,6 +1075,7 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
             <div className="composer-add-popover__head"><strong>{t("添加")}</strong><button type="button" className="composer-add-popover__close" aria-label={t("关闭")} onClick={closeAddMenu}><X size={19} /></button></div>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); fileInput.current?.click(); }}><FileUp size={17} /><span><b>{t("文件")}</b><small>{t("支持 PDF、XLSX、UTF-8 文本、源码与配置")}</small></span></button>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); folderInput.current?.click(); }}><FolderOpen size={17} /><span><b>{t("文件夹")}</b><small>{t("逐个校验支持类型，最多 32 个文件")}</small></span></button>
+            <button type="button" onClick={() => { closeAddMenu(); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t("选择会话并自动生成摘要")}</small></span></button>
             <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { closeAddMenu(); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
             {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { closeAddMenuAfterTouchChoice(); if (!settings?.model && !inherited?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !settings?.model && !inherited?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}
@@ -1006,13 +1085,13 @@ export function SessionInspector({ detail, loading, draftOwner, onLoadHistory, h
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>}
-              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(prompt.trim(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
-              <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined, additions); else await onSteer(prompt.trim(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>
+              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
+              <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, additions); else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>
             </div>
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>
           ) : (
-            <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
+            <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || referencesBlocked || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
           )}</div>}
           </div>
         </div>
@@ -1540,7 +1619,7 @@ function App() {
           {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} />}
           </div>
         </main>
-        <SessionInspector detail={displayedSession ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
+        <SessionInspector referenceCandidates={dashboard.sessions} detail={displayedSession ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
       </div> : view === "hosts" ? <HostsView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />

@@ -2429,5 +2429,21 @@
   "已复制，到主机执行": "Copied — run on the host",
   "复制修复命令": "Copy repair command",
   "主机离线时，网页无法代替你在主机执行命令。": "The panel cannot run this command remotely while the host is offline.",
-  "命令已复制，尚未执行修复。请到对应主机粘贴运行。": "Command copied. No repair has run yet. Paste and run it on the selected host."
+  "命令已复制，尚未执行修复。请到对应主机粘贴运行。": "Command copied. No repair has run yet. Paste and run it on the selected host.",
+  "复用会话": "Reuse session",
+  "选择会话并自动生成摘要": "Select a session and generate a summary",
+  "复用的会话": "Referenced sessions",
+  "删除引用卡片": "Remove reference",
+  "摘要失败": "Summary failed",
+  "摘要已就绪 · 展开预览": "Summary ready · Preview",
+  "正在合并摘要": "Combining summaries",
+  "正在分段总结": "Summarizing in parts",
+  "正在读取同步历史": "Reading synced history",
+  "重试摘要": "Retry summary",
+  "搜索会话": "Search sessions",
+  "搜索主机、项目或会话": "Search hosts, projects, or sessions",
+  "请等待会话摘要完成；失败时重试或删除卡片": "Wait for the summary; retry or remove a failed card",
+  "已复制会话链接": "Session link copied",
+  "浏览器未允许复制会话链接": "Browser denied copying the session link",
+  "复制会话链接": "Copy session link"
 }

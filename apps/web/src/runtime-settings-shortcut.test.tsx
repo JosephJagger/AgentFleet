@@ -59,7 +59,7 @@ it("does not present a previous turn receipt or unbound observation as the curre
  expect(screen.getByText("未确认")).toBeTruthy();expect(screen.queryByText(/old-model|observed-model/)).toBeNull();
 });
 it("hides duplicate follow-up settings and switches to send settings when the turn ends",()=>{
- const props={sessionId:"s",activeTurnId:"turn",summary:{sessionId:"s",settings:{model:"same-model",effort:"low"},changed:false,loaded:true},observed:{accepted:{nativeTurnId:"turn",acceptedAt:"2026-09-10T00:00:00Z",model:"same-model",effort:"low"}},onOpen:()=>{}};
+ const props={sessionId:"s",activeTurnId:"turn",summary:{sessionId:"s",settings:{model:"same-model",effort:"low"},changed:false,loaded:true},observed:{accepted:{nativeTurnId:"turn",acceptedAt:"2026-09-10T00:00:00Z",model:"same-model",effort:"low",mode:"default" as const}},onOpen:()=>{}};
  const view=render(<RuntimeSettingsShortcut {...props} running/>);
  expect(screen.queryByText("后续任务")).toBeNull();expect(screen.getByText("当前任务")).toBeTruthy();expect(screen.getByText("same-model · low · 默认模式")).toBeTruthy();
  view.rerender(<RuntimeSettingsShortcut {...props} running={false}/>);

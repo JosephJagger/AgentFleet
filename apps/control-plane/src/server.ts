@@ -4,6 +4,7 @@ import { createHash, type Hash } from "node:crypto";
 import { PassThrough } from "node:stream";
 import { WritingMemory } from "./writing-memory.js";
 import { WritingAI } from "./writing-ai.js";
+import { SessionReferences } from "./session-references.js";
 import { hybridWritingSuggestions } from "./writing-nlp.js";
 import { WritingPreferences } from "./writing-preferences.js";
 import { WritingHistory } from "./writing-history.js";
@@ -203,6 +204,7 @@ export async function buildControlPlane(
   const writingAI = new WritingAI(db, config.databasePath, writingMemory);
   const startupMachineReconciliation = registry.reconcileControlPlaneRestart();
   const coordination = new CoordinationService(db, config);
+  const sessionReferences = new SessionReferences(db, registry, coordination, writingAI);
   const usage = new UsageService(db);
   const resetRadar = new ResetRadar();
   const codexPreferences = new CodexPreferencesService(db);
@@ -1040,6 +1042,12 @@ export async function buildControlPlane(
     limiter.check(`writing-ai:${request.principal!.userId}`, 12, 60_000);
     return writingAI.suggest(request.principal as Principal, routeId(request), record(request.body).draft);
   });
+  app.post("/api/session-references", { preHandler: mutate }, async request => {
+    limiter.check(`session-reference:${request.principal!.userId}`, 20, 60_000);
+    return sessionReferences.start(request.principal as Principal, requiredString(record(request.body).sourceId, "sourceId", 200));
+  });
+  app.get("/api/session-references/:id", { preHandler: authenticate }, async request => sessionReferences.status(request.principal as Principal, routeId(request)));
+  app.delete("/api/session-references/:id", { preHandler: mutate }, async request => sessionReferences.cancel(request.principal as Principal, routeId(request)));
   app.post("/api/sessions/:id/writing-nlp", { preHandler: mutate, bodyLimit: 12_000 }, async (request, reply) => {
     limiter.check(`writing-nlp:${request.principal!.userId}`, 90, 60_000);
     writingMemory.session(request.principal as Principal, routeId(request));
