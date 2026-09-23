@@ -41,15 +41,46 @@ function Invoke-AgentFleetWebRequest([string]$Uri, [string]$OutFile) {
   Invoke-WebRequest @parameters
 }
 function Register-AgentFleetUpdateHandoff {
-  # The installer can be launched by an older Agent whose task wrapper exits
-  # with the worker. A separate one-shot task starts the stable background task
-  # after that old process tree has finished, independent of old Agent code.
+  # An older task wrapper may exit after this installer returns. Keep the
+  # handoff independent of that wrapper until the new worker verifies itself.
+  # A single Start-ScheduledTask can be ignored while the old task is still
+  # Running; repeating the check closes that handoff race.
   $handoffName = 'AgentFleet-Update-Handoff'
-  $handoffScript = "`$ErrorActionPreference='SilentlyContinue'; Start-ScheduledTask -TaskName 'AgentFleet-Background'; Start-Sleep -Seconds 2; Unregister-ScheduledTask -TaskName '$handoffName' -Confirm:`$false"
+  $escapedRoot = $StateRoot.Replace("'", "''")
+  $handoffScript = @"
+`$ErrorActionPreference = 'SilentlyContinue'
+`$root = '$escapedRoot'
+`$log = Join-Path `$root 'update-handoff.log'
+`$task = Get-ScheduledTask -TaskName 'AgentFleet-Background' -ErrorAction SilentlyContinue
+`$state = `$null
+try { `$state = Get-Content -Raw -LiteralPath (Join-Path `$root 'update-state.json') | ConvertFrom-Json } catch { }
+if (`$state.phase -in @('succeeded','rolled_back','failed') -and `$task -and `$task.State -eq 'Running') {
+  Add-Content -LiteralPath `$log -Value "`$(Get-Date -Format o) completed: `$(`$state.phase)"
+  Unregister-ScheduledTask -TaskName '$handoffName' -Confirm:`$false
+  exit 0
+}
+if (`$task -and `$task.State -ne 'Running') {
+  Start-ScheduledTask -TaskName 'AgentFleet-Background'
+  Add-Content -LiteralPath `$log -Value "`$(Get-Date -Format o) restarted background task"
+} elseif (`$task -and `$state.phase -in @('staged','verifying')) {
+  # A task can claim Running while its Node worker has already disappeared.
+  # Only repair that empty wrapper after a grace period; leave live workers
+  # and their Codex turns untouched.
+  `$age = if (`$state.startedAt) { ((Get-Date).ToUniversalTime() - ([datetime]`$state.startedAt).ToUniversalTime()).TotalMinutes } else { 0 }
+  if (`$age -ge 3) {
+    `$worker = Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { `$_.CommandLine -like '*AgentFleet*' }
+    if (-not `$worker) {
+      Stop-ScheduledTask -TaskName 'AgentFleet-Background'
+      Start-ScheduledTask -TaskName 'AgentFleet-Background'
+      Add-Content -LiteralPath `$log -Value "`$(Get-Date -Format o) restarted empty background task"
+    }
+  }
+}
+"@
   $encodedHandoff = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($handoffScript))
   $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
   $action = New-ScheduledTaskAction -Execute (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $encodedHandoff"
-  $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
+  $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Hours 1)
   $principal = New-ScheduledTaskPrincipal -UserId $sid -LogonType Interactive -RunLevel Limited
   $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::FromMinutes(5)) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
   Register-ScheduledTask -TaskName $handoffName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
@@ -188,6 +219,8 @@ try {
     if ($LASTEXITCODE -ne 0) {
       Write-Warning 'Background service installation failed. Starting the repaired agent in this window; keep it open.'
       & $StableLauncher run --data-dir $StateRoot
+    } else {
+      Write-Host 'The Windows task is running. Panel connectivity is confirmed only after the host appears online; allow startup and connection time.'
     }
     exit $LASTEXITCODE
   }

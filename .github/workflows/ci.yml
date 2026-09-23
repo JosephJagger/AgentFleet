@@ -9,6 +9,18 @@ permissions:
   contents: read
 
 jobs:
+  windows-installer:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Parse Windows installer with PowerShell 5.1
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path packaging/install.ps1), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

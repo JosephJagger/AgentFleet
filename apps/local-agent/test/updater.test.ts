@@ -20,6 +20,10 @@ test("the Windows installer schedules a handoff that does not depend on the old 
   assert.match(installer, /AgentFleet-Update-Handoff/);
   assert.match(installer, /Start-ScheduledTask -TaskName 'AgentFleet-Background'/);
   assert.match(installer, /New-ScheduledTaskTrigger -Once/);
+  assert.match(installer, /-RepetitionInterval \(New-TimeSpan -Minutes 1\)/);
+  assert.match(installer, /state\.phase -in @\('succeeded','rolled_back','failed'\)/);
+  assert.match(installer, /task\.State -ne 'Running'/);
+  assert.match(installer, /if \(-not `\$worker\)/);
 });
 
 test("release comparison is numeric and rejects non-release versions", () => {
