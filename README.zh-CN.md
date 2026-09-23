@@ -193,7 +193,7 @@ AgentFleets 始终继续同一个 Codex 原生 Thread，保留它的历史和身
 - **官方 SSH：连接服务器上的项目。** 例如从桌面应用连接一台 Linux 开发服务器，你需要能通过 SSH 登录那台服务器，并在服务器上安装、认证 Codex，再添加远程项目。这走的是 SSH 登录流程，不是上面的设备配对流程；官方 SSH 配置说明没有列出“两端同一 ChatGPT 账号和工作区”这一要求。详见[官方远程连接说明](https://learn.chatgpt.com/docs/remote-connections)。
 - **AgentFleets：把主机接入自己的网页面板。** 每台主机安装 Agent，用面板签发的一次性凭据配对。面板账号负责管理主机，主机上的 Codex 账号负责执行任务：各主机的 Codex 账号可以不同，也不必与面板邮箱一致，但每台主机都要有可用的 Codex 认证及权限。
 
-AgentFleets 当前使用单一管理员账号；接入多台主机不代表共享 Codex 账号、合并额度或提供多人团队权限。
+AgentFleets 通过 Django 和 Resend 邮箱验证码支持多用户；首次登录自动创建独立工作区，机器、项目和会话按用户隔离。各主机的 Codex 账号与额度保持独立，暂不提供团队共享权限。
 
 官方远程功能已满足需求时，直接使用官方应用即可。希望自行掌握部署、定制和多主机网页管理时，再选择 AgentFleets。两者功能有重叠，“远程继续会话”并非本项目独有。AgentFleets 在原主机上管理会话，目前不提供将对话及 Git 状态整体迁移到另一台主机的功能；换其他客户端打开同一原生会话前，需先释放面板写入权。
 
@@ -221,14 +221,20 @@ cp .env.example .env
 
 ```dotenv
 ADMIN_EMAIL=you@example.com
-ADMIN_PASSWORD=设置一个至少12位的独立密码
+AUTH_MODE=email
+DJANGO_AUTH_URL=http://identity:8000
+DJANGO_AUTH_SERVICE_TOKEN=独立生成至少32位随机密钥
+DJANGO_SECRET_KEY=再独立生成一个至少32位随机密钥
+RESEND_API_KEY=你的Resend密钥
+RESEND_FROM_EMAIL=login@你的已验证域名
+RESEND_FROM_NAME=AgentFleets
 PUBLIC_ORIGIN=https://panel.example.com
 ALLOWED_ORIGINS=https://panel.example.com
 COOKIE_SECURE=true
 PUBLISH_HOST=127.0.0.1
 ```
 
-将邮箱、密码和示例域名换成自己的值。两个 origin 都不要包含路径或末尾斜杠。系统没有默认管理员密码，`.env` 已被 Git 忽略，不会随代码提交。
+将邮箱、发件地址和示例域名换成自己的值，分别运行 `openssl rand -hex 48` 生成两个 Django 密钥。登录只需要邮箱收到的 6 位验证码，无需密码；发件地址必须使用 Resend 已验证的域名。升级时保留原 `ADMIN_EMAIL`，原工作区及数据会继续归属该邮箱。两个 origin 都不要包含路径或末尾斜杠。API Key 仅在 `.env` 配置，已被 Git 和镜像构建忽略。详见 [Django 用户服务说明](apps/identity/README.md)，备份时需同时保存控制面和用户服务两个数据卷。
 
 如果反向代理会转发客户端地址，只把已经核实的直接代理地址填入 `TRUSTED_PROXIES`；不需要识别真实客户端地址时可以不设置。
 

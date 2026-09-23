@@ -952,17 +952,17 @@ test("TRUSTED_PROXIES accepts only explicit IP addresses and CIDRs", () => {
     PUBLIC_ORIGIN: origin,
     TRUSTED_PROXIES: "127.0.0.1/32, ::1",
   };
-  assert.deepEqual(loadConfig(environment).trustedProxies, ["127.0.0.1/32", "::1"]);
+  assert.deepEqual(loadConfig({ AUTH_MODE: "password", ...environment }).trustedProxies, ["127.0.0.1/32", "::1"]);
   assert.throws(
-    () => loadConfig({ ...environment, TRUSTED_PROXIES: "uniquelocal" }),
+    () => loadConfig({ AUTH_MODE: "password", ...environment, TRUSTED_PROXIES: "uniquelocal" }),
     /invalid IP\/CIDR/,
   );
   assert.throws(
-    () => loadConfig({ ...environment, TRUSTED_PROXIES: "127.0.0.1/99" }),
+    () => loadConfig({ AUTH_MODE: "password", ...environment, TRUSTED_PROXIES: "127.0.0.1/99" }),
     /invalid IP\/CIDR/,
   );
   assert.throws(
-    () => loadConfig({ ...environment, ADMIN_PASSWORD: "replace-with-a-long-random-password" }),
+    () => loadConfig({ AUTH_MODE: "password", ...environment, ADMIN_PASSWORD: "replace-with-a-long-random-password" }),
     /ADMIN_PASSWORD is required/,
   );
 });

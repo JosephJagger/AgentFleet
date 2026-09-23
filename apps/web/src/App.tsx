@@ -1,3 +1,4 @@
+import { EmailLoginForm } from "./components/EmailLoginForm";
 import { writingAIErrorMessage } from "./lib/writing-assistance";
 import { WorldClocks } from "./components/WorldClocks";
 import { hasLiveTransport, onlineFirst } from "./lib/machine-order";
@@ -201,25 +202,6 @@ function IconButton({ label, children, onClick, className = "", disabled = false
 }
 
 function Login({ onLogin }: { onLogin: (dashboard: Dashboard) => void }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    setBusy(true);
-    try {
-      const result = await api.login(email, password);
-      onLogin(result.dashboard);
-    } catch (nextError) {
-      setError(errorMessage(nextError));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <main className="login-shell">
       <div className="login-mark" aria-hidden="true">
@@ -244,22 +226,8 @@ function Login({ onLogin }: { onLogin: (dashboard: Dashboard) => void }) {
       <section className="login-panel" aria-labelledby="login-title">
         <div className="eyebrow">{t("Codex · 多主机控制台")}</div>
         <h2 id="login-title">{t("进入控制面")}</h2>
-        <p className="subtle">{t("使用部署时设置的管理员账号。")}</p>
-        <form onSubmit={submit}>
-          <label>
-            <span>{t("邮箱")}</span>
-            <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required autoFocus />
-          </label>
-          <label>
-            <span>{t("密码")}</span>
-            <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-          </label>
-          {error && <div className="form-error" role="alert"><AlertTriangle size={15} />{systemText(error)}</div>}
-          <button className="button button--primary login-submit" disabled={busy}>
-            {busy ? <LoaderCircle className="spin" size={17} /> : <ArrowRight size={17} />}
-            {busy ? t("正在验证") : t("进入 AgentFleets")}
-          </button>
-        </form>
+        <p className="subtle">{t("输入邮箱接收验证码，首次登录自动创建独立工作区。")}</p>
+        <EmailLoginForm onLogin={onLogin} />
         <div className="login-foot"><StatusDot tone="live" /> {t("受控登录 · 会话可单独撤销")}</div>
       </section>
     </main>

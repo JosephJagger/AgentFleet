@@ -2,6 +2,9 @@ import { isIP } from "node:net";
 import { resolve } from "node:path";
 
 export interface ControlPlaneConfig {
+  authMode?: "email" | "password";
+  djangoAuthUrl?: string;
+  djangoAuthServiceToken?: string;
   host: string;
   port: number;
   databasePath: string;
@@ -61,14 +64,27 @@ function trustedProxies(value: string | undefined): string[] | undefined {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ControlPlaneConfig {
   const adminEmail = env.ADMIN_EMAIL?.trim().toLowerCase();
-  const adminPassword = env.ADMIN_PASSWORD;
+  const authMode = env.AUTH_MODE ?? "email";
+  if (authMode !== "email" && authMode !== "password") throw new Error("AUTH_MODE must be email or password");
+  const djangoAuthUrl = env.DJANGO_AUTH_URL;
+  const djangoAuthServiceToken = env.DJANGO_AUTH_SERVICE_TOKEN;
+  if (authMode === "email") {
+    if (!djangoAuthUrl || !djangoAuthServiceToken || djangoAuthServiceToken.length < 32) {
+      throw new Error("DJANGO_AUTH_URL and DJANGO_AUTH_SERVICE_TOKEN (at least 32 characters) are required");
+    }
+    const url = new URL(djangoAuthUrl);
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+      throw new Error("DJANGO_AUTH_URL must be an HTTP(S) service URL without credentials, query or fragment");
+    }
+  }
+  const adminPassword = env.ADMIN_PASSWORD ?? "";
   if (!adminEmail) throw new Error("ADMIN_EMAIL is required");
-  if (
+  if (authMode === "password" && (
     !adminPassword
     || adminPassword.length < 12
     || adminPassword === "replace-with-a-long-random-password"
     || adminPassword === "use-a-long-random-password"
-  ) {
+  )) {
     throw new Error("ADMIN_PASSWORD is required and must be at least 12 characters");
   }
 
@@ -89,6 +105,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ControlPlaneCo
   }
 
   return {
+    authMode,
+    ...(djangoAuthUrl ? { djangoAuthUrl } : {}),
+    ...(djangoAuthServiceToken ? { djangoAuthServiceToken } : {}),
     host: env.HOST ?? "127.0.0.1",
     port: positiveInt(env.PORT, 3000, "PORT"),
     databasePath: resolve(env.DATABASE_PATH ?? "data/control-plane.sqlite"),

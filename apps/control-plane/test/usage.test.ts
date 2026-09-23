@@ -12,7 +12,7 @@ import { payloadHash } from "../src/crypto.js";
 import { RegistryService } from "../src/registry.js";
 import { UsageService } from "../src/usage.js";
 import { buildControlPlane } from "../src/server.js";
-const config=()=>({...loadConfig({ADMIN_EMAIL:"usage@example.test",ADMIN_PASSWORD:randomUUID(),DATABASE_PATH:":memory:",PUBLIC_ORIGIN:"http://usage.test",COOKIE_SECURE:"false"}),databasePath:":memory:"});
+const config=()=>({...loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL:"usage@example.test",ADMIN_PASSWORD:randomUUID(),DATABASE_PATH:":memory:",PUBLIC_ORIGIN:"http://usage.test",COOKIE_SECURE:"false"}),databasePath:":memory:"});
 function fixture(path=":memory:") {
   const db=new ControlPlaneDatabase(path);const {workspaceId}=db.bootstrap(config());const at=new Date().toISOString();
   for(const machine of ["a","b"]) {
@@ -64,9 +64,9 @@ test("shared account quota selects one newest snapshot without summing percentag
  service.quota("a",{...snapshot,accountKey:"unknown",observedAt:"2000-01-01T00:00:00Z"});
  assert.equal(service.read(workspaceId,"machine","a").accounts[0]?.stale,true);
 });
-test("usage routes require authentication and migration creates version 35",async t=>{
+test("usage routes require authentication and migration creates version 36",async t=>{
  const {app,db}=await buildControlPlane(config());t.after(()=>app.close());
- assert.equal(db.get<{user_version:number}>("PRAGMA user_version")?.user_version,35);
+ assert.equal(db.get<{user_version:number}>("PRAGMA user_version")?.user_version,36);
  for(const path of ["sessions","projects","machines"])assert.equal((await app.inject({method:"GET",url:`/api/${path}/missing/usage`})).statusCode,401);
 });
 

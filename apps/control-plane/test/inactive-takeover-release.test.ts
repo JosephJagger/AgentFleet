@@ -7,7 +7,7 @@ import { COMMAND_TYPES } from "../src/api-schema.js";
 
 test("three days without recorded token use schedules a safe native takeover release", () => {
   const db = new ControlPlaneDatabase(":memory:");
-  const config = loadConfig({
+  const config = loadConfig({ AUTH_MODE: "password",
     ADMIN_EMAIL: "owner@example.test",
     ADMIN_PASSWORD: "correct horse battery staple",
     PUBLIC_ORIGIN: "http://control-plane.test",

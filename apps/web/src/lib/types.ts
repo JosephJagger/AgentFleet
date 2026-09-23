@@ -302,6 +302,7 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly code?: string,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
   }

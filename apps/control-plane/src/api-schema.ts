@@ -432,6 +432,24 @@ export type ServerToClientMessage =
 const stringId = { type: "string", minLength: 1, maxLength: 200 } as const;
 
 export const apiSchemas = {
+  requestCode: {
+    body: {
+      type: "object", additionalProperties: false, required: ["email"],
+      properties: {
+        email: { type: "string", minLength: 3, maxLength: 254 },
+        locale: { type: "string", enum: ["en", "zh"] },
+      },
+    },
+  },
+  verifyCode: {
+    body: {
+      type: "object", additionalProperties: false, required: ["challengeId", "code"],
+      properties: {
+        challengeId: { type: "string", minLength: 36, maxLength: 36, pattern: "^[0-9a-f-]{36}$" },
+        code: { type: "string", pattern: "^[0-9]{6}$" },
+      },
+    },
+  },
   login: {
     body: {
       type: "object",

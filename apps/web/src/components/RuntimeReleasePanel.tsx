@@ -42,12 +42,13 @@ export function RuntimeReleasePanel({ machine }: { machine: Machine }) {
       <ul className="runtime-release-checks">{data.checks.map((check, index) => <li key={`${systemText(check.name)}:${index}`} data-state={check.state}><CheckCircle2 size={16} aria-hidden="true" /><div><strong>{systemText(check.name)}</strong><p>{systemText(check.detail)}</p></div></li>)}</ul>
       <p className="runtime-release-host"><strong>{machine.name}</strong> · {rollout}</p>
       <p className="host-help">{t("约每 6 小时检查官方版本；支持自动更新的连接服务约每 15 分钟检查托管目标。Linux 中心验证通过后，各平台主机还会校验版本、SHA-256、schema 与启动健康。不兼容的协议需要开发适配，不会强制晋升。")}</p>
-      <div className="host-operation-buttons">
+      {data.canControl === false && <p className="host-help">{t("全站升级设置由平台管理员管理。")}</p>}
+      {data.canControl !== false && <div className="host-operation-buttons">
         <button type="button" className="button button--quiet" disabled={busy || !data.configured || !data.workerOnline || data.paused || running} onClick={() => void control("check")}><RefreshCw size={15} />{t("立即检查新版")}</button>
         <button type="button" className="button button--quiet" disabled={busy || !data.configured} onClick={() => void control(data.paused ? "resume" : "pause")}>{data.paused ? t("恢复自动晋升") : t("暂停自动晋升")}</button>
         {data.previous && <button type="button" className="button button--quiet" disabled={busy || !data.workerOnline} onClick={() => setConfirm(true)}>{t("回退托管目标")}</button>}
-      </div>
-      {confirm && <div className="runtime-release-confirm" role="group" aria-label={t("确认回退托管目标")}><p>{t("将所有托管主机的目标回退到")}{locale() === "en" ? " " : ""}{data.previous?.version}{locale() === "en" ? " " : ""}{t("，并暂停自动晋升。等待任务结束后切换，不中断正在运行的任务。")}</p><button type="button" className="button button--danger" disabled={busy} onClick={() => void control("rollback")}>{t("确认回退并暂停晋升")}</button><button type="button" className="button button--quiet" disabled={busy} onClick={() => setConfirm(false)}>{t("取消")}</button></div>}
+      </div>}
+      {data.canControl !== false && confirm && <div className="runtime-release-confirm" role="group" aria-label={t("确认回退托管目标")}><p>{t("将所有托管主机的目标回退到")}{locale() === "en" ? " " : ""}{data.previous?.version}{locale() === "en" ? " " : ""}{t("，并暂停自动晋升。等待任务结束后切换，不中断正在运行的任务。")}</p><button type="button" className="button button--danger" disabled={busy} onClick={() => void control("rollback")}>{t("确认回退并暂停晋升")}</button><button type="button" className="button button--quiet" disabled={busy} onClick={() => setConfirm(false)}>{t("取消")}</button></div>}
       {data.history.length > 0 && <details className="runtime-release-history"><summary>{t("验证与晋升记录")}</summary>{data.history.map((item, index) => <article key={`${item.at}:${index}`}><strong>{item.version} · {item.result === "promoted" ? t("已晋升") : item.result === "rollback" ? t("已回退") : t("未晋升")}</strong><time>{date(item.at)}</time><p>{systemText(item.message)}</p></article>)}</details>}
     </>}
     {notice && <p role="status">{systemText(notice)}</p>}{error && <p role="alert" className="catalog-error">{systemText(error)}</p>}

@@ -8,7 +8,7 @@ import { CoordinationService } from "../src/coordination.js";
 test("same account switches browsers without handoff; other accounts and concurrent tasks remain fenced", async t => {
   const origin = "http://control-plane.test";
   const password = "isolated-account-lease-password";
-  const { app, db, config } = await buildControlPlane({ ...loadConfig({ ADMIN_EMAIL: "owner@example.test", ADMIN_PASSWORD: password,
+  const { app, db, config } = await buildControlPlane({ ...loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL: "owner@example.test", ADMIN_PASSWORD: password,
     PUBLIC_ORIGIN: origin, COOKIE_SECURE: "false", LOG_LEVEL: "silent" }), databasePath: ":memory:" });
   t.after(() => app.close());
   async function login(email = "owner@example.test") {

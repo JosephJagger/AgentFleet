@@ -36,6 +36,7 @@ export class AuthService {
   ) {}
 
   login(email: string, password: string, ip: string, userAgent: string): SessionCredentials {
+    invariant(this.config.authMode !== "email", 403, "PASSWORD_LOGIN_DISABLED", "Use an email verification code to sign in");
     const user = this.db.get<{
       user_id: string;
       workspace_id: string;
@@ -46,6 +47,43 @@ export class AuthService {
       throw new AppError(401, "INVALID_CREDENTIALS", "Email or password is incorrect");
     }
 
+    return this.createSession(user, ip, userAgent);
+  }
+
+  loginVerifiedIdentity(identity: { id: string; email: string }, ip: string, userAgent: string): SessionCredentials {
+    const email = identity.email.trim().toLowerCase();
+    const user = this.db.transaction(() => {
+      const linked = this.db.get<{ user_id: string; workspace_id: string; email: string }>(
+        "SELECT user_id,workspace_id,email FROM users WHERE identity_id=?", identity.id,
+      );
+      if (linked) {
+        invariant(linked.email.toLowerCase() === email, 409, "IDENTITY_MISMATCH", "Account email has changed; contact the administrator");
+        return linked;
+      }
+      const existing = this.db.get<{ user_id: string; workspace_id: string; email: string; identity_id: string | null }>(
+        "SELECT user_id,workspace_id,email,identity_id FROM users WHERE email=? COLLATE NOCASE", email,
+      );
+      if (existing) {
+        invariant(!existing.identity_id, 409, "IDENTITY_MISMATCH", "Account is already linked to another identity");
+        this.db.run("UPDATE users SET identity_id=? WHERE user_id=?", identity.id, existing.user_id);
+        return existing;
+      }
+      const userId = newId("usr"), workspaceId = newId("ws"), createdAt = nowIso();
+      this.db.run("INSERT INTO workspaces(workspace_id,name,created_at) VALUES(?,?,?)", workspaceId, email, createdAt);
+      // admin is the existing workspace-owner role, not a platform administrator.
+      this.db.run("INSERT INTO users(user_id,workspace_id,email,password_hash,role,created_at,identity_id) VALUES(?,?,?,?,?,?,?)",
+        userId, workspaceId, email, "!", "admin", createdAt, identity.id);
+      this.db.audit({ workspaceId, actorUserId: userId, action: "user.register" });
+      return { user_id: userId, workspace_id: workspaceId, email };
+    });
+    return this.createSession(user, ip, userAgent);
+  }
+
+  requirePlatformAdmin(principal: Principal): void {
+    invariant(principal.email.toLowerCase() === this.config.adminEmail.toLowerCase(), 403, "ADMIN_REQUIRED", "Platform administrator access is required");
+  }
+
+  private createSession(user: { user_id: string; workspace_id: string; email: string }, ip: string, userAgent: string): SessionCredentials {
     const clientSessionId = newId("csess");
     const sessionToken = randomToken(32);
     const csrfToken = randomToken(32);

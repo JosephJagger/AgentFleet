@@ -8,7 +8,7 @@ import { loadConfig } from "../src/config.js";
 import { channelControl } from "../src/runtime-channel.js";
 test("runtime channel controls require login and CSRF; absent targets never become a forced upgrade", async t => {
   const directory = await mkdtemp(join(tmpdir(), "runtime-channel-api-"));
-  const config = loadConfig({ ADMIN_EMAIL: "runtime@example.test", ADMIN_PASSWORD: "runtime-channel-test-password", PUBLIC_ORIGIN: "http://runtime.test", COOKIE_SECURE: "false", DATABASE_PATH: join(directory, "test.sqlite"), RUNTIME_RELEASE_DIR: join(directory, "channel"), LOG_LEVEL: "silent" });
+  const config = loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL: "runtime@example.test", ADMIN_PASSWORD: "runtime-channel-test-password", PUBLIC_ORIGIN: "http://runtime.test", COOKIE_SECURE: "false", DATABASE_PATH: join(directory, "test.sqlite"), RUNTIME_RELEASE_DIR: join(directory, "channel"), LOG_LEVEL: "silent" });
   const { app } = await buildControlPlane(config);
   t.after(async () => { await app.close(); await rm(directory, { recursive: true, force: true }); });
   assert.equal((await app.inject({ method: "GET", url: "/api/runtime-release" })).statusCode, 401);

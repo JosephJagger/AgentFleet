@@ -19,6 +19,8 @@ agentfleet-state
 **/node_modules
 **/dist
 **/coverage
+**/.venv
+**/__pycache__
 *.log
 README.local.md
 .private

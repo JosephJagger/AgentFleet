@@ -6,7 +6,7 @@ import { WritingMemory, extractWritingCandidates, safeWritingText } from "../src
 import { WritingAI, relevantWritingVocabulary } from "../src/writing-ai.js";
 import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
 
-const config = () => ({ ...loadConfig({ ADMIN_EMAIL:"writing@example.test", ADMIN_PASSWORD:"writing-test-password", PUBLIC_ORIGIN:"http://writing.test", COOKIE_SECURE:"false", LOG_LEVEL:"silent" }), databasePath: ":memory:" });
+const config = () => ({ ...loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL:"writing@example.test", ADMIN_PASSWORD:"writing-test-password", PUBLIC_ORIGIN:"http://writing.test", COOKIE_SECURE:"false", LOG_LEVEL:"silent" }), databasePath: ":memory:" });
 function fixture() {
   const db = new ControlPlaneDatabase(":memory:"); const { workspaceId,userId } = db.bootstrap(config()); const at = new Date().toISOString();
   db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,created_at,updated_at) VALUES('m',?,'key','fingerprint','host','linux','24','x64',?,?)`,workspaceId,at,at);

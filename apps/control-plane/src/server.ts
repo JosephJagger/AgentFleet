@@ -19,6 +19,7 @@ import { WebSocket, type RawData } from "ws";
 import type { ControlPlaneConfig } from "./config.js";
 import { loadConfig } from "./config.js";
 import { ControlPlaneDatabase } from "./db.js";
+import { IdentityService } from "./identity.js";
 import { AuthService, type Principal } from "./auth.js";
 import { RegistryService, type AgentConnectionIdentity } from "./registry.js";
 import { CoordinationService, type DispatchTarget } from "./coordination.js";
@@ -191,6 +192,7 @@ export async function buildControlPlane(
   const db = new ControlPlaneDatabase(config.databasePath);
   db.bootstrap(config);
   const auth = new AuthService(db, config);
+  const identity = new IdentityService(config);
   const registry = new RegistryService(db, config);
   const writingPreferences = new WritingPreferences(db);
   const writingMemory = new WritingMemory(db);
@@ -512,8 +514,9 @@ export async function buildControlPlane(
     compatibilityProfile:channelProfile(config.runtimeReleaseDir),
   }));
 
-  app.get("/api/runtime-release", { preHandler: authenticate }, async () => channelStatus(config.runtimeReleaseDir));
+  app.get("/api/runtime-release", { preHandler: authenticate }, async request => ({ ...channelStatus(config.runtimeReleaseDir), canControl: request.principal!.email.toLowerCase() === config.adminEmail.toLowerCase() }));
   app.post("/api/runtime-release/control", { preHandler: mutate }, async request => {
+    auth.requirePlatformAdmin(request.principal as Principal);
     invariant(config.runtimeReleaseDir, 409, "RUNTIME_CHANNEL_DISABLED", "自动验证服务尚未配置");
     const action = record(request.body).action;
     invariant(["check", "pause", "resume", "rollback"].includes(String(action)), 400, "INVALID_ACTION", "无效的托管升级操作");
@@ -559,29 +562,42 @@ export async function buildControlPlane(
       .send(createReadStream(path, { start, end }));
   });
 
+  const sendLogin = (reply: FastifyReply, credentials: import("./auth.js").SessionCredentials) => {
+    reply.header("cache-control", "no-store");
+    reply.setCookie(config.cookieName, credentials.sessionToken, {
+      path: "/", httpOnly: true, secure: config.cookieSecure,
+      sameSite: "strict", maxAge: config.sessionTtlSeconds,
+    });
+    return {
+      user: { userId: credentials.principal.userId, email: credentials.principal.email, workspaceId: credentials.principal.workspaceId },
+      clientSessionId: credentials.principal.clientSessionId,
+      csrfToken: credentials.csrfToken, expiresAt: credentials.principal.expiresAt,
+    };
+  };
+
+  app.post("/api/auth/request-code", { schema: apiSchemas.requestCode }, async (request, reply) => {
+    auth.requireOrigin(request);
+    limiter.check(`email-send:${clientIp(request)}`, 10, 5 * 60_000);
+    const body = record(request.body);
+    reply.header("cache-control", "no-store");
+    return identity.requestCode(requiredString(body.email, "email", 254), clientIp(request), body.locale === "zh" ? "zh" : "en");
+  });
+
+  app.post("/api/auth/verify-code", { schema: apiSchemas.verifyCode }, async (request, reply) => {
+    auth.requireOrigin(request);
+    limiter.check(`email-verify:${clientIp(request)}`, 30, 5 * 60_000);
+    const body = record(request.body);
+    const user = await identity.verifyCode(requiredString(body.challengeId, "challengeId", 36), requiredString(body.code, "code", 6), clientIp(request));
+    return sendLogin(reply, auth.loginVerifiedIdentity(user, clientIp(request), userAgent(request)));
+  });
+
+  // Explicitly opt-in legacy deployments only; email mode never falls back.
   app.post("/api/auth/login", { schema: apiSchemas.login }, async (request, reply) => {
     auth.requireOrigin(request);
     limiter.check(`login:${clientIp(request)}`, 10, 5 * 60_000);
     const body = record(request.body);
-    const credentials = auth.login(
-      requiredString(body.email, "email", 320),
-      requiredString(body.password, "password", 1024),
-      clientIp(request),
-      userAgent(request),
-    );
-    reply.setCookie(config.cookieName, credentials.sessionToken, {
-      path: "/",
-      httpOnly: true,
-      secure: config.cookieSecure,
-      sameSite: "strict",
-      maxAge: config.sessionTtlSeconds,
-    });
-    return {
-      user: { userId: credentials.principal.userId, email: credentials.principal.email },
-      clientSessionId: credentials.principal.clientSessionId,
-      csrfToken: credentials.csrfToken,
-      expiresAt: credentials.principal.expiresAt,
-    };
+    return sendLogin(reply, auth.login(requiredString(body.email, "email", 320),
+      requiredString(body.password, "password", 1024), clientIp(request), userAgent(request)));
   });
 
   app.post("/api/auth/logout", { preHandler: mutate }, async (request, reply) => {

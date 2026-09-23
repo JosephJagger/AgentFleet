@@ -1230,3 +1230,5 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 .usage-trigger-text { display: flex; flex-direction: column; gap: 4px; text-align: left; }
 .usage-trigger-text small { font-size: var(--text-caption); font-weight: 400; line-height: 1.4; opacity: .75; }
+
+.login-code-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: space-between; }

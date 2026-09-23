@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 35) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 36) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1203,6 +1203,12 @@ export class ControlPlaneDatabase {
       this.sqlite.exec("PRAGMA user_version=35");
       if(this.all("PRAGMA foreign_key_check").length)throw new Error("Connection repair migration violated foreign keys");
     });
+    if (version < 36) this.transaction(() => {
+      if (!this.all<{ name: string }>("PRAGMA table_info(users)").some(column => column.name === "identity_id")) {
+        this.sqlite.exec("ALTER TABLE users ADD COLUMN identity_id TEXT");
+      }
+      this.sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_identity_idx ON users(identity_id); PRAGMA user_version=36");
+    });
   }
 
   transaction<T>(operation: () => T): T {
@@ -1232,15 +1238,15 @@ export class ControlPlaneDatabase {
   bootstrap(config: ControlPlaneConfig): { workspaceId: string; userId: string } {
     return this.transaction(() => {
       const existing = this.get<{ user_id: string; workspace_id: string; email: string }>(
-        "SELECT user_id, workspace_id, email FROM users LIMIT 1",
+        "SELECT user_id, workspace_id, email FROM users WHERE email=? COLLATE NOCASE",
+        config.adminEmail,
       );
       if (existing) {
-        if (existing.email.toLowerCase() !== config.adminEmail.toLowerCase()) {
-          throw new Error(
-            `ADMIN_EMAIL (${config.adminEmail}) does not match bootstrapped admin (${existing.email})`,
-          );
-        }
         return { workspaceId: existing.workspace_id, userId: existing.user_id };
+      }
+
+      if (this.get("SELECT user_id FROM users LIMIT 1")) {
+        throw new Error("ADMIN_EMAIL does not match the existing administrator; retain the original email when upgrading");
       }
 
       const workspaceId = newId("ws");
@@ -1257,7 +1263,7 @@ export class ControlPlaneDatabase {
         userId,
         workspaceId,
         config.adminEmail,
-        hashPassword(config.adminPassword),
+        config.authMode === "email" ? "!" : hashPassword(config.adminPassword),
         "admin",
         createdAt,
       );

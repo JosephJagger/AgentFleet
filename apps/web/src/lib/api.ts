@@ -94,6 +94,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       string(error.message, string(body.message, t("请求未完成"))),
       response.status,
       string(error.code, string(body.code)) || undefined,
+      Number(response.headers.get("retry-after")) || undefined,
     );
   }
   if (typeof body.csrfToken === "string") {
@@ -598,6 +599,7 @@ async function loadDashboard(): Promise<Dashboard> {
 }
 
 export interface RuntimeReleaseStatus {
+  canControl?: boolean;
   configured: boolean; paused: boolean; workerOnline: boolean; phase: string; message: string;
   latestVersion?: string; lastCheckedAt?: string; nextCheckAt?: string;
   target?: { version: string }; previous?: { version: string };
@@ -635,10 +637,13 @@ export const api = {
   machineCodexPreferences: (id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(`/api/machines/${encodeURIComponent(id)}/codex-settings`, { signal }),
   saveMachineCodexPreferences: (id: string, input: { settings: import("./codex-settings").CodexSettings | null; revision: number }) => request<import("./codex-settings").CodexPreferences>(`/api/machines/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
   saveCodexPreferences: (id: string, input: { scope: string; settings: import("./codex-settings").CodexSettings | null; revision: number }) => request<import("./codex-settings").CodexPreferences>(`/api/sessions/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
-  async login(email: string, password: string) {
-    await request<JsonObject>("/api/auth/login", {
+  requestLoginCode: (email: string, locale: "zh" | "en") => request<{ challengeId: string; expiresIn: number; resendAfter: number }>(
+    "/api/auth/request-code", { method: "POST", body: JSON.stringify({ email, locale }) }),
+  async verifyLoginCode(challengeId: string, code: string) {
+    dashboardCache = undefined;
+    await request<JsonObject>("/api/auth/verify-code", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ challengeId, code }),
     });
     return { dashboard: await loadDashboard() };
   },

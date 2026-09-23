@@ -4,6 +4,9 @@ dist/
 coverage/
 /release/
 *.tsbuildinfo
+.venv/
+__pycache__/
+*.py[cod]
 apps/web/vite.config.js
 apps/web/vite.config.d.ts
 

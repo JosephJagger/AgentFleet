@@ -42,8 +42,8 @@ test("AppleFleets validates the structured Codex result", () => {
 
 test("AppleFleets configuration is opt-in and requires a strong token", () => {
   const base = { ADMIN_EMAIL: "admin@example.com", ADMIN_PASSWORD: "correct horse battery staple" };
-  assert.equal(loadConfig(base).appleFleetsApiToken, undefined);
-  assert.throws(() => loadConfig({ ...base, APPLEFLEETS_API_TOKEN: "short", APPLEFLEETS_PROJECT: "AppleFleets" }));
-  const config = loadConfig({ ...base, APPLEFLEETS_API_TOKEN: "a".repeat(64), APPLEFLEETS_PROJECT: "AppleFleets" });
+  assert.equal(loadConfig({ AUTH_MODE: "password", ...base }).appleFleetsApiToken, undefined);
+  assert.throws(() => loadConfig({ AUTH_MODE: "password", ...base, APPLEFLEETS_API_TOKEN: "short", APPLEFLEETS_PROJECT: "AppleFleets" }));
+  const config = loadConfig({ AUTH_MODE: "password", ...base, APPLEFLEETS_API_TOKEN: "a".repeat(64), APPLEFLEETS_PROJECT: "AppleFleets" });
   assert.equal(config.appleFleetsProject, "AppleFleets");
 });

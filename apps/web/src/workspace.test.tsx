@@ -10,7 +10,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), login: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn() },
+  api: { writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -516,12 +516,14 @@ describe("会话工作区", () => {
   it("未登录打开第二台主机深链，登录后仍进入指定主机", async () => {
     history.replaceState(null, "", "/hosts/2");
     vi.mocked(api.dashboard).mockRejectedValueOnce(new ApiError("请登录", 401, "UNAUTHORIZED"));
-    vi.mocked(api.login).mockResolvedValue({ dashboard: dashboard() });
+    vi.mocked(api.requestLoginCode).mockResolvedValue({ challengeId: "challenge", expiresIn: 600, resendAfter: 60 });
+    vi.mocked(api.verifyLoginCode).mockResolvedValue({ dashboard: dashboard() });
     render(<App />);
     await screen.findByRole("heading", { name: "进入控制面" });
     fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: "a@example.com" } });
-    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "test-only" } });
-    fireEvent.click(screen.getByRole("button", { name: "进入 AgentFleets" }));
+    fireEvent.click(screen.getByRole("button", { name: "发送验证码" }));
+    fireEvent.change(await screen.findByLabelText("6 位验证码"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "验证并登录" }));
     expect((await screen.findByRole("button", { name: /^主机2，/ })).getAttribute("aria-pressed")).toBe("true");
     expect(location.pathname).toBe("/hosts/2");
   });

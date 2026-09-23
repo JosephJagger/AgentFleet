@@ -16,6 +16,14 @@ services:
       DATABASE_PATH: /app/data/control-plane.sqlite
       WEB_DIST_DIR: /app/web
       RUNTIME_RELEASE_DIR: /app/runtime-releases
+      AUTH_MODE: email
+      DJANGO_AUTH_URL: http://identity:8000
+      # Only Django needs the email-provider key and signing secret.
+      RESEND_API_KEY: ""
+      DJANGO_SECRET_KEY: ""
+    depends_on:
+      identity:
+        condition: service_healthy
     ports:
       - "${PUBLISH_HOST:-127.0.0.1}:3215:3000"
     volumes:
@@ -28,6 +36,33 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
+
+  identity:
+    build:
+      context: .
+      dockerfile: apps/identity/Dockerfile
+    restart: unless-stopped
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
+      DJANGO_AUTH_SERVICE_TOKEN: ${DJANGO_AUTH_SERVICE_TOKEN:?Set DJANGO_AUTH_SERVICE_TOKEN in .env}
+      DJANGO_DATABASE_PATH: /data/identity.sqlite
+      RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY in .env}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      RESEND_FROM_NAME: ${RESEND_FROM_NAME:-AgentFleets}
+    volumes:
+      - agentfleet-identity:/data
+    # Internal service only: no published host port.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
 
   runtime-validator:
     container_name: agentfleet-runtime-validator
@@ -55,6 +90,8 @@ services:
       start_period: 60s
 
 volumes:
+  agentfleet-identity:
+    name: agentfleet-identity
   agentfleet-data:
     name: agentfleet-data
   agentfleet-runtime-releases:

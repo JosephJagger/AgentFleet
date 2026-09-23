@@ -13,7 +13,7 @@ const second = "data:image/png;base64," + Buffer.concat([Buffer.from(png.split("
 async function fixture(t: import("node:test").TestContext, disk = false) {
   const origin = "http://images.test", password = "isolated-image-quota-password";
   const path = disk ? join(mkdtempSync(join(tmpdir(), "agentfleet-images-")), "db.sqlite") : ":memory:";
-  const result = await buildControlPlane({ ...loadConfig({ ADMIN_EMAIL: "images@example.test", ADMIN_PASSWORD: password, PUBLIC_ORIGIN: origin, COOKIE_SECURE: "false", LOG_LEVEL: "silent" }), databasePath: path });
+  const result = await buildControlPlane({ ...loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL: "images@example.test", ADMIN_PASSWORD: password, PUBLIC_ORIGIN: origin, COOKIE_SECURE: "false", LOG_LEVEL: "silent" }), databasePath: path });
   t.after(() => result.app.close());
   const login = await result.app.inject({ method: "POST", url: "/api/auth/login", headers: { origin }, payload: { email: "images@example.test", password } });
   const headers = { cookie: cookieFromSetCookie(login.headers["set-cookie"]), ...csrfHeaders(login.json().csrfToken, origin) };
