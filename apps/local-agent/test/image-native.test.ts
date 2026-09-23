@@ -53,14 +53,17 @@ test("native image turn reaches Responses as image bytes and survives writer rel
     const created=await server.createThread(project,"project","Pasted image fixture");
     managed={nativeThreadId:created.nativeThreadId,projectId:project.id,logicalSessionId:"fixture",executionSegmentId:"fixture",appServerEpoch:server.appServerEpoch,
       policyVerified:true,sessionCwd:cwd,permissionProfile:"project"} as ManagedThread;
-    await server.startTurn(managed,project,"Describe the image.",undefined,undefined,[png]);
+    const reference = "[Referenced Codex session — fixed summary snapshot]\nSession ID: source-fixture\nSummary: Completed API review.\n[/Referenced Codex session]";
+    await server.startTurn(managed,project,`Describe the image.\n\n${reference}`,undefined,undefined,[png]);
     await completed;
     assert.ok(captured, "native runtime reached the local fixture");
     assert.ok(JSON.stringify(captured).includes('"input_image"'), "upstream receives a real image input, not a filename");
     const history=await server.readThread(created.nativeThreadId);
     assert.ok(JSON.stringify(history.items).includes(png), "native stored history retains inline image bytes");
+    assert.ok(JSON.stringify(history.items).includes("source-fixture"), "native history stores the fixed referenced-session snapshot");
     await server.releaseWriter(); await reader.start();
     await reader.resumeThread(created.nativeThreadId,project);
     assert.ok(JSON.stringify((await reader.readThread(created.nativeThreadId)).items).includes(png), "second process resumes the same image context");
+    assert.ok(JSON.stringify((await reader.readThread(created.nativeThreadId)).items).includes("source-fixture"), "resumed native session retains the referenced-session snapshot");
   } finally {await server.stop();await reader.stop();upstream.closeAllConnections();await new Promise<void>(resolve=>upstream.close(()=>resolve()));}
 });
