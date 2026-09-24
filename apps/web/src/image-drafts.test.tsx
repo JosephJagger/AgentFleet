@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { useImageDraft, isInlineImage } from "./lib/image-drafts";
+import { useImageDraft, isInlineImage, prepareClipboardImage } from "./lib/image-drafts";
 const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
 afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();vi.unstubAllGlobals();});
 function Draft({session="a"}:{session?:string}) {const draft=useImageDraft("user",session); return <><textarea aria-label="paste" onPaste={draft.onPaste}/><input aria-label="upload" type="file" onChange={event=>void draft.addFiles(Array.from(event.currentTarget.files??[]))}/><span>{draft.processing?"processing":"ready"}</span><output>{JSON.stringify(draft.images)}</output><p>{draft.error}</p><button onClick={()=>draft.remove(0)}>remove</button></>;}
@@ -24,6 +24,19 @@ it("adds an image selected from a mobile file picker",async()=>{
   fireEvent.change(screen.getByLabelText("upload"),{target:{files:[new File(["fixture"],"photo.webp",{type:"image/webp"})]}});
   await waitFor(()=>expect(screen.getByRole("status").textContent).toContain("data:image/png"));
   expect(localStorage.getItem("agentfleet.images:user:a")).toContain("data:image/png");
+});
+it("falls back to JPEG when a mobile browser cannot encode WebP and PNG remains too large",async()=>{
+  mocks();
+  const oversizedPng = new Blob([new Uint8Array(129 * 1024)], {type:"image/png"});
+  const jpeg = new Blob([Uint8Array.from([255,216,255,224,0,16,74,70,73,70,0,0,255,217])], {type:"image/jpeg"});
+  const encoded: string[] = [];
+  vi.spyOn(HTMLCanvasElement.prototype,"toBlob").mockImplementation((callback,type)=>{
+    encoded.push(type ?? "");
+    callback(type === "image/jpeg" ? jpeg : oversizedPng);
+  });
+  const result = await prepareClipboardImage(new File(["mobile photo"],"photo.png",{type:"image/png"}));
+  expect(result.startsWith("data:image/jpeg;base64,")).toBe(true);
+  expect(encoded).toEqual(["image/png","image/webp","image/jpeg"]);
 });
 it("a paste finishing after switching sessions cannot attach to the new conversation",async()=>{
   let finish!:()=>void;mocks(()=>new Promise(resolve=>{finish=resolve;}));

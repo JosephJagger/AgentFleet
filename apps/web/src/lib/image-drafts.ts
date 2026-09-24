@@ -18,14 +18,20 @@ export async function prepareClipboardImage(file: File): Promise<string> {
     const image = new Image(); image.src = url; await image.decode();
     if (!image.naturalWidth || image.naturalWidth * image.naturalHeight > 40_000_000) throw new Error(t("图片尺寸过大，请截取需要分析的区域"));
     let scale = Math.min(1, 2560 / Math.max(image.naturalWidth, image.naturalHeight));
+    let webpSupported = true;
     const canvas = document.createElement("canvas");
     for (let attempt = 0; attempt < 7; attempt++) {
       canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
       const context = canvas.getContext("2d"); if (!context) throw new Error(t("浏览器无法处理截图，请更新浏览器后重试"));
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      for (const [type, quality] of [["image/png", 1], ["image/webp", .88], ["image/webp", .7]] as const) {
+      const formats: [string, number][] = [["image/png", 1], ...(webpSupported ? [["image/webp", .88], ["image/webp", .7]] as [string, number][] : []), ["image/jpeg", .88], ["image/jpeg", .72], ["image/jpeg", .55]];
+      for (const [type, quality] of formats) {
+        if (type === "image/webp" && !webpSupported) continue;
         const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, type, quality));
-        if (blob && blob.size <= MAX_BYTES) return dataUrl(blob);
+        if (!blob) continue;
+        // Some mobile browsers silently return PNG when WebP encoding is unavailable.
+        if (blob.type !== type) { if (type === "image/webp") webpSupported = false; continue; }
+        if (blob.size <= MAX_BYTES) return dataUrl(blob);
       }
       scale *= .75;
     }
