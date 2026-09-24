@@ -2540,5 +2540,13 @@
   "请写明任务并等待引用核验；失败时重试或删除卡片": "Describe the task and wait for reference validation; retry or remove a failed card",
   "重试": "Retry",
   "一次最多引用两个会话": "You can reference up to two sessions at a time",
-  "读取中…": "Loading…"
+  "读取中…": "Loading…",
+  "任务": "Tasks",
+  "历史记录": "History",
+  "刷新": "Refresh",
+  "尚无执行记录": "No runs yet",
+  "先选择项目或已接管会话，再设置任务内容和时间。": "Choose a project or controlled session before setting the task and schedule.",
+  "没有匹配的已接管会话": "No matching controlled sessions",
+  "还没有定时任务。选择项目或会话后创建第一个任务。": "No scheduled tasks yet. Choose a project or session to create one.",
+  "查看需要确认的操作和问题。": "Review actions and questions that need your input."
 }

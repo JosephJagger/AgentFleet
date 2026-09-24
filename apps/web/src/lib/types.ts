@@ -38,6 +38,10 @@ export interface ScheduledRun {
   created_at: string; updated_at: string;
 }
 
+export interface ScheduledHistoryRun extends ScheduledRun {
+  title: string; project_id: string; machine_id: string;
+}
+
 export interface ScheduledNotification {
   id: string; readAt: string | null; createdAt: string; runId: string;
   status: ScheduledRun["status"]; detail: string | null; sessionId: string | null;

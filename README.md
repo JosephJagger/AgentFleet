@@ -37,7 +37,7 @@ Think of each enrolled host as a place where Codex executes work, and AgentFleet
 | **Native goals, Plan mode, and plugin skills** | Set a persistent session goal, switch the next turn to a host-advertised collaboration mode, and select skills from installed, enabled Codex plugins. |
 | **Host files in conversation results** | Open or download files linked by Codex directly from the message. Bytes stream on demand from the bound host and remain limited to that session's registered project. |
 | **An overview across multiple hosts** | Follow running work, return to completed-but-controlled sessions, queue follow-up messages, and inspect recorded tokens and reported account quota. |
-| **Scheduled work in a project** | Run a prompt once, every N minutes, daily, on weekdays, or on chosen weekdays in a named time zone. Use a managed session or create a fresh one per run; inspect execution records and notifications in the panel. |
+| **Scheduled work in a project** | Run a prompt once, every N minutes, daily, on weekdays, or on chosen weekdays in a named time zone. Use a managed session or create a fresh one per run; inspect results in the Scheduled tasks History. |
 | **Switchable interface themes** | Choose from 17 themes, with Castle in the Sky as the default for new browsers. Five Chinese classics join illustrated themes with coordinated messages, Markdown, code blocks and composers. |
 
 ### Visual context, even on a headless server
@@ -91,7 +91,7 @@ These are future directions, not shipped features or a delivery schedule. Univer
 
 ## Built for your native sessions
 
-Scheduled tasks run through the same host and native-session controls as a manual send. If a host is offline or a project is busy, the latest due run waits; missed runs are coalesced, and anything more than 24 hours late expires. An uncertain result is recorded for review and is never sent again automatically. The **Pending** tab combines approval requests and unread scheduled-task results.
+Scheduled tasks run through the same host and native-session controls as a manual send. If a host is offline or a project is busy, the latest due run waits; missed runs are coalesced, and anything more than 24 hours late expires. An uncertain result is recorded for review and is never sent again automatically. The **History** tab on the Scheduled tasks page keeps recent results; **Pending** remains for approvals and questions.
 
 <table>
 <tr>

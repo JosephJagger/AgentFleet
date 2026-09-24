@@ -924,6 +924,7 @@ export async function buildControlPlane(
     const query = request.query as Record<string, unknown>;
     return scheduledTasks.list(request.principal as Principal, typeof query.projectId === "string" ? query.projectId : undefined);
   });
+  app.get("/api/scheduled-runs", { preHandler: authenticate }, async request => scheduledTasks.history(request.principal as Principal));
   app.post("/api/scheduled-tasks", { preHandler: mutate }, async request => {
     const body = record(request.body);
     return { task: scheduledTasks.create(request.principal as Principal, {

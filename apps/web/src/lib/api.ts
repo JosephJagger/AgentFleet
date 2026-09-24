@@ -611,6 +611,7 @@ export interface RuntimeReleaseStatus {
 
 export const api = {
   scheduledTasks: (projectId?: string) => request<{tasks: import("./types").ScheduledTask[]}>(`/api/scheduled-tasks${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`),
+  scheduledHistory: () => request<{runs:import("./types").ScheduledHistoryRun[]}>("/api/scheduled-runs"),
   scheduledTask: (id: string) => request<{task: import("./types").ScheduledTask; runs: import("./types").ScheduledRun[]}>(`/api/scheduled-tasks/${encodeURIComponent(id)}`),
   createScheduledTask: (input: {projectId:string;title:string;prompt:string;destinationSessionId?:string|null;schedule:import("./types").ScheduledTaskSchedule;timezone:string}) => request<{task:import("./types").ScheduledTask}>("/api/scheduled-tasks",{method:"POST",body:JSON.stringify(input)}),
   updateScheduledTask: (id:string,input:{projectId:string;title:string;prompt:string;destinationSessionId?:string|null;schedule:import("./types").ScheduledTaskSchedule;timezone:string;enabled:boolean}) => request<{task:import("./types").ScheduledTask}>(`/api/scheduled-tasks/${encodeURIComponent(id)}`,{method:"PUT",body:JSON.stringify(input)}),
@@ -690,7 +691,7 @@ export const api = {
     const raw = await request<JsonObject>(`/api/projects?${query}`, { signal });
     return { items: list(raw.items ?? raw.projects).map(mapProject), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null, total: integer(raw.total) };
   },
-  async sessions(options: { machineId?: string; projectId?: string; cursor?: string | null; q?: string; executionState?: string; limit?: number }, signal?: AbortSignal): Promise<Page<FleetSession>> {
+  async sessions(options: { machineId?: string; projectId?: string; cursor?: string | null; q?: string; executionState?: string; managed?: boolean; limit?: number }, signal?: AbortSignal): Promise<Page<FleetSession>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 30) });
     for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
     const raw = await request<JsonObject>(`/api/sessions?${query}`, { signal });

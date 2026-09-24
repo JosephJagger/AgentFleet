@@ -121,6 +121,14 @@ export class ScheduledTasksService {
     return { task: this.present(task), runs: this.db.all<RunRow>("SELECT * FROM scheduled_runs WHERE task_id=? ORDER BY scheduled_at DESC LIMIT 100", taskId) };
   }
 
+  history(principal: Principal): { runs: Array<RunRow & { title: string; project_id: string; machine_id: string }> } {
+    return { runs: this.db.all<RunRow & { title: string; project_id: string; machine_id: string }>(
+      `SELECT r.*,t.title,t.project_id,t.machine_id FROM scheduled_runs r
+       JOIN scheduled_tasks t ON t.task_id=r.task_id
+       WHERE t.workspace_id=? AND t.owner_user_id=?
+       ORDER BY r.scheduled_at DESC,r.run_id DESC LIMIT 100`, principal.workspaceId, principal.userId) };
+  }
+
   private present(row: TaskRow): Record<string, unknown> {
     return { id: row.task_id, projectId: row.project_id, machineId: row.machine_id, title: row.title, prompt: row.prompt,
       destinationKind: row.destination_kind, destinationSessionId: row.destination_session_id,

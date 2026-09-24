@@ -53,6 +53,10 @@ test("offline scheduled run is held once, expires after 24 hours, and creates a 
   db.run("UPDATE scheduled_runs SET scheduled_at=? WHERE task_id=?", new Date(Date.now() - 25 * 3600_000).toISOString(), taskId);
   runMaintenance();
   assert.equal(db.get<{ status: string }>("SELECT status FROM scheduled_runs WHERE task_id=?", taskId)?.status, "missed");
+  const history = await app.inject({ method: "GET", url: "/api/scheduled-runs", headers: { cookie } });
+  assert.equal(history.statusCode, 200);
+  assert.equal((JSON.parse(history.body) as { runs: Array<{ title: string; status: string }> }).runs[0]?.title, "Daily check");
+  assert.equal((JSON.parse(history.body) as { runs: Array<{ title: string; status: string }> }).runs[0]?.status, "missed");
   const notes = await app.inject({ method: "GET", url: "/api/scheduled-notifications", headers: { cookie } });
   assert.equal((JSON.parse(notes.body) as { unread: number }).unread, 1);
   const read = await app.inject({ method: "POST", url: "/api/scheduled-notifications/read", headers, payload: {} });
