@@ -61,6 +61,37 @@ function fileUrl(sessionId: string, path: string, download = false): string {
   return `/api/sessions/${encodeURIComponent(sessionId)}/files?path=${encodeURIComponent(path)}${download ? "&download=1" : ""}`;
 }
 
+// Codex emits file citations as directives in assistant prose. Convert only
+// Markdown text nodes, leaving fenced/inline code and copied replies intact.
+function remarkFileCitations() {
+  type Node = { type?: string; value?: string; children?: Node[]; url?: string };
+  const citation = /:codex-file-citation\{([^{}]*)\}/gu;
+  function visit(node: Node): void {
+    if (!node.children || ["link", "linkReference", "image", "code", "inlineCode"].includes(node.type ?? "")) return;
+    const children: Node[] = [];
+    for (const child of node.children) {
+      if (child.type !== "text" || typeof child.value !== "string") {
+        visit(child);
+        children.push(child);
+        continue;
+      }
+      let start = 0;
+      for (const match of child.value.matchAll(citation)) {
+        const attribute = /(?:^|\s)path="((?:\\.|[^"\\])*)"/u.exec(match[1] ?? "");
+        const path = attribute?.[1]?.replace(/\\(["\\])/gu, "$1");
+        if (!path || !hostFilePath(path)) continue;
+        if (match.index > start) children.push({ type: "text", value: child.value.slice(start, match.index) });
+        const filename = path.split(/[\\/]/u).at(-1) || path;
+        children.push({ type: "link", url: path, children: [{ type: "text", value: filename }] });
+        start = match.index + match[0].length;
+      }
+      if (start < child.value.length) children.push({ type: "text", value: child.value.slice(start) });
+    }
+    node.children = children;
+  }
+  return (tree: unknown) => visit(tree as Node);
+}
+
 function LocalFileLink({ sessionId, path, children }: { sessionId: string; path: string; children?: ReactNode }) {
   return <span className="markdown-file">
     <span className="markdown-file__name">{children}</span>
@@ -92,7 +123,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({ body, sessionId }
     img: ({ src, alt }) => src ? <a href={src} target="_blank" rel="noopener noreferrer">{alt || t("查看图片")}</a> : <span>{alt}</span>,
   }), [activeLocale, sessionId]);
   return <div className="message-markdown">
-    <div className="message-markdown__body"><Markdown remarkPlugins={[remarkGfm]} components={components} urlTransform={(url) => hostFilePath(url) ? url : defaultUrlTransform(url)} skipHtml>{body}</Markdown></div>
+    <div className="message-markdown__body"><Markdown remarkPlugins={[remarkGfm, remarkFileCitations]} components={components} urlTransform={(url) => hostFilePath(url) ? url : defaultUrlTransform(url)} skipHtml>{body}</Markdown></div>
     <div className="message-markdown__actions">
       <button type="button" onClick={() => void copyReply()} aria-label={copied ? t("回复已复制") : t("复制回复")}>
         {copied ? <Check size={14} /> : <Copy size={14} />}{copied ? t("已复制") : t("复制回复")}

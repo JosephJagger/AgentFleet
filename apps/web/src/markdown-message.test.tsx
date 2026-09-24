@@ -51,4 +51,19 @@ describe("assistant Markdown", () => {
     expect(preview[1]?.getAttribute("href")).toContain("path=C%3A%2Fwork%2Fspec.docx");
     expect(preview[2]?.getAttribute("href")).toContain("path=docs%2Fplan.pdf");
   });
+  it("renders macOS and Windows Codex file citations without changing their exact paths or code examples", () => {
+    const mac = '/Users/gongqiankun/Documents/台钓/钓鱼核心玩法参数表.xlsx';
+    const win = 'C:\\work\\参数表.xlsx';
+    const marker = (path: string) => `:codex-file-citation{path="${path}" purpose="output"}`;
+    const body = `Excel：${marker(mac)}。Windows：${marker(win)}\n\n\`${marker(mac)}\`\n\n\`\`\`text\n${marker(mac)}\n\`\`\``;
+    const { container } = render(<MarkdownMessage sessionId="session-1" body={body} />);
+    expect(screen.getAllByRole("link", { name: "预览" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "下载" })).toHaveLength(2);
+    expect(screen.getAllByText("钓鱼核心玩法参数表.xlsx")).toHaveLength(1);
+    expect(screen.getAllByText("参数表.xlsx")).toHaveLength(1);
+    expect(screen.getAllByRole("link", { name: "下载" })[0]?.getAttribute("href")).toBe(`/api/sessions/session-1/files?path=${encodeURIComponent(mac)}&download=1`);
+    expect(screen.getAllByRole("link", { name: "下载" })[1]?.getAttribute("href")).toBe(`/api/sessions/session-1/files?path=${encodeURIComponent(win)}&download=1`);
+    expect(container.querySelector("pre")?.textContent).toContain(marker(mac));
+    expect(container.querySelector("p code")?.textContent).toBe(marker(mac));
+  });
 });
