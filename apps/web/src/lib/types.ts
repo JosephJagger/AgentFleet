@@ -18,6 +18,32 @@ export interface Project {
   retentionDays: 1 | 3 | 7 | 14 | 30;
 }
 
+export type ScheduledTaskSchedule =
+  | { kind: "once"; at: string }
+  | { kind: "minutes"; everyMinutes: number; startsAt: string }
+  | { kind: "daily" | "weekdays"; time: string }
+  | { kind: "weekly"; time: string; weekdays: number[] };
+
+export interface ScheduledTask {
+  id: string; projectId: string; machineId: string; title: string; prompt: string;
+  destinationKind: "existing" | "new"; destinationSessionId: string | null;
+  schedule: ScheduledTaskSchedule; timezone: string; nextAt: string | null;
+  enabled: boolean; createdAt: string; updatedAt: string;
+}
+
+export interface ScheduledRun {
+  run_id: string; task_id: string; scheduled_at: string;
+  status: "pending" | "dispatching" | "running" | "succeeded" | "failed" | "missed" | "needs_attention";
+  session_id: string | null; command_id: string | null; detail: string | null;
+  created_at: string; updated_at: string;
+}
+
+export interface ScheduledNotification {
+  id: string; readAt: string | null; createdAt: string; runId: string;
+  status: ScheduledRun["status"]; detail: string | null; sessionId: string | null;
+  title: string; projectId: string; machineId: string;
+}
+
 export interface Machine {
   codexCatalog?: import("./codex-settings").CodexCatalog | null;
   id: string;

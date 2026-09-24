@@ -17,6 +17,7 @@ import { SessionConfiguration, type ConfigurationRequest } from "./components/Se
 import { FleetStatus } from "./components/FleetStatus";
 import { SettingsView } from "./components/SettingsView";
 import { UsageView } from "./components/UsageView";
+import { ScheduledTasksView } from "./components/ScheduledTasksView";
 import { NativeSessionDeletion } from "./components/NativeSessionDeletion";
 import { CommandRecovery } from "./components/CommandRecovery";
 import {
@@ -108,6 +109,7 @@ import type {
   FleetSession,
   Machine,
   Project,
+  ScheduledNotification,
   SessionDetail,
   TimelineEvent,
 } from "./lib/types";
@@ -601,7 +603,7 @@ type TurnAdditions = {
   goal?: string;
 };
 
-export function SessionInspector({ detail, loading, draftOwner, referenceCandidates = [], onLoadHistory, historyLoading, onRefresh, onClaim, onReleaseManagement,  onSend, onQueue, onSteer, onCancelQueued, onCancel, onApproval, onClose, onNewSession }: {
+export function SessionInspector({ detail, loading, draftOwner, referenceCandidates = [], onLoadHistory, historyLoading, onRefresh, onClaim, onReleaseManagement,  onSend, onQueue, onSteer, onCancelQueued, onCancel, onApproval, onClose, onNewSession, onSchedule }: {
   detail?: SessionDetail;
   loading: boolean;
   draftOwner?: string;
@@ -618,6 +620,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   onCancelQueued: (queueItemId: string) => Promise<void>;
   onCancel: () => Promise<void>;
   onApproval: (decision: "accept" | "decline") => Promise<void>;
+  onSchedule?: () => void;
   onClose?: () => void;
   onNewSession?: () => void;
 }) {
@@ -930,6 +933,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span>{t("会话配置")}</span></button>
           <SessionActions>
             <button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(new URL(sessionPath(session.id), window.location.origin).href); setCommandMessage(t("已复制会话链接")); } catch { setCommandMessage(t("浏览器未允许复制会话链接")); } }}><Copy size={16} />{t("复制会话链接")}</button>
+            {onSchedule && <button type="button" className="button button--quiet" onClick={onSchedule}><Clock3 size={16}/>{t("定时执行")}</button>}
             <button type="button" className="button button--quiet" onClick={onRefresh}><RefreshCw size={16} />{t("刷新会话")}</button>
             <NativeSessionDeletion key={`delete:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} pending={pendingCommand} onChanged={onRefresh} />
           </SessionActions>
@@ -1144,14 +1148,16 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   );
 }
 
-export function ApprovalsView({ approvals, onOpen, onBack }: { approvals: Approval[]; onOpen: (id: string) => void; onBack: () => void }) {
+export function ApprovalsView({ approvals, notifications = [], onOpen, onRead = async () => {}, onReadAll = async () => {}, onBack }: { approvals: Approval[]; notifications?: ScheduledNotification[]; onOpen: (id: string) => void; onRead?: (id: string) => Promise<void>; onReadAll?: () => Promise<void>; onBack: () => void }) {
+  const unread = notifications.filter(item => !item.readAt);
   return (
     <section className="wide-view">
-      <div className="wide-view__heading"><div><h1>{t("待处理")}</h1><p>{t("查看需要你确认的操作和回答的问题。")}</p></div><KeyRound size={31} /></div>
+      <div className="wide-view__heading"><div><h1>{t("待处理")}</h1><p>{t("查看需要确认的操作、问题与定时任务通知。")}</p></div><KeyRound size={31} /></div>
       <div className="request-explainer"><div><strong>{t("确认操作")}</strong><p>{t("需要你允许的命令或文件修改。你可以只允许这一次，也可以拒绝。")}</p></div><div><strong>{t("回答问题")}</strong><p>{t("Codex 需要了解你的选择或补充要求，例如计划模式中的提问。")}</p></div></div>
-      {approvals.length === 0 ? <div className="wide-empty request-empty"><Check size={30} /><h2>{t("暂无待处理事项")}</h2><p>{t("有新的确认请求或问题时，会在这里提醒你。")}</p><button type="button" className="button button--primary" onClick={onBack}>{t("返回工作台")}</button></div> : (
+      {approvals.length === 0 && unread.length === 0 ? <div className="wide-empty request-empty"><Check size={30} /><h2>{t("暂无待处理事项")}</h2><p>{t("有新的确认请求、问题或定时任务结果时，会在这里提醒你。")}</p><button type="button" className="button button--primary" onClick={onBack}>{t("返回工作台")}</button></div> : (
         <div className="approval-grid">{approvals.map((approval) => <button type="button" key={approval.id} className="approval-preview" onClick={() => onOpen(approval.logicalSessionId)}><span className={`risk-stripe risk-stripe--${approval.risk}`} /><div><span className="request-kind">{approval.type === "user_input" ? t("需要回答") : t("需要确认")}</span><div className="eyebrow">{approval.machineName} · {approval.projectAlias}</div><h3>{approval.summary}</h3><p>{approval.command || approval.paths?.join(", ")}</p><span className="request-open">{t("打开会话处理 →")}</span></div><ChevronRight size={18} /></button>)}</div>
       )}
+      {unread.length > 0 && <section className="scheduled-notifications"><div className="scheduled-list__heading"><h2>{t("定时任务通知")}</h2><button type="button" className="button button--quiet" onClick={() => void onReadAll()}>{t("全部已读")}</button></div>{unread.map(item => <div className="scheduled-notification" key={item.id}><Clock3 size={18}/><div><strong>{item.title} · {t(item.status === "succeeded" ? "已完成" : item.status === "failed" ? "失败" : item.status === "missed" ? "已错过" : "需要处理")}</strong><span>{new Date(item.createdAt).toLocaleString(locale())}{item.detail ? ` · ${systemText(item.detail)}` : ""}</span></div>{item.sessionId && <button type="button" className="button button--quiet" onClick={() => onOpen(item.sessionId!)}>{t("打开会话")}</button>}<button type="button" className="button button--quiet" onClick={() => void onRead(item.id)}>{t("已读")}</button></div>)}</section>}
     </section>
   );
 }
@@ -1334,6 +1340,9 @@ function App() {
   const [pairOpen, setPairOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createProject, setCreateProject] = useState<Project>();
+  const [schedulePrefill, setSchedulePrefill] = useState<{projectId?:string;sessionId?:string}>({});
+  const [scheduledNotifications, setScheduledNotifications] = useState<ScheduledNotification[]>([]);
+  const [scheduledUnread, setScheduledUnread] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [removeMachine, setRemoveMachine] = useState<Machine>();
   useMobileViewport();
@@ -1411,6 +1420,11 @@ function App() {
     }
   }, [toast]);
 
+  const loadScheduledNotifications = useCallback(async () => {
+    try { const result = await api.scheduledNotifications(); setScheduledNotifications(result.notifications); setScheduledUnread(result.unread); }
+    catch { /* Login and reconnect are handled by the existing dashboard flow. */ }
+  }, []);
+
   const loadDetail = useCallback(async function refreshDetail(id?: string, silent = false): Promise<void> {
     if (id !== selectedSessionRef.current) return;
     const active = inFlightDetail.current;
@@ -1486,6 +1500,12 @@ function App() {
   }, []);
 
   useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+  useEffect(() => {
+    if (!dashboard) return;
+    void loadScheduledNotifications();
+    const timer = window.setInterval(() => void loadScheduledNotifications(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [Boolean(dashboard),loadScheduledNotifications]);
   useEffect(() => {
     // The collection URL selects a default once, then records its stable ID.
     // Explicit missing/deleted IDs stay visible instead of silently selecting another host.
@@ -1636,6 +1656,14 @@ function App() {
   async function updateMachineAlias(alias: string | null) { if (!selectedMachine) return; try { await api.updateMachineAlias(selectedMachine.id, alias); toast("success", alias ? t("主机显示名称已改为 {0}", alias) : t("已恢复显示真实 hostname")); await loadDashboard(true); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
 
   function openApproval(sessionId: string) { selectSession(sessionId); }
+  function openScheduled(projectId?: string, sessionId?: string) {
+    setSchedulePrefill({ projectId, sessionId });
+    setView("scheduled");
+  }
+  async function readScheduledNotification(id?: string) {
+    try { await api.readScheduledNotifications(id); await loadScheduledNotifications(); }
+    catch (error) { toast("danger", errorMessage(error)); }
+  }
 
   return (
     <div className={`app-shell${view === "fleet" && (displayedSession || detailLoading) ? " app-shell--conversation" : ""}`}>
@@ -1645,7 +1673,8 @@ function App() {
         <nav className="primary-nav" aria-label={t("主导航")}>
           <button aria-current={view === "fleet" ? "page" : undefined} className={view === "fleet" ? "active" : ""} onClick={() => { setView("fleet"); }}><MonitorDot size={16} />{t("工作台")}</button>
           <button aria-current={view === "hosts" ? "page" : undefined} className={view === "hosts" ? "active" : ""} onClick={() => { setView("hosts"); }}><Server size={16} />{t("主机")}</button>
-          {(dashboard.stats.approvals > 0 || view === "approvals") && <button aria-current={view === "approvals" ? "page" : undefined} className={view === "approvals" ? "active" : ""} onClick={() => { setView("approvals"); }}><KeyRound size={16} />{t("待处理")}{locale() === "en" ? " " : ""}{dashboard.stats.approvals > 0 && <span className="nav-count">{dashboard.stats.approvals}</span>}</button>}
+          {(dashboard.stats.approvals > 0 || scheduledUnread > 0 || view === "approvals") && <button aria-current={view === "approvals" ? "page" : undefined} className={view === "approvals" ? "active" : ""} onClick={() => { setView("approvals"); }}><KeyRound size={16} />{t("待处理")}{locale() === "en" ? " " : ""}{dashboard.stats.approvals + scheduledUnread > 0 && <span className="nav-count">{dashboard.stats.approvals + scheduledUnread}</span>}</button>}
+          <button aria-current={view === "scheduled" ? "page" : undefined} className={view === "scheduled" ? "active" : ""} onClick={() => openScheduled()}><Clock3 size={16}/>{t("定时任务")}</button>
           <button aria-current={view === "usage" ? "page" : undefined} className={view === "usage" ? "active" : ""} onClick={() => { setView("usage"); }}><BarChart3 size={16} />{t("消耗")}</button>
           <button aria-current={view === "security" ? "page" : undefined} className={view === "security" ? "active" : ""} onClick={() => { setView("security"); }}><ShieldCheck size={16} />{t("设置")}</button>
           {dashboard.user.platformAdmin === true && <button aria-current={view === "admin" ? "page" : undefined} className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><ShieldCheck size={16} />{t("管理")}</button>}
@@ -1659,11 +1688,11 @@ function App() {
           <div className="catalog-toggle-bar"><button type="button" className="catalog-toggle" aria-label={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话")} title={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话，让对话更宽")} aria-expanded={!catalogCollapsed} aria-controls="workbench-catalog" onClick={() => setCatalogCollapsed((value) => !value)}>{catalogCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}<span>{catalogCollapsed ? t("展开") : t("收起列表")}</span></button></div>
           <div id="workbench-catalog" className="fleet-catalog-content" role="region" aria-label={t("项目与会话列表")} tabIndex={0}>
           {selectedMachine && <><MachineSummaryHeader machine={selectedMachine} onAliasChange={updateMachineAlias} /><button className="catalog-more" type="button" onClick={() => setView("hosts")}>{t("管理主机与默认设置")}</button>{selectedMachine.discovery?.state !== "ready" && <DiscoveryStatus discovery={selectedMachine.discovery} />}</>}
-          {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} />}
+          {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} onSchedule={project => openScheduled(project.id)} />}
           </div>
         </main>
-        <SessionInspector referenceCandidates={dashboard.sessions} detail={displayedSession ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
-      </div> : view === "hosts" ? <HostsView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
+        <SessionInspector referenceCandidates={dashboard.sessions} detail={displayedSession ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
+      </div> : view === "hosts" ? <HostsView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} notifications={scheduledNotifications} onOpen={openApproval} onRead={id => readScheduledNotification(id)} onReadAll={() => readScheduledNotification()} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />
       <CreateSessionDialog open={createOpen} machines={dashboard.machines} selectedMachineId={selectedMachineId} initialProject={createProject} onClose={() => setCreateOpen(false)} onToast={toast} onCreate={async (machineId, projectId, title) => { const result = await api.createSession(machineId, projectId, title); setSelectedMachineId(machineId); selectSession(result.session.id); toast("success", t("受管会话已创建")); await loadDashboard(true); }} />

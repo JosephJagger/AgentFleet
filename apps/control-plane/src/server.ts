@@ -13,6 +13,7 @@ import { QuotaRefreshService } from "./quota-refresh.js";
 import { UsageService } from "./usage.js";
 import { ResetRadar } from "./reset-radar.js";
 import { AppleFleetsIntegration } from "./applefleets.js";
+import { ScheduledTasksService, type Schedule } from "./scheduled-tasks.js";
 import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
@@ -383,6 +384,12 @@ export async function buildControlPlane(
     }
     return attempt;
   };
+
+  const scheduledTasks = new ScheduledTasksService(db, registry, coordination, auth.servicePrincipal("scheduled_tasks"), dispatchCommand,
+    machineId => {
+      const agent = agents.get(machineId);
+      return Boolean(agent?.reconciliationReady && !agent.dispatchPaused && agent.socket.readyState === WebSocket.OPEN);
+    });
 
   const appleFleets = config.appleFleetsApiToken && config.appleFleetsProject
     ? new AppleFleetsIntegration({
@@ -912,6 +919,42 @@ export async function buildControlPlane(
       return {...page,sessions:page.items};
     }
     return {sessions:registry.listSessions(request.principal as Principal)};
+  });
+  app.get("/api/scheduled-tasks", { preHandler: authenticate }, async request => {
+    const query = request.query as Record<string, unknown>;
+    return scheduledTasks.list(request.principal as Principal, typeof query.projectId === "string" ? query.projectId : undefined);
+  });
+  app.post("/api/scheduled-tasks", { preHandler: mutate }, async request => {
+    const body = record(request.body);
+    return { task: scheduledTasks.create(request.principal as Principal, {
+      projectId: String(body.projectId ?? ""), title: String(body.title ?? ""), prompt: String(body.prompt ?? ""),
+      destinationSessionId: typeof body.destinationSessionId === "string" ? body.destinationSessionId : null,
+      schedule: body.schedule as Schedule, timezone: String(body.timezone ?? ""),
+    }) };
+  });
+  app.get("/api/scheduled-tasks/:id", { preHandler: authenticate }, async request => scheduledTasks.get(request.principal as Principal, routeId(request)));
+  app.put("/api/scheduled-tasks/:id", { preHandler: mutate }, async request => {
+    const body = record(request.body);
+    return { task: scheduledTasks.update(request.principal as Principal, routeId(request), {
+      projectId: String(body.projectId ?? ""), title: String(body.title ?? ""), prompt: String(body.prompt ?? ""),
+      destinationSessionId: typeof body.destinationSessionId === "string" ? body.destinationSessionId : null,
+      schedule: body.schedule as Schedule, timezone: String(body.timezone ?? ""), enabled: body.enabled === true,
+    }) };
+  });
+  app.post("/api/scheduled-tasks/:id/enabled", { preHandler: mutate }, async request => {
+    const body = record(request.body);
+    invariant(typeof body.enabled === "boolean", 400, "INVALID_INPUT", "enabled must be a boolean");
+    return { task: scheduledTasks.setEnabled(request.principal as Principal, routeId(request), body.enabled) };
+  });
+  app.delete("/api/scheduled-tasks/:id", { preHandler: mutate }, async request => {
+    scheduledTasks.remove(request.principal as Principal, routeId(request));
+    return { ok: true };
+  });
+  app.get("/api/scheduled-notifications", { preHandler: authenticate }, async request => scheduledTasks.notifications(request.principal as Principal));
+  app.post("/api/scheduled-notifications/read", { preHandler: mutate }, async request => {
+    const body = request.body === undefined ? {} : record(request.body);
+    scheduledTasks.readNotifications(request.principal as Principal, typeof body.id === "string" ? body.id : undefined);
+    return { ok: true };
   });
   app.post("/api/sessions", { preHandler: mutate, schema: apiSchemas.createSession }, async (request) => {
     const body = record(request.body);
@@ -1560,6 +1603,7 @@ export async function buildControlPlane(
     const expiredContent = coordination.purgeExpiredContent();
     writingMemory.cleanup();
     const expiredAudit = coordination.purgeExpiredAudit();
+    scheduledTasks.sweep();
     let inactiveTakeoversReleased = 0;
     if (Date.now() >= nextInactiveTakeoverSweepAt) {
       nextInactiveTakeoverSweepAt = Date.now() + 60 * 60 * 1_000;

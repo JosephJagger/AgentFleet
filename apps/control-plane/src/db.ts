@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 38) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 39) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1220,6 +1220,50 @@ export class ControlPlaneDatabase {
         this.sqlite.exec("ALTER TABLE machine_usage ADD COLUMN reset_cards_available INTEGER CHECK(reset_cards_available IS NULL OR reset_cards_available >= 0)");
       }
       this.sqlite.exec("PRAGMA user_version=38");
+    });
+    if (version < 39) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS scheduled_tasks (
+        task_id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+        machine_id TEXT NOT NULL REFERENCES machines(machine_id),
+        owner_user_id TEXT NOT NULL REFERENCES users(user_id),
+        service_client_session_id TEXT NOT NULL REFERENCES client_sessions(client_session_id),
+        title TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        destination_session_id TEXT REFERENCES logical_sessions(logical_session_id) ON DELETE SET NULL,
+        destination_kind TEXT NOT NULL CHECK(destination_kind IN ('existing','new')),
+        schedule_kind TEXT NOT NULL CHECK(schedule_kind IN ('once','minutes','daily','weekdays','weekly')),
+        schedule_json TEXT NOT NULL,
+        timezone TEXT NOT NULL,
+        next_at TEXT,
+        enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS scheduled_tasks_due ON scheduled_tasks(enabled,next_at);
+      CREATE TABLE IF NOT EXISTS scheduled_runs (
+        run_id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL REFERENCES scheduled_tasks(task_id) ON DELETE CASCADE,
+        scheduled_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending','dispatching','running','succeeded','failed','missed','needs_attention')),
+        session_id TEXT REFERENCES logical_sessions(logical_session_id) ON DELETE SET NULL,
+        command_id TEXT REFERENCES commands(command_id),
+        detail TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(task_id,scheduled_at)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS scheduled_runs_pending ON scheduled_runs(status,scheduled_at);
+      CREATE TABLE IF NOT EXISTS scheduled_notifications (
+        notification_id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL UNIQUE REFERENCES scheduled_runs(run_id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(user_id),
+        read_at TEXT,
+        created_at TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS scheduled_notifications_unread ON scheduled_notifications(user_id,read_at,created_at);
+      PRAGMA user_version=39`);
     });
   }
 

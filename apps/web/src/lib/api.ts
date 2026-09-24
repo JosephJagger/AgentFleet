@@ -610,6 +610,14 @@ export interface RuntimeReleaseStatus {
 }
 
 export const api = {
+  scheduledTasks: (projectId?: string) => request<{tasks: import("./types").ScheduledTask[]}>(`/api/scheduled-tasks${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`),
+  scheduledTask: (id: string) => request<{task: import("./types").ScheduledTask; runs: import("./types").ScheduledRun[]}>(`/api/scheduled-tasks/${encodeURIComponent(id)}`),
+  createScheduledTask: (input: {projectId:string;title:string;prompt:string;destinationSessionId?:string|null;schedule:import("./types").ScheduledTaskSchedule;timezone:string}) => request<{task:import("./types").ScheduledTask}>("/api/scheduled-tasks",{method:"POST",body:JSON.stringify(input)}),
+  updateScheduledTask: (id:string,input:{projectId:string;title:string;prompt:string;destinationSessionId?:string|null;schedule:import("./types").ScheduledTaskSchedule;timezone:string;enabled:boolean}) => request<{task:import("./types").ScheduledTask}>(`/api/scheduled-tasks/${encodeURIComponent(id)}`,{method:"PUT",body:JSON.stringify(input)}),
+  setScheduledTaskEnabled: (id:string,enabled:boolean) => request<{task:import("./types").ScheduledTask}>(`/api/scheduled-tasks/${encodeURIComponent(id)}/enabled`,{method:"POST",body:JSON.stringify({enabled})}),
+  deleteScheduledTask: (id:string) => request<{ok:true}>(`/api/scheduled-tasks/${encodeURIComponent(id)}`,{method:"DELETE"}),
+  scheduledNotifications: () => request<{notifications:import("./types").ScheduledNotification[];unread:number}>("/api/scheduled-notifications"),
+  readScheduledNotifications: (id?:string) => request<{ok:true}>("/api/scheduled-notifications/read",{method:"POST",body:JSON.stringify(id?{id}:{})}),
   writingPreferences: (id?:string,signal?:AbortSignal) => request<WritingPreferencesState>(id ? `/api/sessions/${encodeURIComponent(id)}/writing-preferences` : '/api/settings/writing',{signal}),
   saveWritingPreferences: (settings:Partial<CompletionPreferences>|null,id?:string,signal?:AbortSignal) => request<WritingPreferencesState>(id ? `/api/sessions/${encodeURIComponent(id)}/writing-preferences` : '/api/settings/writing',{method:'PUT',body:JSON.stringify({settings}),signal}),
   writingMemory: (id: string, signal?: AbortSignal) => request<WritingMemoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-memory`, { signal }),

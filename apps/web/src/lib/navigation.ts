@@ -1,6 +1,6 @@
 import { sessionFromPath, sessionPath } from "./session-workspace";
 
-export type View = "fleet" | "hosts" | "approvals" | "usage" | "security" | "admin";
+export type View = "fleet" | "hosts" | "approvals" | "scheduled" | "usage" | "security" | "admin";
 export interface AppRoute { view: View; machineId?: string; sessionId?: string }
 
 export function routeFromPath(pathname: string): AppRoute {
@@ -9,6 +9,7 @@ export function routeFromPath(pathname: string): AppRoute {
   if (/^\/admin\/?$/.test(pathname)) return { view: "admin" };
   if (/^\/settings\/?$/.test(pathname)) return { view: "security" };
   if (/^\/approvals\/?$/.test(pathname)) return { view: "approvals" };
+  if (/^\/scheduled\/?$/.test(pathname)) return { view: "scheduled" };
   const match = /^\/(hosts|workbench|usage)(?:\/([^/]+))?\/?$/.exec(pathname);
   if (match) {
     const view = match[1] === "hosts" ? "hosts" : match[1] === "usage" ? "usage" : "fleet";
@@ -22,6 +23,7 @@ export function routePath(route: AppRoute): string {
   if (route.view === "admin") return "/admin";
   if (route.view === "security") return "/settings";
   if (route.view === "approvals") return "/approvals";
+  if (route.view === "scheduled") return "/scheduled";
   if (route.view === "usage") return route.machineId ? `/usage/${encodeURIComponent(route.machineId)}` : "/usage";
   if (route.view === "fleet" && route.sessionId) return sessionPath(route.sessionId);
   const base = route.view === "hosts" ? "/hosts" : "/workbench";
