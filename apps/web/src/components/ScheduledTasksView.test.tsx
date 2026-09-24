@@ -42,3 +42,22 @@ it("searches all controlled sessions before enabling task settings and keeps his
   fireEvent.click(screen.getByRole("button", { name: "历史记录" }));
   expect(await screen.findByText("Daily check")).toBeTruthy();
 });
+
+it("searches host, project, and path before choosing a project for a new session", async () => {
+  setLocale("zh-CN");
+  vi.mocked(api.scheduledTasks).mockResolvedValue({ tasks: [] });
+  vi.mocked(api.scheduledHistory).mockResolvedValue({ runs: [] });
+  const manyProjects = [{ ...machines[0], projects: Array.from({ length: 20 }, (_, index) => ({
+    id: `project-${index + 1}`, alias: index === 16 ? "Blog_规划" : `Project ${index + 1}`,
+    pathHint: index === 16 ? "/work/blog" : `/work/project-${index + 1}`,
+  })) }] as Machine[];
+  render(<ScheduledTasksView machines={manyProjects} onSession={vi.fn()} onToast={vi.fn()} />);
+  const results = screen.getByRole("listbox", { name: "选择项目" });
+  expect(within(results).getAllByRole("option")).toHaveLength(20);
+  expect(screen.getByRole("textbox", { name: "任务名称" }).matches(":disabled")).toBe(true);
+  fireEvent.change(screen.getByRole("searchbox", { name: "搜索项目" }), { target: { value: "blog" } });
+  expect(within(results).getAllByRole("option")).toHaveLength(1);
+  fireEvent.click(within(results).getByRole("option", { name: /Blog_规划/ }));
+  expect(screen.getByRole("textbox", { name: "任务名称" }).matches(":disabled")).toBe(false);
+  expect(screen.getByText(/已选项目 · Home \/ Blog_规划/)).toBeTruthy();
+});

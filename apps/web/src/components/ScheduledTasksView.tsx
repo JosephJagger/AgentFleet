@@ -51,6 +51,7 @@ export function ScheduledTasksView({ machines, initialProjectId, initialSessionI
   const [sidebarTab, setSidebarTab] = useState<"tasks" | "history">("tasks");
   const [history, setHistory] = useState<ScheduledHistoryRun[]>([]);
   const [projectId, setProjectId] = useState(initialProjectId ?? "");
+  const [projectQuery, setProjectQuery] = useState("");
   const [sessionId, setSessionId] = useState(initialSessionId ?? "");
   const [sessionQuery, setSessionQuery] = useState("");
   const [sessions, setSessions] = useState<FleetSession[]>([]);
@@ -94,7 +95,7 @@ export function ScheduledTasksView({ machines, initialProjectId, initialSessionI
   }, [destination, sessionQuery, lockedProjectId]);
 
   const reset = () => {
-    setSidebarTab("tasks"); setSelectedId(undefined); setTitle(""); setPrompt(""); setKind("once"); setLocalAt(nextLocal()); setMinutes(30); setTime("09:00"); setWeekdays([1]); setDestination("new"); setSessionId(""); setError("");
+    setSidebarTab("tasks"); setSelectedId(undefined); setProjectId(initialProjectId ?? ""); setProjectQuery(""); setTitle(""); setPrompt(""); setKind("once"); setLocalAt(nextLocal()); setMinutes(30); setTime("09:00"); setWeekdays([1]); setDestination("new"); setSessionId(""); setError("");
   };
   const selectTask = (task: ScheduledTask) => {
     setSelectedId(task.id); setProjectId(task.projectId); setTitle(task.title); setPrompt(task.prompt);
@@ -109,6 +110,7 @@ export function ScheduledTasksView({ machines, initialProjectId, initialSessionI
   };
   const selected = tasks.find(task => task.id === selectedId);
   const chosenProject = projects.find(project => project.id === projectId);
+  const matchingProjects = projects.filter(project => `${project.machineName} ${project.alias} ${project.pathHint}`.toLocaleLowerCase().includes(projectQuery.trim().toLocaleLowerCase()));
   const targetReady = destination === "new" ? Boolean(projectId) : Boolean(projectId && sessionId);
 
   const save = async (event: React.FormEvent) => {
@@ -149,7 +151,14 @@ export function ScheduledTasksView({ machines, initialProjectId, initialSessionI
         <h2>{selected ? t("编辑定时任务") : t("新建定时任务")}</h2>
         <form className="stack-form" onSubmit={event => void save(event)}>
           <div className="scheduled-choice"><span>{t("会话")}</span><label><input type="radio" checked={destination === "new"} onChange={() => { setDestination("new"); setSessionId(""); if (!selected) setProjectId(""); }}/>{t("每次新建会话")}</label><label><input type="radio" checked={destination === "existing"} onChange={() => { setDestination("existing"); setSessionId(""); if (!selected) setProjectId(""); }}/>{t("使用项目里的已有会话")}</label></div>
-          {destination === "new" ? <label><span>{t("项目")}</span><select required value={projectId} disabled={Boolean(selected)} onChange={event => setProjectId(event.target.value)}><option value="">{t("选择项目")}</option>{projects.map(project => <option value={project.id} key={project.id}>{project.machineName} · {project.alias}</option>)}</select></label> : <div className="scheduled-session-picker">
+          {destination === "new" ? <div className="scheduled-project-picker">
+            <label><span>{t("项目")}</span><input type="search" aria-label={t("搜索项目")} placeholder={t("搜索主机、项目或路径")} value={projectQuery} disabled={Boolean(selected)} onChange={event => setProjectQuery(event.target.value)}/></label>
+            {chosenProject && <div className="scheduled-session-selected"><Check size={16}/><span>{t("已选项目")} · {chosenProject.machineName} / {chosenProject.alias}</span></div>}
+            {!selected && <div className="scheduled-session-results" role="listbox" aria-label={t("选择项目")}>
+              {matchingProjects.length === 0 && <p className="subtle">{t("没有匹配的项目")}</p>}
+              {matchingProjects.map(project => <button type="button" role="option" aria-selected={project.id === projectId} className={project.id === projectId ? "active" : ""} key={project.id} onClick={() => setProjectId(project.id)}><strong>{project.alias}</strong><small>{project.machineName} · {project.pathHint}</small></button>)}
+            </div>}
+          </div> : <div className="scheduled-session-picker">
             <label><span>{t("搜索已接管会话")}</span><input placeholder={t("搜索主机、项目或会话")} value={sessionQuery} onChange={event => setSessionQuery(event.target.value)}/></label>
             {sessionId && <div className="scheduled-session-selected"><Check size={16}/><span>{sessions.find(session => session.id === sessionId)?.title ?? t("已选会话")} · {chosenProject?.machineName ?? ""} / {chosenProject?.alias ?? projectId}</span></div>}
             <div className="scheduled-session-results" role="listbox" aria-label={t("选择已接管的会话")}>

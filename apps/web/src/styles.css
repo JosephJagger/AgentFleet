@@ -1312,7 +1312,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .scheduled-choice>span{width:100%;font-weight:700}
 .scheduled-choice label,.scheduled-weekdays label{display:inline-flex;align-items:center;gap:8px;flex:1 1 220px;padding:11px 13px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
 .scheduled-choice input[type="radio"],.scheduled-weekdays input[type="checkbox"]{width:auto;min-width:auto;max-width:none;flex:none;margin:0}
-.scheduled-session-picker{display:grid;gap:10px}
+.scheduled-session-picker,.scheduled-project-picker{display:grid;gap:10px}
 .scheduled-session-results{max-height:264px;overflow-y:auto;display:grid;gap:4px;border:1px solid var(--line);border-radius:12px;padding:6px;background:var(--paper)}
 .scheduled-session-results button{display:grid;gap:3px;width:100%;padding:9px 11px;text-align:left;border:0;border-radius:9px;background:transparent;color:var(--ink);cursor:pointer}
 .scheduled-session-results button:hover,.scheduled-session-results button.active{background:var(--surface);outline:1px solid var(--line)}
