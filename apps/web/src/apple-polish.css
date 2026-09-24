@@ -23,6 +23,7 @@ h1, h2, h3 { font-weight: 650; letter-spacing: -.018em; }
 .primary-nav { padding: 3px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper-solid); }
 .primary-nav button { border-radius: 10px; min-height: 36px; padding: 7px 14px; }
 .primary-nav button.active { background: var(--paper); color: var(--cobalt-deep); box-shadow: var(--control-shadow); }
+.primary-nav .nav-label-compact { display: none; }
 .brand-lockup { letter-spacing: -.025em; }
 .world-clock time { letter-spacing: .015em; }
 .world-clock__weather { line-height: 1.4; }
@@ -75,8 +76,10 @@ h1, h2, h3 { font-weight: 650; letter-spacing: -.018em; }
   .composer-input { border-radius: 18px; }
 }
 @media (max-width: 660px) {
-  .primary-nav { border-radius: 0; border-inline: 0; border-bottom: 0; background: var(--paper); }
-  .primary-nav button { border-radius: 12px; }
+  .primary-nav { inset-inline: 8px; gap: 1px; padding: 5px; border-radius: 16px; background: var(--paper); }
+  .primary-nav button { border-radius: 12px; font-size: .6875rem; line-height: 1.2; white-space: nowrap; }
+  .primary-nav .nav-label-full { display: none; }
+  .primary-nav .nav-label-compact { display: inline; }
   .primary-nav button.active { background: var(--cobalt-soft); box-shadow: none; }
   .activity-panel { border-radius: 20px; }
   .usage-body { padding: 18px; }

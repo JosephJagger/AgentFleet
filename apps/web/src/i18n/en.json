@@ -1,5 +1,9 @@
 {
   "定时任务": "Scheduled tasks",
+  "定时": "Tasks",
+  "工作": "Work",
+  "待办": "Inbox",
+  "设定": "Prefs",
   "定时执行": "Schedule in this session",
   "管理 {0} 的定时任务": "Manage scheduled tasks for {0}",
   "让 Codex 在所选主机的项目中按时工作，并保留每次结果。": "Run Codex on a schedule in a selected host project and keep every result.",

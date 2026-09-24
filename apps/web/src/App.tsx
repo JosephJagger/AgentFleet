@@ -204,6 +204,10 @@ function IconButton({ label, children, onClick, className = "", disabled = false
   );
 }
 
+function NavText({ full, compact }: { full: string; compact: string }) {
+  return <><span className="nav-label-full">{t(full)}</span><span className="nav-label-compact" aria-hidden="true">{t(compact)}</span></>;
+}
+
 function Login({ onLogin }: { onLogin: (dashboard: Dashboard) => void }) {
   return (
     <main className="login-shell">
@@ -1651,13 +1655,13 @@ function App() {
         <div className="brand-lockup"><span className="brand-glyph"><ThemeEmblem /></span><span>AgentFleets</span></div>
         <WorldClocks side="left" />
         <nav className="primary-nav" aria-label={t("主导航")}>
-          <button aria-current={view === "fleet" ? "page" : undefined} className={view === "fleet" ? "active" : ""} onClick={() => { setView("fleet"); }}><MonitorDot size={16} />{t("工作台")}</button>
-          <button aria-current={view === "hosts" ? "page" : undefined} className={view === "hosts" ? "active" : ""} onClick={() => { setView("hosts"); }}><Server size={16} />{t("主机")}</button>
-          {(dashboard.stats.approvals > 0 || view === "approvals") && <button aria-current={view === "approvals" ? "page" : undefined} className={view === "approvals" ? "active" : ""} onClick={() => { setView("approvals"); }}><KeyRound size={16} />{t("待处理")}{dashboard.stats.approvals > 0 && <span className="nav-count">{dashboard.stats.approvals}</span>}</button>}
-          <button aria-current={view === "scheduled" ? "page" : undefined} className={view === "scheduled" ? "active" : ""} onClick={() => openScheduled()}><Clock3 size={16}/>{t("定时任务")}</button>
-          <button aria-current={view === "usage" ? "page" : undefined} className={view === "usage" ? "active" : ""} onClick={() => { setView("usage"); }}><BarChart3 size={16} />{t("消耗")}</button>
-          <button aria-current={view === "security" ? "page" : undefined} className={view === "security" ? "active" : ""} onClick={() => { setView("security"); }}><ShieldCheck size={16} />{t("设置")}</button>
-          {dashboard.user.platformAdmin === true && <button aria-current={view === "admin" ? "page" : undefined} className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><ShieldCheck size={16} />{t("管理")}</button>}
+          <button aria-current={view === "fleet" ? "page" : undefined} aria-label={t("工作台")} className={view === "fleet" ? "active" : ""} onClick={() => { setView("fleet"); }}><MonitorDot size={16} /><NavText full="工作台" compact="工作" /></button>
+          <button aria-current={view === "hosts" ? "page" : undefined} aria-label={t("主机")} className={view === "hosts" ? "active" : ""} onClick={() => { setView("hosts"); }}><Server size={16} /><NavText full="主机" compact="主机" /></button>
+          {(dashboard.stats.approvals > 0 || view === "approvals") && <button aria-current={view === "approvals" ? "page" : undefined} aria-label={dashboard.stats.approvals > 0 ? `${t("待处理")} ${dashboard.stats.approvals}` : t("待处理")} className={view === "approvals" ? "active" : ""} onClick={() => { setView("approvals"); }}><KeyRound size={16} /><NavText full="待处理" compact="待办" />{dashboard.stats.approvals > 0 && <span className="nav-count">{dashboard.stats.approvals}</span>}</button>}
+          <button aria-current={view === "scheduled" ? "page" : undefined} aria-label={t("定时任务")} className={view === "scheduled" ? "active" : ""} onClick={() => openScheduled()}><Clock3 size={16}/><NavText full="定时任务" compact="定时" /></button>
+          <button aria-current={view === "usage" ? "page" : undefined} aria-label={t("消耗")} className={view === "usage" ? "active" : ""} onClick={() => { setView("usage"); }}><BarChart3 size={16} /><NavText full="消耗" compact="消耗" /></button>
+          <button aria-current={view === "security" ? "page" : undefined} aria-label={t("设置")} className={view === "security" ? "active" : ""} onClick={() => { setView("security"); }}><ShieldCheck size={16} /><NavText full="设置" compact="设定" /></button>
+          {dashboard.user.platformAdmin === true && <button aria-current={view === "admin" ? "page" : undefined} aria-label={t("管理")} className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><ShieldCheck size={16} /><NavText full="管理" compact="管理" /></button>}
         </nav>
         <WorldClocks side="right" />
         <div className="topbar-actions"><LanguageSwitcher compact /><span className="account-label">{dashboard.user.displayName}</span><IconButton label={t("退出登录")} onClick={async () => { await api.logout(); setDashboard(undefined); setConnected(false); }}><LogOut size={16} /></IconButton></div>
