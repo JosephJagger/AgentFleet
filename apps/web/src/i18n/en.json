@@ -2556,5 +2556,7 @@
   "先选择项目或已接管会话，再设置任务内容和时间。": "Choose a project or controlled session before setting the task and schedule.",
   "没有匹配的已接管会话": "No matching controlled sessions",
   "还没有定时任务。选择项目或会话后创建第一个任务。": "No scheduled tasks yet. Choose a project or session to create one.",
-  "查看需要确认的操作和问题。": "Review actions and questions that need your input."
+  "查看需要确认的操作和问题。": "Review actions and questions that need your input.",
+  "收起明细": "Hide details",
+  "查看完整明细": "View full details"
 }

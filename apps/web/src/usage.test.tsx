@@ -132,3 +132,19 @@ it("limits usage tables to ten rows and paginates projects and sessions independ
  fireEvent.click(within(projectPages).getByRole("button",{name:"第 2 页"}));
  expect(screen.getAllByText("A very long usage title 11 that should stay on one line")).toHaveLength(2);
 });
+
+it("keeps mobile usage concise and permits closing after expanding details",async()=>{
+ const original=window.matchMedia;
+ window.matchMedia=vi.fn().mockReturnValue({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()});
+ try {
+  vi.mocked(api.usage).mockResolvedValue(data);
+  render(<UsageButton scope="project" id="p1"/>);
+  fireEvent.click(await screen.findByRole("button",{name:/总消耗/}));
+  const dialog=screen.getByRole("dialog");
+  expect(within(dialog).queryByText("账号额度（共享）")).toBeNull();
+  fireEvent.click(within(dialog).getByRole("button",{name:"查看完整明细"}));
+  expect(within(dialog).getByText("账号额度（共享）")).toBeTruthy();
+  fireEvent.click(within(dialog).getAllByRole("button",{name:"关闭用量"}).at(-1)!);
+  await waitFor(()=>expect(dialog.hasAttribute("open")).toBe(false));
+ } finally {window.matchMedia=original;}
+});

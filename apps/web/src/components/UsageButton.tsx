@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { BarChart3, X } from "lucide-react";
 import { api } from "../lib/api";
 import type { UsageSummary } from "../lib/usage";
@@ -8,6 +9,10 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
   const [data,setData]=useState<UsageSummary>();const [failed,setFailed]=useState(false);const [open,setOpen]=useState(false);
   const [refreshing,setRefreshing]=useState(false);const [refreshNotice,setRefreshNotice]=useState("");
   const dialog=useRef<HTMLDialogElement>(null);
+  const [mobile,setMobile]=useState(()=>window.matchMedia?.("(max-width: 900px)").matches??false);
+  const [expanded,setExpanded]=useState(false);
+  useEffect(()=>{const media=window.matchMedia?.("(max-width: 900px)");if(!media)return;const update=()=>setMobile(media.matches);media.addEventListener("change",update);return()=>media.removeEventListener("change",update);},[]);
+  useEffect(()=>{if(!open)setExpanded(false);},[open]);
   const refreshUsage=useRef<()=>void>(()=>{});
   useEffect(()=>{
     setData(undefined);setFailed(false);setOpen(false);setRefreshNotice("");
@@ -58,10 +63,12 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
         </span>
       </>:<><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope!=="machine"&&!failed&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",fiveHour[0].remainingPercent)}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
     </button>
-    <dialog ref={dialog} className="modal usage-dialog" aria-label={t("用量与剩余额度")} onCancel={()=>setOpen(false)} onClose={()=>setOpen(false)}>
+    {createPortal(<dialog ref={dialog} className="modal usage-dialog" aria-label={t("用量与剩余额度")} onClick={event=>{if(event.target!==event.currentTarget)return;const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)setOpen(false);}} onCancel={()=>setOpen(false)} onClose={()=>setOpen(false)}>
       <header className="modal-head"><div><h2>{t("用量与剩余额度")}</h2><p>{t("账号看额度，项目和会话看已记录 token")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setOpen(false)}><X size={18}/></button></header>
       <div className="usage-body">
         {failed&&<p role="status">{t("用量读取失败，已有数据可能过期。")}</p>}
+        {mobile&&scope!=="machine"&&<section className="usage-mobile-summary"><h3>{t("已记录 token 消耗")}</h3><dl className="usage-totals"><div><dt>{t("已记录总量")}</dt><dd>{data?.recorded?number(data.recorded.totalTokens):"—"}</dd></div><div><dt>{t("本轮周额度内已记录")}</dt><dd>{periodTokens==null?"—":number(periodTokens)}</dd></div><div><dt>{t("周缓存命中率")}</dt><dd>{rate(weeklyCacheRate)}</dd></div></dl>{data&&<p>{t("已获取 {0} / {1} 个会话",data.observedSessions,data.totalSessions)}</p>}<button type="button" className="button button--quiet" aria-expanded={expanded} onClick={()=>setExpanded(value=>!value)}>{expanded?t("收起明细"):t("查看完整明细")}</button></section>}
+        {(!mobile||scope==="machine"||expanded)&&<>
         <section><h3>{t("账号额度（共享）")}</h3>
           {scope==="machine"&&<button type="button" className="button button--quiet" disabled={refreshing} onClick={()=>void refreshHost()}>{t("刷新额度")}</button>}
           {refreshNotice&&<p role="status">{refreshNotice}</p>}
@@ -93,7 +100,9 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
         {scope==="machine"&&<section><h3>{t("项目本周消耗排名（前 10）")}</h3>{data?.topWeeklyProjects?.length?<ol className="usage-ranking">{data.topWeeklyProjects.map(p=><li key={p.id}>{p.title}<strong>{number(p.totalTokens)} tokens · {t("周命中 {0}",rate(cacheRate(p.inputTokens,p.cachedInputTokens)))}</strong></li>)}</ol>:<p>{data?.quotaCycle?t("本轮暂无已记录消耗。"):t("重置时间未知，暂不计算本周排名。")}</p>}</section>}
         {scope!=="session"&&!!data?.topSessions.length&&<section><h3>{t("会话总消耗排名（前 10）")}</h3><ol className="usage-ranking">{data.topSessions.map(s=><li key={s.id}>{onSession?<button type="button" onClick={()=>{setOpen(false);onSession(s.id);}}>{s.title}</button>:<a href={`/sessions/${encodeURIComponent(s.id)}`}>{s.title}</a>}<strong>{number(s.totalTokens)} tokens</strong></li>)}</ol></section>}
         {scope!=="session"&&<section><h3>{t("会话本周消耗排名（前 10）")}</h3>{data?.topWeeklySessions?.length?<ol className="usage-ranking">{data.topWeeklySessions.map(s=><li key={s.id}>{onSession?<button type="button" onClick={()=>{setOpen(false);onSession(s.id);}}>{s.title}</button>:<a href={`/sessions/${encodeURIComponent(s.id)}`}>{s.title}</a>}<strong>{number(s.totalTokens)} tokens · {t("周命中 {0}",rate(cacheRate(s.inputTokens,s.cachedInputTokens)))}</strong></li>)}</ol>:<p>{data?.quotaCycle?t("本轮暂无已记录消耗。"):t("重置时间未知，暂不计算本周排名。")}</p>}</section>}
+        </>}
       </div>
-    </dialog>
+      {mobile&&<footer className="usage-dialog-footer"><button type="button" className="button button--quiet" onClick={()=>setOpen(false)}>{t("关闭用量")}</button></footer>}
+    </dialog>,document.body)}
   </>;
 }
