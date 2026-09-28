@@ -10,7 +10,7 @@
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a><br><br>
-  <a href="#self-host">Get started</a> · <a href="#built-for-your-native-sessions">Features</a> · <a href="#how-it-compares-to-codex">Compare with Codex</a> · <a href="#our-vision">Vision</a> · <a href="CONTRIBUTING.md">Contribute</a> · <a href="SECURITY.md">Security</a>
+  <a href="https://www.agentfleets.cn">Try it free</a> · <a href="#self-host">Self-host</a> · <a href="#built-for-your-native-sessions">Features</a> · <a href="#how-it-compares-to-codex">Compare with Codex</a> · <a href="#our-vision">Vision</a> · <a href="CONTRIBUTING.md">Contribute</a> · <a href="SECURITY.md">Security</a>
 </p>
 
 <p align="center"><strong>Pick up your Codex work from any browser.</strong><br>
@@ -22,6 +22,24 @@ Keep execution in your own environment.</p>
 ![AgentFleets workspace showing native quota, credit balance, session usage and a running Codex conversation with fictional demo data](docs/assets/workspace-en.png)
 
 <p align="center"><sub>Actual interface with synthetic demo data. No production accounts, hosts, or conversations are shown.</sub></p>
+
+## Try AgentFleets for free
+
+Visit **[https://www.agentfleets.cn](https://www.agentfleets.cn)** to try the hosted panel for free, without deploying your own server.
+
+1. Open the console from the website and sign in with your email verification code.
+2. Choose **Add host**, then run the installation command on a computer where you already use Codex.
+3. Once connected, choose a project and session to continue your work from a desktop or mobile browser.
+
+Tasks execute on your connected host. Bring your own Codex account and available quota; the free panel experience does not include Codex credits. If you prefer to run the panel yourself, follow [Self-host](#self-host).
+
+## Recent improvements you can use
+
+- **Schedule routine work.** Search for a project or an existing managed session, choose the destination first, then set the prompt and schedule. Review each run in **Scheduled tasks → History**. For example, ask Codex to check a project every weekday morning.
+- **Give another task relevant conversation context.** Paste a copied session link or use **+ → Reuse session**. Send the reference card with your instructions; Codex consults the readable conversation snapshot as needed, without waiting for a separate AI summary.
+- **Send screenshots from your phone.** Choose an image from the **+** menu or paste it on desktop. Improved browser compatibility for automatic resizing and compression reduces oversized-image failures on mobile.
+- **Use the panel on smaller screens.** Mobile navigation uses compact labels; login forms fit narrow screens; scheduled-task cards follow the selected theme. Mobile usage dialogs show concise details first and provide a close button.
+- **Find one clear recovery entry.** Switching between offline hosts no longer accumulates duplicate repair panels. Recovery guidance explains when local repair is needed; simply leaving the panel unused does not require repairing a host.
 
 ## One console for Codex across your machines
 
@@ -87,7 +105,7 @@ Today, AgentFleets manages native Codex sessions on supported Linux, macOS, and 
 - **Coordinated work across hosts:** move toward explicit multi-host workflows with task dependencies and progress tracking. Today's panel manages sessions on each host; it does not automatically schedule one job across the fleet or migrate its conversation and Git state.
 - **Richer remote inputs:** expand beyond the current bounded file, folder, image, goal, Plan mode, and installed-plugin workflows while retaining host-side validation.
 
-These are future directions, not shipped features or a delivery schedule. Universal operating-system support and a complete interface for every computer operation remain goals. AgentFleets currently provides Codex session operations, not a general server monitoring, patch management, or multi-user access-control system.
+These are future directions, not shipped features or a delivery schedule. Universal operating-system support and a complete interface for every computer operation remain goals. AgentFleets currently provides Codex session operations, not a general server monitoring or operating-system patch management system. User workspaces are isolated; shared team permissions remain outside the current scope.
 
 ## Built for your native sessions
 
@@ -184,7 +202,7 @@ Quota and credits are shared by a Codex account; project and session figures are
 
 | Area | Official desktop Remote Control | AgentFleets |
 | --- | --- | --- |
-| Access | Supported desktop/mobile apps | Your self-hosted web panel |
+| Access | Supported desktop/mobile apps | Hosted or self-hosted web panel |
 | Device identity | Same ChatGPT account **and workspace**, plus device authorization | Independent panel login and one-time host enrollment |
 | Connection | Authorized devices connect through the official relay | Agent on each host connects outward to your control plane |
 | Continue work | Continue chats and steer active work remotely | Continue native sessions with explicit take-control/release handling |
@@ -316,7 +334,7 @@ docker compose logs --tail=200 control-plane
 
 If the health check still fails, include those outputs when reporting the problem, after removing passwords, enrollment tickets, tokens, private hostnames, and conversation content.
 
-Panel source updates and host Agent updates are separate. The commands above update the control plane and web interface. Once the panel is healthy, open the affected host and use its update or recovery action to update the installed Agent; an offline Agent may require the repair command shown by the panel to be run locally.
+Panel source updates and host Agent updates are separate. The commands above update the control plane and web interface. For interface-only changes, users just refresh the panel; no host Agent upgrade or repair is needed. When a release also requires an Agent update, use the host update action. If a host stays unreachable after it is powered on, connected to the network, and signed in to the OS account used for installation, run the platform-specific repair command shown on its host page. Repair is a troubleshooting step, not a routine step after time away.
 
 Compose keeps control-plane data and validated runtimes in the `agentfleet-data` and `agentfleet-runtime-releases` named volumes. Back up `.env` and these volumes before an upgrade. Do not run `docker compose down -v` unless you intend to erase the stored data.
 
