@@ -13,6 +13,7 @@ import "./message-themes.css";
 import "./classic-themes.css";
 import "./chinese-themes.css";
 import "./settings-layout.css";
+import "./display-scale.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

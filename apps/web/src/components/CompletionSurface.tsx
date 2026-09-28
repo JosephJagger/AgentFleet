@@ -18,7 +18,10 @@ export function CompletionSurface({ anchor, children }: { anchor: RefObject<HTML
     if (!surface) return;
     const update = () => {
       const rect = surface.getBoundingClientRect();
-      const next = { left: Math.max(8, rect.left), top: rect.top - 6, width: Math.min(rect.width, window.innerWidth - 16), height: Math.max(0, Math.min(206, rect.top - 14)) };
+      // DOM rectangles use visual pixels; a body portal uses zoomed CSS pixels.
+      const scale = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+      const left = rect.left / scale, top = rect.top / scale;
+      const next = { left: Math.max(8, left), top: top - 6, width: Math.min(rect.width / scale, window.innerWidth / scale - 16), height: Math.max(0, Math.min(206, top - 14)) };
       setPosition(previous => Object.keys(next).every(key => next[key as keyof typeof next] === previous[key as keyof typeof next]) ? previous : next);
     };
     update();

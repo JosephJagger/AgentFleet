@@ -1,0 +1,16 @@
+/* Page density, independent of the user's browser zoom. Keep touch layouts at
+   their existing size. Root zoom also covers dialogs portalled to the body. */
+@supports (zoom: .8) {
+  @media (min-width: 901px) and (pointer: fine) {
+    :root { zoom: .8; }
+
+    /* Viewport units do not expand with CSS zoom. Fill the physical viewport
+       instead of leaving an unused strip below the conversation. */
+    .app-shell, .login-shell, .boot-screen { min-height: 125dvh; }
+    .fleet-layout { height: calc(125dvh - 68px); }
+  }
+
+  @media (min-width: 901px) and (max-width: 1699px) and (pointer: fine) {
+    .fleet-layout { height: calc(125dvh - 124px); }
+  }
+}
