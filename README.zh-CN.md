@@ -340,38 +340,6 @@ Compose 使用 `agentfleet-data` 和 `agentfleet-runtime-releases` 两个命名�
 
 需要在升级网页的同时保留现有 Agent 下载文件时，请查看[发布说明](docs/web-only-release.md)。
 
-### 连接 AppleFleets iPhone App
-
-AppleFleets 可以把 Apple Watch 跑步摘要提交给这台 Linux 主机上的 Codex，再把小红书和抖音文案返回手机。手机只上传距离、用时、配速、心率摘要和公里分段，不上传 GPS 坐标。
-
-1. 登录 AgentFleets 网页面板，确认 Linux 主机显示为在线。
-2. 在这台主机下添加一个项目，项目名称填写 `iwatch`，宿主机目录填写 `/root/iwatch`。
-3. 打开该项目的内容同步。这个开关用于把 Codex 最终回答送回 iPhone。
-4. 在 Linux 终端进入 AgentFleet 项目目录，生成连接令牌：
-
-```sh
-openssl rand -hex 32
-```
-
-5. 复制终端显示的 64 位字符，编辑 AgentFleet 的 `.env`，在末尾加入：
-
-```dotenv
-APPLEFLEETS_API_TOKEN=刚才生成的64位字符
-APPLEFLEETS_PROJECT=iwatch
-```
-
-6. 重新构建并启动：
-
-```sh
-docker compose up -d --build
-curl --fail http://127.0.0.1:3215/ready
-```
-
-7. 在 iPhone 打开 AppleFleets，地址填写你的 AgentFleets HTTPS 地址，例如 `https://panel.example.com`；“连接令牌”填写第 4 步生成的字符。
-8. 打开一条跑步记录，点击“用 Linux Codex 生成文案”。看到“文案已返回”即配置成功。
-
-每次生成会在 AgentFleets 中新建一个独立会话，标题以 `AppleFleets` 开头，方便查看执行过程。接口令牌只能提交这类固定格式的跑步任务和读取对应结果，不能代替管理员网页登录。令牌泄露时，重新执行第 4 步、替换 `.env` 并重启即可使旧令牌失效。
-
 ## 进一步了解
 
 <details>

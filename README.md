@@ -340,38 +340,6 @@ Compose keeps control-plane data and validated runtimes in the `agentfleet-data`
 
 See [release guidance](docs/web-only-release.md) for deployments that must preserve an existing set of Agent downloads.
 
-### Connect the AppleFleets iPhone app
-
-AppleFleets can send an Apple Watch workout summary to Codex on an enrolled Linux host and receive structured Xiaohongshu and Douyin copy. It sends distance, duration, pace, heart-rate summary, and kilometer splits; GPS coordinates are excluded.
-
-1. Sign in to AgentFleets and confirm the Linux host is online.
-2. Add a project named `iwatch` on that host, using `/root/iwatch` as its host directory.
-3. Enable content sync for that project so the final Codex message can return to the phone.
-4. Generate a dedicated token on the server:
-
-```sh
-openssl rand -hex 32
-```
-
-5. Add the resulting 64-character value and the project name to `.env`:
-
-```dotenv
-APPLEFLEETS_API_TOKEN=paste-the-64-character-token-here
-APPLEFLEETS_PROJECT=iwatch
-```
-
-6. Rebuild and restart AgentFleets:
-
-```sh
-docker compose up -d --build
-curl --fail http://127.0.0.1:3215/ready
-```
-
-7. In the AppleFleets iPhone app, enter your HTTPS origin, such as `https://panel.example.com`, and paste the token.
-8. Open a workout and tap **Generate with Linux Codex**. A successful run ends with **Copy received**.
-
-Each request creates an isolated AgentFleets session whose title begins with `AppleFleets`. The token can only submit the fixed workout request and read its corresponding result; it does not grant browser administrator access. Generate a new token, update `.env`, and restart the service to revoke a leaked token.
-
 ## Worth knowing
 
 <details>
