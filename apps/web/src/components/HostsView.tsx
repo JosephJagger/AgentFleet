@@ -67,8 +67,8 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
   const repair = repairCommand(machine, location.origin);
   return <section className="wide-view hosts-view"><div className="wide-view__heading"><div><h1>{t("主机")}</h1><p>{t("选择一台主机，设置默认模型、修改名称或检查连接。")}</p></div><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></div>
     <HostCards machines={machines} selectedId={machine.id} onSelect={onSelect} />
-    {machine.reachability !== "live" && <HostRecovery key={machine.id} machine={machine} />}
-    <CodexSettingsPanel key={machine.id} machineId={machine.id} />
+    {machine.reachability !== "live" && <HostRecovery key={`recovery:${machine.id}`} machine={machine} />}
+    <CodexSettingsPanel key={`settings:${machine.id}`} machineId={machine.id} />
     <PermissionPanel key={`permissions:${machine.id}`} machineId={machine.id} />
     <HostImageStorage key={`images:${machine.id}`} machineId={machine.id} name={machine.name} />
     <div className="host-workspace"><section className="settings-block"><div className="host-heading"><div><h2>{machine.name}</h2><span>{machine.os} · {machine.arch} · {machine.reachability === "live" ? t("在线") : machine.reachability === "reconciling" ? t("正在同步") : machine.reachability === "reconnecting" ? t("正在重连") : t("离线")}</span></div><button className="button machine-remove-trigger" type="button" onClick={() => onRemove(machine)}><Trash2 size={14} />{t("移除主机")}</button></div>

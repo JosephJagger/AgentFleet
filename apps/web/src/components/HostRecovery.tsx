@@ -29,6 +29,7 @@ export function HostRecovery({ machine }: { machine: Machine }) {
   }
   return <section className="settings-block host-recovery" aria-label={t("恢复主机连接")}>
     <div className="host-recovery__heading"><RotateCcw size={23} /><div><h2>{t("恢复主机连接")}</h2><p>{t("主机不可达时，在主机本地重置 AgentFleets 连接服务。")}</p></div></div>
+    <p>{t("关闭面板不影响主机连接。主机开机、联网并登录安装时的系统账号后，应自动恢复连接；持续无法连接时再使用下方修复命令。")}</p>
     <ol><li>{t("先确认主机已开机并联网，登录安装 AgentFleets 时使用的系统账号。")}</li><li>{platform === "windows" ? t("在该主机打开 PowerShell，粘贴下方命令并执行。") : t("在该主机打开终端，粘贴下方命令并执行。")}</li><li>{t("执行完成后，面板收到主机连接会自动更新状态。")}</li></ol>
     <p className="subtle">{t("命令会下载连接服务并重新注册、启动后台服务，保留配对、项目和会话数据。若主机仍有任务运行，请先等待任务结束。")}</p>
     <div className="host-recovery__command"><span>{platform === "windows" ? "Windows · PowerShell" : platform === "macos" ? "macOS · Terminal" : "Linux · Terminal"}</span><pre tabIndex={0} aria-label={t("连接修复命令")}><code>{command}</code></pre></div>

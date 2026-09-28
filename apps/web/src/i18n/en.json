@@ -2502,6 +2502,7 @@
   "管理分类": "Administration sections",
   "托管升级": "Managed upgrades",
   "恢复主机连接": "Restore host connection",
+  "关闭面板不影响主机连接。主机开机、联网并登录安装时的系统账号后，应自动恢复连接；持续无法连接时再使用下方修复命令。": "Closing the panel does not disconnect the host. It should reconnect automatically once powered on, online, and signed in to the OS account used for installation. Use the repair command below only if it remains disconnected.",
   "主机不可达时，在主机本地重置 AgentFleets 连接服务。": "When this host is unreachable, reset its AgentFleets connection service locally.",
   "先确认主机已开机并联网，登录安装 AgentFleets 时使用的系统账号。": "Make sure the host is powered on and connected to the internet. Sign in with the OS account used to install AgentFleets.",
   "在该主机打开 PowerShell，粘贴下方命令并执行。": "Open PowerShell on that host, paste the command below and run it.",
