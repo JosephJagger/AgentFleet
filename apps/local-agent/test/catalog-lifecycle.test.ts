@@ -144,3 +144,24 @@ test("native history pages validate bounded content and reject non-advancing cur
  const page=await server.readHistoryPage("native",null);assert.equal(page.items[0]?.nativeTurnId,"turn");assert.equal(page.nextCursor,"next");
  await assert.rejects(server.readHistoryPage("native","next"),/did not advance/);
 });
+
+test("explicit catalog refresh requests fresh model pages, retains last good data on failure and recovers", async () => {
+  const server = new CodexAppServer({} as AppServerCallbacks);
+  const internal = server as unknown as { request(method: string, params: Record<string, unknown>): Promise<unknown> };
+  let generation=0, calls=0, fail=false;
+  internal.request=async (method,params)=>{
+    if(method==="model/list"){
+      calls++;if(fail)throw new Error("catalog unavailable");
+      assert.equal(params.includeHidden,false);
+      return {data:[{model:generation ? "new-model" : "old-model",supportedReasoningEfforts:[]}],nextCursor:null};
+    }
+    if(method==="collaborationMode/list")return {data:[]};
+    throw new Error("optional");
+  };
+  await server.refreshCodexCatalog(); assert.equal(server.getCodexCatalog().models[0]?.model,"old-model");
+  generation++;await server.refreshCodexCatalog();assert.equal(server.getCodexCatalog().models[0]?.model,"new-model");assert.equal(calls,2);
+  const successfulAt=server.getCodexCatalog().fetchedAt;
+  fail=true;await server.refreshCodexCatalog();assert.equal(server.getCodexCatalog().models[0]?.model,"new-model");
+  assert.equal(server.getCodexCatalog().fetchedAt,successfulAt);assert.match(server.getCodexCatalog().error!,/unavailable/);
+  fail=false;await server.refreshCodexCatalog();assert.equal(server.getCodexCatalog().error,undefined);
+});

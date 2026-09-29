@@ -158,8 +158,10 @@ export class AgentMaintenance {
           canRestart: this.options.store.canSafelyRestart() };
       } else if (operationType === "catalog.refresh") {
         const deadline = Date.now() + 120_000;
+        let refreshModels = true;
         do {
-          result = await this.options.runtime.refreshCatalog();
+          result = await this.options.runtime.refreshCatalog(refreshModels);
+          refreshModels = false;
           if (result.state === "ready") break;
           await progress(result);
           if (Date.now() > deadline) throw new AgentError("CATALOG_REFRESH_TIMEOUT", "catalog is still scanning; inspect the host discovery progress");

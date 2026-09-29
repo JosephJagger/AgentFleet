@@ -444,9 +444,15 @@ export class AgentRuntime {
 
   async refreshQuota(): Promise<void> { await this.appServer?.refreshQuota?.(); }
 
-  async refreshCatalog(): Promise<Record<string, unknown>> {
+  async refreshCatalog(refreshModels = true): Promise<Record<string, unknown>> {
     void this.appServer?.refreshQuota?.();
     if (!this.canRead()) throw new AgentError("CATALOG_READ_UNSUPPORTED", this.support.readCompatibilityReason ?? this.readOnlyReasons().join("; "));
+    if (refreshModels && this.appServer?.refreshCodexCatalog) {
+      await this.appServer.refreshCodexCatalog();
+      this.notifyRegistryChanged();
+      const catalog = this.appServer.getCodexCatalog?.();
+      if (catalog?.error) throw new AgentError("MODEL_CATALOG_REFRESH_FAILED", `模型列表刷新失败：${catalog.error}`);
+    }
     await this.reconcileExistingThreads();
     if (this.discoveryStatus.state === "error") throw new AgentError("CATALOG_REFRESH_FAILED", this.discoveryStatus.error ?? "catalog refresh failed");
     return this.getDiscoveryStatus();

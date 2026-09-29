@@ -169,6 +169,7 @@ export interface ThreadResumeResult extends ThreadStartResult {
 /** The small, allow-listed App Server surface used by the runtime. */
 export interface AppServerClient {
   refreshQuota?(): Promise<void>;
+  refreshCodexCatalog?(): Promise<void>;
   getQuotaSnapshot?(): Record<string, unknown> | undefined;
   previewDeletion?(thread:ManagedThread,project:ProjectRecord):Promise<DeletionPreview>;
   deleteThread?(thread:ManagedThread,project:ProjectRecord,preview:DeletionPreview):Promise<void>;
@@ -478,7 +479,7 @@ export class CodexAppServer implements AppServerClient {
     await this.refreshCodexCatalog();
   }
 
-  private async refreshCodexCatalog(): Promise<void> {
+  async refreshCodexCatalog(): Promise<void> {
     try {
       const models = new Map<string, CodexCatalog["models"][number]>();
       let cursor: string | null = null;
@@ -525,7 +526,7 @@ export class CodexAppServer implements AppServerClient {
       } catch { /* Plugins are optional and must never make the model catalog unusable. */ }
       this.codexCatalog = { models: [...models.values()], modes, plugins, pluginSkills, fetchedAt: nowIso() };
     } catch (error) {
-      this.codexCatalog = { models: [], modes: [], fetchedAt: nowIso(), error: errorMessage(error).slice(0, 500) };
+      this.codexCatalog = { ...this.codexCatalog, error: errorMessage(error).slice(0, 500) };
     }
   }
 

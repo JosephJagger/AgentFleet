@@ -5,7 +5,7 @@ import type { AppServerCallbacks, AppServerClient } from "../src/app-server.js";
 import type { ApprovalRecord, ManagedThread, ProjectRecord } from "../src/types.js";
 
 function fixture() {
-  const clients: { callbacks: AppServerCallbacks; stopped: number; released: number; failRelease: boolean; resumes: number; quotaReads: number; answers: unknown[] }[] = [];
+  const clients: { callbacks: AppServerCallbacks; stopped: number; released: number; failRelease: boolean; resumes: number; quotaReads: number; modelReads: number; answers: unknown[] }[] = [];
   const approvals: ApprovalRecord[] = []; const events: unknown[] = []; const exits: string[] = [];
   const callbacks: AppServerCallbacks = {
     findManagedThread: id => ({ nativeThreadId: id } as ManagedThread), findProject: () => undefined,
@@ -14,9 +14,10 @@ function fixture() {
     onExit: async () => { exits.push("global"); }, onThreadExit: async id => { exits.push(id); },
   };
   const server = new SessionAppServer(callbacks, (cb, epoch) => {
-    const c = { callbacks: cb, stopped: 0, released: 0, failRelease: false, resumes: 0, quotaReads: 0, answers: [] as unknown[] };
+    const c = { callbacks: cb, stopped: 0, released: 0, failRelease: false, resumes: 0, quotaReads: 0, modelReads: 0, answers: [] as unknown[] };
     clients.push(c);
     return { appServerEpoch: epoch, start: async () => undefined, stop: async () => { c.stopped++; },
+      refreshCodexCatalog: async () => { c.modelReads++; },
       refreshQuota: async () => { c.quotaReads++; }, getQuotaSnapshot: () => ({observedAt:"2026-09-10T00:00:00Z",windows:[]}),
       releaseWriter: async () => { if (c.failRelease) throw new Error("still active"); c.released++; },
       resumeThread: async (id: string) => { c.resumes++; return { nativeThreadId: id }; },
@@ -103,4 +104,12 @@ test("quota events coalesce across writers, idle time does not poll, and release
  await f.server.unsubscribeThread("a");f.clients[1]!.callbacks.onQuotaChanged?.();t.mock.timers.tick(120_000);await settle();assert.equal(f.clients[0]!.quotaReads,3);
  await f.server.refreshQuota();assert.equal(f.clients[0]!.quotaReads,4,"explicit refresh remains available");
  f.clients[2]!.callbacks.onQuotaChanged?.();await f.server.stop();t.mock.timers.tick(120_000);await settle();assert.equal(f.clients[0]!.quotaReads,4);
+});
+
+test("model refresh reaches only the catalog reader and preserves active session writers", async () => {
+  const f=fixture();await f.server.start();await f.server.resumeThread("active",project);
+  await f.server.refreshCodexCatalog();
+  assert.equal(f.clients[0]!.modelReads,1);assert.equal(f.clients.length,2);
+  assert.equal(f.clients[1]!.stopped,0);assert.equal(f.clients[1]!.released,0);
+  await f.server.stop();
 });

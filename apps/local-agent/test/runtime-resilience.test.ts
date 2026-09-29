@@ -1583,3 +1583,21 @@ test("running host usage is reported for the same managed session even when full
  assert.equal(sessions.find(s=>s.externalId==="existing-cloud-session")?.nativeUsage?.usage.total.totalTokens,100);
  assert.equal(server.resumeCount,0);assert.equal(store.snapshot().managedThreads[id]?.logicalSessionId,"existing-cloud-session");
 });
+
+test("manual scan refreshes and publishes models; pagination skips duplicate reads and failure is explicit", async t => {
+  const { store }=await fixture();
+  let reads=0, error:string|undefined;
+  const runtime=new AgentRuntime({store,identity,pairing,support,appServerFactory:callbacks=>{
+    const server=new FakeAppServer("model-refresh",callbacks);
+    return Object.assign(server,{refreshCodexCatalog:async()=>{reads++;},getCodexCatalog:()=>({models:[],modes:[],fetchedAt:new Date().toISOString(),...(error?{error}:{})})});
+  }});
+  t.after(()=>runtime.shutdown());
+  const {registryChanges}=captureCallbacks(runtime);
+  await runtime.initialize();
+  const before=registryChanges.count;
+  await runtime.refreshCatalog();assert.equal(reads,1);assert.ok(registryChanges.count>before);
+  await runtime.refreshCatalog(false);assert.equal(reads,1);
+  error="network unavailable";
+  await assert.rejects(runtime.refreshCatalog(),{code:"MODEL_CATALOG_REFRESH_FAILED"});
+  assert.equal(reads,2);
+});

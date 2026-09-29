@@ -67,6 +67,7 @@ export class SessionAppServer implements AppServerClient {
     return this.quotaRead;
   }
   getQuotaSnapshot() { return this.catalog.getQuotaSnapshot?.(); }
+  async refreshCodexCatalog() { await this.catalog.refreshCodexCatalog?.(); }
   getCodexCatalog() { return this.catalog.getCodexCatalog!(); }
   readPluginSkill(reference: { name: string; path: string }) { return this.catalog.readPluginSkill!(reference); }
   listThreads() { return this.catalog.listThreads(); }
