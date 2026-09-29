@@ -44,15 +44,15 @@ it("keeps quota discoverable with multiple model windows and no session token re
  expect(await screen.findByRole("button",{name:/周额度\s*38%/})).toBeTruthy();
 });
 it("shows a temporary reset forecast only when supplied, and displays native reset cards",async()=>{
- vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",resetPrediction:{kind:"temporary-reset",probability:92,expectedAt:"2026-09-24T12:00:00Z",observedAt:"2026-09-23T12:00:00Z",sourceUrl:"https://x.com/thsottiaux/status/123"},accounts:[{...data.accounts[0],resetCardsAvailable:2}]});
+ vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",resetPrediction:{kind:"temporary-reset",signal:"announced" as const,publishedAt:"2026-09-23T12:00:00Z",evidence:"reset announced",expectedAt:"2026-09-24T12:00:00Z",observedAt:"2026-09-23T12:00:00Z",sourceUrl:"https://x.com/thsottiaux/status/123"},accounts:[{...data.accounts[0],resetCardsAvailable:2}]});
  render(<UsageButton scope="machine" id="m1"/>);
  fireEvent.click(await screen.findByRole("button",{name:/周额度\s*38%/}));
- expect(await screen.findByText(/预测概率 92%/)).toBeTruthy();
+ expect(await screen.findByText(/已宣布将重置/)).toBeTruthy();
  expect(screen.getByText("可用重置卡 2 张")).toBeTruthy();
- expect(screen.getByRole("link",{name:"查看依据"}).getAttribute("href")).toBe("https://x.com/thsottiaux/status/123");
+ expect(screen.getByRole("button",{name:"查看消息时间轴"})).toBeTruthy();
 });
 it("host card shows positive credits before a forecast, then the forecast when credits reach zero",async()=>{
- const prediction={kind:"temporary-reset" as const,probability:92,expectedAt:"2026-09-24T12:00:00Z",observedAt:"2026-09-23T12:00:00Z",sourceUrl:"https://example.test/forecast"};
+ const prediction={kind:"temporary-reset" as const,signal:"announced" as const,publishedAt:"2026-09-23T12:00:00Z",evidence:"reset announced",expectedAt:"2026-09-24T12:00:00Z",observedAt:"2026-09-23T12:00:00Z",sourceUrl:"https://example.test/forecast"};
  vi.mocked(api.usage).mockResolvedValueOnce({...data,scope:"machine",resetPrediction:prediction}).mockResolvedValue({...data,scope:"machine",resetPrediction:prediction,accounts:[{...data.accounts[0],credits:{balance:"0",hasCredits:false,unlimited:false}}]});
  const view=render(<UsageButton scope="machine" id="m1"/>);
  const card=await screen.findByRole("button",{name:/周额度\s*38%/});
@@ -60,7 +60,7 @@ it("host card shows positive credits before a forecast, then the forecast when c
  expect(within(card).queryByText("临时重置预测")).toBeNull();
  document.dispatchEvent(new Event("visibilitychange"));
  await waitFor(()=>expect(within(card).getByText("临时重置预测")).toBeTruthy());
- expect(within(card).getByText(/预测概率 92%/)).toBeTruthy();
+ expect(within(card).getByText(/已宣布将重置/)).toBeTruthy();
  expect(within(card).queryByText("点数余额")).toBeNull();
  view.unmount();
 });
@@ -147,4 +147,15 @@ it("keeps mobile usage concise and permits closing after expanding details",asyn
   fireEvent.click(within(dialog).getAllByRole("button",{name:"关闭用量"}).at(-1)!);
   await waitFor(()=>expect(dialog.hasAttribute("open")).toBe(false));
  } finally {window.matchMedia=original;}
+});
+it("clicking the forecast card opens the Chinese timeline without changing native reset dates",async()=>{
+ const resetAt=data.accounts[0].windows[0].resetsAt;
+ vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",accounts:[{...data.accounts[0],credits:{balance:"0",hasCredits:false,unlimited:false}}],resetRadar:{state:"ready",checkedAt:new Date().toISOString(),nextCheckAt:null,timeline:[{id:"42",publishedAt:new Date().toISOString(),summary:"介绍 Codex 最新功能",signal:"none",sourceUrl:"https://x.com/thsottiaux/status/42"}]}});
+ render(<UsageButton scope="machine" id="m1"/>);
+ const card=await screen.findByRole("button",{name:/周额度\s*38%/});
+ fireEvent.click(within(card).getByText("临时重置预测"));
+ const timeline=screen.getByRole("dialog",{name:"重置消息时间轴"});
+ expect(within(timeline).getByText("介绍 Codex 最新功能")).toBeTruthy();
+ expect(within(timeline).getByRole("link",{name:"查看原帖"}).getAttribute("href")).toBe("https://x.com/thsottiaux/status/42");
+ expect(data.accounts[0].windows[0].resetsAt).toBe(resetAt);
 });

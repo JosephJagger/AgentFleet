@@ -1333,3 +1333,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .scheduled-weekdays{display:flex;gap:10px;flex-wrap:wrap;border:1px solid var(--line,#d7c9a7);border-radius:12px;padding:10px}
 .scheduled-weekdays legend{font-weight:700}
 @media(max-width:850px){.scheduled-layout{grid-template-columns:1fr}.scheduled-list{max-height:280px;overflow:auto}.scheduled-view{padding-bottom:calc(128px + env(safe-area-inset-bottom))}}
+
+/* Reset announcement timeline follows every theme's semantic palette. */
+.radar-dialog { background: var(--paper-solid); color: var(--ink); border-color: var(--line); }
+.radar-dialog .modal-head { background: var(--paper-raised); border-bottom: 1px solid var(--line); }
+.radar-dialog .usage-body { background: var(--paper-solid); color: var(--ink); }
+.radar-dialog .radar-timeline-item { position: relative; margin: 0 0 0 7px; padding: 4px 0 22px 22px; border: 0; border-left: 2px solid var(--line); overflow-wrap: anywhere; }
+.radar-timeline-item::before { content: ""; position: absolute; left: -6px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 4px var(--paper-solid); }
+.radar-timeline-item:not([data-signal="none"])::before { background: var(--cobalt); }
+.radar-timeline-item small, .radar-dialog .modal-head p { color: var(--muted); }
+.radar-timeline-item p { margin: 8px 0; color: var(--ink); }
+.radar-timeline-item a { color: var(--cobalt); font-size: var(--text-caption); }
+.host-quota-metric--forecast:hover { outline: 1px solid var(--cobalt); outline-offset: 2px; }

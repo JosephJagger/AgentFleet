@@ -207,7 +207,7 @@ export async function buildControlPlane(
   const coordination = new CoordinationService(db, config);
   const sessionReferences = new SessionReferences(db, registry, coordination, writingAI);
   const usage = new UsageService(db);
-  const resetRadar = new ResetRadar();
+  const resetRadar = new ResetRadar({ statePath: config.databasePath === ":memory:" ? undefined : resolve(config.databasePath, "..", "reset-radar.json") });
   const codexPreferences = new CodexPreferencesService(db);
   const machineMaintenance = new MaintenanceService(db);
   const credentials = new CredentialRenewalService(db);
@@ -222,6 +222,7 @@ export async function buildControlPlane(
     bodyLimit: 12 * 1024 * 1024,
     requestTimeout: 15_000,
   });
+  app.addHook("onReady", async () => resetRadar.start());
   app.addHook("onClose", async () => writingSemantic.close());
   const agents = new Map<string, AgentSocketState>();
   const clients = new Map<string, Set<ClientSocketState>>();
@@ -985,7 +986,7 @@ export async function buildControlPlane(
       const weekly=account?.windows.find((window:{bucket:string;windowMinutes:number;remainingPercent:number})=>window.bucket==="codex"&&window.windowMinutes===10080);
       const resetPrediction=await resetRadar.read(`${workspaceId}:${id}`,
         weekly?{remainingPercent:weekly.remainingPercent,resetCardsAvailable:account?.resetCardsAvailable??null}:null);
-      return {...summary,resetPrediction};
+      return {...summary,resetPrediction,resetRadar:resetRadar.status()};
     });
   }
   app.get("/api/sessions/:id/files", { preHandler: authenticate }, async (request, reply) => {
@@ -1624,6 +1625,7 @@ export async function buildControlPlane(
   app.addHook("onClose", async () => {
     closing = true;
     clearInterval(maintenance);
+    await resetRadar.stop();
     for (const requestId of [...projectFiles.keys()]) failProjectFile(requestId, new Error("Control Plane is stopping"));
     for (const agent of agents.values()) agent.socket.terminate();
     for (const states of clients.values()) for (const state of states) state.socket.terminate();

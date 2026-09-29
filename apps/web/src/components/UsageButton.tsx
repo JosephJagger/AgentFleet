@@ -10,12 +10,15 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
   const [refreshing,setRefreshing]=useState(false);const [refreshNotice,setRefreshNotice]=useState("");
   const dialog=useRef<HTMLDialogElement>(null);
   const [mobile,setMobile]=useState(()=>window.matchMedia?.("(max-width: 900px)").matches??false);
+  const [radarOpen,setRadarOpen]=useState(false);
+  const radarDialog=useRef<HTMLDialogElement>(null);
+  useEffect(()=>{if(radarOpen)radarDialog.current?.showModal?.();else radarDialog.current?.close();},[radarOpen]);
   const [expanded,setExpanded]=useState(false);
   useEffect(()=>{const media=window.matchMedia?.("(max-width: 900px)");if(!media)return;const update=()=>setMobile(media.matches);media.addEventListener("change",update);return()=>media.removeEventListener("change",update);},[]);
   useEffect(()=>{if(!open)setExpanded(false);},[open]);
   const refreshUsage=useRef<()=>void>(()=>{});
   useEffect(()=>{
-    setData(undefined);setFailed(false);setOpen(false);setRefreshNotice("");
+    setData(undefined);setFailed(false);setOpen(false);setRadarOpen(false);setRefreshNotice("");
     const controller=new AbortController();let busy=false;
     const update=async()=>{if(busy||controller.signal.aborted)return;busy=true;try{const next=await api.usage(scope,id,controller.signal);if(!next || next.coverage!=="observed-only" || !Array.isArray(next.accounts) || !Array.isArray(next.topSessions))throw new Error("Invalid usage response");if(!controller.signal.aborted){setData(next);setFailed(false);}}catch{if(!controller.signal.aborted)setFailed(true);}finally{busy=false;}};
     refreshUsage.current=()=>{void update();};
@@ -45,6 +48,9 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
   const resetAt=showWeeklyReset?weekly[0].w.resetsAt:null;
   const richMachineSummary=scope==="machine"&&!failed&&data?.accounts.length===1&&(weekly.length===1||fiveHour.length===1||accountCredits||data.resetPrediction);
   const updatedAt=data?.accounts.length?data.accounts.map(a=>a.observedAt).sort().at(-1):null;
+  const signalLabel=(signal:string)=>signal==="announced"?t("已宣布将重置"):signal==="confirmed"?t("已宣布完成重置"):signal==="card-announced"?t("已宣布发放重置卡"):signal==="card-confirmed"?t("已宣布重置卡发放完成"):t("无重置信号");
+  const radarEmpty=data?.resetRadar?.state==="error"?t("信号检查失败"):data?.resetRadar?.state==="unconfigured"?t("数据源未配置"):data?.resetRadar?.state==="pending"?t("正在检查信号"):t("暂无预测");
+  const radarLabel=data?.resetPrediction?signalLabel(data.resetPrediction.signal):radarEmpty;
   const periodTokens=data?.quotaCycle?.recordedTokens;
   const weeklyCacheRate=cacheRate(data?.quotaCycle?.inputTokens,data?.quotaCycle?.cachedInputTokens);
   const rate=(value:number|null)=>value==null?t("未记录"):t("{0}%",new Intl.NumberFormat(locale(),{maximumFractionDigits:1}).format(value));
@@ -57,12 +63,21 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
             {weekly.length===1&&<span className="host-quota-metric host-quota-metric--weekly"><small>{t("周额度")}</small><strong>{weekly[0].w.remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${weekly[0].w.remainingPercent}%`}}/></span><em>{weekly[0].w.resetsAt?t("下次重置：{0}",date(new Date(weekly[0].w.resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
             {fiveHour.length===1&&<span className="host-quota-metric host-quota-metric--five-hour"><small>{t("5 小时额度")}</small><strong>{fiveHour[0].remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${fiveHour[0].remainingPercent}%`}}/></span><em>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
             {showCreditBalance?<span className="host-quota-metric host-quota-metric--credits"><small>{t("点数余额")}</small><strong>{accountCredits?.balance!=null&&!accountCredits.unlimited?<>{creditBalance(accountCredits.balance)} <b>{t("点")}</b></>:creditText(accountCredits)}</strong><em>{t("由原生 Codex 上报")}</em></span>
-            :<span className="host-quota-metric host-quota-metric--forecast"><small>{t("临时重置预测")}</small><strong>{data?.resetPrediction?date(data.resetPrediction.expectedAt):t("暂无预测")}</strong><em>{data?.resetPrediction?t("可能于该时间前临时重置 · 预测概率 {0}%",data.resetPrediction.probability):t("点数不足时显示预测")}</em></span>}
+            :<span className="host-quota-metric host-quota-metric--forecast" onClick={event=>{event.stopPropagation();setRadarOpen(true);}}><small>{t("临时重置预测")}</small><strong>{radarLabel}</strong><em>{t("仅供参考，不改变原生重置时间")}</em></span>}
           </span>
           {updatedAt&&<span className="host-quota-updated"><i aria-hidden="true"/>{t("更新于 {0}",date(updatedAt))}<b aria-hidden="true">→</b></span>}
         </span>
       </>:<><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope!=="machine"&&!failed&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",fiveHour[0].remainingPercent)}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
     </button>
+    {scope==="machine"&&createPortal(<dialog ref={radarDialog} className="modal usage-dialog radar-dialog" aria-label={t("重置消息时间轴")} onClick={event=>{if(event.target===event.currentTarget){const r=event.currentTarget.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)setRadarOpen(false);}}} onCancel={()=>setRadarOpen(false)} onClose={()=>setRadarOpen(false)}>
+      <header className="modal-head"><div><h2>{t("重置消息时间轴")}</h2><p>{t("最近 24 小时 · 最新在上")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setRadarOpen(false)}><X size={18}/></button></header>
+      <div className="usage-body"><p>{t("仅供参考，不改变原生重置时间")}</p>
+        {data?.resetRadar?.checkedAt&&<small>{t("更新于 {0}",date(data.resetRadar.checkedAt))}</small>}
+        {data?.resetRadar?.state==="error"&&<p role="status">{t("信号检查失败")}</p>}
+        {!data?.resetRadar?.timeline?.length&&<p>{t("最近 24 小时暂无已分析帖子")}</p>}
+        {data?.resetRadar?.timeline?.map(post=><section className="radar-timeline-item" data-signal={post.signal} key={post.id}><small>{date(post.publishedAt)} · {signalLabel(post.signal)}</small><p>{post.summary}</p><a href={post.sourceUrl} target="_blank" rel="noopener noreferrer">{t("查看原帖")}</a></section>)}
+      </div>
+    </dialog>,document.body)}
     {createPortal(<dialog ref={dialog} className="modal usage-dialog" aria-label={t("用量与剩余额度")} onClick={event=>{if(event.target!==event.currentTarget)return;const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)setOpen(false);}} onCancel={()=>setOpen(false)} onClose={()=>setOpen(false)}>
       <header className="modal-head"><div><h2>{t("用量与剩余额度")}</h2><p>{t("账号看额度，项目和会话看已记录 token")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setOpen(false)}><X size={18}/></button></header>
       <div className="usage-body">
@@ -82,8 +97,8 @@ export function UsageButton({scope,id,onSession}:{scope:"session"|"project"|"mac
           </div>)}
           <p className="usage-note">{t("账号额度由同账号的多个设备和会话共享，不能按 token 比例归属到某个项目。")}</p>
           {scope==="machine"&&<div className="usage-reset-forecast" aria-live="polite">
-            <strong>{t("临时重置预测")}</strong>
-            {data?.resetPrediction?<p>{t("可能于 {0} 前临时重置",date(data.resetPrediction.expectedAt))} · {t("预测概率 {0}%",data.resetPrediction.probability)} <a href={data.resetPrediction.sourceUrl} target="_blank" rel="noopener noreferrer">{t("查看依据")}</a></p>:<p>{t("暂无预测")}</p>}
+            <strong>{t("临时重置预测")}</strong><p>{radarLabel}</p>
+            <button type="button" className="button button--quiet" onClick={()=>setRadarOpen(true)}>{t("查看消息时间轴")}</button>
             {data?.accounts.length===1&&data.accounts[0].resetCardsAvailable!=null&&<small>{t("可用重置卡 {0} 张",data.accounts[0].resetCardsAvailable)}</small>}
             <small>{t("重置卡发放暂无可靠预测；到账数量来自原生 Codex。")}</small>
           </div>}

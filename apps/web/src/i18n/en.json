@@ -2559,5 +2559,20 @@
   "还没有定时任务。选择项目或会话后创建第一个任务。": "No scheduled tasks yet. Choose a project or session to create one.",
   "查看需要确认的操作和问题。": "Review actions and questions that need your input.",
   "收起明细": "Hide details",
-  "查看完整明细": "View full details"
+  "查看完整明细": "View full details",
+  "已宣布将重置": "Reset announced",
+  "已宣布完成重置": "Reset completion announced",
+  "已宣布发放重置卡": "Reset card grant announced",
+  "已宣布重置卡发放完成": "Reset card grant completed",
+  "无重置信号": "No reset signal",
+  "信号检查失败": "Signal check failed",
+  "数据源未配置": "Source not configured",
+  "正在检查信号": "Checking signals",
+  "临时重置信号": "Extra reset signals",
+  "仅供参考，不改变原生重置时间": "Informational only; native reset times are unchanged",
+  "查看消息时间轴": "View message timeline",
+  "重置消息时间轴": "Reset message timeline",
+  "最近 24 小时 · 最新在上": "Past 24 hours · newest first",
+  "最近 24 小时暂无已分析帖子": "No analyzed posts in the past 24 hours",
+  "查看原帖": "View original post"
 }
