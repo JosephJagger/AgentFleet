@@ -37,7 +37,7 @@ export function parseReferences(value: unknown): ReferenceRequest[] {
 export function buildReferenceFiles(db: ControlPlaneDatabase, coordination: CoordinationService, principal: Principal, requests: ReferenceRequest[]): Array<{ name: string; relativePath: string; mimeType: string; data: string }> {
   return requests.map(({ id, version }, index) => {
     const row = db.get<{ title: string; host_name: string; project_alias: string; projection_epoch: number; content_epoch: number; next_session_seq: number; history_completeness: string }>(
-      "SELECT s.title,m.name AS host_name,p.alias AS project_alias,s.projection_epoch,s.content_epoch,s.next_session_seq,s.history_completeness FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id JOIN projects p ON p.project_id=s.project_id WHERE s.logical_session_id=? AND s.workspace_id=? AND s.deleted_at IS NULL", id, principal.workspaceId);
+      "SELECT s.title,m.name AS host_name,p.alias AS project_alias,s.projection_epoch,s.content_epoch,s.next_session_seq,e.history_completeness FROM logical_sessions s JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL JOIN machines m ON m.machine_id=s.machine_id JOIN projects p ON p.project_id=s.project_id WHERE s.logical_session_id=? AND s.workspace_id=? AND s.deleted_at IS NULL ORDER BY e.created_at DESC LIMIT 1", id, principal.workspaceId);
     invariant(row, 404, "REFERENCE_NOT_FOUND", "Referenced session is unavailable");
     invariant(`${row.projection_epoch}:${row.content_epoch}:${row.next_session_seq - 1}` === version, 409, "REFERENCE_CHANGED", "Referenced session changed; remove and add the card again");
     const pages: string[][] = [];
