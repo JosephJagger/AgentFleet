@@ -13,3 +13,9 @@ Agent 0.30.51 起，主机 → 高级维护工具 → 重新扫描，会明确�
 失败会报告“模型列表刷新失败”，保留最近成功目录和其更新时间，并标记错误；不会把失败当成成功刷新。Codex 0.158.0 的 model/list 没有强制清除缓存参数，因此刷新后仍不出现新模型时，需要进一步核对原生缓存、版本及账号可用范围，不能保证新发布模型立即可选。
 
 From Agent 0.30.51, **Host → Advanced maintenance tools → Rescan** explicitly rereads the native model catalog, including pagination, and republishes it. It uses the catalog reader without restarting active session writers. Failure preserves the last successful catalog and timestamp with an explicit error. This reread does not guarantee bypassing Codex's internal model cache.
+
+### Agent 0.30.52 发布清单修复
+
+0.30.51 发布清单中的 JSON 空格导致 POSIX 安装器解析失败，已失败主机会暂停同一版本。0.30.52 使用兼容清单并保留 0.30.51 的模型刷新修复，让主机在空闲时自动重试新版本。发布前必须运行 `node packaging/validate-release-manifest.mjs <manifest.json>`，它实际执行 Linux/macOS 安装器的字段解析。
+
+Agent 0.30.52 corrects the release manifest formatting and retains the model refresh fix. Hosts that paused the failed 0.30.51 update can retry the new version when idle. Release validation now exercises the POSIX installer parsers before publishing.

@@ -119,6 +119,7 @@ STAGED_DIGEST=$(sha256sum "$STAGED_ARTIFACT" | awk '{print $1}')
 printf '%s  %s\n' "$STAGED_DIGEST" "$(basename -- "$ARTIFACT")" > "$STAGED_CHECKSUM"
 node "$SCRIPT_DIR/generate-manifest.mjs" \
   "$VERSION" sea "$STAGED_ARTIFACT" "$STAGED_MANIFEST" "$(basename -- "$ARTIFACT")"
+node "$SCRIPT_DIR/validate-release-manifest.mjs" "$STAGED_MANIFEST"
 
 # A hard-link publication is atomic and fails if another builder published the
 # same immutable version after the preflight check. Never use mv -f here.

@@ -116,6 +116,7 @@ STAGED_DIGEST=$(sha256sum "$STAGED_ARTIFACT" | awk '{print $1}')
 printf '%s  %s\n' "$STAGED_DIGEST" "$(basename -- "$ARTIFACT")" > "$STAGED_CHECKSUM"
 node "$SCRIPT_DIR/generate-manifest.mjs" \
   "$VERSION" portable "$STAGED_ARTIFACT" "$STAGED_MANIFEST" "$(basename -- "$ARTIFACT")"
+node "$SCRIPT_DIR/validate-release-manifest.mjs" "$STAGED_MANIFEST"
 
 if ! ln "$STAGED_ARTIFACT" "$ARTIFACT"; then
   echo "immutable release was published concurrently for version $VERSION" >&2
