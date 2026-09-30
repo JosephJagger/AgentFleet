@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { AgentAutoUpdater, compareReleaseVersions, stageAgentUpdate, windowsUpdateRestartScript } from "../src/updater.js";
+import { AgentAutoUpdater, clearCompletedAgentUpdateDrain, compareReleaseVersions, stageAgentUpdate, windowsUpdateRestartScript } from "../src/updater.js";
 import { readFileSync } from "node:fs";
 
 test("Windows update handoff retries the background task after the current task exits", () => {
@@ -120,4 +120,22 @@ test("staging invokes the installer in stage-only mode with structured arguments
     "--data-dir",
     join(directory, "state"),
   ]);
+});
+
+
+test("startup clears only completed agent update drains, independent of an older runtime transaction", async t => {
+  const { StateStore } = await import("../src/store.js");
+  const directory = await mkdtemp(join(tmpdir(), "agentfleet-completed-drain-"));
+  const store = new StateStore(directory); await store.initialize(); t.after(() => store.close());
+  for (const operationId of ["agent-update-0.30.55", "agent-update-0.30.54"]) {
+    await store.setMaintenanceDrain(operationId);
+    await clearCompletedAgentUpdateDrain(store,"0.30.55");
+    assert.equal(store.snapshot().maintenanceDrain,undefined);
+  }
+  for (const operationId of ["agent-update-0.30.56", "runtime-update-newer", "manual-maintenance", "agent-update-invalid"]) {
+    await store.setMaintenanceDrain(operationId);
+    await clearCompletedAgentUpdateDrain(store,"0.30.55");
+    assert.equal(store.snapshot().maintenanceDrain?.operationId,operationId);
+    await store.setMaintenanceDrain(undefined);
+  }
 });

@@ -1,3 +1,4 @@
+import { parseClaudeMetadata } from "./claude-metadata.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import { invariant } from "./errors.js";
 const keys = ["inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens", "totalTokens"] as const;
@@ -67,12 +68,14 @@ export class UsageService {
     this.db.run(`INSERT INTO machine_usage(machine_id,account_key,observed_at,windows_json,credits_json,reset_cards_available) VALUES(?,?,?,?,?,?)
       ON CONFLICT(machine_id) DO UPDATE SET account_key=excluded.account_key,observed_at=excluded.observed_at,windows_json=excluded.windows_json,credits_json=excluded.credits_json,reset_cards_available=excluded.reset_cards_available WHERE excluded.observed_at>=machine_usage.observed_at`,machineId,accountKey,new Date(at).toISOString(),JSON.stringify(windows),credits===null?null:JSON.stringify(credits),cardCount);
   }
-  read(workspaceId: string, scope: "session" | "project" | "machine", id: string) {
+  read(workspaceId: string, scope: "session" | "project" | "machine", id: string, requestedProvider: "codex" | "claude" = "codex") {
     const table=scope==="session"?"logical_sessions":scope==="project"?"projects":"machines";
     const column=scope==="session"?"logical_session_id":scope==="project"?"project_id":"machine_id";
     invariant(this.db.get(`SELECT 1 FROM ${table} WHERE ${column}=? AND workspace_id=?${scope==="session"?" AND deleted_at IS NULL":""}`,id,workspaceId),404,"USAGE_SCOPE_NOT_FOUND","Usage scope was not found");
-    const sessions=this.db.all<{logical_session_id:string;machine_id:string;title:string}>(`SELECT logical_session_id,machine_id,title FROM logical_sessions WHERE workspace_id=? AND ${column}=? AND deleted_at IS NULL`,workspaceId,id);
-    const rows=this.db.all<Row & {title:string;project_id:string;project_title:string}>(`SELECT u.*,s.title,s.project_id,p.alias AS project_title FROM session_usage u JOIN logical_sessions s USING(logical_session_id) JOIN projects p ON p.project_id=s.project_id WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL`,workspaceId,id);
+    const provider = scope === "machine" ? requestedProvider : this.db.get<{provider:"codex"|"claude"}>(scope === "project" ? "SELECT provider FROM projects WHERE project_id=?" : "SELECT p.provider FROM projects p JOIN logical_sessions s USING(project_id) WHERE s.logical_session_id=?",id)!.provider;
+    const providerFilter = ` AND project_id IN (SELECT project_id FROM projects WHERE provider='${provider === "claude" ? "claude" : "codex"}')`;
+    const sessions=this.db.all<{logical_session_id:string;machine_id:string;title:string}>(`SELECT logical_session_id,machine_id,title FROM logical_sessions WHERE workspace_id=? AND ${column}=? AND deleted_at IS NULL${providerFilter}`,workspaceId,id);
+    const rows=this.db.all<Row & {title:string;project_id:string;project_title:string}>(`SELECT u.*,s.title,s.project_id,p.alias AS project_title FROM session_usage u JOIN logical_sessions s USING(logical_session_id) JOIN projects p ON p.project_id=s.project_id WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")}`,workspaceId,id);
     const recorded=zero(); for(const row of rows) { const c=counts(JSON.parse(row.recorded_json))!; for(const key of keys) recorded[key]+=c[key]; }
     const machineIds=new Set(sessions.map(s=>s.machine_id)); if(scope==="machine")machineIds.add(id);
     if(scope==="project") { const project=this.db.get<{machine_id:string}>("SELECT machine_id FROM projects WHERE project_id=?",id); if(project)machineIds.add(project.machine_id); }
@@ -80,9 +83,16 @@ export class UsageService {
     const targetKeys=new Set(quotaRows.filter(r=>machineIds.has(r.machine_id)).map(r=>r.account_key??r.machine_id));
     const creditByKey=new Map<string,string>();for(const r of quotaRows){const key=r.account_key??r.machine_id;if(r.credits_json&&!creditByKey.has(key))creditByKey.set(key,r.credits_json);}
     const cardsByKey=new Map<string,number>();for(const r of quotaRows){const key=r.account_key??r.machine_id;if(r.reset_cards_available!==null&&!cardsByKey.has(key))cardsByKey.set(key,r.reset_cards_available);}
-    const seen=new Set<string>();const accounts=quotaRows.flatMap(r=>{const key=r.account_key??r.machine_id;if(!targetKeys.has(key)||seen.has(key))return [];seen.add(key);const credits=creditByKey.get(key);return [{sourceMachine:r.name,identityKnown:r.account_key!==null,observedAt:r.observed_at,stale:Date.now()-Date.parse(r.observed_at)>180_000,windows:JSON.parse(r.windows_json),credits:credits?JSON.parse(credits):null,resetCardsAvailable:cardsByKey.get(key)??null}];});
+    const seen=new Set<string>();const accounts=(provider === "claude" ? [] : quotaRows).flatMap(r=>{const key=r.account_key??r.machine_id;if(!targetKeys.has(key)||seen.has(key))return [];seen.add(key);const credits=creditByKey.get(key);return [{sourceMachine:r.name,identityKnown:r.account_key!==null,observedAt:r.observed_at,stale:Date.now()-Date.parse(r.observed_at)>180_000,windows:JSON.parse(r.windows_json),credits:credits?JSON.parse(credits):null,resetCardsAvailable:cardsByKey.get(key)??null}];});
+    const claudeAccounts=this.db.all<{machine_id:string;name:string;discovery_json:string|null}>("SELECT machine_id,name,discovery_json FROM machines WHERE workspace_id=? AND identity_state='active'",workspaceId).flatMap(machine=>{
+      if(!machineIds.has(machine.machine_id))return [];
+      const quota=parseClaudeMetadata(JSON.parse(machine.discovery_json ?? "{}").agentRuntimes?.claude).quota;
+      if(!quota?.available || !quota.windows.length)return [];
+      return [{sourceMachine:machine.name,identityKnown:false,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180_000,subscriptionType:quota.subscriptionType,windows:quota.windows,credits:null,resetCardsAvailable:null}];
+    });
+    if(provider === "claude")accounts.push(...claudeAccounts);
     const weekly = accounts.flatMap(account => account.windows.filter((w: { bucket: string; windowMinutes: number; resetsAt: number | null }) =>
-      w.bucket === "codex" && w.windowMinutes === 10080 && w.resetsAt !== null && w.resetsAt * 1000 > Date.now() && w.resetsAt * 1000 - 10080 * 60_000 <= Date.now()));
+      w.bucket === provider && w.windowMinutes === 10080 && w.resetsAt !== null && w.resetsAt * 1000 > Date.now() && w.resetsAt * 1000 - 10080 * 60_000 <= Date.now()));
     let quotaCycle: { startsAt: string; resetsAt: string; recordedTokens: number | null; inputTokens: number | null; cachedInputTokens: number | null; boundaryIncomplete: boolean } | null = null;
     let weeklySessions: {id:string;title:string;projectId:string;projectTitle:string;totalTokens:number;inputTokens:number|null;cachedInputTokens:number|null;detailsMissing:number}[] = [];
     if (weekly.length === 1) {
@@ -95,14 +105,14 @@ export class UsageService {
         COALESCE(SUM(CASE WHEN d.starts_at>=? AND d.ends_at<? AND (d.input_tokens IS NULL OR d.cached_input_tokens IS NULL) THEN 1 ELSE 0 END),0) AS detailsMissing,
         COALESCE(SUM(CASE WHEN d.starts_at<? OR d.ends_at>=? THEN 1 ELSE 0 END),0) AS uncertain
         FROM usage_intervals d JOIN logical_sessions s USING(logical_session_id)
-        WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL AND d.ends_at>=? AND d.starts_at<?`,
+        WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")} AND d.ends_at>=? AND d.starts_at<?`,
         startsAt,resetsAt,startsAt,resetsAt,startsAt,resetsAt,startsAt,resetsAt,startsAt,resetsAt,workspaceId,id,startsAt,resetsAt)!;
       quotaCycle = { startsAt,resetsAt,recordedTokens:rows.length ? period.total : null,inputTokens:rows.length&&period.detailsMissing===0?period.input:null,cachedInputTokens:rows.length&&period.detailsMissing===0?period.cached:null,boundaryIncomplete:period.uncertain>0 };
       weeklySessions = this.db.all<{id:string;title:string;projectId:string;projectTitle:string;totalTokens:number;inputTokens:number|null;cachedInputTokens:number|null;detailsMissing:number}>(`SELECT s.logical_session_id AS id,s.title,s.project_id AS projectId,p.alias AS projectTitle,SUM(d.total_tokens) AS totalTokens,
           SUM(d.input_tokens) AS inputTokens,SUM(d.cached_input_tokens) AS cachedInputTokens,
           SUM(CASE WHEN d.input_tokens IS NULL OR d.cached_input_tokens IS NULL THEN 1 ELSE 0 END) AS detailsMissing
         FROM usage_intervals d JOIN logical_sessions s USING(logical_session_id) JOIN projects p ON p.project_id=s.project_id
-        WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL AND d.starts_at>=? AND d.ends_at<?
+        WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")} AND d.starts_at>=? AND d.ends_at<?
         GROUP BY s.logical_session_id HAVING SUM(d.total_tokens)>0 ORDER BY totalTokens DESC,s.logical_session_id`,workspaceId,id,startsAt,resetsAt);
       weeklySessions = weeklySessions.map(row=>({...row,inputTokens:row.detailsMissing?null:row.inputTokens,cachedInputTokens:row.detailsMissing?null:row.cachedInputTokens}));
 
@@ -130,7 +140,7 @@ export class UsageService {
       weeklyCachedInputTokens:quotaCycle?(weekly?weekly.cachedInputTokens:0):null,
     };}).sort((a,b)=>(b.weeklyTokens??-1)-(a.weeklyTokens??-1)||b.totalTokens-a.totalTokens||a.id.localeCompare(b.id)):[];
     return { topWeeklyProjects:quotaCycle?[...weeklyProjects.values()].sort((a,b)=>b.totalTokens-a.totalTokens).slice(0,10):null,
-      topWeeklySessions:quotaCycle?weeklySessions.slice(0,10).map(({id,title,totalTokens,inputTokens,cachedInputTokens})=>({id,title,totalTokens,inputTokens,cachedInputTokens})):null, topProjects:[...projectTotals.values()].sort((a,b)=>b.totalTokens-a.totalTokens).slice(0,10), scope, observedSessions:rows.length,totalSessions:sessions.length,recorded:rows.length?recorded:null,quotaCycle,
+      topWeeklySessions:quotaCycle?weeklySessions.slice(0,10).map(({id,title,totalTokens,inputTokens,cachedInputTokens})=>({id,title,totalTokens,inputTokens,cachedInputTokens})):null, provider,topProjects:[...projectTotals.values()].sort((a,b)=>b.totalTokens-a.totalTokens).slice(0,10), scope, observedSessions:rows.length,totalSessions:sessions.length,recorded:rows.length?recorded:null,quotaCycle,
       firstObservedAt:rows.map(r=>r.first_at).sort()[0]??null,lastObservedAt:rows.map(r=>r.observed_at).sort().at(-1)??null,
       coverage:"observed-only",accounts,discontinuities:rows.reduce((n,r)=>n+r.discontinuities,0),
       last:scope==="session" && rows[0]?JSON.parse(rows[0].last_json):null,nativeTotal:scope==="session" && rows[0]?JSON.parse(rows[0].counters_json):null,

@@ -1,6 +1,7 @@
 import { invariant } from "./errors.js";
 
 export interface ListOptions {
+  provider?: "codex" | "claude";
   limit: number;
   offset?: number;
   cursor?: string;

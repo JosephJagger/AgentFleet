@@ -67,3 +67,25 @@ describe("assistant Markdown", () => {
     expect(container.querySelector("p code")?.textContent).toBe(marker(mac));
   });
 });
+
+it("renders Claude inline and plain file paths as scoped actions, preserving reply copying",async()=>{
+ const writeText=vi.fn().mockResolvedValue(undefined);Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText}});
+ const path="/root/blog-cs/CONTENT_AUTOPILOT_PRD.md";
+ const body=`同一份文件也在 \`${path}\`。\n\n下载：/root/blog-cs/说明.pdf。\n\nWindows：\`C:\\work\\PRD v5.md\`，源码：\`./src/main.ts:12\``;
+ render(<MarkdownMessage sessionId="claude-session" body={body}/>);
+ const links=screen.getAllByRole("link",{name:"下载"});expect(links).toHaveLength(4);
+ expect(links[0]?.getAttribute("href")).toBe(`/api/sessions/claude-session/files?path=${encodeURIComponent(path)}&download=1`);
+ expect(links[2]?.getAttribute("href")).toContain(encodeURIComponent("C:\\work\\PRD v5.md"));
+ expect(links[3]?.getAttribute("href")).toContain("path=.%2Fsrc%2Fmain.ts&");
+ fireEvent.click(screen.getByRole("button",{name:"复制回复"}));await waitFor(()=>expect(writeText).toHaveBeenCalledWith(body));
+});
+it("does not turn commands, directories, remote URLs or fenced code into host file actions",()=>{
+ const body='`/root/blog-cs/` `/model` `cat /root/blog-cs/PRD.md`\n\nhttps://example.com/docs/PRD.md\n\n```sh\ncat /root/blog-cs/PRD.md\n```';
+ render(<MarkdownMessage sessionId="claude-session" body={body}/>);
+ expect(screen.queryByRole("link",{name:"下载"})).toBeNull();
+ expect(screen.getByRole("link",{name:"https://example.com/docs/PRD.md"}).getAttribute("href")).toBe("https://example.com/docs/PRD.md");
+});
+it("keeps file paths inert without a session binding",()=>{
+ render(<MarkdownMessage body='文件：`/root/blog-cs/PRD.md`。'/>);
+ expect(screen.queryByRole("link",{name:"下载"})).toBeNull();
+});

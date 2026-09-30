@@ -32,7 +32,7 @@ async function restrictPrivateKey(path: string): Promise<boolean> {
     }
   }
   try {
-    const { stdout } = await execFileAsync("whoami.exe", [], { timeout: 5_000, encoding: "utf8" });
+    const { stdout } = await execFileAsync("whoami.exe", [], { timeout: 5_000, encoding: "utf8", windowsHide: true });
     const account = stdout.trim();
     if (!account || /[\r\n]/u.test(account)) return false;
     await execFileAsync("icacls.exe", [path, "/inheritance:r", "/grant:r", `${account}:(F)`], {

@@ -186,3 +186,47 @@ export class CodexCatalogWatcher {
     this.watches.clear();
   }
 }
+
+/** Observe Claude transcript directories without traversing user projects or credentials. */
+export class ClaudeCatalogWatcher {
+  private readonly watches = new Map<string, FSWatcher>();
+  private closed = false;
+  private refreshPromise: Promise<void> | undefined;
+  constructor(private readonly home: string, private readonly changed: () => void) {}
+  refresh(): Promise<void> {
+    if (this.closed) return Promise.resolve();
+    if (this.refreshPromise) return this.refreshPromise;
+    this.refreshPromise = this.rebuild().finally(() => { this.refreshPromise = undefined; });
+    return this.refreshPromise;
+  }
+  private async rebuild(): Promise<void> {
+    const wanted = new Set<string>();
+    const install = async (path: string) => {
+      try {
+        const info = await lstat(path);
+        if (!info.isDirectory() || info.isSymbolicLink() || wanted.size >= 2048 || this.closed) return false;
+        wanted.add(path);
+        if (!this.watches.has(path)) {
+          const watcher = watch(path, { persistent: false }, (event, name) => {
+            if (this.closed) return;
+            if (!name || name.toString().endsWith(".jsonl") || event === "rename") {
+              this.changed();
+              if (event === "rename") void this.refresh().catch(() => undefined);
+            }
+          });
+          watcher.on("error", () => { watcher.close(); this.watches.delete(path); });
+          this.watches.set(path, watcher);
+        }
+        return true;
+      } catch { return false; }
+    };
+    await install(dirname(this.home));
+    await install(this.home);
+    const projects = join(this.home, "projects");
+    if (await install(projects)) for (const entry of await readdir(projects, { withFileTypes: true })) {
+      if (entry.isDirectory() && !entry.isSymbolicLink()) await install(join(projects, entry.name));
+    }
+    for (const [path, watcher] of this.watches) if (!wanted.has(path) || this.closed) { watcher.close(); this.watches.delete(path); }
+  }
+  close(): void { this.closed = true; for (const watcher of this.watches.values()) watcher.close(); this.watches.clear(); }
+}

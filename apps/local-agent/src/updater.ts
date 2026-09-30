@@ -46,6 +46,14 @@ export function compareReleaseVersions(left: string, right: string): number {
   return 0;
 }
 
+/** An externally activated agent can leave a drain newer than the retained
+ * runtime transaction. Installed versions prove completion independently. */
+export async function clearCompletedAgentUpdateDrain(store: StateStore, currentVersion: string): Promise<void> {
+  const drain = store.snapshot().maintenanceDrain;
+  const match = /^agent-update-(\d+\.\d+\.\d+)$/.exec(drain?.operationId ?? "");
+  if (match && compareReleaseVersions(match[1]!, currentVersion) <= 0) await store.setMaintenanceDrain(undefined);
+}
+
 async function fetchBoundedText(
   fetchImpl: FetchLike,
   url: string,
@@ -96,7 +104,7 @@ export async function stageAgentUpdate(options: {
     try {
       await writeFile(installerPath, options.installer, { encoding: "utf8", mode: 0o600 });
       await runInstaller("powershell.exe", [
-        "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+        "-NoLogo", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass",
         "-File", installerPath, "-Mode", "Stage", "-Url", options.controlPlaneUrl,
       ], undefined, options.signal, await codexNetworkEnvironment(process.env));
     } finally {
@@ -120,6 +128,7 @@ async function runInstaller(
     const child = spawn(executable, args, {
       env: environment,
       stdio: [stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
+      windowsHide: true,
     });
     let output = "";
     const capture = (chunk: Buffer) => {
@@ -215,6 +224,7 @@ export class AgentAutoUpdater {
   }
 
   private async performCheck(signal?: AbortSignal): Promise<UpdateCheckResult> {
+    if (this.options.store) await clearCompletedAgentUpdateDrain(this.options.store, this.options.currentVersion);
     const baseUrl = this.options.controlPlaneUrl.replace(/\/$/, "");
     const manifest = await fetchBoundedText(
       this.fetchImpl,

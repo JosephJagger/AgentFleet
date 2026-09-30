@@ -1,3 +1,4 @@
+import {ClaudePreferencesService} from "./claude-preferences.js";
 import { AdministrationService } from "./administration.js";
 import { createWorldWeather } from "./world-weather.js";
 import { createHash, type Hash } from "node:crypto";
@@ -134,6 +135,7 @@ function record(value: unknown, message = "Request body must be a JSON object"):
 
 function listOptions(query: Record<string, unknown>): ListOptions {
   const options: ListOptions = { limit: pageLimit(query.limit) };
+  if (query.provider !== undefined) { invariant(query.provider === "codex" || query.provider === "claude",400,"INVALID_PROVIDER","Unknown agent provider"); options.provider = query.provider; }
   for (const name of ["cursor", "machineId", "projectId", "q", "executionState"] as const) {
     if (query[name] !== undefined) options[name] = requiredString(query[name], name, name === "cursor" ? 8192 : 500);
   }
@@ -837,7 +839,7 @@ export async function buildControlPlane(
   });
   app.get("/api/projects", { preHandler: authenticate }, async (request) => {
     const query = request.query as Record<string, unknown>;
-    if (query.limit !== undefined || query.cursor !== undefined || query.q !== undefined || query.offset !== undefined) {
+    if (query.provider !== undefined || query.limit !== undefined || query.cursor !== undefined || query.q !== undefined || query.offset !== undefined) {
       const options = listOptions(query);
       if (query.offset !== undefined) {
         const offset = Number(query.offset);
@@ -905,7 +907,7 @@ export async function buildControlPlane(
       requiredString(body.clientMutationId, "clientMutationId", 200),
       undefined,
       undefined,
-      { path, alias, createDirectory: body.createDirectory },
+      { path, alias, createDirectory: body.createDirectory, ...(body.provider === "claude" ? { provider: "claude" as const } : {}) },
     );
     const agent = agents.get(machineId);
     if (agent?.reconciliationReady) for (const offer of machineMaintenance.offers(machineId)) sendJson(agent.socket, offer);
@@ -980,8 +982,9 @@ export async function buildControlPlane(
   for (const [path,scope] of [["sessions","session"],["projects","project"],["machines","machine"]] as const) {
     app.get(`/api/${path}/:id/usage`, { preHandler: authenticate }, async request => {
       const workspaceId=(request.principal as Principal).workspaceId,id=routeId(request);
-      const summary=usage.read(workspaceId,scope,id);quotaRefresh.request(workspaceId,scope,id);
-      if(scope!=="machine")return summary;
+      const provider=(request.query as {provider?:string}).provider === "claude" ? "claude" : "codex";
+      const summary=usage.read(workspaceId,scope,id,provider);if(summary.provider !== "claude")quotaRefresh.request(workspaceId,scope,id);
+      if(scope!=="machine" || summary.provider === "claude")return summary;
       const account=summary.accounts.length===1?summary.accounts[0]:null;
       const weekly=account?.windows.find((window:{bucket:string;windowMinutes:number;remainingPercent:number})=>window.bucket==="codex"&&window.windowMinutes===10080);
       const resetPrediction=await resetRadar.read(`${workspaceId}:${id}`,
@@ -1195,6 +1198,10 @@ export async function buildControlPlane(
     return { ...result, dispatchAttempt: attempt };
   });
 
+  app.get("/api/sessions/:id/claude-settings", {preHandler:authenticate}, async request =>
+    new ClaudePreferencesService(db).read(request.principal as Principal,routeId(request)));
+  app.put("/api/sessions/:id/claude-settings", {preHandler:mutate}, async request =>
+    new ClaudePreferencesService(db).write(request.principal as Principal,routeId(request),record(request.body)));
   app.get("/api/sessions/:id/codex-settings", { preHandler: authenticate }, async (request) => {
     return codexPreferences.read(request.principal as Principal, routeId(request));
   });

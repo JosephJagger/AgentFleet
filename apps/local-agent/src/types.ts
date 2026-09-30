@@ -28,6 +28,7 @@ export interface PairingCredential {
 }
 
 export interface ProjectRecord {
+  provider?: "codex" | "claude";
   id: string;
   alias: string;
   root: string;
@@ -149,6 +150,7 @@ export interface ApprovalRecord {
 export interface ManagedThread {
   nativeUsage?: { usage: Record<string, unknown>; occurredAt: string };
   nativeUsageDigest?: string;
+  historyOrderDigests?: Record<string,string>;
   usageObservedAt?: string;
   historyPage?: { cursor: string | null; legacyAnchor?: string; complete: boolean };
   /** Fences catalog reads issued before a local metadata mutation. */

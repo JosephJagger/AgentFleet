@@ -53,8 +53,10 @@ async function gitRootFor(cwd: string): Promise<string> {
 export async function discoverProjectFromCwd(
   cwd: string,
   existingProjects: readonly ProjectRecord[],
+  provider: "codex" | "claude" = "codex",
 ): Promise<ProjectRecord> {
   if (!isAbsolute(cwd)) throw new AgentError("PROJECT_PATH_INVALID", "thread cwd must be an absolute path");
+  existingProjects = existingProjects.filter(project => (project.provider ?? "codex") === provider);
   const canonicalCwd = await realpath(cwd);
   const cwdStat = await stat(canonicalCwd);
   if (!cwdStat.isDirectory()) throw new AgentError("PROJECT_NOT_DIRECTORY", "thread cwd must be a directory");
@@ -77,7 +79,8 @@ export async function discoverProjectFromCwd(
   }
   const identity = sha256(`${root}\0${rootStat.dev.toString()}\0${rootStat.ino.toString()}`).slice("sha256:".length);
   return {
-    id: `proj_auto_${identity.slice(0, 32)}`,
+    id: `${provider === "claude" ? "proj_claude_" : "proj_auto_"}${identity.slice(0, 32)}`,
+    ...(provider === "claude" ? { provider } : {}),
     alias: basename(root) || "root",
     root,
     device: rootStat.dev.toString(),
@@ -88,15 +91,16 @@ export async function discoverProjectFromCwd(
   };
 }
 
-export async function addProject(store: StateStore, path: string, alias: string, source: ProjectRecord["source"] = "explicit"): Promise<ProjectRecord> {
+export async function addProject(store: StateStore, path: string, alias: string, source: ProjectRecord["source"] = "explicit", provider: "codex" | "claude" = "codex"): Promise<ProjectRecord> {
   const project = await resolveProject(path, alias);
   project.source = source;
+  if (provider === "claude") { project.id = `proj_claude_${project.id}`; project.provider = provider; }
   await store.addProject(project);
-  return store.snapshot().projects.find((entry) => entry.root === project.root) ?? project;
+  return store.snapshot().projects.find((entry) => entry.root === project.root && (entry.provider ?? "codex") === provider) ?? project;
 }
 
 /** Add an absolute host path, optionally creating its final directory first. */
-export async function addProjectFromPanel(store: StateStore, path: string, alias: string, createDirectory: boolean): Promise<ProjectRecord> {
+export async function addProjectFromPanel(store: StateStore, path: string, alias: string, createDirectory: boolean, provider: "codex" | "claude" = "codex"): Promise<ProjectRecord> {
   if (!isAbsolute(path)) throw new AgentError("PROJECT_PATH_INVALID", "project path must be absolute");
   const requested = resolve(path);
   let created = false;
@@ -108,7 +112,7 @@ export async function addProjectFromPanel(store: StateStore, path: string, alias
     created = true;
   }
   try {
-    return await addProject(store, requested, alias);
+    return await addProject(store, requested, alias, "explicit", provider);
   } catch (error) {
     if (created) await rmdir(requested).catch(() => undefined);
     throw error;

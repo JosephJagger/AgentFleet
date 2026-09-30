@@ -1,3 +1,7 @@
+import { useClaudePreferences } from "./lib/claude-preferences";
+import { ClaudeControls } from "./components/ClaudeControls";
+import { agentName } from "./lib/agent-provider";
+import { AgentPicker } from "./components/AgentPicker";
 import { AdminView } from "./components/AdminView";
 import { EmailLoginForm } from "./components/EmailLoginForm";
 import { writingAIErrorMessage } from "./lib/writing-assistance";
@@ -362,9 +366,11 @@ export function CompatibilityProfileCard({ machine, profile }: { machine: Machin
   );
 }
 
-export function MachineSummaryHeader({ machine, onAliasChange }: {
+export function MachineSummaryHeader({ machine, onAliasChange, provider = "codex", onProviderChange }: {
   machine: Machine;
   onAliasChange: (alias: string | null) => Promise<void>;
+  provider?: "codex" | "claude";
+  onProviderChange?: (provider: "codex" | "claude") => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(machine.displayAlias ?? "");
@@ -400,12 +406,13 @@ export function MachineSummaryHeader({ machine, onAliasChange }: {
           <div className="machine-name-line">
             <h1>{machine.name}</h1>
             <IconButton label={t("修改主机显示名称")} onClick={() => setEditing(true)}><Pencil size={14} /></IconButton>
+            {onProviderChange && <AgentPicker value={provider} claudeInstalled={machine.agentRuntimes?.claude?.installed === true} onChange={onProviderChange} />}
           </div>
         )}
         {machine.displayAlias && <span className="machine-hostname">hostname · {machine.hostname}</span>}
       </div>
       <div className="machine-summary__actions">
-        <UsageButton scope="machine" id={machine.id}/>
+        <UsageButton scope="machine" id={machine.id} provider={provider}/>
         <div className="machine-summary__facts"><span><GitBranch size={14} />{count(machine.discovery?.discoveredProjects ?? machine.projects.length, "个项目")} </span><span>{machine.reachability === "live" ? t("在线") : machine.reachability === "reconciling" ? t("正在同步") : machine.reachability === "reconnecting" ? t("正在重连") : t("等待连接")}</span></div>
       </div>
     </section>
@@ -552,15 +559,15 @@ function EventIcon({ event }: { event: TimelineEvent }) {
   return <Activity size={15} />;
 }
 
-function Timeline({ events, sessionId }: { events: TimelineEvent[]; sessionId: string }) {
-  if (events.length === 0) return <div className="timeline-empty"><Clock3 size={19} />{t("发送消息后，Codex 的回复和操作进度会显示在这里。")}</div>;
+function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; sessionId: string; provider?: string }) {
+  if (events.length === 0) return <div className="timeline-empty"><Clock3 size={19} />{t(provider === "claude" ? "发送消息后，Claude Code 的回复和操作进度会显示在这里。" : "发送消息后，Codex 的回复和操作进度会显示在这里。")}</div>;
   return (
     <div className="timeline">
       {events.map((event) => (
         <article className={`timeline-event timeline-event--${event.actor ?? "system"}`} key={event.id} data-scroll-anchor={event.id}>
           <span className="timeline-event__node"><EventIcon event={event} /></span>
           <div className="timeline-event__head">
-            <strong>{systemText(event.title) || (event.actor === "user" ? t("你") : event.actor === "agent" ? "Codex" : event.type)}{event.type === "turn.completed" && <span className="timeline-event__turn-tokens"> · {event.turnTokens == null ? t("本轮 token 未记录") : t("本轮消耗 {0} tokens", new Intl.NumberFormat(locale()).format(event.turnTokens))} · {event.turnCacheHitRate == null ? t("缓存命中率未记录") : t("缓存命中率 {0}%", new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(event.turnCacheHitRate))}</span>}</strong>
+            <strong>{(event.title === "Codex" ? agentName(provider) : systemText(event.title?.replace(provider === "claude" ? /^Codex/ : /$^/, "Claude Code"))) || (event.actor === "user" ? t("你") : event.actor === "agent" ? agentName(provider) : event.type)}{event.type === "turn.completed" && <span className="timeline-event__turn-tokens"> · {event.turnTokens == null ? t("本轮 token 未记录") : t("本轮消耗 {0} tokens", new Intl.NumberFormat(locale()).format(event.turnTokens))} · {event.turnCacheHitRate == null ? t("缓存命中率未记录") : t("缓存命中率 {0}%", new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(event.turnCacheHitRate))}</span>}</strong>
             <time>{new Date(event.occurredAt).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</time>
           </div>
           {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} sessionId={sessionId} /> : <p>{event.body}</p> : null}
@@ -734,6 +741,11 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const [modeOverride, setModeOverride] = useState<"default" | "plan">();
   const [configuration, setConfiguration] = useState<ConfigurationRequest>();
   const [runtimeChoice, setRuntimeChoice] = useState<RuntimeChoice>();
+  const claudePrefs=useClaudePreferences(detail?.session.provider === "claude" ? detail.session.id : undefined);
+  const claudeModel=claudePrefs.settings.model;
+  const claudeEffort=claudePrefs.settings.effort ?? "";
+  const claudePlan=claudePrefs.settings.mode === "plan";
+  const [claudeSettingsOpen,setClaudeSettingsOpen]=useState(0);
   const [runtimeSummary, setRuntimeSummary] = useState<RuntimeSummary>();
   const [commandMessage, setCommandMessage] = useState("");
   const [rawView, setRawView] = useState(false);
@@ -776,7 +788,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
     const nextId = detail?.session.id;
     if (!nextId || nextId === lastSessionId.current) return;
     lastSessionId.current = nextId;
-    setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedPlugins([]); setModeOverride(undefined);
+    setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedPlugins([]); setModeOverride(undefined); setClaudeSettingsOpen(0);
   }, [detail?.session.id, draftOwner]);
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
   useEffect(() => { setActiveCompletion(current => Math.min(current, Math.max(0, completions.length - 1))); }, [completions.length]);
@@ -827,7 +839,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const canSend = !pendingCommand && (session.actions?.start?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.threadRuntime === "idle" && !session.state.unknownFreeze));
   const canCancel = !pendingCommand && (session.actions?.cancel?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.currentTurn === "in_progress" && session.activeTurnId));
   const canQueueOrSteer = Boolean(detail.writable && session.state.reachability === "live" && session.state.currentTurn === "in_progress" && session.activeTurnId);
-  const slashCommand = parseCodexCommand(prompt);
+  const slashCommand = session.provider === "claude" ? undefined : parseCodexCommand(prompt);
   const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() || referenceCards.length ? { ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(referenceCards.length ? { references: referenceCards.filter(card => card.identity).map(card => ({ id: card.sourceId, version: card.identity!.version })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
   const referencesBlocked = referenceCards.some(card => card.error || !card.identity) || (referenceCards.length > 0 && !prompt.trim());
   const sendText = () => prompt.trim();
@@ -836,8 +848,9 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const inherited = session.runtimeSettings?.accepted ?? session.runtimeSettings?.observed;
   const baseSettings = settings ?? (runtimeSummary?.sessionId === session.id ? runtimeSummary.settings ?? undefined : undefined);
   const modeBase = baseSettings ?? (inherited?.model ? { model: inherited.model, ...(inherited.effort ? { effort: inherited.effort } : {}) } : undefined);
-  const sendSettings = modeOverride === "plan" && modeBase ? { ...modeBase, mode: "plan" } satisfies CodexSettings : baseSettings;
-  const modeBlocked = modeOverride === "plan" && !modeBase;
+  const sendSettings = session.provider === "claude" ? claudePrefs.ready && session.collaborationModes?.includes("plan") ? claudePrefs.settings : undefined : modeOverride === "plan" && modeBase ? { ...modeBase, mode: "plan" } satisfies CodexSettings : baseSettings;
+  const modeBlocked = session.provider === "claude" ? !claudePrefs.ready : modeOverride === "plan" && !modeBase;
+
   async function runSlash(name: string, args = "") {
     setCommandMessage("");
     const command = codexCommands.find((item) => item.name === name);
@@ -889,7 +902,20 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
     event.preventDefault();
     if (imageBlocked || busy || referencesBlocked || modeBlocked) return;
     if (prompt.trim() === "/") return;
-    if (slashCommand) { await runSlash(slashCommand.name, slashCommand.args); return; }
+    if (session.provider === "claude" && /^\/[a-z]+(?:\s|$)/i.test(prompt.trim())) {
+      if (!session.collaborationModes?.includes("plan")) {setCommandMessage(t("Claude Code 原生控制需要 Agent 0.30.57 或更新版本"));return;}
+      const [name,...args]=prompt.trim().slice(1).split(/\s+/);const arg=args.join(" ");
+      try {
+      if (name === "plan") {await claudePrefs.save({...claudePrefs.settings,mode:claudePlan?"default":"plan"});setCommandMessage(t("Claude Code 计划模式将在下一轮生效"));}
+      else if (name === "model" && (!arg || /^(host|sonnet|opus|haiku|claude-[a-zA-Z0-9.-]{1,120})$/.test(arg))) {if(arg)await claudePrefs.save({...claudePrefs.settings,model:session.claudeModels?.find(m=>m.model===arg || m.model.startsWith(`claude-${arg}-`))?.model ?? arg,effort:undefined,permissionMode:claudePrefs.settings.permissionMode === "auto" ? "default" : claudePrefs.settings.permissionMode});else setClaudeSettingsOpen(n=>n+1);setCommandMessage(t("Claude Code 模型：{0}",arg||claudeModel));}
+      else if (name === "effort" && (!arg || ["low","medium","high","xhigh","max"].includes(arg))) {if(arg)await claudePrefs.save({...claudePrefs.settings,effort:arg});else setClaudeSettingsOpen(n=>n+1);setCommandMessage(t("Claude Code 思考强度：{0}",arg||claudeEffort||t("继承宿主机")));}
+      else if (name === "help") setCommandMessage(t("Claude Code：/model、/effort、/plan；文件、图片和会话引用可从 + 添加。宿主机 skills 和 MCP 由原生配置加载。"));
+      else {setCommandMessage(t("此 Claude Code 终端命令尚未接入面板，请在宿主机使用；未作为聊天消息发送。"));return;}
+      setPrompt("");
+      } catch(error) {setCommandMessage(errorMessage(error));}
+      return;
+    }
+    if (session.provider !== "claude" && slashCommand) { await runSlash(slashCommand.name, slashCommand.args); return; }
     if (!hasInput || !canSend) return;
     setBusy(true);
     try {
@@ -924,13 +950,13 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
     <aside className="inspector">
       <header className="inspector-head">
         <IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton>
-        <div className="eyebrow inspector-context" title={`${session.machineName} · ${session.projectAlias}`}>{session.machineName} · {session.projectAlias}</div>
+        <div className="eyebrow inspector-context" title={`${session.machineName} · ${agentName(session.provider)} · ${session.projectAlias}`}>{session.machineName} · {agentName(session.provider)} · {session.projectAlias}</div>
         <div className="inspector-title-row">
           <h2 title={session.title}>{session.title}</h2>
           <div className="session-facts">
             <StatePill session={session} />
             <span className={`history-mark history-mark--${session.state.history}`}>{{ complete: t("完整历史"), partial: t("部分历史"), summary_only: t("历史摘要"), metadata_only: t("仅会话信息"), unavailable: t("历史暂不可用") }[session.state.history]}</span>
-            <UsageButton scope="session" id={session.id}/>
+            <UsageButton scope="session" id={session.id} provider={session.provider}/>
           </div>
         <div className="inspector-head__actions">
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span>{t("会话配置")}</span></button>
@@ -966,13 +992,13 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           <span className="share-strip__icon"><Share2 size={16} /></span>
           <div>
             <strong>{session.historyMode !== "unknown" ? t("宿主机共享会话") : t("仅可查看的宿主机会话")}</strong>
-            <span>{canClaim ? t("同步主机上的历史，继续原来的 Codex 会话") : systemText(session.actions?.claim?.message) || (session.state.threadRuntime === "active" ? t("请先结束宿主机正在运行的任务") : t("正在检查这个会话是否支持继续操作"))}</span>
+            <span>{canClaim ? t(session.provider === "claude" ? "同步主机上的历史，继续原来的 Claude Code 会话" : "同步主机上的历史，继续原来的 Codex 会话") : systemText(session.actions?.claim?.message) || (session.state.threadRuntime === "active" ? t("请先结束宿主机正在运行的任务") : t("正在检查这个会话是否支持继续操作"))}</span>
           </div>
             <button className="button button--share" type="button" disabled={!canClaim || busy} onClick={async () => { setBusy(true); try { await onClaim(); } finally { setBusy(false); } }}>{busy ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />}{locale() === "en" ? " " : ""}{t("接管并同步")}</button>
         </div>
       )}
       {session.state.unknownFreeze && <div className="freeze-banner"><AlertTriangle size={17} /><div><strong>{t("结果不确定，写入已冻结")}</strong><span>{t("可以点击解除冻结核验主机结果；系统不会自动重发原命令。")}</span><SessionRecovery key={`${draftOwner}:${session.id}`} machineId={session.machineId} sessionId={session.id} online={detail.hostOnline === true} supported={detail.recoverySupported === true} onChanged={onRefresh} /></div></div>}
-      <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? detail.events : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} />}</ConversationViewport>
+      <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? detail.events : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}</ConversationViewport>
       {approval?.status === "pending" && (approval.type === "user_input"
         ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} onChanged={onRefresh} />
         : <ApprovalCard approval={approval} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
@@ -993,27 +1019,29 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
       <SessionConfiguration key={`config:${draftOwner}:${session.id}`} request={configuration} title={session.title} onClose={() => setConfiguration(undefined)}>
         {configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
-        <CodexSettingsPanel key={`${draftOwner}:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />
-        <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />
+        {session.provider !== "claude" && <CodexSettingsPanel key={`${draftOwner}:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />}
+        {session.provider !== "claude" && <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />}
         <SessionWritingPreferencesPanel key={`writing:${draftOwner}:${session.id}`} settings={writingSettings} />
-        <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
+        {session.provider !== "claude" && <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
           <CodexInspectionPanel key={`inspect:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} request={inspectionRequest?.sessionId === session.id ? inspectionRequest : undefined} onChanged={onRefresh} />
           <CodexCommandGuide key={`commands:${draftOwner}:${session.id}`} />
-        </details>
+        </details>}
         <details className="session-sync-details session-config-section"><summary><span>{t("同步详情")}<small>{t("查看会话同步状态的排查信息")}</small></span></summary><p className="mono">seq {session.sessionSeq} · epoch {session.contentEpoch}</p></details>
       </SessionConfiguration>
       <form className="composer" onSubmit={submit}>
-        {prompt.trimStart().startsWith("/") && <div className="codex-command-menu" role="group" aria-label={t("Codex 命令")}><p>{t("面板命令 · 点击待接入项可查看原因，不会发送给模型")}</p>{codexCommands.filter((item) => item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map((item) => <button type="button" key={item.name} onClick={() => void runSlash(item.name, slashCommand?.args)}><code>/{item.name}</code><span>{item.label} · {coverageLabels[item.coverage]}</span></button>)}</div>}
+        {session.provider !== "claude" && prompt.trimStart().startsWith("/") && <div className="codex-command-menu" role="group" aria-label={t("Codex 命令")}><p>{t("面板命令 · 点击待接入项可查看原因，不会发送给模型")}</p>{codexCommands.filter((item) => item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map((item) => <button type="button" key={item.name} onClick={() => void runSlash(item.name, slashCommand?.args)}><code>/{item.name}</code><span>{item.label} · {coverageLabels[item.coverage]}</span></button>)}</div>}
         {!configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
-        {canQueueOrSteer && <div className="composer-mode"><Activity size={14} />{t("Codex 正在处理：可补充当前任务，或排到下一轮")}</div>}
-        <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} modeOverride={modeOverride === "plan" ? "plan" : undefined} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onClearMode={() => setModeOverride(undefined)} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>
+        {canQueueOrSteer && <div className="composer-mode"><Activity size={14} />{t(session.provider === "claude" ? "Claude Code 正在处理：可排到下一轮" : "Codex 正在处理：可补充当前任务，或排到下一轮")}</div>}
+        {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
+
+        {session.provider !== "claude" && <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} modeOverride={modeOverride === "plan" ? "plan" : undefined} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onClearMode={() => setModeOverride(undefined)} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>}
         {referenceCards.length > 0 && <div className="session-reference-cards" aria-label={t("复用的会话")}>
           {referenceCards.map(card => { const source = card.identity; const candidate = referenceCandidates.find(item => item.id === card.sourceId); const failed = Boolean(card.error); return <article className="session-reference-card" key={card.key}>
             <div className="session-reference-card__head"><strong>{source?.title ?? candidate?.title ?? card.sourceId}</strong><button type="button" aria-label={t("删除引用卡片")} onClick={() => removeReference(card.key)}><X size={15} /></button></div>
             <small>{source ? `${source.host} · ${source.project}` : candidate ? `${candidate.machineName} · ${candidate.projectAlias}` : t("正在读取会话")}</small>
-            <small>{t("发送后由 Codex 按任务查阅可读历史；不预先生成摘要")}</small>
+            <small>{t(session.provider === "claude" ? "发送后由 Claude Code 按任务查阅可读历史；不预先生成摘要" : "发送后由 Codex 按任务查阅可读历史；不预先生成摘要")}</small>
             {failed ? <p role="alert">{card.error}</p> : source ? <span role="status">{t("引用已就绪")}{source.incomplete ? ` · ${t("部分历史未同步")}` : ""}</span> : <span role="status">{t("正在核验会话")}</span>}
             {failed && <button type="button" className="button button--secondary" onClick={() => retryReference(card.key)}>{t("重试")}</button>}
           </article>; })}
@@ -1021,7 +1049,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         {referencePicker && <div ref={referencePickerRef} className="session-reference-picker" role="dialog" aria-label={t("复用会话")}>
           <div className="session-reference-picker__head"><div><strong>{t("复用会话")}</strong><small>{t("选择会话或粘贴链接，添加引用卡片")}</small></div><button type="button" aria-label={t("关闭")} onClick={() => setReferencePicker(false)}><X size={18}/></button></div>
           <div className="session-reference-picker__search"><label htmlFor="reference-session-search">{t("浏览会话")}</label><input id="reference-session-search" aria-label={t("搜索会话")} value={referenceSearch} onChange={event => { setReferenceSearch(event.target.value); setReferencePage(1); setReferenceCursors([null]); referenceListRef.current && (referenceListRef.current.scrollTop = 0); }} placeholder={t("搜索主机、项目或会话")}/></div>
-          <div ref={referenceListRef} className="session-reference-picker__list" role="group" aria-label={t("会话列表")}>{referenceLoading ? <p role="status">{t("正在加载会话")}</p> : referenceError ? <p role="alert">{referenceError}</p> : referenceItems.length ? referenceItems.map(item => <button type="button" key={item.id} onClick={() => { setReferencePicker(false); void addReference(item.id); }}><b title={item.title}>{item.title}</b><small>{item.machineName} · {item.projectAlias}</small></button>) : <p>{t("没有匹配的会话")}</p>}</div>
+          <div ref={referenceListRef} className="session-reference-picker__list" role="group" aria-label={t("会话列表")}>{referenceLoading ? <p role="status">{t("正在加载会话")}</p> : referenceError ? <p role="alert">{referenceError}</p> : referenceItems.length ? referenceItems.map(item => <button type="button" key={item.id} onClick={() => { setReferencePicker(false); void addReference(item.id); }}><b title={item.title}>{item.title}</b><small>{item.machineName} · {agentName(item.provider)} · {item.projectAlias}</small></button>) : <p>{t("没有匹配的会话")}</p>}</div>
           <div className="session-reference-picker__footer"><span>{t("共 {0} 个会话", referenceTotal)}{referencePages > 1 && <> · {t("第 {0} / {1} 页", referencePage, referencePages)}</>}</span>{referencePages > 1 && <div><button type="button" aria-label={t("上一页")} disabled={referenceLoading || referencePage === 1} onClick={() => changeReferencePage(referencePage - 1)}><ChevronLeft size={17}/></button><button type="button" aria-label={t("下一页")} disabled={referenceLoading || !referenceNextCursor} onClick={() => changeReferencePage(referencePage + 1)}><ChevronRight size={17}/></button></div>}</div>
           <div className="session-reference-picker__link"><label htmlFor="reference-session-link">{t("粘贴会话链接")}</label><div><input id="reference-session-link" value={referenceLink} onChange={event => { setReferenceLink(event.target.value); setReferenceLinkError(""); }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addReferenceLink(); } }} placeholder={`${window.location.origin}/sessions/…`} aria-invalid={Boolean(referenceLinkError)} aria-describedby={referenceLinkError ? "reference-session-link-error" : undefined}/><button type="button" disabled={!referenceLink.trim()} onClick={() => addReferenceLink()}>{t("添加引用")}</button></div>{referenceLinkError && <small id="reference-session-link-error" role="alert">{referenceLinkError}</small>}</div>
         </div>}
@@ -1057,11 +1085,11 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         </div><button type="button" className="prompt-completions-dismiss" aria-label={t("收起补全建议")} title={t("收起补全建议")} onMouseDown={event => event.preventDefault()} onClick={() => { setDismissedCompletion(completionKey); textArea.current?.focus(); }}><X size={16} aria-hidden="true" /></button></div></CompletionSurface>}
         <textarea
           ref={textArea}
-          aria-label={t("发送给 Codex 的消息")}
+          aria-label={t(session.provider === "claude" ? "发送给 Claude Code 的消息" : "发送给 Codex 的消息")}
           aria-autocomplete="list"
           aria-controls={completions.length > 0 ? "prompt-completions" : undefined}
           aria-activedescendant={completions.length > 0 ? `prompt-completion-${activeCompletion}` : undefined}
-          placeholder={canSend ? t("告诉 Codex 下一步做什么…") : canQueueOrSteer ? t("补充当前任务，或写入下一轮队列…") : t("先写下想法，恢复可用后手动发送…")}
+          placeholder={canSend ? session.provider === "claude" ? t("告诉 Claude Code 下一步做什么…") : t("告诉 Codex 下一步做什么…") : canQueueOrSteer ? t("补充当前任务，或写入下一轮队列…") : t("先写下想法，恢复可用后手动发送…")}
           value={prompt}
           onChange={(event) => { setPrompt(event.target.value); setCompletionFocused(true); setCompletionCaret(event.target.selectionStart); setCompletionSelectionEnd(event.target.selectionEnd); setDismissedCompletion(""); }}
           onFocus={() => setCompletionFocused(true)}
@@ -1108,7 +1136,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
               requestAnimationFrame(() => {
                 if (textArea.current === input && input.value === nextPrompt) input.setSelectionRange(caret, caret);
               });
-            } else if (!event.shiftKey && !event.altKey && !event.metaKey && canSend) {
+            } else if (!event.shiftKey && !event.altKey && !event.metaKey && (canSend || (session.provider === "claude" && prompt.trim().startsWith("/")))) {
               event.preventDefault();
               if (!event.repeat) event.currentTarget.form?.requestSubmit();
             }
@@ -1125,18 +1153,19 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             <div className="composer-add-popover__head"><strong>{t("添加")}</strong><button type="button" className="composer-add-popover__close" aria-label={t("关闭")} onClick={closeAddMenu}><X size={19} /></button></div>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); fileInput.current?.click(); }}><FileUp size={17} /><span><b>{t("文件")}</b><small>{t("支持 PDF、XLSX、UTF-8 文本、源码与配置")}</small></span></button>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); folderInput.current?.click(); }}><FolderOpen size={17} /><span><b>{t("文件夹")}</b><small>{t("逐个校验支持类型，最多 32 个文件")}</small></span></button>
-            <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t("添加会话引用，由 Codex 按需查阅")}</small></span></button>
+            <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t(session.provider === "claude" ? "添加会话引用，由 Claude Code 按需查阅" : "添加会话引用，由 Codex 按需查阅")}</small></span></button>
             <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { closeAddMenu(); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
+            {session.provider === "claude" && <button type="button" onClick={()=>{closeAddMenu();setClaudeSettingsOpen(n=>n+1);}}><Code2 size={17}/><span><b>{t("Claude Code 设置")}</b><small>{t("模型 · 思考强度 · 计划模式")}</small></span></button>}
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
-            {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer} aria-pressed={modeOverride === "plan"} onClick={() => { closeAddMenuAfterTouchChoice(); if (!modeBase?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{modeOverride === "plan" ? t("已开启；下一轮按计划模式运行") : !modeBase?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={modeOverride === "plan" ? "active" : ""} /></button>}
-            {(session.plugins?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.plugins!.map(plugin => { const selected = selectedPlugins.some(item => item.pluginId === plugin.pluginId); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={plugin.pluginId} onClick={() => { setSelectedPlugins(current => selected ? current.filter(item => item.pluginId !== plugin.pluginId) : [...current, plugin]); closeAddMenuAfterTouchChoice(); }}><Puzzle size={17} /><span><b>{plugin.pluginName}</b></span></button>; })}</div></>}
+            {session.collaborationModes?.includes("plan") && <button type="button" disabled={canQueueOrSteer || (session.provider === "claude" && !claudePrefs.ready)} aria-pressed={session.provider === "claude" ? claudePlan : modeOverride === "plan"} onClick={() => { closeAddMenuAfterTouchChoice(); if (session.provider !== "claude" && !modeBase?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } if(session.provider === "claude") {void claudePrefs.save({...claudePrefs.settings,mode:claudePlan?"default":"plan"}).catch(error=>setCommandMessage(errorMessage(error)));} else setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{(session.provider === "claude" ? claudePlan : modeOverride === "plan") ? t("已开启；下一轮按计划模式运行") : session.provider !== "claude" && !modeBase?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={(session.provider === "claude" ? claudePlan : modeOverride === "plan") ? "active" : ""} /></button>}
+            {session.provider !== "claude" && (session.plugins?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.plugins!.map(plugin => { const selected = selectedPlugins.some(item => item.pluginId === plugin.pluginId); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={plugin.pluginId} onClick={() => { setSelectedPlugins(current => selected ? current.filter(item => item.pluginId !== plugin.pluginId) : [...current, plugin]); closeAddMenuAfterTouchChoice(); }}><Puzzle size={17} /><span><b>{plugin.pluginName}</b></span></button>; })}</div></>}
           </div></details>
           {canQueueOrSteer ? (
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>}
               </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || modeBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
-              <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, additions); else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>
+              {session.provider !== "claude" && <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, additions); else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>}
             </div>
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>
@@ -1333,6 +1362,7 @@ function App() {
   const [route, setRoute] = useState(() => routeFromPath(location.pathname));
   const view = route.view;
   const routeRef = useRef(route);
+  const [machineProviders, setMachineProviders] = useState<Record<string, "codex" | "claude">>({});
   const [selectedMachineId, setSelectedMachineId] = useState<string | undefined>(route.machineId);
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(route.sessionId);
   const [detail, setDetail] = useState<SessionDetail>();
@@ -1478,7 +1508,7 @@ function App() {
         type: update.eventType,
         occurredAt: existing?.occurredAt ?? new Date().toISOString(),
         actor: update.eventType === "agent_message.delta" ? "agent" : "system",
-        title: update.eventType === "agent_message.delta" ? t("Codex · 实时") : update.eventType === "command_output.delta" ? t("命令输出 · 实时") : t("变更预览 · 实时"),
+        title: update.eventType === "agent_message.delta" ? `${agentName(detail?.session.provider)} · ${t("实时")}` : update.eventType === "command_output.delta" ? t("命令输出 · 实时") : t("变更预览 · 实时"),
         body: update.eventType === "agent_message.delta" ? bounded(`${existing?.body ?? ""}${delta}`) : update.eventType === "turn_diff.delta" ? t("正在接收最终变更…") : null,
         output: update.eventType === "command_output.delta" ? bounded(`${existing?.output ?? ""}${delta}`) : null,
         diff: update.eventType === "turn_diff.delta" ? volatileDiff(diffText) : null,
@@ -1541,7 +1571,20 @@ function App() {
   }, [detail?.session.id, detail?.commands?.map((command) => `${command.id}:${command.state}`).join("|"), loadDetail, loadDashboard]);
 
   const selectedMachine = useMemo(() => dashboard?.machines.find((machine) => machine.id === selectedMachineId), [dashboard, selectedMachineId]);
+  const selectedProvider = machineProviders[selectedMachineId ?? ""] ?? "codex";
+  const providerMachines = dashboard?.machines.filter(machine => selectedProvider !== "claude" || machine.agentRuntimes?.claude?.installed).map(machine => ({ ...machine, projects: machine.projects.filter(project => (project.provider ?? "codex") === selectedProvider) })) ?? [];
+  function selectProvider(provider: "codex" | "claude") {
+    if (!selectedMachineId || provider === "claude" && !selectedMachine?.agentRuntimes?.claude?.installed) return;
+    setMachineProviders(current => ({ ...current, [selectedMachineId]: provider }));
+    navigate({ view: "fleet", machineId: selectedMachineId });
+  }
+
   const displayedSession = detail && detail.session.id === selectedSessionId ? detail.session : undefined;
+  useEffect(() => {
+    if (!displayedSession) return;
+    const provider = displayedSession.provider ?? "codex";
+    setMachineProviders(current => current[displayedSession.machineId] === provider ? current : { ...current, [displayedSession.machineId]: provider });
+  }, [displayedSession?.id, displayedSession?.provider]);
 
   if (!authKnown) return <main className="boot-screen"><span className="brand-glyph"><Radio size={19} /></span><LoaderCircle className="spin" size={22} /><span>{t("正在接入 Control Plane")}</span></main>;
   if (!dashboard) return <Login onLogin={(next) => { setDashboard(next); const session = next.sessions.find((item) => item.id === selectedSessionRef.current); setSelectedMachineId(routeRef.current.machineId ?? session?.machineId ?? next.machines[0]?.id); }} />;
@@ -1671,17 +1714,17 @@ function App() {
         <main className="fleet-main">
           <div className="catalog-toggle-bar"><button type="button" className="catalog-toggle" aria-label={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话")} title={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话，让对话更宽")} aria-expanded={!catalogCollapsed} aria-controls="workbench-catalog" onClick={() => setCatalogCollapsed((value) => !value)}>{catalogCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}<span>{catalogCollapsed ? t("展开") : t("收起列表")}</span></button></div>
           <div id="workbench-catalog" className="fleet-catalog-content" role="region" aria-label={t("项目与会话列表")} tabIndex={0}>
-          {selectedMachine && <><MachineSummaryHeader machine={selectedMachine} onAliasChange={updateMachineAlias} /><button className="catalog-more" type="button" onClick={() => setView("hosts")}>{t("管理主机与默认设置")}</button>{selectedMachine.discovery?.state !== "ready" && <DiscoveryStatus discovery={selectedMachine.discovery} />}</>}
-          {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} onSchedule={project => openScheduled(project.id)} />}
+          {selectedMachine && <><MachineSummaryHeader machine={selectedMachine} onAliasChange={updateMachineAlias} provider={selectedProvider} onProviderChange={selectProvider} /><button className="catalog-more" type="button" onClick={() => setView("hosts")}>{t("管理主机与默认设置")}</button>{selectedMachine.discovery?.state !== "ready" && <DiscoveryStatus discovery={selectedMachine.discovery} />}</>}
+          {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog key={`${selectedMachineId}:${selectedProvider}`} provider={selectedProvider} machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} onSchedule={project => openScheduled(project.id)} />}
           </div>
         </main>
         <SessionInspector referenceCandidates={dashboard.sessions} detail={displayedSession ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
       </div> : view === "hosts" ? <HostsView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />
-      <CreateSessionDialog open={createOpen} machines={dashboard.machines} selectedMachineId={selectedMachineId} initialProject={createProject} onClose={() => setCreateOpen(false)} onToast={toast} onCreate={async (machineId, projectId, title) => { const result = await api.createSession(machineId, projectId, title); setSelectedMachineId(machineId); selectSession(result.session.id); toast("success", t("受管会话已创建")); await loadDashboard(true); }} />
-      <CreateProjectDialog open={createProjectOpen} machines={dashboard.machines} selectedMachineId={selectedMachineId} onClose={() => setCreateProjectOpen(false)} onToast={toast} onCreate={async (machineId, path, alias, createDirectory) => {
-        let operation = await api.createProject(machineId, path, alias, createDirectory);
+      <CreateSessionDialog open={createOpen} machines={providerMachines} selectedMachineId={selectedMachineId} initialProject={createProject} onClose={() => setCreateOpen(false)} onToast={toast} onCreate={async (machineId, projectId, title) => { const result = await api.createSession(machineId, projectId, title); setSelectedMachineId(machineId); selectSession(result.session.id); toast("success", t("受管会话已创建")); await loadDashboard(true); }} />
+      <CreateProjectDialog open={createProjectOpen} machines={providerMachines} selectedMachineId={selectedMachineId} onClose={() => setCreateProjectOpen(false)} onToast={toast} onCreate={async (machineId, path, alias, createDirectory) => {
+        let operation = await api.createProject(machineId, path, alias, createDirectory, selectedProvider);
         const deadline = Date.now() + 120_000;
         while (operation.state === "accepted" || operation.state === "running") {
           if (Date.now() >= deadline) throw new Error(t("主机仍在处理项目，请稍后刷新项目列表"));

@@ -1,3 +1,4 @@
+import { agentName } from "../lib/agent-provider";
 import { count, t, locale, systemText } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -56,7 +57,7 @@ export function NativeSessionDeletion({session,commands,pending,onChanged}:{sess
     <section ref={modal} className="modal native-session-deletion" role="dialog" aria-modal="true" aria-labelledby="native-deletion-title">
     <div className="modal-head"><h2 id="native-deletion-title">{t("永久删除原生会话")}</h2><button type="button" className="icon-button" aria-label={t("关闭删除确认")} autoFocus disabled={busy} onClick={close}><X size={18}/></button></div>
     <p>{t("永久删除宿主机及面板中的此会话和它派生的子代理后代历史，无法撤销。项目文件不在删除范围内。")}</p>
-    <p>{session.machineName} · {session.projectAlias} · {session.title}</p>
+    <p>{session.machineName} · {agentName(session.provider)} · {session.projectAlias} · {session.title}</p>
     <button type="button" className="button button--quiet" disabled={busy||pending||!session.actions?.deletePreview?.allowed} onClick={()=>void preview()}>{t("读取主机删除范围")}</button>
     {!session.actions?.deletePreview?.allowed&&<p>{systemText(session.actions?.deletePreview?.message)||t("请更新主机连接服务后使用删除预览。")}</p>}
     {previewId&&!plan&&<p>{systemText(receipt?.message)||t("正在等待主机返回删除范围…")}</p>}

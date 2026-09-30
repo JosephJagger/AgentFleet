@@ -1,3 +1,4 @@
+import { api } from "./lib/api";
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -320,4 +321,87 @@ describe("SessionInspector host sharing", () => {
     expect(screen.getByText(/Agent 0\.16\.1 正在等待自动更新/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /取消接管/ })).toBeNull();
   });
+});
+
+describe("主机 Agent 选择", () => {
+  it("默认 Codex，未安装 Claude 时禁用；安装后可以选择", () => {
+    const machine = {id:"m",name:"host",hostname:"host",os:"Linux",arch:"x64",projects:[],reachability:"live",agentRuntimes:{claude:{installed:false}}} as unknown as Machine;
+    const change = vi.fn();
+    const view = render(<MachineSummaryHeader machine={machine} onAliasChange={async()=>{}} onProviderChange={change} />);
+    const trigger = screen.getByRole("button",{name:"选择 Agent"});
+    expect(trigger.textContent).toContain("Codex");
+    fireEvent.click(trigger);
+    expect((screen.getByRole("menuitemradio",{name:/Claude Code/}) as HTMLButtonElement).disabled).toBe(true);
+    view.rerender(<MachineSummaryHeader machine={{...machine,agentRuntimes:{claude:{installed:true,version:"test"}}}} onAliasChange={async()=>{}} onProviderChange={change} />);
+    const claude = screen.getByRole("menuitemradio",{name:/Claude Code/});
+    expect((claude as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(claude);
+    expect(change).toHaveBeenCalledWith("claude");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+  it("支持键盘导航、Escape 关闭与点击外部关闭", () => {
+    const machine={id:"m",name:"host",hostname:"host",os:"Linux",arch:"x64",projects:[],reachability:"live",agentRuntimes:{claude:{installed:true}}} as unknown as Machine;
+    render(<MachineSummaryHeader machine={machine} onAliasChange={async()=>{}} onProviderChange={vi.fn()} />);
+    const trigger=screen.getByRole("button",{name:"选择 Agent"});
+    fireEvent.keyDown(trigger,{key:"ArrowDown"});
+    const menu=screen.getByRole("menu");
+    fireEvent.keyDown(menu,{key:"End"});
+    expect(document.activeElement).toBe(screen.getByRole("menuitemradio",{name:/Claude Code/}));
+    fireEvent.keyDown(menu,{key:"Escape"});
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    fireEvent.click(trigger);fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+});
+
+describe("Claude Code 原生输入能力",()=>{
+ it("显示工具归属、Claude 原生计划模式和模型，保留通用表达优化",async()=>{
+  Object.defineProperty(HTMLDialogElement.prototype,"showModal",{configurable:true,value:function(){this.setAttribute("open","");}});
+  Object.defineProperty(HTMLDialogElement.prototype,"close",{configurable:true,value:function(){this.removeAttribute("open");}});
+  const claude={...session("claude","content","Claude session",new Date().toISOString()),provider:"claude" as const,claudeModels:[{model:"claude-sonnet-5-5",displayName:"Sonnet 5.5",efforts:["low","medium","high"],supportsAutoMode:true}],claudePermissionModes:["default","auto","acceptEdits","dontAsk"],nativeThreadId:"claude_original",collaborationModes:["default","plan"],imageInputSupported:true,fileInputSupported:true};
+  const detail:SessionDetail={session:claude,events:[{id:"reply",sessionSeq:1,type:"item.completed",actor:"agent",title:"Codex",body:"OK",occurredAt:new Date().toISOString()}],approval:null,writable:true,queue:[]};
+  let saved={settings:null as import("./lib/claude-preferences").ClaudeSettings|null,revision:0};
+  vi.spyOn(api,"claudePreferences").mockImplementation(async()=>saved);
+  const save=vi.spyOn(api,"saveClaudePreferences").mockImplementation(async(_id,input)=>{saved={settings:input.settings,revision:input.revision+1};return saved;});
+  const send=vi.fn(async()=>undefined);
+  const view=render(<SessionInspector detail={detail} loading={false} onRefresh={()=>{}} onClaim={async()=>{}} onContinueManaged={async()=>{}} onReleaseManagement={async()=>{}} onSend={send} onQueue={async()=>{}} onSteer={async()=>{}} onCancelQueued={async()=>{}} onCancel={async()=>{}} onApproval={async()=>{}}/>);
+  expect(screen.getByText("linux-host · Claude Code · content")).toBeTruthy();
+  expect(screen.queryByText("Codex")).toBeNull();
+  expect(screen.queryByRole("combobox",{name:"Claude Code 模型"})).toBeNull();
+  await waitFor(()=>expect(screen.queryByText(/正在读取会话配置/)).toBeNull());
+  fireEvent.click(screen.getByRole("button",{name:"Claude Code 设置"}));
+  fireEvent.change(screen.getByRole("combobox",{name:"Claude Code 模型"}),{target:{value:"claude-sonnet-5-5"}});
+  fireEvent.change(screen.getByRole("combobox",{name:"Claude Code 权限模式"}),{target:{value:"auto"}});
+  fireEvent.click(screen.getByRole("button",{name:"保存"}));
+  await waitFor(()=>expect(screen.queryByRole("dialog",{name:"Claude Code 设置"})).toBeNull());
+  fireEvent.click(screen.getByRole("button",{name:"计划模式 先分析并制定计划"}));
+  await waitFor(()=>expect(saved.settings?.mode).toBe("plan"));
+  const input=screen.getByRole("textbox",{name:"发送给 Claude Code 的消息"});
+  fireEvent.change(input,{target:{value:"Make a plan"}});
+  fireEvent.submit(input.closest("form")!);
+  await waitFor(()=>expect(send).toHaveBeenCalledWith("Make a plan",{model:"claude-sonnet-5-5",permissionMode:"auto",mode:"plan"},undefined));
+  expect(save).toHaveBeenCalled();
+  expect(screen.getByRole("button",{name:/优化表达/})).toBeTruthy();
+  fireEvent.click(screen.getByRole("button",{name:"Claude Code 设置 模型 · 思考强度 · 计划模式"}));
+  expect(screen.getByRole("dialog",{name:"Claude Code 设置"})).toBeTruthy();
+  expect(screen.getByRole("option",{name:"Sonnet 5.5"})).toBeTruthy();
+  fireEvent.change(screen.getByRole("combobox",{name:"Claude Code 思考强度"}),{target:{value:"high"}});
+  fireEvent.click(screen.getByRole("button",{name:"保存"}));
+  await waitFor(()=>expect(screen.queryByRole("dialog",{name:"Claude Code 设置"})).toBeNull());
+
+  view.unmount();
+  render(<SessionInspector detail={detail} loading={false} onRefresh={()=>{}} onClaim={async()=>{}} onContinueManaged={async()=>{}} onReleaseManagement={async()=>{}} onSend={send} onQueue={async()=>{}} onSteer={async()=>{}} onCancelQueued={async()=>{}} onCancel={async()=>{}} onApproval={async()=>{}}/>);
+  await waitFor(()=>expect(screen.getByRole("button",{name:"Claude Code 设置"}).textContent).toContain("Sonnet 5.5 · high"));
+  fireEvent.click(screen.getByRole("button",{name:"Claude Code 设置"}));
+  expect((screen.getByRole("combobox",{name:"Claude Code 计划模式"}) as HTMLSelectElement).value).toBe("plan");
+  expect((screen.getByRole("combobox",{name:"Claude Code 权限模式"}) as HTMLSelectElement).value).toBe("auto");
+  fireEvent.change(screen.getByRole("combobox",{name:"Claude Code 思考强度"}),{target:{value:"low"}});
+  save.mockRejectedValueOnce(new Error("save failed"));
+  fireEvent.click(screen.getByRole("button",{name:"保存"}));
+  await waitFor(()=>expect(screen.getByRole("alert").textContent).toContain("save failed"));
+  expect(saved.settings?.effort).toBe("high");
+  fireEvent.click(screen.getByRole("button",{name:"取消"}));
+  expect(screen.getByRole("button",{name:"Claude Code 设置"}).textContent).toContain("high");
+ });
 });

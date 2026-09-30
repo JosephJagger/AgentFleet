@@ -92,6 +92,39 @@ function remarkFileCitations() {
   return (tree: unknown) => visit(tree as Node);
 }
 
+/** Recognize explicit file references in prose; commands and fenced examples stay untouched. */
+function remarkHostFilePaths() {
+  type Node = {type?:string;value?:string;children?:Node[];url?:string};
+  const inlinePath=(value:string):string|undefined=>{
+    const path=value.replace(/:\d+(?::\d+)?$/u, "");
+    if(!/^(?:\/(?!\/)|[A-Za-z]:[\\/]|\.{1,2}[\\/]|[A-Za-z0-9_@.-]+[\\/])/u.test(path) || /[\r\n<>|]/u.test(path) || !/[^\\/]\.[A-Za-z0-9]{1,16}$/u.test(path))return undefined;
+    return hostFilePath(path);
+  };
+  const prosePath=/(^|[\s（(【[“"'：:，,。;；])((?:\/(?!\/)|[A-Za-z]:[\\/]|\.{1,2}[\\/])[^\s<>"'`，。；：！？、（）【】()\[\]{}]+\.[A-Za-z0-9]{1,16})(?=$|[\s，。；：！？、（）【】()\[\]{}.,;:"'”])/gu;
+  function visit(node:Node):void {
+    if(!node.children || ["link","linkReference","image","code"].includes(node.type ?? ""))return;
+    const children:Node[]=[];
+    for(const child of node.children){
+      if(child.type === "inlineCode" && typeof child.value === "string") {
+        const path=inlinePath(child.value);
+        children.push(path?{type:"link",url:path,children:[child]}:child);
+      }else if(child.type === "text" && typeof child.value === "string") {
+        let start=0;
+        for(const match of child.value.matchAll(prosePath)) {
+          const path=inlinePath(match[2]!);if(!path)continue;
+          const index=match.index+match[1]!.length;
+          if(index>start)children.push({type:"text",value:child.value.slice(start,index)});
+          children.push({type:"link",url:path,children:[{type:"inlineCode",value:match[2]}]});
+          start=index+match[2]!.length;
+        }
+        if(start<child.value.length)children.push({type:"text",value:child.value.slice(start)});
+      }else {visit(child);children.push(child);}
+    }
+    node.children=children;
+  }
+  return (tree:unknown)=>visit(tree as Node);
+}
+
 function LocalFileLink({ sessionId, path, children }: { sessionId: string; path: string; children?: ReactNode }) {
   return <span className="markdown-file">
     <span className="markdown-file__name">{children}</span>
@@ -123,7 +156,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({ body, sessionId }
     img: ({ src, alt }) => src ? <a href={src} target="_blank" rel="noopener noreferrer">{alt || t("查看图片")}</a> : <span>{alt}</span>,
   }), [activeLocale, sessionId]);
   return <div className="message-markdown">
-    <div className="message-markdown__body"><Markdown remarkPlugins={[remarkGfm, remarkFileCitations]} components={components} urlTransform={(url) => hostFilePath(url) ? url : defaultUrlTransform(url)} skipHtml>{body}</Markdown></div>
+    <div className="message-markdown__body"><Markdown remarkPlugins={[remarkGfm, remarkFileCitations, ...(sessionId ? [remarkHostFilePaths] : [])]} components={components} urlTransform={(url) => hostFilePath(url) ? url : defaultUrlTransform(url)} skipHtml>{body}</Markdown></div>
     <div className="message-markdown__actions">
       <button type="button" onClick={() => void copyReply()} aria-label={copied ? t("回复已复制") : t("复制回复")}>
         {copied ? <Check size={14} /> : <Copy size={14} />}{copied ? t("已复制") : t("复制回复")}

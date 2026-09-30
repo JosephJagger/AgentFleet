@@ -1,5 +1,7 @@
+import { parseClaudeSettings } from "./claude-settings.js";
 import { readNativeSessionCwd, readNativeUsage } from "./native-usage.js";
 import { nativeImageCleanup } from "./native-image-cleanup.js";
+import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { setImmediate as yieldToIO } from "node:timers/promises";
 import { parseImages } from "./images.js";
@@ -22,9 +24,10 @@ import {
   type ThreadHistorySnapshot,
   type VolatileAppEvent,
 } from "./app-server.js";
-import { SessionAppServer } from "./session-app-server.js";
+import { createMultiRuntime } from "./multi-runtime.js";
+import { isClaudeThread, isClaudeProject } from "./claude-runtime.js";
 import { AgentError, publicError } from "./errors.js";
-import { CatalogSyncScheduler, CodexCatalogWatcher, CATALOG_RECONCILE_MS } from "./catalog-sync.js";
+import { CatalogSyncScheduler, CodexCatalogWatcher, ClaudeCatalogWatcher, CATALOG_RECONCILE_MS } from "./catalog-sync.js";
 import { detectHostCodex } from "./host-codex.js";
 import { refreshEnvironmentChecks } from "./platform.js";
 import { check } from "./preflight.js";
@@ -289,6 +292,7 @@ export class AgentRuntime {
   private transportGeneration: number | undefined;
   private readonly catalogSync: CatalogSyncScheduler;
   private readonly catalogWatcher: CodexCatalogWatcher | undefined;
+  private readonly claudeCatalogWatcher: ClaudeCatalogWatcher | undefined;
   private discoveryRequested = false;
   private discoveryIndexOnly = false;
   private discoveryRunning = false;
@@ -332,7 +336,7 @@ export class AgentRuntime {
     ];
     const readiness = checks.some(item => item.state === "failed") ? "action_required"
       : visibleState !== "ready" ? "checking" : this.isWritable() ? "ready" : "read_only";
-    return { ...this.discoveryStatus, state: visibleState, backgroundSync,
+    return { ...this.discoveryStatus, state: visibleState, backgroundSync, agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {},
       ...(serverUnavailable ? { error: "Codex 会话服务启动失败，项目和会话扫描暂不可用。连接服务会自动重试。" } : {}),
       syncMode: this.catalogWatcher?.mode ?? "fallback", reconcileIntervalSeconds: CATALOG_RECONCILE_MS / 1000,
       ...(completed ? { scannedCount: completed.scannedCount, discoveredCount: completed.discoveredCount, lastSuccessfulAt: completed.lastSuccessfulAt } : {}),
@@ -498,7 +502,7 @@ export class AgentRuntime {
     this.identity = options.identity;
     this.pairing = options.pairing;
     this.support = options.support;
-    this.appServerFactory = options.appServerFactory ?? ((callbacks) => new SessionAppServer(callbacks));
+    this.appServerFactory = options.appServerFactory ?? ((callbacks) => createMultiRuntime(callbacks));
     this.restartSleep = options.restartSleep ?? ((milliseconds, signal) => delay(milliseconds, signal));
     this.restartDelay = options.restartDelay ?? appServerRestartDelay;
     this.catalogSync = new CatalogSyncScheduler(async change => {
@@ -506,8 +510,9 @@ export class AgentRuntime {
       if (!this.appServer || this.shuttingDown) return;
       await this.reconcileExistingThreads(change === "index");
       if (this.discoveryStatus.state === "error") throw new AgentError("CATALOG_REFRESH_FAILED", "catalog refresh failed");
-    }, { ...options.catalogSyncTiming, repair: async () => { await this.catalogWatcher?.refresh(); } });
+    }, { ...options.catalogSyncTiming, repair: async () => { await Promise.all([this.catalogWatcher?.refresh(), this.claudeCatalogWatcher?.refresh()]); } });
     const home = options.catalogHome ?? this.support.codexProfile?.codexHome;
+    this.claudeCatalogWatcher = options.appServerFactory ? undefined : new ClaudeCatalogWatcher(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), () => this.catalogSync.request("full"));
     this.catalogWatcher = home ? new CodexCatalogWatcher(home, change => this.catalogSync.request(change), () => this.notifyRegistryChanged()) : undefined;
   }
 
@@ -519,7 +524,7 @@ export class AgentRuntime {
         error: this.support.readCompatibilityReason ?? this.readOnlyReasons().join("; ") };
     }
     if (this.canRead()) {
-      await this.catalogWatcher?.refresh();
+      await Promise.all([this.catalogWatcher?.refresh(), this.claudeCatalogWatcher?.refresh()]);
       this.catalogSync.start();
       try {
         await this.startAppServerOnce();
@@ -604,7 +609,7 @@ export class AgentRuntime {
       },
       resumeStreams,
       capacity: this.capacityState(),
-      discovery: this.getDiscoveryStatus(),
+      discovery: { ...this.getDiscoveryStatus(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       projects: this.projectSummaries(),
       sessions: [...Object.values(state.managedThreads).flatMap((thread) => {
@@ -698,7 +703,7 @@ export class AgentRuntime {
       activeTurns: Object.values(state.managedThreads).filter((thread) => thread.activeTurnId !== undefined).length,
       readOnly: !this.isWritable(),
       readOnlyReasons: this.readOnlyReasons(),
-      discovery: this.getDiscoveryStatus(),
+      discovery: { ...this.getDiscoveryStatus(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       ...(this.support.codexProfile ? { codexProfile: this.support.codexProfile } : {}),
       ...(this.isWritable() ? {} : { unreachableReason: this.readOnlyReasons().join("; ") }),
@@ -720,9 +725,10 @@ export class AgentRuntime {
     const state = this.store.snapshot();
     return state.projects.map((project) => ({
       externalId: project.id,
+      provider: project.provider ?? "codex",
       alias: project.alias,
       canonicalRoot: project.root,
-      identityHash: sha256(canonicalJson({ device: project.device, inode: project.inode, root: project.root })),
+      identityHash: sha256(canonicalJson({ device: project.device, inode: project.inode, root: project.root, ...(isClaudeProject(project) ? { provider: "claude" } : {}) })),
       leaseVersion: project.identityVersion,
     }));
   }
@@ -743,8 +749,8 @@ export class AgentRuntime {
     }
   }
 
-  async addProject(path: string, alias: string, createDirectory: boolean): Promise<ProjectRecord> {
-    const project = await addProjectFromPanel(this.store, path, alias, createDirectory);
+  async addProject(path: string, alias: string, createDirectory: boolean, provider: "codex" | "claude" = "codex"): Promise<ProjectRecord> {
+    const project = await addProjectFromPanel(this.store, path, alias, createDirectory, provider);
     try { await this.refreshCatalog(); }
     finally { this.notifyRegistryChanged(); }
     return project;
@@ -938,6 +944,7 @@ export class AgentRuntime {
     this.shuttingDown = true;
     this.catalogSync.close();
     this.catalogWatcher?.close();
+    this.claudeCatalogWatcher?.close();
     if (this.discoveryContinuation) clearTimeout(this.discoveryContinuation);
     this.discoveryContinuation = undefined;
     this.restartController?.abort(new AgentError("AGENT_SHUTDOWN", "agent is shutting down"));
@@ -984,6 +991,13 @@ export class AgentRuntime {
       }] : []);
       const next = {cursor:page.nextCursor ?? cursor,complete:page.nextCursor === null,...(anchor ? {legacyAnchor:anchor} : {})};
       imported += await this.store.appendHistoryBatch(current.nativeThreadId,events,anchor ?? page.items.at(-1)?.nativeItemId ?? current.historyCursor ?? "",next,page.items.slice(0,start));
+      if(page.order?.length) {
+        const digest=sha256(canonicalJson(page.order));const key=cursor ?? "0";
+        if(this.store.snapshot().managedThreads[current.nativeThreadId]?.historyOrderDigests?.[key] !== digest) {
+          await this.emitForThread(current,{type:"thread.history.order",nativeThreadId:current.nativeThreadId,payload:{items:page.order}});
+          await this.store.updateManagedThread(current.nativeThreadId,candidate=>{candidate.historyOrderDigests={...candidate.historyOrderDigests,[key]:digest};});
+        }
+      }
       this.callbacks.onOutboxChanged();
       await yieldToIO();
       if (!page.nextCursor) {
@@ -995,7 +1009,7 @@ export class AgentRuntime {
   }
 
   private async syncNativeUsage(thread: ManagedThread, snapshot: ThreadHistorySnapshot): Promise<void> {
-    if (snapshot.nativeThreadId !== thread.nativeThreadId || this.imageMaintenanceSessions.has(thread.logicalSessionId ?? "")) return;
+    if (isClaudeThread(thread.nativeThreadId) || snapshot.nativeThreadId !== thread.nativeThreadId || this.imageMaintenanceSessions.has(thread.logicalSessionId ?? "")) return;
     const nativeUsage = this.store.snapshot().projectContentPolicies[thread.projectId]?.syncContent === false ? undefined : await readNativeUsage(this.support.codexProfile?.codexHome, snapshot.rolloutPath, thread.nativeThreadId);
     if (nativeUsage && thread.logicalSessionId && thread.executionSegmentId && (!thread.usageObservedAt || nativeUsage.occurredAt >= thread.usageObservedAt)) {
       const digest = sha256(canonicalJson(nativeUsage));
@@ -1127,17 +1141,18 @@ export class AgentRuntime {
           try {
             const currentState = this.store.snapshot();
             const priorThread = currentState.managedThreads[thread.nativeThreadId] ?? currentState.discoveredThreads[thread.nativeThreadId];
-            const sessionCwd = await readNativeSessionCwd(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId)
+            const sessionCwd = (isClaudeThread(thread.nativeThreadId) ? undefined : await readNativeSessionCwd(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId))
               ?? priorThread?.sessionCwd
               ?? thread.cwd;
             const project = await discoverProjectFromCwd(
               sessionCwd,
               [...knownProjects, ...discoveredProjects.values()],
+              isClaudeThread(thread.nativeThreadId) ? "claude" : "codex",
             );
-            discoveredProjects.set(project.root, project);
+            discoveredProjects.set(`${project.provider ?? "codex"}:${project.root}`, project);
             const priorUsage = this.store.snapshot().managedThreads[thread.nativeThreadId]?.nativeUsage ?? this.store.snapshot().discoveredThreads[thread.nativeThreadId]?.nativeUsage;
             const nativeUsage = this.store.snapshot().projectContentPolicies[project.id]?.syncContent === false
-              ? undefined : await readNativeUsage(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId) ?? priorUsage;
+              ? undefined : (isClaudeThread(thread.nativeThreadId) ? undefined : await readNativeUsage(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId)) ?? priorUsage;
             observed.push({
               ...(nativeUsage ? { nativeUsage } : {}),
               externalId: thread.nativeThreadId,
@@ -1541,7 +1556,7 @@ export class AgentRuntime {
         if (plugins.some(selected => !catalog?.plugins?.some(plugin => plugin.pluginId === selected.pluginId && plugin.pluginName === selected.pluginName))) throw new AgentError("PLUGIN_UNAVAILABLE", "所选插件已变化，请刷新后重选");
         if (pluginSkills.some(selected => !catalog?.pluginSkills?.some(skill => skill.pluginId === selected.pluginId && skill.name === selected.name && skill.path === selected.path))) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "所选插件技能已变化，请刷新后重选");
         const prompt = nativeAction ? "" : requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
-        const settings = validateSettings(command.payload.settings, server.getCodexCatalog?.());
+        const settings = isClaudeProject(project) ? parseClaudeSettings(command.payload.settings) : validateSettings(command.payload.settings, server.getCodexCatalog?.());
         const profile = permissionProfile(command.payload.permissionProfile);
         if (command.precondition.executionSegmentId !== command.executionSegmentId) {
           throw new AgentError("PRECONDITION_INVALID", "execution segment precondition does not match the command");
@@ -1629,7 +1644,7 @@ export class AgentRuntime {
           await this.syncManagedHistory(thread, resumed.history, false);
         }
         if (thread.activeTurnId !== undefined) throw new AgentError("THREAD_BUSY", "thread still has an active turn");
-        const turnSettings = nativeAction ? settings : settingsAfterPlan(settings, thread.acceptedSettings, server.getCodexCatalog?.());
+        const turnSettings = isClaudeProject(project) ? settings : nativeAction ? settings : settingsAfterPlan(settings, thread.acceptedSettings, server.getCodexCatalog?.());
         const clientUserMessageId = optionalString(command.payload.clientUserMessageId, "payload.clientUserMessageId");
         const materialized = nativeAction ? [] : await materializeAttachments(project, command.commandId, rawAttachments);
         const referenced = referenceInputs(prompt, materialized);
@@ -1803,7 +1818,7 @@ export class AgentRuntime {
     const thread = this.store.snapshot().managedThreads[event.nativeThreadId];
     if (!thread || thread.appServerEpoch !== epoch) return;
     if (event.type === "thread.usage") {
-      await this.store.updateManagedThread(thread.nativeThreadId, candidate => { candidate.usageObservedAt = nowIso(); });
+      await this.store.updateManagedThread(thread.nativeThreadId, candidate => { candidate.usageObservedAt = nowIso(); if (isClaudeThread(thread.nativeThreadId) && isRecord(event.payload.usage)) candidate.nativeUsage={usage:event.payload.usage,occurredAt:candidate.usageObservedAt}; });
     }
     let mappedEvent = event;
     if (event.type === "turn.completed" && event.nativeTurnId !== undefined) {

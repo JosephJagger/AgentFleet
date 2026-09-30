@@ -30,6 +30,8 @@ build_darwin() {
   tar -xzf "$NODE_ARCHIVE" -C "$STAGE" "$NODE_FOLDER/bin/node"
   cp "$STAGE/$NODE_FOLDER/bin/node" "$TARGET/runtime/node"
   cp -R "$AGENT_DIR/dist" "$TARGET/lib/dist"
+  mkdir -p "$TARGET/lib/node_modules/@anthropic-ai"
+  cp -R "$AGENT_DIR/node_modules/@anthropic-ai/claude-agent-sdk" "$TARGET/lib/node_modules/@anthropic-ai/claude-agent-sdk"
   cp "$AGENT_DIR/package.json" "$TARGET/lib/package.json"
   cp "$SCRIPT_DIR/portable-launcher.sh" "$TARGET/agentfleet"
   chmod 755 "$TARGET/agentfleet" "$TARGET/runtime/node"
@@ -44,6 +46,8 @@ build_windows() {
   mkdir -p "$TARGET/runtime" "$TARGET/lib"
   cp "$NODE_WINDOWS_X64_EXE" "$TARGET/runtime/node.exe"
   cp -R "$AGENT_DIR/dist" "$TARGET/lib/dist"
+  mkdir -p "$TARGET/lib/node_modules/@anthropic-ai"
+  cp -R "$AGENT_DIR/node_modules/@anthropic-ai/claude-agent-sdk" "$TARGET/lib/node_modules/@anthropic-ai/claude-agent-sdk"
   cp "$AGENT_DIR/package.json" "$TARGET/lib/package.json"
   cp "$SCRIPT_DIR/windows-launcher.cmd" "$TARGET/agentfleet.cmd"
   tar -czf "$ARTIFACT" -C "$STAGE/win32-x64" agentfleet

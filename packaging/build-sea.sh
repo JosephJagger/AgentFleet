@@ -69,6 +69,7 @@ npm run build
   --platform=node \
   --format=cjs \
   --target=node24 \
+  --define:import.meta.url=__agentfleetModuleUrl \
   --banner:js="$(tr '\n' ' ' < "$SCRIPT_DIR/sea-prelude.cjs")" \
   --log-level=error \
   --outfile="$SCRIPT_DIR/build/agentfleet.cjs"

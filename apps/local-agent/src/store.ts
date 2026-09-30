@@ -676,12 +676,12 @@ export class StateStore {
   async addProject(project: ProjectRecord): Promise<void> {
     await this.update((state) => {
       const sameAlias = state.projects.find(
-        (entry) => (entry.source ?? "explicit") === "explicit" && entry.alias === project.alias,
+        (entry) => (entry.source ?? "explicit") === "explicit" && entry.alias === project.alias && (entry.provider ?? "codex") === (project.provider ?? "codex"),
       );
       if (sameAlias && sameAlias.root !== project.root) {
         throw new AgentError("PROJECT_ALIAS_EXISTS", `project alias '${project.alias}' is already in use`);
       }
-      const existing = state.projects.find((entry) => entry.root === project.root);
+      const existing = state.projects.find((entry) => entry.root === project.root && (entry.provider ?? "codex") === (project.provider ?? "codex"));
       if (existing) {
         existing.alias = project.alias;
         existing.device = project.device;
@@ -1368,7 +1368,7 @@ export class StateStore {
       const timestamp = nowIso();
 
       for (const project of discoveredProjects) {
-        const existing = state.projects.find((entry) => entry.root === project.root);
+        const existing = state.projects.find((entry) => entry.root === project.root && (entry.provider ?? "codex") === (project.provider ?? "codex"));
         if (existing) {
           if (existing.device !== project.device || existing.inode !== project.inode) {
             existing.device = project.device;

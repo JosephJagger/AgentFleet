@@ -30,8 +30,8 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     identity_state: string; security_state: string; compatibility: string; runtime_read_only: number;
     command_types_json: string | null; holder: string | null; pending_approvals: number; queued: number; frozen: number;
     runtime_settings_json: string | null;
-    paginated_history: number;
-  }>(`SELECT s.*,e.native_thread_id,e.history_mode,m.reachability AS machine_reachability,
+    paginated_history: number; provider: string; discovery_json: string | null;
+  }>(`SELECT s.*,p.provider,m.discovery_json,e.native_thread_id,e.history_mode,m.reachability AS machine_reachability,
       m.identity_state,m.security_state,m.compatibility,m.runtime_read_only,m.command_types_json,m.paginated_history,
       (SELECT holder_client_session_id FROM control_leases WHERE logical_session_id=s.logical_session_id
         AND state='active' AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY acquired_at DESC LIMIT 1) AS holder,
@@ -53,6 +53,7 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
         )
       ) AS frozen
     FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id
+    JOIN projects p ON p.project_id=s.project_id
     JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL
     WHERE s.logical_session_id=? ORDER BY e.created_at DESC LIMIT 1`, sessionId);
   const actions = {} as SessionActions;
@@ -62,6 +63,8 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     const action = actionName as Exclude<SessionAction, "read">;
     let availability = allowed;
     if (!row) availability = blocked("SESSION_NOT_FOUND", "会话不存在");
+    else if (row.provider === "claude" && ["deletePreview", "delete", "rename", "archive", "unarchive", "fork", "compact", "review", "inspect", "stop", "steer"].includes(action)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "Claude Code 尚不支持此操作");
+    else if (row.provider === "claude" && !(row.discovery_json && JSON.parse(row.discovery_json)?.agentRuntimes?.claude?.installed === true)) availability = blocked("CLAUDE_NOT_INSTALLED", "宿主机未安装 Claude Code");
     else if (!supportsCommand(row.command_types_json, command)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "主机尚未报告支持此操作，请更新连接服务");
     else if (row.identity_state !== "active") availability = blocked("MACHINE_REVOKED", "主机连接已移除");
     else if (row.machine_reachability !== "online") availability = blocked("MACHINE_OFFLINE", "等待主机重新连接");

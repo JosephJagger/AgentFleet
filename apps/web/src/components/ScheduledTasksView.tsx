@@ -1,3 +1,4 @@
+import { agentName } from "../lib/agent-provider";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Check, ChevronRight, LoaderCircle, Pause, Play, Plus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
@@ -164,7 +165,7 @@ export function ScheduledTasksView({ machines, initialProjectId, initialSessionI
             <div className="scheduled-session-results" role="listbox" aria-label={t("选择已接管的会话")}>
               {sessionLoading && <p className="subtle">{t("正在加载会话")}</p>}
               {!sessionLoading && sessions.length === 0 && <p className="subtle">{t("没有匹配的已接管会话")}</p>}
-              {sessions.map(session => <button type="button" role="option" aria-selected={session.id === sessionId} className={session.id === sessionId ? "active" : ""} key={session.id} onClick={() => { setSessionId(session.id); setProjectId(session.projectId); }}><strong>{session.title}</strong><small>{session.machineName} · {session.projectAlias}</small></button>)}
+              {sessions.map(session => <button type="button" role="option" aria-selected={session.id === sessionId} className={session.id === sessionId ? "active" : ""} key={session.id} onClick={() => { setSessionId(session.id); setProjectId(session.projectId); }}><strong>{session.title}</strong><small>{session.machineName} · {agentName(session.provider)} · {session.projectAlias}</small></button>)}
             </div>
             {nextCursor && <button type="button" className="button button--quiet" onClick={async () => { setSessionLoading(true); try { const page = await api.sessions({ managed: true, projectId: lockedProjectId, q: sessionQuery.trim() || undefined, cursor: nextCursor, limit: 50 }); setSessions(current => [...current,...page.items]); setNextCursor(page.nextCursor); } catch (reason) { setError((reason as Error).message); } finally { setSessionLoading(false); } }}>{t("加载更多会话")}</button>}
             <small>{t("未接管的会话请先在工作台接管。")}</small>

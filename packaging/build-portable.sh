@@ -71,6 +71,8 @@ STAGE=$(mktemp -d "$SCRIPT_DIR/build/portable-$VERSION.XXXXXX")
 mkdir -p "$STAGE/agentfleet/runtime" "$STAGE/agentfleet/lib"
 cp "$(command -v node)" "$STAGE/agentfleet/runtime/node"
 cp -R "$AGENT_DIR/dist" "$STAGE/agentfleet/lib/dist"
+mkdir -p "$STAGE/agentfleet/lib/node_modules/@anthropic-ai"
+cp -R "$AGENT_DIR/node_modules/@anthropic-ai/claude-agent-sdk" "$STAGE/agentfleet/lib/node_modules/@anthropic-ai/claude-agent-sdk"
 cp "$AGENT_DIR/package.json" "$STAGE/agentfleet/lib/package.json"
 cp "$SCRIPT_DIR/portable-launcher.sh" "$STAGE/agentfleet/agentfleet"
 chmod 755 "$STAGE/agentfleet/agentfleet" "$STAGE/agentfleet/runtime/node"

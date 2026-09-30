@@ -53,3 +53,10 @@ it("累计计数器重置时采用原生末次请求，零输入不虚构缓存�
   expect(timelineItems([first, reset, completed])[0]).toMatchObject({ turnTokens: 110, turnCacheHitRate: 50 });
   expect(timelineItems([reset, completed])[0]).toMatchObject({ turnTokens: 10, turnCacheHitRate: null });
 });
+it("Claude 原生顺序纠正补同步错位，并合并历史和实时回复", () => {
+  const message=(seq:number,item:string,text:string,type:string,turn:string)=>mapEvent({eventId:`e${seq}`,sessionSeq:seq,type:"item.completed",nativeThreadId:"claude_original",nativeTurnId:turn,nativeItemId:item,payload:{item:{id:item,type,text,content:[{type:"text",text}]}}});
+  const order=mapEvent({eventId:"order",sessionSeq:4,type:"thread.history.order",nativeThreadId:"claude_original",payload:{items:[{itemId:"user",index:0,occurredAt:"2026-09-30T06:00:00Z"},{itemId:"answer",index:100,occurredAt:"2026-09-30T06:00:01Z"}]}});
+  const result=timelineItems([message(1,"answer","reply","agentMessage","live-turn"),message(2,"user","429?","userMessage","history-user"),message(3,"answer","reply","agentMessage","history-answer"),order]);
+  expect(result.map(e=>e.body)).toEqual(["429?","reply"]);
+  expect(result[0]?.occurredAt).toBe("2026-09-30T06:00:00Z");
+});

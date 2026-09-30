@@ -30,7 +30,7 @@ export type CommandRunner = (file: string, args: string[]) => Promise<CommandRes
 
 const defaultRunner: CommandRunner = (file, args) =>
   new Promise((finish) => {
-    execFile(file, args, { encoding: "utf8", timeout: 15_000, maxBuffer: 64 * 1_024 }, (error, stdout, stderr) => {
+    execFile(file, args, { encoding: "utf8", timeout: 15_000, maxBuffer: 64 * 1_024, windowsHide: true }, (error, stdout, stderr) => {
       const rawCode = error === null ? undefined : (error as unknown as { code?: unknown }).code;
       const numericCode = typeof rawCode === "number"
         ? rawCode

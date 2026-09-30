@@ -1,6 +1,6 @@
 {
   "name": "@agentfleet/local-agent",
-  "version": "0.30.54",
+  "version": "0.30.59",
   "private": true,
   "description": "P0b AgentFleet local agent for Linux, macOS, Windows and schema-compatible Codex hosts",
   "type": "module",
@@ -22,5 +22,8 @@
     "esbuild": "^0.25.12",
     "postject": "^1.0.0-alpha.6",
     "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.285"
   }
 }

@@ -37,12 +37,12 @@ it("项目分页在左侧显示总页数并通过前后按钮翻页", async () =
   fireEvent.click(screen.getByRole("button", { name: "下一页" }));
   await screen.findByText("第九个项目");
   expect(screen.getByText("第 2 / 5 页")).toBeTruthy();
-  expect(api.projects).toHaveBeenLastCalledWith({ machineId: "m", offset: 8, limit: 8 }, expect.any(AbortSignal));
+  expect(api.projects).toHaveBeenLastCalledWith({ machineId: "m", provider: "codex", offset: 8, limit: 8 }, expect.any(AbortSignal));
 });
 
 it("后台刷新不插入加载行，保留已有项目和会话 DOM", async () => {
   const { rerender, container } = render(<WorkspaceCatalog {...props} refreshKey="1" />);
-  fireEvent.click(await screen.findByRole("button", { name: /测试项目 \/srv/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /测试项目.*\/srv/ }));
   const original = await screen.findByText("会话 1");
   const pending = deferred<Page<FleetSession>>();
   vi.mocked(api.sessions).mockReturnValue(pending.promise);
@@ -57,7 +57,7 @@ it("后台刷新不插入加载行，保留已有项目和会话 DOM", async () 
 it("后台刷新保留所有已加载页，较晚页失败也不提交半份列表", async () => {
   vi.mocked(api.sessions).mockImplementation(async ({ cursor }) => cursor ? { items: [row("31")], nextCursor: null } : { items: [row("1")], nextCursor: "page-2" });
   const { rerender } = render(<WorkspaceCatalog {...props} refreshKey="1" />);
-  fireEvent.click(await screen.findByRole("button", { name: /测试项目 \/srv/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /测试项目.*\/srv/ }));
   fireEvent.click(await screen.findByRole("button", { name: "加载更多会话" }));
   await screen.findByText("会话 31");
   rerender(<WorkspaceCatalog {...props} refreshKey="2" />);
@@ -88,7 +88,7 @@ it("空项目后台刷新时空状态不消失", async () => {
 
 it("项目刷新失败不会卸载已展开的会话", async () => {
   const { rerender } = render(<WorkspaceCatalog {...props} refreshKey="1" />);
-  fireEvent.click(await screen.findByRole("button", { name: /测试项目 \/srv/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /测试项目.*\/srv/ }));
   const original = await screen.findByText("会话 1");
   vi.mocked(api.projects).mockRejectedValue(new Error("项目请求失败"));
   rerender(<WorkspaceCatalog {...props} refreshKey="2" />);
@@ -98,7 +98,7 @@ it("项目刷新失败不会卸载已展开的会话", async () => {
 
 it("已取消的慢刷新不会覆盖最新会话", async () => {
   const { rerender } = render(<WorkspaceCatalog {...props} refreshKey="1" />);
-  fireEvent.click(await screen.findByRole("button", { name: /测试项目 \/srv/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /测试项目.*\/srv/ }));
   await screen.findByText("会话 1");
   const pending = deferred<Page<FleetSession>>();
   vi.mocked(api.sessions).mockReturnValueOnce(pending.promise);
@@ -115,7 +115,7 @@ it("已取消的慢刷新不会覆盖最新会话", async () => {
 it("会话行在历史标记右侧展示独立 token 数，并区分零和未记录", async () => {
   vi.mocked(api.sessions).mockResolvedValue({ items: [{...row("used"),recordedTokens:1200},{...row("zero"),recordedTokens:0},row("missing")], nextCursor:null });
   const {container}=render(<WorkspaceCatalog {...props} refreshKey="usage" />);
-  fireEvent.click(await screen.findByRole("button",{name:/测试项目 \/srv/}));
+  fireEvent.click(await screen.findByRole("button",{name:/测试项目.*\/srv/}));
   await screen.findByText("会话 used");
   const labels=container.querySelectorAll(".session-row__tokens");
   expect(labels).toHaveLength(3);
@@ -123,4 +123,14 @@ it("会话行在历史标记右侧展示独立 token 数，并区分零和未记
   expect(labels[0].previousElementSibling?.className).toBe("history-mark");
   expect(labels[1].textContent).toBe("总消耗 0 tokens · 本周消耗 — tokens");
   expect(labels[2].textContent).toBe("总消耗 — tokens · 本周消耗 — tokens");
+});
+
+it("切换 Agent 重新加载独立项目目录", async () => {
+  vi.mocked(api.projects).mockImplementation(async options => ({ items: [{...project, id: options.provider === "claude" ? "claude-p" : "codex-p", alias: options.provider === "claude" ? "Claude 项目" : "Codex 项目"}],nextCursor:null }));
+  const view = render(<WorkspaceCatalog {...props} provider="codex" refreshKey="agents" />);
+  await screen.findByText("Codex 项目");
+  view.rerender(<WorkspaceCatalog {...props} provider="claude" refreshKey="agents" />);
+  await screen.findByText("Claude 项目");
+  expect(screen.queryByText("Codex 项目")).toBeNull();
+  expect(api.projects).toHaveBeenLastCalledWith(expect.objectContaining({ provider: "claude", offset: 0 }), expect.any(AbortSignal));
 });

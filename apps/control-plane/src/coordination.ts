@@ -1,3 +1,6 @@
+import {ClaudePreferencesService} from "./claude-preferences.js";
+import {parseClaudeMetadata} from "./claude-metadata.js";
+import { parseClaudeSettings, supportsClaudeControls } from "./claude-settings.js";
 import { UsageService } from "./usage.js";
 import type { ControlPlaneConfig } from "./config.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
@@ -78,6 +81,7 @@ interface SessionCommandRow {
   compatibility: string;
   agent_version: string | null;
   command_types_json: string | null;
+  provider: string;
   runtime_read_only: number;
   machine_reachability: string;
   project_lease_version: number;
@@ -106,6 +110,7 @@ interface ProjectTurnReservationRow {
 }
 
 const KNOWN_EVENT_TYPES = new Set([
+  "thread.history.order",
   "thread.usage",
   "session.created",
   "thread.started",
@@ -538,14 +543,24 @@ export class CoordinationService {
       }
 
       const session = this.commandSession(principal, logicalSessionId);
-      if ((input.type === "turn.start" || input.type === "turn.queue") && payload.settings === undefined) {
+      if (session.provider !== "claude" && (input.type === "turn.start" || input.type === "turn.queue") && payload.settings === undefined) {
         const preferences = new CodexPreferencesService(this.db).read(principal, logicalSessionId);
         if (preferences.desired) payload.settings = validateCodexSettings(preferences.desired, preferences.catalog);
       }
+      if(session.provider === "claude" && (input.type === "turn.start" || input.type === "turn.queue") && payload.settings === undefined){
+        const saved=new ClaudePreferencesService(this.db).read(principal,logicalSessionId);
+        if(saved.settings)payload.settings=saved.settings;
+      }
       if (payload.settings !== undefined) {
+
         invariant(input.type === "turn.start" || input.type === "turn.queue", 400, "CODEX_SETTINGS_ACTION_DENIED", "Settings can only apply when starting a new turn");
-        const machine = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
-        validateCodexSettings(payload.settings, machine?.codex_catalog_json ? parseCodexCatalog(JSON.parse(machine.codex_catalog_json)) : null);
+        const machine = this.db.get<{ codex_catalog_json: string | null; agent_version:string;discovery_json:string|null }>("SELECT codex_catalog_json,agent_version,discovery_json FROM machines WHERE machine_id=?", session.machine_id);
+        if(session.provider === "claude") { invariant(supportsClaudeControls(machine?.agent_version),409,"CLAUDE_AGENT_UPDATE_REQUIRED","Claude Code 原生控制需要 Agent 0.30.57 或更新版本"); try {parseClaudeSettings(payload.settings);} catch {invariant(false,400,"CLAUDE_SETTINGS_INVALID","Unsupported Claude Code settings");} }
+        else validateCodexSettings(payload.settings, machine?.codex_catalog_json ? parseCodexCatalog(JSON.parse(machine.codex_catalog_json)) : null);
+        if(session.provider === "claude") {
+          const selected=parseClaudeSettings(payload.settings)?.permissionMode;
+          if(selected) invariant(supportsClaudeControls(machine?.agent_version,59) && parseClaudeMetadata(JSON.parse(machine?.discovery_json ?? "{}").agentRuntimes?.claude).permissionModes.includes(selected),409,"CLAUDE_PERMISSION_MODE_UNAVAILABLE","Update the host Agent or select a permission mode supported by native Claude Code");
+        }
       }
       const claiming = input.type === "thread.claim";
       invariant(
@@ -560,6 +575,7 @@ export class CoordinationService {
       invariant(session.compatibility === "compatible", 409, "MACHINE_INCOMPATIBLE", "Machine is not P0a-compatible");
       invariant(session.machine_reachability === "online", 409, "MACHINE_OFFLINE", "Machine must be online when accepting a command");
       invariant(!session.runtime_read_only, 409, "MACHINE_READ_ONLY", "Agent runtime currently supports read-only access");
+      invariant(session.provider !== "claude" || ["thread.claim", "thread.release", "turn.start", "turn.queue", "turn.cancel", "approval.decide_once", "input.respond"].includes(input.type),409,"AGENT_CAPABILITY_UNAVAILABLE","Claude Code does not support this operation");
       invariant(supportsCommand(session.command_types_json, input.type), 409, "AGENT_CAPABILITY_UNAVAILABLE", "Agent has not reported support for this operation; update the connection service");
       const references = parseReferences(payload.references);
       if (references.length) {
@@ -579,10 +595,11 @@ export class CoordinationService {
       const hasRichInput = images.length > 0 || attachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0;
       if (attachments.length || plugins.length || pluginSkills.length || payload.goal !== undefined) invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "ATTACHMENTS_NOT_ALLOWED", "此操作不能附带文件、插件或目标");
       if (payload.goal !== undefined) invariant(typeof payload.goal === "string" && payload.goal.trim().length > 0 && payload.goal.length <= 2_000 && !payload.goal.includes("\0"), 400, "GOAL_INVALID", "目标需要为 1–2000 个字符");
-      if (attachments.length) {
+      if (attachments.length && session.provider !== "claude") {
         const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
         invariant(parseCodexCatalog(raw?.codex_catalog_json ? JSON.parse(raw.codex_catalog_json) : null)?.fileInput === true, 409, "AGENT_FILE_UNSUPPORTED", "请先更新这台主机的连接服务，当前版本不能接收文件");
       }
+      invariant(session.provider !== "claude" || (!plugins.length && !pluginSkills.length),400,"AGENT_PLUGIN_MISMATCH","Claude Code loads host plugins from its own settings");
       if (pluginSkills.length) {
         const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
         const catalog = parseCodexCatalog(raw?.codex_catalog_json ? JSON.parse(raw.codex_catalog_json) : null);
@@ -736,7 +753,7 @@ export class CoordinationService {
 
       // Snapshot inheritance only for NEW commands. Retries retain the accepted
       // snapshot even if defaults changed; the wire hash covers resolved values.
-      if (["thread.claim", "turn.start", "turn.queue", "turn.compact", "turn.review"].includes(input.type)) {
+      if (session.provider !== "claude" && ["thread.claim", "turn.start", "turn.queue", "turn.compact", "turn.review"].includes(input.type)) {
         const permissions = new PermissionPreferencesService(this.db).read(principal, "sessions", logicalSessionId);
         invariant(permissions.supported || permissions.profile === "project", 409, "PERMISSION_AGENT_UPDATE_REQUIRED", "Update the host connection service before executing with expanded permissions");
         if (permissions.supported) {
@@ -903,7 +920,7 @@ export class CoordinationService {
   private commandSession(principal: Principal, logicalSessionId: string): SessionCommandRow {
     const row = this.db.get<SessionCommandRow>(
       `SELECT s.*,m.security_state,m.identity_state,m.compatibility,m.agent_version,m.command_types_json,m.runtime_read_only,m.paginated_history,m.reachability AS machine_reachability,
-        p.lease_version AS project_lease_version,p.sync_content,p.retention_days,
+        p.provider,p.lease_version AS project_lease_version,p.sync_content,p.retention_days,
         e.execution_segment_id,e.native_thread_id,e.history_mode
        FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id
        JOIN projects p ON p.project_id=s.project_id
@@ -1181,7 +1198,7 @@ export class CoordinationService {
     return this.db.transaction(() => {
       const session = this.db.get<SessionCommandRow>(
         `SELECT s.*,m.security_state,m.identity_state,m.compatibility,m.agent_version,m.runtime_read_only,m.reachability AS machine_reachability,
-          p.lease_version AS project_lease_version,p.sync_content,p.retention_days,
+          p.provider,p.lease_version AS project_lease_version,p.sync_content,p.retention_days,
           e.execution_segment_id,e.native_thread_id,e.history_mode
          FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id
          JOIN projects p ON p.project_id=s.project_id

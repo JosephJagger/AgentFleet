@@ -149,7 +149,7 @@ export interface ThreadHistoryItem {
   item: Record<string, unknown> | null;
 }
 
-export interface ThreadHistoryPage { items: ThreadHistoryItem[]; nextCursor: string | null; }
+export interface ThreadHistoryPage { items: ThreadHistoryItem[]; nextCursor: string | null; order?: Array<{itemId:string;index:number;occurredAt?:string}>; }
 
 export interface ThreadHistorySnapshot {
   rolloutPath?: string;
@@ -168,6 +168,7 @@ export interface ThreadResumeResult extends ThreadStartResult {
 
 /** The small, allow-listed App Server surface used by the runtime. */
 export interface AppServerClient {
+  getAgentRuntimes?(): Record<string, unknown>;
   refreshQuota?(): Promise<void>;
   refreshCodexCatalog?(): Promise<void>;
   getQuotaSnapshot?(): Record<string, unknown> | undefined;
@@ -441,7 +442,7 @@ export class CodexAppServer implements AppServerClient {
     const child = spawn(
       codexExecutable,
       appServerLaunchArgs(),
-      { stdio: ["pipe", "pipe", "pipe"], shell: false, env: childEnvironment },
+      { stdio: ["pipe", "pipe", "pipe"], shell: false, env: childEnvironment, windowsHide: true },
     );
     this.child = child;
     child.stdout.setEncoding("utf8");

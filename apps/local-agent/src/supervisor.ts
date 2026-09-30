@@ -176,7 +176,7 @@ async function superviseOwnedAgent(dataDir: string, signal: AbortSignal): Promis
     const environment = { ...process.env, AGENTFLEET_SUPERVISED: "1", AGENTFLEET_SUPERVISOR_TOKEN: token,
       AGENTFLEET_WORKER_EXECUTABLE: launcher, AGENTFLEET_WORKER_DATA_DIR: dataDir };
     const child = process.platform === "win32"
-      ? spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "& $env:AGENTFLEET_WORKER_EXECUTABLE run --data-dir $env:AGENTFLEET_WORKER_DATA_DIR; exit $LASTEXITCODE"], { env: environment, stdio: "inherit", windowsHide: true })
+      ? spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "& $env:AGENTFLEET_WORKER_EXECUTABLE run --data-dir $env:AGENTFLEET_WORKER_DATA_DIR; exit $LASTEXITCODE"], { env: environment, stdio: "inherit", windowsHide: true })
       : spawn(launcher, ["run", "--data-dir", dataDir], { env: environment, stdio: "inherit", detached: true });
     let healthy = false;
     let timedOut = false;

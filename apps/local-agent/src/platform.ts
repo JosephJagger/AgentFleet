@@ -109,6 +109,7 @@ async function detectCodexSchemaHash(codexExecutable: string): Promise<string | 
       timeout: 15_000,
       maxBuffer: 64 * 1_024,
       encoding: "utf8",
+      windowsHide: true,
     });
     const contents = await readFile(join(directory, "codex_app_server_protocol.v2.schemas.json"));
     return createHash("sha256").update(contents).digest("hex");
@@ -153,6 +154,7 @@ export async function detectSupport(
       timeout: 5_000,
       maxBuffer: 16_384,
       encoding: "utf8",
+      windowsHide: true,
     });
     const match = /^codex-cli\s+([^\s]+)\s*$/m.exec(stdout);
     codexVersion = match?.[1] ?? null;

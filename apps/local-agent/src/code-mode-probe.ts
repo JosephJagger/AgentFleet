@@ -11,7 +11,7 @@ export async function probeCodeModeHost(executable: string): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "agentfleet-code-mode-check-"));
   const env: NodeJS.ProcessEnv = { HOME: directory, CODEX_HOME: directory, PATH: process.env.PATH,
     ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot, USERPROFILE: directory, TEMP: directory, TMP: directory } : {}) };
-  const child = spawn(executable, ["--listen", "stdio"], { env, cwd: directory, stdio: ["pipe", "pipe", "ignore"], shell: false });
+  const child = spawn(executable, ["--listen", "stdio"], { env, cwd: directory, stdio: ["pipe", "pipe", "ignore"], shell: false, windowsHide: true });
   let buffer: Buffer = Buffer.alloc(0);
   let timer: NodeJS.Timeout | undefined;
   const send = (value: unknown) => { const data = Buffer.from(JSON.stringify(value)); const header = Buffer.alloc(4); header.writeUInt32LE(data.length); child.stdin.write(Buffer.concat([header, data])); };

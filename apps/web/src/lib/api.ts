@@ -109,6 +109,7 @@ function mapProject(rawValue: unknown): Project {
   const raw = record(rawValue);
   return {
     id: string(raw.projectId),
+    provider: raw.provider === "claude" ? "claude" : "codex",
     machineId: string(raw.machineId),
     alias: string(raw.alias, t("未命名项目")),
     pathHint: string(raw.canonicalRoot, string(raw.repoRoot, t("路径未上报"))),
@@ -151,6 +152,7 @@ function mapMachine(rawValue: unknown, projects: Project[]): Machine {
   return {
     id: string(raw.machineId),
     discovery: mapDiscovery(raw.discovery),
+    agentRuntimes: record(record(raw.discovery).agentRuntimes) as Machine["agentRuntimes"],
     maintenanceCapabilities: list(raw.maintenanceCapabilities).filter((item): item is string => typeof item === "string"),
     codexProfile: Object.keys(record(raw.codexProfile)).length ? record(raw.codexProfile) : undefined,
     codexCatalog: raw.codexCatalog as Machine["codexCatalog"],
@@ -265,6 +267,9 @@ function mapSession(
     weeklyBoundaryIncomplete: raw.weeklyBoundaryIncomplete === true,
     recordedTokens: typeof raw.recordedTokens === "number" && Number.isSafeInteger(raw.recordedTokens) && raw.recordedTokens >= 0 ? raw.recordedTokens : null,
     id: string(raw.logicalSessionId),
+    provider: raw.provider === "claude" ? "claude" : "codex",
+    claudePermissionModes: Array.isArray(raw.claudePermissionModes) ? raw.claudePermissionModes as string[] : [],
+    claudeModels: Array.isArray(raw.claudeModels) ? raw.claudeModels as FleetSession["claudeModels"] : [],
     runtimeSettings: raw.runtimeSettings as FleetSession["runtimeSettings"],
     title: string(raw.title, t("未命名会话")),
     machineId,
@@ -421,6 +426,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     occurredAt: string(raw.occurredAt, new Date().toISOString()),
     actor,
     title: eventTitle(type, item),
+    ...(type === "thread.history.order" ? {historyOrder:list(payload.items).map(record).filter(x=>typeof x.itemId === "string" && Number.isSafeInteger(x.index)).map(x=>({itemId:String(x.itemId),index:Number(x.index),...(typeof x.occurredAt === "string" ? {occurredAt:x.occurredAt} : {})}))} : {}),
     images: list(item.content).map(record).filter(entry => entry.type === "image" && isInlineImage(entry.url)).slice(0, 4).map(entry => entry.url as string),
     body: eventBody(item, payload),
     payloadState: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? raw.payloadState : "present",
@@ -635,7 +641,7 @@ export const api = {
   cancelSessionReference: (id: string) => request<{cancelled:boolean}>(`/api/session-references/${encodeURIComponent(id)}`, { method: "DELETE" }),
   writingNLP: (id: string, draft: string, signal: AbortSignal) => request<{suggestions:NLPSuggestion[]}>(`/api/sessions/${encodeURIComponent(id)}/writing-nlp`, {method:"POST",body:JSON.stringify({draft}),signal}),
   refreshQuota: (id:string) => request<{requested:boolean}>(`/api/machines/${encodeURIComponent(id)}/usage/refresh`,{method:"POST",body:"{}"}),
-  usage: (scope: "session" | "project" | "machine", id: string, signal?: AbortSignal) => request<UsageSummary>(`/api/${scope === "session" ? "sessions" : scope === "project" ? "projects" : "machines"}/${encodeURIComponent(id)}/usage`, { signal }),
+  usage: (scope: "session" | "project" | "machine", id: string, signal?: AbortSignal, provider: "codex" | "claude" = "codex") => request<UsageSummary>(`/api/${scope === "session" ? "sessions" : scope === "project" ? "projects" : "machines"}/${encodeURIComponent(id)}/usage?provider=${provider}`, { signal }),
   imageSessions: (id: string, cursor = "", signal?: AbortSignal) => request<{sessions: import("./types").ImageSessionUsage[]; nextCursor: string | null}>(`/api/machines/${encodeURIComponent(id)}/images/sessions?cursor=${encodeURIComponent(cursor)}`, { signal }),
   async imageOperation(machineId: string, logicalSessionId: string, previewOperationId?: string): Promise<HostOperation> {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { method: "POST", body: JSON.stringify({type: previewOperationId ? "images.clean" : "images.preview", logicalSessionId, previewOperationId, clientMutationId: crypto.randomUUID()}) });
@@ -654,6 +660,8 @@ export const api = {
   codexPreferences: (id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(`/api/sessions/${encodeURIComponent(id)}/codex-settings`, { signal }),
   machineCodexPreferences: (id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(`/api/machines/${encodeURIComponent(id)}/codex-settings`, { signal }),
   saveMachineCodexPreferences: (id: string, input: { settings: import("./codex-settings").CodexSettings | null; revision: number }) => request<import("./codex-settings").CodexPreferences>(`/api/machines/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
+  claudePreferences: (id:string,signal?:AbortSignal)=>request<import("./claude-preferences").ClaudePreferences>(`/api/sessions/${encodeURIComponent(id)}/claude-settings`,{signal}),
+  saveClaudePreferences: (id:string,input:{settings:import("./claude-preferences").ClaudeSettings;revision:number})=>request<import("./claude-preferences").ClaudePreferences>(`/api/sessions/${encodeURIComponent(id)}/claude-settings`,{method:"PUT",body:JSON.stringify(input)}),
   saveCodexPreferences: (id: string, input: { scope: string; settings: import("./codex-settings").CodexSettings | null; revision: number }) => request<import("./codex-settings").CodexPreferences>(`/api/sessions/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
   requestLoginCode: (email: string, locale: "zh" | "en") => request<{ challengeId: string; expiresIn: number; resendAfter: number }>(
     "/api/auth/request-code", { method: "POST", body: JSON.stringify({ email, locale }) }),
@@ -685,13 +693,13 @@ export const api = {
     const raw = await request<JsonObject>("/api/release");
     return { build: string(raw.controlPlaneBuild, t("未上报")), schema: integer(raw.dbSchemaVersion), agentVersion: string(raw.agentVersion, t("未发布")), manifestStatus: string(record(raw.agentManifest).status, "unavailable") };
   },
-  async projects(options: { machineId?: string; cursor?: string | null; q?: string; limit?: number; offset?: number }, signal?: AbortSignal): Promise<Page<Project>> {
+  async projects(options: { provider?: "codex" | "claude"; machineId?: string; cursor?: string | null; q?: string; limit?: number; offset?: number }, signal?: AbortSignal): Promise<Page<Project>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 8) });
     for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
     const raw = await request<JsonObject>(`/api/projects?${query}`, { signal });
     return { items: list(raw.items ?? raw.projects).map(mapProject), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null, total: integer(raw.total) };
   },
-  async sessions(options: { machineId?: string; projectId?: string; cursor?: string | null; q?: string; executionState?: string; managed?: boolean; limit?: number }, signal?: AbortSignal): Promise<Page<FleetSession>> {
+  async sessions(options: { provider?: "codex" | "claude"; machineId?: string; projectId?: string; cursor?: string | null; q?: string; executionState?: string; managed?: boolean; limit?: number }, signal?: AbortSignal): Promise<Page<FleetSession>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 30) });
     for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
     const raw = await request<JsonObject>(`/api/sessions?${query}`, { signal });
@@ -825,10 +833,10 @@ export const api = {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { method: "POST", body: JSON.stringify({ type, clientMutationId, ...(logicalSessionId ? {logicalSessionId} : {}) }) });
     return mapHostOperation(raw.operation);
   },
-  async createProject(machineId: string, path: string, alias: string, createDirectory: boolean): Promise<HostOperation> {
+  async createProject(machineId: string, path: string, alias: string, createDirectory: boolean, provider: "codex" | "claude" = "codex"): Promise<HostOperation> {
     const raw = await request<JsonObject>("/api/projects", {
       method: "POST",
-      body: JSON.stringify({ machineId, path, alias, createDirectory, clientMutationId: crypto.randomUUID() }),
+      body: JSON.stringify({ machineId, path, alias, createDirectory, provider, clientMutationId: crypto.randomUUID() }),
     });
     return mapHostOperation(raw.operation);
   },

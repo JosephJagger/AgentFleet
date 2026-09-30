@@ -29,7 +29,7 @@ import {
   stageWindowsBackgroundService,
 } from "./service.js";
 import { StateStore } from "./store.js";
-import { AgentAutoUpdater, scheduleWindowsUpdateRestart } from "./updater.js";
+import { AgentAutoUpdater, clearCompletedAgentUpdateDrain, scheduleWindowsUpdateRestart } from "./updater.js";
 import { configureRuntimeProfile } from "./runtime-profile.js";
 import { repairManagedCodeMode } from "./managed-code-mode.js";
 import { superviseAgent, writeWorkerHealth, readUpdateTransaction, workerStopExitCode } from "./supervisor.js";
@@ -286,6 +286,7 @@ async function run(args: ParsedArgs): Promise<void> {
   let stop: (() => void) | undefined;
   let updateStagedVersion: string | undefined;
   try {
+    await clearCompletedAgentUpdateDrain(store, AGENT_VERSION);
     await configureRuntimeProfile(dataDir);
     const pairing = store.snapshot().pairing;
     if (!pairing) throw new AgentError("NOT_PAIRED", "run 'pair' before starting the agent");

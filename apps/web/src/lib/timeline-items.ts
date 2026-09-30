@@ -12,6 +12,8 @@ const subtractUsage = (current: TokenCounts, previous: TokenCounts): TokenCounts
 /** Project native item lifecycle events into one visible item, without changing the event log. */
 export function timelineItems(events: TimelineEvent[]): TimelineEvent[] {
   const result: TimelineEvent[] = [];
+  const historyOrder=new Map<string,{index:number;occurredAt?:string}>();
+  for(const event of events) for(const item of event.historyOrder ?? []) historyOrder.set(JSON.stringify([event.nativeThreadId,item.itemId]),item);
   const positions = new Map<string, number>();
   const usageByTurn = new Map<string, TokenCounts>();
   const cumulativeByScope = new Map<string, TokenCounts>();
@@ -30,8 +32,10 @@ export function timelineItems(events: TimelineEvent[]): TimelineEvent[] {
       usageByTurn.set(key, addUsage(usageByTurn.get(key), increment));
     }
   }
-  for (const event of events) {
-    if (event.type === "thread.usage") continue;
+  for (const original of events) {
+    if (original.type === "thread.usage" || original.type === "thread.history.order") continue;
+    const metadata=historyOrder.get(JSON.stringify([original.nativeThreadId,original.nativeItemId]));
+    const event=metadata?.occurredAt ? {...original,occurredAt:metadata.occurredAt} : original;
     const scope = event.nativeThreadId || event.executionSegmentId;
     if (event.type === "turn.completed") {
       const usage = scope && event.nativeTurnId ? usageByTurn.get(JSON.stringify([scope, event.nativeTurnId])) : undefined;
@@ -46,7 +50,7 @@ export function timelineItems(events: TimelineEvent[]): TimelineEvent[] {
       result.push(event);
       continue;
     }
-    const key = `native-item:${JSON.stringify([scope, event.nativeTurnId, event.nativeItemId])}`;
+    const key = `native-item:${JSON.stringify([scope, scope.startsWith("claude_") ? null : event.nativeTurnId, event.nativeItemId])}`;
     const position = positions.get(key);
     if (position === undefined) {
       positions.set(key, result.length);
@@ -61,5 +65,9 @@ export function timelineItems(events: TimelineEvent[]): TimelineEvent[] {
       : event.sessionSeq >= previous.sessionSeq ? event : previous;
     result[position] = { ...selected, id: key };
   }
+  // Reorder conversation slots using the native chain, leaving operational events in place.
+  const slots=result.map((event,index)=>({event,index})).filter(({event})=>event.nativeThreadId?.startsWith("claude_") && historyOrder.has(JSON.stringify([event.nativeThreadId,event.nativeItemId])));
+  const ordered=slots.map(x=>x.event).sort((a,b)=>historyOrder.get(JSON.stringify([a.nativeThreadId,a.nativeItemId]))!.index-historyOrder.get(JSON.stringify([b.nativeThreadId,b.nativeItemId]))!.index);
+  slots.forEach((slot,index)=>{result[slot.index]=ordered[index]!;});
   return result;
 }

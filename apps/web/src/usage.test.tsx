@@ -159,3 +159,12 @@ it("clicking the forecast card opens the Chinese timeline without changing nativ
  expect(within(timeline).getByRole("link",{name:"查看原帖"}).getAttribute("href")).toBe("https://x.com/thsottiaux/status/42");
  expect(data.accounts[0].windows[0].resetsAt).toBe(resetAt);
 });
+it("Claude shows native subscription limits without Codex credits or reset forecasts",async()=>{
+ vi.mocked(api.usage).mockResolvedValue({...data,provider:"claude",scope:"machine",accounts:[{sourceMachine:"B52H",identityKnown:false,subscriptionType:"pro",observedAt:new Date().toISOString(),stale:false,credits:null,windows:[{bucket:"claude",window:"seven_day",windowMinutes:10080,usedPercent:1,remainingPercent:99,resetsAt:1900000000},{bucket:"claude",window:"five_hour",windowMinutes:300,usedPercent:5,remainingPercent:95,resetsAt:1900000000}]}]});
+ render(<UsageButton scope="machine" id="m1" provider="claude"/>);
+ const card=await screen.findByRole("button",{name:/周额度\s*99%/});
+ expect(within(card).getByText("95%")).toBeTruthy();expect(screen.queryByText("临时重置预测")).toBeNull();
+ fireEvent.click(card);
+ expect(screen.getByText("PRO · 由宿主机 Claude Code 原生查询")).toBeTruthy();
+ expect(screen.queryByText("点数余额")).toBeNull();expect(screen.queryByText(/额度暂未接入/)).toBeNull();
+});

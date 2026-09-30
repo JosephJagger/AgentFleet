@@ -69,9 +69,9 @@ test("shared account quota selects one newest snapshot without summing percentag
  service.quota("a",{...snapshot,accountKey:"unknown",observedAt:"2000-01-01T00:00:00Z"});
  assert.equal(service.read(workspaceId,"machine","a").accounts[0]?.stale,true);
 });
-test("usage routes require authentication and migration creates version 39",async t=>{
+test("usage routes require authentication and migration creates version 41",async t=>{
  const {app,db}=await buildControlPlane(config());t.after(()=>app.close());
- assert.equal(db.get<{user_version:number}>("PRAGMA user_version")?.user_version,39);
+ assert.equal(db.get<{user_version:number}>("PRAGMA user_version")?.user_version,41);
  for(const path of ["sessions","projects","machines"])assert.equal((await app.inject({method:"GET",url:`/api/${path}/missing/usage`})).statusCode,401);
 });
 
@@ -233,4 +233,55 @@ test("quota demand reuses fresh account data, coalesces viewers and backs off wi
  service.quota("b",{...snapshot,observedAt:new Date().toISOString()});
  assert.equal(refresh.request(workspaceId,"machine","a"),false,"newest peer snapshot is reused");
  assert.equal(calls,2);
+});
+
+test("agent providers isolate same-host projects and session pages",t=>{
+ const {db,workspaceId,at}=fixture();t.after(()=>db.close());
+ const principal={workspaceId,userId:"test-user",clientSessionId:"test-client",email:"test@example.test",csrfHash:"test",expiresAt:at};
+ db.run("INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,provider,created_at,last_reported_at) VALUES('p-claude',?,'a','p-claude','Claude project','/work/a','claude-a','claude',?,?)",workspaceId,at,at);
+ db.run("INSERT INTO logical_sessions(logical_session_id,workspace_id,machine_id,project_id,title,managed,execution_state,reachability,created_at,updated_at) VALUES('claude-session',?,'a','p-claude','Claude original',1,'idle','live',?,?)",workspaceId,at,at);
+ db.run("INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,native_thread_id,history_mode,created_at) VALUES('claude-segment','claude-session','a','p-claude','claude_original','paginated',?)",at);
+ const registry=new RegistryService(db,config());
+ assert.deepEqual(registry.listProjectsPage(principal,{machineId:"a",provider:"claude",limit:8}).items.map(p=>p.projectId),['p-claude']);
+ assert.deepEqual(registry.listProjectsPage(principal,{machineId:"a",provider:"codex",limit:8}).items.map(p=>p.projectId),['p-a']);
+ assert.deepEqual(registry.listSessionsPage(principal,{machineId:"a",provider:"claude",limit:30}).items.map(s=>s.logicalSessionId),['claude-session']);
+ assert.equal(registry.getSession(principal,'claude-session').provider,'claude');
+ assert.equal(registry.getSession(principal,'claude-session').imageInputSupported,true);
+ assert.deepEqual(registry.getSession(principal,'claude-session').plugins,[]);
+});
+test("Claude usage never uses Codex account limits or mixes provider totals", t=>{
+ const {db,workspaceId,service,at}=fixture();t.after(()=>db.close());
+ db.run("UPDATE projects SET provider='claude' WHERE project_id='p-a'");
+ service.record(event("a1",100,2));service.record(event("b1",100,7));
+ service.quota("a",{observedAt:at,windows:[{bucket:"codex",window:"secondary",windowMinutes:10080,usedPercent:40,resetsAt:Math.floor(Date.now()/1000)+3600}]});
+ const project=service.read(workspaceId,"project","p-a");assert.equal(project.provider,"claude");assert.deepEqual(project.accounts,[]);assert.equal(project.quotaCycle,null);assert.equal(project.recorded?.totalTokens,20);
+ const claude=service.read(workspaceId,"machine","a","claude");assert.equal(claude.recorded?.totalTokens,20);assert.deepEqual(claude.accounts,[]);
+ assert.equal(service.read(workspaceId,"machine","a").recorded,null);
+ assert.equal(service.read(workspaceId,"machine","b").recorded?.totalTokens,70);
+});
+test("native Claude quota persists in discovery, is isolated from Codex and defines Claude's weekly cycle",t=>{
+ const {db,workspaceId,service,at}=fixture();t.after(()=>db.close());
+ db.run("UPDATE projects SET provider='claude' WHERE project_id='p-a'");service.record(event("a1",100,2));
+ service.quota("a",{observedAt:at,windows:[{bucket:"codex",window:"secondary",windowMinutes:10080,usedPercent:40,resetsAt:Math.floor(Date.now()/1000)+3600}]});
+ const registry=new RegistryService(db,config());
+ const resetsAt=Math.floor(Date.now()/1000)+86400;
+ registry.updateDiscovery("a",{state:"ready",agentRuntimes:{claude:{installed:true,version:"2.1.285",accessToken:"do-not-store",models:[{model:"claude-opus-5-5",displayName:"Opus 5.5",efforts:["high"]}],quota:{available:true,subscriptionType:"pro",observedAt:at,windows:[{bucket:"claude",window:"seven_day",windowMinutes:10080,usedPercent:1,remainingPercent:999,resetsAt},{bucket:"claude",window:"five_hour",windowMinutes:300,usedPercent:5,resetsAt}]}}}});
+ const value=service.read(workspaceId,"project","p-a");
+ assert.equal(value.accounts.length,1);assert.equal(value.accounts[0]?.windows[0].remainingPercent,99);assert.equal(value.accounts[0]?.credits,null);assert.equal(value.quotaCycle?.recordedTokens,20);
+ assert.equal(service.read(workspaceId,"machine","a").accounts[0]?.windows[0].remainingPercent,60);
+ assert.equal(db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='a'")!.discovery_json.includes("do-not-store"),false);
+ registry.updateDiscovery("a",{state:"ready",agentRuntimes:{claude:{installed:true,quota:{available:false,observedAt:at,windows:[]}}}});
+ assert.deepEqual(service.read(workspaceId,"project","p-a").accounts,[]);
+});
+test("Claude permission modes are allowlisted host capabilities and settings",async t=>{
+ const {parseClaudeSettings}=await import("../src/claude-settings.js");
+ const {db,workspaceId,at}=fixture();t.after(()=>db.close());
+ db.run("UPDATE machines SET agent_version='0.30.59' WHERE machine_id='a'");db.run("UPDATE projects SET provider='claude' WHERE project_id='p-a'");
+ const registry=new RegistryService(db,config());
+ registry.updateDiscovery("a",{state:"ready",agentRuntimes:{claude:{installed:true,permissionModes:["default","auto","acceptEdits","bypassPermissions","dontAsk"],models:[{model:"claude-opus-5-5",displayName:"Opus 5.5",efforts:["high"],supportsAutoMode:true}]}}});
+ const principal={workspaceId,userId:"test-user",clientSessionId:"test-client",email:"test@example.test",csrfHash:"test",expiresAt:at};
+ db.run("INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,native_thread_id,history_mode,created_at) VALUES('claude-permission-segment','a1','a','p-a','claude_original','paginated',?)",at);
+ const summary=registry.getSession(principal,"a1");assert.deepEqual(summary.claudePermissionModes,["default","auto","acceptEdits","dontAsk"]);assert.equal(summary.claudeModels?.[0]?.supportsAutoMode,true);
+ assert.equal(parseClaudeSettings({model:"host",permissionMode:"auto"})?.permissionMode,"auto");assert.throws(()=>parseClaudeSettings({model:"host",permissionMode:"bypassPermissions"}));
+ db.run("UPDATE machines SET agent_version='0.30.58' WHERE machine_id='a'");assert.deepEqual(registry.getSession(principal,"a1").claudePermissionModes,[]);
 });

@@ -84,7 +84,7 @@ export function parseWindowsSystemProxy(output: string): Partial<NodeJS.ProcessE
 export async function codexNetworkEnvironment(
   environment: NodeJS.ProcessEnv,
   platform: NodeJS.Platform = process.platform,
-  runner: ProxyCommandRunner = async (file, args) => execFileAsync(file, args, { encoding: "utf8", timeout: 2_000, maxBuffer: 32_768 }),
+  runner: ProxyCommandRunner = async (file, args) => execFileAsync(file, args, { encoding: "utf8", timeout: 2_000, maxBuffer: 32_768, windowsHide: true }),
 ): Promise<NodeJS.ProcessEnv> {
   const result = { ...environment };
   if (PROXY_KEYS.some((key) => result[key])) return result;
@@ -93,7 +93,7 @@ export async function codexNetworkEnvironment(
       ? parseMacSystemProxy((await runner("/usr/sbin/scutil", ["--proxy"])).stdout)
       : platform === "win32"
         ? parseWindowsSystemProxy((await runner("powershell.exe", [
-          "-NoProfile", "-NonInteractive", "-Command",
+          "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
           "$p=Get-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings';[pscustomobject]@{proxyEnable=$p.ProxyEnable;proxyServer=$p.ProxyServer}|ConvertTo-Json -Compress",
         ])).stdout)
         : {};

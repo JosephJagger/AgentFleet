@@ -1,3 +1,4 @@
+import { agentName } from "../lib/agent-provider";
 import { t, localized } from "../i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -92,7 +93,7 @@ export function FleetStatus({ machines, sessions, connected, onSession, onMachin
             </button>;
           }) : visible.map(session => <button className="activity-item" type="button" key={session.id} onClick={() => { close(); onSession(session.id); }}>
             <span className={`activity-item__icon${session.state.currentTurn === "in_progress" && session.state.reachability === "live" ? " activity-item__icon--running" : ""}`}><Activity size={20} /></span>
-            <span className="activity-item__copy"><strong>{session.title}</strong><small>{session.machineName} · {session.projectAlias}</small><em>{sessionActivity(session, machines)}</em></span><ArrowUpRight size={17} aria-hidden="true" />
+            <span className="activity-item__copy"><strong>{session.title}</strong><small>{session.machineName} · {agentName(session.provider)} · {session.projectAlias}</small><em>{sessionActivity(session, machines)}</em></span><ArrowUpRight size={17} aria-hidden="true" />
           </button>)}
           {counts[selected.id] === 0 && <div className="activity-empty"><selected.icon size={30} /><h3>{category === "hosts" ? t("暂无在线主机") : category === "running" ? t("暂无运行中的会话") : t("暂无已接管的会话")}</h3><p>{category === "hosts" ? t("主机连接后会显示在这里。") : category === "running" ? t("开始任务后，可从这里快速回到会话。") : t("在会话中点击接管，即可在这里集中访问。")}</p></div>}
         </div>

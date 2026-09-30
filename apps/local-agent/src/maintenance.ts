@@ -115,7 +115,7 @@ export class AgentMaintenance {
         if (!target || typeof target.path !== "string" || typeof target.alias !== "string" || typeof target.createDirectory !== "boolean") {
           throw new AgentError("PROJECT_TARGET_INVALID", "project path, alias, and directory option are required");
         }
-        const project = await this.options.runtime.addProject(target.path, target.alias, target.createDirectory);
+        const project = await this.options.runtime.addProject(target.path, target.alias, target.createDirectory, target.provider === "claude" ? "claude" : "codex");
         result = { projectExternalId: project.id, alias: project.alias, canonicalRoot: project.root };
       } else if (operationType === "images.preview" || operationType === "images.clean") {
         if (!operation.recoveryTarget) throw new AgentError("IMAGE_SCOPE_INVALID", "缺少会话清理目标");

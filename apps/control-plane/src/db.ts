@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 39) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 41) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1264,6 +1264,18 @@ export class ControlPlaneDatabase {
       ) STRICT;
       CREATE INDEX IF NOT EXISTS scheduled_notifications_unread ON scheduled_notifications(user_id,read_at,created_at);
       PRAGMA user_version=39`);
+    });
+    if (version < 40) this.transaction(() => {
+      if (!this.all<{name:string}>("PRAGMA table_info(projects)").some(column => column.name === "provider")) this.sqlite.exec("ALTER TABLE projects ADD COLUMN provider TEXT NOT NULL DEFAULT 'codex' CHECK(provider IN ('codex','claude'))");
+      this.sqlite.exec("PRAGMA user_version=40");
+    });
+    if (version < 41) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS claude_preferences (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        logical_session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id) ON DELETE CASCADE,
+        settings_json TEXT NOT NULL, revision INTEGER NOT NULL, updated_at TEXT NOT NULL,
+        PRIMARY KEY(workspace_id,logical_session_id)
+      ) STRICT; PRAGMA user_version=41`);
     });
   }
 

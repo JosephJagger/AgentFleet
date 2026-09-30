@@ -110,6 +110,7 @@ export const CODEX_COMPATIBILITY_PROFILE: CodexCompatibilityProfile = {
 };
 
 export interface ProjectSummary {
+  provider?: "codex" | "claude";
   projectId: string;
   machineId: string;
   alias: string;
@@ -136,6 +137,9 @@ export interface ControlLeaseView {
 }
 
 export interface LogicalSessionSummary {
+  claudePermissionModes?:string[];
+  claudeModels?: Array<{model:string;displayName:string;efforts:string[];supportsAutoMode?:boolean}>;
+  provider?: "codex" | "claude";
   recordedTokens?: number | null;
   weeklyTokens?: number | null;
   weeklyBoundaryIncomplete?: boolean;
@@ -240,6 +244,7 @@ export interface DurableAgentEvent {
 }
 
 export interface AgentProjectHello {
+  provider?: "codex" | "claude";
   externalId: string;
   alias: string;
   canonicalRoot: string;
@@ -484,6 +489,7 @@ export const apiSchemas = {
         path: { type: "string", minLength: 1, maxLength: 4096 },
         alias: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
         createDirectory: { type: "boolean" },
+        provider: { type: "string", enum: ["codex", "claude"] },
         clientMutationId: { type: "string", minLength: 8, maxLength: 200 },
       },
     },

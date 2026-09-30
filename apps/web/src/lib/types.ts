@@ -6,6 +6,7 @@ export type MachineCompatibility = "compatible" | "degraded_read_only" | "incomp
 export type MachineCapacity = "unknown" | "idle" | "busy" | "saturated";
 
 export interface Project {
+  provider?: "codex" | "claude";
   id: string;
   machineId: string;
   alias: string;
@@ -49,6 +50,7 @@ export interface ScheduledNotification {
 }
 
 export interface Machine {
+  agentRuntimes?: { claude?: { installed: boolean; version: string | null } };
   codexCatalog?: import("./codex-settings").CodexCatalog | null;
   id: string;
   name: string;
@@ -144,7 +146,12 @@ export interface SessionState {
   unknownFreeze: boolean;
 }
 
+export interface ClaudeModel {model:string;displayName:string;efforts:string[];supportsAutoMode?:boolean;}
+
 export interface FleetSession {
+  claudeModels?: ClaudeModel[];
+  claudePermissionModes?:string[];
+  provider?: "codex" | "claude";
   recordedTokens?: number | null;
   weeklyTokens?: number | null;
   weeklyBoundaryIncomplete?: boolean;
@@ -197,6 +204,7 @@ export interface CommandReceipt {
 }
 
 export interface TimelineEvent {
+  historyOrder?: Array<{itemId:string;index:number;occurredAt?:string}>;
   nativeThreadId?: string;
   nativeTurnId?: string;
   nativeItemId?: string;
