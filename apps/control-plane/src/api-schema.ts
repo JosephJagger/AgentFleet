@@ -23,6 +23,7 @@ export const COMMAND_TYPES = [
   "approval.decide_once",
   "input.respond",
   "codex.inspect",
+  "codex.manage",
   "thread.terminals.stop",
 ] as const;
 export type CommandType = (typeof COMMAND_TYPES)[number];
@@ -186,7 +187,7 @@ export interface ActionAvailability {
   reasonCode: string | null;
   message: string | null;
 }
-export type SessionAction = "deletePreview" | "delete" | "read" | "claim" | "release" | "start" | "queue" | "steer" | "cancel" | "approve" | "rename" | "archive" | "unarchive" | "fork" | "compact" | "review" | "inspect" | "stop";
+export type SessionAction = "deletePreview" | "delete" | "read" | "claim" | "release" | "start" | "queue" | "steer" | "cancel" | "approve" | "rename" | "archive" | "unarchive" | "fork" | "compact" | "review" | "inspect" | "manage" | "stop";
 export type SessionActions = Record<SessionAction, ActionAvailability>;
 
 export interface AgentCapabilities {

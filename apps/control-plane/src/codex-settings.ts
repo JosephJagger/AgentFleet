@@ -59,13 +59,13 @@ export function parseRuntimeSettings(value: unknown): Record<string, unknown> | 
     invariant(["project", "network", "full"].includes(String(permissions.profile)), 400, "INVALID_PERMISSION_PROFILE", "Unknown accepted permission profile");
     result.permissions = { profile: permissions.profile, source: text(permissions.source, 32), acceptedAt: text(permissions.acceptedAt, 64), nativeTurnId: text(permissions.nativeTurnId) };
   }
-  for (const [key, fields] of [["observed", ["model", "provider", "effort", "observedAt"]], ["accepted", ["model", "effort", "mode", "personality", "serviceTier", "acceptedAt", "nativeTurnId"]]] as const) {
+  for (const [key, fields] of [["observed", ["model", "provider", "effort", "observedAt"]], ["accepted", ["model", "effort", "mode", "personality", "serviceTier", "acceptedAt", "nativeTurnId"]], ["active", ["model", "effort", "serviceTier", "summary", "changedAt", "nativeTurnId"]]] as const) {
     if (raw[key] == null) continue;
     const entry = object(raw[key]);
     const clean: Record<string, string | null> = {};
     for (const field of fields) if (entry[field] !== undefined && entry[field] !== null) clean[field] = text(entry[field]);
-    if (key === "accepted" && entry.serviceTier === null) clean.serviceTier = null;
-    if (clean.model) result[key] = clean;
+    if ((key === "accepted" || key === "active") && entry.serviceTier === null) clean.serviceTier = null;
+    if (key === "active" ? clean.nativeTurnId && clean.changedAt : clean.model) result[key] = clean;
   }
   return result;
 }

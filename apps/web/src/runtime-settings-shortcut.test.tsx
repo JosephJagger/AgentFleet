@@ -88,3 +88,13 @@ it("shows a removable goal beside runtime settings",()=>{
  render(<RuntimeSettingsShortcut sessionId="s" summary={{sessionId:"s",settings:{model:"example-model"},changed:false,loaded:true}} running={false} goal="完成发布" onClearGoal={clear} onOpen={()=>{}}/>);
  expect(screen.getByText("目标：完成发布")).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:"关闭目标"}));expect(clear).toHaveBeenCalledOnce();
 });
+
+it("运行中设置仅覆盖当前任务，下一轮和计划模式保持原设置，旧轮次覆盖无效",()=>{
+ const observed={accepted:{nativeTurnId:"turn",acceptedAt:"2026-09-30T00:00:00Z",model:"original",effort:"medium",mode:"plan" as const},active:{nativeTurnId:"turn",changedAt:"2026-09-30T00:01:00Z",model:"updated",effort:"high"}};
+ const summary={sessionId:"s",source:"session" as const,changed:false,loaded:true,settings:{model:"original",effort:"medium",mode:"plan" as const}};
+ const view=render(<RuntimeSettingsShortcut sessionId="s" activeTurnId="turn" running observed={observed} summary={summary} onOpen={()=>{}}/>);
+ expect(screen.getByText("updated · high · 计划模式")).toBeTruthy();
+ expect(screen.getByText(/会话覆盖 · original · medium/)).toBeTruthy();
+ view.rerender(<RuntimeSettingsShortcut sessionId="s" activeTurnId="turn" running observed={{...observed,active:{...observed.active,nativeTurnId:"old"}}} summary={summary} onOpen={()=>{}}/>);
+ expect(screen.queryByText(/updated/)).toBeNull();
+});

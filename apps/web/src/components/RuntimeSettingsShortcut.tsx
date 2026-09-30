@@ -13,7 +13,9 @@ export function RuntimeSettingsShortcut({sessionId,summary,observed,running,acti
   const text=current?.loaded?`${source} · ${model??t("模型未上报")} · ${effort??t("继承强度")}`:current?.failed?t("模型配置暂不可用"):t("读取模型配置…");
   const title=`${detail} · ${t("点击配置下次发送的模型与推理强度")} · ${t("首次发送即采用所选配置；正在执行的任务及其补充指令不会切换模型。")}${!current?.settings&&native?` · ${t("模型信息来自最近一次主机记录")}`:""}`;
   // Only a receipt bound to this exact native turn can describe the running task.
-  const accepted=activeTurnId && observed?.accepted?.nativeTurnId===activeTurnId?observed.accepted:undefined;
+  const receipt=activeTurnId && observed?.accepted?.nativeTurnId===activeTurnId?observed.accepted:undefined;
+  const active=activeTurnId && observed?.active?.nativeTurnId===activeTurnId?observed.active:undefined;
+  const accepted=receipt ? { ...receipt, ...active } : active?.model ? { ...active, model: active.model, mode: undefined } : undefined;
   // Missing mode in an accepted receipt is uncertainty, not evidence that the
   // saved settings differ. Keep the second line for a known Plan/default change.
   const same=Boolean(current?.loaded && accepted && model===accepted.model && effort===accepted.effort

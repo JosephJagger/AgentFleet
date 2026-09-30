@@ -46,6 +46,13 @@ export function timelineItems(events: TimelineEvent[]): TimelineEvent[] {
       });
       continue;
     }
+    if (["codex.mcp_progress", "codex.hook_status"].includes(event.type) && scope && event.nativeItemId) {
+      const key = `codex-activity:${JSON.stringify([scope, event.nativeTurnId, event.nativeItemId, event.type])}`;
+      const position = positions.get(key);
+      if (position === undefined) { positions.set(key, result.length); result.push({ ...event, id: key }); }
+      else { const previous = result[position]!; result[position] = { ...(previous.payloadState === "deleted" || previous.sessionSeq > event.sessionSeq ? previous : event), id: key }; }
+      continue;
+    }
     if (!["item.started", "item.completed"].includes(event.type) || !scope || !event.nativeTurnId || !event.nativeItemId) {
       result.push(event);
       continue;

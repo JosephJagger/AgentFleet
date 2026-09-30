@@ -678,7 +678,7 @@ describe("会话工作区", () => {
     render(<App />);
     await screen.findByText("选择一个会话");
     expect(api.session).not.toHaveBeenCalled();
-    expect((await screen.findByRole("button", { name: /项目1 \/srv/ })).getAttribute("aria-expanded")).toBe("false");
+    expect((await screen.findByRole("button", { name: /项目1.*\/srv/ })).getAttribute("aria-expanded")).toBe("false");
   });
   it("深链定位会话所属主机", async () => {
     history.replaceState(null, "", "/sessions/B");

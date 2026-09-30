@@ -933,3 +933,12 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
   .completion-floating .prompt-completions { max-height: var(--completion-height, 206px); }
   .completion-floating .prompt-completions-shell { border-radius: 12px; }
 }
+
+/* Codex management uses the same theme surfaces as the existing session settings. */
+.codex-operations-panel .stack-form { min-width: 0; }
+.codex-operations-panel dl { margin: 12px 0; max-height: 360px; overflow-y: auto; overscroll-behavior: contain; }
+.codex-operations-panel dl > div { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.codex-operations-panel dt { font-weight: 600; overflow-wrap: anywhere; }
+.codex-operations-panel dt small { display: block; font-weight: 400; opacity: .7; }
+.codex-operations-panel dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.codex-operations-panel input, .codex-operations-panel select { min-width: 0; max-width: 100%; }

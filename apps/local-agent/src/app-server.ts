@@ -1,3 +1,9 @@
+import { executeCodexWorkspaceOperation } from "./codex-workspace-operations.js";
+import { codexNotification } from "./codex-notifications.js";
+import { elicitationForm, elicitationContent, type ElicitationField } from "./mcp-elicitation.js";
+import { executeCodexOperation } from "./codex-operation-executor.js";
+import { parseCodexOperation, parseForkRange, type CodexOperationResult } from "./codex-operations.js";
+import { REFERENCE_TOOL, queryReference } from "./reference-tool.js";
 import { quotaSnapshot, tokenUsage } from "./usage.js";
 import { previewNativeDeletion, type DeletionPreview } from "./native-deletion.js";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
@@ -55,8 +61,10 @@ const APP_SERVER_METHODS = new Set([
   "review/start",
   "account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "plugin/read", "plugin/skill/read", "thread/goal/set",
   "permissionProfile/list", "experimentalFeature/list", "thread/goal/get", "thread/backgroundTerminals/list", "thread/backgroundTerminals/clean",
+  "fuzzyFileSearch", "fs/readDirectory", "command/exec", "mcpServer/resource/read", "mcpServer/tool/call", "account/workspaceMessages/read", "windowsSandbox/readiness", "app/read", "app/installed", "server/diagnostics", "threadSection/list", "threadSection/create", "threadSection/update", "threadSection/delete", "thread/section/move", "thread/attachment/add", "thread/attachment/remove", "thread/queue/update", "thread/queue/delete", "thread/queue/reorder",
   "turn/steer",
   "turn/interrupt",
+  "account/login/start", "account/login/cancel", "account/logout", "account/usage/read", "modelProvider/capabilities/read", "configRequirements/read", "config/value/write", "thread/attachment/list", "memory/status", "thread/memoryMode/set", "memory/reset", "plugin/reconcile", "marketplace/add", "marketplace/remove", "marketplace/upgrade", "thread/searchOccurrences", "thread/timeline/list", "thread/queue/list", "turn/settings/update", "account/rateLimitResetCredit/consume", "thread/goal/clear", "plugin/install", "plugin/uninstall", "mcpServer/oauth/login", "config/mcpServer/reload", "skills/config/write",
 ]);
 const APPROVAL_METHODS = new Set([
   "item/permissions/requestApproval",
@@ -65,6 +73,7 @@ const APPROVAL_METHODS = new Set([
   "execCommandApproval",
   "applyPatchApproval",
   "item/tool/requestUserInput",
+  "mcpServer/elicitation/request",
 ]);
 
 type JsonId = string | number;
@@ -168,6 +177,7 @@ export interface ThreadResumeResult extends ThreadStartResult {
 
 /** The small, allow-listed App Server surface used by the runtime. */
 export interface AppServerClient {
+  manageCodex?(thread: ManagedThread, request: unknown, mutationId: string): Promise<CodexOperationResult>;
   getAgentRuntimes?(): Record<string, unknown>;
   refreshQuota?(): Promise<void>;
   refreshCodexCatalog?(): Promise<void>;
@@ -177,7 +187,7 @@ export interface AppServerClient {
   getCodexCatalog?(): CodexCatalog;
   readPluginSkill?(reference: { name: string; path: string }): Promise<string>;
   inspectEnvironment?(cwd: string, threadId?: string): Promise<CodexInspection>;
-  threadAction?(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string): Promise<Record<string, unknown>>;
+  threadAction?(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string, range?: { beforeTurnId?: string; lastTurnId?: string }): Promise<Record<string, unknown>>;
   startNativeTurn?(thread: ManagedThread, action: "compact" | "review", target?: Record<string, unknown>): Promise<TurnStartResult>;
   readonly appServerEpoch: string;
   start(): Promise<void>;
@@ -188,7 +198,7 @@ export interface AppServerClient {
   readThread(threadId: string, metadataOnly?: boolean): Promise<ThreadHistorySnapshot>;
   readHistoryPage?(threadId: string, cursor: string | null): Promise<ThreadHistoryPage>;
   readTurnOutcome?(threadId: string, turnId: string): Promise<{ cwd: string; status: string } | null>;
-  resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile?: PermissionProfile): Promise<ThreadResumeResult>;
+  resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile?: PermissionProfile, metadataOnly?: boolean): Promise<ThreadResumeResult>;
   unsubscribeThread(threadId: string): Promise<void>;
   releaseWriter?(): Promise<void>;
   startTurn(
@@ -575,6 +585,7 @@ export class CodexAppServer implements AppServerClient {
         serviceName: "agentfleet",
         ephemeral: false,
         threadSource: "agentfleet",
+        dynamicTools: [REFERENCE_TOOL],
       }),
       "thread/start",
     );
@@ -635,7 +646,7 @@ export class CodexAppServer implements AppServerClient {
     await this.request("thread/delete",{threadId:thread.nativeThreadId});
   }
 
-  async threadAction(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string): Promise<Record<string, unknown>> {
+  async threadAction(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string, range?: { beforeTurnId?: string; lastTurnId?: string }): Promise<Record<string, unknown>> {
     this.assertInitialized();
     const metadata = resultObject(await this.request("thread/read", { threadId: thread.nativeThreadId, includeTurns: false }), "thread/read");
     const before = historySnapshot(metadata.thread, "thread/read");
@@ -654,13 +665,15 @@ export class CodexAppServer implements AppServerClient {
       await this.request(action === "archive" ? "thread/archive" : "thread/unarchive", { threadId });
       return { archived: action === "archive" };
     }
-    const raw = resultObject(await this.request("thread/fork", { threadId, cwd, excludeTurns: true, approvalPolicy: "on-request", approvalsReviewer: "user", sandbox: "workspace-write",
+    const raw = resultObject(await this.request("thread/fork", { threadId, cwd, excludeTurns: true, deferGoalContinuation: true, ...parseForkRange(range), approvalPolicy: "on-request", approvalsReviewer: "user", sandbox: "workspace-write",
       config: { approval_policy: "on-request", sandbox_mode: "workspace-write", sandbox_workspace_write: { network_access: false, writable_roots: [project.root], exclude_tmpdir_env_var: true, exclude_slash_tmp: true } } }), "thread/fork");
     const fork = resultObject(raw.thread, "thread/fork thread");
     const nativeThreadId = requireString(fork.id, "fork.id", { maxLength: 256 });
     if (nativeThreadId === threadId || fork.cwd !== cwd) throw new AgentError("APP_SERVER_PROTOCOL", "Fork identity or project does not match");
-    await this.unsubscribeThread(nativeThreadId);
-    return { forkedNativeThreadId: nativeThreadId, sourceNativeThreadId: threadId };
+    let writerReleased = true;
+    try { await this.unsubscribeThread(nativeThreadId); }
+    catch { writerReleased = false; }
+    return { forkedNativeThreadId: nativeThreadId, sourceNativeThreadId: threadId, writerReleased };
   }
 
   async startNativeTurn(thread: ManagedThread, action: "compact" | "review", target?: Record<string, unknown>): Promise<TurnStartResult> {
@@ -683,6 +696,26 @@ export class CodexAppServer implements AppServerClient {
   async inspectEnvironment(cwd: string, threadId?: string): Promise<CodexInspection> {
     this.assertInitialized();
     return inspectCodex((method, params) => this.request(method, params), cwd, threadId);
+  }
+
+  async manageCodex(thread: ManagedThread, value: unknown, mutationId: string): Promise<CodexOperationResult> {
+    this.assertInitialized();
+    const request = parseCodexOperation(value);
+    if (request.operation === "turn.settings" && ["model", "effort", "serviceTier"].some(key => key in request.arguments)) {
+      const modelId = request.arguments.model ?? thread.observedSettings?.model ?? thread.acceptedSettings?.model;
+      const model = this.codexCatalog.models.find(item => item.model === modelId);
+      if (!model || this.codexCatalog.error) throw new AgentError("CODEX_MODEL_UNAVAILABLE", "请刷新宿主机模型列表，选择当前可用模型");
+      if (request.arguments.effort !== undefined && !model.efforts.includes(String(request.arguments.effort))) throw new AgentError("CODEX_EFFORT_UNAVAILABLE", "所选模型不支持此推理强度");
+      if (request.arguments.serviceTier != null && !model.serviceTiers?.some(tier => tier.id === request.arguments.serviceTier)) throw new AgentError("CODEX_SETTINGS_INVALID", "所选模型不支持此服务档位");
+    }
+    if (["files.search", "files.list", "terminal.run"].includes(request.operation)) {
+      const project = this.callbacks.findProject(thread.projectId);
+      if (!project) throw new AgentError("CODEX_TARGET_CHANGED", "Session project is unavailable");
+      return executeCodexWorkspaceOperation(request, thread, project, (method, params) => this.request(method, params));
+    }
+    const result = await executeCodexOperation(value, thread.nativeThreadId, mutationId, (method, params) => this.request(method, params), async () => { await this.refreshQuota(); this.callbacks.onQuotaChanged?.(); }, thread.activeTurnId, thread.sessionCwd ?? this.callbacks.findProject(thread.projectId)?.root);
+    if (["plugin.install", "plugin.uninstall", "skill.toggle", "plugin.reconcile", "marketplace.add", "marketplace.remove", "marketplace.upgrade"].includes(parseCodexOperation(value).operation)) this.callbacks.onCatalogChanged?.(this.appServerEpoch);
+    return result;
   }
 
   async stopBackgroundTerminals(thread: ManagedThread, project: ProjectRecord): Promise<void> {
@@ -795,7 +828,7 @@ export class CodexAppServer implements AppServerClient {
     return {items,nextCursor:typeof raw.nextCursor === "string" ? raw.nextCursor : null};
   }
 
-  async resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile: PermissionProfile = "project"): Promise<ThreadResumeResult> {
+  async resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile: PermissionProfile = "project", metadataOnly = false): Promise<ThreadResumeResult> {
     this.assertInitialized();
     const before = await this.readThread(threadId, true);
     const cwd = await verifySessionCwd(project, sessionCwd ?? before.cwd);
@@ -810,6 +843,7 @@ export class CodexAppServer implements AppServerClient {
         threadId,
         excludeTurns: true,
         cwd,
+        ...(metadataOnly ? { config: { "features.goals": false } } : {}),
         ...threadPermissionParams(project.root, profile),
       }),
       "thread/resume",
@@ -898,6 +932,8 @@ export class CodexAppServer implements AppServerClient {
       throw new AgentError("THREAD_READ_ONLY", "thread policy or app-server ownership cannot be proven");
     }
     const cwd = await verifySessionCwd(project, thread.sessionCwd ?? project.root);
+    this.referenceTurns.delete(thread.nativeThreadId);
+    this.turnReferences.set(thread.nativeThreadId, extras?.referenceFiles ?? []);
     if (extras?.goal) await this.request("thread/goal/set", { threadId: thread.nativeThreadId, objective: extras.goal });
     const result = resultObject(
       await this.request("turn/start", {
@@ -908,6 +944,7 @@ export class CodexAppServer implements AppServerClient {
         threadId: thread.nativeThreadId,
         ...(clientUserMessageId === undefined ? {} : { clientUserMessageId }),
         input: this.imageInputs(prompt, images, settings?.model ?? thread.observedSettings?.model, extras),
+        ...(extras?.outputSchema ? { outputSchema: extras.outputSchema } : {}),
         cwd,
         approvalPolicy: thread.permissionProfile === "full" ? "never" : "on-request",
         approvalsReviewer: "user",
@@ -934,6 +971,7 @@ export class CodexAppServer implements AppServerClient {
     if (thread.activeTurnId !== turnId) {
       throw new AgentError("TURN_PRECONDITION_FAILED", "the expected active turn is no longer current");
     }
+    if (extras?.referenceFiles?.length) this.turnReferences.set(thread.nativeThreadId, extras.referenceFiles);
     if (extras?.goal) await this.request("thread/goal/set", { threadId: thread.nativeThreadId, objective: extras.goal });
     const result = resultObject(
       await this.request("turn/steer", {
@@ -959,7 +997,7 @@ export class CodexAppServer implements AppServerClient {
 
   async respondApproval(approval: ApprovalRecord, decision: "accept" | "decline" | "cancel"): Promise<void> {
     this.assertInitialized();
-    if (approval.method === "item/tool/requestUserInput") throw new AgentError("INPUT_RESPONSE_REQUIRED", "A question requires answers, not permission approval");
+    if (approval.params.kind === "user_input") throw new AgentError("INPUT_RESPONSE_REQUIRED", "A question requires answers, not permission approval");
     if (approval.appServerEpoch !== this.appServerEpoch) {
       throw new AgentError("APPROVAL_EPOCH_STALE", "approval belongs to an exited app-server instance");
     }
@@ -974,11 +1012,11 @@ export class CodexAppServer implements AppServerClient {
 
   async respondInput(request: ApprovalRecord, answers: InputAnswers): Promise<void> {
     this.assertInitialized();
-    if (request.method !== "item/tool/requestUserInput" || request.appServerEpoch !== this.appServerEpoch) {
+    if (request.params.kind !== "user_input" || request.appServerEpoch !== this.appServerEpoch) {
       throw new AgentError("APPROVAL_EPOCH_STALE", "Input request belongs to another app-server or request kind");
     }
     const validated = inputAnswers(answers, inputQuestions(request.params.questions));
-    await this.writeLine({ id: request.nativeRequestId, result: { answers: validated } });
+    await this.writeLine({ id: request.nativeRequestId, result: request.method === "mcpServer/elicitation/request" ? { action: "accept", content: elicitationContent(validated, inputQuestions(request.params.questions), request.params.elicitationFields as Record<string, ElicitationField>) } : { answers: validated } });
     const timer = this.approvalTimers.get(request.approvalId);
     if (timer) clearTimeout(timer);
     this.approvalTimers.delete(request.approvalId);
@@ -989,6 +1027,10 @@ export class CodexAppServer implements AppServerClient {
     if (!this.child || !this.initialized) throw new AgentError("APP_SERVER_UNAVAILABLE", "codex app-server is not initialized");
   }
 
+  private readonly referenceTurns = new Map<string, string>();
+  private readonly activityTimes = new Map<string, number>();
+  private readonly turnReferences = new Map<string, import("./attachments.js").MaterializedAttachment[]>();
+
   private async request(method: string, params: Record<string, unknown> | null): Promise<unknown> {
     if (!APP_SERVER_METHODS.has(method)) throw new AgentError("RPC_FORBIDDEN", `app-server RPC '${method}' is not allowed`);
     const id = this.nextRequestId++;
@@ -996,7 +1038,7 @@ export class CodexAppServer implements AppServerClient {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new AgentError("APP_SERVER_TIMEOUT", `${method} did not respond in time`));
-      }, method === "initialize" ? 15_000 : ["model/list", "collaborationMode/list"].includes(method) ? 5_000 : ["account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "plugin/read", "plugin/skill/read", "permissionProfile/list", "experimentalFeature/list", "thread/goal/get", "thread/backgroundTerminals/list"].includes(method) ? 15_000 : 60_000);
+      }, method === "mcpServer/oauth/login" ? 150_000 : method === "initialize" ? 15_000 : ["model/list", "collaborationMode/list"].includes(method) ? 5_000 : ["account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "plugin/read", "plugin/skill/read", "permissionProfile/list", "experimentalFeature/list", "thread/goal/get", "thread/backgroundTerminals/list"].includes(method) ? 15_000 : 60_000);
       this.pending.set(id, { method, resolve, reject, timer });
     });
     try {
@@ -1039,6 +1081,20 @@ export class CodexAppServer implements AppServerClient {
     const params = isRecord(message.params) ? message.params : {};
     if (message.id !== undefined) {
       const requestId = readId(message.id, "server request id");
+      if (message.method === "currentTime/read") {
+        const thread = typeof params.threadId === "string" ? this.callbacks.findManagedThread(params.threadId) : undefined;
+        if (!thread || thread.nativeThreadId !== params.threadId || thread.appServerEpoch !== this.appServerEpoch || !thread.policyVerified) {
+          await this.writeLine({ id: requestId, error: { code: -32602, message: "Time request is outside the active session binding" } });
+        } else await this.writeLine({ id: requestId, result: { currentTimeAt: Math.floor(Date.now() / 1000) } });
+        return;
+      }
+      if (message.method === "item/tool/call") {
+        const thread = typeof params.threadId === "string" ? this.callbacks.findManagedThread(params.threadId) : undefined;
+        const granted = typeof params.turnId === "string" && thread?.policyVerified && thread.nativeThreadId === params.threadId && thread.appServerEpoch === this.appServerEpoch && params.tool === REFERENCE_TOOL.name && !params.namespace && (params.turnId === thread.activeTurnId || params.turnId === this.referenceTurns.get(thread.nativeThreadId));
+        const result = granted ? await queryReference(this.turnReferences.get(thread.nativeThreadId) ?? [], params.arguments) : { success: false, contentItems: [{ type: "inputText", text: "Tool is unavailable for this thread or turn" }] };
+        await this.writeLine({ id: requestId, result });
+        return;
+      }
       if (!APPROVAL_METHODS.has(message.method)) {
         await this.writeLine({
           id: requestId,
@@ -1066,7 +1122,7 @@ export class CodexAppServer implements AppServerClient {
         pending.reject(new AgentError("THREAD_WRITER_BUSY", "会话正在被本机 Codex 或其他客户端占用，请退出该会话后重试（active writer）"));
         return;
       }
-      pending.reject(new AgentError("APP_SERVER_RPC_ERROR", `${pending.method}: ${detail}`));
+      pending.reject(new AgentError("APP_SERVER_RPC_ERROR", `${pending.method}: ${redact(detail).slice(0, 2000)}`));
       return;
     }
     pending.resolve(message.result);
@@ -1105,11 +1161,11 @@ export class CodexAppServer implements AppServerClient {
     try {
       safeParams = method === "item/tool/requestUserInput"
         ? { kind: "user_input", questions: inputQuestions(params.questions), isBlocking: params.isBlocking === true }
-        : this.sanitizeApprovalParams(method, params);
+        : method === "mcpServer/elicitation/request" ? (() => { const form = elicitationForm(params); return { kind: "user_input", questions: form.questions, elicitationFields: form.fields, isBlocking: true }; })() : this.sanitizeApprovalParams(method, params);
     } catch {
       await this.writeLine({ id: requestId, result: this.approvalResponse(method, "decline") });
       await this.callbacks.onEvent({ type: "agent.warning", nativeThreadId: thread.nativeThreadId,
-        payload: { code: "INPUT_REQUEST_UNSUPPORTED", detail: "此请求包含敏感输入或不支持的权限格式，已拒绝；请检查执行权限配置。" } }, this.appServerEpoch);
+        payload: { code: "INPUT_REQUEST_UNSUPPORTED", detail: method === "mcpServer/elicitation/request" ? "MCP 请求包含敏感或暂不支持的表单，请在宿主机处理。" : "此请求包含敏感输入或不支持的权限格式，已拒绝；请检查执行权限配置。" } }, this.appServerEpoch);
       return;
     }
     const actionHash = sha256(
@@ -1238,6 +1294,7 @@ export class CodexAppServer implements AppServerClient {
   private approvalResponse(method: string, decision: "accept" | "decline" | "cancel"): Record<string, unknown> {
     if (method === "item/permissions/requestApproval") return { permissions: {}, scope: "turn" };
     if (method === "item/tool/requestUserInput") return { answers: {} };
+    if (method === "mcpServer/elicitation/request") return { action: decision, content: null };
     if (method === "item/commandExecution/requestApproval" || method === "item/fileChange/requestApproval") {
       return { decision };
     }
@@ -1247,12 +1304,13 @@ export class CodexAppServer implements AppServerClient {
   }
 
   private async handleNotification(method: string, params: Record<string, unknown>): Promise<void> {
-    if (["thread/started", "thread/archived", "thread/unarchived", "thread/name/updated", "thread/status/changed", "turn/started", "turn/completed"].includes(method)) {
+    if (["thread/started", "thread/archived", "thread/unarchived", "thread/name/updated", "thread/status/changed", "turn/started", "turn/completed", "mcpServer/oauthLogin/completed", "mcpServer/startupStatus/updated"].includes(method)) {
       this.callbacks.onCatalogChanged?.(this.appServerEpoch);
     }
     const threadId = threadIdFromParams(params);
     if (threadId && !this.callbacks.findManagedThread(threadId)) return;
     if (method === "turn/started" && threadId && isRecord(params.turn) && typeof params.turn.id === "string") {
+      if (this.turnReferences.has(threadId)) this.referenceTurns.set(threadId, params.turn.id);
       this.compactStarts.get(threadId)?.resolve({ nativeTurnId: params.turn.id, status: typeof params.turn.status === "string" ? params.turn.status : "inProgress" });
     }
     if (method === "item/agentMessage/delta" || method === "item/commandExecution/outputDelta") {
@@ -1308,8 +1366,22 @@ export class CodexAppServer implements AppServerClient {
       return;
     }
 
+    if (method === "account/login/completed") { this.quota = undefined; this.quotaGeneration++; this.callbacks.onQuotaChanged?.(); this.callbacks.onCatalogChanged?.(this.appServerEpoch); return; }
     if (method === "account/updated") { this.quota = undefined; this.quotaGeneration++; this.callbacks.onQuotaChanged?.(); return; }
     if (method === "account/rateLimits/updated") { this.callbacks.onQuotaChanged?.(); return; }
+    const activity = codexNotification(method, params);
+    if (activity) {
+      const key = `${activity.nativeThreadId}\0${activity.nativeTurnId ?? ""}\0${activity.nativeItemId ?? ""}\0${activity.type}`;
+      if (activity.type === "codex.mcp_progress") {
+        const previous = this.activityTimes.get(key) ?? 0;
+        if (Date.now() - previous < 5000) return;
+        this.activityTimes.set(key, Date.now());
+        if (this.activityTimes.size > 500) this.activityTimes.delete(this.activityTimes.keys().next().value!);
+      }
+      await this.callbacks.onEvent(activity, this.appServerEpoch);
+      if (["codex.mcp_auth", "codex.mcp_status"].includes(activity.type)) this.callbacks.onCatalogChanged?.(this.appServerEpoch);
+      return;
+    }
     let event: AppEvent | null = null;
     if (method === "thread/tokenUsage/updated" && typeof params.threadId === "string" && typeof params.turnId === "string") {
       const usage = tokenUsage(params.tokenUsage);
@@ -1337,6 +1409,8 @@ export class CodexAppServer implements AppServerClient {
     } else if (method === "turn/completed" && typeof params.threadId === "string") {
       const turn = summarizeTurn(params.turn);
       if (turn && typeof turn.id === "string") {
+        if (this.referenceTurns.get(params.threadId) === turn.id) { this.referenceTurns.delete(params.threadId); this.turnReferences.delete(params.threadId); }
+        for (const key of this.activityTimes.keys()) if (key.startsWith(`${params.threadId}\0${turn.id}\0`)) this.activityTimes.delete(key);
         const finalDiff = this.finalDiffs.get(`${params.threadId}\0${turn.id}`);
         this.finalDiffs.delete(`${params.threadId}\0${turn.id}`);
         event = {
@@ -1375,6 +1449,7 @@ export class CodexAppServer implements AppServerClient {
     this.pending.clear();
     for (const pending of this.compactStarts.values()) pending.reject(new AgentError("APP_SERVER_EXITED", "App Server exited during compaction"));
     this.compactStarts.clear();
+    this.referenceTurns.clear(); this.turnReferences.clear(); this.activityTimes.clear();
     for (const timer of this.approvalTimers.values()) clearTimeout(timer);
     this.approvalTimers.clear();
     this.requestApprovals.clear();

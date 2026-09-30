@@ -1,3 +1,5 @@
+import { parseOutputSchema } from "./output-schema.js";
+import { parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, sanitizeCodexResult, parseReviewTarget, parseForkRange } from "./codex-operations.js";
 import {ClaudePreferencesService} from "./claude-preferences.js";
 import {parseClaudeMetadata} from "./claude-metadata.js";
 import { parseClaudeSettings, supportsClaudeControls } from "./claude-settings.js";
@@ -577,6 +579,9 @@ export class CoordinationService {
       invariant(!session.runtime_read_only, 409, "MACHINE_READ_ONLY", "Agent runtime currently supports read-only access");
       invariant(session.provider !== "claude" || ["thread.claim", "thread.release", "turn.start", "turn.queue", "turn.cancel", "approval.decide_once", "input.respond"].includes(input.type),409,"AGENT_CAPABILITY_UNAVAILABLE","Claude Code does not support this operation");
       invariant(supportsCommand(session.command_types_json, input.type), 409, "AGENT_CAPABILITY_UNAVAILABLE", "Agent has not reported support for this operation; update the connection service");
+      if (["turn.start", "turn.queue", "turn.compact", "turn.review", "thread.claim"].includes(input.type)) {
+        invariant(!this.pendingCodexMutation(session.machine_id), 409, "CODEX_OPERATION_PENDING", "Wait for Codex environment changes to be confirmed before starting tasks");
+      }
       const references = parseReferences(payload.references);
       if (references.length) {
         invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "REFERENCES_NOT_ALLOWED", "Session references require a message");
@@ -594,6 +599,11 @@ export class CoordinationService {
       const pluginSkills = parsePluginSkills(payload.pluginSkills);
       const hasRichInput = images.length > 0 || attachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0;
       if (attachments.length || plugins.length || pluginSkills.length || payload.goal !== undefined) invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "ATTACHMENTS_NOT_ALLOWED", "此操作不能附带文件、插件或目标");
+      if (payload.outputSchema !== undefined) {
+        invariant(session.provider !== "claude" && ["turn.start", "turn.queue"].includes(input.type), 400, "OUTPUT_SCHEMA_ACTION_DENIED", "结构化输出只能在新的 Codex 任务中设置");
+        invariant(this.db.get<{command_types_json:string|null}>("SELECT command_types_json FROM machines WHERE machine_id=?", session.machine_id)?.command_types_json?.includes('"codex.manage"'), 409, "AGENT_CAPABILITY_UNAVAILABLE", "请先更新主机连接服务，再使用结构化输出");
+        try { payload.outputSchema = parseOutputSchema(payload.outputSchema); } catch { throw new AppError(400, "OUTPUT_SCHEMA_INVALID", "结构化输出的 JSON Schema 无效"); }
+      }
       if (payload.goal !== undefined) invariant(typeof payload.goal === "string" && payload.goal.trim().length > 0 && payload.goal.length <= 2_000 && !payload.goal.includes("\0"), 400, "GOAL_INVALID", "目标需要为 1–2000 个字符");
       if (attachments.length && session.provider !== "claude") {
         const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
@@ -672,6 +682,17 @@ export class CoordinationService {
         invariant(Object.keys(payload).length === 0, 400, "INVALID_NATIVE_PAYLOAD", "Stopping background terminals takes no payload");
         invariant(session.native_thread_id && precondition.nativeThreadId === session.native_thread_id && precondition.executionSegmentId === executionSegmentId, 409, "THREAD_VERSION_CONFLICT", "Terminal target changed");
         invariant(precondition.threadControlVersion === session.thread_control_version && precondition.projectLeaseVersion === session.project_lease_version && precondition.expectedActiveTurnId === session.active_turn_id, 409, "THREAD_VERSION_CONFLICT", "Refresh the exact terminal target before stopping");
+      } else if (input.type === "codex.manage") {
+        this.requireLease(principal, logicalSessionId, input.controlLeaseId);
+        let request;
+        try { request = parseCodexOperation(payload); } catch { throw new AppError(400, "CODEX_OPERATION_INVALID", "Invalid Codex operation"); }
+        invariant(session.native_thread_id && precondition.nativeThreadId === session.native_thread_id && precondition.executionSegmentId === executionSegmentId && precondition.threadControlVersion === session.thread_control_version && precondition.projectLeaseVersion === session.project_lease_version && precondition.expectedActiveTurnId === session.active_turn_id, 409, "CODEX_TARGET_CHANGED", "Refresh Codex state before operating");
+        invariant(session.sync_content === 1, 409, "CONTENT_SYNC_DISABLED", "Enable content sync before receiving Codex operation results");
+        invariant(!this.db.get("SELECT 1 FROM commands c JOIN command_projection cp USING(command_id) JOIN logical_sessions s USING(logical_session_id) WHERE s.machine_id=? AND c.type='codex.manage' AND cp.state IN ('accepted','dispatching','unknown') LIMIT 1", session.machine_id),409,"CODEX_OPERATION_PENDING","Wait for the previous Codex operation to be confirmed");
+        if (request.operation === "turn.settings") invariant(session.active_turn_id && session.execution_state === "running", 409, "NO_ACTIVE_TURN", "当前没有可更新的运行中任务");
+        if (!readOnlyCodexOperation(request.operation) && !liveCodexOperation(request.operation)) {
+          invariant(!this.db.get("SELECT 1 FROM logical_sessions WHERE machine_id=? AND active_turn_id IS NOT NULL LIMIT 1", session.machine_id) && !this.db.get("SELECT 1 FROM project_turn_reservations r JOIN projects p USING(project_id) WHERE p.machine_id=? LIMIT 1", session.machine_id), 409, "HOST_BUSY", "Wait for host tasks before changing Codex environment");
+        }
       } else if (input.type === "codex.inspect") {
         invariant(!input.controlLeaseId && Object.keys(payload).length === 0, 400, "INVALID_INSPECTION", "Inspection is read-only and takes no payload or control lease");
         invariant(precondition.executionSegmentId === executionSegmentId && precondition.projectLeaseVersion === session.project_lease_version, 409, "PROJECT_VERSION_CONFLICT", "Inspection target changed");
@@ -684,6 +705,7 @@ export class CoordinationService {
         invariant(!this.db.get("SELECT 1 FROM project_turn_reservations WHERE project_id=?", session.project_id), 409, "PROJECT_TURN_RESERVED", "Project has an active or uncertain task");
         invariant(!this.db.get("SELECT 1 FROM approvals WHERE logical_session_id=? AND state='pending'", logicalSessionId) && !this.db.get("SELECT 1 FROM turn_queue WHERE logical_session_id=? AND state IN ('queued','dispatching','unknown')", logicalSessionId), 409, "SESSION_HAS_PENDING_WORK", "Resolve questions, approvals and queued turns first");
         if (input.type === "thread.rename") invariant(Object.keys(payload).length === 1 && typeof payload.name === "string" && payload.name.trim().length > 0 && payload.name.length <= 200 && !payload.name.includes("\0"), 400, "INVALID_THREAD_NAME", "Provide a name of 1–200 characters");
+        else if (input.type === "thread.fork") { try { parseForkRange(payload); } catch { throw new AppError(400, "INVALID_FORK_RANGE", "Fork requires one exact native turn boundary or the complete history"); } }
         else if (input.type === "thread.delete") {
           invariant(Object.keys(payload).length === 2 && typeof payload.previewCommandId === "string" && typeof payload.fingerprint === "string",400,"DELETE_CONFIRMATION_REQUIRED","先读取删除预览，再明确确认删除");
           const preview = this.getCommand(principal,payload.previewCommandId);
@@ -698,7 +720,10 @@ export class CoordinationService {
         invariant(Object.hasOwn(precondition, "expectedActiveTurnId") && precondition.expectedActiveTurnId === null && session.active_turn_id === null, 409, "ACTIVE_TURN_CONFLICT", "expectedActiveTurnId must be null and the session must be idle", { activeTurnId: session.active_turn_id });
         invariant(precondition.projectLeaseVersion === session.project_lease_version, 409, "PROJECT_VERSION_CONFLICT", "projectLeaseVersion changed", { currentVersion: session.project_lease_version });
         if (input.type === "turn.start") invariant(typeof payload.prompt === "string" && (payload.prompt.trim().length > 0 || hasRichInput) && Buffer.byteLength(payload.prompt) <= 200_000, 400, "INVALID_PROMPT", "请填写消息或添加附件，文字不能超过 200 KB");
-        else invariant(session.native_thread_id && Object.keys(payload).length === 0, 400, "INVALID_NATIVE_PAYLOAD", "Native turns require an existing thread and an empty payload");
+        else {
+          invariant(session.native_thread_id && Object.keys(payload).every(key => input.type === "turn.review" && key === "target"), 400, "INVALID_NATIVE_PAYLOAD", "Invalid native turn payload");
+          if (input.type === "turn.review") { try { parseReviewTarget(payload.target); } catch { throw new AppError(400, "INVALID_REVIEW_TARGET", "Invalid review target"); } }
+        }
       } else if (input.type === "turn.queue") {
         invariant(session.sync_content === 1, 409, "QUEUE_REQUIRES_CONTENT_SYNC", "Queue is unavailable while Project content sync is disabled");
         invariant(!input.controlLeaseId, 400, "QUEUE_LEASE_FORBIDDEN", "queued turns use queueVersion instead of a Control Lease");
@@ -1016,6 +1041,7 @@ export class CoordinationService {
     const result = Object.fromEntries(["nativeThreadId", "nativeTurnId", "status", "claimed", "released", "writerReleased", "hostThreadPreserved", "importedItems", "title", "archived", "forkedNativeThreadId", "backgroundTerminalsStopped"]
       .filter((key) => ["string", "number", "boolean"].includes(typeof resultValue[key])).map((key) => [key, resultValue[key]]));
     if (row.type === "thread.delete.preview" && resultValue.deletionPreview && typeof resultValue.deletionPreview === "object" && JSON.stringify(resultValue.deletionPreview).length <= 32_000) result.deletionPreview = resultValue.deletionPreview;
+    if (row.type === "codex.manage") result.codexResult = sanitizeCodexResult(resultValue.codexResult);
     if (row.type === "codex.inspect" && resultValue.inspection && typeof resultValue.inspection === "object" && JSON.stringify(resultValue.inspection).length <= 32_000) result.inspection = sanitizeInspection(resultValue.inspection);
     return {
       commandId: row.command_id,
@@ -1194,6 +1220,18 @@ export class CoordinationService {
   }
 
   /** Promote exactly one queue head after a terminal turn; no Attempt exists before this point. */
+  private pendingCodexMutation(machineId: string): boolean {
+    const pending = this.db.all<{ body: string }>(
+      `SELECT COALESCE(cc.body_json,c.payload_json) AS body FROM commands c
+       JOIN command_projection cp USING(command_id) JOIN logical_sessions s USING(logical_session_id)
+       LEFT JOIN command_contents cc ON cc.command_id=c.command_id AND cc.deleted_at IS NULL
+       WHERE s.machine_id=? AND c.type='codex.manage' AND cp.state IN ('accepted','dispatching','unknown')`, machineId);
+    return pending.some(row => {
+      try { const request = parseCodexOperation(JSON.parse(row.body)); return !readOnlyCodexOperation(request.operation) && !liveCodexOperation(request.operation); }
+      catch { return true; }
+    });
+  }
+
   activateNextQueued(logicalSessionId: string): { commandId: string } | null {
     return this.db.transaction(() => {
       const session = this.db.get<SessionCommandRow>(
@@ -1210,6 +1248,7 @@ export class CoordinationService {
           session.identity_state !== "active" || session.security_state !== "normal" || session.compatibility !== "compatible" ||
           session.machine_reachability !== "online" || session.runtime_read_only === 1) return null;
       if (this.db.get("SELECT 1 FROM project_turn_reservations WHERE project_id=?", session.project_id)) return null;
+      if (this.pendingCodexMutation(session.machine_id)) return null;
       if (this.db.get("SELECT 1 FROM turn_queue WHERE logical_session_id=? AND state='unknown'", logicalSessionId)) return null;
 
       const timestamp = nowIso();
@@ -1766,7 +1805,7 @@ export class CoordinationService {
       const rows = this.db.all<{ command_id: string }>(
         `SELECT c.command_id FROM commands c
          JOIN command_projection cp ON cp.command_id=c.command_id
-         WHERE c.type IN ('turn.start','turn.queue','turn.compact','turn.review','thread.rename','thread.archive','thread.unarchive','thread.fork','thread.delete.preview','thread.delete','thread.terminals.stop','codex.inspect','input.respond') AND cp.state='accepted' AND c.expires_at<=?
+         WHERE c.type IN ('turn.start','turn.queue','turn.compact','turn.review','thread.rename','thread.archive','thread.unarchive','thread.fork','thread.delete.preview','thread.delete','thread.terminals.stop','codex.inspect','codex.manage','input.respond') AND cp.state='accepted' AND c.expires_at<=?
            AND NOT EXISTS (
              SELECT 1 FROM dispatch_attempts a JOIN dispatch_attempt_projection p ON p.dispatch_attempt_id=a.dispatch_attempt_id
              WHERE a.command_id=c.command_id AND p.state<>'delivery_failed_before_claim'

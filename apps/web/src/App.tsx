@@ -1,3 +1,6 @@
+import { parseOutputSchema } from "./lib/output-schema";
+import { CodexOutputPanel } from "./components/CodexOutputPanel";
+import { CodexOperationsPanel } from "./components/CodexOperationsPanel";
 import { useClaudePreferences } from "./lib/claude-preferences";
 import { ClaudeControls } from "./components/ClaudeControls";
 import { agentName } from "./lib/agent-provider";
@@ -607,6 +610,7 @@ function ApprovalCard({ approval, onDecide, busy }: { approval: Approval; onDeci
 }
 
 type TurnAdditions = {
+  outputSchema?: Record<string, unknown>;
   attachments?: Array<{ name: string; relativePath: string; mimeType: string; data: string }>;
   references?: Array<{ id: string; version: string }>;
   plugins?: Array<{ pluginId: string; pluginName: string }>;
@@ -647,6 +651,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const imageDraft = useImageDraft(draftOwner ?? "preview", detail?.session.id);
   const fileDraft = useFileDraft(detail?.session.id);
   const [selectedPlugins, setSelectedPlugins] = useState<Array<{ pluginId: string; pluginName: string }>>([]);
+  const [outputSchemaDraft, setOutputSchemaDraft] = useSessionDraft(draftOwner ?? "preview", detail?.session.id, "output-schema");
   const [goal, setGoal] = useSessionDraft(draftOwner ?? "preview", detail?.session.id, "goal");
   type ReferenceCard = { key: string; sourceId: string; identity?: SessionReferenceIdentity; error?: string };
   const [referenceCards, setReferenceCards] = useState<ReferenceCard[]>([]);
@@ -840,7 +845,10 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const canCancel = !pendingCommand && (session.actions?.cancel?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.currentTurn === "in_progress" && session.activeTurnId));
   const canQueueOrSteer = Boolean(detail.writable && session.state.reachability === "live" && session.state.currentTurn === "in_progress" && session.activeTurnId);
   const slashCommand = session.provider === "claude" ? undefined : parseCodexCommand(prompt);
-  const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() || referenceCards.length ? { ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(referenceCards.length ? { references: referenceCards.filter(card => card.identity).map(card => ({ id: card.sourceId, version: card.identity!.version })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
+  let outputSchema: Record<string, unknown> | undefined;
+  let outputSchemaError = false;
+  if (session.provider !== "claude" && outputSchemaDraft.trim()) { try { outputSchema = parseOutputSchema(JSON.parse(outputSchemaDraft)); } catch { outputSchemaError = true; } }
+  const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() || referenceCards.length || outputSchema ? { ...(outputSchema ? { outputSchema } : {}), ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(referenceCards.length ? { references: referenceCards.filter(card => card.identity).map(card => ({ id: card.sourceId, version: card.identity!.version })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
   const referencesBlocked = referenceCards.some(card => card.error || !card.identity) || (referenceCards.length > 0 && !prompt.trim());
   const sendText = () => prompt.trim();
   const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length);
@@ -900,7 +908,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (imageBlocked || busy || referencesBlocked || modeBlocked) return;
+    if (imageBlocked || busy || referencesBlocked || modeBlocked || outputSchemaError) return;
     if (prompt.trim() === "/") return;
     if (session.provider === "claude" && /^\/[a-z]+(?:\s|$)/i.test(prompt.trim())) {
       if (!session.collaborationModes?.includes("plan")) {setCommandMessage(t("Claude Code 原生控制需要 Agent 0.30.57 或更新版本"));return;}
@@ -1024,6 +1032,8 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         <SessionWritingPreferencesPanel key={`writing:${draftOwner}:${session.id}`} settings={writingSettings} />
         {session.provider !== "claude" && <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
+          <CodexOutputPanel value={outputSchemaDraft} error={outputSchemaError} onChange={setOutputSchemaDraft} />
+          <CodexOperationsPanel key={`codex-tools:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh} />
           <CodexInspectionPanel key={`inspect:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} request={inspectionRequest?.sessionId === session.id ? inspectionRequest : undefined} onChanged={onRefresh} />
           <CodexCommandGuide key={`commands:${draftOwner}:${session.id}`} />
         </details>}
@@ -1164,13 +1174,13 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>}
-              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || modeBlocked || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
-              {session.provider !== "claude" && <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, additions); else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>}
+              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
+              {session.provider !== "claude" && <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) { const { outputSchema: _outputSchema, ...steerAdditions } = additions; await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, steerAdditions); } else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>}
             </div>
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>
           ) : (
-            <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
+            <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
           )}</div>}
           </div>
         </div>

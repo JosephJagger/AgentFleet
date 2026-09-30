@@ -1132,7 +1132,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
   await app.ready();
   assert.equal(
     Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    41,
+    42,
   );
 
   const login = await app.inject({
@@ -1344,6 +1344,64 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
       assert.ok(db.get("SELECT 1 FROM project_turn_reservations WHERE project_id=?", projectId), "native turn must reserve project");
     } finally { db.sqlite.exec("ROLLBACK TO native_turn_test; RELEASE native_turn_test"); }
   }
+  for (const boundary of [{ beforeTurnId: "task-boundary" }, { lastTurnId: "task-boundary" }]) {
+    db.sqlite.exec("SAVEPOINT codex_fork_range_test");
+    try {
+      const session = sessions[0]!;
+      db.run("UPDATE machines SET command_types_json=? WHERE machine_id=?", JSON.stringify(COMMAND_TYPES), machineId);
+      db.run("UPDATE execution_segments SET native_thread_id='native-test' WHERE execution_segment_id=?", session.executionSegmentId);
+      const base = startPayload(session, leases[0]!.leaseId, "fork-range-test");
+      const input = { ...base, type: "thread.fork", precondition: { ...base.precondition, nativeThreadId: "native-test" }, payload: boundary };
+      const url = `/api/sessions/${session.logicalSessionId}/commands`;
+      for (const payload of [{ beforeTurnId: "a", lastTurnId: "b" }, { beforeTurnId: "" }, { cwd: "/another" }]) {
+        const invalid = await app.inject({ method: "POST", url, headers: browserHeaders, payload: { ...input, payload } });
+        assert.equal(invalid.statusCode, 400, invalid.body);
+      }
+      const accepted = await app.inject({ method: "POST", url, headers: browserHeaders, payload: input });
+      assert.equal(accepted.statusCode, 202, accepted.body);
+      assert.deepEqual(accepted.json().command.payload, boundary);
+    } finally { db.sqlite.exec("ROLLBACK TO codex_fork_range_test; RELEASE codex_fork_range_test"); }
+  }
+  db.sqlite.exec("SAVEPOINT codex_operation_test");
+  try {
+    const session = sessions[0]!;
+    db.run("UPDATE machines SET command_types_json=? WHERE machine_id=?", JSON.stringify(COMMAND_TYPES), machineId);
+    db.run("UPDATE execution_segments SET native_thread_id='native-test' WHERE execution_segment_id=?", session.executionSegmentId);
+    const input = { ...startPayload(session, leases[0]!.leaseId, "codex-usage-test"), type: "codex.manage", precondition: { ...startPayload(session, leases[0]!.leaseId, "ignored").precondition, nativeThreadId: "native-test" }, payload: { operation: "usage.read", arguments: {} } };
+    const url = `/api/sessions/${session.logicalSessionId}/commands`;
+    const noLease = await app.inject({ method: "POST", url, headers: browserHeaders, payload: { ...input, controlLeaseId: undefined } });
+    assert.equal(noLease.statusCode, 403, noLease.body);
+    const wrongTarget = await app.inject({ method: "POST", url, headers: browserHeaders, payload: { ...input, precondition: { ...input.precondition, nativeThreadId: "wrong" } } });
+    assert.equal(wrongTarget.statusCode, 409, wrongTarget.body);
+    const arbitraryRpc = await app.inject({ method: "POST", url, headers: browserHeaders, payload: { ...input, payload: { operation: "fs/writeFile", arguments: {} } } });
+    assert.equal(arbitraryRpc.statusCode, 400, arbitraryRpc.body);
+    const unconfirmed = await app.inject({ method: "POST", url, headers: browserHeaders, payload: { ...input, payload: { operation: "resetCard.consume", arguments: {} } } });
+    assert.equal(unconfirmed.statusCode, 400, unconfirmed.body);
+    const result = await app.inject({ method: "POST", url, headers: browserHeaders, payload: input });
+    assert.equal(result.statusCode, 202, result.body);
+    const repeated = await app.inject({ method: "POST", url, headers: browserHeaders, payload: input });
+    assert.equal(repeated.statusCode, 200, repeated.body);
+    const concurrent = await app.inject({ method: "POST", url, headers: browserHeaders, payload: { ...input, clientMutationId: "another-codex-op" } });
+    assert.equal(concurrent.statusCode, 409, concurrent.body);
+    const commandId = result.json().command.commandId ?? result.json().command.id;
+    db.run("UPDATE command_contents SET body_json=? WHERE command_id=?", JSON.stringify({ operation: "account.logout", arguments: { confirmed: true } }), commandId);
+    const fenced = await app.inject({ method: "POST", url, headers: browserHeaders, payload: startPayload(session, leases[0]!.leaseId, "blocked-by-codex-mutation") });
+    assert.equal(fenced.statusCode, 409, fenced.body);
+    assert.match(fenced.body, /CODEX_OPERATION_PENDING/);
+  } finally { db.sqlite.exec("ROLLBACK TO codex_operation_test; RELEASE codex_operation_test"); }
+  db.sqlite.exec("SAVEPOINT codex_output_test");
+  try {
+    const session = sessions[0]!;
+    db.run("UPDATE machines SET command_types_json=? WHERE machine_id=?", JSON.stringify(COMMAND_TYPES), machineId);
+    const schema = { type: "object", properties: { summary: { type: "string" } }, required: ["summary"], additionalProperties: false };
+    const base = startPayload(session, leases[0]!.leaseId, "structured-output-test");
+    const url = `/api/sessions/${session.logicalSessionId}/commands`;
+    const invalid = await app.inject({ method: "POST", url, headers: browserHeaders, payload: { ...base, payload: { ...base.payload, outputSchema: { ...schema, additionalProperties: true } } } });
+    assert.equal(invalid.statusCode, 400, invalid.body);
+    const valid = await app.inject({ method: "POST", url, headers: browserHeaders, payload: { ...base, payload: { ...base.payload, outputSchema: schema } } });
+    assert.equal(valid.statusCode, 202, valid.body);
+    assert.deepEqual(valid.json().command.payload.outputSchema, schema);
+  } finally { db.sqlite.exec("ROLLBACK TO codex_output_test; RELEASE codex_output_test"); }
   db.sqlite.exec("SAVEPOINT input_test");
   try {
     const session = sessions[0]!;

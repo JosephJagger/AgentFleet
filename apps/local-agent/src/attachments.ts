@@ -70,7 +70,7 @@ export interface UploadedAttachment {
 export interface PluginSkillReference { pluginId: string; name: string; path: string }
 export interface PluginReference { pluginId: string; pluginName: string }
 export interface MaterializedAttachment { name: string; path: string }
-export interface TurnExtras { attachments?: MaterializedAttachment[]; pluginSkills?: PluginSkillReference[]; goal?: string }
+export interface TurnExtras { outputSchema?: Record<string, unknown>; referenceFiles?: MaterializedAttachment[] | undefined; attachments?: MaterializedAttachment[]; pluginSkills?: PluginSkillReference[]; goal?: string }
 
 function safeRelativePath(value: unknown): string {
   if (typeof value !== "string" || !value || value.length > 1_024 || value.includes("\0") || value.includes("\\"))

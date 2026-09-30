@@ -60,3 +60,12 @@ it("Claude 原生顺序纠正补同步错位，并合并历史和实时回复", 
   expect(result.map(e=>e.body)).toEqual(["429?","reply"]);
   expect(result[0]?.occurredAt).toBe("2026-09-30T06:00:00Z");
 });
+
+it("原生进度更新同一卡片，旧事件和另一轮任务不能覆盖完成状态", () => {
+  const running = mapEvent({ type: "codex.hook_status", eventId: "hook-start", sessionSeq: 1, nativeThreadId: "thread", nativeTurnId: "turn", nativeItemId: "hook", payload: { message: "running" } });
+  const completed = { ...running, id: "hook-done", sessionSeq: 2, body: "completed" };
+  expect(timelineItems([completed, running])).toEqual([expect.objectContaining({ body: "completed", title: "Hook 状态" })]);
+  expect(timelineItems([running, completed, { ...completed, nativeTurnId: "other" }])).toHaveLength(2);
+  const deleted = { ...completed, payloadState: "deleted" as const, body: null };
+  expect(timelineItems([deleted, running])[0]).toMatchObject({ payloadState: "deleted", body: null });
+});

@@ -1,0 +1,5 @@
+import { t } from "../i18n";
+const example = JSON.stringify({ type: "object", properties: { summary: { type: "string" }, items: { type: "array", items: { type: "string" } } }, required: ["summary", "items"], additionalProperties: false }, null, 2);
+export function CodexOutputPanel({ value, error, onChange }: { value: string; error: boolean; onChange: (value: string) => void }) {
+  return <details className="codex-settings-panel"><summary>{t("结构化输出（下一轮）")}</summary><p>{t("要求下一轮最终回复符合 JSON Schema；不会改变正在执行的任务。留空即使用普通回复。")}</p><label>{t("输出 JSON Schema")}<textarea rows={8} maxLength={16000} value={value} onChange={e => onChange(e.target.value)} spellCheck={false}/></label>{error && <p role="alert">{t("结构无效：使用 object 根类型，列出 required，并设置 additionalProperties 为 false。")}</p>}<div className="row"><button type="button" className="button button--quiet" onClick={() => onChange(example)}>{t("使用摘要与条目示例")}</button><button type="button" className="button button--quiet" disabled={!value} onClick={() => onChange("")}>{t("恢复普通回复")}</button></div></details>;
+}

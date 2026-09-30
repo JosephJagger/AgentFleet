@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 41) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 42) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1277,6 +1277,22 @@ export class ControlPlaneDatabase {
         PRIMARY KEY(workspace_id,logical_session_id)
       ) STRICT; PRAGMA user_version=41`);
     });
+
+    if (version < 42) {
+      const schema = this.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE type='table' AND name='commands'")!.sql;
+      const indexes = this.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE type IN ('index','trigger') AND tbl_name='commands' AND sql IS NOT NULL");
+      if (!schema.includes("'codex.inspect'")) throw new Error("Unexpected command schema before Codex operations migration");
+      this.sqlite.exec("PRAGMA foreign_keys = OFF; PRAGMA legacy_alter_table = ON");
+      try { this.transaction(() => {
+        this.sqlite.exec("ALTER TABLE commands RENAME TO commands_before_codex_operations");
+        this.sqlite.exec(schema.replace("'codex.inspect'", "'codex.inspect','codex.manage'"));
+        this.sqlite.exec("INSERT INTO commands SELECT * FROM commands_before_codex_operations; DROP TABLE commands_before_codex_operations");
+        for (const index of indexes) this.sqlite.exec(index.sql);
+        if (this.all("PRAGMA foreign_key_check").length) throw new Error("Codex operations migration violated foreign keys");
+        this.sqlite.exec("PRAGMA user_version=42");
+      }); } finally { this.sqlite.exec("PRAGMA legacy_alter_table = OFF; PRAGMA foreign_keys = ON"); }
+    }
+
   }
 
   transaction<T>(operation: () => T): T {

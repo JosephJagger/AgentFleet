@@ -13,7 +13,7 @@ const commandLabels: Record<string, string> = localized(() => ({
   "turn.queue": t("排队消息"), "turn.steer": t("追加本轮"), "turn.cancel": t("停止本轮"),
   "thread.rename": t("重命名会话"), "thread.archive": t("宿主机归档"), "thread.unarchive": t("恢复归档"), "thread.fork": t("分支会话"),
   "turn.compact": t("上下文压缩"), "turn.review": t("代码审查"), "input.respond": t("回答问题"),
-  "codex.inspect": t("查询 Codex 环境"),
+  "codex.inspect": t("查询 Codex 环境"), "codex.manage": t("Codex 工具与账号操作"),
 }));
 
 export function receiptStatus(command: CommandReceipt): { label: string; tone: string } {

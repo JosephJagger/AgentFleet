@@ -6,7 +6,7 @@ import type { CodexSettings } from "./codex-settings.js";
 import type { InputAnswers } from "./user-input.js";
 import type { TurnExtras } from "./attachments.js";
 
-type Writer = { client: AppServerClient; token: string; threadId?: string; live: boolean };
+type Writer = { client: AppServerClient; token: string; threadId?: string; live: boolean; verified?: boolean };
 type Factory = (callbacks: AppServerCallbacks, epoch: string) => AppServerClient;
 
 /** One read-only catalog connection and disposable, isolated session writers.
@@ -79,6 +79,36 @@ export class SessionAppServer implements AppServerClient {
     if (!client.readHistoryPage) throw new AgentError("HISTORY_PAGING_UNAVAILABLE", "Native history pagination is unavailable");
     return client.readHistoryPage(id,cursor);
   }
+  manageCodex(thread: ManagedThread, value: unknown, mutationId: string) {
+    const request = value as { operation?: string };
+    return this.serial(thread.nativeThreadId, async () => {
+      const needsWriter = ["mcp.catalog", "mcp.resource", "mcp.call"].includes(request.operation ?? "") || request.operation?.startsWith("goal.") || request.operation === "memory.mode" || request.operation?.startsWith("nativeQueue.") && request.operation !== "nativeQueue.read";
+      let temporary: Writer | undefined;
+      let client = this.catalog;
+      if (request.operation === "turn.settings") client = this.writer(thread.nativeThreadId).client;
+      else if (needsWriter) {
+        let writer = this.writers.get(thread.nativeThreadId);
+        if (!writer) {
+          const project = this.callbacks.findProject(thread.projectId);
+          if (!project) throw new AgentError("CODEX_TARGET_CHANGED", "Session project is unavailable");
+          temporary = writer = await this.newWriter(thread.nativeThreadId);
+          try {
+            const resumed = await writer.client.resumeThread(thread.nativeThreadId, project, thread.sessionCwd, thread.permissionProfile, true);
+            if (resumed.nativeThreadId !== thread.nativeThreadId || !resumed.policyVerified) throw new AgentError("CODEX_TARGET_CHANGED", "Restored session policy could not be verified");
+            writer.verified = true;
+          } catch (error) { await this.release(writer).catch(() => undefined); throw error; }
+        }
+        client = writer.client;
+      }
+      try {
+        if (!client.manageCodex) throw new AgentError("AGENT_CAPABILITY_UNAVAILABLE", "Codex operation is unavailable");
+        const result = await client.manageCodex(thread, value, mutationId);
+        // A confirmed native mutation remains confirmed even if writer cleanup fails.
+        if (temporary) await this.release(temporary).catch(() => { process.stderr.write("warning: Codex operation confirmed; session writer release remains pending\n"); });
+        return result;
+      } catch (error) { if (temporary) await this.release(temporary).catch(() => undefined); throw error; }
+    });
+  }
   inspectEnvironment(cwd: string, id?: string) { return (id ? this.writers.get(id)?.client ?? this.catalog : this.catalog).inspectEnvironment!(cwd, id); }
 
   private serial<T>(id: string, work: () => Promise<T>): Promise<T> {
@@ -97,7 +127,10 @@ export class SessionAppServer implements AppServerClient {
     const current = () => writer.live && !this.stopped;
     const scope = (id: string | number) => `${writer.token}:${JSON.stringify(id)}`;
     writer.client = this.factory({
-      findManagedThread: id => current() && id === writer.threadId ? this.callbacks.findManagedThread(id) : undefined,
+      findManagedThread: id => {
+        const thread = current() && id === writer.threadId ? this.callbacks.findManagedThread(id) : undefined;
+        return thread && writer.verified ? { ...thread, appServerEpoch: this.appServerEpoch, policyVerified: true } : thread;
+      },
       findProject: id => this.callbacks.findProject(id),
       onEvent: async (event, epoch) => { if (current() && event.nativeThreadId === writer.threadId) await this.callbacks.onEvent(event, epoch); },
       onVolatile: (event, epoch) => { if (current() && event.nativeThreadId === writer.threadId) this.callbacks.onVolatile(event, epoch); },
@@ -195,11 +228,14 @@ export class SessionAppServer implements AppServerClient {
       }
     });
   }
-  threadAction(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string) {
+  threadAction(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string, range?: { beforeTurnId?: string; lastTurnId?: string }) {
     return this.serial(thread.nativeThreadId, async () => {
       const writer = this.writers.get(thread.nativeThreadId) ?? await this.newWriter(thread.nativeThreadId);
-      try { return await writer.client.threadAction!(thread, project, action, name, expectedTitle); }
-      finally { await this.release(writer); }
+      let result: Record<string, unknown>;
+      try { result = await writer.client.threadAction!(thread, project, action, name, expectedTitle, range); }
+      catch (error) { await this.release(writer).catch(() => undefined); throw error; }
+      try { await this.release(writer); return { ...result, writerReleased: true }; }
+      catch { return { ...result, writerReleased: false }; }
     });
   }
   private approval(approval: ApprovalRecord) {

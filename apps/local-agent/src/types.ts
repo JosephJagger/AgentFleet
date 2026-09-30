@@ -132,7 +132,8 @@ export interface ApprovalRecord {
     | "item/fileChange/requestApproval"
     | "execCommandApproval"
     | "applyPatchApproval"
-    | "item/tool/requestUserInput";
+    | "item/tool/requestUserInput"
+    | "mcpServer/elicitation/request";
   actionHash: string;
   appServerEpoch: string;
   projectId: string;
@@ -162,6 +163,7 @@ export interface ManagedThread {
   archived?: boolean;
   observedSettings?: import("./codex-settings.js").CodexObservedSettings;
   acceptedSettings?: import("./codex-settings.js").CodexSettings & { acceptedAt: string; nativeTurnId: string };
+  activeTurnSettings?: { nativeTurnId: string; changedAt: string; model?: string; effort?: string; serviceTier?: string | null; summary?: string };
   nativeThreadId: string;
   projectId: string;
   logicalSessionId?: string;

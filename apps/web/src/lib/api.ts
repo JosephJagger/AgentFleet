@@ -326,6 +326,7 @@ export function mapCommandReceipt(rawValue: unknown): CommandReceipt {
     prompt: raw.payloadState === "deleted" ? null : string(record(raw.payload).prompt) || null,
     deletionPreview: raw.payloadState !== "deleted" && raw.type === "thread.delete.preview" ? record(raw.result).deletionPreview as CommandReceipt["deletionPreview"] : undefined,
     writerReleased: raw.type === "thread.release" && record(raw.result).writerReleased === true,
+    codexResult: raw.payloadState !== "deleted" && raw.type === "codex.manage" ? record(raw.result).codexResult as CommandReceipt["codexResult"] : undefined,
     inspection: raw.payloadState !== "deleted" && raw.type === "codex.inspect" ? record(raw.result).inspection as CommandReceipt["inspection"] : undefined,
   };
 }
@@ -368,6 +369,7 @@ function eventTitle(type: string, item: JsonObject): string {
     "approval.resolved": t("审批请求已结束"),
     "command.result": t("远端命令结果"),
     "agent.warning": t("Agent 警告"),
+    "codex.model_rerouted": t("原生模型已切换"), "codex.mcp_progress": t("MCP 工具进度"), "codex.hook_status": t("Hook 状态"), "codex.auth_recovery": t("原生认证恢复"), "codex.mcp_auth": t("MCP 授权状态"), "codex.mcp_status": t("MCP 连接状态"),
   };
   return titles[type] ?? type;
 }
@@ -852,7 +854,7 @@ export const api = {
   async command(
     logicalSessionId: string,
     input: {
-      type: "thread.delete.preview" | "thread.delete" | "thread.claim" | "thread.release" | "thread.rename" | "thread.archive" | "thread.unarchive" | "thread.fork" | "turn.start" | "turn.compact" | "turn.review" | "turn.queue" | "turn.steer" | "turn.cancel" | "input.respond" | "codex.inspect" | "thread.terminals.stop";
+      type: "thread.delete.preview" | "thread.delete" | "thread.claim" | "thread.release" | "thread.rename" | "thread.archive" | "thread.unarchive" | "thread.fork" | "turn.start" | "turn.compact" | "turn.review" | "turn.queue" | "turn.steer" | "turn.cancel" | "input.respond" | "codex.inspect" | "codex.manage" | "thread.terminals.stop";
       payload: Record<string, unknown>;
       controlLeaseId?: string;
       precondition: Record<string, unknown>;
@@ -862,7 +864,7 @@ export const api = {
   ) {
     // Acquire/refresh just before an explicit action. Merely viewing a session
     // never holds or renews operation access, and another browser needs no handoff.
-    if (["thread.claim", "thread.release", "thread.rename", "thread.archive", "thread.unarchive", "thread.fork", "thread.delete.preview", "thread.delete", "turn.start", "turn.compact", "turn.review", "turn.cancel", "thread.terminals.stop"].includes(input.type)) {
+    if (["thread.claim", "thread.release", "thread.rename", "thread.archive", "thread.unarchive", "thread.fork", "thread.delete.preview", "thread.delete", "turn.start", "turn.compact", "turn.review", "turn.cancel", "thread.terminals.stop", "codex.manage"].includes(input.type)) {
       const { lease } = await api.acquireLease(logicalSessionId);
       input = { ...input, controlLeaseId: lease.id };
     }
