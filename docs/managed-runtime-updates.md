@@ -19,3 +19,9 @@ From Agent 0.30.51, **Host → Advanced maintenance tools → Rescan** explicitl
 0.30.51 发布清单中的 JSON 空格导致 POSIX 安装器解析失败，已失败主机会暂停同一版本。0.30.52 使用兼容清单并保留 0.30.51 的模型刷新修复，让主机在空闲时自动重试新版本。发布前必须运行 `node packaging/validate-release-manifest.mjs <manifest.json>`，它实际执行 Linux/macOS 安装器的字段解析。
 
 Agent 0.30.52 corrects the release manifest formatting and retains the model refresh fix. Hosts that paused the failed 0.30.51 update can retry the new version when idle. Release validation now exercises the POSIX installer parsers before publishing.
+
+### Codex 0.159.0 托管适配
+
+0.159.0 官方稳定版的 App Server v2 协议哈希为 `81a88c04ae4984b16d73080f4109d0477682bc76c8adbe483e371175ce54c054`。相对 0.158.0，新增可选的历史项目游标形式、MCP 服务筛选项和错误类型；已有的字符串游标与 AgentFleet 使用的请求保持有效。通过隔离环境的版本、协议、启动、配置和会话列表测试后，由托管验证器再次核验四个平台官方文件及 Code Mode，再晋升目标。主机只在空闲时应用。
+
+Codex 0.159.0 adds optional protocol fields while retaining the string history cursor used by AgentFleet. The managed validator verifies official artifacts and a sandboxed App Server smoke test before promotion; hosts apply the target when idle.
