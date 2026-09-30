@@ -25,3 +25,7 @@ Agent 0.30.52 corrects the release manifest formatting and retains the model ref
 0.159.0 官方稳定版的 App Server v2 协议哈希为 `81a88c04ae4984b16d73080f4109d0477682bc76c8adbe483e371175ce54c054`。相对 0.158.0，新增可选的历史项目游标形式、MCP 服务筛选项和错误类型；已有的字符串游标与 AgentFleet 使用的请求保持有效。通过隔离环境的版本、协议、启动、配置和会话列表测试后，由托管验证器再次核验四个平台官方文件及 Code Mode，再晋升目标。主机只在空闲时应用。
 
 Codex 0.159.0 adds optional protocol fields while retaining the string history cursor used by AgentFleet. The managed validator verifies official artifacts and a sandboxed App Server smoke test before promotion; hosts apply the target when idle.
+
+0.159.2 是随后发布的稳定修订版；其 App Server v2 schema 哈希与 0.159.0 完全相同，也已完成官方文件摘要和隔离启动验证。托管验证器因此优先晋升 0.159.2。
+
+Codex 0.159.2 is the subsequent stable patch with the same App Server v2 schema hash as 0.159.0. The managed validator targets this later stable release.
