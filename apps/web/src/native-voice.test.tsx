@@ -57,6 +57,11 @@ it("microphone opens only on explicit start; native answer connects, mute works,
   await waitFor(() => expect(socket.sent[0]).toMatchObject({ type: "start", logicalSessionId: "session", leaseId: "lease" }));
   socket.receive({ type: "answer", sdp: "v=0\r\n" });
   await waitFor(() => expect(screen.getByRole("button", { name: "静音" }).getAttribute("disabled")).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "收起语音控制" }));
+  expect(screen.queryByRole("button", { name: "结束语音" })).toBeNull();
+  expect(track.stop).not.toHaveBeenCalled();
+  expect(socket.readyState).toBe(1);
+  fireEvent.click(screen.getByRole("button", { name: "语音控制" }));
   fireEvent.click(screen.getByRole("button", { name: "静音" }));
   expect(track.enabled).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "取消静音" }));

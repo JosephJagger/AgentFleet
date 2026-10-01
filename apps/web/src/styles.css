@@ -1346,19 +1346,22 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .radar-timeline-item a { color: var(--cobalt); font-size: var(--text-caption); }
 .host-quota-metric--forecast:hover { outline: 1px solid var(--cobalt); outline-offset: 2px; }
 
-.native-voice { display:flex; flex-wrap:wrap; align-items:center; gap:12px; border:1px solid var(--line); border-radius:var(--radius-md); padding:14px 16px; margin:12px 0; background:var(--paper); color:var(--ink); min-width:0; }
-.native-voice__description { display:flex; align-items:center; gap:10px; flex:1 1 220px; }
-.native-voice__description > svg { color:var(--cobalt); flex-shrink:0; }
-.native-voice__description span { display:flex; flex-direction:column; gap:4px; }
-.native-voice__description strong { font-size:var(--text-small); }
-.native-voice__description small,.native-voice__hint { color:var(--muted); font-size:var(--text-caption); line-height:1.6; }
-.native-voice__actions { display:flex; flex-wrap:wrap; gap:8px; }
-.native-voice__hint,.native-voice__error { flex-basis:100%; margin:0; overflow-wrap:anywhere; }
-.native-voice__error { color:var(--red); }
+/* Voice lives in the composer toolbar; controls float without resizing messages. */
+.native-voice { position:relative; display:inline-flex; align-self:flex-end; flex:0 0 auto; min-width:0; }
+.composer-actions .native-voice__trigger, .native-voice__trigger { position:relative; display:grid; place-items:center; width:44px; height:44px; min-height:44px; padding:0; border-radius:50%; }
+.native-voice--active .native-voice__trigger { color:var(--mint); border-color:var(--mint); background:color-mix(in srgb,var(--mint) 12%,var(--paper)); }
+.native-voice__indicator { position:absolute; right:3px; top:3px; width:7px; height:7px; border-radius:50%; background:var(--mint); box-shadow:0 0 0 2px var(--paper); }
+.native-voice__popover { position:absolute; z-index:40; bottom:calc(100% + 10px); right:0; width:min(300px,calc(100vw - 40px)); max-height:min(320px,45dvh); overflow-y:auto; overscroll-behavior:contain; padding:12px; background:var(--paper-solid); color:var(--ink); border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:var(--shadow-card); }
+.composer:has(.native-voice__popover), .composer-input:has(.native-voice__popover) { overflow:visible; }
+.native-voice__head { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:var(--text-small); }
+.native-voice__close { display:grid; place-items:center; width:28px; height:28px; padding:0; border:0; border-radius:50%; background:transparent; color:var(--muted); }
+.native-voice__status, .native-voice__hint { color:var(--muted); font-size:var(--text-caption); line-height:1.5; }
+.native-voice__status { margin:4px 0 10px; }
+.native-voice__actions { display:flex; gap:8px; }
+.native-voice__actions > button { flex:1; justify-content:center; }
+.native-voice__error { margin:6px 0; color:var(--red); font-size:var(--text-caption); overflow-wrap:anywhere; }
 .native-voice audio { display:none; }
-@media(max-width:600px) { .native-voice { padding:12px; } .native-voice__actions { width:100%; } .native-voice__actions button { flex:1; min-width:0; } }
-
-.native-voice__transcript { flex-basis:100%; max-height:180px; overflow-y:auto; overscroll-behavior:contain; background:var(--paper-solid); border:1px solid var(--line); border-radius:var(--radius-sm); padding:10px 12px; }
-.native-voice__transcript p { display:flex; gap:10px; margin:0 0 8px; font-size:var(--text-small); line-height:1.7; overflow-wrap:anywhere; }
-.native-voice__transcript strong { flex-shrink:0; color:var(--muted); min-width:42px; font-size:var(--text-caption); }
-.native-voice__transcript p:last-child { margin-bottom:0; }
+.native-voice__transcript-details { margin-top:10px; font-size:var(--text-caption); color:var(--muted); }
+.native-voice__transcript { max-height:120px; overflow-y:auto; overscroll-behavior:contain; padding-top:8px; }
+.native-voice__transcript p { display:flex; gap:8px; margin:0 0 8px; color:var(--ink); font-size:var(--text-caption); line-height:1.6; overflow-wrap:anywhere; }
+.native-voice__transcript strong { flex-shrink:0; color:var(--muted); min-width:36px; }

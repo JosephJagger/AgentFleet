@@ -2805,5 +2805,7 @@
   "播放 Codex 语音": "Play Codex audio",
   "语音可以触发开发任务，沿用会话权限与审批；结束语音不会取消已开始的任务。": "Voice can start development tasks using this session’s permissions and approvals. Ending voice does not cancel tasks already started.",
   "请先结束语音，再发送新的文字任务。": "End voice before sending a new text task.",
-  "本次语音转写": "Voice transcript"
+  "本次语音转写": "Voice transcript",
+  "语音控制": "Voice controls",
+  "收起语音控制": "Collapse voice controls"
 }
