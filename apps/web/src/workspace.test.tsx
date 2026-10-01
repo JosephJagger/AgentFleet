@@ -964,3 +964,17 @@ it("active turn retains append controls through reconnect and disables writes un
   view.rerender(<SessionInspector {...props} detail={props.detail}/>);
   expect(screen.getByRole("button",{name:"发送"})).toBeTruthy();
 });
+
+it.each(["追加本轮","加入队列"])("clears a previous reconciliation warning after %s succeeds",async action=>{
+  const operation=vi.fn().mockRejectedValueOnce(new ApiError("Session must finish reconciliation before accepting a command",409,"SESSION_RECONCILING")).mockResolvedValue(undefined);
+  const props=inspectorProps("A");
+  const running={...props.detail,session:{...props.detail.session,activeTurnId:"turn-1",state:{...props.detail.session.state,currentTurn:"in_progress" as const,threadRuntime:"active" as const}}};
+  render(<SessionInspector {...props} detail={running} onSteer={operation} onQueue={operation}/>);
+  fireEvent.change(screen.getByPlaceholderText("补充当前任务，或写入下一轮队列…"),{target:{value:"继续检查"}});
+  fireEvent.click(screen.getByRole("button",{name:action}));
+  await screen.findByText("会话正在恢复状态，请稍候再发送");
+  expect(screen.queryByText("Session must finish reconciliation before accepting a command")).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:action}));
+  await waitFor(()=>expect(operation).toHaveBeenCalledTimes(2));
+  await waitFor(()=>expect(screen.queryByText("会话正在恢复状态，请稍候再发送")).toBeNull());
+});

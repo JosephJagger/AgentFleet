@@ -1,9 +1,12 @@
+import type { CoordinationService } from "./coordination.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import type { Principal } from "./auth.js";
 import type { RegistryService } from "./registry.js";
 import { invariant } from "./errors.js";
 import { newId, nowIso } from "./crypto.js";
+
+export const VOICE_CONTROL_TTL_SECONDS = 120;
 
 export interface VoiceBinding {
   voiceId: string; logicalSessionId: string; projectId: string; machineId: string;
@@ -33,6 +36,12 @@ export class NativeVoiceService {
       this.db.run("INSERT INTO voice_sessions(voice_id,logical_session_id,project_id,machine_id,owner_id,lease_id,binding_json,state,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'starting',?,?)", binding.voiceId,id,session.projectId,session.machineId,principal.clientSessionId,leaseId,JSON.stringify(binding),at,at);
       return binding;
     });
+  }
+  keepAlive(principal: Principal, id: string, coordination: CoordinationService) {
+    const row = this.get(id);
+    invariant(row && ["starting", "active"].includes(row.state) && row.owner_id === principal.clientSessionId && this.validOwner(row), 409, "VOICE_CONTROL_EXPIRED", "语音控制权已失效，请重新开始");
+    const lease = this.db.get<{version: number}>("SELECT version FROM control_leases WHERE control_lease_id=?", row.lease_id)!;
+    return coordination.renewLease(principal, row.logical_session_id, row.lease_id, lease.version, VOICE_CONTROL_TTL_SECONDS);
   }
   get(id: string) { return this.db.get<VoiceRow>("SELECT * FROM voice_sessions WHERE voice_id=?",id); }
   pending(machineId?: string) { return machineId ? this.db.all<VoiceRow>("SELECT * FROM voice_sessions WHERE machine_id=? AND state<>'closed'",machineId) : this.db.all<VoiceRow>("SELECT * FROM voice_sessions WHERE state<>'closed'"); }

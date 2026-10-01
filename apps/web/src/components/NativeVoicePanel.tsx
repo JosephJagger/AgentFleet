@@ -65,8 +65,6 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
     resources.current.starting=true;
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || typeof RTCPeerConnection === "undefined") throw new Error(t("此浏览器不支持实时语音，请使用 HTTPS 下的现代浏览器"));
-      let { lease } = await api.acquireLease(sessionId);
-      if (!current()) return;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
       if (!current()) { stream.getTracks().forEach(track => track.stop()); return; }
       resources.current.stream = stream;
@@ -99,6 +97,8 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
         peer.addEventListener("icegatheringstatechange", changed);
       });
       if (!current()) return;
+      const { lease } = await api.acquireLease(sessionId);
+      if (!current()) return;
       const socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/voice`);
       resources.current.socket = socket;
       let offerSent = false;
@@ -108,15 +108,10 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
           const value = JSON.parse(String(event.data)) as { type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string };
           if (value.type === "ready" && !offerSent) {
             offerSent = true;
-            socket.send(JSON.stringify({ type: "start", logicalSessionId: sessionId, leaseId: lease.id, sdp: peer.localDescription?.sdp }));
-            let renewing = false;
+            socket.send(JSON.stringify({ type: "start", logicalSessionId: sessionId, leaseId: lease.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
             resources.current.heartbeat = setInterval(() => {
               if (!current() || socket.readyState !== WebSocket.OPEN) return;
               socket.send(JSON.stringify({ type: "heartbeat" }));
-              if (!renewing) {
-                renewing = true;
-                void api.renewLease(sessionId, lease.id, lease.version).then(result => { lease = result.lease; }).catch(() => fail(t("会话控制权已失效，麦克风已关闭"))).finally(() => { renewing = false; });
-              }
             }, 15_000);
           } else if (value.type === "answer" && value.sdp) await peer.setRemoteDescription({ type: "answer", sdp: value.sdp });
           else if(value.type==="transcript" && ["user","assistant"].includes(String(value.role)) && typeof value.text==="string") {

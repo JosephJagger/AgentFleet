@@ -92,3 +92,18 @@ test("Linux installer reuses only isolated schema-verified runtime, never the PA
   assert.match(result.stdout, /0\.153\.4$/);
   await assert.rejects(access(environment.HOST_MARKER), { code: "ENOENT" });
 });
+
+test("Agent-only Linux staging preserves the runtime profile and companion tools byte-for-byte",{skip:process.platform!=="linux"},async t=>{
+  const root=await mkdtemp(join(tmpdir(),"agentfleet-preserve-runtime-"));t.after(()=>rm(root,{recursive:true,force:true}));
+  const profile=join(root,"runtime-profile.json");
+  const original=JSON.stringify({schemaVersion:1,codexExecutable:"/managed/0.159.2/codex",managedVersion:"0.159.2",managedReleaseRevision:"validated-revision",managedSandboxHelperSha256:"a".repeat(64)});
+  await writeFile(profile,original);const helper=join(root,"code-mode-host");await writeFile(helper,"existing-companion");
+  const source=await readFile(new URL("../../../../packaging/install.sh",import.meta.url),"utf8");
+  const block=source.slice(source.indexOf('# Agent-only staging must preserve'),source.indexOf('\nif [ -n "$OLD_TARGET"',source.indexOf('# Agent-only staging must preserve')));
+  assert.ok(block.length>1000);
+  const script=`set -eu\nprepare_managed_codex() { echo 'runtime must stay unchanged' >&2; exit 91; }\n${block}`;
+  const env={...process.env,MODE:"stage",PROFILE_EXISTED:"yes",PROFILE_TARGET:profile};
+  await promisify(execFile)("/bin/sh",["-c",script],{env});
+  assert.equal(await readFile(profile,"utf8"),original);assert.equal(await readFile(helper,"utf8"),"existing-companion");
+  await assert.rejects(promisify(execFile)("/bin/sh",["-c",script],{env:{...env,PROFILE_EXISTED:"no"}}),/runtime must stay unchanged/);
+});

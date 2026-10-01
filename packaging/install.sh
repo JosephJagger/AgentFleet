@@ -713,6 +713,8 @@ if [ -f "$CODEX_CACHE_DIR/codex-resources/bwrap" ] && [ ! -L "$CODEX_CACHE_DIR/c
   HELPER_EXISTED=yes
 fi
 ACTIVATION_PENDING=yes
+# Agent-only staging must preserve the validated runtime and its companion tools.
+if [ "$MODE" != stage ] || [ "$PROFILE_EXISTED" != yes ]; then
 prepare_managed_codex
 CODEX_BWRAP_VERSION=0.153.4
 if [ "$SELECTED_CODEX_VERSION" = 0.153.2 ]; then
@@ -757,6 +759,7 @@ PROFILE_CODEX_HOME=$(json_path "$SELECTED_CODEX_HOME")
 (umask 077; printf '{"schemaVersion":1,"codexExecutable":"%s","codexHome":"%s","source":"%s","managedSandboxHelperSha256":"%s"}\n' \
   "$PROFILE_CODEX_PATH" "$PROFILE_CODEX_HOME" "$SELECTED_CODEX_SOURCE_KIND" "$CODEX_BWRAP_SHA256" > "$PROFILE_TARGET.new-$$")
 mv -f "$PROFILE_TARGET.new-$$" "$PROFILE_TARGET"
+fi
 
 if [ -n "$OLD_TARGET" ] && [ "$OLD_TARGET" != "$TARGET/agentfleet" ]; then
   atomic_link "$PREVIOUS_LINK" "$OLD_TARGET"

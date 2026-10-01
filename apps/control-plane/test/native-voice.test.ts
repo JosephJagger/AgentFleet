@@ -97,3 +97,38 @@ test("voice signaling requires the authenticated same-origin browser and never p
   assert.equal(db.get<{n:number}>('SELECT COUNT(*) AS n FROM voice_sessions')?.n,0);
   assert.equal(db.get<{n:number}>('SELECT COUNT(*) AS n FROM commands')?.n,0);
 });
+
+test("authenticated voice heartbeats renew only their bound lease and tolerate delayed UI requests", t => {
+  const f=fixture();t.after(()=>f.db.close());
+  const initial=Date.now();
+  t.mock.timers.enable({apis:["Date"],now:initial});
+  f.db.run("UPDATE control_leases SET expires_at=?",new Date(initial+45000).toISOString());
+  const binding=f.voice.start(f.principal,"s","lease",f.connection);
+  const coordinator=new CoordinationService(f.db,f.config);
+  f.voice.keepAlive(f.principal,binding.voiceId,coordinator);
+  assert.equal(Date.parse(f.db.get<{expires_at:string}>("SELECT expires_at FROM control_leases")!.expires_at),initial+120000);
+  t.mock.timers.setTime(initial+70000); // Old 45-second lease would already have expired.
+  f.voice.keepAlive(f.principal,binding.voiceId,coordinator);
+  assert.equal(Date.parse(f.db.get<{expires_at:string}>("SELECT expires_at FROM control_leases")!.expires_at),initial+190000);
+  for(let i=1;i<=40;i++) {
+    t.mock.timers.setTime(initial+70000+i*60000);
+    f.voice.keepAlive(f.principal,binding.voiceId,coordinator);
+  }
+  assert.equal(f.voice.validOwner(f.voice.get(binding.voiceId)!),true,"an active call keeps its lease after 30 minutes");
+  t.mock.timers.setTime(initial+70000+40*60000+120001);
+  assert.throws(()=>f.voice.keepAlive(f.principal,binding.voiceId,coordinator),/控制权/);
+  assert.equal(f.voice.validOwner(f.voice.get(binding.voiceId)!),false,"an expired lease cannot be resurrected");
+});
+
+test("voice keepalive cannot cross sockets, resume closed calls or outlive account revocation",t=>{
+  const f=fixture();t.after(()=>f.db.close());
+  const binding=f.voice.start(f.principal,"s","lease",f.connection);
+  const coordinator=new CoordinationService(f.db,f.config);
+  const browser=f.auth.servicePrincipal("other-voice-browser");
+  assert.throws(()=>f.voice.keepAlive(browser,binding.voiceId,coordinator),/控制权/);
+  f.voice.state(binding.voiceId,"closed");
+  assert.throws(()=>f.voice.keepAlive(f.principal,binding.voiceId,coordinator),/控制权/);
+  const next=f.voice.start(f.principal,"s","lease",f.connection);
+  f.db.run("UPDATE client_sessions SET revoked_at=? WHERE client_session_id=?",new Date().toISOString(),f.principal.clientSessionId);
+  assert.throws(()=>f.voice.keepAlive(f.principal,next.voiceId,coordinator),/控制权/);
+});

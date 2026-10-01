@@ -139,3 +139,15 @@ test("startup clears only completed agent update drains, independent of an older
     await store.setMaintenanceDrain(undefined);
   }
 });
+
+test("a staged update is not installed again while waiting for the worker to exit",async()=>{
+  let installations=0,restarts=0,requests=0;
+  const updater=new AgentAutoUpdater({currentVersion:"0.30.65",controlPlaneUrl:"https://fleet.example",dataDir:"/tmp/agentfleet",
+    canUpdate:()=>true,onStaged:()=>{restarts++;},logger:{info(){},warn(){}},
+    fetchImpl:async input=>{requests++;return new Response(String(input).endsWith("manifest.json")?JSON.stringify({schemaVersion:1,version:"0.30.66"}):"#!/bin/sh\nexit 0\n");},
+    stageUpdate:async()=>{installations++;},
+  });
+  assert.equal(await updater.checkNow(),"staged");
+  assert.deepEqual(await Promise.all([updater.checkNow(),updater.checkNow()]),["staged","staged"]);
+  assert.equal(installations,1);assert.equal(restarts,1);assert.equal(requests,2);
+});

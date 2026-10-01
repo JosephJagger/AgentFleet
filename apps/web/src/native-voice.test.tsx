@@ -140,3 +140,37 @@ it("signaling failures are distinguished from audio failures and stop the microp
   expect(track.stop).toHaveBeenCalled();
   expect(Peer.all[0]!.closed).toBe(true);
 });
+
+it("acquires fresh control after microphone preparation and keeps alive without separate HTTP renewals",async()=>{
+  let resolve!: (value:MediaStream)=>void;
+  getUserMedia.mockReturnValueOnce(new Promise<MediaStream>(r=>{resolve=r;}));
+  render(<NativeVoicePanel sessionId="session" canStart onActiveChange={()=>undefined}/>);
+  fireEvent.click(screen.getByRole("button",{name:"开始语音"}));
+  await waitFor(()=>expect(getUserMedia).toHaveBeenCalled());
+  expect(api.acquireLease).not.toHaveBeenCalled();
+  resolve(stream);
+  await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  const socket=Socket.all[0]!;
+  vi.useFakeTimers();
+  try {
+    await act(async()=>{socket.receive({type:"ready"});socket.receive({type:"answer",sdp:"v=0\r\n"});});
+    expect(screen.getByRole("button",{name:"静音"}).hasAttribute("disabled")).toBe(false);
+    expect(socket.sent[0]).toMatchObject({type:"start",controlHeartbeat:true});
+    act(()=>vi.advanceTimersByTime(90000));
+    expect(socket.sent.filter(m=>m.type==="heartbeat")).toHaveLength(6);
+    expect(api.renewLease).not.toHaveBeenCalled();
+    expect(track.stop).not.toHaveBeenCalled();
+  }finally{vi.useRealTimers();}
+});
+
+it("hiding the page ends the call, while closing just the popover keeps it alive",async()=>{
+  render(<NativeVoicePanel sessionId="session" canStart onActiveChange={()=>undefined}/>);
+  fireEvent.click(screen.getByRole("button",{name:"开始语音"}));
+  await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  const socket=Socket.all[0]!;socket.receive({type:"ready"});
+  fireEvent.click(screen.getByRole("button",{name:"收起语音控制"}));
+  expect(track.stop).not.toHaveBeenCalled();
+  fireEvent(window,new Event("pagehide"));
+  expect(track.stop).toHaveBeenCalled();
+  expect(socket.sent.at(-1)).toEqual({type:"stop"});
+});

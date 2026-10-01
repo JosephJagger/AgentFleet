@@ -168,6 +168,11 @@ try {
   } else { $null }
   $stableContents = "@echo off`r`nsetlocal`r`nset /p AGENTFLEET_CURRENT=<`"%~dp0bin\current.txt`"`r`ncall `"%~dp0bin\%AGENTFLEET_CURRENT%\agentfleet.cmd`" %*`r`nexit /b %errorlevel%`r`n"
 
+  if ($Mode -eq 'Stage') {
+    if (-not $existingProfile) { throw 'installer: existing runtime profile is required for an update' }
+    $codexVersion = if ($existingProfile.managedVersion) { [string]$existingProfile.managedVersion } else { 'preserved' }
+    Write-Host 'Preserving the existing Codex runtime, profile and companion tools.'
+  } else {
   $hostCodexPath = if ($existingProfile -and [string]$existingProfile.source -eq 'managed' -and (Test-Path ([string]$existingProfile.codexExecutable) -PathType Leaf)) { [string]$existingProfile.codexExecutable } else { $null }
   $hostVersion = $null
   if ($hostCodexPath) {
@@ -205,6 +210,8 @@ try {
   $profile = @{ schemaVersion = 1; codexExecutable = $env:AGENTFLEET_CODEX_EXECUTABLE; codexHome = $codexHome; source = $codexSourceKind } | ConvertTo-Json -Compress
   [IO.File]::WriteAllText("$RuntimeProfile.new", $profile + "`n", [Text.UTF8Encoding]::new($false))
   Move-Item -Force -LiteralPath "$RuntimeProfile.new" -Destination $RuntimeProfile
+
+  }
 
   if ($previousVersion -and $previousVersion -ne [string]$manifest.version) {
     [IO.File]::WriteAllText("$PreviousFile.new", $previousVersion, [Text.ASCIIEncoding]::new())

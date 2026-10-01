@@ -192,6 +192,7 @@ export class AgentAutoUpdater {
   private active: Promise<void> | undefined;
   private controller: AbortController | undefined;
   private stopped = false;
+  private staged = false;
   private checkActive: Promise<UpdateCheckResult> | undefined;
 
   constructor(options: AgentAutoUpdaterOptions) {
@@ -214,6 +215,7 @@ export class AgentAutoUpdater {
   }
 
   async checkNow(signal?: AbortSignal): Promise<UpdateCheckResult> {
+    if (this.staged) return "staged";
     if (this.checkActive) return this.checkActive;
     this.checkActive = this.performCheck(signal).catch(async (error) => {
       this.options.onError?.(error instanceof Error ? error.message.slice(0, 500) : "更新失败");
@@ -271,6 +273,7 @@ export class AgentAutoUpdater {
       await this.options.store?.setMaintenanceDrain(undefined);
       throw error;
     }
+    this.staged = true;
     this.options.onStaged(availableVersion);
     return "staged";
   }
@@ -306,6 +309,7 @@ export class AgentAutoUpdater {
       await restoreUpdateTransaction(this.options.dataDir, transaction, error instanceof Error ? error.message : "托管切换失败");
       throw error;
     }
+    this.staged = true;
     this.options.onStaged(this.options.currentVersion);
     return "staged";
   }
