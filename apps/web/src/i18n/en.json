@@ -191,7 +191,7 @@
   "尚未开始": "Not started",
   "已停止": "Stopped",
   "未完成": "Incomplete",
-  "状态待确认": "Status unconfirmed",
+  "状态待确认": "Awaiting confirmation",
   "项目与会话": "Projects and sessions",
   "所有项目与会话": "All projects and sessions",
   "新会话": "New session",
@@ -2828,5 +2828,16 @@
   "语音请求": "Voice request",
   "展开记录": "Expand transcript",
   "语音记录": "Voice transcript",
-  "通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。": "Send text and images during calls. Add to a running task, or queue work for later."
+  "通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。": "Send text and images during calls. Add to a running task, or queue work for later.",
+  "面板语音总控": "Panel voice control",
+  "总控通话控制": "Panel call controls",
+  "开始总控通话": "Start panel call",
+  "总控": "Voice control",
+  "一通电话跨主机派发任务，一次跟进一个；切换页面不断线。": "Dispatch across hosts in one call, one task at a time. Navigate without ending the call.",
+  "语音主机": "Voice host",
+  "等待支持总控的主机上线": "Waiting for a compatible voice host",
+  "使用所选主机的 Codex 登录账号。说出目标主机、项目和会话；原有会话电话仍可单独使用。": "Uses the selected host’s Codex account. Name the target host, project and session. Session calls remain available.",
+  "打开目标会话": "Open target session",
+  "任务结果": "Task result",
+  "挂断不取消已派发任务；关闭网页或浏览器进入后台会结束通话。": "Ending the call does not cancel dispatched tasks. Closing the page or backgrounding the browser ends the call."
 }

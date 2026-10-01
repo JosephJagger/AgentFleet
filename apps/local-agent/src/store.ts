@@ -620,9 +620,11 @@ export class StateStore {
     });
   }
 
+  async setPanelVoiceRuntime(value: {voiceId:string;pid?:number} | undefined) { await this.update(state=>{if(value)state.panelVoiceRuntime=value;else delete state.panelVoiceRuntime;}); }
+
   canSafelyRestart(): boolean {
     const state = this.snapshot();
-    return !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean"].includes(operation.operationType)) &&
+    return !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean"].includes(operation.operationType)) &&
       !Object.values(state.managedThreads).some((thread) => thread.activeTurnId !== undefined || thread.realtimeSessionId !== undefined) &&
       !Object.values(state.approvals).some((approval) => approval.state === "pending" || approval.state === "delivery_unknown") &&
       !Object.values(state.commandJournal).some((command) => ["claimed", "invoking", "responded", "unknown"].includes(command.state)) &&

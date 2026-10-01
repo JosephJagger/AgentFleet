@@ -1,3 +1,4 @@
+import { PanelVoiceRuntime } from "./panel-voice.js";
 import { parseOutputSchema } from "./output-schema.js";
 import { parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, parseReviewTarget, parseForkRange } from "./codex-operations.js";
 import { parseClaudeSettings } from "./claude-settings.js";
@@ -521,6 +522,10 @@ export class AgentRuntime {
   }
 
   async initialize(): Promise<void> {
+    const oldPanel=this.store.snapshot().panelVoiceRuntime;
+    if(oldPanel && !oldPanel.pid)await this.store.setPanelVoiceRuntime(undefined);
+    if(oldPanel?.pid){try{process.kill(oldPanel.pid,0);}catch(error){if(isRecord(error)&&error.code==='ESRCH')await this.store.setPanelVoiceRuntime(undefined);}}
+
     await this.store.reconcileInterruptedWork();
     await this.store.beginProducerEpoch(this.producerEpoch);
     if (!this.canRead()) {
@@ -545,6 +550,7 @@ export class AgentRuntime {
   }
 
   setTransportGeneration(generation: number | undefined): void {
+    if(this.transportGeneration!==generation)void this.panelVoice?.stop().catch(()=>undefined);
     this.transportGeneration = generation;
   }
 
@@ -948,6 +954,7 @@ export class AgentRuntime {
 
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
+    await this.panelVoice?.close();
     this.catalogSync.close();
     this.catalogWatcher?.close();
     this.claudeCatalogWatcher?.close();
@@ -1848,6 +1855,19 @@ export class AgentRuntime {
   }
 
   private voiceLane: Promise<unknown> = Promise.resolve();
+  private panelVoice?: PanelVoiceRuntime;
+  async handlePanelVoice(value:Record<string,unknown>):Promise<void> {
+    if(value.transportGeneration!==this.transportGeneration||value.producerEpoch!==this.producerEpoch||value.appServerEpoch!==this.getAppServerEpoch())throw new AgentError("VOICE_FENCED","Stale panel voice");
+    const id=String(value.voiceId??"");if(!/^pvoice_[A-Za-z0-9_-]+$/.test(id))throw new AgentError("VOICE_INVALID","Invalid panel voice identity");
+    this.panelVoice??=new PanelVoiceRuntime(this.store,event=>this.callbacks.onVolatile({...event,producerEpoch:this.producerEpoch,appServerEpoch:this.getAppServerEpoch()}));
+    if(value.action==='stop')return this.panelVoice.stop(id);
+    if(value.action==='heartbeat'){this.panelVoice.heartbeat(id);return;}
+    if(value.action==='tool.result'){this.panelVoice.result(id,String(value.requestId),value.result);return;}
+    if(value.action==='report'&&typeof value.text==='string')return this.panelVoice.report(id,value.text,String(value.reportId));
+    if(value.action!=='start'||typeof value.sdp!=='string'||value.sdp.length>65536||!value.sdp.startsWith('v=0\r\n'))throw new AgentError('VOICE_INVALID','Invalid voice offer');
+    if(!this.isWritable()||this.store.snapshot().maintenanceDrain||this.support.codexVersion!=='0.159.2')throw new AgentError('VOICE_UNAVAILABLE','Host voice unavailable');
+    return this.panelVoice.start(id,value.sdp);
+  }
   handleVoice(value: Record<string, unknown>): Promise<void> {
     const operation=this.voiceLane.catch(()=>undefined).then(()=>this.invokeVoice(value));
     this.voiceLane=operation;

@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 43) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 44) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1308,6 +1308,24 @@ export class ControlPlaneDatabase {
       ) STRICT;
       CREATE UNIQUE INDEX IF NOT EXISTS voice_project_active ON voice_sessions(project_id) WHERE state<>'closed';
       PRAGMA user_version=43`);
+    });
+
+    if (version < 44) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS panel_voice_calls (
+        voice_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        user_id TEXT NOT NULL REFERENCES users(user_id), owner_id TEXT NOT NULL REFERENCES client_sessions(client_session_id),
+        machine_id TEXT NOT NULL REFERENCES machines(machine_id), binding_json TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('starting','active','closing','closed')), created_at TEXT NOT NULL
+      ) STRICT;
+      CREATE UNIQUE INDEX IF NOT EXISTS panel_voice_user_active ON panel_voice_calls(user_id) WHERE state<>'closed';
+      CREATE TABLE IF NOT EXISTS panel_voice_jobs (
+        job_id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(user_id), workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        voice_id TEXT NOT NULL REFERENCES panel_voice_calls(voice_id), request_id TEXT NOT NULL,
+        session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id), command_id TEXT NOT NULL REFERENCES commands(command_id),
+        native_turn_id TEXT, state TEXT NOT NULL CHECK(state IN ('submitted','running','unknown','completed','failed','interrupted')), reported_call_id TEXT, created_at TEXT NOT NULL, UNIQUE(voice_id,request_id)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS panel_voice_jobs_owner ON panel_voice_jobs(user_id,created_at);
+      CREATE UNIQUE INDEX IF NOT EXISTS panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown');
+      PRAGMA user_version=44`);
     });
 
   }

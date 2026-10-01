@@ -252,6 +252,7 @@ export interface ProjectDiscoveryStatus {
 }
 
 export interface AgentState {
+  panelVoiceRuntime?: {voiceId:string;pid?:number};
   nativeDeletionTombstones: Record<string,string>;
   schemaVersion: 2;
   identity?: IdentityMetadata;

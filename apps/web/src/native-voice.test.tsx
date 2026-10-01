@@ -187,3 +187,37 @@ it("audio failure reports a bounded reason and late callbacks cannot overwrite i
  expect(socket.sent.filter(v=>v.type==="stop")).toHaveLength(1);
  expect(screen.getByRole("alert").textContent).toContain("语音音频连接失败");
 });
+
+it("global signaling survives page content changes without acquiring a project lease",async()=>{
+  const task=vi.fn();
+  const view=render(<><NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart onActiveChange={()=>undefined} onPanelTask={task}/><main>Hosts</main></>);
+  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));
+  await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  const socket=Socket.all[0]!;socket.receive({type:'ready'});
+  await waitFor(()=>expect(socket.sent[0]).toMatchObject({type:'panel.start',machineId:'host'}));
+  expect(api.acquireLease).not.toHaveBeenCalled();
+  socket.receive({type:'answer',sdp:'v=0\r\n'});
+  await waitFor(()=>expect(screen.getByRole('button',{name:'静音'})).toBeTruthy());
+  view.rerender(<><NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart onActiveChange={()=>undefined} onPanelTask={task}/><main>Projects</main></>);
+  expect(Socket.all).toHaveLength(1);expect(socket.readyState).toBe(1);expect(track.stop).not.toHaveBeenCalled();
+  act(()=>socket.receive({type:'panel_task',task:{jobId:'job',state:'running'}}));
+  expect(task).toHaveBeenCalledWith({jobId:'job',state:'running'});
+  expect(screen.getByText('项目任务正在执行')).toBeTruthy();
+});
+
+it("panel control keeps the chosen voice host across dashboard refreshes and target navigation",async()=>{
+  const {PanelVoiceControl}=await import('./components/PanelVoiceControl');
+  const open=vi.fn();
+  const host={id:'host',name:'Demo',agentVersion:'0.30.69',reachability:'live'};
+  const view=render(<PanelVoiceControl machines={[host] as never} onOpenSession={open}/>);
+  fireEvent.click(screen.getByRole('button',{name:'面板语音总控'}));
+  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));
+  await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  const socket=Socket.all[0]!;socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});
+  await waitFor(()=>expect(screen.getByRole('combobox').hasAttribute('disabled')).toBe(true));
+  view.rerender(<PanelVoiceControl machines={[{...host,id:'other'},{...host,reachability:'stale'}] as never} onOpenSession={open}/>);
+  expect(Socket.all).toHaveLength(1);expect(socket.readyState).toBe(1);expect(track.stop).not.toHaveBeenCalled();
+  act(()=>socket.receive({type:'panel_task',task:{jobId:'job',sessionId:'target',title:'Target session',host:'Demo',project:'Demo',state:'running'}}));
+  fireEvent.click(screen.getByRole('button',{name:'打开目标会话'}));
+  expect(open).toHaveBeenCalledWith('target');expect(socket.readyState).toBe(1);
+});

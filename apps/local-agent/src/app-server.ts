@@ -1,3 +1,4 @@
+import { PANEL_VOICE_TOOL, PANEL_VOICE_INSTRUCTIONS, PANEL_REALTIME_PROMPT } from "./panel-voice-tools.js";
 import { voiceErrorCode } from "./voice-errors.js";
 import { executeCodexWorkspaceOperation } from "./codex-workspace-operations.js";
 import { codexNotification } from "./codex-notifications.js";
@@ -41,7 +42,7 @@ import {
 } from "./util.js";
 
 const APP_SERVER_METHODS = new Set([
-  "thread/realtime/start", "thread/realtime/stop",
+  "thread/realtime/start", "thread/realtime/stop", "thread/realtime/appendText",
   "initialize",
   "model/list",
   "collaborationMode/list",
@@ -112,6 +113,7 @@ export interface VolatileAppEvent {
 }
 
 export interface AppServerCallbacks {
+  onPanelTool?(args: unknown): Promise<unknown>;
   findManagedThread(threadId: string): ManagedThread | undefined;
   findProject(projectId: string): ProjectRecord | undefined;
   onEvent(event: AppEvent, appServerEpoch: string): Promise<void>;
@@ -839,11 +841,24 @@ export class CodexAppServer implements AppServerClient {
     return {items,nextCursor:typeof raw.nextCursor === "string" ? raw.nextCursor : null};
   }
 
+  private panelThreadId?: string;
+  async startPanelVoice(cwd:string,voiceId:string,sdp:string):Promise<string> {
+    // Override inherited integrations on this thread only; preserve the account's normal project configuration.
+    const effective=resultObject(await this.request("config/read",{includeLayers:false}),"panel config");
+    const config:Record<string,unknown>={"features.realtime_conversation":true,"features.goals":false,"shell_environment_policy.inherit":"none","web_search":"disabled","features.shell_tool":false,"features.unified_exec":false,"features.apps":false};
+    const inherited=isRecord(effective.config)?effective.config:{};
+    if(isRecord(inherited.mcp_servers)) for(const name of Object.keys(inherited.mcp_servers)) config[`mcp_servers.${JSON.stringify(name)}.enabled`]=false;
+    const raw=resultObject(await this.request("thread/start",{cwd,ephemeral:true,approvalPolicy:"never",sandbox:"read-only",dynamicTools:[PANEL_VOICE_TOOL],developerInstructions:PANEL_VOICE_INSTRUCTIONS,config}),"panel thread/start");
+    const thread=resultObject(raw.thread,"panel thread");const id=requireString(thread.id,"thread.id",{maxLength:256});
+    this.panelThreadId=id;
+    await this.startVoice({nativeThreadId:id,realtimeSessionId:voiceId} as ManagedThread,sdp);return id;
+  }
+  async reportPanelVoice(threadId:string,text:string) {if(threadId!==this.panelThreadId)throw new AgentError("VOICE_FENCED","Wrong coordinator");await this.request("thread/realtime/appendText",{threadId,text:text.slice(0,10000)});}
   async startVoice(thread: ManagedThread, sdp: string): Promise<void> {
     if (!thread.realtimeSessionId || this.voiceIds.has(thread.nativeThreadId)) throw new AgentError("VOICE_BUSY", "Native voice is already active");
     this.voiceIds.set(thread.nativeThreadId, thread.realtimeSessionId);
     try {
-      await this.request("thread/realtime/start", { threadId:thread.nativeThreadId, outputModality:"audio", version:"v3", voice:"sol", realtimeSessionId:thread.realtimeSessionId, prompt:"You are the realtime voice interface for the current Codex project. For requests to inspect project status, read files, run commands, modify code, or perform any project task, use the native delegation mechanism to delegate to the client Codex agent. A verbal promise is not execution. Do not claim a task is running or completed until the backend reports that state. Relay backend results accurately, including failures. If the project or task is ambiguous, ask a short clarification. Keep conversation concise and use the user’s language.", includeStartupContext:true, flushTranscriptTailOnSessionEnd:false, transport:{type:"webrtc",sdp} });
+      await this.request("thread/realtime/start", { threadId:thread.nativeThreadId, outputModality:"audio", version:"v3", voice:"sol", realtimeSessionId:thread.realtimeSessionId, prompt:this.panelThreadId===thread.nativeThreadId ? PANEL_REALTIME_PROMPT : "You are the realtime voice interface for the current Codex project. For requests to inspect project status, read files, run commands, modify code, or perform any project task, use the native delegation mechanism to delegate to the client Codex agent. A verbal promise is not execution. Do not claim a task is running or completed until the backend reports that state. Relay backend results accurately, including failures. If the project or task is ambiguous, ask a short clarification. Keep conversation concise and use the user’s language.", includeStartupContext:true, flushTranscriptTailOnSessionEnd:false, transport:{type:"webrtc",sdp} });
     } catch (error) { await this.stopVoice(thread.nativeThreadId); throw error; }
   }
   async stopVoice(threadId: string): Promise<void> {
@@ -1120,6 +1135,10 @@ export class CodexAppServer implements AppServerClient {
         return;
       }
       if (message.method === "item/tool/call") {
+        if (this.panelThreadId && params.threadId===this.panelThreadId && params.tool===PANEL_VOICE_TOOL.name && !params.namespace && this.callbacks.onPanelTool) {
+          let value:unknown;try {value=await this.callbacks.onPanelTool(params.arguments);}catch {value={error:"Panel request failed; query status before retrying."};}
+          await this.writeLine({id:requestId,result:{success:true,contentItems:[{type:"inputText",text:JSON.stringify(value).slice(0,24000)}]}});return;
+        }
         const thread = typeof params.threadId === "string" ? this.callbacks.findManagedThread(params.threadId) : undefined;
         const granted = typeof params.turnId === "string" && thread?.policyVerified && thread.nativeThreadId === params.threadId && thread.appServerEpoch === this.appServerEpoch && params.tool === REFERENCE_TOOL.name && !params.namespace && (params.turnId === thread.activeTurnId || params.turnId === this.referenceTurns.get(thread.nativeThreadId));
         const result = granted ? await queryReference(this.turnReferences.get(thread.nativeThreadId) ?? [], params.arguments) : { success: false, contentItems: [{ type: "inputText", text: "Tool is unavailable for this thread or turn" }] };
@@ -1343,7 +1362,7 @@ export class CodexAppServer implements AppServerClient {
       this.callbacks.onCatalogChanged?.(this.appServerEpoch);
     }
     const threadId = threadIdFromParams(params);
-    if (threadId && !this.callbacks.findManagedThread(threadId)) return;
+    if (threadId && threadId !== this.panelThreadId && !this.callbacks.findManagedThread(threadId)) return;
     if (threadId && method.startsWith("thread/realtime/")) {
       const voiceId=this.voiceIds.get(threadId);
       if(voiceId && ["thread/realtime/transcript/delta","thread/realtime/transcript/done"].includes(method) && ["user","assistant"].includes(String(params.role))) {

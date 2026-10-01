@@ -4,14 +4,15 @@ import { createPortal } from "react-dom";
 import { api } from "../lib/api";
 import { t } from "../i18n";
 
+export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;state:string;result:string;link:string; }
 type Phase = "idle" | "connecting" | "connected" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
-export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange }: { sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
+export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask }: { globalMachineId?: string; onPanelTask?: (task: PanelVoiceTask) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
   const [expanded, setExpanded] = useState(false);
   const control = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const [portalHost, setPortalHost] = useState<Element | null>(null);
-  useEffect(() => { setPortalHost(control.current?.closest(".inspector") ?? null); }, [sessionId]);
+  useEffect(() => { setPortalHost(globalMachineId ? document.body : control.current?.closest(".inspector") ?? null); }, [sessionId,globalMachineId]);
   const trigger = useRef<HTMLButtonElement>(null);
   const popoverId = useId();
   useEffect(() => {
@@ -49,13 +50,16 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   };
   useEffect(() => {
     const hide = () => { if (resources.current.starting || resources.current.peer || resources.current.stream) { cleanup.current("PAGE_HIDDEN"); setPhase("idle"); } };
+    const otherCall = (event:Event) => {if((event as CustomEvent).detail!==popoverId&&(resources.current.starting||resources.current.peer)){cleanup.current("USER_HANGUP");setPhase("idle");}};
+    window.addEventListener("agentfleet:voice-start",otherCall);
     const visibility = () => { if (document.visibilityState === "hidden") hide(); };
     window.addEventListener("pagehide", hide);
     document.addEventListener("visibilitychange", visibility);
-    return () => { cleanup.current(); window.removeEventListener("pagehide", hide); document.removeEventListener("visibilitychange", visibility); };
+    return () => { cleanup.current(); window.removeEventListener("agentfleet:voice-start",otherCall); window.removeEventListener("pagehide", hide); document.removeEventListener("visibilitychange", visibility); };
   }, [sessionId]);
 
   async function start() {
+    window.dispatchEvent(new CustomEvent("agentfleet:voice-start",{detail:popoverId}));
     cleanup.current();
     const attempt = generation.current;
     const current = () => attempt === generation.current;
@@ -97,7 +101,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
         peer.addEventListener("icegatheringstatechange", changed);
       });
       if (!current()) return;
-      const { lease } = await api.acquireLease(sessionId);
+      const lease = globalMachineId ? undefined : (await api.acquireLease(sessionId)).lease;
       if (!current()) return;
       const socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/voice`);
       resources.current.socket = socket;
@@ -105,10 +109,10 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       socket.onmessage = event => {
         if (!current()) return;
         void (async () => {
-          const value = JSON.parse(String(event.data)) as { type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string };
+          const value = JSON.parse(String(event.data)) as { type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask };
           if (value.type === "ready" && !offerSent) {
             offerSent = true;
-            socket.send(JSON.stringify({ type: "start", logicalSessionId: sessionId, leaseId: lease.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
+            socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
             resources.current.heartbeat = setInterval(() => {
               if (!current() || socket.readyState !== WebSocket.OPEN) return;
               socket.send(JSON.stringify({ type: "heartbeat" }));
@@ -123,6 +127,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
             });
           }
           else if (value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
+          else if(value.type==="panel_task" && value.task) { onPanelTask?.(value.task); setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
           else if (value.type === "error") fail(value.message ?? t("原生实时语音暂不可用"), "SERVER_ERROR");
           else if (value.type === "closed") { cleanup.current("NATIVE_CLOSED"); setPhase("idle"); }
         })().catch(() => fail(t("原生实时语音暂不可用"), "SIGNAL_INVALID"));
@@ -136,8 +141,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   }
   const active = phase === "connecting" || phase === "connected";
   const status = active ? t(phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
-  const callPanel = expanded && <div ref={panel} id={popoverId} className="native-voice__popover" role="region" aria-label={t("原生实时语音")}>
-    <div className="native-voice__head"><strong>{t("语音通话")}</strong><button type="button" className="native-voice__close" aria-label={t("收起语音控制")} onClick={() => { setExpanded(false); trigger.current?.focus(); }}><X size={16} /></button></div>
+  const callPanel = expanded && <div ref={panel} id={popoverId} className={`native-voice__popover${globalMachineId ? " native-voice__popover--global" : ""}`} role="region" aria-label={t("原生实时语音")}>
+    <div className="native-voice__head"><strong>{t(globalMachineId ? "面板语音总控" : "语音通话")}</strong><button type="button" className="native-voice__close" aria-label={t("收起语音控制")} onClick={() => { setExpanded(false); trigger.current?.focus(); }}><X size={16} /></button></div>
     <div className={`native-voice__orb${active && !muted ? " native-voice__orb--live" : ""}`} aria-hidden="true">{phase === "connecting" && <LoaderCircle className="spin" size={24} />}</div>
     <p className="native-voice__status" role="status">{status}</p>
     {message && <p className="native-voice__error" role="alert">{message}</p>}
@@ -150,7 +155,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     {transcript.length > 0 && <details className="native-voice__transcript-details"><summary>{t("本次语音转写")}</summary><div className="native-voice__transcript" ref={transcriptArea} tabIndex={0}>{transcript.map((entry,index) => <p key={index}><strong>{entry.role === "user" ? t("你") : "Codex"}</strong><span>{entry.text}</span></p>)}</div></details>}
   </div>;
   return <div ref={control} className={`native-voice${active ? " native-voice--active" : ""}`}>
-    <button ref={trigger} type="button" className="button button--secondary native-voice__trigger" disabled={!active && !canStart} aria-label={t(active ? "语音控制" : "开始语音")} title={t(active ? "语音控制" : "开始语音")} aria-expanded={expanded} aria-controls={expanded ? popoverId : undefined} onClick={() => { if (active) setExpanded(value => !value); else void start(); }}>
+    <button ref={trigger} type="button" className="button button--secondary native-voice__trigger" disabled={!active && !canStart} aria-label={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} title={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} aria-expanded={expanded} aria-controls={expanded ? popoverId : undefined} onClick={() => { if (active) setExpanded(value => !value); else void start(); }}>
       {phase === "connecting" ? <LoaderCircle className="spin" size={19} /> : <Phone size={19} />}
       {active && <i className="native-voice__indicator" aria-hidden="true" />}
     </button>

@@ -519,7 +519,7 @@ export class CoordinationService {
     return { scanned: candidates.length, scheduled };
   }
 
-  createCommand(principal: Principal, logicalSessionId: string, input: CreateCommandRequest): {
+  createCommand(principal: Principal, logicalSessionId: string, input: CreateCommandRequest, withinTransaction = false): {
     command: Record<string, unknown>;
     duplicate: boolean;
   } {
@@ -531,7 +531,7 @@ export class CoordinationService {
     const computedHash = hashPayload({ type: input.type, precondition, payload });
     invariant(!input.payloadHash || input.payloadHash === computedHash, 400, "PAYLOAD_HASH_MISMATCH", "payloadHash does not match the canonical command body", { computedHash });
 
-    return this.db.transaction(() => {
+    const create = () => {
       const existing = this.db.get<{ command_id: string; payload_hash: string; request_hash: string | null }>(
         `SELECT command_id,payload_hash,request_hash FROM commands
          WHERE workspace_id=? AND actor_client_session_id=? AND client_mutation_id=?`,
@@ -940,7 +940,8 @@ export class CoordinationService {
         },
       });
       return { command: this.getCommand(principal, commandId), duplicate: false };
-    });
+    };
+    return withinTransaction ? create() : this.db.transaction(create);
   }
 
   private commandSession(principal: Principal, logicalSessionId: string): SessionCommandRow {
