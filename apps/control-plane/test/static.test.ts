@@ -13,7 +13,7 @@ function config(webDistDir: string): ControlPlaneConfig {
     databasePath: ":memory:",
     webDistDir,
     publicOrigin: "http://control-plane.test",
-    allowedOrigins: new Set(["http://control-plane.test"]),
+    allowedOrigins: new Set(["http://control-plane.test", "https://panel.example.test"]),
     adminEmail: "admin@example.test",
     adminPassword: "correct horse battery staple",
     cookieName: "agentfleet_test",
@@ -44,6 +44,9 @@ test("static hosting preserves SPA routes without masking missing assets", async
 
   const spaRoute = await app.inject({ method: "GET", url: "/sessions/session-1" });
   assert.equal(spaRoute.statusCode, 200);
+  assert.equal(spaRoute.headers["permissions-policy"], "camera=(), microphone=(self), geolocation=()");
+  assert.match(spaRoute.headers["content-security-policy"] ?? "", /connect-src 'self' ws:\/\/control-plane\.test wss:\/\/panel\.example\.test;/);
+  assert.match(spaRoute.headers["content-security-policy"] ?? "", /media-src 'self' blob:/);
   assert.match(spaRoute.body, /AgentFleet test shell/);
   assert.match(spaRoute.headers["content-security-policy"] ?? "", /base-uri 'none'/);
   assert.match(spaRoute.headers["content-security-policy"] ?? "", /frame-ancestors 'none'/);

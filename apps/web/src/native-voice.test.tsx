@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NativeVoicePanel } from "./components/NativeVoicePanel";
 import { api } from "./lib/api";
@@ -106,4 +106,37 @@ it("busy sessions cannot start voice", () => {
   render(<NativeVoicePanel sessionId="one" canStart={false} onActiveChange={() => undefined} />);
   expect(screen.getByRole("button", { name: "开始语音" }).hasAttribute("disabled")).toBe(true);
   expect(getUserMedia).not.toHaveBeenCalled();
+});
+
+it("a brief cellular audio disconnection recovers without stopping the microphone", async () => {
+  render(<NativeVoicePanel sessionId="session" canStart onActiveChange={() => undefined} />);
+  fireEvent.click(screen.getByRole("button", { name: "开始语音" }));
+  await waitFor(() => expect(Socket.all).toHaveLength(1));
+  Socket.all[0]!.receive({ type: "answer", sdp: "v=0\r\n" });
+  await waitFor(() => expect(screen.getByRole("button", { name: "静音" }).hasAttribute("disabled")).toBe(false));
+  vi.useFakeTimers();
+  try {
+    const peer = Peer.all[0]!;
+    peer.connectionState = "disconnected"; peer.onconnectionstatechange?.();
+    vi.advanceTimersByTime(2_000);
+    peer.connectionState = "connected"; peer.onconnectionstatechange?.();
+    vi.advanceTimersByTime(9_000);
+    expect(track.stop).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+    peer.connectionState = "disconnected"; peer.onconnectionstatechange?.();
+    act(() => vi.advanceTimersByTime(8_000));
+    expect(track.stop).toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toContain("音频连接中断");
+  } finally { vi.useRealTimers(); }
+});
+
+it("signaling failures are distinguished from audio failures and stop the microphone", async () => {
+  render(<NativeVoicePanel sessionId="session" canStart onActiveChange={() => undefined} />);
+  fireEvent.click(screen.getByRole("button", { name: "开始语音" }));
+  await waitFor(() => expect(Socket.all).toHaveLength(1));
+  fireEvent.click(screen.getByRole("button", { name: "收起语音控制" }));
+  act(() => Socket.all[0]!.onerror?.());
+  expect(screen.getByRole("alert").textContent).toContain("信令连接失败");
+  expect(track.stop).toHaveBeenCalled();
+  expect(Peer.all[0]!.closed).toBe(true);
 });

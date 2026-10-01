@@ -297,10 +297,10 @@ export async function buildControlPlane(
     reply.header("x-content-type-options", "nosniff");
     reply.header("x-frame-options", "DENY");
     reply.header("referrer-policy", "no-referrer");
-    reply.header("permissions-policy", "camera=(), microphone=(), geolocation=()");
+    reply.header("permissions-policy", "camera=(), microphone=(self), geolocation=()");
     reply.header(
       "content-security-policy",
-      "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; object-src 'none'; script-src 'self'; style-src 'self'",
+      `default-src 'self'; base-uri 'none'; connect-src 'self' ${[...config.allowedOrigins].map(origin => { const url = new URL(origin); url.protocol = url.protocol === "https:" ? "wss:" : "ws:"; return url.origin; }).join(" ")}; media-src 'self' blob:; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; object-src 'none'; script-src 'self'; style-src 'self'`,
     );
     if (
       request.url.startsWith("/api/") ||

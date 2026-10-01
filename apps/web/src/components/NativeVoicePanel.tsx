@@ -31,7 +31,7 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
   const [playBlocked, setPlayBlocked] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
   const generation = useRef(0);
-  const resources = useRef<{ starting?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; timeout?: ReturnType<typeof setTimeout> }>({});
+  const resources = useRef<{ starting?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
   const activeCallback = useRef(onActiveChange);
   activeCallback.current = onActiveChange;
   const cleanup = useRef<() => void>(() => undefined);
@@ -39,7 +39,7 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
     generation.current++;
     const owned = resources.current;
     resources.current = {};
-    clearInterval(owned.heartbeat); clearTimeout(owned.timeout);
+    clearInterval(owned.heartbeat); clearTimeout(owned.timeout); clearTimeout(owned.disconnectTimeout);
     owned.stream?.getTracks().forEach(track => track.stop());
     owned.peer?.close();
     if (owned.socket?.readyState === WebSocket.OPEN) owned.socket.send(JSON.stringify({ type: "stop" }));
@@ -81,8 +81,12 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
       };
       peer.onconnectionstatechange = () => {
         if (!current()) return;
-        if (peer.connectionState === "connected") { clearTimeout(resources.current.timeout); setPhase("connected"); }
-        if (["failed", "disconnected", "closed"].includes(peer.connectionState)) fail(t("语音连接中断，麦克风已关闭，请重新开始"));
+        if (peer.connectionState === "connected") { clearTimeout(resources.current.timeout); clearTimeout(resources.current.disconnectTimeout); resources.current.disconnectTimeout = undefined; setPhase("connected"); }
+        // Cellular transitions can briefly disconnect ICE without ending the call.
+        if (peer.connectionState === "disconnected" && !resources.current.disconnectTimeout) {
+          resources.current.disconnectTimeout = setTimeout(() => fail(t("语音音频连接中断，麦克风已关闭，请重新开始")), 8_000);
+        }
+        if (["failed", "closed"].includes(peer.connectionState)) fail(t("语音音频连接失败，麦克风已关闭，请更换网络后重试"));
       };
       resources.current.timeout = setTimeout(() => fail(t("语音连接超时，麦克风已关闭，请稍后重试")), 45_000);
       await peer.setLocalDescription(await peer.createOffer());
@@ -128,7 +132,7 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
           else if (value.type === "closed") { cleanup.current(); setPhase("idle"); }
         })().catch(() => fail(t("原生实时语音暂不可用")));
       };
-      socket.onerror = () => fail(t("语音连接中断，麦克风已关闭，请重新开始"));
+      socket.onerror = () => fail(t("语音信令连接失败，麦克风已关闭，请刷新面板后重试"));
       socket.onclose = () => fail(t("语音连接已结束，麦克风已关闭"));
     } catch (error) {
       const denied = error instanceof DOMException && ["NotAllowedError", "SecurityError"].includes(error.name);
