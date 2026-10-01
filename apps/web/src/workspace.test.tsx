@@ -979,7 +979,7 @@ it.each(["追加本轮","加入队列"])("clears a previous reconciliation warni
   await waitFor(()=>expect(screen.queryByText("会话正在恢复状态，请稍候再发送")).toBeNull());
 });
 
-it("voice composer queues independent work while idle and keeps running work steerable",async()=>{
+it("voice composer sends while idle and keeps running work steerable",async()=>{
  vi.stubGlobal("isSecureContext",true);
  vi.stubGlobal("RTCPeerConnection",class {});
  const previous=Object.getOwnPropertyDescriptor(navigator,"mediaDevices");
@@ -989,11 +989,11 @@ it("voice composer queues independent work while idle and keeps running work ste
  try {
   fireEvent.click(screen.getByRole("button",{name:"开始语音"}));
   fireEvent.change(screen.getByRole("textbox",{name:"发送给 Codex 的消息"}),{target:{value:"独立任务"}});
-  expect(screen.queryByRole("button",{name:"发送"})).toBeNull();
+  expect(screen.getByRole("button",{name:"发送"})).toBeTruthy();
   expect(screen.queryByRole("button",{name:"追加本轮"})).toBeNull();
-  fireEvent.click(screen.getByRole("button",{name:"加入队列"}));
-  await waitFor(()=>expect(queue).toHaveBeenCalledOnce());
-  expect(send).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button",{name:"发送"}));
+  await waitFor(()=>expect(send).toHaveBeenCalledOnce());
+  expect(queue).not.toHaveBeenCalled();
   const running={...props.detail,session:{...props.detail.session,activeTurnId:"voice-turn",state:{...props.detail.session.state,threadRuntime:"active" as const,currentTurn:"in_progress" as const}}};
   view.rerender(<SessionInspector {...props} detail={running} onQueue={queue} onSteer={steer} onSend={send}/>);
   fireEvent.change(screen.getByRole("textbox",{name:"发送给 Codex 的消息"}),{target:{value:"补充要求"}});
@@ -1002,7 +1002,7 @@ it("voice composer queues independent work while idle and keeps running work ste
  } finally {view.unmount();vi.unstubAllGlobals();if(previous)Object.defineProperty(navigator,"mediaDevices",previous);else Reflect.deleteProperty(navigator,"mediaDevices");}
 });
 
-it("idle voice queue reaches the API with text and images, preserving draft on rejection", async () => {
+it("idle voice send reaches the API with text and images, preserving draft on rejection", async () => {
   history.replaceState(null, "", "/sessions/A");
   vi.stubGlobal("isSecureContext", true);
   vi.stubGlobal("RTCPeerConnection", class {});
@@ -1013,23 +1013,23 @@ it("idle voice queue reaches the API with text and images, preserving draft on r
   localStorage.setItem("agentfleet.images:user-1:A", JSON.stringify([png]));
   const snapshot = { ...detail("A"), session: { ...detail("A").session, imageInputSupported: true } };
   vi.mocked(api.session).mockResolvedValue(snapshot);
-  const command = { id: "voice-queue", type: "turn.queue", state: "queued" as const, outcome: "pending" as const, createdAt: "2026-10-01T00:00:00Z" };
+  const command = { id: "voice-queue", type: "turn.start", state: "queued" as const, outcome: "pending" as const, createdAt: "2026-10-01T00:00:00Z" };
   vi.mocked(api.command).mockRejectedValueOnce(new Error("排队暂时失败")).mockResolvedValueOnce({ command });
   const view = render(<App />);
   try {
     fireEvent.click(await screen.findByRole("button", { name: "开始语音" }));
     const input = screen.getByRole("textbox", { name: "发送给 Codex 的消息" });
     fireEvent.change(input, { target: { value: "请检查这张截图" } });
-    fireEvent.click(screen.getByRole("button", { name: "加入队列" }));
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
     await waitFor(() => expect(api.command).toHaveBeenCalledTimes(1));
     expect(api.command).toHaveBeenLastCalledWith("A", expect.objectContaining({
-      type: "turn.queue", payload: expect.objectContaining({ prompt: "请检查这张截图", images: [png] }),
-      precondition: expect.objectContaining({ expectedActiveTurnId: null, queueVersion: 0 }),
+      type: "turn.start", payload: expect.objectContaining({ prompt: "请检查这张截图", images: [png] }),
+      precondition: expect.objectContaining({ expectedActiveTurnId: null }),
     }));
     await screen.findAllByText("排队暂时失败");
     expect((input as HTMLTextAreaElement).value).toBe("请检查这张截图");
     expect(localStorage.getItem("agentfleet.images:user-1:A")).toContain(png);
-    fireEvent.click(screen.getByRole("button", { name: "加入队列" }));
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
     await waitFor(() => expect(api.command).toHaveBeenCalledTimes(2));
     await waitFor(() => expect((input as HTMLTextAreaElement).value).toBe(""));
     expect(localStorage.getItem("agentfleet.images:user-1:A")).toBeNull();

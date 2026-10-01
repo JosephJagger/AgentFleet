@@ -1674,3 +1674,21 @@ test("reconnecting after a process restart requires a dead recorded writer or a 
   await runtime.handleVoice(value);
   assert.equal(signals.at(-1)?.previousWriterExitConfirmed,true);
 });
+
+test("typed start during voice reuses the verified session without resuming or disconnecting audio", async t => {
+  const { store, projects } = await fixture(); const project = projects[0]!; let server!: FakeAppServer;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: cb => (server = new FakeAppServer("voice-typed", cb)) });
+  runtime.setTransportGeneration(1); await runtime.initialize(); t.after(() => runtime.shutdown());
+  const base = command(project, "typed-attempt", "typed-command", "voice-session", server.appServerEpoch);
+  await store.setManagedThread({ nativeThreadId: "voice-native", projectId: project.id, logicalSessionId: base.logicalSessionId,
+    executionSegmentId: base.executionSegmentId, appServerEpoch: server.appServerEpoch, policyVersion: "remote-restricted-v1",
+    policyVerified: true, subscribed: false, contentEpoch: 1, createdAt: new Date().toISOString(), realtimeSessionId: "voice_fixture" });
+  await runtime.handleCommand({ ...base, commandId: "voice-policy-change", attemptId: "voice-policy-change", payload: { ...base.payload, permissionProfile: "full" } }, 1);
+  assert.equal(server.startTurnCount, 0); assert.equal(server.unsubscribeCount, 0);
+  await runtime.handleCommand(base, 1);
+  assert.equal(server.startTurnCount, 1);
+  assert.equal(server.resumeCount, 0); assert.equal(server.unsubscribeCount, 0); assert.equal(server.voiceStops, 0);
+  assert.equal(store.snapshot().managedThreads['voice-native']?.realtimeSessionId, "voice_fixture");
+  await runtime.handleCommand(command(project, "other-attempt", "other-command", "other-session", server.appServerEpoch), 1);
+  assert.equal(server.startTurnCount, 1);
+});

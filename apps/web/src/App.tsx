@@ -1045,11 +1045,11 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         </details>}
         <details className="session-sync-details session-config-section"><summary><span>{t("同步详情")}<small>{t("查看会话同步状态的排查信息")}</small></span></summary><p className="mono">seq {session.sessionSeq} · epoch {session.contentEpoch}</p></details>
       </SessionConfiguration>
-      <form className="composer" onSubmit={event => { if (voiceActive) event.preventDefault(); else void submit(event); }}>
+      <form className="composer" onSubmit={event => { void submit(event); }}>
         {session.provider !== "claude" && prompt.trimStart().startsWith("/") && <div className="codex-command-menu" role="group" aria-label={t("Codex 命令")}><p>{t("面板命令 · 点击待接入项可查看原因，不会发送给模型")}</p>{codexCommands.filter((item) => item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map((item) => <button type="button" key={item.name} onClick={() => void runSlash(item.name, slashCommand?.args)}><code>/{item.name}</code><span>{item.label} · {coverageLabels[item.coverage]}</span></button>)}</div>}
         {!configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
-        {voiceActive && <p className="composer-mode" role="status">{t("通话中可追加正在执行的任务；排队任务将在挂断并完成当前任务后执行。")}</p>}
+        {voiceActive && <p className="composer-mode" role="status">{t("通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。")}</p>}
         {hasActiveTurn && <div className="composer-mode"><Activity size={14} />{t(session.provider === "claude" ? "Claude Code 正在处理：可排到下一轮" : "Codex 正在处理：可补充当前任务，或排到下一轮")}</div>}
         {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
 
@@ -1177,7 +1177,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             {session.collaborationModes?.includes("plan") && <button type="button" disabled={hasActiveTurn || (session.provider === "claude" && !claudePrefs.ready)} aria-pressed={session.provider === "claude" ? claudePlan : modeOverride === "plan"} onClick={() => { closeAddMenuAfterTouchChoice(); if (session.provider !== "claude" && !modeBase?.model) { setConfiguration({ section: "settings", nonce: Date.now() }); setCommandMessage(t("请先选择模型，再开启计划模式。")); return; } if(session.provider === "claude") {void claudePrefs.save({...claudePrefs.settings,mode:claudePlan?"default":"plan"}).catch(error=>setCommandMessage(errorMessage(error)));} else setModeOverride(current => current === "plan" ? undefined : "plan"); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{(session.provider === "claude" ? claudePlan : modeOverride === "plan") ? t("已开启；下一轮按计划模式运行") : session.provider !== "claude" && !modeBase?.model ? t("选择模型后可开启") : t("先分析并制定计划")}</small></span><i className={(session.provider === "claude" ? claudePlan : modeOverride === "plan") ? "active" : ""} /></button>}
             {session.provider !== "claude" && (session.plugins?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.plugins!.map(plugin => { const selected = selectedPlugins.some(item => item.pluginId === plugin.pluginId); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={plugin.pluginId} onClick={() => { setSelectedPlugins(current => selected ? current.filter(item => item.pluginId !== plugin.pluginId) : [...current, plugin]); closeAddMenuAfterTouchChoice(); }}><Puzzle size={17} /><span><b>{plugin.pluginName}</b></span></button>; })}</div></>}
           </div></details>
-          {hasActiveTurn || voiceActive ? (
+          {hasActiveTurn ? (
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>}
@@ -1187,7 +1187,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>
           ) : (
-            <button className="button button--primary" disabled={voiceActive || !canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
+            <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
           )}</div>}
           </div>
         </div>

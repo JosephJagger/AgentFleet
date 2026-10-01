@@ -129,3 +129,25 @@ test("voice restores a released writer with realtime enabled and rejects unverif
   verified=false;await assert.rejects(server.startVoice(thread,"sdp"),{code:"VOICE_POLICY_UNVERIFIED"});
   assert.equal(starts,1);await server.stop();
 });
+
+test("typed work shares the live voice writer and rejects a concurrently started native task", async () => {
+  let clients = 0, resumes = 0, turns = 0, stops = 0;
+  const thread = { nativeThreadId: "voice", projectId: "project", realtimeSessionId: "voice_fixture", policyVerified: true } as ManagedThread;
+  const callbacks = { findProject: () => project, findManagedThread: () => thread, onEvent: async () => undefined, onVolatile: () => undefined, onExit: async () => undefined } as unknown as AppServerCallbacks;
+  const server = new SessionAppServer(callbacks, (_cb, epoch) => {
+    clients++;
+    return { appServerEpoch: epoch, start: async () => undefined, stop: async () => { stops++; }, getProcessId: () => process.pid,
+      resumeThread: async () => { resumes++; return { nativeThreadId: "voice", policyVerified: true }; },
+      startVoice: async () => undefined, stopVoice: async () => undefined,
+      startTurn: async () => { turns++; return { nativeTurnId: "typed", status: "inProgress" }; },
+    } as unknown as AppServerClient;
+  });
+  await server.startVoice(thread, "sdp");
+  const initialClients = clients;
+  await server.startTurn(thread, project, "look at the attached image", undefined, undefined, ["data:image/png;base64,fixture"]);
+  assert.equal(turns, 1); assert.equal(clients, initialClients); assert.equal(resumes, 1); assert.equal(stops, 0);
+  thread.activeTurnId = "native-race";
+  await assert.rejects(server.startTurn(thread, project, "another"), { code: "THREAD_BUSY" });
+  assert.equal(turns, 1);
+  await server.stop();
+});

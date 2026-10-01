@@ -242,6 +242,7 @@ const KNOWN_FAILED_INVOCATION_CODES = new Set([
   "THREAD_READ_ONLY",
   "THREAD_RESUME_MISMATCH",
   "TURN_PRECONDITION_FAILED",
+  "VOICE_POLICY_CHANGED",
 ]);
 
 function isKnownFailedInvocation(error: unknown): boolean {
@@ -807,7 +808,7 @@ export class AgentRuntime {
         throw new AgentError("MACHINE_DRAINING", "the agent is waiting for a safe maintenance restart");
       }
       const project = projectById(this.store, command.projectId);
-      if(Object.values(this.store.snapshot().managedThreads).some(t=>t.realtimeSessionId && (t.projectId===project.id || command.type==="codex.manage")) && !["turn.cancel","turn.steer","approval.decide_once","input.respond"].includes(command.type)) throw new AgentError("VOICE_PROJECT_BUSY", "请先结束项目的实时语音，再执行此操作");
+      if(Object.values(this.store.snapshot().managedThreads).some(t=>t.realtimeSessionId && (t.projectId===project.id || command.type==="codex.manage") && !(command.type==="turn.start" && t.logicalSessionId===command.logicalSessionId)) && !["turn.cancel","turn.steer","approval.decide_once","input.respond"].includes(command.type)) throw new AgentError("VOICE_PROJECT_BUSY", "请先结束项目的实时语音，再执行此操作");
       await verifyProjectIdentity(project);
       if (!this.isWritable()) throw new AgentError("MACHINE_READ_ONLY", this.readOnlyReasons().join("; "));
       const server = this.appServer;
@@ -1653,11 +1654,14 @@ export class AgentRuntime {
         }
         if (thread.projectId !== project.id) throw new AgentError("THREAD_NOT_MANAGED", "thread is not owned by this project");
         if (thread.activeTurnId !== undefined) throw new AgentError("THREAD_BUSY", "thread still has an active turn");
+        if (thread.realtimeSessionId && ((thread.permissionProfile ?? "project") !== profile || thread.appServerEpoch !== server.appServerEpoch || !thread.policyVerified)) {
+          throw new AgentError("VOICE_POLICY_CHANGED", "请结束通话后再更改执行权限或恢复会话");
+        }
         if ((thread.permissionProfile ?? "project") !== profile && thread.subscribed) {
           await server.unsubscribeThread(thread.nativeThreadId);
           thread = await this.store.updateManagedThread(thread.nativeThreadId, candidate => { candidate.subscribed = false; });
         }
-        if (thread.appServerEpoch !== server.appServerEpoch || !thread.policyVerified || !thread.subscribed) {
+        if (thread.appServerEpoch !== server.appServerEpoch || !thread.policyVerified || (!thread.subscribed && !thread.realtimeSessionId)) {
           const resumed = await server.resumeThread(thread.nativeThreadId, project, thread.sessionCwd ?? project.root, profile);
           if (!resumed.policyVerified) {
             throw new AgentError("POLICY_NOT_PROVEN", resumed.policyFailure ?? "effective thread policy could not be proven");
@@ -1753,7 +1757,7 @@ export class AgentRuntime {
         if (!thread || thread.projectId !== project.id) {
           throw new AgentError("THREAD_NOT_MANAGED", "thread is not managed by this project");
         }
-        if (thread.appServerEpoch !== server.appServerEpoch || !thread.policyVerified || !thread.subscribed) {
+        if (thread.appServerEpoch !== server.appServerEpoch || !thread.policyVerified || (!thread.subscribed && !thread.realtimeSessionId)) {
           throw new AgentError("THREAD_READ_ONLY", "active thread ownership or policy cannot be proven");
         }
         if (thread.activeTurnId !== turnId || command.precondition.nativeTurnId !== turnId) {

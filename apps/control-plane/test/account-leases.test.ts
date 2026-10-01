@@ -75,6 +75,13 @@ test("same account switches browsers without handoff; other accounts and concurr
     payload: { ...imageRequest, payload: { prompt: "image", images: ["http://private-host/image.png"] } } });
   assert.equal(invalidImage.statusCode, 400);
   assert.equal(invalidImage.json().error.code, "INVALID_IMAGES");
+  // A live call permits typed/image starts only in its own session, not while closing.
+  const holder = db.get<{holder_client_session_id:string}>("SELECT holder_client_session_id FROM control_leases WHERE control_lease_id=?", recovered.json().leaseId)!;
+  db.run("INSERT INTO voice_sessions(voice_id,logical_session_id,project_id,machine_id,owner_id,lease_id,binding_json,state,created_at,updated_at) VALUES('typed-voice',?,'proj_accounts','mach_accounts',?,?,'{}','closing',?,?)", session.logicalSessionId, holder.holder_client_session_id, recovered.json().leaseId, now, now);
+  const closing = await app.inject({ method: "POST", url: `${url}/commands`, headers: b, payload: payload("voice-closing-denied", recovered.json().leaseId) });
+  assert.equal(closing.statusCode, 409);
+  assert.equal(closing.json().error.code, "VOICE_PROJECT_BUSY");
+  db.run("UPDATE voice_sessions SET state='active' WHERE voice_id='typed-voice'");
   const results = await Promise.all([a, b].map((headers, i) => app.inject({ method: "POST", url: `${url}/commands`, headers,
     payload: { ...payload(`concurrent-account-${i}`, recovered.json().leaseId), payload: { prompt: "", images: [png] } } })));
   assert.deepEqual(results.map(r => r.statusCode).sort(), [202, 409]);

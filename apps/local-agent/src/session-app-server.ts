@@ -230,7 +230,11 @@ export class SessionAppServer implements AppServerClient {
     });
   }
   startTurn(thread: ManagedThread, project: ProjectRecord, prompt: string, messageId?: string, settings?: CodexSettings, images?: string[], extras?: TurnExtras) {
-    return this.serial(thread.nativeThreadId, () => this.writer(thread.nativeThreadId).client.startTurn(thread, project, prompt, messageId, settings, images, extras));
+    return this.serial(thread.nativeThreadId, () => {
+      const current = this.callbacks.findManagedThread(thread.nativeThreadId);
+      if (current?.activeTurnId) throw new AgentError("THREAD_BUSY", "A native task started before the message could be sent; append to it or retry");
+      return this.writer(thread.nativeThreadId).client.startTurn(thread, project, prompt, messageId, settings, images, extras);
+    });
   }
   startNativeTurn(thread: ManagedThread, action: "compact" | "review", target?: Record<string, unknown>) {
     return this.serial(thread.nativeThreadId, () => this.writer(thread.nativeThreadId).client.startNativeTurn!(thread, action, target));

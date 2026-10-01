@@ -2827,5 +2827,6 @@
   "通话中可追加正在执行的任务；排队任务将在挂断并完成当前任务后执行。": "During a call, add instructions to the running task. Queued tasks run after the call and current task end.",
   "语音请求": "Voice request",
   "展开记录": "Expand transcript",
-  "语音记录": "Voice transcript"
+  "语音记录": "Voice transcript",
+  "通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。": "Send text and images during calls. Add to a running task, or queue work for later."
 }
