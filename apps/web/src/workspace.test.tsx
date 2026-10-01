@@ -1001,3 +1001,41 @@ it("voice composer queues independent work while idle and keeps running work ste
   await waitFor(()=>expect(steer).toHaveBeenCalledOnce());
  } finally {view.unmount();vi.unstubAllGlobals();if(previous)Object.defineProperty(navigator,"mediaDevices",previous);else Reflect.deleteProperty(navigator,"mediaDevices");}
 });
+
+it("idle voice queue reaches the API with text and images, preserving draft on rejection", async () => {
+  history.replaceState(null, "", "/sessions/A");
+  vi.stubGlobal("isSecureContext", true);
+  vi.stubGlobal("RTCPeerConnection", class {});
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  const previous = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+  Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: () => new Promise(() => {}) } });
+  const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
+  localStorage.setItem("agentfleet.images:user-1:A", JSON.stringify([png]));
+  const snapshot = { ...detail("A"), session: { ...detail("A").session, imageInputSupported: true } };
+  vi.mocked(api.session).mockResolvedValue(snapshot);
+  const command = { id: "voice-queue", type: "turn.queue", state: "queued" as const, outcome: "pending" as const, createdAt: "2026-10-01T00:00:00Z" };
+  vi.mocked(api.command).mockRejectedValueOnce(new Error("排队暂时失败")).mockResolvedValueOnce({ command });
+  const view = render(<App />);
+  try {
+    fireEvent.click(await screen.findByRole("button", { name: "开始语音" }));
+    const input = screen.getByRole("textbox", { name: "发送给 Codex 的消息" });
+    fireEvent.change(input, { target: { value: "请检查这张截图" } });
+    fireEvent.click(screen.getByRole("button", { name: "加入队列" }));
+    await waitFor(() => expect(api.command).toHaveBeenCalledTimes(1));
+    expect(api.command).toHaveBeenLastCalledWith("A", expect.objectContaining({
+      type: "turn.queue", payload: expect.objectContaining({ prompt: "请检查这张截图", images: [png] }),
+      precondition: expect.objectContaining({ expectedActiveTurnId: null, queueVersion: 0 }),
+    }));
+    await screen.findAllByText("排队暂时失败");
+    expect((input as HTMLTextAreaElement).value).toBe("请检查这张截图");
+    expect(localStorage.getItem("agentfleet.images:user-1:A")).toContain(png);
+    fireEvent.click(screen.getByRole("button", { name: "加入队列" }));
+    await waitFor(() => expect(api.command).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect((input as HTMLTextAreaElement).value).toBe(""));
+    expect(localStorage.getItem("agentfleet.images:user-1:A")).toBeNull();
+  } finally {
+    view.unmount(); vi.unstubAllGlobals();
+    if (previous) Object.defineProperty(navigator, "mediaDevices", previous);
+    else Reflect.deleteProperty(navigator, "mediaDevices");
+  }
+});
