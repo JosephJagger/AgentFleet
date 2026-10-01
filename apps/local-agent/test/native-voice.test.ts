@@ -52,3 +52,10 @@ test("voice resume merges realtime and goal flags with the verified permission c
   assert.equal(config.sandbox_mode,"workspace-write");
   assert.equal(result.policyVerified,true);
 });
+
+import { voiceErrorCode } from "../src/voice-errors.js";
+test("voice diagnostics expose only fixed codes, never native credentials or URLs",()=>{
+  assert.equal(voiceErrorCode("failed sideband: HTTP 403 bearer secret"),"VOICE_HTTP_403");
+  assert.equal(voiceErrorCode("SDP codec unsupported https://private/?token=secret"),"VOICE_SDP");
+  assert.equal(voiceErrorCode("sensitive unknown body"),"VOICE_NATIVE_ERROR");
+});

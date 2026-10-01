@@ -1604,7 +1604,13 @@ export async function buildControlPlane(
               nativeVoice.stopped(row.voice_id,message.throughHostSeq!);
               sweepVoice();
             } else if(message.event==="closed" || message.event==="error") {
-              if(owner && message.event==="error") sendJson(owner.socket,{type:"error",message:"原生语音连接失败，请结束后重试"});
+              if(message.event==="error") {
+                const code=typeof message.message==="string" && /^VOICE_(?:HTTP_(?:400|401|403|404|408|409|429|500|502|503|504)|AUTH|LIMIT|SDP|TIMEOUT|SIDEBAND|BUSY|NATIVE_ERROR)$/.test(message.message) ? message.message : "VOICE_NATIVE_ERROR";
+                // Retain only an allowlisted diagnostic code, never the native error body.
+                db.run("UPDATE voice_sessions SET binding_json=json_set(binding_json,'$.failureCode',?) WHERE voice_id=?",code,row.voice_id);
+                app.log.warn({voiceId:row.voice_id,machineId:identity.machineId,code},"Native voice failed");
+                if(owner) sendJson(owner.socket,{type:"error",message:`原生语音连接失败（${code}），请重新点击电话重试`});
+              }
               stopVoice(row.voice_id);
             } else throw new AppError(400,"VOICE_INVALID","Invalid voice event");
           } else if (message.type === "volatile") {

@@ -1,3 +1,4 @@
+import { voiceErrorCode } from "./voice-errors.js";
 import { executeCodexWorkspaceOperation } from "./codex-workspace-operations.js";
 import { codexNotification } from "./codex-notifications.js";
 import { elicitationForm, elicitationContent, type ElicitationField } from "./mcp-elicitation.js";
@@ -1354,7 +1355,7 @@ export class CodexAppServer implements AppServerClient {
       }
       if (voiceId && ["thread/realtime/sdp","thread/realtime/closed","thread/realtime/error"].includes(method)) {
         const event=method.endsWith("/sdp") ? "sdp" : method.endsWith("/closed") ? "closed" : "error";
-        this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event,...(event==="sdp" && typeof params.sdp==="string" && params.sdp.length<=65536 ? {sdp:params.sdp} : {}),...(event==="error" ? {message:"原生语音连接失败，请结束后重试"} : {})}},this.appServerEpoch);
+        this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event,...(event==="sdp" && typeof params.sdp==="string" && params.sdp.length<=65536 ? {sdp:params.sdp} : {}),...(event==="error" ? {message:voiceErrorCode(params.message)} : {})}},this.appServerEpoch);
         if(event==="closed") {this.voiceIds.delete(threadId);this.voiceClosures.get(threadId)?.resolve();}
       }
       return;
