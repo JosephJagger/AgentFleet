@@ -40,6 +40,7 @@ import {
 } from "./util.js";
 
 const APP_SERVER_METHODS = new Set([
+  "thread/realtime/start", "thread/realtime/stop",
   "initialize",
   "model/list",
   "collaborationMode/list",
@@ -102,7 +103,7 @@ export interface AppEvent {
 }
 
 export interface VolatileAppEvent {
-  type: "agent_message.delta" | "command_output.delta" | "turn_diff.delta";
+  type: "agent_message.delta" | "command_output.delta" | "turn_diff.delta" | "voice.event";
   payload: Record<string, unknown>;
   nativeThreadId: string;
   nativeTurnId: string;
@@ -120,6 +121,7 @@ export interface AppServerCallbacks {
   onThreadExit?(threadId: string, appServerEpoch: string, detail: string): Promise<void>;
   onCatalogChanged?(appServerEpoch: string): void;
   onQuotaChanged?(): void;
+  onVoiceWriter?(threadId:string,pid:number): Promise<void>;
 }
 
 export interface ThreadStartResult {
@@ -177,6 +179,9 @@ export interface ThreadResumeResult extends ThreadStartResult {
 
 /** The small, allow-listed App Server surface used by the runtime. */
 export interface AppServerClient {
+  getProcessId?(): number | undefined;
+  startVoice?(thread: ManagedThread, sdp: string): Promise<void>;
+  stopVoice?(threadId: string): Promise<void>;
   manageCodex?(thread: ManagedThread, request: unknown, mutationId: string): Promise<CodexOperationResult>;
   getAgentRuntimes?(): Record<string, unknown>;
   refreshQuota?(): Promise<void>;
@@ -198,7 +203,7 @@ export interface AppServerClient {
   readThread(threadId: string, metadataOnly?: boolean): Promise<ThreadHistorySnapshot>;
   readHistoryPage?(threadId: string, cursor: string | null): Promise<ThreadHistoryPage>;
   readTurnOutcome?(threadId: string, turnId: string): Promise<{ cwd: string; status: string } | null>;
-  resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile?: PermissionProfile, metadataOnly?: boolean): Promise<ThreadResumeResult>;
+  resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile?: PermissionProfile, metadataOnly?: boolean, realtime?: boolean): Promise<ThreadResumeResult>;
   unsubscribeThread(threadId: string): Promise<void>;
   releaseWriter?(): Promise<void>;
   startTurn(
@@ -422,11 +427,16 @@ export class CodexAppServer implements AppServerClient {
   private finalDiffs = new Map<string, string>();
   private compactStarts = new Map<string, { resolve: (turn: TurnStartResult) => void; reject: (error: Error) => void }>();
   private exitHandled = false;
+  private readonly voiceIds = new Map<string, string>();
+  private voiceNotifications: Promise<void> = Promise.resolve();
+  private readonly voiceClosures = new Map<string,{resolve:()=>void,reject:(error:Error)=>void}>();
 
   constructor(callbacks: AppServerCallbacks, epoch: string = randomUUID(), private readonly environment: NodeJS.ProcessEnv = process.env) {
     this.callbacks = callbacks;
     this.appServerEpoch = epoch;
   }
+
+  getProcessId() { return this.child?.pid; }
 
   private quota: Record<string, unknown> | undefined;
   private quotaPending = false;
@@ -828,7 +838,27 @@ export class CodexAppServer implements AppServerClient {
     return {items,nextCursor:typeof raw.nextCursor === "string" ? raw.nextCursor : null};
   }
 
-  async resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile: PermissionProfile = "project", metadataOnly = false): Promise<ThreadResumeResult> {
+  async startVoice(thread: ManagedThread, sdp: string): Promise<void> {
+    if (!thread.realtimeSessionId || this.voiceIds.has(thread.nativeThreadId)) throw new AgentError("VOICE_BUSY", "Native voice is already active");
+    this.voiceIds.set(thread.nativeThreadId, thread.realtimeSessionId);
+    try {
+      await this.request("thread/realtime/start", { threadId:thread.nativeThreadId, outputModality:"audio", version:"v3", includeStartupContext:true, flushTranscriptTailOnSessionEnd:false, transport:{type:"webrtc",sdp} });
+    } catch (error) { await this.stopVoice(thread.nativeThreadId); throw error; }
+  }
+  async stopVoice(threadId: string): Promise<void> {
+    if (!this.voiceIds.has(threadId)) { await this.voiceNotifications; return; }
+    const closed=new Promise<void>((resolve,reject)=>this.voiceClosures.set(threadId,{resolve,reject}));
+    // Native RPC acceptance alone is not evidence that the voice fanout drained.
+    const timeout=setTimeout(()=>this.voiceClosures.get(threadId)?.reject(new AgentError("VOICE_CLOSE_PENDING","Native voice closure is still pending")),20_000);
+    void closed.catch(()=>undefined);
+    try {
+      await this.request("thread/realtime/stop", {threadId});
+      await closed;
+      await this.voiceNotifications;
+    } finally { clearTimeout(timeout);this.voiceClosures.delete(threadId); }
+  }
+
+  async resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile: PermissionProfile = "project", metadataOnly = false, realtime = false): Promise<ThreadResumeResult> {
     this.assertInitialized();
     const before = await this.readThread(threadId, true);
     const cwd = await verifySessionCwd(project, sessionCwd ?? before.cwd);
@@ -843,8 +873,8 @@ export class CodexAppServer implements AppServerClient {
         threadId,
         excludeTurns: true,
         cwd,
-        ...(metadataOnly ? { config: { "features.goals": false } } : {}),
         ...threadPermissionParams(project.root, profile),
+        ...(metadataOnly || realtime ? { config: { ...threadPermissionParams(project.root,profile).config, ...(metadataOnly ? { "features.goals": false } : {}), ...(realtime ? { "features.realtime_conversation": true } : {}) } } : {}),
       }),
       "thread/resume",
     );
@@ -1107,7 +1137,11 @@ export class CodexAppServer implements AppServerClient {
       try { await registration; } finally { this.inputRegistrations.delete(requestId); }
       return;
     }
-    await this.handleNotification(message.method, params);
+    const voiceThread=threadIdFromParams(params);
+    if(voiceThread && (this.voiceIds.has(voiceThread) || message.method.startsWith("thread/realtime/"))) {
+      this.voiceNotifications=this.voiceNotifications.catch(()=>undefined).then(()=>this.handleNotification(message.method as string,params));
+      await this.voiceNotifications;
+    } else await this.handleNotification(message.method, params);
   }
 
   private handleResponse(message: Record<string, unknown>): void {
@@ -1309,6 +1343,22 @@ export class CodexAppServer implements AppServerClient {
     }
     const threadId = threadIdFromParams(params);
     if (threadId && !this.callbacks.findManagedThread(threadId)) return;
+    if (threadId && method.startsWith("thread/realtime/")) {
+      const voiceId=this.voiceIds.get(threadId);
+      if(voiceId && ["thread/realtime/transcript/delta","thread/realtime/transcript/done"].includes(method) && ["user","assistant"].includes(String(params.role))) {
+        const text=method.endsWith("/done") ? params.text : params.delta;
+        if(typeof text==="string") this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event:"transcript",role:params.role,text:text.slice(0,8000),final:method.endsWith("/done")}},this.appServerEpoch);
+      }
+      if (voiceId && ["thread/realtime/sdp","thread/realtime/closed","thread/realtime/error"].includes(method)) {
+        const event=method.endsWith("/sdp") ? "sdp" : method.endsWith("/closed") ? "closed" : "error";
+        this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event,...(event==="sdp" && typeof params.sdp==="string" && params.sdp.length<=65536 ? {sdp:params.sdp} : {}),...(event==="error" ? {message:"原生语音连接失败，请结束后重试"} : {})}},this.appServerEpoch);
+        if(event==="closed") {this.voiceIds.delete(threadId);this.voiceClosures.get(threadId)?.resolve();}
+      }
+      return;
+    }
+    if (method === "turn/started" && threadId && this.voiceIds.has(threadId) && isRecord(params.turn) && typeof params.turn.id === "string") {
+      await this.callbacks.onEvent({type:"turn.started",nativeThreadId:threadId,nativeTurnId:params.turn.id,payload:{turn:params.turn,voiceSessionId:this.voiceIds.get(threadId)}},this.appServerEpoch);
+    }
     if (method === "turn/started" && threadId && isRecord(params.turn) && typeof params.turn.id === "string") {
       if (this.turnReferences.has(threadId)) this.referenceTurns.set(threadId, params.turn.id);
       this.compactStarts.get(threadId)?.resolve({ nativeTurnId: params.turn.id, status: typeof params.turn.status === "string" ? params.turn.status : "inProgress" });
@@ -1447,6 +1497,8 @@ export class CodexAppServer implements AppServerClient {
       pending.reject(new AgentError("APP_SERVER_EXITED", `${pending.method}: ${detail}`));
     }
     this.pending.clear();
+    for(const waiter of this.voiceClosures.values()) waiter.reject(new AgentError("VOICE_STATE_UNKNOWN","Native voice writer exited before closure"));
+    this.voiceClosures.clear();this.voiceIds.clear();
     for (const pending of this.compactStarts.values()) pending.reject(new AgentError("APP_SERVER_EXITED", "App Server exited during compaction"));
     this.compactStarts.clear();
     this.referenceTurns.clear(); this.turnReferences.clear(); this.activityTimes.clear();

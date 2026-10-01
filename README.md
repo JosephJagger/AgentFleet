@@ -35,6 +35,7 @@ Tasks execute on your connected host. Bring your own Codex account and available
 
 ## Recent improvements you can use
 
+- **Talk to native Codex in realtime (experimental).** In a managed, idle Codex session, choose **Start voice**, allow microphone access, then talk, mute, or end the connection. Requires a supported host runtime (currently validated with Agent 0.30.61 and Codex 0.159.2) and a modern HTTPS browser. Voice can start development tasks using the session’s permissions and approvals; ending voice closes the microphone without cancelling tasks already started.
 - **Schedule routine work.** Search for a project or an existing managed session, choose the destination first, then set the prompt and schedule. Review each run in **Scheduled tasks → History**. For example, ask Codex to check a project every weekday morning.
 - **Give another task relevant conversation context.** Paste a copied session link or use **+ → Reuse session**. Send the reference card with your instructions; Codex consults the readable conversation snapshot as needed, without waiting for a separate AI summary.
 - **Send screenshots from your phone.** Choose an image from the **+** menu or paste it on desktop. Improved browser compatibility for automatic resizing and compression reduces oversized-image failures on mobile.

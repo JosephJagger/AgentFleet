@@ -1,3 +1,4 @@
+import { NativeVoicePanel } from "./components/NativeVoicePanel";
 import { parseOutputSchema } from "./lib/output-schema";
 import { CodexOutputPanel } from "./components/CodexOutputPanel";
 import { CodexOperationsPanel } from "./components/CodexOperationsPanel";
@@ -638,6 +639,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   onClose?: () => void;
   onNewSession?: () => void;
 }) {
+  const [voiceActive, setVoiceActive] = useState(false);
   const [prompt, setPrompt] = useSessionDraft(draftOwner ?? "preview", detail?.session.id);
   const writingSettings = useCompletionPreferences(draftOwner ?? "preview", detail?.session.id);
   const [completionPreferences] = writingSettings;
@@ -1039,7 +1041,9 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         </details>}
         <details className="session-sync-details session-config-section"><summary><span>{t("同步详情")}<small>{t("查看会话同步状态的排查信息")}</small></span></summary><p className="mono">seq {session.sessionSeq} · epoch {session.contentEpoch}</p></details>
       </SessionConfiguration>
-      <form className="composer" onSubmit={submit}>
+      {session.provider !== "claude" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
+      <form className="composer" onSubmit={event => { if (voiceActive) event.preventDefault(); else void submit(event); }}>
+        {voiceActive && <p className="native-voice__hint">{t("请先结束语音，再发送新的文字任务。")}</p>}
         {session.provider !== "claude" && prompt.trimStart().startsWith("/") && <div className="codex-command-menu" role="group" aria-label={t("Codex 命令")}><p>{t("面板命令 · 点击待接入项可查看原因，不会发送给模型")}</p>{codexCommands.filter((item) => item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map((item) => <button type="button" key={item.name} onClick={() => void runSlash(item.name, slashCommand?.args)}><code>/{item.name}</code><span>{item.label} · {coverageLabels[item.coverage]}</span></button>)}</div>}
         {!configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
@@ -1174,13 +1178,13 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>}
-              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
+              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={voiceActive || Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); setModeOverride(undefined); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
               {session.provider !== "claude" && <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) { const { outputSchema: _outputSchema, ...steerAdditions } = additions; await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, steerAdditions); } else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>}
             </div>
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>
           ) : (
-            <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
+            <button className="button button--primary" disabled={voiceActive || !canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
           )}</div>}
           </div>
         </div>

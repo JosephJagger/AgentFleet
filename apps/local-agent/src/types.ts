@@ -149,6 +149,11 @@ export interface ApprovalRecord {
 }
 
 export interface ManagedThread {
+  realtimeSessionId?: string;
+  realtimeWriterPid?: number;
+  realtimeWriterEpoch?: string;
+  realtimeProducerEpoch?: string;
+  voiceExitReceipt?: {voiceId:string;producerEpoch:string;throughHostSeq:number};
   nativeUsage?: { usage: Record<string, unknown>; occurredAt: string };
   nativeUsageDigest?: string;
   historyOrderDigests?: Record<string,string>;

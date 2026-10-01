@@ -1,3 +1,4 @@
+import { NativeVoiceService, validVoiceOffer, type VoiceBinding } from "./native-voice.js";
 import {ClaudePreferencesService} from "./claude-preferences.js";
 import { AdministrationService } from "./administration.js";
 import { createWorldWeather } from "./world-weather.js";
@@ -55,6 +56,7 @@ interface AgentSocketState {
   reconciliationReady: boolean;
   dispatchPaused?: boolean;
   projectFiles?: boolean;
+  realtimeVoice?: boolean;
 }
 
 interface PendingProjectFile {
@@ -228,6 +230,34 @@ export async function buildControlPlane(
   app.addHook("onClose", async () => writingSemantic.close());
   const agents = new Map<string, AgentSocketState>();
   const clients = new Map<string, Set<ClientSocketState>>();
+  const nativeVoice = new NativeVoiceService(db,registry);
+  const voiceOwners = new Map<string,{socket:WebSocket;lastSeen:number;startedAt:number;token:string}>();
+  const stopVoice = (voiceId:string) => {
+    const row=nativeVoice.get(voiceId);
+    if(!row || row.state==="closed" || row.closed_through!==null) return;
+    const binding=JSON.parse(row.binding_json) as VoiceBinding;
+    const agent=agents.get(row.machine_id);
+    nativeVoice.state(voiceId,"closing");
+    if(!agent?.reconciliationReady || !agent.producerEpoch || !agent.appServerEpoch || !sendJson(agent.socket,{type:"voice.control",...binding,action:"stop",previousProducerEpoch:binding.producerEpoch,producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,transportGeneration:agent.identity.transportGeneration})) nativeVoice.state(voiceId,"unknown");
+  };
+  const sweepVoice = () => {
+    for(const row of nativeVoice.pending()) {
+      if(nativeVoice.finish(row)) {
+        const owner=voiceOwners.get(row.voice_id);
+        if(owner) sendJson(owner.socket,{type:"closed"});
+        voiceOwners.get(row.voice_id)?.socket.close(); voiceOwners.delete(row.voice_id);
+        continue;
+      }
+      const owner=voiceOwners.get(row.voice_id);
+      let authenticated=false;
+      if(owner) try { authenticated=auth.authenticateToken(owner.token).clientSessionId===row.owner_id; } catch { /* Revoked voice owners must stop. */ }
+      if(!owner || !authenticated || !nativeVoice.validOwner(row) || Date.now()-owner.lastSeen>45000 || Date.now()-owner.startedAt>30*60*1000) {
+        if(owner) { sendJson(owner.socket,{type:"error",message:"语音连接已结束或控制权已过期"}); owner.socket.close(); voiceOwners.delete(row.voice_id); }
+        if(row.state!=="closing" && row.state!=="unknown") stopVoice(row.voice_id);
+      }
+    }
+  };
+
   const projectFiles = new Map<string, PendingProjectFile>();
 
   const failProjectFile = (requestId: string, error: Error): void => {
@@ -1275,6 +1305,40 @@ export async function buildControlPlane(
     ),
   }));
 
+  app.get("/ws/voice", {websocket:true,preValidation:async(request)=>{auth.requireOrigin(request);request.principal=auth.authenticateRequest(request);}}, (socket,request)=>{
+    const token=request.cookies[config.cookieName] as string;
+    let voiceId:string|undefined;
+    sendJson(socket,{type:"ready"});
+    socket.on("message",(data:RawData)=>{
+      try {
+        const principal=auth.authenticateToken(token);
+        const value=record(parseWsMessage(data),"Invalid voice message");
+        if(value.type==="start") {
+          limiter.check(`voice:${principal.clientSessionId}`,6,60000);
+          invariant(!voiceId && validVoiceOffer(value.sdp),400,"VOICE_INVALID","无效的语音连接请求");
+          const id=requiredString(value.logicalSessionId,"logicalSessionId",200);
+          const session=registry.getSession(principal,id);
+          const agent=agents.get(session.machineId);
+          invariant(agent?.realtimeVoice && agent.reconciliationReady && !agent.dispatchPaused && agent.producerEpoch && agent.appServerEpoch && agent.socket.readyState===WebSocket.OPEN,409,"VOICE_UNAVAILABLE","主机暂不支持原生实时语音，请更新连接服务与托管 Codex");
+          const binding=nativeVoice.start(principal,id,requiredString(value.leaseId,"leaseId",200),{producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,transportGeneration:agent.identity.transportGeneration});
+          voiceId=binding.voiceId;
+          voiceOwners.set(voiceId,{socket,lastSeen:Date.now(),startedAt:Date.now(),token});
+          invariant(sendJson(agent.socket,{type:"voice.control",...binding,action:"start",sdp:value.sdp}),409,"VOICE_OFFLINE","主机语音连接未完成");
+        } else if(value.type==="heartbeat" && voiceId) {
+          const owner=voiceOwners.get(voiceId);
+          invariant(owner?.socket===socket,403,"VOICE_NOT_OWNER","Voice owner changed");
+          owner.lastSeen=Date.now(); sendJson(socket,{type:"heartbeat"});
+        } else if(value.type==="stop" && voiceId) stopVoice(voiceId);
+        else throw new AppError(400,"VOICE_INVALID","Invalid voice action");
+      } catch(error) {
+        sendJson(socket,{type:"error",message:error instanceof AppError ? error.message : "语音连接未完成，请结束后重试"});
+        if(voiceId) stopVoice(voiceId);
+        socket.close();
+      }
+    });
+    socket.on("close",()=>{if(voiceId) { voiceOwners.delete(voiceId);stopVoice(voiceId); }});
+  });
+
   app.get(
     "/ws/client",
     {
@@ -1372,6 +1436,7 @@ export async function buildControlPlane(
           if (message.type === "hello") {
             state.reconciliationReady = false;
             state.projectFiles = message.capabilities?.projectFiles === true;
+            state.realtimeVoice = message.capabilities?.realtimeVoice === true;
             delete state.reconciliationId;
             delete state.producerEpoch;
             delete state.appServerEpoch;
@@ -1406,6 +1471,7 @@ export async function buildControlPlane(
               reconciliationId: message.reconciliationId,
               serverTime: nowIso(),
             });
+            for(const row of nativeVoice.pending(identity.machineId)) if(!voiceOwners.has(row.voice_id)) stopVoice(row.voice_id);
             broadcastMachine(identity.machineId);
             for(const offer of machineMaintenance.offers(identity.machineId)) sendJson(socket,offer);
             if (!completed.alreadyComplete && completed.dispatchEligible) {
@@ -1513,6 +1579,30 @@ export async function buildControlPlane(
               sendJson(socket, { type: "event.nack", ...result });
               if (result.code === "SOURCE_STREAM_CORRUPT") broadcastMachine(identity.machineId);
             }
+          } else if (message.type === "voice.event") {
+            invariant(agents.get(identity.machineId)===state && state.reconciliationReady && message.producerEpoch===state.producerEpoch && message.appServerEpoch===state.appServerEpoch,409,"VOICE_FENCED","Stale voice event");
+            const row=nativeVoice.get(message.voiceId);
+            invariant(row && row.machine_id===identity.machineId,403,"VOICE_TARGET_CHANGED","Voice belongs to another host");
+            const binding=JSON.parse(row.binding_json) as VoiceBinding;
+            // Reconnected stop acknowledgements are accepted only from the original native epoch.
+            invariant(binding.producerEpoch===message.producerEpoch && binding.appServerEpoch===message.appServerEpoch || message.event==="stopped" && message.previousWriterExitConfirmed===true && message.throughProducerEpoch===binding.producerEpoch,409,"VOICE_FENCED","Voice epoch changed; previous exit remains unproven");
+            if(row.state==="closed") return;
+            const owner=voiceOwners.get(row.voice_id);
+            if(message.event==="sdp") {
+              if(row.state!=="starting" || !owner) return;
+              invariant(typeof message.sdp==="string" && message.sdp.length<=65536 && message.sdp.startsWith("v=0\r\n"),400,"VOICE_INVALID","Invalid voice answer");
+              nativeVoice.state(row.voice_id,"active");sendJson(owner.socket,{type:"answer",sdp:message.sdp});
+            } else if(message.event==="transcript") {
+              if(row.state!=="active" || !owner) return;
+              invariant(["user","assistant"].includes(String(message.role)) && typeof message.text==="string" && message.text.length<=8000 && typeof message.final==="boolean",400,"VOICE_INVALID","Invalid voice transcript");
+              sendJson(owner.socket,{type:"transcript",role:message.role,text:message.text,final:message.final});
+            } else if(message.event==="stopped") {
+              nativeVoice.stopped(row.voice_id,message.throughHostSeq!);
+              sweepVoice();
+            } else if(message.event==="closed" || message.event==="error") {
+              if(owner && message.event==="error") sendJson(owner.socket,{type:"error",message:"原生语音连接失败，请结束后重试"});
+              stopVoice(row.voice_id);
+            } else throw new AppError(400,"VOICE_INVALID","Invalid voice event");
           } else if (message.type === "volatile") {
             invariant(state.producerEpoch && state.appServerEpoch, 409, "AGENT_HELLO_REQUIRED", "Agent must send hello first");
             invariant(state.reconciliationReady, 409, "RECONCILIATION_REQUIRED", "Volatile frames are disabled until reconciliation completes");
@@ -1595,6 +1685,13 @@ export async function buildControlPlane(
         cancelMachineFiles(identity.machineId, identity.transportGeneration);
         if (agents.get(identity.machineId) === state) agents.delete(identity.machineId);
         if (closing) return;
+        for(const row of nativeVoice.pending(identity.machineId)) {
+          const binding=JSON.parse(row.binding_json) as VoiceBinding;
+          if(binding.transportGeneration!==identity.transportGeneration) continue;
+          nativeVoice.state(row.voice_id,"unknown");
+          const owner=voiceOwners.get(row.voice_id);
+          if(owner) {sendJson(owner.socket,{type:"error",message:"主机连接中断，语音已停止；请等待连接状态确认"});owner.socket.close();voiceOwners.delete(row.voice_id);}
+        }
         coordination.handleConnectionLost(identity);
         registry.disconnect(identity, reason.toString() || "websocket_closed");
         broadcastMachine(identity.machineId);
@@ -1605,6 +1702,7 @@ export async function buildControlPlane(
   let nextInactiveTakeoverSweepAt = 0;
   const runMaintenance = (): { offlineMachines: string[]; expiredContent: number; expiredAudit: number; inactiveTakeoversReleased: number } => {
     db.expireTransientState();
+    sweepVoice();
     coordination.expireUndispatchedCommands();
     const offlineMachines = registry.sweepOffline();
     for (const machineId of offlineMachines) broadcastMachine(machineId);
@@ -1634,6 +1732,9 @@ export async function buildControlPlane(
     clearInterval(maintenance);
     await resetRadar.stop();
     for (const requestId of [...projectFiles.keys()]) failProjectFile(requestId, new Error("Control Plane is stopping"));
+    for(const row of nativeVoice.pending()) stopVoice(row.voice_id);
+    for(const owner of voiceOwners.values()) owner.socket.terminate();
+    voiceOwners.clear();
     for (const agent of agents.values()) agent.socket.terminate();
     for (const states of clients.values()) for (const state of states) state.socket.terminate();
     agents.clear();

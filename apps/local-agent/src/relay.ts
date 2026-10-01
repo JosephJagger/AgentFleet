@@ -206,6 +206,7 @@ export class RelayConnection {
       await waitForClose(socket, signal);
     } finally {
       clearInterval(heartbeat);
+      await this.runtime.closeAllVoice();
     }
   }
 
@@ -303,6 +304,15 @@ export class RelayConnection {
       return;
     }
     switch (value.type) {
+      case "voice.control": {
+        if(!this.reconciliationReady) return;
+        const source=this.socket;
+        void this.runtime.handleVoice(value).catch(()=>{
+          if(this.socket===source) this.send({type:"voice.event",voiceId:value.voiceId,event:"error",message:"语音连接未完成，请结束后重试；主机状态未确认时不会重复启动",producerEpoch:this.runtime.producerEpoch,appServerEpoch:this.runtime.getAppServerEpoch()});
+        });
+        return;
+      }
+
       case "welcome":
         if (typeof value.transportGeneration === "number" && value.transportGeneration !== this.generation) {
           if (this.socket) closeRelaySocket(this.socket, 4008, "transport generation mismatch");
@@ -387,6 +397,8 @@ export class RelayConnection {
           this.scheduleFollowupHello();
         } else {
           this.reconciliationReady = true;
+          for(const event of this.pendingVoiceEvents.values()) if(event.producerEpoch===this.runtime.producerEpoch && event.appServerEpoch===this.runtime.getAppServerEpoch()) this.send(event);
+          this.pendingVoiceEvents.clear();
           this.onReady?.();
         }
         return;
@@ -597,7 +609,13 @@ export class RelayConnection {
     }
   }
 
+  private readonly pendingVoiceEvents = new Map<string,Record<string,unknown>>();
   private sendVolatile(event: Record<string, unknown>): void {
+    if(event.type==="voice.event") {
+      if(this.reconciliationReady && this.socket?.readyState===WebSocket.OPEN) this.send(event);
+      else if(typeof event.voiceId==="string" && this.pendingVoiceEvents.size<48) this.pendingVoiceEvents.set(`${event.voiceId}:${String(event.event)}`,event);
+      return;
+    }
     if (!this.reconciliationReady || this.socket?.readyState !== WebSocket.OPEN) return;
     if (
       typeof event.projectId !== "string"

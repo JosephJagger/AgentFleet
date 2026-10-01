@@ -83,6 +83,10 @@ class FakeAppServer implements AppServerClient {
   catalog: CodexCatalog = { models: [{ model: "host-model", displayName: "Host", efforts: ["low", "high"], defaultEffort: "low" }], modes: ["default"], fetchedAt: new Date().toISOString() };
   inputCalls: unknown[] = [];
   nativeCalls: string[] = [];
+  voiceStarts = 0;
+  voiceStops = 0;
+  async startVoice(thread: ManagedThread, _sdp: string) { this.voiceStarts++; this.callbacks.onVolatile({type:"voice.event",nativeThreadId:thread.nativeThreadId,nativeTurnId:thread.realtimeSessionId!,payload:{event:"sdp",sdp:"v=0\r\n"}},this.appServerEpoch); }
+  async stopVoice(_threadId: string) { this.voiceStops++; }
   async stopBackgroundTerminals(thread: ManagedThread): Promise<void> { this.nativeCalls.push(`stop:${thread.nativeThreadId}`); }
   async respondInput(_request: ApprovalRecord, answers: Record<string, { answers: string[] }>): Promise<void> { this.inputCalls.push(answers); }
   async threadAction(_thread: ManagedThread, _project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string): Promise<Record<string, unknown>> {
@@ -1600,4 +1604,62 @@ test("manual scan refreshes and publishes models; pagination skips duplicate rea
   error="network unavailable";
   await assert.rejects(runtime.refreshCatalog(),{code:"MODEL_CATALOG_REFRESH_FAILED"});
   assert.equal(reads,2);
+});
+
+
+test("native voice fences competing execution, tracks autonomous turns, and stops audio without cancelling the backing task",async t=>{
+  const {store,projects}=await fixture();const project=projects[0]!;
+  let server!:FakeAppServer;
+  const runtime=new AgentRuntime({store,identity,pairing,support:{...support,codexVersion:"0.159.2"},appServerFactory:cb=>(server=new FakeAppServer("voice-epoch",cb))});
+  runtime.setTransportGeneration(1);await runtime.initialize();t.after(()=>runtime.shutdown());
+  await store.setManagedThread({nativeThreadId:"voice-thread",projectId:project.id,logicalSessionId:"voice-session",executionSegmentId:"voice-segment",appServerEpoch:server.appServerEpoch,policyVersion:"remote-restricted-v1",policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString()});
+  const signals:Record<string,unknown>[]=[];
+  runtime.setCallbacks({onOutboxChanged:()=>undefined,onCommandAck:()=>undefined,onRegistryChanged:()=>undefined,onVolatile:event=>signals.push(event)});
+  const value={action:"start",voiceId:"voice_fixture",logicalSessionId:"voice-session",executionSegmentId:"voice-segment",nativeThreadId:"voice-thread",contentEpoch:1,producerEpoch:runtime.producerEpoch,appServerEpoch:server.appServerEpoch,transportGeneration:1,sdp:"v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n"};
+  await assert.rejects(runtime.handleVoice({...value,transportGeneration:2}),/Stale/);
+  await runtime.handleVoice(value);
+  assert.equal(server.voiceStarts,1);assert.equal(store.canSafelyRestart(),false);
+  await assert.rejects(runtime.handleVoice({...value,voiceId:"voice_other"}),/busy/);
+  await server.callbacks.onEvent({type:"turn.started",nativeThreadId:"voice-thread",nativeTurnId:"voice-turn",payload:{voiceSessionId:"voice_fixture"}},server.appServerEpoch);
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnId,"voice-turn");
+  assert.equal(store.snapshot().outbox.some(e=>e.type==="turn.started"&&e.nativeTurnId==="voice-turn"),true);
+  await runtime.handleVoice({...value,action:"stop"});
+  assert.equal(server.voiceStops,1);assert.equal(server.interruptTurnCount,0);
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnId,"voice-turn");
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.realtimeSessionId,undefined);
+  assert.equal(signals.some(e=>e.event==="stopped"&&Number.isInteger(e.throughHostSeq)),true);
+  await server.callbacks.onEvent({type:"turn.completed",nativeThreadId:"voice-thread",nativeTurnId:"voice-turn",payload:{turn:{status:"completed"}}},server.appServerEpoch);
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnId,undefined);
+  assert.equal(server.unsubscribeCount,1);
+});
+
+test("backing task completion retains a live voice writer until the caller explicitly ends voice",async t=>{
+  const {store,projects}=await fixture();const project=projects[0]!;let server!:FakeAppServer;
+  const runtime=new AgentRuntime({store,identity,pairing,support:{...support,codexVersion:"0.159.2"},appServerFactory:cb=>(server=new FakeAppServer("voice-epoch",cb))});
+  runtime.setTransportGeneration(1);await runtime.initialize();t.after(()=>runtime.shutdown());
+  await store.setManagedThread({nativeThreadId:"voice-thread",projectId:project.id,logicalSessionId:"voice-session",executionSegmentId:"voice-segment",appServerEpoch:server.appServerEpoch,policyVersion:"remote-restricted-v1",policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),activeTurnId:"voice-turn",realtimeSessionId:"voice_fixture"});
+  await server.callbacks.onEvent({type:"turn.completed",nativeThreadId:"voice-thread",nativeTurnId:"voice-turn",payload:{turn:{status:"completed"}}},server.appServerEpoch);
+  assert.equal(server.unsubscribeCount,0);assert.equal(store.canSafelyRestart(),false);
+  await runtime.closeAllVoice();assert.equal(server.voiceStops,1);
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.realtimeSessionId,undefined);
+});
+
+test("reconnecting after a process restart requires a dead recorded writer or a durable exit receipt",async t=>{
+  const {store,projects}=await fixture();const project=projects[0]!;let server!:FakeAppServer;
+  await store.beginProducerEpoch("old-producer");
+  const runtime=new AgentRuntime({store,identity,pairing,support:{...support,codexVersion:"0.159.2"},appServerFactory:cb=>(server=new FakeAppServer("new-voice-epoch",cb))});
+  runtime.setTransportGeneration(2);await runtime.initialize();t.after(()=>runtime.shutdown());
+  await store.setManagedThread({nativeThreadId:"voice-thread",projectId:project.id,logicalSessionId:"voice-session",executionSegmentId:"voice-segment",appServerEpoch:server.appServerEpoch,policyVersion:"remote-restricted-v1",policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),realtimeSessionId:"voice_fixture",realtimeWriterEpoch:"old-voice-epoch",realtimeProducerEpoch:"old-producer",realtimeWriterPid:process.pid});
+  const signals:Record<string,unknown>[]=[];
+  runtime.setCallbacks({onOutboxChanged:()=>undefined,onCommandAck:()=>undefined,onRegistryChanged:()=>undefined,onVolatile:event=>signals.push(event)});
+  const value={action:"stop",voiceId:"voice_fixture",logicalSessionId:"voice-session",executionSegmentId:"voice-segment",nativeThreadId:"voice-thread",contentEpoch:1,producerEpoch:runtime.producerEpoch,previousProducerEpoch:"old-producer",appServerEpoch:server.appServerEpoch,transportGeneration:2};
+  await assert.rejects(runtime.handleVoice(value),/still present/);
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.realtimeSessionId,"voice_fixture");
+  await store.updateManagedThread("voice-thread",candidate=>{candidate.realtimeWriterPid=2147483647;});
+  await runtime.handleVoice(value);
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.realtimeSessionId,undefined);
+  assert.equal(server.voiceStops,0);
+  assert.equal(signals.at(-1)?.throughProducerEpoch,"old-producer");
+  await runtime.handleVoice(value);
+  assert.equal(signals.at(-1)?.previousWriterExitConfirmed,true);
 });

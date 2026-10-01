@@ -605,6 +605,7 @@ export class AgentRuntime {
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
         maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"],
         projectFiles: true,
+        realtimeVoice: this.isWritable() && this.support.codexVersion === "0.159.2",
         queue: this.isWritable(),
         steer: this.isWritable(),
         shell: false,
@@ -806,6 +807,7 @@ export class AgentRuntime {
         throw new AgentError("MACHINE_DRAINING", "the agent is waiting for a safe maintenance restart");
       }
       const project = projectById(this.store, command.projectId);
+      if(Object.values(this.store.snapshot().managedThreads).some(t=>t.realtimeSessionId && (t.projectId===project.id || command.type==="codex.manage")) && !["turn.cancel","turn.steer","approval.decide_once","input.respond"].includes(command.type)) throw new AgentError("VOICE_PROJECT_BUSY", "请先结束项目的实时语音，再执行此操作");
       await verifyProjectIdentity(project);
       if (!this.isWritable()) throw new AgentError("MACHINE_READ_ONLY", this.readOnlyReasons().join("; "));
       const server = this.appServer;
@@ -1262,6 +1264,7 @@ export class AgentRuntime {
       findProject: (projectId) => this.store.snapshot().projects.find((project) => project.id === projectId),
       onEvent: (event, epoch) => this.handleAppEvent(event, epoch),
       onVolatile: (event, epoch) => this.handleVolatile(event, epoch),
+      onVoiceWriter: (id,pid) => this.store.updateManagedThread(id,t=>{t.realtimeWriterPid=pid;t.realtimeWriterEpoch=this.getAppServerEpoch()!;t.realtimeProducerEpoch=this.producerEpoch;}).then(()=>undefined),
       onApproval: (approval) => this.handleApproval(approval),
       onApprovalResolved: (requestId, epoch) => this.handleApprovalResolved(requestId, epoch),
       onExit: (epoch, detail) => this.handleAppExit(epoch, detail),
@@ -1840,12 +1843,71 @@ export class AgentRuntime {
     }
   }
 
+  private voiceLane: Promise<unknown> = Promise.resolve();
+  handleVoice(value: Record<string, unknown>): Promise<void> {
+    const operation=this.voiceLane.catch(()=>undefined).then(()=>this.invokeVoice(value));
+    this.voiceLane=operation;
+    return operation;
+  }
+  private async invokeVoice(value: Record<string, unknown>): Promise<void> {
+    const voiceId=value.voiceId;
+    if(typeof voiceId!=="string" || !/^voice_[A-Za-z0-9_-]+$/.test(voiceId)) throw new AgentError("VOICE_INVALID", "Invalid voice identity");
+    if(value.transportGeneration!==this.transportGeneration || value.producerEpoch!==this.producerEpoch || value.appServerEpoch!==this.getAppServerEpoch()) throw new AgentError("VOICE_FENCED", "Stale voice connection");
+    const thread=Object.values(this.store.snapshot().managedThreads).find(t=>t.logicalSessionId===value.logicalSessionId && t.nativeThreadId===value.nativeThreadId && t.executionSegmentId===value.executionSegmentId && (value.action==="stop" || t.contentEpoch===value.contentEpoch));
+    if(!thread || !this.appServer) throw new AgentError("VOICE_TARGET_CHANGED", "Voice session binding changed");
+    if(value.action==="stop") {
+      if(thread.realtimeSessionId && thread.realtimeSessionId!==voiceId) throw new AgentError("VOICE_FENCED", "Another voice owns this session");
+      const previousProducer=typeof value.previousProducerEpoch==="string" ? value.previousProducerEpoch : this.producerEpoch;
+      let proof=thread.voiceExitReceipt?.voiceId===voiceId ? thread.voiceExitReceipt : undefined;
+      if(!proof) {
+        const previousWriter=thread.realtimeSessionId && (thread.realtimeWriterEpoch ?? thread.appServerEpoch)!==this.appServer.appServerEpoch;
+        if(previousWriter) {
+          if(!thread.realtimeWriterPid) throw new AgentError("VOICE_STATE_UNKNOWN", "Previous voice writer exit needs verification");
+          let alive=true;
+          try { process.kill(thread.realtimeWriterPid,0); } catch(error) { if(isRecord(error) && error.code==="ESRCH") alive=false; }
+          if(alive) throw new AgentError("VOICE_STATE_UNKNOWN", "Previous voice process is still present; it will not be killed by PID");
+        } else if(thread.realtimeSessionId) await this.appServer.stopVoice?.(thread.nativeThreadId);
+        else if(previousProducer!==this.producerEpoch) throw new AgentError("VOICE_STATE_UNKNOWN", "Previous voice exit receipt is unavailable");
+        const producer=thread.realtimeProducerEpoch ?? previousProducer;
+        proof={voiceId,producerEpoch:producer,throughHostSeq:this.store.snapshot().producerStreams[producer]?.lastProducedSeq ?? 0};
+        await this.store.updateManagedThread(thread.nativeThreadId,t=>{
+          t.voiceExitReceipt=proof!;delete t.realtimeSessionId;delete t.realtimeWriterPid;delete t.realtimeWriterEpoch;delete t.realtimeProducerEpoch;
+          if(!t.activeTurnId)t.subscribed=false;
+        });
+      }
+      this.callbacks.onVolatile({type:"voice.event",voiceId,event:"stopped",throughHostSeq:proof.throughHostSeq,throughProducerEpoch:proof.producerEpoch,previousWriterExitConfirmed:true,producerEpoch:this.producerEpoch,appServerEpoch:this.appServer.appServerEpoch});
+      return;
+    }
+    if(isClaudeThread(thread.nativeThreadId)) throw new AgentError("VOICE_UNAVAILABLE", "Native voice requires a Codex session");
+    if(value.action!=="start" || typeof value.sdp!=="string" || value.sdp.length>65536 || !value.sdp.startsWith("v=0\r\n") || !value.sdp.includes("m=audio ")) throw new AgentError("VOICE_INVALID", "Invalid voice offer");
+    if(!this.isWritable() || this.store.snapshot().maintenanceDrain || this.support.codexVersion!=="0.159.2" || !this.appServer.startVoice || thread.appServerEpoch!==this.appServer.appServerEpoch || !thread.policyVerified) throw new AgentError("VOICE_UNAVAILABLE", "请先升级托管 Codex 到支持实时语音的版本并完成会话接管");
+    const snapshot=this.store.snapshot();
+    if(Object.values(snapshot.managedThreads).some(t=>t.projectId===thread.projectId && (t.activeTurnId || t.realtimeSessionId)) || snapshot.projectReservations[thread.projectId] || Object.values(snapshot.commandJournal).some(c=>["claimed","invoking","responded","unknown"].includes(c.state))) throw new AgentError("VOICE_BUSY", "Project or host operations are still busy");
+    await verifyProjectIdentity(projectById(this.store,thread.projectId));
+    await this.store.updateManagedThread(thread.nativeThreadId,t=>{ t.realtimeSessionId=voiceId;t.realtimeWriterEpoch=this.appServer!.appServerEpoch;t.realtimeProducerEpoch=this.producerEpoch;t.subscribed=true; });
+    try { await this.appServer.startVoice({...thread,realtimeSessionId:voiceId},value.sdp); }
+    catch(error) {
+      // A confirmed stop is the only route to a durable exit receipt.
+      await this.invokeVoice({...value,action:"stop"});
+      throw error;
+    }
+  }
+
+  async closeAllVoice(): Promise<void> {
+    for(const thread of Object.values(this.store.snapshot().managedThreads)) if(thread.realtimeSessionId) {
+      try { await this.handleVoice({action:"stop",voiceId:thread.realtimeSessionId,logicalSessionId:thread.logicalSessionId,nativeThreadId:thread.nativeThreadId,executionSegmentId:thread.executionSegmentId,contentEpoch:thread.contentEpoch,producerEpoch:this.producerEpoch,appServerEpoch:this.getAppServerEpoch(),transportGeneration:this.transportGeneration}); } catch { /* Unproven exit remains reserved for reconciliation. */ }
+    }
+  }
+
   private async handleAppEvent(event: AppEvent, epoch: string): Promise<void> {
     if (event.nativeThreadId === undefined) return;
     const thread = this.store.snapshot().managedThreads[event.nativeThreadId];
     if (!thread || thread.appServerEpoch !== epoch) return;
     if (event.type === "thread.usage") {
       await this.store.updateManagedThread(thread.nativeThreadId, candidate => { candidate.usageObservedAt = nowIso(); if (isClaudeThread(thread.nativeThreadId) && isRecord(event.payload.usage)) candidate.nativeUsage={usage:event.payload.usage,occurredAt:candidate.usageObservedAt}; });
+    }
+    if(event.type==="turn.started" && thread.realtimeSessionId && event.nativeTurnId && event.payload.voiceSessionId===thread.realtimeSessionId) {
+      await this.store.updateManagedThread(thread.nativeThreadId,t=>{ t.activeTurnId=event.nativeTurnId!; });
     }
     let mappedEvent = event;
     if (event.type === "turn.completed" && event.nativeTurnId !== undefined) {
@@ -1878,7 +1940,7 @@ export class AgentRuntime {
     // the next queued turn). Failed release preserves the execution connection.
     if (["turn.completed", "turn.failed", "turn.interrupted"].includes(mappedEvent.type)) {
       const server = this.appServer;
-      if (server?.appServerEpoch === epoch) {
+      if (server?.appServerEpoch === epoch && !this.store.snapshot().managedThreads[thread.nativeThreadId]?.realtimeSessionId) {
         try {
           await server.unsubscribeThread(thread.nativeThreadId);
           await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => { candidate.subscribed = false; });
@@ -1904,6 +1966,12 @@ export class AgentRuntime {
   }
 
   private handleVolatile(event: VolatileAppEvent, epoch: string): void {
+    if(event.type==="voice.event") {
+      const thread=this.store.snapshot().managedThreads[event.nativeThreadId];
+      if(thread?.appServerEpoch!==epoch || thread.realtimeSessionId!==event.nativeTurnId) return;
+      this.callbacks.onVolatile({type:"voice.event",voiceId:event.nativeTurnId,producerEpoch:this.producerEpoch,appServerEpoch:epoch,...event.payload});
+      return;
+    }
     const thread = this.store.snapshot().managedThreads[event.nativeThreadId];
     if (!thread || thread.appServerEpoch !== epoch) return;
     this.callbacks.onVolatile({
@@ -1963,6 +2031,9 @@ export class AgentRuntime {
   private async handleThreadExit(id: string, epoch: string, detail: string): Promise<void> {
     const thread = this.store.snapshot().managedThreads[id];
     if (!thread || thread.appServerEpoch !== epoch || this.appServer?.appServerEpoch !== epoch || this.shuttingDown) return;
+    if(thread.realtimeSessionId) {
+      this.callbacks.onVolatile({type:"voice.event",voiceId:thread.realtimeSessionId,event:"closed",producerEpoch:this.producerEpoch,appServerEpoch:epoch});
+    }
     await this.store.handleAppServerExit(epoch, thread.projectId);
     const invalidated = await this.store.invalidateApprovals(epoch, id);
     await this.store.updateManagedThread(id, candidate => {

@@ -71,7 +71,7 @@ test("shared account quota selects one newest snapshot without summing percentag
 });
 test("usage routes require authentication and migration creates version 42",async t=>{
  const {app,db}=await buildControlPlane(config());t.after(()=>app.close());
- assert.equal(db.get<{user_version:number}>("PRAGMA user_version")?.user_version,42);
+ assert.equal(db.get<{user_version:number}>("PRAGMA user_version")?.user_version,43);
  for(const path of ["sessions","projects","machines"])assert.equal((await app.inject({method:"GET",url:`/api/${path}/missing/usage`})).statusCode,401);
 });
 

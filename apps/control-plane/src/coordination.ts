@@ -564,6 +564,7 @@ export class CoordinationService {
           if(selected) invariant(supportsClaudeControls(machine?.agent_version,59) && parseClaudeMetadata(JSON.parse(machine?.discovery_json ?? "{}").agentRuntimes?.claude).permissionModes.includes(selected),409,"CLAUDE_PERMISSION_MODE_UNAVAILABLE","Update the host Agent or select a permission mode supported by native Claude Code");
         }
       }
+      invariant(["turn.cancel","turn.steer","approval.decide_once","input.respond"].includes(input.type) || !this.db.get("SELECT 1 FROM voice_sessions WHERE state<>'closed' AND (project_id=? OR ?='codex.manage' AND machine_id=?)",session.project_id,input.type,session.machine_id),409,"VOICE_PROJECT_BUSY","请先结束项目的实时语音，再执行此操作");
       const claiming = input.type === "thread.claim";
       invariant(
         claiming ? session.managed === 0 : session.managed === 1,
@@ -1248,7 +1249,7 @@ export class CoordinationService {
           session.identity_state !== "active" || session.security_state !== "normal" || session.compatibility !== "compatible" ||
           session.machine_reachability !== "online" || session.runtime_read_only === 1) return null;
       if (this.db.get("SELECT 1 FROM project_turn_reservations WHERE project_id=?", session.project_id)) return null;
-      if (this.pendingCodexMutation(session.machine_id)) return null;
+      if (this.pendingCodexMutation(session.machine_id) || this.db.get("SELECT 1 FROM voice_sessions WHERE project_id=? AND state<>'closed'",session.project_id)) return null;
       if (this.db.get("SELECT 1 FROM turn_queue WHERE logical_session_id=? AND state='unknown'", logicalSessionId)) return null;
 
       const timestamp = nowIso();
@@ -1860,6 +1861,18 @@ export class CoordinationService {
     const commandId = payload && typeof payload === "object" && !Array.isArray(payload)
       ? (payload as Record<string, unknown>).commandId
       : undefined;
+    const voiceId=payload && typeof payload==="object" && !Array.isArray(payload) ? (payload as Record<string,unknown>).voiceSessionId : undefined;
+    if(typeof voiceId==="string") {
+      const voice=this.db.get<{binding_json:string,state:string,updated_at:string}>("SELECT binding_json,state,updated_at FROM voice_sessions WHERE voice_id=? AND machine_id=? AND project_id=? AND logical_session_id=?",voiceId,connection.machineId,event.projectId,event.logicalSessionId);
+      if(!voice || voice.state==="closed") return false;
+      const binding=JSON.parse(voice.binding_json) as Record<string,unknown>;
+      if(binding.producerEpoch!==event.producerEpoch || binding.appServerEpoch!==event.appServerEpoch || binding.executionSegmentId!==event.executionSegmentId || binding.nativeThreadId!==event.nativeThreadId) return false;
+      const competing=this.db.get<{native_turn_id:string|null,logical_session_id:string}>("SELECT native_turn_id,logical_session_id FROM project_turn_reservations WHERE project_id=?",event.projectId);
+      if(competing) return competing.native_turn_id===event.nativeTurnId && competing.logical_session_id===event.logicalSessionId;
+      if(this.db.get("SELECT 1 FROM logical_sessions WHERE project_id=? AND active_turn_id IS NOT NULL AND (logical_session_id<>? OR active_turn_id<>?)",event.projectId,event.logicalSessionId,event.nativeTurnId)) return false;
+      this.db.run("INSERT INTO project_turn_reservations(project_id,logical_session_id,command_id,native_turn_id,state,version,reserved_at,updated_at,bound_producer_epoch,bound_app_server_epoch,binding_state) VALUES(?,?,NULL,?,'active',1,?,?,?,?,'bound')",event.projectId,event.logicalSessionId,event.nativeTurnId,timestamp,timestamp,event.producerEpoch,event.appServerEpoch);
+      return true;
+    }
     if (typeof commandId !== "string") return false;
     const session = this.db.get<{ project_id: string; active_turn_id: string | null }>(
       "SELECT project_id,active_turn_id FROM logical_sessions WHERE logical_session_id=?",

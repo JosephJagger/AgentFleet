@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 42) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 43) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1292,6 +1292,23 @@ export class ControlPlaneDatabase {
         this.sqlite.exec("PRAGMA user_version=42");
       }); } finally { this.sqlite.exec("PRAGMA legacy_alter_table = OFF; PRAGMA foreign_keys = ON"); }
     }
+
+    if (version < 43) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS voice_sessions (
+        voice_id TEXT PRIMARY KEY,
+        logical_session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id),
+        project_id TEXT NOT NULL REFERENCES projects(project_id),
+        machine_id TEXT NOT NULL REFERENCES machines(machine_id),
+        closed_through INTEGER,
+        owner_id TEXT NOT NULL REFERENCES client_sessions(client_session_id),
+        lease_id TEXT NOT NULL REFERENCES control_leases(control_lease_id),
+        binding_json TEXT NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('starting','active','closing','unknown','closed')),
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      ) STRICT;
+      CREATE UNIQUE INDEX IF NOT EXISTS voice_project_active ON voice_sessions(project_id) WHERE state<>'closed';
+      PRAGMA user_version=43`);
+    });
 
   }
 

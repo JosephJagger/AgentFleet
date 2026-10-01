@@ -187,6 +187,40 @@ export class SessionAppServer implements AppServerClient {
       catch (error) { await this.release(writer).catch(() => undefined); throw error; }
     });
   }
+  startVoice(thread: ManagedThread, sdp: string) {
+    return this.serial(thread.nativeThreadId, async () => {
+      if (this.writers.has(thread.nativeThreadId)) throw new AgentError("VOICE_BUSY", "Session writer is still occupied");
+      const project=this.callbacks.findProject(thread.projectId);
+      if(!project) throw new AgentError("VOICE_TARGET_CHANGED", "Project unavailable");
+      const writer=await this.newWriter(thread.nativeThreadId);
+      try {
+        const restored=await writer.client.resumeThread(thread.nativeThreadId,project,thread.sessionCwd,thread.permissionProfile,true,true);
+        if(restored.nativeThreadId!==thread.nativeThreadId || !restored.policyVerified) throw new AgentError("VOICE_POLICY_UNVERIFIED", "Native session permissions could not be verified");
+        writer.verified=true;
+        if(!writer.client.startVoice) throw new AgentError("VOICE_UNAVAILABLE", "Native realtime voice unavailable");
+        const pid=writer.client.getProcessId?.();
+        if(!pid) throw new AgentError("VOICE_PROCESS_UNVERIFIED", "Cannot verify native voice writer identity");
+        await this.callbacks.onVoiceWriter?.(thread.nativeThreadId,pid);
+        await writer.client.startVoice(thread,sdp);
+      } catch(error) {
+        // A timeout may still have started native voice. Confirm its closure first.
+        if(writer.client.stopVoice) {
+          await writer.client.stopVoice(thread.nativeThreadId);
+          if(!this.callbacks.findManagedThread(thread.nativeThreadId)?.activeTurnId) await this.release(writer);
+        }
+        throw error;
+      }
+    });
+  }
+  stopVoice(id: string) {
+    return this.serial(id, async () => {
+      const writer=this.writers.get(id);
+      if(!writer) return;
+      if(!writer.client.stopVoice) throw new AgentError("VOICE_UNAVAILABLE", "Native realtime voice unavailable");
+      await writer.client.stopVoice(id);
+      if(!this.callbacks.findManagedThread(id)?.activeTurnId) await this.release(writer);
+    });
+  }
   unsubscribeThread(id: string) {
     return this.serial(id, async () => {
       const writer = this.writers.get(id);
