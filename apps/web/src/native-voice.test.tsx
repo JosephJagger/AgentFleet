@@ -49,7 +49,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("microphone opens only on explicit start; native answer connects, mute works, and ending closes all media", async () => {
   const active = vi.fn();
-  render(<NativeVoicePanel sessionId="session" canStart onActiveChange={active} />);
+  const view = render(<div className="inspector"><header><NativeVoicePanel sessionId="session" canStart onActiveChange={active} /></header><form className="composer" /></div>);
   expect(getUserMedia).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "开始语音" }));
   await waitFor(() => expect(Socket.all).toHaveLength(1));
@@ -57,16 +57,24 @@ it("microphone opens only on explicit start; native answer connects, mute works,
   await waitFor(() => expect(socket.sent[0]).toMatchObject({ type: "start", logicalSessionId: "session", leaseId: "lease" }));
   socket.receive({ type: "answer", sdp: "v=0\r\n" });
   await waitFor(() => expect(screen.getByRole("button", { name: "静音" }).getAttribute("disabled")).toBeNull());
+  expect(screen.getByText("尚未派发项目任务")).toBeTruthy();
+  socket.receive({ type: "task", phase: "delegated" });
+  await waitFor(() => expect(screen.getByText("已派发，等待项目任务启动")).toBeTruthy());
+  socket.receive({ type: "task", phase: "running" });
+  await waitFor(() => expect(screen.getByText("项目任务正在执行")).toBeTruthy());
   fireEvent.click(screen.getByRole("button", { name: "收起语音控制" }));
-  expect(screen.queryByRole("button", { name: "结束语音" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "挂断" })).toBeNull();
   expect(track.stop).not.toHaveBeenCalled();
   expect(socket.readyState).toBe(1);
   fireEvent.click(screen.getByRole("button", { name: "语音控制" }));
+  expect(view.container.querySelector(".inspector > .native-voice__popover")).toBeTruthy();
+  expect(view.container.querySelector(".composer .native-voice")).toBeNull();
+  fireEvent.pointerDown(screen.getByRole("button", { name: "静音" }));
   fireEvent.click(screen.getByRole("button", { name: "静音" }));
   expect(track.enabled).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "取消静音" }));
   expect(track.enabled).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "结束语音" }));
+  fireEvent.click(screen.getByRole("button", { name: "挂断" }));
   expect(track.stop).toHaveBeenCalled(); expect(Peer.all[0]?.closed).toBe(true);
   expect(socket.sent.at(-1)).toEqual({ type: "stop" }); expect(socket.readyState).toBe(3);
   expect(active).toHaveBeenLastCalledWith(false);
@@ -78,7 +86,7 @@ it("cancelling while permission is pending stops late microphone tracks and neve
   render(<NativeVoicePanel sessionId="session" canStart onActiveChange={() => undefined} />);
   fireEvent.click(screen.getByRole("button", { name: "开始语音" }));
   await waitFor(() => expect(getUserMedia).toHaveBeenCalled());
-  fireEvent.click(screen.getByRole("button", { name: "结束语音" })); resolve(stream);
+  fireEvent.click(screen.getByRole("button", { name: "挂断" })); resolve(stream);
   await waitFor(() => expect(track.stop).toHaveBeenCalled());
   expect(Peer.all).toHaveLength(0); expect(Socket.all).toHaveLength(0);
 });

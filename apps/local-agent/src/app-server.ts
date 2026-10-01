@@ -842,7 +842,7 @@ export class CodexAppServer implements AppServerClient {
     if (!thread.realtimeSessionId || this.voiceIds.has(thread.nativeThreadId)) throw new AgentError("VOICE_BUSY", "Native voice is already active");
     this.voiceIds.set(thread.nativeThreadId, thread.realtimeSessionId);
     try {
-      await this.request("thread/realtime/start", { threadId:thread.nativeThreadId, outputModality:"audio", version:"v3", includeStartupContext:true, flushTranscriptTailOnSessionEnd:false, transport:{type:"webrtc",sdp} });
+      await this.request("thread/realtime/start", { threadId:thread.nativeThreadId, outputModality:"audio", version:"v3", realtimeSessionId:thread.realtimeSessionId, prompt:"You are the realtime voice interface for the current Codex project. For requests to inspect project status, read files, run commands, modify code, or perform any project task, use the native delegation mechanism to delegate to the client Codex agent. A verbal promise is not execution. Do not claim a task is running or completed until the backend reports that state. Relay backend results accurately, including failures. If the project or task is ambiguous, ask a short clarification. Keep conversation concise and use the user’s language.", includeStartupContext:true, flushTranscriptTailOnSessionEnd:false, transport:{type:"webrtc",sdp} });
     } catch (error) { await this.stopVoice(thread.nativeThreadId); throw error; }
   }
   async stopVoice(threadId: string): Promise<void> {
@@ -1349,6 +1349,9 @@ export class CodexAppServer implements AppServerClient {
         const text=method.endsWith("/done") ? params.text : params.delta;
         if(typeof text==="string") this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event:"transcript",role:params.role,text:text.slice(0,8000),final:method.endsWith("/done")}},this.appServerEpoch);
       }
+      if (voiceId && method === "thread/realtime/itemAdded" && isRecord(params.item) && params.item.type === "handoff_request") {
+        this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event:"task",phase:"delegated"}},this.appServerEpoch);
+      }
       if (voiceId && ["thread/realtime/sdp","thread/realtime/closed","thread/realtime/error"].includes(method)) {
         const event=method.endsWith("/sdp") ? "sdp" : method.endsWith("/closed") ? "closed" : "error";
         this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event,...(event==="sdp" && typeof params.sdp==="string" && params.sdp.length<=65536 ? {sdp:params.sdp} : {}),...(event==="error" ? {message:"原生语音连接失败，请结束后重试"} : {})}},this.appServerEpoch);
@@ -1358,6 +1361,10 @@ export class CodexAppServer implements AppServerClient {
     }
     if (method === "turn/started" && threadId && this.voiceIds.has(threadId) && isRecord(params.turn) && typeof params.turn.id === "string") {
       await this.callbacks.onEvent({type:"turn.started",nativeThreadId:threadId,nativeTurnId:params.turn.id,payload:{turn:params.turn,voiceSessionId:this.voiceIds.get(threadId)}},this.appServerEpoch);
+      this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:this.voiceIds.get(threadId)!,payload:{event:"task",phase:"running"}},this.appServerEpoch);
+    }
+    if (method === "turn/completed" && threadId && this.voiceIds.has(threadId) && isRecord(params.turn)) {
+      this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:this.voiceIds.get(threadId)!,payload:{event:"task",phase:params.turn.status === "completed" ? "completed" : "failed"}},this.appServerEpoch);
     }
     if (method === "turn/started" && threadId && isRecord(params.turn) && typeof params.turn.id === "string") {
       if (this.turnReferences.has(threadId)) this.referenceTurns.set(threadId, params.turn.id);

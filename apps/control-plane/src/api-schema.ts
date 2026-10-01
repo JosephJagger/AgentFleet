@@ -292,7 +292,7 @@ export interface AgentReconciliationStream {
 }
 
 export type AgentToServerMessage =
-  | { type: "voice.event"; voiceId: string; producerEpoch: string; appServerEpoch: string; event: "sdp" | "closed" | "stopped" | "error" | "transcript"; role?: string; text?: string; final?: boolean; throughHostSeq?: number; throughProducerEpoch?: string; previousWriterExitConfirmed?: boolean; sdp?: string; message?: string }
+  | { type: "voice.event"; voiceId: string; producerEpoch: string; appServerEpoch: string; event: "sdp" | "closed" | "stopped" | "error" | "transcript" | "task"; phase?: "delegated" | "running" | "completed" | "failed"; role?: string; text?: string; final?: boolean; throughHostSeq?: number; throughProducerEpoch?: string; previousWriterExitConfirmed?: boolean; sdp?: string; message?: string }
   | {
       type: "hello";
       producerEpoch: string;

@@ -1346,13 +1346,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .radar-timeline-item a { color: var(--cobalt); font-size: var(--text-caption); }
 .host-quota-metric--forecast:hover { outline: 1px solid var(--cobalt); outline-offset: 2px; }
 
-/* Voice lives in the composer toolbar; controls float without resizing messages. */
+/* A call entry beside session usage; its panel floats within the conversation. */
 .native-voice { position:relative; display:inline-flex; align-self:flex-end; flex:0 0 auto; min-width:0; }
 .composer-actions .native-voice__trigger, .native-voice__trigger { position:relative; display:grid; place-items:center; width:44px; height:44px; min-height:44px; padding:0; border-radius:50%; }
 .native-voice--active .native-voice__trigger { color:var(--mint); border-color:var(--mint); background:color-mix(in srgb,var(--mint) 12%,var(--paper)); }
 .native-voice__indicator { position:absolute; right:3px; top:3px; width:7px; height:7px; border-radius:50%; background:var(--mint); box-shadow:0 0 0 2px var(--paper); }
-.native-voice__popover { position:absolute; z-index:40; bottom:calc(100% + 10px); right:0; width:min(300px,calc(100vw - 40px)); max-height:min(320px,45dvh); overflow-y:auto; overscroll-behavior:contain; padding:12px; background:var(--paper-solid); color:var(--ink); border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:var(--shadow-card); }
-.composer:has(.native-voice__popover), .composer-input:has(.native-voice__popover) { overflow:visible; }
+.native-voice__popover { position:absolute; z-index:40; top:18%; left:50%; transform:translateX(-50%); width:min(300px,calc(100% - 32px)); max-height:min(440px,60dvh); overflow-y:auto; overscroll-behavior:contain; padding:12px; background:var(--paper-solid); color:var(--ink); border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:var(--shadow-card); }
+
 .native-voice__head { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:var(--text-small); }
 .native-voice__close { display:grid; place-items:center; width:28px; height:28px; padding:0; border:0; border-radius:50%; background:transparent; color:var(--muted); }
 .native-voice__status, .native-voice__hint { color:var(--muted); font-size:var(--text-caption); line-height:1.5; }
@@ -1365,3 +1365,17 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .native-voice__transcript { max-height:120px; overflow-y:auto; overscroll-behavior:contain; padding-top:8px; }
 .native-voice__transcript p { display:flex; gap:8px; margin:0 0 8px; color:var(--ink); font-size:var(--text-caption); line-height:1.6; overflow-wrap:anywhere; }
 .native-voice__transcript strong { flex-shrink:0; color:var(--muted); min-width:36px; }
+
+.native-voice__orb { display:grid; place-items:center; width:104px; height:104px; margin:12px auto; border-radius:50%; background:radial-gradient(circle at 34% 27%,var(--paper-solid),color-mix(in srgb,var(--mint) 65%,var(--paper)) 38%,var(--cobalt) 82%); box-shadow:inset -10px -12px 24px color-mix(in srgb,var(--ink) 20%,transparent),0 5px 22px color-mix(in srgb,var(--mint) 16%,transparent); color:var(--ink); }
+.native-voice__orb--live { animation:voice-call-breathe 3s ease-in-out infinite; }
+.native-voice__popover .native-voice__status { text-align:center; }
+.native-voice__actions { margin-top:12px; }
+.native-voice__actions > button { min-height:44px; }
+.session-facts .native-voice { margin-left:0; align-self:center; }
+@keyframes voice-call-breathe { 50% { transform:scale(1.04); } }
+@media(prefers-reduced-motion:reduce) { .native-voice__orb--live { animation:none; } }
+
+.session-call-actions { display:flex; align-items:center; gap:8px; margin-left:auto; min-width:0; }
+.session-call-actions .usage-trigger { min-width:0; }
+
+.native-voice__task { margin:8px 0; padding:6px 8px; border-radius:var(--radius-sm); background:color-mix(in srgb,var(--mint) 10%,var(--paper)); color:var(--muted); font-size:var(--text-caption); text-align:center; }

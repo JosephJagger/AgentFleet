@@ -19,7 +19,11 @@ test("native stop waits for closed and ordered backing-task events, not just the
   const internal=server as unknown as {request(method:string,params:Record<string,unknown>):Promise<unknown>;handleLine(line:string):Promise<void>};
   internal.request=async(method,params)=>{requests.push({method,params});return {};};
   await server.startVoice(thread,"v=0\r\nm=audio 9\r\n");
+  await internal.handleLine(JSON.stringify({method:"thread/realtime/itemAdded",params:{threadId:"native",item:{type:"handoff_request"}}}));
+  assert.deepEqual(events,["task"]); events.length=0;
   assert.equal(requests[0]?.params.version,"v3");
+  assert.equal(requests[0]?.params.realtimeSessionId,thread.realtimeSessionId);
+  assert.match(String(requests[0]?.params.prompt),/verbal promise is not execution/);
   assert.equal(requests[0]?.params.flushTranscriptTailOnSessionEnd,false);
   let stopped=false;const stop=server.stopVoice("native").then(()=>{stopped=true;});
   await new Promise(resolve=>setImmediate(resolve));assert.equal(stopped,false);
@@ -27,7 +31,7 @@ test("native stop waits for closed and ordered backing-task events, not just the
   const closed=internal.handleLine(JSON.stringify({method:"thread/realtime/closed",params:{threadId:"native"}}));
   await new Promise(resolve=>setImmediate(resolve));assert.equal(stopped,false);
   release();await Promise.all([started,closed,stop]);
-  assert.deepEqual(events,["turn.started","closed"]);assert.equal(stopped,true);
+  assert.deepEqual(events,["turn.started","task","closed"]);assert.equal(stopped,true);
   await server.stopVoice("native");assert.equal(requests.filter(r=>r.method==="thread/realtime/stop").length,1);
 });
 

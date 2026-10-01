@@ -1596,6 +1596,10 @@ export async function buildControlPlane(
               if(row.state!=="active" || !owner) return;
               invariant(["user","assistant"].includes(String(message.role)) && typeof message.text==="string" && message.text.length<=8000 && typeof message.final==="boolean",400,"VOICE_INVALID","Invalid voice transcript");
               sendJson(owner.socket,{type:"transcript",role:message.role,text:message.text,final:message.final});
+            } else if(message.event==="task") {
+              if(row.state!=="active" || !owner) return;
+              invariant(["delegated","running","completed","failed"].includes(String(message.phase)),400,"VOICE_INVALID","Invalid voice task state");
+              sendJson(owner.socket,{type:"task",phase:message.phase});
             } else if(message.event==="stopped") {
               nativeVoice.stopped(row.voice_id,message.throughHostSeq!);
               sweepVoice();

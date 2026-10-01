@@ -2807,5 +2807,12 @@
   "请先结束语音，再发送新的文字任务。": "End voice before sending a new text task.",
   "本次语音转写": "Voice transcript",
   "语音控制": "Voice controls",
-  "收起语音控制": "Collapse voice controls"
+  "收起语音控制": "Collapse voice controls",
+  "语音通话": "Voice call",
+  "挂断": "Hang up",
+  "项目任务正在执行": "Project task running",
+  "已派发，等待项目任务启动": "Delegated · Waiting for project task to start",
+  "项目任务已完成，结果见会话": "Project task completed · See conversation",
+  "项目任务未完成，请查看会话结果": "Project task did not complete · See conversation",
+  "尚未派发项目任务": "No project task delegated yet"
 }

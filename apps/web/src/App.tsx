@@ -966,7 +966,9 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           <div className="session-facts">
             <StatePill session={session} />
             <span className={`history-mark history-mark--${session.state.history}`}>{{ complete: t("完整历史"), partial: t("部分历史"), summary_only: t("历史摘要"), metadata_only: t("仅会话信息"), unavailable: t("历史暂不可用") }[session.state.history]}</span>
-            <UsageButton scope="session" id={session.id} provider={session.provider}/>
+            <div className="session-call-actions"><UsageButton scope="session" id={session.id} provider={session.provider}/>
+      {session.provider !== "claude" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
+            </div>
           </div>
         <div className="inspector-head__actions">
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span>{t("会话配置")}</span></button>
@@ -1184,7 +1186,6 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           ) : (
             <button className="button button--primary" disabled={voiceActive || !canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
           )}</div>}
-      {session.provider !== "claude" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
           </div>
         </div>
         </div>
