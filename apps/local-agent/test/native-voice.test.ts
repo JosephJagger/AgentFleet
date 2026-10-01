@@ -22,6 +22,7 @@ test("native stop waits for closed and ordered backing-task events, not just the
   await internal.handleLine(JSON.stringify({method:"thread/realtime/itemAdded",params:{threadId:"native",item:{type:"handoff_request"}}}));
   assert.deepEqual(events,["task"]); events.length=0;
   assert.equal(requests[0]?.params.version,"v3");
+  assert.equal(requests[0]?.params.voice,"sol");
   assert.equal(requests[0]?.params.realtimeSessionId,thread.realtimeSessionId);
   assert.match(String(requests[0]?.params.prompt),/verbal promise is not execution/);
   assert.equal(requests[0]?.params.flushTranscriptTailOnSessionEnd,false);
