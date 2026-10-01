@@ -845,7 +845,7 @@ export class CodexAppServer implements AppServerClient {
   async startPanelVoice(cwd:string,voiceId:string,sdp:string):Promise<string> {
     // Override inherited integrations on this thread only; preserve the account's normal project configuration.
     const effective=resultObject(await this.request("config/read",{includeLayers:false}),"panel config");
-    const config:Record<string,unknown>={"features.realtime_conversation":true,"features.goals":false,"shell_environment_policy.inherit":"none","web_search":"disabled","features.shell_tool":false,"features.unified_exec":false,"features.apps":false};
+    const config:Record<string,unknown>={"features.realtime_conversation":true,"features.goals":false,"shell_environment_policy.inherit":"none","web_search":"disabled","features.shell_tool":false,"features.unified_exec":false,"features.apps":false,"features.computer_use":false,"features.hooks":false,"features.multi_agent":false,"features.code_mode":false,"features.code_mode_host":false};
     const inherited=isRecord(effective.config)?effective.config:{};
     if(isRecord(inherited.mcp_servers)) for(const name of Object.keys(inherited.mcp_servers)) config[`mcp_servers.${JSON.stringify(name)}.enabled`]=false;
     const raw=resultObject(await this.request("thread/start",{cwd,ephemeral:true,approvalPolicy:"never",sandbox:"read-only",dynamicTools:[PANEL_VOICE_TOOL],developerInstructions:PANEL_VOICE_INSTRUCTIONS,config}),"panel thread/start");

@@ -14,6 +14,7 @@ test('coordinator native notifications and dynamic tool calls are confined to it
   await server.startPanelVoice('/tmp','pvoice_test','v=0\r\nm=audio 9\r\n');
   assert.equal(configuration.ephemeral,true);
   assert.equal(configuration.sandbox,'read-only');
+  for(const feature of ['shell_tool','unified_exec','apps','computer_use','hooks','multi_agent','code_mode_host'])assert.equal((configuration.config as Record<string,unknown>)[`features.${feature}`],false);
   assert.equal((configuration.config as Record<string,unknown>)['mcp_servers."personal".enabled'],false);
   await internal.handleLine(JSON.stringify({method:'thread/realtime/sdp',params:{threadId:'coordinator',sdp:'v=0\r\n'}}));
   assert.equal(events[0]?.event,'sdp');
