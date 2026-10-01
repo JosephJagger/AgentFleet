@@ -115,15 +115,16 @@ test("model refresh reaches only the catalog reader and preserves active session
 });
 
 test("voice restores a released writer with realtime enabled and rejects unverified permissions",async()=>{
-  let verified=true;let starts=0;const flags:unknown[][]=[];
-  const callbacks={findProject:()=>project,findManagedThread:()=>undefined,onEvent:async()=>undefined,onVolatile:()=>undefined,onExit:async()=>undefined,onVoiceWriter:async()=>undefined} as unknown as AppServerCallbacks;
+  let verified=true;let starts=0;const flags:unknown[][]=[];let observed:unknown;
+  const callbacks={findProject:()=>project,findManagedThread:()=>undefined,onEvent:async()=>undefined,onVolatile:()=>undefined,onExit:async()=>undefined,onVoiceWriter:async(_id:string,_pid:number,settings:unknown)=>{observed=settings;}} as unknown as AppServerCallbacks;
   const server=new SessionAppServer(callbacks,(_cb,epoch)=>({appServerEpoch:epoch,start:async()=>undefined,stop:async()=>undefined,releaseWriter:async()=>undefined,getProcessId:()=>process.pid,
-    resumeThread:async(...args:unknown[])=>{flags.push(args);return {nativeThreadId:"voice",policyVerified:verified};},
+    resumeThread:async(...args:unknown[])=>{flags.push(args);return {nativeThreadId:"voice",policyVerified:verified,observedSettings:{model:"native-model",effort:"high",observedAt:"2026-10-01T00:00:00Z"}};},
     startVoice:async()=>{starts++;},stopVoice:async()=>undefined,
   } as unknown as AppServerClient));
   const thread={nativeThreadId:"voice",projectId:"project",realtimeSessionId:"voice_fixture",policyVerified:false} as ManagedThread;
   await server.startVoice(thread,"sdp");
   assert.equal(starts,1);assert.deepEqual(flags[0]?.slice(4),[true,true]);
+  assert.deepEqual(observed,{model:"native-model",effort:"high",observedAt:"2026-10-01T00:00:00Z"});
   await server.stopVoice("voice");await server.unsubscribeThread("voice");
   verified=false;await assert.rejects(server.startVoice(thread,"sdp"),{code:"VOICE_POLICY_UNVERIFIED"});
   assert.equal(starts,1);await server.stop();

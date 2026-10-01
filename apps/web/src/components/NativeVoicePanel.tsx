@@ -6,7 +6,7 @@ import { t } from "../i18n";
 
 type Phase = "idle" | "connecting" | "connected" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
-export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sessionId: string; canStart: boolean; onActiveChange: (active: boolean) => void }) {
+export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange }: { sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
   const [expanded, setExpanded] = useState(false);
   const control = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -34,21 +34,21 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
   const resources = useRef<{ starting?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
   const activeCallback = useRef(onActiveChange);
   activeCallback.current = onActiveChange;
-  const cleanup = useRef<() => void>(() => undefined);
-  cleanup.current = () => {
+  const cleanup = useRef<(reason?: string) => void>(() => undefined);
+  cleanup.current = (reason = "CLIENT_DISPOSED") => {
     generation.current++;
     const owned = resources.current;
     resources.current = {};
     clearInterval(owned.heartbeat); clearTimeout(owned.timeout); clearTimeout(owned.disconnectTimeout);
     owned.stream?.getTracks().forEach(track => track.stop());
     owned.peer?.close();
-    if (owned.socket?.readyState === WebSocket.OPEN) owned.socket.send(JSON.stringify({ type: "stop" }));
+    if (owned.socket?.readyState === WebSocket.OPEN) owned.socket.send(JSON.stringify({ type: "stop", reason }));
     owned.socket?.close();
     if (audio.current) { audio.current.pause(); audio.current.srcObject = null; }
     activeCallback.current(false);
   };
   useEffect(() => {
-    const hide = () => { if (resources.current.starting || resources.current.peer || resources.current.stream) { cleanup.current(); setPhase("idle"); } };
+    const hide = () => { if (resources.current.starting || resources.current.peer || resources.current.stream) { cleanup.current("PAGE_HIDDEN"); setPhase("idle"); } };
     const visibility = () => { if (document.visibilityState === "hidden") hide(); };
     window.addEventListener("pagehide", hide);
     document.addEventListener("visibilitychange", visibility);
@@ -59,7 +59,7 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
     cleanup.current();
     const attempt = generation.current;
     const current = () => attempt === generation.current;
-    const fail = (reason: string) => { if (current()) { cleanup.current(); setMessage(reason); setPhase("error"); setExpanded(true); } };
+    const fail = (reason: string, code = "CLIENT_START_FAILED") => { if (current()) { cleanup.current(code); setMessage(reason); setPhase("error"); setExpanded(true); } };
     setExpanded(true); setPhase("connecting"); setMessage(""); setMuted(false); setPlayBlocked(false); setTranscript([]); setTaskPhase("idle");
     activeCallback.current(true);
     resources.current.starting=true;
@@ -82,11 +82,11 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
         if (peer.connectionState === "connected") { clearTimeout(resources.current.timeout); clearTimeout(resources.current.disconnectTimeout); resources.current.disconnectTimeout = undefined; setPhase("connected"); }
         // Cellular transitions can briefly disconnect ICE without ending the call.
         if (peer.connectionState === "disconnected" && !resources.current.disconnectTimeout) {
-          resources.current.disconnectTimeout = setTimeout(() => fail(t("语音音频连接中断，麦克风已关闭，请重新开始")), 8_000);
+          resources.current.disconnectTimeout = setTimeout(() => fail(t("语音音频连接中断，麦克风已关闭，请重新开始"), "AUDIO_DISCONNECTED"), 8_000);
         }
-        if (["failed", "closed"].includes(peer.connectionState)) fail(t("语音音频连接失败，麦克风已关闭，请更换网络后重试"));
+        if (["failed", "closed"].includes(peer.connectionState)) fail(t("语音音频连接失败，麦克风已关闭，请更换网络后重试"), "AUDIO_FAILED");
       };
-      resources.current.timeout = setTimeout(() => fail(t("语音连接超时，麦克风已关闭，请稍后重试")), 45_000);
+      resources.current.timeout = setTimeout(() => fail(t("语音连接超时，麦克风已关闭，请稍后重试"), "CONNECT_TIMEOUT"), 45_000);
       await peer.setLocalDescription(await peer.createOffer());
       if (!current()) return;
       await new Promise<void>(resolve => {
@@ -123,12 +123,12 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
             });
           }
           else if (value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
-          else if (value.type === "error") fail(value.message ?? t("原生实时语音暂不可用"));
-          else if (value.type === "closed") { cleanup.current(); setPhase("idle"); }
-        })().catch(() => fail(t("原生实时语音暂不可用")));
+          else if (value.type === "error") fail(value.message ?? t("原生实时语音暂不可用"), "SERVER_ERROR");
+          else if (value.type === "closed") { cleanup.current("NATIVE_CLOSED"); setPhase("idle"); }
+        })().catch(() => fail(t("原生实时语音暂不可用"), "SIGNAL_INVALID"));
       };
-      socket.onerror = () => fail(t("语音信令连接失败，麦克风已关闭，请刷新面板后重试"));
-      socket.onclose = () => fail(t("语音连接已结束，麦克风已关闭"));
+      socket.onerror = () => fail(t("语音信令连接失败，麦克风已关闭，请刷新面板后重试"), "SIGNAL_FAILED");
+      socket.onclose = () => fail(t("语音连接已结束，麦克风已关闭"), "SIGNAL_CLOSED");
     } catch (error) {
       const denied = error instanceof DOMException && ["NotAllowedError", "SecurityError"].includes(error.name);
       fail(denied ? t("请允许麦克风访问后重试") : error instanceof Error ? error.message : t("原生实时语音暂不可用"));
@@ -141,10 +141,10 @@ export function NativeVoicePanel({ sessionId, canStart, onActiveChange }: { sess
     <div className={`native-voice__orb${active && !muted ? " native-voice__orb--live" : ""}`} aria-hidden="true">{phase === "connecting" && <LoaderCircle className="spin" size={24} />}</div>
     <p className="native-voice__status" role="status">{status}</p>
     {message && <p className="native-voice__error" role="alert">{message}</p>}
-    {active && <p className="native-voice__task" role="status">{t(taskPhase === "running" ? "项目任务正在执行" : taskPhase === "delegated" ? "已派发，等待项目任务启动" : taskPhase === "completed" ? "项目任务已完成，结果见会话" : taskPhase === "failed" ? "项目任务未完成，请查看会话结果" : "尚未派发项目任务")}</p>}
+    {active && <p className="native-voice__task" role="status">{t(activeTurnId || taskPhase === "running" ? "项目任务正在执行" : taskPhase === "delegated" ? "已派发，等待项目任务启动" : taskPhase === "completed" ? "项目任务已完成，结果见会话" : taskPhase === "failed" ? "项目任务未完成，请查看会话结果" : "尚未派发项目任务")}</p>}
     {active && <div className="native-voice__actions">
       <button type="button" className="button button--secondary" disabled={phase !== "connected"} aria-pressed={muted} onClick={() => { const next = !muted; resources.current.stream?.getAudioTracks().forEach(track => { track.enabled = !next; }); setMuted(next); }}>{muted ? <MicOff size={18} /> : <Mic size={18} />}{t(muted ? "取消静音" : "静音")}</button>
-      <button type="button" className="button button--stop" onClick={() => { cleanup.current(); setPhase("idle"); setExpanded(false); }}><PhoneOff size={18} />{t("挂断")}</button>
+      <button type="button" className="button button--stop" onClick={() => { cleanup.current("USER_HANGUP"); setPhase("idle"); setExpanded(false); }}><PhoneOff size={18} />{t("挂断")}</button>
     </div>}
     {playBlocked && active && <button type="button" className="button button--secondary" onClick={() => { void audio.current?.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true)); }}>{t("播放 Codex 语音")}</button>}
     {transcript.length > 0 && <details className="native-voice__transcript-details"><summary>{t("本次语音转写")}</summary><div className="native-voice__transcript" ref={transcriptArea} tabIndex={0}>{transcript.map((entry,index) => <p key={index}><strong>{entry.role === "user" ? t("你") : "Codex"}</strong><span>{entry.text}</span></p>)}</div></details>}

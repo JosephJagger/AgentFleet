@@ -132,3 +132,13 @@ test("voice keepalive cannot cross sockets, resume closed calls or outlive accou
   f.db.run("UPDATE client_sessions SET revoked_at=? WHERE client_session_id=?",new Date().toISOString(),f.principal.clientSessionId);
   assert.throws(()=>f.voice.keepAlive(f.principal,next.voiceId,coordinator),/控制权/);
 });
+
+test("voice close diagnostics preserve the first bounded cause and reject arbitrary content",t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const binding=f.voice.start(f.principal,"s","lease",f.connection);
+ f.voice.recordCloseReason(binding.voiceId,"private transcript or SDP");
+ assert.equal(JSON.parse(f.voice.get(binding.voiceId)!.binding_json).closeReason,undefined);
+ f.voice.recordCloseReason(binding.voiceId,"AUDIO_FAILED");
+ f.voice.recordCloseReason(binding.voiceId,"SIGNAL_CLOSED");
+ assert.equal(JSON.parse(f.voice.get(binding.voiceId)!.binding_json).closeReason,"AUDIO_FAILED");
+});

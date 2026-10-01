@@ -1625,13 +1625,18 @@ test("native voice fences competing execution, tracks autonomous turns, and stop
   assert.equal(store.snapshot().managedThreads['voice-thread']?.policyVerified,true);
   assert.equal(store.snapshot().managedThreads['voice-thread']?.realtimeSessionId,"voice_fixture");
 
+  await server.callbacks.onVoiceWriter?.("voice-thread",process.pid,{model:"voice-model",effort:"high",observedAt:new Date().toISOString()});
   await assert.rejects(runtime.handleVoice({...value,voiceId:"voice_other"}),/busy/);
   await server.callbacks.onEvent({type:"turn.started",nativeThreadId:"voice-thread",nativeTurnId:"voice-turn",payload:{voiceSessionId:"voice_fixture"}},server.appServerEpoch);
   assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnId,"voice-turn");
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnSettings?.model,"voice-model");
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnSettings?.source,"native_voice");
   assert.equal(store.snapshot().outbox.some(e=>e.type==="turn.started"&&e.nativeTurnId==="voice-turn"),true);
   await runtime.handleVoice({...value,action:"stop"});
   assert.equal(server.voiceStops,1);assert.equal(server.interruptTurnCount,0);
   assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnId,"voice-turn");
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnSettings?.model,"voice-model");
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnSettings?.source,"native_voice");
   assert.equal(store.snapshot().managedThreads['voice-thread']?.realtimeSessionId,undefined);
   assert.equal(signals.some(e=>e.event==="stopped"&&Number.isInteger(e.throughHostSeq)),true);
   await server.callbacks.onEvent({type:"turn.completed",nativeThreadId:"voice-thread",nativeTurnId:"voice-turn",payload:{turn:{status:"completed"}}},server.appServerEpoch);

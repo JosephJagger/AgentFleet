@@ -564,7 +564,7 @@ export class CoordinationService {
           if(selected) invariant(supportsClaudeControls(machine?.agent_version,59) && parseClaudeMetadata(JSON.parse(machine?.discovery_json ?? "{}").agentRuntimes?.claude).permissionModes.includes(selected),409,"CLAUDE_PERMISSION_MODE_UNAVAILABLE","Update the host Agent or select a permission mode supported by native Claude Code");
         }
       }
-      invariant(["turn.cancel","turn.steer","approval.decide_once","input.respond"].includes(input.type) || !this.db.get("SELECT 1 FROM voice_sessions WHERE state<>'closed' AND (project_id=? OR ?='codex.manage' AND machine_id=?)",session.project_id,input.type,session.machine_id),409,"VOICE_PROJECT_BUSY","请先结束项目的实时语音，再执行此操作");
+      invariant(["turn.queue","turn.cancel","turn.steer","approval.decide_once","input.respond"].includes(input.type) || !this.db.get("SELECT 1 FROM voice_sessions WHERE state<>'closed' AND (project_id=? OR ?='codex.manage' AND machine_id=?)",session.project_id,input.type,session.machine_id),409,"VOICE_PROJECT_BUSY","请先结束项目的实时语音，再执行此操作");
       const claiming = input.type === "thread.claim";
       invariant(
         claiming ? session.managed === 0 : session.managed === 1,

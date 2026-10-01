@@ -978,3 +978,26 @@ it.each(["追加本轮","加入队列"])("clears a previous reconciliation warni
   await waitFor(()=>expect(operation).toHaveBeenCalledTimes(2));
   await waitFor(()=>expect(screen.queryByText("会话正在恢复状态，请稍候再发送")).toBeNull());
 });
+
+it("voice composer queues independent work while idle and keeps running work steerable",async()=>{
+ vi.stubGlobal("isSecureContext",true);
+ vi.stubGlobal("RTCPeerConnection",class {});
+ const previous=Object.getOwnPropertyDescriptor(navigator,"mediaDevices");
+ Object.defineProperty(navigator,"mediaDevices",{configurable:true,value:{getUserMedia:()=>new Promise(()=>{})}});
+ const queue=vi.fn(noop),steer=vi.fn(noop),send=vi.fn(noop);const props=inspectorProps("A");
+ const view=render(<SessionInspector {...props} onQueue={queue} onSteer={steer} onSend={send}/>);
+ try {
+  fireEvent.click(screen.getByRole("button",{name:"开始语音"}));
+  fireEvent.change(screen.getByRole("textbox",{name:"发送给 Codex 的消息"}),{target:{value:"独立任务"}});
+  expect(screen.queryByRole("button",{name:"发送"})).toBeNull();
+  expect(screen.queryByRole("button",{name:"追加本轮"})).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"加入队列"}));
+  await waitFor(()=>expect(queue).toHaveBeenCalledOnce());
+  expect(send).not.toHaveBeenCalled();
+  const running={...props.detail,session:{...props.detail.session,activeTurnId:"voice-turn",state:{...props.detail.session.state,threadRuntime:"active" as const,currentTurn:"in_progress" as const}}};
+  view.rerender(<SessionInspector {...props} detail={running} onQueue={queue} onSteer={steer} onSend={send}/>);
+  fireEvent.change(screen.getByRole("textbox",{name:"发送给 Codex 的消息"}),{target:{value:"补充要求"}});
+  fireEvent.click(screen.getByRole("button",{name:"追加本轮"}));
+  await waitFor(()=>expect(steer).toHaveBeenCalledOnce());
+ } finally {view.unmount();vi.unstubAllGlobals();if(previous)Object.defineProperty(navigator,"mediaDevices",previous);else Reflect.deleteProperty(navigator,"mediaDevices");}
+});

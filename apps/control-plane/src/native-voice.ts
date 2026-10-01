@@ -43,6 +43,12 @@ export class NativeVoiceService {
     const lease = this.db.get<{version: number}>("SELECT version FROM control_leases WHERE control_lease_id=?", row.lease_id)!;
     return coordination.renewLease(principal, row.logical_session_id, row.lease_id, lease.version, VOICE_CONTROL_TTL_SECONDS);
   }
+  recordCloseReason(id: string, reason: unknown) {
+    // Fixed categories only: never persist browser text, SDP, audio or transcripts.
+    const allowed = ["USER_HANGUP", "PAGE_HIDDEN", "CLIENT_DISPOSED", "CLIENT_START_FAILED", "AUDIO_DISCONNECTED", "AUDIO_FAILED", "CONNECT_TIMEOUT", "SERVER_ERROR", "SIGNAL_INVALID", "SIGNAL_FAILED", "SIGNAL_CLOSED", "NATIVE_CLOSED"];
+    if (typeof reason !== "string" || !allowed.includes(reason)) return;
+    this.db.run("UPDATE voice_sessions SET binding_json=json_set(binding_json,'$.closeReason',?,'$.closeRecordedAt',?) WHERE voice_id=? AND json_extract(binding_json,'$.closeReason') IS NULL",reason,nowIso(),id);
+  }
   get(id: string) { return this.db.get<VoiceRow>("SELECT * FROM voice_sessions WHERE voice_id=?",id); }
   pending(machineId?: string) { return machineId ? this.db.all<VoiceRow>("SELECT * FROM voice_sessions WHERE machine_id=? AND state<>'closed'",machineId) : this.db.all<VoiceRow>("SELECT * FROM voice_sessions WHERE state<>'closed'"); }
   state(id: string, state: "active" | "closing" | "unknown" | "closed") {

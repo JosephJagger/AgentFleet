@@ -200,7 +200,7 @@ export class SessionAppServer implements AppServerClient {
         if(!writer.client.startVoice) throw new AgentError("VOICE_UNAVAILABLE", "Native realtime voice unavailable");
         const pid=writer.client.getProcessId?.();
         if(!pid) throw new AgentError("VOICE_PROCESS_UNVERIFIED", "Cannot verify native voice writer identity");
-        await this.callbacks.onVoiceWriter?.(thread.nativeThreadId,pid);
+        await this.callbacks.onVoiceWriter?.(thread.nativeThreadId,pid,restored.observedSettings);
         await writer.client.startVoice(thread,sdp);
       } catch(error) {
         // A timeout may still have started native voice. Confirm its closure first.

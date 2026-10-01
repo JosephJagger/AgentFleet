@@ -2821,5 +2821,8 @@
   "已派发，等待项目任务启动": "Delegated · Waiting for project task to start",
   "项目任务已完成，结果见会话": "Project task completed · See conversation",
   "项目任务未完成，请查看会话结果": "Project task did not complete · See conversation",
-  "尚未派发项目任务": "No project task delegated yet"
+  "尚未派发项目任务": "No project task delegated yet",
+  "语音任务": "Voice task",
+  "沿用原生会话模式": "Native session mode",
+  "通话中可追加正在执行的任务；排队任务将在挂断并完成当前任务后执行。": "During a call, add instructions to the running task. Queued tasks run after the call and current task end."
 }

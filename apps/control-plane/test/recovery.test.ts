@@ -1059,3 +1059,22 @@ test("dashboard shortcuts include old managed/running sessions beyond recent and
     assert.equal(registry.listSessionsPage(principal,{limit:100}).items.some(s=>s.logicalSessionId==="activity-0"),false);
   } finally {db.close();}
 });
+
+test("voice queues wait through native close reconciliation and activate only after confirmed closure", t=>{
+ const db=new ControlPlaneDatabase(":memory:");t.after(()=>db.close());
+ seedQueuedCommand(db);
+ const service=new CoordinationService(db,config(":memory:"));const at=new Date().toISOString();
+ db.run("INSERT INTO control_leases(control_lease_id,logical_session_id,holder_client_session_id,version,state,acquired_at,renewed_at,expires_at) VALUES('lease','queue-session','queue-client',1,'active',?,?,'9999-12-31T23:59:59.999Z')",at,at);
+ db.run("INSERT INTO voice_sessions(voice_id,logical_session_id,project_id,machine_id,owner_id,lease_id,binding_json,state,created_at,updated_at) VALUES('voice','queue-session','queue-project','queue-host','queue-client','lease','{}','active',?,?)",at,at);
+ for(const state of ["active","closing","unknown"]){
+  db.run("UPDATE voice_sessions SET state=?",state);
+  assert.equal(service.activateNextQueued("queue-session"),null);
+  assert.equal(db.get<{state:string}>("SELECT state FROM turn_queue")?.state,"queued");
+ }
+ db.run("UPDATE voice_sessions SET state='closed'");
+ db.run("UPDATE logical_sessions SET execution_state='running',active_turn_id='voice-turn'");
+ assert.equal(service.activateNextQueued("queue-session"),null);
+ db.run("UPDATE logical_sessions SET execution_state='completed',active_turn_id=NULL");
+ assert.ok(service.activateNextQueued("queue-session"));
+ assert.equal(service.activateNextQueued("queue-session"),null);
+});

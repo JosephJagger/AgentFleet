@@ -65,6 +65,7 @@ export function parseRuntimeSettings(value: unknown): Record<string, unknown> | 
     const clean: Record<string, string | null> = {};
     for (const field of fields) if (entry[field] !== undefined && entry[field] !== null) clean[field] = text(entry[field]);
     if ((key === "accepted" || key === "active") && entry.serviceTier === null) clean.serviceTier = null;
+    if (key === "active" && object(raw[key]).source === "native_voice") clean.source = "native_voice";
     if (key === "active" ? clean.nativeTurnId && clean.changedAt : clean.model) result[key] = clean;
   }
   return result;

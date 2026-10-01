@@ -98,3 +98,12 @@ it("运行中设置仅覆盖当前任务，下一轮和计划模式保持原设�
  view.rerender(<RuntimeSettingsShortcut sessionId="s" activeTurnId="turn" running observed={{...observed,active:{...observed.active,nativeTurnId:"old"}}} summary={summary} onOpen={()=>{}}/>);
  expect(screen.queryByText(/updated/)).toBeNull();
 });
+
+it("voice task uses only its bound native settings and never an old typed receipt",()=>{
+ const observed={accepted:{nativeTurnId:"old",acceptedAt:"2026-10-01T00:00:00Z",model:"old-model",mode:"plan" as const},active:{nativeTurnId:"voice-turn",changedAt:"2026-10-01T00:01:00Z",source:"native_voice" as const,model:"native-model",effort:"high"}};
+ const view=render(<RuntimeSettingsShortcut sessionId="s" running activeTurnId="voice-turn" observed={observed} onOpen={()=>{}}/>);
+ expect(screen.getByText("语音任务 · native-model · high · 沿用原生会话模式")).toBeTruthy();
+ expect(screen.queryByText(/old-model/)).toBeNull();
+ view.rerender(<RuntimeSettingsShortcut sessionId="s" running activeTurnId="different-turn" observed={observed} onOpen={()=>{}}/>);
+ expect(screen.queryByText(/语音任务/)).toBeNull();
+});

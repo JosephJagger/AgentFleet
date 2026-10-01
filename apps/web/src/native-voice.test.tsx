@@ -76,7 +76,7 @@ it("microphone opens only on explicit start; native answer connects, mute works,
   expect(track.enabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "挂断" }));
   expect(track.stop).toHaveBeenCalled(); expect(Peer.all[0]?.closed).toBe(true);
-  expect(socket.sent.at(-1)).toEqual({ type: "stop" }); expect(socket.readyState).toBe(3);
+  expect(socket.sent.at(-1)).toMatchObject({ type: "stop", reason: "USER_HANGUP" }); expect(socket.readyState).toBe(3);
   expect(active).toHaveBeenLastCalledWith(false);
 });
 
@@ -172,5 +172,18 @@ it("hiding the page ends the call, while closing just the popover keeps it alive
   expect(track.stop).not.toHaveBeenCalled();
   fireEvent(window,new Event("pagehide"));
   expect(track.stop).toHaveBeenCalled();
-  expect(socket.sent.at(-1)).toEqual({type:"stop"});
+  expect(socket.sent.at(-1)).toEqual({type:"stop",reason:"PAGE_HIDDEN"});
+});
+
+it("audio failure reports a bounded reason and late callbacks cannot overwrite it",async()=>{
+ render(<NativeVoicePanel sessionId="session" canStart onActiveChange={()=>{}}/>);
+ fireEvent.click(screen.getByRole("button",{name:"开始语音"}));
+ await waitFor(()=>expect(Socket.all).toHaveLength(1));
+ const socket=Socket.all[0]!;socket.receive({type:"ready"});
+ const peer=Peer.all[0]!;
+ act(()=>{peer.connectionState="failed";peer.onconnectionstatechange?.();});
+ expect(socket.sent.at(-1)).toEqual({type:"stop",reason:"AUDIO_FAILED"});
+ act(()=>{socket.onclose?.();});
+ expect(socket.sent.filter(v=>v.type==="stop")).toHaveLength(1);
+ expect(screen.getByRole("alert").textContent).toContain("语音音频连接失败");
 });

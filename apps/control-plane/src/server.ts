@@ -1346,7 +1346,7 @@ export async function buildControlPlane(
           if (owner.controlHeartbeat) refreshVoiceControl(voiceId);
           else owner.lastSeen=Date.now();
           sendJson(socket,{type:"heartbeat"});
-        } else if(value.type==="stop" && voiceId) stopVoice(voiceId);
+        } else if(value.type==="stop" && voiceId) { nativeVoice.recordCloseReason(voiceId,value.reason); stopVoice(voiceId); }
         else throw new AppError(400,"VOICE_INVALID","Invalid voice action");
       } catch(error) {
         sendJson(socket,{type:"error",message:error instanceof AppError ? error.message : "语音连接未完成，请结束后重试"});
@@ -1358,7 +1358,7 @@ export async function buildControlPlane(
       if (!voiceId || !voiceOwners.get(voiceId)?.controlHeartbeat) return;
       try { refreshVoiceControl(voiceId); } catch { stopVoice(voiceId); }
     });
-    socket.on("close",()=>{if(voiceId) { voiceOwners.delete(voiceId);stopVoice(voiceId); }});
+    socket.on("close",()=>{if(voiceId) { nativeVoice.recordCloseReason(voiceId,"SIGNAL_CLOSED"); voiceOwners.delete(voiceId);stopVoice(voiceId); }});
   });
 
   app.get(
@@ -1626,6 +1626,7 @@ export async function buildControlPlane(
               nativeVoice.stopped(row.voice_id,message.throughHostSeq!);
               sweepVoice();
             } else if(message.event==="closed" || message.event==="error") {
+              if(message.event==="closed") nativeVoice.recordCloseReason(row.voice_id,"NATIVE_CLOSED");
               if(message.event==="error") {
                 const code=typeof message.message==="string" && /^VOICE_(?:HTTP_(?:400|401|403|404|408|409|429|500|502|503|504)|AUTH|LIMIT|SDP|TIMEOUT|SIDEBAND|BUSY|FENCED|TARGET_CHANGED|UNAVAILABLE|POLICY_NOT_PROVEN|POLICY_UNVERIFIED|PROCESS_UNVERIFIED|NATIVE_ERROR)$/.test(message.message) ? message.message : "VOICE_NATIVE_ERROR";
                 // Retain only an allowlisted diagnostic code, never the native error body.

@@ -1264,7 +1264,7 @@ export class AgentRuntime {
       findProject: (projectId) => this.store.snapshot().projects.find((project) => project.id === projectId),
       onEvent: (event, epoch) => this.handleAppEvent(event, epoch),
       onVolatile: (event, epoch) => this.handleVolatile(event, epoch),
-      onVoiceWriter: (id,pid) => this.store.updateManagedThread(id,t=>{t.policyVerified=true;t.realtimeWriterPid=pid;t.realtimeWriterEpoch=this.getAppServerEpoch()!;t.realtimeProducerEpoch=this.producerEpoch;}).then(()=>undefined),
+      onVoiceWriter: (id,pid,settings) => this.store.updateManagedThread(id,t=>{t.policyVerified=true;delete t.realtimeSettings;if(settings){t.realtimeSettings=settings;t.observedSettings=settings;}t.realtimeWriterPid=pid;t.realtimeWriterEpoch=this.getAppServerEpoch()!;t.realtimeProducerEpoch=this.producerEpoch;}).then(()=>undefined),
       onApproval: (approval) => this.handleApproval(approval),
       onApprovalResolved: (requestId, epoch) => this.handleApprovalResolved(requestId, epoch),
       onExit: (epoch, detail) => this.handleAppExit(epoch, detail),
@@ -1871,7 +1871,7 @@ export class AgentRuntime {
         const producer=thread.realtimeProducerEpoch ?? previousProducer;
         proof={voiceId,producerEpoch:producer,throughHostSeq:this.store.snapshot().producerStreams[producer]?.lastProducedSeq ?? 0};
         await this.store.updateManagedThread(thread.nativeThreadId,t=>{
-          t.voiceExitReceipt=proof!;delete t.realtimeSessionId;delete t.realtimeWriterPid;delete t.realtimeWriterEpoch;delete t.realtimeProducerEpoch;
+          t.voiceExitReceipt=proof!;delete t.realtimeSessionId;delete t.realtimeSettings;delete t.realtimeWriterPid;delete t.realtimeWriterEpoch;delete t.realtimeProducerEpoch;
           if(!t.activeTurnId)t.subscribed=false;
         });
       }
@@ -1907,7 +1907,7 @@ export class AgentRuntime {
       await this.store.updateManagedThread(thread.nativeThreadId, candidate => { candidate.usageObservedAt = nowIso(); if (isClaudeThread(thread.nativeThreadId) && isRecord(event.payload.usage)) candidate.nativeUsage={usage:event.payload.usage,occurredAt:candidate.usageObservedAt}; });
     }
     if(event.type==="turn.started" && thread.realtimeSessionId && event.nativeTurnId && event.payload.voiceSessionId===thread.realtimeSessionId) {
-      await this.store.updateManagedThread(thread.nativeThreadId,t=>{ t.activeTurnId=event.nativeTurnId!; });
+      await this.store.updateManagedThread(thread.nativeThreadId,t=>{ t.activeTurnId=event.nativeTurnId!; t.activeTurnSettings={nativeTurnId:event.nativeTurnId!,changedAt:nowIso(),source:"native_voice",...(t.realtimeSettings ? {model:t.realtimeSettings.model,effort:t.realtimeSettings.effort} : {})}; });
     }
     let mappedEvent = event;
     if (event.type === "turn.completed" && event.nativeTurnId !== undefined) {
@@ -1951,6 +1951,7 @@ export class AgentRuntime {
       }
     }
     await this.emitForThread(thread, { ...mappedEvent, appServerEpoch: epoch });
+    if (event.type === "turn.started") this.notifyRegistryChanged();
     if (mappedEvent.type === "item.completed" && mappedEvent.nativeItemId) {
       const historyCursor = mappedEvent.nativeItemId;
       await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => {

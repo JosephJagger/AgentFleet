@@ -17,7 +17,7 @@ export interface CodexPreferences {
   desired: CodexSettings | null;
 }
 export interface RuntimeSettings {
-  active?: { nativeTurnId: string; changedAt: string; model?: string; effort?: string; serviceTier?: string | null; summary?: string };
+  active?: { source?: "native_voice"; nativeTurnId: string; changedAt: string; model?: string; effort?: string; serviceTier?: string | null; summary?: string };
   permissions?: { profile: "project" | "network" | "full"; source: string; acceptedAt: string; nativeTurnId: string };
   archived?: boolean;
   observed?: { model: string; provider?: string; effort?: string; observedAt: string };

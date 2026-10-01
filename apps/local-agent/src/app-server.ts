@@ -122,7 +122,7 @@ export interface AppServerCallbacks {
   onThreadExit?(threadId: string, appServerEpoch: string, detail: string): Promise<void>;
   onCatalogChanged?(appServerEpoch: string): void;
   onQuotaChanged?(): void;
-  onVoiceWriter?(threadId:string,pid:number): Promise<void>;
+  onVoiceWriter?(threadId:string,pid:number,settings?: CodexObservedSettings): Promise<void>;
 }
 
 export interface ThreadStartResult {

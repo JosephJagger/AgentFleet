@@ -150,6 +150,7 @@ export interface ApprovalRecord {
 
 export interface ManagedThread {
   realtimeSessionId?: string;
+  realtimeSettings?: import("./codex-settings.js").CodexObservedSettings;
   realtimeWriterPid?: number;
   realtimeWriterEpoch?: string;
   realtimeProducerEpoch?: string;
@@ -168,7 +169,7 @@ export interface ManagedThread {
   archived?: boolean;
   observedSettings?: import("./codex-settings.js").CodexObservedSettings;
   acceptedSettings?: import("./codex-settings.js").CodexSettings & { acceptedAt: string; nativeTurnId: string };
-  activeTurnSettings?: { nativeTurnId: string; changedAt: string; model?: string; effort?: string; serviceTier?: string | null; summary?: string };
+  activeTurnSettings?: { source?: "native_voice"; nativeTurnId: string; changedAt: string; model?: string; effort?: string; serviceTier?: string | null; summary?: string };
   nativeThreadId: string;
   projectId: string;
   logicalSessionId?: string;
