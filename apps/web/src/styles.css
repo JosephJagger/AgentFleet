@@ -1379,3 +1379,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .session-call-actions .usage-trigger { min-width:0; }
 
 .native-voice__task { margin:8px 0; padding:6px 8px; border-radius:var(--radius-sm); background:color-mix(in srgb,var(--teal) 10%,var(--paper)); color:var(--muted); font-size:var(--text-caption); text-align:center; }
+
+/* Native voice delegation stays intact in history; only its presentation collapses. */
+.voice-request { min-width: 0; max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink); }
+.voice-request summary { padding: 10px 12px; cursor: pointer; }
+.voice-request summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.voice-request__label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-caption); color: var(--muted); }
+.voice-request__label > span { margin-left: 8px; }
+.voice-request__preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; margin-top: 6px; font-size: var(--text-small); line-height: 1.6; }
+.voice-request[open] .voice-request__preview { display: none; }
+.voice-request__content { max-height: 240px; overflow: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); padding: 10px 12px; }
+.voice-request__content p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-small); line-height: 1.6; margin: 0 0 10px; }
+.voice-request__content strong { font-size: var(--text-caption); color: var(--muted); }

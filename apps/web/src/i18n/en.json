@@ -2824,5 +2824,8 @@
   "尚未派发项目任务": "No project task delegated yet",
   "语音任务": "Voice task",
   "沿用原生会话模式": "Native session mode",
-  "通话中可追加正在执行的任务；排队任务将在挂断并完成当前任务后执行。": "During a call, add instructions to the running task. Queued tasks run after the call and current task end."
+  "通话中可追加正在执行的任务；排队任务将在挂断并完成当前任务后执行。": "During a call, add instructions to the running task. Queued tasks run after the call and current task end.",
+  "语音请求": "Voice request",
+  "展开记录": "Expand transcript",
+  "语音记录": "Voice transcript"
 }

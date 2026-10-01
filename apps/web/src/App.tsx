@@ -1,3 +1,4 @@
+import { UserMessage } from "./components/UserMessage";
 import { NativeVoicePanel } from "./components/NativeVoicePanel";
 import { parseOutputSchema } from "./lib/output-schema";
 import { CodexOutputPanel } from "./components/CodexOutputPanel";
@@ -574,7 +575,7 @@ function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; se
             <strong>{(event.title === "Codex" ? agentName(provider) : systemText(event.title?.replace(provider === "claude" ? /^Codex/ : /$^/, "Claude Code"))) || (event.actor === "user" ? t("你") : event.actor === "agent" ? agentName(provider) : event.type)}{event.type === "turn.completed" && <span className="timeline-event__turn-tokens"> · {event.turnTokens == null ? t("本轮 token 未记录") : t("本轮消耗 {0} tokens", new Intl.NumberFormat(locale()).format(event.turnTokens))} · {event.turnCacheHitRate == null ? t("缓存命中率未记录") : t("缓存命中率 {0}%", new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(event.turnCacheHitRate))}</span>}</strong>
             <time>{new Date(event.occurredAt).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</time>
           </div>
-          {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} sessionId={sessionId} /> : <p>{event.body}</p> : null}
+          {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} sessionId={sessionId} /> : event.actor === "user" ? <UserMessage body={event.body} /> : <p>{event.body}</p> : null}
           {event.payloadState !== "deleted" && Boolean(event.images?.length) && <MessageImages images={event.images!} />}
           {event.payloadState !== "deleted" && <CommandExecution command={event.command} output={event.output} />}
           {event.diff && <div className="diff-summary"><FileDiff size={14} />{count(event.diff.files, "个文件")} <b>+{event.diff.additions}</b> <i>−{event.diff.deletions}</i></div>}
