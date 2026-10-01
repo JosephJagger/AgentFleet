@@ -1605,7 +1605,7 @@ export async function buildControlPlane(
               sweepVoice();
             } else if(message.event==="closed" || message.event==="error") {
               if(message.event==="error") {
-                const code=typeof message.message==="string" && /^VOICE_(?:HTTP_(?:400|401|403|404|408|409|429|500|502|503|504)|AUTH|LIMIT|SDP|TIMEOUT|SIDEBAND|BUSY|NATIVE_ERROR)$/.test(message.message) ? message.message : "VOICE_NATIVE_ERROR";
+                const code=typeof message.message==="string" && /^VOICE_(?:HTTP_(?:400|401|403|404|408|409|429|500|502|503|504)|AUTH|LIMIT|SDP|TIMEOUT|SIDEBAND|BUSY|FENCED|TARGET_CHANGED|UNAVAILABLE|POLICY_NOT_PROVEN|POLICY_UNVERIFIED|PROCESS_UNVERIFIED|NATIVE_ERROR)$/.test(message.message) ? message.message : "VOICE_NATIVE_ERROR";
                 // Retain only an allowlisted diagnostic code, never the native error body.
                 db.run("UPDATE voice_sessions SET binding_json=json_set(binding_json,'$.failureCode',?) WHERE voice_id=?",code,row.voice_id);
                 app.log.warn({voiceId:row.voice_id,machineId:identity.machineId,code},"Native voice failed");

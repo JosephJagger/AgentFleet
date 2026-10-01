@@ -1196,7 +1196,7 @@ export class AgentRuntime {
           scannedCount: this.discoveryStatus.scannedCount, discoveredCount: this.discoveryStatus.discoveredCount,
           lastSuccessfulAt: this.discoveryStatus.lastSuccessfulAt! };
         const eligibleThreads = Object.values(this.store.snapshot().managedThreads)
-          .filter((thread) => thread.historySyncInitialized === true && thread.activeTurnId === undefined && !this.store.snapshot().projectReservations[thread.projectId])
+          .filter((thread) => thread.historySyncInitialized === true && !thread.realtimeSessionId && thread.activeTurnId === undefined && !this.store.snapshot().projectReservations[thread.projectId])
           .sort((left, right) => left.nativeThreadId.localeCompare(right.nativeThreadId));
         const offset = this.historySyncOffset % Math.max(eligibleThreads.length, 1);
         const sharedThreads = [...eligibleThreads.slice(offset), ...eligibleThreads.slice(0, offset)].slice(0, 25);
@@ -1210,7 +1210,7 @@ export class AgentRuntime {
               if (thread.appServerEpoch === server.appServerEpoch) await this.syncNativeUsage(thread, snapshot);
               continue;
             }
-            if (this.store.snapshot().projectReservations[thread.projectId] || this.store.snapshot().managedThreads[thread.nativeThreadId]?.activeTurnId) continue;
+            if (this.store.snapshot().projectReservations[thread.projectId] || this.store.snapshot().managedThreads[thread.nativeThreadId]?.activeTurnId || this.store.snapshot().managedThreads[thread.nativeThreadId]?.realtimeSessionId) continue;
             if (thread.subscribed && thread.appServerEpoch === server.appServerEpoch) {
               await server.unsubscribeThread(thread.nativeThreadId);
             }
@@ -1264,7 +1264,7 @@ export class AgentRuntime {
       findProject: (projectId) => this.store.snapshot().projects.find((project) => project.id === projectId),
       onEvent: (event, epoch) => this.handleAppEvent(event, epoch),
       onVolatile: (event, epoch) => this.handleVolatile(event, epoch),
-      onVoiceWriter: (id,pid) => this.store.updateManagedThread(id,t=>{t.realtimeWriterPid=pid;t.realtimeWriterEpoch=this.getAppServerEpoch()!;t.realtimeProducerEpoch=this.producerEpoch;}).then(()=>undefined),
+      onVoiceWriter: (id,pid) => this.store.updateManagedThread(id,t=>{t.policyVerified=true;t.realtimeWriterPid=pid;t.realtimeWriterEpoch=this.getAppServerEpoch()!;t.realtimeProducerEpoch=this.producerEpoch;}).then(()=>undefined),
       onApproval: (approval) => this.handleApproval(approval),
       onApprovalResolved: (requestId, epoch) => this.handleApprovalResolved(requestId, epoch),
       onExit: (epoch, detail) => this.handleAppExit(epoch, detail),
@@ -1880,12 +1880,12 @@ export class AgentRuntime {
     }
     if(isClaudeThread(thread.nativeThreadId)) throw new AgentError("VOICE_UNAVAILABLE", "Native voice requires a Codex session");
     if(value.action!=="start" || typeof value.sdp!=="string" || value.sdp.length>65536 || !value.sdp.startsWith("v=0\r\n") || !value.sdp.includes("m=audio ")) throw new AgentError("VOICE_INVALID", "Invalid voice offer");
-    if(!this.isWritable() || this.store.snapshot().maintenanceDrain || this.support.codexVersion!=="0.159.2" || !this.appServer.startVoice || thread.appServerEpoch!==this.appServer.appServerEpoch || !thread.policyVerified) throw new AgentError("VOICE_UNAVAILABLE", "请先升级托管 Codex 到支持实时语音的版本并完成会话接管");
+    if(!this.isWritable() || this.store.snapshot().maintenanceDrain || this.support.codexVersion!=="0.159.2" || !this.appServer.startVoice) throw new AgentError("VOICE_UNAVAILABLE", "请先升级托管 Codex 到支持实时语音的版本并完成会话接管");
     const snapshot=this.store.snapshot();
     if(Object.values(snapshot.managedThreads).some(t=>t.projectId===thread.projectId && (t.activeTurnId || t.realtimeSessionId)) || snapshot.projectReservations[thread.projectId] || Object.values(snapshot.commandJournal).some(c=>["claimed","invoking","responded","unknown"].includes(c.state))) throw new AgentError("VOICE_BUSY", "Project or host operations are still busy");
     await verifyProjectIdentity(projectById(this.store,thread.projectId));
-    await this.store.updateManagedThread(thread.nativeThreadId,t=>{ t.realtimeSessionId=voiceId;t.realtimeWriterEpoch=this.appServer!.appServerEpoch;t.realtimeProducerEpoch=this.producerEpoch;t.subscribed=true; });
-    try { await this.appServer.startVoice({...thread,realtimeSessionId:voiceId},value.sdp); }
+    await this.store.updateManagedThread(thread.nativeThreadId,t=>{ t.appServerEpoch=this.appServer!.appServerEpoch;t.realtimeSessionId=voiceId;t.realtimeWriterEpoch=this.appServer!.appServerEpoch;t.realtimeProducerEpoch=this.producerEpoch;t.subscribed=true; });
+    try { await this.appServer.startVoice({...thread,appServerEpoch:this.appServer.appServerEpoch,realtimeSessionId:voiceId},value.sdp); }
     catch(error) {
       // A confirmed stop is the only route to a durable exit receipt.
       await this.invokeVoice({...value,action:"stop"});

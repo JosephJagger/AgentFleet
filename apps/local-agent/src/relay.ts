@@ -1,3 +1,4 @@
+import { voiceErrorCode } from "./voice-errors.js";
 import { HEARTBEAT_INTERVAL_MS, MAX_WS_FRAME_BYTES } from "./constants.js";
 import { setImmediate as yieldToIO } from "node:timers/promises";
 import { AgentError, errorMessage } from "./errors.js";
@@ -307,8 +308,8 @@ export class RelayConnection {
       case "voice.control": {
         if(!this.reconciliationReady) return;
         const source=this.socket;
-        void this.runtime.handleVoice(value).catch(()=>{
-          if(this.socket===source) this.send({type:"voice.event",voiceId:value.voiceId,event:"error",message:"语音连接未完成，请结束后重试；主机状态未确认时不会重复启动",producerEpoch:this.runtime.producerEpoch,appServerEpoch:this.runtime.getAppServerEpoch()});
+        void this.runtime.handleVoice(value).catch(error=>{
+          if(this.socket===source) this.send({type:"voice.event",voiceId:value.voiceId,event:"error",message:error instanceof AgentError && ["VOICE_FENCED","VOICE_TARGET_CHANGED","VOICE_UNAVAILABLE","VOICE_BUSY","VOICE_POLICY_UNVERIFIED","VOICE_PROCESS_UNVERIFIED","POLICY_NOT_PROVEN"].includes(error.code) ? (error.code === "POLICY_NOT_PROVEN" ? "VOICE_POLICY_NOT_PROVEN" : error.code) : voiceErrorCode(errorMessage(error)),producerEpoch:this.runtime.producerEpoch,appServerEpoch:this.runtime.getAppServerEpoch()});
         });
         return;
       }

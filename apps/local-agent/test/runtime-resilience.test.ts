@@ -85,7 +85,7 @@ class FakeAppServer implements AppServerClient {
   nativeCalls: string[] = [];
   voiceStarts = 0;
   voiceStops = 0;
-  async startVoice(thread: ManagedThread, _sdp: string) { this.voiceStarts++; this.callbacks.onVolatile({type:"voice.event",nativeThreadId:thread.nativeThreadId,nativeTurnId:thread.realtimeSessionId!,payload:{event:"sdp",sdp:"v=0\r\n"}},this.appServerEpoch); }
+  async startVoice(thread: ManagedThread, _sdp: string) { await this.callbacks.onVoiceWriter?.(thread.nativeThreadId,process.pid); this.voiceStarts++; this.callbacks.onVolatile({type:"voice.event",nativeThreadId:thread.nativeThreadId,nativeTurnId:thread.realtimeSessionId!,payload:{event:"sdp",sdp:"v=0\r\n"}},this.appServerEpoch); }
   async stopVoice(_threadId: string) { this.voiceStops++; }
   async stopBackgroundTerminals(thread: ManagedThread): Promise<void> { this.nativeCalls.push(`stop:${thread.nativeThreadId}`); }
   async respondInput(_request: ApprovalRecord, answers: Record<string, { answers: string[] }>): Promise<void> { this.inputCalls.push(answers); }
@@ -1612,13 +1612,19 @@ test("native voice fences competing execution, tracks autonomous turns, and stop
   let server!:FakeAppServer;
   const runtime=new AgentRuntime({store,identity,pairing,support:{...support,codexVersion:"0.159.2"},appServerFactory:cb=>(server=new FakeAppServer("voice-epoch",cb))});
   runtime.setTransportGeneration(1);await runtime.initialize();t.after(()=>runtime.shutdown());
-  await store.setManagedThread({nativeThreadId:"voice-thread",projectId:project.id,logicalSessionId:"voice-session",executionSegmentId:"voice-segment",appServerEpoch:server.appServerEpoch,policyVersion:"remote-restricted-v1",policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString()});
+  await store.setManagedThread({nativeThreadId:"voice-thread",projectId:project.id,logicalSessionId:"voice-session",executionSegmentId:"voice-segment",appServerEpoch:"previous-epoch",policyVersion:"remote-restricted-v1",policyVerified:false,subscribed:false,contentEpoch:1,createdAt:new Date().toISOString()});
   const signals:Record<string,unknown>[]=[];
   runtime.setCallbacks({onOutboxChanged:()=>undefined,onCommandAck:()=>undefined,onRegistryChanged:()=>undefined,onVolatile:event=>signals.push(event)});
   const value={action:"start",voiceId:"voice_fixture",logicalSessionId:"voice-session",executionSegmentId:"voice-segment",nativeThreadId:"voice-thread",contentEpoch:1,producerEpoch:runtime.producerEpoch,appServerEpoch:server.appServerEpoch,transportGeneration:1,sdp:"v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n"};
   await assert.rejects(runtime.handleVoice({...value,transportGeneration:2}),/Stale/);
   await runtime.handleVoice(value);
   assert.equal(server.voiceStarts,1);assert.equal(store.canSafelyRestart(),false);
+  await store.updateManagedThread("voice-thread",t=>{t.historySyncInitialized=true;});
+  await (runtime as unknown as {reconcileExistingThreads(indexOnly:boolean):Promise<void>}).reconcileExistingThreads(false);
+  assert.equal(server.unsubscribeCount,0);
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.policyVerified,true);
+  assert.equal(store.snapshot().managedThreads['voice-thread']?.realtimeSessionId,"voice_fixture");
+
   await assert.rejects(runtime.handleVoice({...value,voiceId:"voice_other"}),/busy/);
   await server.callbacks.onEvent({type:"turn.started",nativeThreadId:"voice-thread",nativeTurnId:"voice-turn",payload:{voiceSessionId:"voice_fixture"}},server.appServerEpoch);
   assert.equal(store.snapshot().managedThreads['voice-thread']?.activeTurnId,"voice-turn");

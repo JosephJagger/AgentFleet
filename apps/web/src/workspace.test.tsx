@@ -103,14 +103,14 @@ it("只从已保存配置取得模型时仍把计划模式发送给主机", asyn
   fireEvent.click(screen.getByRole("button", { name: "发送" }));
   await waitFor(() => expect(send).toHaveBeenCalledWith("只规划", { model: "saved-model", effort: "medium", mode: "plan" }, undefined));
 });
-it("会话核验期间不提供追加本轮入口，草稿保留", () => {
+it("会话核验期间保留禁用的追加入口，草稿保留", () => {
   const props = inspectorProps("A");
   props.detail = { ...props.detail, session: { ...props.detail.session,
     activeTurnId: "turn-1", state: { ...props.detail.session.state, currentTurn: "in_progress", threadRuntime: "active", reachability: "reconciling" },
   } };
   render(<SessionInspector {...props} />);
   fireEvent.change(screen.getByRole("textbox", { name: "发送给 Codex 的消息" }), { target: { value: "稍后追加" } });
-  expect(screen.queryByRole("button", { name: "追加本轮" })).toBeNull();
+  expect(screen.getByRole("button", { name: "追加本轮" }).hasAttribute("disabled")).toBe(true);
   expect((screen.getByRole("textbox", { name: "发送给 Codex 的消息" }) as HTMLTextAreaElement).value).toBe("稍后追加");
 });
 it("当前任务没有明确模式回执时不会显示默认模式", () => {
@@ -945,4 +945,22 @@ it("核验失败卡片可重试；运行中的排队和追加在核验期间均�
   await waitFor(() => expect(screen.getByText("引用已就绪")).toBeTruthy());
   expect((screen.getByRole("button", { name: "加入队列" }) as HTMLButtonElement).disabled).toBe(false);
   expect((screen.getByRole("button", { name: "追加本轮" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("active turn retains append controls through reconnect and disables writes until live",()=>{
+  const props=inspectorProps("A");
+  const running={...props.detail,session:{...props.detail.session,activeTurnId:"turn-live",state:{...props.detail.session.state,currentTurn:"in_progress" as const,threadRuntime:"active" as const}}};
+  const view=render(<SessionInspector {...props} detail={running}/>);
+  fireEvent.change(screen.getByRole("textbox",{name:"发送给 Codex 的消息"}),{target:{value:"继续检查"}});
+  expect(screen.queryByRole("button",{name:"发送"})).toBeNull();
+  const append=screen.getByRole("button",{name:"追加本轮"});
+  view.rerender(<SessionInspector {...props} detail={{...running,writable:false,session:{...running.session,state:{...running.session.state,reachability:"reconciling"}}}}/>);
+  expect(screen.getByRole("button",{name:"追加本轮"})).toBe(append);
+  expect(append.hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("textbox",{name:"发送给 Codex 的消息"}).getAttribute("placeholder")).toBe("补充当前任务，或写入下一轮队列…");
+  expect(screen.queryByRole("button",{name:"发送"})).toBeNull();
+  view.rerender(<SessionInspector {...props} detail={running}/>);
+  expect(screen.getByRole("button",{name:"追加本轮"})).toBe(append);
+  view.rerender(<SessionInspector {...props} detail={props.detail}/>);
+  expect(screen.getByRole("button",{name:"发送"})).toBeTruthy();
 });
