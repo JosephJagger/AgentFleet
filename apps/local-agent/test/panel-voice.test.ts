@@ -57,3 +57,29 @@ test('startup configuration failure is reported before cleanup closes the owner'
   assert.equal(events[0]?.message,'VOICE_CONFIG');assert.ok(!JSON.stringify(events).includes('SECRET'));
   assert.equal(state,undefined);await runtime.close();
 });
+
+test('native closure disposes the coordinator and allows a new call without waiting for heartbeat expiry',async()=>{
+  let state:unknown;let cb!:AppServerCallbacks;let stopped=0;const events:Record<string,unknown>[]=[];
+  const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(v:unknown)=>{state=v;}} as unknown as StateStore;
+  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),callbacks=>{cb=callbacks;return {start:async()=>undefined,stop:async()=>{stopped++;},getProcessId:()=>123,startPanelVoice:async()=>'thread',reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined};});
+  await runtime.start('pvoice_first','sdp');
+  cb.onVolatile({type:'voice.event',payload:{event:'closed'}} as never,'epoch');
+  await new Promise(r=>setTimeout(r,20));
+  assert.equal(state,undefined);assert.equal(stopped,1);
+  assert.deepEqual(events.map(e=>e.event),['closed','stopped']);
+  await runtime.start('pvoice_second','sdp');await runtime.close();
+});
+
+test('stop of a rejected start is acknowledged without stopping another call; unknown persisted ownership remains fenced',async()=>{
+  let state:unknown;let stops=0;const events:Record<string,unknown>[]=[];
+  const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(v:unknown)=>{state=v;}} as unknown as StateStore;
+  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),()=>({start:async()=>undefined,stop:async()=>{stops++;},getProcessId:()=>123,startPanelVoice:async()=>'thread',reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined}));
+  await runtime.start('pvoice_live','sdp');
+  await assert.rejects(runtime.start('pvoice_rejected','sdp'),/active/);
+  await runtime.stop('pvoice_rejected');assert.equal(stops,0);assert.equal(events.at(-1)?.voiceId,'pvoice_rejected');
+  await runtime.stop('pvoice_live');await runtime.stop('pvoice_live');
+  assert.equal(events.filter(e=>e.voiceId==='pvoice_live'&&e.event==='stopped').length,2);
+  state={voiceId:'pvoice_unknown',pid:999};const n=events.length;
+  await runtime.stop('pvoice_unknown');assert.equal(events.length,n);
+  await runtime.close();
+});

@@ -91,3 +91,14 @@ test('panel diagnostics retain the first safe cause even after cleanup without s
   assert.equal(JSON.parse(service.get(call.voice_id)!.binding_json).failureCode,'VOICE_CONFIG');
   assert.equal(service.recordFailure('missing','Bearer private-token'),'VOICE_NATIVE_ERROR');db.close();
 });
+
+test('task status failures preserve the call and dispatch; status recovers without resending work',t=>{
+ const f=fixture();t.after(()=>f.db.close());f.dispatch();
+ const describe=f.service.describe.bind(f.service);
+ f.service.describe=()=>{throw Error('temporary projection failure');};
+ assert.equal(f.service.poll(f.principal,f.call.voice_id).unavailable,true);
+ assert.equal(f.service.get(f.call.voice_id)?.state,'active');
+ f.service.describe=describe;
+ assert.equal(f.service.poll(f.principal,f.call.voice_id).task?.state,'submitted');
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,1);
+});

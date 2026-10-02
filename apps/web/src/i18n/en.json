@@ -2846,5 +2846,6 @@
   "切换面板页面不断线，挂断后任务继续。关闭网页或切到后台会结束通话。": "Navigate without ending the call. Tasks continue after hangup. Closing or backgrounding the page ends the call.",
   "开始通话": "Start call",
   "通话控制": "Call controls",
-  "正在连接…": "Connecting…"
+  "正在连接…": "Connecting…",
+  "任务状态暂不可用，通话可继续": "Task status is temporarily unavailable. You can continue the call."
 }

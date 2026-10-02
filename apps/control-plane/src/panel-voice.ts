@@ -25,6 +25,10 @@ export class PanelVoiceService {
     this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.failureCode',?) WHERE voice_id=? AND json_extract(binding_json,'$.failureCode') IS NULL",code,id);
     return code;
   }
+  recordCloseReason(id:string,reason:unknown) {
+    const code=typeof reason==='string'&&['USER_HANGUP','PAGE_HIDDEN','CLIENT_DISPOSED','SIGNAL_CLOSED','NATIVE_CLOSED','HOST_DISCONNECTED','OWNER_EXPIRED','SERVER_ERROR'].includes(reason)?reason:'SERVER_ERROR';
+    this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.closeReason',?,'$.closeRequestedAt',?) WHERE voice_id=? AND json_extract(binding_json,'$.closeReason') IS NULL",code,nowIso(),id);
+  }
   closeOrphans() {this.db.run("UPDATE panel_voice_calls SET state='closed' WHERE state<>'closed'");}
   private own(principal:Principal,voiceId:string) {
     const call=this.get(voiceId);
@@ -94,6 +98,18 @@ export class PanelVoiceService {
   }
   acknowledgeReport(voiceId:string,jobId:string) {
     this.db.run("UPDATE panel_voice_jobs SET reported_call_id=? WHERE job_id=? AND user_id=(SELECT user_id FROM panel_voice_calls WHERE voice_id=?)",voiceId,jobId,voiceId);
+  }
+  poll(principal:Principal,voiceId:string) {
+    this.own(principal,voiceId);
+    try {
+      const job=this.current(principal);
+      const task=job?this.describe(principal,job):null;
+      const report=job&&task&&job.reported_call_id!==voiceId&&['completed','failed','interrupted'].includes(job.state)?{reportId:job.job_id,result:task}:null;
+      return {task,report,unavailable:false};
+    } catch {
+      this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.taskStatusError','TASK_STATUS_UNAVAILABLE','$.taskStatusErrorAt',?) WHERE voice_id=?",nowIso(),voiceId);
+      return {task:null,report:null,unavailable:true};
+    }
   }
   report(principal:Principal,voiceId:string) {
     this.own(principal,voiceId);const job=this.current(principal);

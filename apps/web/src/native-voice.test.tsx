@@ -221,3 +221,17 @@ it("panel control keeps the chosen voice host across dashboard refreshes and tar
   fireEvent.click(screen.getByRole('button',{name:'打开目标会话'}));
   expect(open).toHaveBeenCalledWith('target');expect(socket.readyState).toBe(1);
 });
+
+it("panel task status failures and completion keep audio connected",async()=>{
+ render(<NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart onActiveChange={vi.fn()}/>);
+ fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));
+ await waitFor(()=>expect(Socket.all).toHaveLength(1));
+ const socket=Socket.all[0]!;socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});
+ await waitFor(()=>expect(screen.getByRole('button',{name:'静音'}).getAttribute('disabled')).toBeNull());
+ socket.receive({type:'task_status_unavailable'});
+ await waitFor(()=>expect(screen.getByText('任务状态暂不可用，通话可继续')).toBeTruthy());
+ expect(socket.readyState).toBe(1);expect(track.stop).not.toHaveBeenCalled();
+ socket.receive({type:'panel_task',task:{state:'completed'}});
+ await waitFor(()=>expect(screen.getByText('项目任务已完成，结果见会话')).toBeTruthy());
+ expect(socket.readyState).toBe(1);expect(track.stop).not.toHaveBeenCalled();
+});

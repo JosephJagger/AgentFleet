@@ -30,7 +30,14 @@ export class PanelVoiceRuntime {
     if (this.current || this.stopping || this.store.snapshot().panelVoiceRuntime) throw new AgentError('VOICE_BUSY', 'Panel voice is active or awaiting cleanup');
     const client = this.factory({
       findManagedThread: () => undefined, findProject: () => undefined, onEvent: async () => undefined,
-      onVolatile: event => { if (event.type === 'voice.event' && this.current?.id === id && !this.current.cancelled) this.emit({ type: 'voice.event', voiceId: id, ...event.payload }); },
+      onVolatile: event => {
+        if (event.type !== 'voice.event' || this.current?.id !== id || this.current.cancelled) return;
+        this.emit({ type: 'voice.event', voiceId: id, ...event.payload });
+        // Native audio closure does not dispose the dedicated app-server process.
+        // Do not await here: stopVoice drains the notification currently being handled.
+        if (event.payload.event === 'closed' || event.payload.event === 'error')
+          queueMicrotask(() => { void this.stop(id).catch(() => undefined); });
+      },
       onApproval: async () => { throw new AgentError('PANEL_TOOL_DENIED', 'Use the panel dispatch tool'); },
       onApprovalResolved: async () => undefined,
       // Do not await stop from the process exit callback: stop itself waits for process exit.
@@ -79,7 +86,13 @@ export class PanelVoiceRuntime {
   }
   stop(id?: string): Promise<void> {
     const call = this.current;
-    if (!call || (id && call.id !== id)) return Promise.resolve();
+    if (!call || (id && call.id !== id)) {
+      // A rejected start never owned a writer. Acknowledge its stop without
+      // stopping another call; persisted unknown ownership must stay fenced.
+      if (id && this.store.snapshot().panelVoiceRuntime?.voiceId !== id)
+        this.emit({ type: 'voice.event', voiceId: id, event: 'stopped' });
+      return Promise.resolve();
+    }
     if (this.stopping) return this.stopping;
     call.cancelled = true;
     for (const pending of this.pending.values()) {

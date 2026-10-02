@@ -127,6 +127,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
             });
           }
           else if (value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
+          else if(value.type==="task_status_unavailable") setTaskPhase("unknown");
           else if(value.type==="panel_task" && value.task) { onPanelTask?.(value.task); setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
           else if (value.type === "error") fail(value.message ?? t("原生实时语音暂不可用"), "SERVER_ERROR");
           else if (value.type === "closed") { cleanup.current("NATIVE_CLOSED"); setPhase("idle"); }
@@ -146,7 +147,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     <div className={`native-voice__orb${active && !muted ? " native-voice__orb--live" : ""}`} aria-hidden="true">{phase === "connecting" && <LoaderCircle className="spin" size={24} />}</div>
     <p className="native-voice__status" role="status">{status}</p>
     {message && <p className="native-voice__error" role="alert">{message}</p>}
-    {active && <p className="native-voice__task" role="status">{t(activeTurnId || taskPhase === "running" ? "项目任务正在执行" : taskPhase === "delegated" ? "已派发，等待项目任务启动" : taskPhase === "completed" ? "项目任务已完成，结果见会话" : taskPhase === "failed" ? "项目任务未完成，请查看会话结果" : "尚未派发项目任务")}</p>}
+    {active && <p className="native-voice__task" role="status">{t(activeTurnId || taskPhase === "running" ? "项目任务正在执行" : taskPhase === "delegated" ? "已派发，等待项目任务启动" : taskPhase === "completed" ? "项目任务已完成，结果见会话" : taskPhase === "failed" ? "项目任务未完成，请查看会话结果" : taskPhase === "unknown" ? "任务状态暂不可用，通话可继续" : "尚未派发项目任务")}</p>}
     {active && <div className="native-voice__actions">
       <button type="button" className="button button--secondary" disabled={phase !== "connected"} aria-pressed={muted} onClick={() => { const next = !muted; resources.current.stream?.getAudioTracks().forEach(track => { track.enabled = !next; }); setMuted(next); }}>{muted ? <MicOff size={18} /> : <Mic size={18} />}{t(muted ? "取消静音" : "静音")}</button>
       <button type="button" className="button button--stop" onClick={() => { cleanup.current("USER_HANGUP"); setPhase("idle"); setExpanded(false); }}><PhoneOff size={18} />{t("挂断")}</button>
