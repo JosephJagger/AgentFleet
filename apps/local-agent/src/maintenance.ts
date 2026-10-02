@@ -8,7 +8,7 @@ import { readUpdateTransaction, workerHealthDiagnostics } from "./supervisor.js"
 import { collectServiceDiagnostics } from "./service-diagnostics.js";
 import { delay } from "./util.js";
 
-const TYPES: readonly MaintenanceType[] = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"];
+const TYPES: readonly MaintenanceType[] = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host"];
 
 export class AgentMaintenance {
   private readonly active = new Set<string>();
@@ -46,9 +46,11 @@ export class AgentMaintenance {
 
   async replay(): Promise<void> {
     for (const operation of Object.values(this.options.store.snapshot().maintenanceOperations)) {
-      if (operation.state === "running" && ["images.preview", "images.clean"].includes(operation.operationType) && !this.active.has(operation.operationId) && (operation.operationType === "images.clean" || operation.expiresAt && Date.parse(operation.expiresAt) <= Date.now())) {
-        const stopped: MaintenanceOperation = { ...operation, state: "failed", updatedAt: new Date().toISOString(), error: { code: "IMAGE_CLEANUP_UNCONFIRMED", message: "图片操作已中断或过期，请重新预览核验；不会自动重试清理" } };
-        await this.options.store.recordMaintenance(stopped); this.report(stopped); continue;
+      if (operation.state === "running" && ["images.preview", "images.clean", "codex.host"].includes(operation.operationType) && !this.active.has(operation.operationId) && (["images.clean", "codex.host"].includes(operation.operationType) || operation.expiresAt && Date.parse(operation.expiresAt) <= Date.now())) {
+        const stopped: MaintenanceOperation = { ...operation, state: "failed", updatedAt: new Date().toISOString(), error: { code: operation.operationType === "codex.host" ? "OPERATION_UNCONFIRMED" : "IMAGE_CLEANUP_UNCONFIRMED", message: "操作已中断或过期，请先核验实际结果；不会自动重试" } };
+        await this.options.store.recordMaintenance(stopped);
+        if (this.options.store.snapshot().maintenanceDrain?.operationId === operation.operationId) await this.options.store.setMaintenanceDrain(undefined);
+        this.report(stopped); continue;
       }
       if (!await this.reconcileUpdate(operation)) {
         this.report(operation);
@@ -76,9 +78,11 @@ export class AgentMaintenance {
       if (previous) this.report(previous);
       return;
     }
-    if (previous && operationType === "images.clean") {
-      const stopped: MaintenanceOperation = { ...previous, state: "failed", error: { code: "IMAGE_CLEANUP_UNCONFIRMED", message: "清理曾启动但未收到完整回执，请重新预览核验；不会自动重试" }, updatedAt: new Date().toISOString() };
-      await this.options.store.recordMaintenance(stopped); this.report(stopped); return;
+    if (previous && ["images.clean", "codex.host"].includes(operationType)) {
+      const stopped: MaintenanceOperation = { ...previous, state: "failed", error: { code: operationType === "codex.host" ? "OPERATION_UNCONFIRMED" : "IMAGE_CLEANUP_UNCONFIRMED", message: "操作曾启动但未收到完整回执，请先核验实际结果；不会自动重试" }, updatedAt: new Date().toISOString() };
+      await this.options.store.recordMaintenance(stopped);
+      if (this.options.store.snapshot().maintenanceDrain?.operationId === operationId) await this.options.store.setMaintenanceDrain(undefined);
+      this.report(stopped); return;
     }
     if (previous && await this.reconcileUpdate(previous)) return;
     this.active.add(operationId);
@@ -89,13 +93,15 @@ export class AgentMaintenance {
       await this.options.store.recordMaintenance(operation);
       this.report(operation);
     };
-    if (["connection.repair", "session.reconcile", "images.preview", "images.clean", "project.add"].includes(operationType)) operation.recoveryTarget = previous?.recoveryTarget ?? (offer.recoveryTarget as Record<string, unknown>);
+    if (["connection.repair", "session.reconcile", "images.preview", "images.clean", "project.add", "codex.host"].includes(operationType)) operation.recoveryTarget = previous?.recoveryTarget ?? (offer.recoveryTarget as Record<string, unknown>);
     if (operationType === "commands.reconcile" && Array.isArray(offer.commands) && offer.commands.length <= 20 && offer.commands.every(id => typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id))) operation.commands = offer.commands;
     await progress({ phase: "running" });
     let staged = false;
     try {
       let result: Record<string, unknown>;
-      if (operationType === "connection.repair") {
+      if (operationType === "codex.host") {
+        result = await this.options.runtime.manageHostCodex(operation.recoveryTarget, operationId);
+      } else if (operationType === "connection.repair") {
         const target=operation.recoveryTarget;
         if(!target) throw new AgentError("RECOVERY_TARGET_INVALID","缺少主机恢复目标");
         const commands=Array.isArray(target.commands)&&target.commands.length<=20&&target.commands.every(id=>typeof id==="string"&&/^[A-Za-z0-9_-]{1,128}$/.test(id))?target.commands as string[]:[];

@@ -1,7 +1,8 @@
+import { HOST_CODEX_OPERATIONS } from "../lib/host-codex";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { t, systemText } from "../i18n";
-import type { CommandReceipt, FleetSession } from "../lib/types";
+import type { CommandReceipt, FleetSession, Machine, HostOperation } from "../lib/types";
 
 const operations = {
   "files.search": "搜索项目原生文件", "files.list": "浏览项目原生目录", "terminal.run": "运行独立原生命令",
@@ -30,7 +31,7 @@ function operationGroup(op: Operation): keyof typeof operationGroups {
   return "environment";
 }
 
-export function CodexOperationsPanel({ session, commands, onChanged }: { session: FleetSession; commands: CommandReceipt[]; onChanged: () => void }) {
+export function CodexOperationsPanel({ session, commands = [], machine, hostOperations = [], onChanged }: { session?: FleetSession; commands?: CommandReceipt[]; machine?: Machine; hostOperations?: HostOperation[]; onChanged: () => void }) {
   const [operation, setOperation] = useState<Operation>("usage.read");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [experimental, setExperimental] = useState(false);
@@ -39,9 +40,12 @@ export function CodexOperationsPanel({ session, commands, onChanged }: { session
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState<string>();
   const receipt = commands.find(c => c.id === submitted);
-  const pending = commands.some(c => c.type === "codex.manage" && ["accepted", "dispatching", "unknown"].includes(c.state));
-  const result = receipt?.codexResult;
-  const editable = (!experimentalOperation(operation) || experimental) && (operation !== "turn.settings" || !!session.activeTurnId) && session.actions?.manage?.allowed === true && !busy && !pending;
+  const hostReceipt = hostOperations.find(c => c.id === submitted);
+  const hostPending = hostOperations.some(c => c.type === "codex.host" && ["accepted", "running", "unknown"].includes(c.state));
+  const pending = hostPending || commands.some(c => c.type === "codex.manage" && ["accepted", "dispatching", "unknown"].includes(c.state));
+  const result = (hostReceipt?.result?.codexResult as CommandReceipt["codexResult"]) ?? receipt?.codexResult;
+  const allowed = machine ? machine.reachability === "live" && machine.maintenanceCapabilities?.includes("codex.host") === true : session?.actions?.manage?.allowed === true;
+  const editable = (!experimentalOperation(operation) || experimental) && (operation !== "turn.settings" || !!session?.activeTurnId) && allowed && !busy && !pending;
   const input = (key: string, label: string, optional = false) => <label key={key}>{t(label)}<input value={fields[key] ?? ""} required={!optional} maxLength={key === "objective" ? 2000 : key === "uri" ? 2048 : 256} onChange={event => setFields({ ...fields, [key]: event.target.value })} /></label>;
   async function run(cursor?: string) {
     if (!editable || needsConfirmation(operation) && !confirmed) return;
@@ -90,16 +94,22 @@ export function CodexOperationsPanel({ session, commands, onChanged }: { session
     if (needsConfirmation(operation)) args.confirmed = true;
     setBusy(true); setMessage("");
     try {
+      if (machine) {
+        const response = await api.hostCodexOperation(machine.id, { operation, arguments: args }, crypto.randomUUID());
+        setSubmitted(response.id);
+      } else if (session) {
       const response = await api.command(session.id, { type: "codex.manage", clientMutationId: crypto.randomUUID(), payload: { operation, arguments: args },
-        precondition: { nativeThreadId: session.nativeThreadId, executionSegmentId: session.executionSegmentId, threadControlVersion: session.threadControlVersion, expectedActiveTurnId: session.activeTurnId ?? null, projectLeaseVersion: session.projectLeaseVersion } });
-      setSubmitted(response.command.id); setMessage(t("请求已提交，正在等待宿主机回执。")); onChanged();
+        precondition: { nativeThreadId: session.nativeThreadId, executionSegmentId: session.executionSegmentId, threadControlVersion: session.threadControlVersion, expectedActiveTurnId: session?.activeTurnId ?? null, projectLeaseVersion: session.projectLeaseVersion } });
+      setSubmitted(response.command.id);
+      }
+      setMessage(t("请求已提交，正在等待宿主机回执。")); onChanged();
     } catch (e) { setMessage(e instanceof Error ? e.message : t("操作失败")); }
     finally { setBusy(false); }
   }
   return <details className="codex-settings-panel codex-operations-panel"><summary>{t("Codex 工具与账号")}</summary>
     <form className="stack-form" onSubmit={event => { event.preventDefault(); void run(); }}>
       <label className="checkbox-row"><input type="checkbox" checked={experimental} disabled={busy || pending} onChange={e => { setExperimental(e.target.checked); if (!e.target.checked && experimentalOperation(operation)) { setOperation("usage.read"); setFields({}); setSubmitted(undefined); } setConfirmed(false); }} />{t("显示已验证的 Codex 实验接口")}</label>
-      <label>{t("操作")}<select value={operation} disabled={busy || pending} onChange={event => { setOperation(event.target.value as Operation); setFields({}); setConfirmed(false); setMessage(""); setSubmitted(undefined); }}>{Object.entries(operationGroups).map(([group, title]) => { const entries = Object.entries(operations).filter(([key]) => operationGroup(key as Operation) === group && (experimental || !experimentalOperation(key as Operation))); return entries.length ? <optgroup key={group} label={t(title)}>{entries.map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</optgroup> : null; })}</select></label>
+      <label>{t("操作")}<select value={operation} disabled={busy || pending} onChange={event => { setOperation(event.target.value as Operation); setFields({}); setConfirmed(false); setMessage(""); setSubmitted(undefined); }}>{Object.entries(operationGroups).map(([group, title]) => { const entries = Object.entries(operations).filter(([key]) => operationGroup(key as Operation) === group && (!machine || HOST_CODEX_OPERATIONS.includes(key)) && (experimental || !experimentalOperation(key as Operation))); return entries.length ? <optgroup key={group} label={t(title)}>{entries.map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</optgroup> : null; })}</select></label>
       {["account.login", "account.logout"].includes(operation) && <p>{t("这会修改宿主机默认 Codex 环境的登录状态，并影响使用该环境的其他原生会话。登录只在 OpenAI 官方页面完成，面板不接收密码或认证文件。")}</p>}
       {operation === "files.search" && input("query", "文件搜索词")}
       {operation === "files.list" && input("path", "项目内相对目录（留空使用会话目录）", true)}
@@ -119,14 +129,14 @@ export function CodexOperationsPanel({ session, commands, onChanged }: { session
       {operation === "nativeQueue.reorder" && <label>{t("按顺序输入全部原生队列 ID（每行一个）")}<textarea required value={fields.submissionIds ?? ""} onChange={e => setFields({ ...fields, submissionIds: e.target.value })} /></label>}
       {["nativeQueue.update", "nativeQueue.delete", "nativeQueue.reorder"].includes(operation) && <p>{t("先读取原生队列再操作；只改变本会话的原生排队消息，不改变面板队列，也不会启动任务。")}</p>}
       {operation === "account.login.cancel" && input("loginId", "登录请求 ID")}
-      {operation === "usage.read" && <><label>{t("用量范围")}<select value={fields.scope ?? "account"} onChange={e => setFields({ ...fields, scope: e.target.value })}><option value="account">{t("当前原生账号")}</option><option value="thread">{t("当前会话")}</option></select></label><p>{t("来自 Codex 官方用量接口；缺失数据不会按零计算，也不会加到面板已记录的 token 中。")}</p></>}
+      {operation === "usage.read" && <><label>{t("用量范围")}<select value={fields.scope ?? "account"} onChange={e => setFields({ ...fields, scope: e.target.value })}><option value="account">{t("当前原生账号")}</option>{!machine && <option value="thread">{t("当前会话")}</option>}</select></label><p>{t("来自 Codex 官方用量接口；缺失数据不会按零计算，也不会加到面板已记录的 token 中。")}</p></>}
       {operation === "marketplace.add" && input("source", "GitHub 仓库 HTTPS 地址")}
       {["marketplace.remove", "marketplace.upgrade"].includes(operation) && input("marketplaceName", "市场名称（更新时留空表示全部）", operation === "marketplace.upgrade")}
       {operation === "memory.mode" && <label>{t("本会话记忆")}<select value={fields.enabled ?? "true"} onChange={e => setFields({ ...fields, enabled: e.target.value })}><option value="true">{t("启用")}</option><option value="false">{t("停用")}</option></select></label>}
       {operation === "memory.reset" && <p>{t("清除宿主机默认环境的原生记忆数据，影响使用此环境的其他会话；不是清空对话历史。")}</p>}
       {operation === "experiment.configure" && <><p>{t("修改原生用户配置中的 step_model_switching；主机空闲时才允许保存。重新连接 Codex 后生效，已有任务不会被中断。")}</p><label>{t("开关状态")}<select value={fields.enabled ?? "true"} onChange={e => setFields({ ...fields, enabled: e.target.value })}><option value="true">{t("启用")}</option><option value="false">{t("停用")}</option></select></label></>}
       {operation === "history.search" && input("searchTerm", "查找本会话用户消息和最终回复")}
-      {operation === "turn.settings" && <><p>{t("仅修改本轮后续步骤，不改下一轮，不切换计划模式。宿主机必须已启用 step_model_switching；原生拒绝时不会假装成功。")}</p>{input("model", "模型名称（留空不改）", true)}{input("effort", "推理强度（留空不改）", true)}<label>{t("服务档位")}<select value={fields.serviceTier ?? ""} onChange={e => setFields({ ...fields, serviceTier: e.target.value })}><option value="">{t("保持不变")}</option><option value="clear">{t("清除档位")}</option><option value="fast">Fast</option><option value="flex">Flex</option></select></label><label>{t("推理摘要")}<select value={fields.summary ?? ""} onChange={e => setFields({ ...fields, summary: e.target.value })}><option value="">{t("保持不变")}</option>{["auto", "concise", "detailed", "none"].map(v => <option key={v} value={v}>{v}</option>)}</select></label>{!session.activeTurnId && <p>{t("当前没有运行中的任务。")}</p>}</>}
+      {operation === "turn.settings" && <><p>{t("仅修改本轮后续步骤，不改下一轮，不切换计划模式。宿主机必须已启用 step_model_switching；原生拒绝时不会假装成功。")}</p>{input("model", "模型名称（留空不改）", true)}{input("effort", "推理强度（留空不改）", true)}<label>{t("服务档位")}<select value={fields.serviceTier ?? ""} onChange={e => setFields({ ...fields, serviceTier: e.target.value })}><option value="">{t("保持不变")}</option><option value="clear">{t("清除档位")}</option><option value="fast">Fast</option><option value="flex">Flex</option></select></label><label>{t("推理摘要")}<select value={fields.summary ?? ""} onChange={e => setFields({ ...fields, summary: e.target.value })}><option value="">{t("保持不变")}</option>{["auto", "concise", "detailed", "none"].map(v => <option key={v} value={v}>{v}</option>)}</select></label>{!session?.activeTurnId && <p>{t("当前没有运行中的任务。")}</p>}</>}
       {operation === "nativeQueue.read" && <p>{t("这里显示宿主机原生队列，面板加入队列的任务仍在原来的队列中。")}</p>}
       {operation === "resetCards.read" && <p>{t("数量与卡片详情由当前原生账号上报，详情可能不完整。")}</p>}
       {operation === "resetCard.consume" && <>{input("creditId", "重置卡 ID（留空使用下一张可用卡）", true)}<p>{t("使用卡片后重新读取官方额度。这会消耗重置卡，与临时重置预测无关。")}</p></>}
@@ -136,9 +146,10 @@ export function CodexOperationsPanel({ session, commands, onChanged }: { session
       {operation === "mcp.login" && input("name", "MCP 服务器名称")}
       {operation === "skill.toggle" && <>{input("name", "技能名称")}<label>{t("技能状态")}<select value={fields.enabled ?? "true"} onChange={e => setFields({ ...fields, enabled: e.target.value })}><option value="true">{t("启用")}</option><option value="false">{t("停用")}</option></select></label></>}
       {needsConfirmation(operation) && <label className="checkbox-row"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />{t("确认在此宿主机执行所选操作")}</label>}
-      {!session.actions?.manage?.allowed && <p>{systemText(session.actions?.manage?.message) || t("请更新主机连接服务并接管此会话。")}</p>}
+      {!allowed && <p>{systemText(session?.actions?.manage?.message) || t(machine ? "请连接主机并更新连接服务后使用主机级管理。" : "请更新主机连接服务并接管此会话。")}</p>}
       <button type="submit" className="button button--quiet" disabled={!editable || needsConfirmation(operation) && !confirmed}>{busy || pending ? t("等待主机回执") : t(operations[operation])}</button>
     </form>
+    {hostReceipt?.error && <p role="alert">{systemText(hostReceipt.error.message)}</p>}
     {receipt?.message ? <p role="alert">{systemText(receipt.message)}</p> : message && !result && <p role="status">{message}</p>}
     {result && <div aria-live="polite"><p>{t("宿主机返回")}: {t(statusLabel(result.status))}</p>{result.rows.length > 0 && <dl>{result.rows.map((row, index) => <div key={index}><dt>{systemText(row.name)}<small>{systemText(row.status)}</small></dt><dd>{row.detail}</dd></div>)}</dl>}{result.url && <a className="button button--quiet" href={result.url} target="_blank" rel="noopener noreferrer">{t("打开授权页面")}</a>}{result.nextCursor && <button className="button button--quiet" disabled={!editable} onClick={() => void run(result.nextCursor)}>{t("下一页")}</button>}{result.status === "unavailable" && <p>{t("当前账号未返回此项数据，无法据此计算用量。")}</p>}</div>}
   </details>;

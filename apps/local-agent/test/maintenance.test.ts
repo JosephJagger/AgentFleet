@@ -165,3 +165,21 @@ test("image cleanup crash replay never invokes deletion again, successful proof 
   assert.equal(store.canSafelyRestart(),true,"expired preview cannot permanently block host updates");
   assert.equal(calls,1);
 });
+
+test("host native operations execute without a session, deduplicate and never replay interrupted writes", async t => {
+  const directory = await mkdtemp(join(tmpdir(), "agentfleet-host-native-"));
+  const store = new StateStore(directory); await store.initialize();
+  t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+  let calls = 0;
+  const runtime = { manageHostCodex: async (request: unknown) => { calls++; assert.deepEqual(request, { operation: "account.read", arguments: {} }); return { codexResult: { operation: "account.read", status: "loggedIn", rows: [] } }; } } as unknown as AgentRuntime;
+  const reports: Record<string, unknown>[] = [];
+  const maintenance = new AgentMaintenance({ store, runtime, signal: new AbortController().signal, report: r => reports.push(r) });
+  const offer = { operationId: "host-native", operationType: "codex.host", recoveryTarget: { operation: "account.read", arguments: {} }, expiresAt: new Date(Date.now()+60000).toISOString() };
+  await maintenance.handle(offer); await maintenance.handle(offer);
+  assert.equal(calls,1); assert.equal(reports.at(-1)?.state,"succeeded");
+  await store.recordMaintenance({ operationId: "interrupted-login", operationType: "codex.host", state: "running", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), recoveryTarget: { operation:"account.login",arguments:{confirmed:true} } });
+  await store.setMaintenanceDrain("interrupted-login");
+  await maintenance.replay();
+  assert.equal(store.snapshot().maintenanceDrain,undefined);
+  assert.equal(calls,1); assert.equal(store.snapshot().maintenanceOperations["interrupted-login"]?.state,"failed");
+});

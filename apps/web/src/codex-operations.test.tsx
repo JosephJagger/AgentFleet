@@ -4,8 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NativeSessionActions } from "./components/NativeSessionActions";
 import { CodexOperationsPanel } from "./components/CodexOperationsPanel";
 import { api } from "./lib/api";
-import type { CommandReceipt, FleetSession } from "./lib/types";
-vi.mock("./lib/api", () => ({ api: { command: vi.fn() } }));
+import type { CommandReceipt, FleetSession, Machine, HostOperation } from "./lib/types";
+vi.mock("./lib/api", () => ({ api: { hostCodexOperation: vi.fn(), command: vi.fn() } }));
 afterEach(cleanup); beforeEach(() => vi.clearAllMocks());
 const session = { id: "s", nativeThreadId: "thread", executionSegmentId: "segment", threadControlVersion: 4, projectLeaseVersion: 2, activeTurnId: null, actions: { manage: { allowed: true } } } as FleetSession;
 
@@ -86,4 +86,20 @@ it("goal management defaults to paused and has no autonomous activation option",
   fireEvent.click(screen.getByRole("button", { name: "设置或调整目标" }));
   await waitFor(() => expect(api.command).toHaveBeenCalledOnce());
   expect(api.command).toHaveBeenCalledWith("s", expect.objectContaining({ payload: { operation: "goal.set", arguments: { objective: "Verify the project", status: "paused" } } }));
+});
+
+it("host account management needs only a host and preserves explicit confirmation", async () => {
+ const machine={id:"host",reachability:"live",maintenanceCapabilities:["codex.host"]} as Machine;
+ vi.mocked(api.hostCodexOperation).mockResolvedValue({id:"host-result",type:"codex.host",state:"accepted"} as HostOperation);
+ render(<CodexOperationsPanel machine={machine} onChanged={vi.fn()}/>);
+ fireEvent.click(screen.getByText("Codex 工具与账号",{selector:"summary"}));
+ expect(screen.queryByRole("option",{name:"当前会话"})).toBeNull();
+ expect(screen.queryByRole("option",{name:"查看目标与预算进度"})).toBeNull();
+ expect(api.hostCodexOperation).not.toHaveBeenCalled();
+ fireEvent.change(screen.getByLabelText("操作"),{target:{value:"account.logout"}});
+ expect((screen.getByRole("button",{name:"退出原生账号"}) as HTMLButtonElement).disabled).toBe(true);
+ fireEvent.click(screen.getByLabelText("确认在此宿主机执行所选操作"));
+ fireEvent.click(screen.getByRole("button",{name:"退出原生账号"}));
+ await waitFor(()=>expect(api.hostCodexOperation).toHaveBeenCalledWith("host",{operation:"account.logout",arguments:{confirmed:true}},expect.any(String)));
+ expect(api.command).not.toHaveBeenCalled();
 });

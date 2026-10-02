@@ -1,6 +1,6 @@
 import { PanelVoiceRuntime } from "./panel-voice.js";
 import { parseOutputSchema } from "./output-schema.js";
-import { parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, parseReviewTarget, parseForkRange } from "./codex-operations.js";
+import { parseHostCodexOperation, parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, parseReviewTarget, parseForkRange } from "./codex-operations.js";
 import { parseClaudeSettings } from "./claude-settings.js";
 import { readNativeSessionCwd, readNativeUsage } from "./native-usage.js";
 import { nativeImageCleanup } from "./native-image-cleanup.js";
@@ -453,6 +453,20 @@ export class AgentRuntime {
 
   async refreshQuota(): Promise<void> { await this.appServer?.refreshQuota?.(); }
 
+  async manageHostCodex(value: unknown, operationId: string): Promise<Record<string, unknown>> {
+    const request = parseHostCodexOperation(value);
+    if (!this.appServer?.manageHostCodex) throw new AgentError("AGENT_CAPABILITY_UNAVAILABLE", "Native host management is unavailable");
+    if (this.store.snapshot().maintenanceDrain) throw new AgentError("MAINTENANCE_BUSY", "Host maintenance is in progress");
+    // Fence new task submissions before checking existing tasks and voice calls.
+    await this.store.setMaintenanceDrain(operationId);
+    try {
+      if (!readOnlyCodexOperation(request.operation) && !this.store.canSafelyRestart()) throw new AgentError("HOST_BUSY", "请等待主机任务及通话结束后修改原生环境");
+      return { codexResult: await this.appServer.manageHostCodex(request, operationId) };
+    } finally {
+      if (this.store.snapshot().maintenanceDrain?.operationId === operationId) await this.store.setMaintenanceDrain(undefined);
+    }
+  }
+
   async refreshCatalog(refreshModels = true): Promise<Record<string, unknown>> {
     void this.appServer?.refreshQuota?.();
     if (!this.canRead()) throw new AgentError("CATALOG_READ_UNSUPPORTED", this.support.readCompatibilityReason ?? this.readOnlyReasons().join("; "));
@@ -610,7 +624,7 @@ export class AgentRuntime {
           ? ["thread/list", "thread/read", "thread/resume", "thread/unsubscribe", "thread/start", "turn/start", "turn/steer", "turn/interrupt", "approval/reply-once"]
           : this.canRead() && this.appServer ? ["thread/list", "thread/read"] : [],
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
-        maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"],
+        maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host"],
         projectFiles: true,
         realtimeVoice: this.isWritable() && this.support.codexVersion === "0.159.2",
         queue: this.isWritable(),

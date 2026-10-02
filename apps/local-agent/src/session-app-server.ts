@@ -79,6 +79,12 @@ export class SessionAppServer implements AppServerClient {
     if (!client.readHistoryPage) throw new AgentError("HISTORY_PAGING_UNAVAILABLE", "Native history pagination is unavailable");
     return client.readHistoryPage(id,cursor);
   }
+  manageHostCodex(value: unknown, mutationId: string) {
+    return this.serial("host-management", async () => {
+      if (!this.catalog.manageHostCodex) throw new AgentError("AGENT_CAPABILITY_UNAVAILABLE", "Host management is unavailable");
+      return this.catalog.manageHostCodex(value, mutationId);
+    });
+  }
   manageCodex(thread: ManagedThread, value: unknown, mutationId: string) {
     const request = value as { operation?: string };
     return this.serial(thread.nativeThreadId, async () => {

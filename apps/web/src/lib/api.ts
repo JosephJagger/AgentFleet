@@ -834,6 +834,10 @@ export const api = {
       body: JSON.stringify({ alias }),
     });
   },
+  async hostCodexOperation(machineId: string, nativeRequest: { operation: string; arguments: Record<string, unknown> }, clientMutationId: string): Promise<HostOperation> {
+    const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { method: "POST", body: JSON.stringify({ type: "codex.host", clientMutationId, nativeRequest }) });
+    return mapHostOperation(raw.operation);
+  },
   async hostOperations(machineId: string, signal?: AbortSignal): Promise<HostOperation[]> {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { signal });
     return list(raw.operations).map(mapHostOperation);

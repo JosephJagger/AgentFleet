@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 45) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 46) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1351,6 +1351,20 @@ export class ControlPlaneDatabase {
         INSERT INTO permission_preferences SELECT * FROM permission_preferences_v44;
         DROP TABLE permission_preferences_v44;
         PRAGMA user_version=45`);
+    });
+
+    if (version < 46) this.transaction(() => {
+      const schema = this.get<{ sql: string }>("SELECT sql FROM sqlite_master WHERE type='table' AND name='machine_operations'")!.sql;
+      if (!schema.includes("'codex.host'")) {
+        if (!schema.includes("'project.add'")) throw new Error("Unexpected host operation schema");
+        const indexes = this.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='machine_operations' AND sql IS NOT NULL");
+        this.sqlite.exec("ALTER TABLE machine_operations RENAME TO machine_operations_v45");
+        this.sqlite.exec(schema.replace("'project.add'", "'project.add','codex.host'"));
+        this.sqlite.exec("INSERT INTO machine_operations SELECT * FROM machine_operations_v45; DROP TABLE machine_operations_v45");
+        for (const index of indexes) this.sqlite.exec(index.sql);
+      }
+      if (this.all("PRAGMA foreign_key_check").length) throw new Error("Host management migration violated foreign keys");
+      this.sqlite.exec("PRAGMA user_version=46");
     });
 
   }

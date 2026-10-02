@@ -98,3 +98,11 @@ export function sanitizeCodexResult(value: unknown): CodexOperationResult | null
   }
   return { operation: String(v.operation), status: v.status.slice(0, 200), rows, ...(url ? { url } : {}), ...(typeof v.nextCursor === "string" && v.nextCursor.length <= 4096 ? { nextCursor: v.nextCursor } : {}) };
 }
+
+/** Operations whose native RPC does not require a project or thread. */
+export const HOST_CODEX_OPERATIONS: readonly string[] = ["account.read", "account.login", "account.login.cancel", "account.logout", "usage.read", "resetCards.read", "resetCard.consume", "plugin.catalog", "plugin.install", "plugin.uninstall", "plugin.reconcile", "marketplace.add", "marketplace.remove", "marketplace.upgrade", "apps.installed", "apps.read", "config.requirements", "provider.read", "workspaceMessages.read", "windows.readiness", "memory.status", "memory.reset", "experiment.configure", "mcp.login", "mcp.reload", "skill.toggle"];
+export function parseHostCodexOperation(value: unknown) {
+  const request = parseCodexOperation(value);
+  if (!HOST_CODEX_OPERATIONS.includes(request.operation) || request.operation === "usage.read" && request.arguments.scope === "thread") throw new Error("This operation requires a session context");
+  return request;
+}

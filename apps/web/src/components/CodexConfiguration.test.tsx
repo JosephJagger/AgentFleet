@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { CodexConfiguration } from "./CodexConfiguration";
 import { api } from "../lib/api";
 import type { Machine } from "../lib/types";
-vi.mock("../lib/api",()=>({api:{projects:vi.fn(),sessions:vi.fn(),codexManagementContext:vi.fn()}}));
+vi.mock("../lib/api",()=>({api:{hostOperations:vi.fn().mockResolvedValue([]),projects:vi.fn(),sessions:vi.fn(),codexManagementContext:vi.fn()}}));
 vi.mock("./CodexSettingsPanel",()=>({CodexSettingsPanel:({workspace,machineId,projectId}: {workspace?:boolean;machineId?:string;projectId?:string})=><p>settings:{workspace?"workspace":projectId??machineId}</p>}));
 vi.mock("./PermissionPanel",()=>({PermissionPanel:()=>null}));
 vi.mock("./CodexOperationsPanel",()=>({CodexOperationsPanel:()=>null}));
@@ -35,6 +35,7 @@ it("host and project search loads next pages instead of restricting choices to d
 });
 it("native management never borrows or claims a session automatically",async()=>{
  vi.mocked(api.projects).mockResolvedValue({items:[],nextCursor:null,total:0});
+ vi.mocked(api.hostOperations).mockResolvedValue([]);
  vi.mocked(api.sessions).mockResolvedValue({items:[],nextCursor:null,total:0});
  render(<CodexConfiguration machines={machines} initialMachineId="m"/>);
  fireEvent.click(screen.getByRole("button",{name:"原生工具与账号"}));

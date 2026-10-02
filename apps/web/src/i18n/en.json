@@ -2881,5 +2881,11 @@
   "Codex 版本是程序版本，不是模型名称。模型和权限在「设置 → Codex 配置」中管理。": "The Codex version is the program version, not a model name. Manage models and permissions in Settings → Codex settings.",
   "原生模型尚未上报；请选择模型或等待主机同步后再发送。": "The native model has not been reported. Select a model or wait for host synchronization before sending.",
   "加载更多项目": "Load more projects",
-  "保存配置": "Save configuration"
+  "保存配置": "Save configuration",
+  "主机原生管理": "Host native management",
+  "主机账号与原生环境": "Host account and native environment",
+  "直接管理所选主机的账号、额度、插件和原生环境，无需选择或创建会话。变更仅影响此主机，不会同步账号到其他主机。": "Manage this host’s account, limits, plugins and native environment without selecting or creating a session. Changes apply only to this host; accounts are not synced to other hosts.",
+  "需要会话上下文的工具": "Tools requiring a session",
+  "目标、附件、队列和项目 MCP 工具需要会话上下文。仅使用这些工具时选择会话；不会自动接管或新建会话。": "Goals, attachments, queues and project MCP tools require a session. Select a session only for these tools; none will be automatically claimed or created.",
+  "请连接主机并更新连接服务后使用主机级管理。": "Connect the host and update its connection service to use host management."
 }

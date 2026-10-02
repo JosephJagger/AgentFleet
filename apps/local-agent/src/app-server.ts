@@ -4,7 +4,7 @@ import { executeCodexWorkspaceOperation } from "./codex-workspace-operations.js"
 import { codexNotification } from "./codex-notifications.js";
 import { elicitationForm, elicitationContent, type ElicitationField } from "./mcp-elicitation.js";
 import { executeCodexOperation } from "./codex-operation-executor.js";
-import { parseCodexOperation, parseForkRange, type CodexOperationResult } from "./codex-operations.js";
+import { parseHostCodexOperation, parseCodexOperation, parseForkRange, type CodexOperationResult } from "./codex-operations.js";
 import { REFERENCE_TOOL, queryReference } from "./reference-tool.js";
 import { quotaSnapshot, tokenUsage } from "./usage.js";
 import { previewNativeDeletion, type DeletionPreview } from "./native-deletion.js";
@@ -185,6 +185,7 @@ export interface AppServerClient {
   getProcessId?(): number | undefined;
   startVoice?(thread: ManagedThread, sdp: string): Promise<void>;
   stopVoice?(threadId: string): Promise<void>;
+  manageHostCodex?(request: unknown, mutationId: string): Promise<CodexOperationResult>;
   manageCodex?(thread: ManagedThread, request: unknown, mutationId: string): Promise<CodexOperationResult>;
   getAgentRuntimes?(): Record<string, unknown>;
   refreshQuota?(): Promise<void>;
@@ -709,6 +710,14 @@ export class CodexAppServer implements AppServerClient {
   async inspectEnvironment(cwd: string, threadId?: string): Promise<CodexInspection> {
     this.assertInitialized();
     return inspectCodex((method, params) => this.request(method, params), cwd, threadId);
+  }
+
+  async manageHostCodex(value: unknown, mutationId: string): Promise<CodexOperationResult> {
+    this.assertInitialized();
+    const request = parseHostCodexOperation(value);
+    const result = await executeCodexOperation(request, "", mutationId, (method, params) => this.request(method, params), async () => { await this.refreshQuota(); this.callbacks.onQuotaChanged?.(); });
+    if (/^(plugin\.|marketplace\.)/.test(request.operation)) this.callbacks.onCatalogChanged?.(this.appServerEpoch);
+    return result;
   }
 
   async manageCodex(thread: ManagedThread, value: unknown, mutationId: string): Promise<CodexOperationResult> {

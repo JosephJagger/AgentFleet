@@ -326,6 +326,26 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   assert.ok(!maintenanceFrames.includes("error"), "maintenance replay remains idempotent");
   agentSocket.off("message", captureMaintenance);
 
+  // Host-native operations work before any session exists, with the same auth/CSRF boundary.
+  const hostUrl = `/api/machines/${agentCredential.machineId}/operations`;
+  const nativePayload = { type: "codex.host", clientMutationId: "host-native-regression", nativeRequest: { operation: "account.read", arguments: {} } };
+  assert.equal((await app.inject({ method:"POST", url:hostUrl, payload:nativePayload })).statusCode,401);
+  assert.equal((await app.inject({ method:"POST", url:hostUrl, headers:browserHeaders, payload:nativePayload })).statusCode,409);
+  db.run("UPDATE machines SET maintenance_types_json=? WHERE machine_id=?",JSON.stringify(["codex.host","project.add","diagnostics.collect"]),agentCredential.machineId);
+  assert.equal((await app.inject({method:"POST",url:hostUrl,headers:browserHeaders,payload:{...nativePayload,nativeRequest:{operation:"goal.read"}}})).statusCode,400);
+  const hostRequest=await app.inject({method:"POST",url:hostUrl,headers:browserHeaders,payload:nativePayload});
+  assert.equal(hostRequest.statusCode,202,hostRequest.body);
+  const hostOffer=await agentInbox.next("maintenance.offer");
+  assert.deepEqual(hostOffer.recoveryTarget,nativePayload.nativeRequest);
+  const duplicateHost=await app.inject({method:"POST",url:hostUrl,headers:browserHeaders,payload:nativePayload});
+  assert.equal(duplicateHost.json().operation.operationId,hostRequest.json().operation.operationId);
+  await agentInbox.next("maintenance.offer");
+  assert.equal((await app.inject({method:"POST",url:hostUrl,headers:browserHeaders,payload:{...nativePayload,nativeRequest:{operation:"usage.read"}}})).statusCode,409);
+  agentSocket.send(JSON.stringify({type:"maintenance.result",operationId:hostOffer.operationId,state:"succeeded",result:{codexResult:{operation:"account.read",status:"loggedIn",rows:[]},accessToken:"must-not-persist"}}));
+  agentSocket.send(JSON.stringify({type:"ping"}));await agentInbox.next("pong");
+  const nativeReceipt=await app.inject({method:"GET",url:`/api/operations/${hostOffer.operationId}`,headers:browserHeaders});
+  assert.equal(nativeReceipt.json().operation.state,"succeeded");assert.equal(nativeReceipt.body.includes("must-not-persist"),false);
+
   const createSession = await app.inject({
     method: "POST",
     url: "/api/sessions",
@@ -1132,7 +1152,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
   await app.ready();
   assert.equal(
     Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    45,
+    46,
   );
 
   const login = await app.inject({

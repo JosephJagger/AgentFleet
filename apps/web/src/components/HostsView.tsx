@@ -12,7 +12,7 @@ import { HostCodexInventory } from "./HostCodexInventory";
 import { HostReadiness } from "./HostReadiness";
 import { HostImageStorage } from "./HostImageStorage";
 
-const operationNames: Record<MaintenanceType, string> = localized(() => ({ "connection.repair":t("一键恢复连接"), "images.preview": t("预览会话图片"), "images.clean": t("清理会话图片"), "commands.reconcile": t("核验主机回执"), "session.reconcile": t("解除冻结"), "catalog.refresh": t("重新扫描"), "agent.update": t("检查并更新"), "runtime.reconnect": t("重新连接 Codex"), "diagnostics.collect": t("检查连接"), "project.add": t("创建项目") }));
+const operationNames: Record<MaintenanceType, string> = localized(() => ({ "connection.repair":t("一键恢复连接"), "images.preview": t("预览会话图片"), "images.clean": t("清理会话图片"), "commands.reconcile": t("核验主机回执"), "session.reconcile": t("解除冻结"), "catalog.refresh": t("重新扫描"), "agent.update": t("检查并更新"), "runtime.reconnect": t("重新连接 Codex"), "diagnostics.collect": t("检查连接"), "codex.host": t("主机原生管理"), "project.add": t("创建项目") }));
 const operationStates: Record<HostOperation["state"], string> = localized(() => ({ accepted: t("等待主机"), running: t("正在处理"), succeeded: t("主机已完成"), failed: t("操作未完成"), unknown: t("结果待核验"), expired: t("操作已过期") }));
 const operationDescriptions: Partial<Record<MaintenanceType, string>> = localized(() => ({
   "connection.repair":t("自动检查连接、核验旧任务、重连 Codex 并同步项目与会话。不会重发原命令。"),

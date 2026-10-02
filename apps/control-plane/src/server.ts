@@ -948,7 +948,7 @@ export async function buildControlPlane(
   }));
   app.post("/api/machines/:id/operations",{preHandler:mutate},async(request,reply)=>{
     const body=record(request.body);const machineId=routeId(request);
-    const operation=machineMaintenance.create(request.principal as Principal,machineId,requiredString(body.type,"type",100),requiredString(body.clientMutationId,"clientMutationId",200),typeof body.logicalSessionId === "string" ? body.logicalSessionId : undefined,typeof body.previewOperationId === "string" ? body.previewOperationId : undefined);
+    const operation=machineMaintenance.create(request.principal as Principal,machineId,requiredString(body.type,"type",100),requiredString(body.clientMutationId,"clientMutationId",200),typeof body.logicalSessionId === "string" ? body.logicalSessionId : undefined,typeof body.previewOperationId === "string" ? body.previewOperationId : undefined, undefined, body.nativeRequest);
     const agent=agents.get(machineId);
     if(agent?.reconciliationReady) for(const offer of machineMaintenance.offers(machineId)) sendJson(agent.socket,offer);
     reply.code(202);return {operation};

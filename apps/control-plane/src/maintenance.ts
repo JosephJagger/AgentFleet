@@ -1,23 +1,26 @@
+import { parseHostCodexOperation, sanitizeCodexResult } from "./codex-operations.js";
 import { CloudImages } from "./cloud-images.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import type { Principal } from "./auth.js";
 import { invariant } from "./errors.js";
 import { futureIso, newId, nowIso } from "./crypto.js";
 
-export const MAINTENANCE_TYPES = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add"] as const;
+export const MAINTENANCE_TYPES = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host"] as const;
 export type MaintenanceType = (typeof MAINTENANCE_TYPES)[number];
 
 export class MaintenanceService {
   constructor(private readonly db: ControlPlaneDatabase) {}
 
-  create(principal: Principal, machineId: string, type: string, mutationId: string, logicalSessionId?: string, previewOperationId?: string, projectTarget?: { provider?: "codex" | "claude"; path: string; alias: string; createDirectory: boolean }): Record<string, unknown> {
+  create(principal: Principal, machineId: string, type: string, mutationId: string, logicalSessionId?: string, previewOperationId?: string, projectTarget?: { provider?: "codex" | "claude"; path: string; alias: string; createDirectory: boolean }, nativeRequest?: unknown): Record<string, unknown> {
     invariant(MAINTENANCE_TYPES.includes(type as MaintenanceType),400,"INVALID_OPERATION","Unsupported machine operation");
     invariant(mutationId.length>=8 && mutationId.length<=200,400,"INVALID_MUTATION_ID","clientMutationId must be between 8 and 200 characters");
+    let hostRequest: ReturnType<typeof parseHostCodexOperation> | undefined;
+    if (type === "codex.host") { try { hostRequest = parseHostCodexOperation(nativeRequest); } catch { invariant(false,400,"INVALID_CODEX_OPERATION","此操作或参数不适用于主机级管理"); } }
     return this.db.transaction(()=>{
       const previous=this.db.get<{operation_id:string;type:string;request_json:string|null}>("SELECT operation_id,type,request_json FROM machine_operations WHERE machine_id=? AND actor_client_session_id=? AND client_mutation_id=?",machineId,principal.clientSessionId,mutationId);
       if(previous) {
         const previousRequest = previous.request_json ? JSON.parse(previous.request_json) : {};
-        invariant(previous.type===type && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
+        invariant(previous.type===type && (type!=="codex.host" || JSON.stringify(previousRequest)===JSON.stringify(hostRequest)) && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
         return this.get(principal,previous.operation_id);
       }
       const machine=this.db.get<{identity_state:string;reachability:string;maintenance_types_json:string}>("SELECT identity_state,reachability,maintenance_types_json FROM machines WHERE machine_id=? AND workspace_id=?",machineId,principal.workspaceId);
@@ -26,7 +29,11 @@ export class MaintenanceService {
       invariant(machine.reachability==="online",409,"MACHINE_OFFLINE","Machine must be online");
       invariant((JSON.parse(machine.maintenance_types_json) as string[]).includes(type),409,"AGENT_CAPABILITY_UNAVAILABLE","Update the connection service to use this operation");
       let target: Record<string,unknown> | null = null;
-      if(type === "connection.repair") {
+      if(type === "codex.host") {
+        invariant(logicalSessionId === undefined && previewOperationId === undefined,400,"INVALID_OPERATION_TARGET","Host operations do not accept a session target");
+        invariant(!this.db.get("SELECT 1 FROM machine_operations WHERE machine_id=? AND type='codex.host' AND state IN ('accepted','running','unknown') LIMIT 1", machineId),409,"CODEX_OPERATION_PENDING","Wait for the previous host operation to be confirmed");
+        target={...hostRequest!};
+      } else if(type === "connection.repair") {
         invariant(logicalSessionId === undefined && previewOperationId === undefined,400,"INVALID_OPERATION_TARGET","Connection repair does not accept a session target");
         const connection = this.db.get<{app_server_epoch:string}>("SELECT app_server_epoch FROM agent_connections WHERE machine_id=? AND disconnected_at IS NULL AND app_server_epoch IS NOT NULL ORDER BY transport_generation DESC LIMIT 1",machineId);
         invariant(connection,409,"MACHINE_RECONNECTING","Wait for the host to finish reconnecting");
@@ -68,7 +75,7 @@ export class MaintenanceService {
         target={appServerEpoch:connection.app_server_epoch,logicalSessionId:session.logical_session_id,contentEpoch:session.content_epoch,executionSegmentId:session.execution_segment_id,nativeThreadId:session.native_thread_id,...(recoverableReservation?{nativeTurnId:reservation.native_turn_id,previousAppServerEpoch:reservation.bound_app_server_epoch}:{})};
       } else invariant(logicalSessionId === undefined,400,"INVALID_OPERATION_TARGET","This operation does not accept a session target");
       const timestamp=nowIso();const operationId=newId("op");
-      this.db.run("INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,'accepted',?,?,?)",operationId,machineId,principal.workspaceId,principal.clientSessionId,mutationId,type,timestamp,timestamp,futureIso(["connection.repair","session.reconcile","images.preview","images.clean"].includes(type) ? 300 : 3600));
+      this.db.run("INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,'accepted',?,?,?)",operationId,machineId,principal.workspaceId,principal.clientSessionId,mutationId,type,timestamp,timestamp,futureIso(["codex.host","connection.repair","session.reconcile","images.preview","images.clean"].includes(type) ? 300 : 3600));
       if(target) this.db.run("UPDATE machine_operations SET request_json=? WHERE operation_id=?",JSON.stringify(target),operationId);
       this.db.audit({workspaceId:principal.workspaceId,actorUserId:principal.userId,actorClientSessionId:principal.clientSessionId,machineId,action:"machine.operation.request",metadata:{operationId,type}});
       return this.get(principal,operationId);
@@ -125,7 +132,7 @@ export class MaintenanceService {
       safeError={code:typeof value.code==="string"?value.code.slice(0,100):"OPERATION_FAILED",message:typeof value.message==="string"?value.message.slice(0,2000):"主机操作失败"};
     }
     this.db.transaction(() => {
-      let persistedResult=resultJson;
+      let persistedResult=row.type === "codex.host" && state === "succeeded" ? JSON.stringify({ codexResult: sanitizeCodexResult((result as Record<string,unknown>)?.codexResult) }) : resultJson;
       if(row.type === "images.clean" && state === "succeeded" && row.request_json && result && typeof result === "object") {
         persistedResult=JSON.stringify(new CloudImages(this.db).complete(machineId,JSON.parse(row.request_json),result as Record<string,unknown>));
       }
