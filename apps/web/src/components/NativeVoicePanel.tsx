@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Mic, MicOff, Phone, PhoneOff, LoaderCircle, X } from "lucide-react";
+import { Mic, MicOff, Headset, Phone, PhoneOff, LoaderCircle, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api";
 import { t } from "../i18n";
@@ -154,9 +154,10 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     {playBlocked && active && <button type="button" className="button button--secondary" onClick={() => { void audio.current?.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true)); }}>{t("播放 Codex 语音")}</button>}
     {transcript.length > 0 && <details className="native-voice__transcript-details"><summary>{t("本次语音转写")}</summary><div className="native-voice__transcript" ref={transcriptArea} tabIndex={0}>{transcript.map((entry,index) => <p key={index}><strong>{entry.role === "user" ? t("你") : "Codex"}</strong><span>{entry.text}</span></p>)}</div></details>}
   </div>;
-  return <div ref={control} className={`native-voice${active ? " native-voice--active" : ""}`}>
-    <button ref={trigger} type="button" className="button button--secondary native-voice__trigger" disabled={!active && !canStart} aria-label={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} title={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} aria-expanded={expanded} aria-controls={expanded ? popoverId : undefined} onClick={() => { if (active) setExpanded(value => !value); else void start(); }}>
-      {phase === "connecting" ? <LoaderCircle className="spin" size={19} /> : <Phone size={19} />}
+  return <div ref={control} className={`native-voice${globalMachineId ? " native-voice--panel" : ""}${active ? " native-voice--active" : ""}`}>
+    <button ref={trigger} type="button" className={`button ${globalMachineId ? "button--primary" : "button--secondary"} native-voice__trigger`} disabled={!active && !canStart} aria-label={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} title={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} aria-expanded={expanded} aria-controls={expanded ? popoverId : undefined} onClick={() => { if (active) setExpanded(value => !value); else void start(); }}>
+      {phase === "connecting" ? <LoaderCircle className="spin" size={19} /> : globalMachineId ? <Headset size={20} /> : <Phone size={19} />}
+      {globalMachineId && <span>{t(phase === "connecting" ? "正在连接…" : active ? "通话控制" : "开始通话")}</span>}
       {active && <i className="native-voice__indicator" aria-hidden="true" />}
     </button>
     {portalHost ? createPortal(callPanel, portalHost) : callPanel}

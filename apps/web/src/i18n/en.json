@@ -2839,5 +2839,12 @@
   "使用所选主机的 Codex 登录账号。说出目标主机、项目和会话；原有会话电话仍可单独使用。": "Uses the selected host’s Codex account. Name the target host, project and session. Session calls remain available.",
   "打开目标会话": "Open target session",
   "任务结果": "Task result",
-  "挂断不取消已派发任务；关闭网页或浏览器进入后台会结束通话。": "Ending the call does not cancel dispatched tasks. Closing the page or backgrounding the browser ends the call."
+  "挂断不取消已派发任务；关闭网页或浏览器进入后台会结束通话。": "Ending the call does not cancel dispatched tasks. Closing the page or backgrounding the browser ends the call.",
+  "语音总控": "Voice control",
+  "说出主机、项目和任务，总控帮你派发并汇报。": "Name a host, project and task. Voice control dispatches the work and reports back.",
+  "使用此主机的 Codex 账号通话，可指挥其他主机。": "Use this host’s Codex account for the call. Tasks can run on other hosts.",
+  "切换面板页面不断线，挂断后任务继续。关闭网页或切到后台会结束通话。": "Navigate without ending the call. Tasks continue after hangup. Closing or backgrounding the page ends the call.",
+  "开始通话": "Start call",
+  "通话控制": "Call controls",
+  "正在连接…": "Connecting…"
 }
