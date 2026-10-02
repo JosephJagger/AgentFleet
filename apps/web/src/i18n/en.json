@@ -2887,5 +2887,12 @@
   "直接管理所选主机的账号、额度、插件和原生环境，无需选择或创建会话。变更仅影响此主机，不会同步账号到其他主机。": "Manage this host’s account, limits, plugins and native environment without selecting or creating a session. Changes apply only to this host; accounts are not synced to other hosts.",
   "需要会话上下文的工具": "Tools requiring a session",
   "目标、附件、队列和项目 MCP 工具需要会话上下文。仅使用这些工具时选择会话；不会自动接管或新建会话。": "Goals, attachments, queues and project MCP tools require a session. Select a session only for these tools; none will be automatically claimed or created.",
-  "请连接主机并更新连接服务后使用主机级管理。": "Connect the host and update its connection service to use host management."
+  "请连接主机并更新连接服务后使用主机级管理。": "Connect the host and update its connection service to use host management.",
+  "语音音色": "Voice settings",
+  "音色": "Voice",
+  "会话语音与面板总控统一使用此音色。保存后从下一次通话生效，当前通话不变。": "Session calls and panel voice control share this voice. Changes apply to the next call; the current call stays unchanged.",
+  "音色选项来自托管 Codex 原生接口；切换音色需要连接服务 0.30.73 或更新版本。": "Voice options come from the managed Codex native interface. Changing voices requires AgentFleets connection service 0.30.73 or later.",
+  "保存音色": "Save voice",
+  "音色已保存，下次通话生效。": "Voice saved. It will apply to your next call.",
+  "所选音色需要连接服务 0.30.73 或更新版本，请先更新语音主机": "The selected voice requires connection service 0.30.73 or later. Update the voice host first."
 }

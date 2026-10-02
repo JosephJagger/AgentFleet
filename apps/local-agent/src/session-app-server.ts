@@ -193,7 +193,7 @@ export class SessionAppServer implements AppServerClient {
       catch (error) { await this.release(writer).catch(() => undefined); throw error; }
     });
   }
-  startVoice(thread: ManagedThread, sdp: string) {
+  startVoice(thread: ManagedThread, sdp: string, voice?: string) {
     return this.serial(thread.nativeThreadId, async () => {
       if (this.writers.has(thread.nativeThreadId)) throw new AgentError("VOICE_BUSY", "Session writer is still occupied");
       const project=this.callbacks.findProject(thread.projectId);
@@ -207,7 +207,7 @@ export class SessionAppServer implements AppServerClient {
         const pid=writer.client.getProcessId?.();
         if(!pid) throw new AgentError("VOICE_PROCESS_UNVERIFIED", "Cannot verify native voice writer identity");
         await this.callbacks.onVoiceWriter?.(thread.nativeThreadId,pid,restored.observedSettings);
-        await writer.client.startVoice(thread,sdp);
+        await writer.client.startVoice(thread,sdp,voice);
       } catch(error) {
         // A timeout may still have started native voice. Confirm its closure first.
         if(writer.client.stopVoice) {

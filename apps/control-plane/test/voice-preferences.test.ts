@@ -1,0 +1,35 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { ControlPlaneDatabase } from "../src/db.js";
+import { loadConfig } from "../src/config.js";
+import { VoicePreferencesService } from "../src/voice-preferences.js";
+import type { Principal } from "../src/auth.js";
+
+test("voice defaults persist independently of runtime settings, isolate workspaces and reject stale saves", t => {
+  const dir = mkdtempSync(join(tmpdir(), "voice-prefs-"));
+  const path = join(dir, "db.sqlite"); let db = new ControlPlaneDatabase(path);
+  t.after(() => { db.close(); rmSync(dir, {recursive: true, force: true}); });
+  const config = loadConfig({AUTH_MODE:"password", ADMIN_EMAIL:"voice@test.example", ADMIN_PASSWORD:randomUUID(), DATABASE_PATH:path, PUBLIC_ORIGIN:"http://test", COOKIE_SECURE:"false"});
+  const principal = db.bootstrap(config) as Principal;
+  let service = new VoicePreferencesService(db);
+  assert.equal(service.read(principal).voice,"sol");
+  assert.equal(service.read(principal).voices.length,19);
+  assert.equal(service.forStart(principal,"0.30.72"),"sol");
+  service.write(principal,{voice:"coral",revision:0});
+  assert.equal(service.forStart(principal,"0.30.73"),"coral");
+  assert.throws(()=>service.forStart(principal,"0.30.72"),/0.30.73/);
+  assert.throws(()=>service.forStart(principal,"unknown"),/0.30.73/);
+  assert.throws(()=>service.write(principal,{voice:"sol",revision:0}),/another browser/);
+  assert.throws(()=>service.write(principal,{voice:"made-up",revision:1}),/不支持/);
+  assert.throws(()=>service.write(principal,{revision:1}),/请选择/);
+  assert.equal(service.read({...principal,workspaceId:"other"}).voice,"sol");
+  assert.equal(db.all("SELECT * FROM codex_preferences").length,0);
+  db.close(); db = new ControlPlaneDatabase(path); service = new VoicePreferencesService(db);
+  assert.equal(service.read(principal).voice,"coral");
+  service.write(principal,{voice:"sol",revision:1});
+  assert.equal(service.forStart(principal,"0.30.72"),"sol");
+});

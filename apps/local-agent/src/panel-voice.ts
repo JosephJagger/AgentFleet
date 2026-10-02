@@ -26,7 +26,7 @@ export class PanelVoiceRuntime {
     this.watchdog.unref();
   }
 
-  async start(id: string, sdp: string) {
+  async start(id: string, sdp: string, voice?: string) {
     if (this.current || this.stopping || this.store.snapshot().panelVoiceRuntime) throw new AgentError('VOICE_BUSY', 'Panel voice is active or awaiting cleanup');
     const client = this.factory({
       findManagedThread: () => undefined, findProject: () => undefined, onEvent: async () => undefined,
@@ -61,7 +61,7 @@ export class PanelVoiceRuntime {
       await client.start();
       await this.store.setPanelVoiceRuntime({ voiceId: id, ...(client.getProcessId() ? { pid: client.getProcessId()! } : {}) });
       if (call.cancelled) return;
-      call.threadId = await client.startPanelVoice(call.directory, id, sdp);
+      call.threadId = await client.startPanelVoice(call.directory, id, sdp, voice);
     })();
     try { await call.ready; } catch (error) {
       // Deliver the sanitized cause before stopped, which releases the browser owner.

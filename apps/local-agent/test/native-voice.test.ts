@@ -60,3 +60,14 @@ test("voice diagnostics expose only fixed codes, never native credentials or URL
   assert.equal(voiceErrorCode("SDP codec unsupported https://private/?token=secret"),"VOICE_SDP");
   assert.equal(voiceErrorCode("sensitive unknown body"),"VOICE_NATIVE_ERROR");
 });
+
+test("selected voice reaches the native realtime request and invalid voices never start", async () => {
+  const server = new CodexAppServer({} as AppServerCallbacks);
+  const requests: {method:string;params:Record<string,unknown>}[] = [];
+  (server as unknown as {request(method:string,params:Record<string,unknown>):Promise<unknown>}).request = async (method,params) => { requests.push({method,params}); return {}; };
+  const thread = {nativeThreadId:"voice-choice",realtimeSessionId:"voice_choice"} as ManagedThread;
+  await assert.rejects(server.startVoice(thread,"sdp","invalid"),/Unsupported native voice/);
+  assert.equal(requests.length,0);
+  await server.startVoice(thread,"sdp","coral");
+  assert.equal(requests[0]?.params.voice,"coral");
+});

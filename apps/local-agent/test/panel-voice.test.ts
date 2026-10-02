@@ -8,10 +8,11 @@ test('coordinator native notifications and dynamic tool calls are confined to it
   const events:Record<string,unknown>[]=[];const replies:Record<string,unknown>[]=[];const calls:string[]=[];
   const server=new CodexAppServer({findManagedThread:()=>undefined,findProject:()=>undefined,onEvent:async()=>undefined,onVolatile:(e:{payload:Record<string,unknown>})=>events.push(e.payload),onPanelTool:async()=>{calls.push('tool');return {state:'idle'};}} as unknown as AppServerCallbacks);
   const internal=server as unknown as {request(method:string,params:Record<string,unknown>):Promise<unknown>;handleLine(line:string):Promise<void>;writeLine(value:Record<string,unknown>):Promise<void>};
-  let configuration:Record<string,unknown>={};
-  internal.request=async(method,params)=>{if(method==='config/read')return {config:{mcp_servers:{personal:{command:'node',args:['mcp.js'],tool_timeout_sec:null},'node.repl':{url:'https://example.test/mcp'}}}};if(method==='thread/start'){configuration=params;return {thread:{id:'coordinator'}};}return {};};
+  let configuration:Record<string,unknown>={};let selectedVoice:unknown;
+  internal.request=async(method,params)=>{if(method==='thread/realtime/start')selectedVoice=params.voice;if(method==='config/read')return {config:{mcp_servers:{personal:{command:'node',args:['mcp.js'],tool_timeout_sec:null},'node.repl':{url:'https://example.test/mcp'}}}};if(method==='thread/start'){configuration=params;return {thread:{id:'coordinator'}};}return {};};
   internal.writeLine=async reply=>{replies.push(reply);};
-  await server.startPanelVoice('/tmp','pvoice_test','v=0\r\nm=audio 9\r\n');
+  await server.startPanelVoice('/tmp','pvoice_test','v=0\r\nm=audio 9\r\n','shimmer');
+  assert.equal(selectedVoice,'shimmer');
   assert.equal(configuration.ephemeral,true);
   assert.equal(configuration.sandbox,'read-only');
   for(const feature of ['shell_tool','unified_exec','apps','computer_use','hooks','multi_agent','code_mode_host'])assert.equal((configuration.config as Record<string,unknown>)[`features.${feature}`],false);

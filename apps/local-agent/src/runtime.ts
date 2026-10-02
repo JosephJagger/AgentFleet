@@ -1,3 +1,4 @@
+import { parseRealtimeVoice } from "./voice-options.js";
 import { PanelVoiceRuntime } from "./panel-voice.js";
 import { parseOutputSchema } from "./output-schema.js";
 import { parseHostCodexOperation, parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, parseReviewTarget, parseForkRange } from "./codex-operations.js";
@@ -1880,7 +1881,7 @@ export class AgentRuntime {
     if(value.action==='report'&&typeof value.text==='string')return this.panelVoice.report(id,value.text,String(value.reportId));
     if(value.action!=='start'||typeof value.sdp!=='string'||value.sdp.length>65536||!value.sdp.startsWith('v=0\r\n'))throw new AgentError('VOICE_INVALID','Invalid voice offer');
     if(!this.isWritable()||this.store.snapshot().maintenanceDrain||this.support.codexVersion!=='0.159.2')throw new AgentError('VOICE_UNAVAILABLE','Host voice unavailable');
-    return this.panelVoice.start(id,value.sdp);
+    return this.panelVoice.start(id,value.sdp,parseRealtimeVoice(value.voice));
   }
   handleVoice(value: Record<string, unknown>): Promise<void> {
     const operation=this.voiceLane.catch(()=>undefined).then(()=>this.invokeVoice(value));
@@ -1923,7 +1924,7 @@ export class AgentRuntime {
     if(Object.values(snapshot.managedThreads).some(t=>t.projectId===thread.projectId && (t.activeTurnId || t.realtimeSessionId)) || snapshot.projectReservations[thread.projectId] || Object.values(snapshot.commandJournal).some(c=>["claimed","invoking","responded","unknown"].includes(c.state))) throw new AgentError("VOICE_BUSY", "Project or host operations are still busy");
     await verifyProjectIdentity(projectById(this.store,thread.projectId));
     await this.store.updateManagedThread(thread.nativeThreadId,t=>{ t.appServerEpoch=this.appServer!.appServerEpoch;t.realtimeSessionId=voiceId;t.realtimeWriterEpoch=this.appServer!.appServerEpoch;t.realtimeProducerEpoch=this.producerEpoch;t.subscribed=true; });
-    try { await this.appServer.startVoice({...thread,appServerEpoch:this.appServer.appServerEpoch,realtimeSessionId:voiceId},value.sdp); }
+    try { await this.appServer.startVoice({...thread,appServerEpoch:this.appServer.appServerEpoch,realtimeSessionId:voiceId},value.sdp,parseRealtimeVoice(value.voice)); }
     catch(error) {
       // A confirmed stop is the only route to a durable exit receipt.
       await this.invokeVoice({...value,action:"stop"});

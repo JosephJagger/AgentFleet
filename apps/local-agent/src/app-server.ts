@@ -1,3 +1,4 @@
+import { parseRealtimeVoice } from "./voice-options.js";
 import { PANEL_VOICE_TOOL, PANEL_VOICE_INSTRUCTIONS, PANEL_REALTIME_PROMPT } from "./panel-voice-tools.js";
 import { voiceErrorCode } from "./voice-errors.js";
 import { executeCodexWorkspaceOperation } from "./codex-workspace-operations.js";
@@ -183,7 +184,7 @@ export interface ThreadResumeResult extends ThreadStartResult {
 /** The small, allow-listed App Server surface used by the runtime. */
 export interface AppServerClient {
   getProcessId?(): number | undefined;
-  startVoice?(thread: ManagedThread, sdp: string): Promise<void>;
+  startVoice?(thread: ManagedThread, sdp: string, voice?: string): Promise<void>;
   stopVoice?(threadId: string): Promise<void>;
   manageHostCodex?(request: unknown, mutationId: string): Promise<CodexOperationResult>;
   manageCodex?(thread: ManagedThread, request: unknown, mutationId: string): Promise<CodexOperationResult>;
@@ -851,7 +852,7 @@ export class CodexAppServer implements AppServerClient {
   }
 
   private panelThreadId?: string;
-  async startPanelVoice(cwd:string,voiceId:string,sdp:string):Promise<string> {
+  async startPanelVoice(cwd:string,voiceId:string,sdp:string,voice?:string):Promise<string> {
     // Override inherited integrations on this thread only; preserve the account's normal project configuration.
     const effective=resultObject(await this.request("config/read",{includeLayers:false}),"panel config");
     const config:Record<string,unknown>={"features.realtime_conversation":true,"features.goals":false,"shell_environment_policy.inherit":"none","web_search":"disabled","features.shell_tool":false,"features.unified_exec":false,"features.apps":false,"features.computer_use":false,"features.hooks":false,"features.multi_agent":false,"features.code_mode":false,"features.code_mode_host":false};
@@ -864,14 +865,15 @@ export class CodexAppServer implements AppServerClient {
     const raw=resultObject(await this.request("thread/start",{cwd,ephemeral:true,approvalPolicy:"never",sandbox:"read-only",dynamicTools:[PANEL_VOICE_TOOL],developerInstructions:PANEL_VOICE_INSTRUCTIONS,config}),"panel thread/start");
     const thread=resultObject(raw.thread,"panel thread");const id=requireString(thread.id,"thread.id",{maxLength:256});
     this.panelThreadId=id;
-    await this.startVoice({nativeThreadId:id,realtimeSessionId:voiceId} as ManagedThread,sdp);return id;
+    await this.startVoice({nativeThreadId:id,realtimeSessionId:voiceId} as ManagedThread,sdp,voice);return id;
   }
   async reportPanelVoice(threadId:string,text:string) {if(threadId!==this.panelThreadId)throw new AgentError("VOICE_FENCED","Wrong coordinator");await this.request("thread/realtime/appendText",{threadId,text:text.slice(0,10000)});}
-  async startVoice(thread: ManagedThread, sdp: string): Promise<void> {
+  async startVoice(thread: ManagedThread, sdp: string, voice?: string): Promise<void> {
+    const selectedVoice = parseRealtimeVoice(voice);
     if (!thread.realtimeSessionId || this.voiceIds.has(thread.nativeThreadId)) throw new AgentError("VOICE_BUSY", "Native voice is already active");
     this.voiceIds.set(thread.nativeThreadId, thread.realtimeSessionId);
     try {
-      await this.request("thread/realtime/start", { threadId:thread.nativeThreadId, outputModality:"audio", version:"v3", voice:"sol", realtimeSessionId:thread.realtimeSessionId, prompt:this.panelThreadId===thread.nativeThreadId ? PANEL_REALTIME_PROMPT : "You are the realtime voice interface for the current Codex project. For requests to inspect project status, read files, run commands, modify code, or perform any project task, use the native delegation mechanism to delegate to the client Codex agent. A verbal promise is not execution. Do not claim a task is running or completed until the backend reports that state. Relay backend results accurately, including failures. If the project or task is ambiguous, ask a short clarification. Keep conversation concise and use the user’s language.", includeStartupContext:true, flushTranscriptTailOnSessionEnd:false, transport:{type:"webrtc",sdp} });
+      await this.request("thread/realtime/start", { threadId:thread.nativeThreadId, outputModality:"audio", version:"v3", voice:selectedVoice, realtimeSessionId:thread.realtimeSessionId, prompt:this.panelThreadId===thread.nativeThreadId ? PANEL_REALTIME_PROMPT : "You are the realtime voice interface for the current Codex project. For requests to inspect project status, read files, run commands, modify code, or perform any project task, use the native delegation mechanism to delegate to the client Codex agent. A verbal promise is not execution. Do not claim a task is running or completed until the backend reports that state. Relay backend results accurately, including failures. If the project or task is ambiguous, ask a short clarification. Keep conversation concise and use the user’s language.", includeStartupContext:true, flushTranscriptTailOnSessionEnd:false, transport:{type:"webrtc",sdp} });
     } catch (error) { await this.stopVoice(thread.nativeThreadId); throw error; }
   }
   async stopVoice(threadId: string): Promise<void> {

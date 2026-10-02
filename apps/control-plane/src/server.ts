@@ -1,3 +1,4 @@
+import { VoicePreferencesService } from "./voice-preferences.js";
 import { PanelVoiceService } from "./panel-voice.js";
 import { NativeVoiceService, validVoiceOffer, VOICE_CONTROL_TTL_SECONDS, type VoiceBinding } from "./native-voice.js";
 import {ClaudePreferencesService} from "./claude-preferences.js";
@@ -1281,6 +1282,8 @@ export async function buildControlPlane(
     new ClaudePreferencesService(db).read(request.principal as Principal,routeId(request)));
   app.put("/api/sessions/:id/claude-settings", {preHandler:mutate}, async request =>
     new ClaudePreferencesService(db).write(request.principal as Principal,routeId(request),record(request.body)));
+  app.get("/api/settings/codex/voice", { preHandler: authenticate }, async request => new VoicePreferencesService(db).read(request.principal as Principal));
+  app.put("/api/settings/codex/voice", { preHandler: mutate }, async request => new VoicePreferencesService(db).write(request.principal as Principal, record(request.body)));
   app.get("/api/settings/codex", { preHandler: authenticate }, async request =>
     codexPreferences.readTarget(request.principal as Principal, "workspace"));
   app.put("/api/settings/codex", { preHandler: mutate }, async request => {
@@ -1385,9 +1388,10 @@ export async function buildControlPlane(
           invariant((version[0]??0)>0||(version[1]??0)>30||version[1]===30&&(version[2]??0)>=69,409,"PANEL_AGENT_UPDATE","总控通话需要连接服务 0.30.69 或更新版本");
           const agent=agents.get(machineId);
           invariant(agent?.realtimeVoice&&agent.reconciliationReady&&!agent.dispatchPaused&&agent.producerEpoch&&agent.appServerEpoch,409,"VOICE_UNAVAILABLE","语音主机暂不可用");
+          const voice=new VoicePreferencesService(db).forStart(principal,String(machine.agentVersion));
           const call=panelVoice.start(principal,machineId,{producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,transportGeneration:agent.identity.transportGeneration});
           voiceId=call.voice_id;panelOwners.set(voiceId,{socket,token,lastSeen:Date.now(),lastPing:Date.now()});
-          invariant(sendPanel(voiceId,'start',{sdp:value.sdp}),409,"VOICE_OFFLINE","主机连接中断");
+          invariant(sendPanel(voiceId,'start',{sdp:value.sdp,voice}),409,"VOICE_OFFLINE","主机连接中断");
         } else if(voiceId?.startsWith('pvoice_')) {
           const owner=panelOwners.get(voiceId);invariant(owner?.socket===socket,403,"VOICE_NOT_OWNER","总控通话已结束");
           if(value.type==='heartbeat'){owner.lastSeen=Date.now();sendPanel(voiceId,'heartbeat');sendJson(socket,{type:'heartbeat'});}
@@ -1400,11 +1404,12 @@ export async function buildControlPlane(
           const session=registry.getSession(principal,id);
           const agent=agents.get(session.machineId);
           invariant(agent?.realtimeVoice && agent.reconciliationReady && !agent.dispatchPaused && agent.producerEpoch && agent.appServerEpoch && agent.socket.readyState===WebSocket.OPEN,409,"VOICE_UNAVAILABLE","主机暂不支持原生实时语音，请更新连接服务与托管 Codex");
+          const voice=new VoicePreferencesService(db).forStart(principal,String(registry.getMachine(principal,session.machineId).agentVersion));
           const binding=nativeVoice.start(principal,id,requiredString(value.leaseId,"leaseId",200),{producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,transportGeneration:agent.identity.transportGeneration});
           voiceId=binding.voiceId;
           voiceOwners.set(voiceId,{socket,lastSeen:Date.now(),lastPing:Date.now(),controlHeartbeat:value.controlHeartbeat===true,token});
           refreshVoiceControl(voiceId);
-          invariant(sendJson(agent.socket,{type:"voice.control",...binding,action:"start",sdp:value.sdp}),409,"VOICE_OFFLINE","主机语音连接未完成");
+          invariant(sendJson(agent.socket,{type:"voice.control",...binding,action:"start",sdp:value.sdp,voice}),409,"VOICE_OFFLINE","主机语音连接未完成");
         } else if(value.type==="heartbeat" && voiceId) {
           const owner=voiceOwners.get(voiceId);
           invariant(owner?.socket===socket,403,"VOICE_NOT_OWNER","Voice owner changed");

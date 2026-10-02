@@ -1,3 +1,4 @@
+export type VoicePreferences = { voice: string; revision: number; voices: string[] };
 import type { CompletionPreferences, WritingPreferencesState } from "./completion-preferences";
 import type { TokenCounts, UsageSummary } from "./usage";
 import type { WritingAISettings, WritingMemoryState } from "./writing-assistance";
@@ -659,6 +660,8 @@ export const api = {
   adminSystem: () => request<{ authMode: string; registration: string }>("/api/admin/system"),
   runtimeRelease: (signal?: AbortSignal) => request<RuntimeReleaseStatus>("/api/runtime-release", { signal }),
   runtimeReleaseControl: (action: "check" | "pause" | "resume" | "rollback") => request<RuntimeReleaseStatus>("/api/runtime-release/control", { method: "POST", body: JSON.stringify({ action }) }),
+  voicePreferences: (signal?: AbortSignal) => request<VoicePreferences>("/api/settings/codex/voice", { signal }),
+  saveVoicePreferences: (input: { voice: string; revision: number }) => request<VoicePreferences>("/api/settings/codex/voice", { method: "PUT", body: JSON.stringify(input) }),
   runtimePreferences: (scope: import("./codex-settings").SettingsScope, id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(scope === "workspace" ? "/api/settings/codex" : `/api/${scope === "machine" ? "machines" : scope === "project" ? "projects" : "sessions"}/${encodeURIComponent(id)}/codex-settings`, { signal }),
   saveRuntimePreferences: (scope: import("./codex-settings").SettingsScope, id: string, input: { scope: string; overrides: import("./codex-settings").FieldOverrides; revision: number }) => request<import("./codex-settings").CodexPreferences>(scope === "workspace" ? "/api/settings/codex" : `/api/${scope === "machine" ? "machines" : scope === "project" ? "projects" : "sessions"}/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
   codexPreferences: (id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(`/api/sessions/${encodeURIComponent(id)}/codex-settings`, { signal }),
