@@ -1395,7 +1395,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .panel-voice-control { position: relative; margin-left: 8px; }
 .panel-voice-control > button { min-height: 40px; gap: 6px; white-space: nowrap; }
 .panel-voice-control--active { color: var(--teal); }
-.panel-voice-control--active i { width: 7px; height: 7px; background: currentColor; border-radius: 50%; }
+.panel-voice-control--active i { flex: 0 0 7px; width: 7px; height: 7px; background: var(--teal); border-radius: 50%; box-shadow: 0 0 7px var(--teal), 0 0 12px color-mix(in srgb,var(--teal) 40%,transparent); }
 .panel-voice-control__settings { position: fixed; z-index: 1000; right: 16px; top: 78px; width: min(380px,calc(100vw - 32px)); max-height: calc(100dvh - 110px); overflow: auto; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper-solid); color: var(--ink); box-shadow: 0 10px 40px #0003; }
 .panel-voice-control__settings[hidden] { display: none; }
 .panel-voice-control__settings header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
@@ -1414,4 +1414,4 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 @media(max-width:760px) { .panel-voice-control { margin-left:0; } .panel-voice-control > button > span { display:none; } .panel-voice-control__settings { top:80px; } }
 
 .panel-voice-control__floating { display:none; }
-@media(max-width:900px) { .panel-voice-control__floating { display:inline-flex; position:fixed; z-index:60; right:12px; top:calc(164px + env(safe-area-inset-top)); min-height:36px; gap:6px; padding:6px 10px; font-size:var(--text-caption); background:color-mix(in srgb,var(--teal) 14%,var(--paper-solid)); border-color:var(--teal); color:var(--teal); font-weight:600; box-shadow:0 0 0 1px color-mix(in srgb,var(--teal) 22%,transparent),0 0 18px color-mix(in srgb,var(--teal) 28%,transparent),0 3px 12px #0002; } .panel-voice-control__floating::after { content:""; flex:0 0 7px; width:7px; height:7px; margin-left:3px; border-radius:50%; background:var(--teal); box-shadow:0 0 7px var(--teal); } }
+@media(max-width:900px) { body:has(.app-shell--conversation) .panel-voice-control__floating { display:inline-flex; position:fixed; z-index:60; right:12px; top:calc(164px + env(safe-area-inset-top)); min-height:36px; gap:6px; padding:6px 10px; font-size:var(--text-caption); background:var(--paper-solid); border-color:var(--teal); color:var(--teal); box-shadow:0 3px 12px #0002; } }
