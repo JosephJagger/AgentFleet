@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { CodexAppServer, type AppServerCallbacks } from "./app-server.js";
+import { voiceErrorCode } from "./voice-errors.js";
 import { AgentError } from "./errors.js";
 import type { StateStore } from "./store.js";
 
@@ -55,7 +56,11 @@ export class PanelVoiceRuntime {
       if (call.cancelled) return;
       call.threadId = await client.startPanelVoice(call.directory, id, sdp);
     })();
-    try { await call.ready; } catch (error) { await this.stop(id); throw error; }
+    try { await call.ready; } catch (error) {
+      // Deliver the sanitized cause before stopped, which releases the browser owner.
+      this.emit({type:'voice.event',voiceId:id,event:'error',message:voiceErrorCode(error instanceof Error?error.message:'')});
+      await this.stop(id); throw error;
+    }
   }
 
   heartbeat(id: string) { if (this.current?.id === id) this.current.lastSeen = Date.now(); }

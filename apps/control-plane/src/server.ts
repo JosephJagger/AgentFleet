@@ -1658,6 +1658,7 @@ export async function buildControlPlane(
               invariant(call&&call.machine_id===identity.machineId,403,"VOICE_TARGET_CHANGED","Wrong panel voice host");
               const binding=JSON.parse(call.binding_json);
               invariant(binding.producerEpoch===message.producerEpoch&&binding.appServerEpoch===message.appServerEpoch&&binding.transportGeneration===state.identity.transportGeneration,409,"VOICE_FENCED","Stale coordinator");
+              if(message.event==='error')panelVoice.recordFailure(call.voice_id,message.message);
               if(call.state==='closed')return;
               const owner=panelOwners.get(call.voice_id);
               if(message.event==='stopped'||message.event==='closed'){panelVoice.state(call.voice_id,'closed');if(owner)sendJson(owner.socket,{type:'closed'});panelOwners.delete(call.voice_id);return;}
@@ -1673,7 +1674,7 @@ export async function buildControlPlane(
                 sendPanel(call.voice_id,'tool.result',{requestId,result});
               }
               else if(message.event==='transcript'){if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role)))sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final)});}
-              else if(message.event==='error'){sendJson(owner.socket,{type:'error',message:'总控原生语音连接失败，请结束后重试'});stopPanel(call.voice_id);}
+              else if(message.event==='error'){const code=panelVoice.recordFailure(call.voice_id,message.message);app.log.warn({voiceId:call.voice_id,machineId:identity.machineId,code},'Panel voice failed');sendJson(owner.socket,{type:'error',message:`总控语音连接失败（${code}），请重新连接`});stopPanel(call.voice_id);}
               return;
             }
             const row=nativeVoice.get(message.voiceId);

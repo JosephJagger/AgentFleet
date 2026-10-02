@@ -84,3 +84,10 @@ test('completion follows the exact native turn; deleted content is never spoken 
   f.db.run("UPDATE content_blobs SET body_json='{}' WHERE payload_ref='payload-4'");
   assert.equal(f.service.current(f.principal)?.state,'completed','confirmed terminal state survives content expiration');
 });
+
+test('panel diagnostics retain the first safe cause even after cleanup without storing raw native errors',()=>{
+  const {db,service,call}=fixture();
+  service.recordFailure(call.voice_id,'VOICE_CONFIG');service.state(call.voice_id,'closed');service.recordFailure(call.voice_id,'VOICE_NATIVE_ERROR');
+  assert.equal(JSON.parse(service.get(call.voice_id)!.binding_json).failureCode,'VOICE_CONFIG');
+  assert.equal(service.recordFailure('missing','Bearer private-token'),'VOICE_NATIVE_ERROR');db.close();
+});

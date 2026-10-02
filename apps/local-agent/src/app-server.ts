@@ -847,7 +847,11 @@ export class CodexAppServer implements AppServerClient {
     const effective=resultObject(await this.request("config/read",{includeLayers:false}),"panel config");
     const config:Record<string,unknown>={"features.realtime_conversation":true,"features.goals":false,"shell_environment_policy.inherit":"none","web_search":"disabled","features.shell_tool":false,"features.unified_exec":false,"features.apps":false,"features.computer_use":false,"features.hooks":false,"features.multi_agent":false,"features.code_mode":false,"features.code_mode_host":false};
     const inherited=isRecord(effective.config)?effective.config:{};
-    if(isRecord(inherited.mcp_servers)) for(const name of Object.keys(inherited.mcp_servers)) config[`mcp_servers.${JSON.stringify(name)}.enabled`]=false;
+    // App-server override keys split on dots literally; TOML-style quoted names
+    // would create a second, transport-less MCP entry. Replace the whole map
+    // to preserve transport identity (including dotted server names). Do not
+    // replay config/read nullable/default fields as TOML overrides.
+    if(isRecord(inherited.mcp_servers)) config.mcp_servers=Object.fromEntries(Object.entries(inherited.mcp_servers).map(([name,server])=>[name,{...(isRecord(server)&&typeof server.command==='string'?{command:server.command}:isRecord(server)&&typeof server.url==='string'?{url:server.url}:{}),enabled:false}]));
     const raw=resultObject(await this.request("thread/start",{cwd,ephemeral:true,approvalPolicy:"never",sandbox:"read-only",dynamicTools:[PANEL_VOICE_TOOL],developerInstructions:PANEL_VOICE_INSTRUCTIONS,config}),"panel thread/start");
     const thread=resultObject(raw.thread,"panel thread");const id=requireString(thread.id,"thread.id",{maxLength:256});
     this.panelThreadId=id;
