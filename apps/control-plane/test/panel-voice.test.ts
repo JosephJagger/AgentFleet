@@ -102,3 +102,25 @@ test('task status failures preserve the call and dispatch; status recovers witho
  assert.equal(f.service.poll(f.principal,f.call.voice_id).task?.state,'submitted');
  assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,1);
 });
+
+for (const previouslyReported of [false,true]) test(`reconnecting never automatically speaks an old completed task (reported=${previouslyReported})`,t=>{
+ const f=fixture();t.after(()=>f.db.close());const job=f.dispatch() as {jobId:string};
+ f.db.run("UPDATE panel_voice_jobs SET state='completed' WHERE job_id=?",job.jobId);
+ assert.equal(f.service.poll(f.principal,f.call.voice_id).report?.reportId,job.jobId);
+ if(previouslyReported) f.service.acknowledgeReport(f.call.voice_id,job.jobId);
+ f.service.state(f.call.voice_id,'closed');
+ const next=f.service.start(f.principal,'m',{});f.service.state(next.voice_id,'active');
+ assert.equal(f.service.poll(f.principal,next.voice_id).report,null);
+ assert.equal(f.service.report(f.principal,next.voice_id),null);
+ assert.equal((f.service.tool(f.principal,next.voice_id,'ask-status',{action:'status'}) as {jobId:string}).jobId,job.jobId,'explicit status remains available');
+ f.service.acknowledgeReport(next.voice_id,job.jobId);
+ assert.equal(f.db.get<{reported_call_id:string|null}>("SELECT reported_call_id FROM panel_voice_jobs WHERE job_id=?",job.jobId)?.reported_call_id,previouslyReported?f.call.voice_id:null,'new calls cannot steal report acknowledgements');
+});
+test('a previous-call task finishing during a new call remains silent',t=>{
+ const f=fixture();t.after(()=>f.db.close());const job=f.dispatch() as {jobId:string};
+ f.service.state(f.call.voice_id,'closed');const next=f.service.start(f.principal,'m',{});f.service.state(next.voice_id,'active');
+ assert.equal(f.service.poll(f.principal,next.voice_id).report,null);
+ f.db.run("UPDATE panel_voice_jobs SET state='completed' WHERE job_id=?",job.jobId);
+ assert.equal(f.service.poll(f.principal,next.voice_id).task?.state,'completed');
+ assert.equal(f.service.poll(f.principal,next.voice_id).report,null);
+});

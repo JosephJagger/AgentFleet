@@ -96,15 +96,20 @@ export class PanelVoiceService {
     return this.describe(principal,this.db.get<PanelJob>("SELECT * FROM panel_voice_jobs WHERE job_id=?",jobId)!);
     });
   }
+  private shouldAutoReport(job:PanelJob,voiceId:string) {
+    // An automatic spoken result belongs to the call that dispatched the work.
+    // A new call may query old work explicitly, but must never replay it on connect.
+    return job.voice_id===voiceId && job.reported_call_id===null && ['completed','failed','interrupted'].includes(job.state);
+  }
   acknowledgeReport(voiceId:string,jobId:string) {
-    this.db.run("UPDATE panel_voice_jobs SET reported_call_id=? WHERE job_id=? AND user_id=(SELECT user_id FROM panel_voice_calls WHERE voice_id=?)",voiceId,jobId,voiceId);
+    this.db.run("UPDATE panel_voice_jobs SET reported_call_id=? WHERE job_id=? AND voice_id=? AND user_id=(SELECT user_id FROM panel_voice_calls WHERE voice_id=? AND state='active')",voiceId,jobId,voiceId,voiceId);
   }
   poll(principal:Principal,voiceId:string) {
     this.own(principal,voiceId);
     try {
       const job=this.current(principal);
       const task=job?this.describe(principal,job):null;
-      const report=job&&task&&job.reported_call_id!==voiceId&&['completed','failed','interrupted'].includes(job.state)?{reportId:job.job_id,result:task}:null;
+      const report=job&&task&&this.shouldAutoReport(job,voiceId)?{reportId:job.job_id,result:task}:null;
       return {task,report,unavailable:false};
     } catch {
       this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.taskStatusError','TASK_STATUS_UNAVAILABLE','$.taskStatusErrorAt',?) WHERE voice_id=?",nowIso(),voiceId);
@@ -115,7 +120,7 @@ export class PanelVoiceService {
     this.own(principal,voiceId);const job=this.current(principal);
     if(!job)return null;
     const result=this.describe(principal,job);
-    if(['completed','failed','interrupted'].includes(job.state)&&job.reported_call_id!==voiceId) return {result,reportId:job.job_id};
+    if(this.shouldAutoReport(job,voiceId)) return {result,reportId:job.job_id};
     return null;
   }
 }
