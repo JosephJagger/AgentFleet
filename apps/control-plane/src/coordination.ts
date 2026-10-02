@@ -547,6 +547,7 @@ export class CoordinationService {
       const session = this.commandSession(principal, logicalSessionId);
       if (session.provider !== "claude" && (input.type === "turn.start" || input.type === "turn.queue") && payload.settings === undefined) {
         const preferences = new CodexPreferencesService(this.db).read(principal, logicalSessionId);
+        invariant(!preferences.resolutionIssue, 409, "CODEX_MODEL_UNRESOLVED", preferences.resolutionIssue ?? "Model unavailable");
         if (preferences.desired) payload.settings = validateCodexSettings(preferences.desired, preferences.catalog);
       }
       if(session.provider === "claude" && (input.type === "turn.start" || input.type === "turn.queue") && payload.settings === undefined){

@@ -711,7 +711,7 @@ describe("会话工作区", () => {
       expect((screen.getByLabelText("显示名称") as HTMLInputElement).value).toBe("主机2");
     }
     expect(api.session).not.toHaveBeenCalled();
-    expect(api.machineCodexPreferences).toHaveBeenLastCalledWith("2", expect.any(AbortSignal));
+    expect(screen.getByRole("button", { name: "前往配置" })).toBeTruthy();
     fireEvent.click(within(nav).getByRole("button", { name: "工作台" }));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("主机2");
     expect(screen.getByText("选择一个会话")).toBeTruthy();

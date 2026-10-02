@@ -49,3 +49,33 @@ dialog.modal.usage-dialog > .usage-body { flex: 1 1 auto; min-height: 0; overflo
   .usage-mobile-summary .usage-totals { gap: 12px; }
   .usage-mobile-summary > .button { min-height: 44px; }
 }
+
+/* Shared theme surfaces; settings controls must fit narrow mobile viewports. */
+.settings-layout > .codex-configuration { grid-column: 1 / -1; }
+.codex-configuration > details > summary { cursor: pointer; }
+.codex-configuration > details > summary h2 { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.codex-configuration > details > summary > span { display: block; color: var(--muted); font-size: var(--text-small); }
+.codex-config-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.codex-configuration label { display: grid; gap: 7px; min-width: 0; margin: 12px 0; }
+.codex-configuration input:not([type="checkbox"]):not([type="radio"]), .codex-configuration select, .codex-configuration textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.codex-configuration input[type="checkbox"], .codex-configuration input[type="radio"] { width: auto; flex: 0 0 auto; }
+.codex-configuration .permission-confirm, .codex-configuration .permission-inherit, .codex-configuration .checkbox-row { display: flex; align-items: flex-start; gap: 8px; }
+.codex-configuration .codex-settings-panel, .codex-configuration .permission-panel { margin-top: 18px; background: var(--paper-solid); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
+.codex-settings-fields > label > small { color: var(--muted); font-weight: normal; overflow-wrap: anywhere; }
+.codex-config-context { border-left: 3px solid var(--teal); padding: 8px 12px; overflow-wrap: anywhere; }
+.codex-configuration .codex-settings-save { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 600px) {
+  .codex-configuration .codex-settings-fields { grid-template-columns: minmax(0, 1fr); }
+  .codex-config-tabs .button { flex: 1 1 130px; white-space: normal; }
+  .codex-configuration .permission-cards { grid-template-columns: minmax(0, 1fr); }
+}
+.codex-configuration .codex-settings-panel { max-height: none; overflow: visible; }
+.codex-configuration .codex-settings-panel > summary { position: static; font-size: var(--text-small); }
+.codex-settings-panel > summary small { display: block; color: var(--muted); margin-top: 4px; font-weight: normal; }
+.codex-settings-fields > label > small { grid-column: 1 / -1; }
+.codex-configuration .codex-settings-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
+.codex-configuration .codex-settings-panel label { grid-template-columns: minmax(0, 1fr); font-size: var(--text-small); }
+.codex-configuration .codex-settings-panel select { min-height: 44px; font-size: 1rem; }
+@media (max-width: 600px) {
+  .codex-configuration .codex-settings-fields { grid-template-columns: minmax(0, 1fr); }
+}

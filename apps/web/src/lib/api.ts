@@ -659,6 +659,8 @@ export const api = {
   adminSystem: () => request<{ authMode: string; registration: string }>("/api/admin/system"),
   runtimeRelease: (signal?: AbortSignal) => request<RuntimeReleaseStatus>("/api/runtime-release", { signal }),
   runtimeReleaseControl: (action: "check" | "pause" | "resume" | "rollback") => request<RuntimeReleaseStatus>("/api/runtime-release/control", { method: "POST", body: JSON.stringify({ action }) }),
+  runtimePreferences: (scope: import("./codex-settings").SettingsScope, id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(scope === "workspace" ? "/api/settings/codex" : `/api/${scope === "machine" ? "machines" : scope === "project" ? "projects" : "sessions"}/${encodeURIComponent(id)}/codex-settings`, { signal }),
+  saveRuntimePreferences: (scope: import("./codex-settings").SettingsScope, id: string, input: { scope: string; overrides: import("./codex-settings").FieldOverrides; revision: number }) => request<import("./codex-settings").CodexPreferences>(scope === "workspace" ? "/api/settings/codex" : `/api/${scope === "machine" ? "machines" : scope === "project" ? "projects" : "sessions"}/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
   codexPreferences: (id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(`/api/sessions/${encodeURIComponent(id)}/codex-settings`, { signal }),
   machineCodexPreferences: (id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(`/api/machines/${encodeURIComponent(id)}/codex-settings`, { signal }),
   saveMachineCodexPreferences: (id: string, input: { settings: import("./codex-settings").CodexSettings | null; revision: number }) => request<import("./codex-settings").CodexPreferences>(`/api/machines/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
@@ -685,11 +687,11 @@ export const api = {
     }
   },
   dashboard: loadDashboard,
-  permissions(kind: "machines" | "sessions", id: string, signal?: AbortSignal) {
-    return request<import("./permissions").PermissionPreferences>(`/api/${kind}/${encodeURIComponent(id)}/permissions`, { signal });
+  permissions(kind: "workspace" | "machines" | "projects" | "sessions", id: string, signal?: AbortSignal) {
+    return request<import("./permissions").PermissionPreferences>(kind === "workspace" ? "/api/settings/permissions" : `/api/${kind}/${encodeURIComponent(id)}/permissions`, { signal });
   },
-  savePermissions(kind: "machines" | "sessions", id: string, input: { scope: import("./permissions").PermissionScope; profile: import("./permissions").PermissionProfile | null; revision: number; confirmFullAccess?: boolean }) {
-    return request<import("./permissions").PermissionPreferences>(`/api/${kind}/${encodeURIComponent(id)}/permissions`, { method: "PUT", body: JSON.stringify(input) });
+  savePermissions(kind: "workspace" | "machines" | "projects" | "sessions", id: string, input: { scope: import("./permissions").PermissionScope; profile: import("./permissions").PermissionProfile | null; revision: number; confirmFullAccess?: boolean }) {
+    return request<import("./permissions").PermissionPreferences>(kind === "workspace" ? "/api/settings/permissions" : `/api/${kind}/${encodeURIComponent(id)}/permissions`, { method: "PUT", body: JSON.stringify(input) });
   },
   async release() {
     const raw = await request<JsonObject>("/api/release");
@@ -713,6 +715,11 @@ export const api = {
     if (beforeSeq !== undefined && beforeSeq !== null) query.set("beforeSeq", String(beforeSeq));
     const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}/events?${query}`, { signal });
     return { events: list(raw.items ?? raw.events).map(mapEvent), nextBeforeSeq: typeof raw.nextBeforeSeq === "number" ? raw.nextBeforeSeq : null, projectionEpoch: integer(raw.projectionEpoch), contentEpoch: integer(raw.contentEpoch), throughSeq: integer(raw.throughSeq) };
+  },
+  async codexManagementContext(id: string, signal?: AbortSignal) {
+    const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}`, { signal: timeoutSignal(signal, 15_000) });
+    const cached = dashboardCache;
+    return { session: mapSession(raw.session, cached?.machines ?? [], cached?.machines.flatMap(m => m.projects) ?? [], cached?.user.clientSessionId ?? ""), commands: list(raw.commands).map(mapCommandReceipt) };
   },
   async commandReceipts(id: string, signal?: AbortSignal): Promise<CommandReceipt[]> {
     const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}`, { signal: timeoutSignal(signal, 15_000) });

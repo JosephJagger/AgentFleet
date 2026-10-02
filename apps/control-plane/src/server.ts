@@ -1281,10 +1281,24 @@ export async function buildControlPlane(
     new ClaudePreferencesService(db).read(request.principal as Principal,routeId(request)));
   app.put("/api/sessions/:id/claude-settings", {preHandler:mutate}, async request =>
     new ClaudePreferencesService(db).write(request.principal as Principal,routeId(request),record(request.body)));
+  app.get("/api/settings/codex", { preHandler: authenticate }, async request =>
+    codexPreferences.readTarget(request.principal as Principal, "workspace"));
+  app.put("/api/settings/codex", { preHandler: mutate }, async request => {
+    const principal = request.principal as Principal;
+    return codexPreferences.writeTarget(principal, "workspace", principal.workspaceId, record(request.body));
+  });
+  app.get("/api/settings/permissions", { preHandler: authenticate }, async request =>
+    new PermissionPreferencesService(db).read(request.principal as Principal, "workspace", ""));
+  app.put("/api/settings/permissions", { preHandler: mutate }, async request =>
+    new PermissionPreferencesService(db).write(request.principal as Principal, "workspace", "", record(request.body)));
+  app.get("/api/projects/:id/codex-settings", { preHandler: authenticate }, async request =>
+    codexPreferences.readTarget(request.principal as Principal, "project", routeId(request)));
+  app.put("/api/projects/:id/codex-settings", { preHandler: mutate }, async request =>
+    codexPreferences.writeTarget(request.principal as Principal, "project", routeId(request), record(request.body)));
   app.get("/api/sessions/:id/codex-settings", { preHandler: authenticate }, async (request) => {
     return codexPreferences.read(request.principal as Principal, routeId(request));
   });
-  for (const kind of ["machines", "sessions"] as const) {
+  for (const kind of ["machines", "projects", "sessions"] as const) {
     app.get(`/api/${kind}/:id/permissions`, { preHandler: authenticate }, async request =>
       new PermissionPreferencesService(db).read(request.principal as Principal, kind, routeId(request)));
     app.put(`/api/${kind}/:id/permissions`, { preHandler: mutate }, async request =>

@@ -9,7 +9,7 @@ export function RuntimeSettingsShortcut({sessionId,summary,observed,running,acti
   const model=current?.settings?.model??native?.model;
   const effort=current?.settings?current.settings.effort:native?.effort;
   const source=current?.changed?t("本次"):current?.source==="session"?t("会话覆盖"):t("继承");
-  const detail=current?.source==="machine"?t("主机默认"):current?.source==="project"?t("项目默认"):current?.source==="session"?t("会话覆盖"):t("Codex 自身配置");
+  const detail=current?.source==="workspace"?t("统一默认"):current?.source==="machine"?t("主机默认"):current?.source==="project"?t("项目默认"):current?.source==="session"?t("会话覆盖"):t("Codex 自身配置");
   const text=current?.loaded?`${source} · ${model??t("模型未上报")} · ${effort??t("继承强度")}`:current?.failed?t("模型配置暂不可用"):t("读取模型配置…");
   const title=`${detail} · ${t("点击配置下次发送的模型与推理强度")} · ${t("首次发送即采用所选配置；正在执行的任务及其补充指令不会切换模型。")}${!current?.settings&&native?` · ${t("模型信息来自最近一次主机记录")}`:""}`;
   // Only a receipt bound to this exact native turn can describe the running task.

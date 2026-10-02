@@ -6,35 +6,35 @@ import { CodexSettingsPanel, type RuntimeSummary } from "./components/CodexSetti
 import { RuntimeSettingsShortcut } from "./components/RuntimeSettingsShortcut";
 import { api } from "./lib/api";
 import type { CodexPreferences } from "./lib/codex-settings";
-vi.mock("./lib/api",()=>({api:{codexPreferences:vi.fn(),saveCodexPreferences:vi.fn()}}));
+vi.mock("./lib/api",()=>({api:{codexPreferences:vi.fn(),saveRuntimePreferences:vi.fn()}}));
 afterEach(()=>{cleanup();vi.resetAllMocks();});
 const fixture:CodexPreferences={catalog:{models:[{model:"example-model",displayName:"Example model",efforts:["low","high"],defaultEffort:"low"}],modes:[],fetchedAt:"2026-09-10T00:00:00Z"},preferences:{machine:{settings:{model:"example-model",effort:"low"},revision:1},project:{settings:null,revision:0},session:{settings:null,revision:0}},source:"machine",desired:{model:"example-model",effort:"low"}};
 it("keeps the saved settings visible until saving succeeds",async()=>{
  vi.mocked(api.codexPreferences).mockResolvedValue(fixture);
- vi.mocked(api.saveCodexPreferences).mockResolvedValue({...fixture,source:"session",desired:{model:"example-model",effort:"high"},preferences:{...fixture.preferences,session:{settings:{model:"example-model",effort:"high"},revision:1}}});
+ vi.mocked(api.saveRuntimePreferences).mockResolvedValue({...fixture,source:"session",desired:{model:"example-model",effort:"high"},preferences:{...fixture.preferences,session:{settings:{model:"example-model",effort:"high"},revision:1}}});
  function Harness(){const [summary,setSummary]=useState<RuntimeSummary>();return <><CodexSettingsPanel sessionId="s" onSummary={setSummary}/><RuntimeSettingsShortcut sessionId="s" summary={summary} running={false} onOpen={()=>{}}/></>;}
  render(<Harness/>);await screen.findByText("继承 · example-model · low");
  fireEvent.click(screen.getByText("运行配置"));fireEvent.change(screen.getByRole("combobox",{name:"推理强度"}),{target:{value:"high"}});
  expect(screen.queryByText("本次 · example-model · high")).toBeNull();
  expect(screen.getByText("继承 · example-model · low")).toBeTruthy();
- fireEvent.click(screen.getByRole("button",{name:"保存为此会话配置"}));
+ fireEvent.click(screen.getByRole("button",{name:"保存配置"}));
  await screen.findByText("会话覆盖 · example-model · high");
 });
 it("does not publish a draft model while saving or after a save failure",async()=>{
  vi.mocked(api.codexPreferences).mockResolvedValue({...fixture,catalog:{...fixture.catalog!,models:[...fixture.catalog!.models,{model:"new-model",displayName:"New model",efforts:["low"],defaultEffort:"low"}]}});
  let rejectSave!: (reason: Error) => void;
- vi.mocked(api.saveCodexPreferences).mockImplementation(()=>new Promise((_resolve,reject)=>{rejectSave=reject;}));
+ vi.mocked(api.saveRuntimePreferences).mockImplementation(()=>new Promise((_resolve,reject)=>{rejectSave=reject;}));
  const changed=vi.fn();
  function Harness(){const [summary,setSummary]=useState<RuntimeSummary>();return <><CodexSettingsPanel sessionId="s" onChange={changed} onSummary={setSummary}/><RuntimeSettingsShortcut sessionId="s" summary={summary} running={false} onOpen={()=>{}}/></>;}
  render(<Harness/>);await screen.findByText("继承 · example-model · low");
  fireEvent.click(screen.getByText("运行配置"));
- fireEvent.change(screen.getByRole("combobox",{name:"会话模型"}),{target:{value:"new-model"}});
- fireEvent.click(screen.getByRole("button",{name:"保存为此会话配置"}));
+ fireEvent.change(screen.getByRole("combobox",{name:"模型"}),{target:{value:"new-model"}});
+ fireEvent.click(screen.getByRole("button",{name:"保存配置"}));
  expect(screen.getByText("继承 · example-model · low")).toBeTruthy();
- expect(changed).toHaveBeenLastCalledWith({sessionId:"s",settings:fixture.desired});
+ expect(changed).toHaveBeenLastCalledWith({sessionId:"s"});
  rejectSave(new Error("保存失败"));await screen.findByText("保存失败");
  expect(screen.getByText("继承 · example-model · low")).toBeTruthy();
- expect(changed).toHaveBeenLastCalledWith({sessionId:"s",settings:fixture.desired});
+ expect(changed).toHaveBeenLastCalledWith({sessionId:"s"});
 });
 it("opens quick configuration without changing settings and rejects a previous session summary",()=>{
  const open=vi.fn();const summary:RuntimeSummary={sessionId:"a",source:"session",settings:{model:"old-model",effort:"high"},changed:false,loaded:true};

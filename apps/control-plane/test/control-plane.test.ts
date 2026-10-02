@@ -1132,7 +1132,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
   await app.ready();
   assert.equal(
     Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    44,
+    45,
   );
 
   const login = await app.inject({
@@ -1461,6 +1461,32 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
     const forged = await app.inject({ method: "POST", url: commandUrl, headers: browserHeaders, payload: { ...request, clientMutationId: "forged-permission", payload: { ...request.payload, permissionProfile: "full" } } });
     assert.equal(forged.statusCode, 400);
   } finally { db.sqlite.exec("ROLLBACK TO permission_test; RELEASE permission_test"); }
+  db.sqlite.exec("SAVEPOINT workspace_settings_test");
+  try {
+    const workspaceUrl = "/api/settings/codex";
+    const projectUrl = `/api/projects/${projectId}/codex-settings`;
+    assert.equal((await app.inject({method:"GET",url:workspaceUrl})).statusCode,401);
+    assert.equal((await app.inject({method:"PUT",url:workspaceUrl,headers:{cookie:browserHeaders.cookie},payload:{overrides:{model:"test-model"},revision:0}})).statusCode,403);
+    const saveDefault = (overrides: unknown, revision: number) => app.inject({method:"PUT",url:workspaceUrl,headers:browserHeaders,payload:{overrides,revision}});
+    assert.equal((await saveDefault({model:"test-model",effort:"low",mode:"plan"},0)).statusCode,200);
+    assert.equal((await app.inject({method:"PUT",url:projectUrl,headers:browserHeaders,payload:{overrides:{effort:"high"},revision:0}})).statusCode,200);
+    const inherited = json<{desired:unknown}>((await app.inject({method:"GET",url:settingsUrl,headers:browserHeaders})).body);
+    assert.deepEqual(inherited.desired,{model:"test-model",effort:"high",mode:"plan"});
+    const session=sessions[0]!;
+    const request={...startPayload(session,leases[0]!.leaseId,"workspace-default-snapshot"),payload:{prompt:"fixture"}};
+    const commandUrl=`/api/sessions/${session.logicalSessionId}/commands`;
+    const accepted=await app.inject({method:"POST",url:commandUrl,headers:browserHeaders,payload:request});
+    assert.equal(accepted.statusCode,202,accepted.body);
+    const commandId=json<{command:{commandId:string}}>(accepted.body).command.commandId;
+    const stored=()=>JSON.parse(db.get<{body_json:string}>("SELECT body_json FROM command_contents WHERE command_id=?",commandId)!.body_json);
+    assert.deepEqual(stored().settings,inherited.desired);
+    assert.equal((await saveDefault({model:"test-model",effort:"low",mode:"default"},1)).statusCode,200);
+    const duplicate=await app.inject({method:"POST",url:commandUrl,headers:browserHeaders,payload:request});
+    assert.equal(duplicate.statusCode,200,duplicate.body);
+    assert.deepEqual(stored().settings,inherited.desired,"accepted commands keep their snapshot after defaults change");
+    assert.equal((await app.inject({method:"GET",url:"/api/projects/missing/codex-settings",headers:browserHeaders})).statusCode,404);
+    assert.equal((await app.inject({method:"GET",url:"/api/settings/permissions",headers:browserHeaders})).statusCode,200);
+  } finally { db.sqlite.exec("ROLLBACK TO workspace_settings_test; RELEASE workspace_settings_test"); }
   db.transaction = originalTransaction;
   const concurrent = await Promise.all([
     app.inject({

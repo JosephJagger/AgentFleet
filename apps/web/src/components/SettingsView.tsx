@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Laptop, LoaderCircle, ShieldCheck, SunMoon } from "lucide-react";
 import { api } from "../lib/api";
 import type { ClientSessionInfo, Dashboard, Project } from "../lib/types";
+import { CodexConfiguration } from "./CodexConfiguration";
 import { ThemeSettings } from "./ThemeSwitcher";
 import { WritingPreferencesPanel } from "./WritingPreferencesPanel";
 import { WritingAISettings } from "./WritingAISettings";
@@ -35,7 +36,7 @@ function HistoryPolicy({ project, onSaved, onToast }: { project: Project; onSave
   </form>;
 }
 
-export function SettingsView({ dashboard, onUpdated, onToast }: { dashboard: Dashboard; onUpdated: () => Promise<void>; onToast: Notice }) {
+export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }: { initialMachineId?: string; dashboard: Dashboard; onUpdated: () => Promise<void>; onToast: Notice }) {
   const [sessions, setSessions] = useState<ClientSessionInfo[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionError, setSessionError] = useState("");
@@ -92,6 +93,7 @@ export function SettingsView({ dashboard, onUpdated, onToast }: { dashboard: Das
   return <section className="wide-view settings-view">
     <div className="wide-view__heading"><div><h1>{t("设置")}</h1><p>{t("管理界面外观、浏览器登录和云端历史。")}</p></div><ShieldCheck size={30} /></div>
     <div className="settings-layout">
+      <CodexConfiguration machines={dashboard.machines} initialMachineId={initialMachineId} />
       <WritingPreferencesPanel key={dashboard.user.id} owner={dashboard.user.id} />
       <WritingAISettings />
       <section className="settings-block theme-settings-block"><h2><SunMoon size={18} />{t("界面外观")}</h2><p className="subtle">{t("选择阅读更舒适的外观，自动保存在此浏览器。")}</p><ThemeSettings paginated /></section>

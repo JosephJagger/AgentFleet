@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 44) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 45) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1326,6 +1326,31 @@ export class ControlPlaneDatabase {
       CREATE INDEX IF NOT EXISTS panel_voice_jobs_owner ON panel_voice_jobs(user_id,created_at);
       CREATE UNIQUE INDEX IF NOT EXISTS panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown');
       PRAGMA user_version=44`);
+    });
+
+    if (version < 45) this.transaction(() => {
+      this.sqlite.exec(`ALTER TABLE codex_preferences RENAME TO codex_preferences_v44;
+        CREATE TABLE codex_preferences (
+          workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+          scope TEXT NOT NULL CHECK(scope IN ('workspace','machine','project','session')),
+          target_id TEXT NOT NULL, settings_json TEXT, field_overrides_json TEXT,
+          revision INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id,scope,target_id)
+        );
+        INSERT INTO codex_preferences(workspace_id,scope,target_id,settings_json,revision,updated_at)
+          SELECT workspace_id,scope,target_id,settings_json,revision,updated_at FROM codex_preferences_v44;
+        DROP TABLE codex_preferences_v44;
+        ALTER TABLE permission_preferences RENAME TO permission_preferences_v44;
+        CREATE TABLE permission_preferences (
+          workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+          scope TEXT NOT NULL CHECK(scope IN ('workspace','machine','project','session')),
+          target_id TEXT NOT NULL, profile TEXT CHECK(profile IN ('project','network','full')),
+          revision INTEGER NOT NULL, updated_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id,scope,target_id)
+        );
+        INSERT INTO permission_preferences SELECT * FROM permission_preferences_v44;
+        DROP TABLE permission_preferences_v44;
+        PRAGMA user_version=45`);
     });
 
   }

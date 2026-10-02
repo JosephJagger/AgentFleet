@@ -4,30 +4,33 @@ import { invariant } from "./errors.js";
 import { nowIso } from "./crypto.js";
 
 export type PermissionProfile = "project" | "network" | "full";
-type Scope = "machine" | "project" | "session";
+type Scope = "workspace" | "machine" | "project" | "session";
 type Preference = { profile: PermissionProfile | null; revision: number };
 
 /** Independent of model overrides: choosing a model must not freeze host permissions. */
 export class PermissionPreferencesService {
   constructor(private readonly db: ControlPlaneDatabase) {}
-  read(principal: Principal, kind: "machines" | "sessions", id: string) {
-    const target = kind === "machines"
+  read(principal: Principal, kind: "workspace" | "machines" | "projects" | "sessions", id: string) {
+    const target = kind === "workspace" ? { machine_id: undefined, project_id: undefined, permission_profiles: 1 } : kind === "projects"
+      ? this.db.get<{ machine_id: string; project_id: string; permission_profiles: number }>("SELECT p.machine_id,p.project_id,m.permission_profiles FROM projects p JOIN machines m USING(machine_id) WHERE p.project_id=? AND p.workspace_id=? AND m.identity_state='active'", id, principal.workspaceId)
+      : kind === "machines"
       ? this.db.get<{ machine_id: string; project_id?: string; permission_profiles: number }>("SELECT machine_id,permission_profiles FROM machines WHERE machine_id=? AND workspace_id=? AND identity_state='active'", id, principal.workspaceId)
       : this.db.get<{ machine_id: string; project_id: string; permission_profiles: number }>(`SELECT s.machine_id,s.project_id,m.permission_profiles FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id WHERE s.logical_session_id=? AND s.workspace_id=? AND m.identity_state='active'`, id, principal.workspaceId);
     invariant(target, 404, "PERMISSION_TARGET_NOT_FOUND", "主机或会话不存在");
-    const targets = { machine: target.machine_id, project: target.project_id, session: kind === "sessions" ? id : undefined };
-    const preferences = Object.fromEntries((["machine", "project", "session"] as const).map(scope => {
+    const targets = { workspace: principal.workspaceId, machine: target.machine_id, project: target.project_id, session: kind === "sessions" ? id : undefined };
+    const preferences = Object.fromEntries((["workspace", "machine", "project", "session"] as const).map(scope => {
       const row = targets[scope] ? this.db.get<Preference>("SELECT profile,revision FROM permission_preferences WHERE workspace_id=? AND scope=? AND target_id=?", principal.workspaceId, scope, targets[scope]!) : undefined;
       return [scope, row ?? { profile: null, revision: 0 }];
     })) as Record<Scope, Preference>;
-    const source = preferences.session.profile ? "session" : preferences.project.profile ? "project" : preferences.machine.profile ? "machine" : "default";
+    const source = preferences.session.profile ? "session" : preferences.project.profile ? "project" : preferences.machine.profile ? "machine" : preferences.workspace.profile ? "workspace" : "default";
     return { preferences, source, profile: source === "default" ? "project" as const : preferences[source].profile!, supported: target.permission_profiles === 1, targets };
   }
-  write(principal: Principal, kind: "machines" | "sessions", id: string, input: Record<string, unknown>) {
+  write(principal: Principal, kind: "workspace" | "machines" | "projects" | "sessions", id: string, input: Record<string, unknown>) {
     return this.db.transaction(() => {
       const current = this.read(principal, kind, id);
       const scope = input.scope;
-      invariant(scope === "machine" || (kind === "sessions" && (scope === "project" || scope === "session")), 400, "INVALID_PERMISSION_SCOPE", "请选择主机、项目或会话");
+      invariant(scope === "workspace" || scope === "machine" || scope === "project" || scope === "session", 400, "INVALID_PERMISSION_SCOPE", "Unknown scope");
+      invariant(kind === "workspace" ? scope === "workspace" : scope === "machine" || (kind === "projects" && scope === "project") || (kind === "sessions" && (scope === "project" || scope === "session")), 400, "INVALID_PERMISSION_SCOPE", "请选择主机、项目或会话");
       const profile = input.profile;
       invariant(profile === null || profile === "project" || profile === "network" || profile === "full", 400, "INVALID_PERMISSION_PROFILE", "请选择有效的权限配置或继承");
       invariant(Number.isSafeInteger(input.revision) && input.revision === current.preferences[scope].revision, 409, "PERMISSION_REVISION_CONFLICT", "权限已在其他页面修改，请刷新后再保存");

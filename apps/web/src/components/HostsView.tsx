@@ -6,8 +6,6 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { HostOperation, Machine, MaintenanceType } from "../lib/types";
 import { DiscoveryStatus } from "./DiscoveryStatus";
-import { CodexSettingsPanel } from "./CodexSettingsPanel";
-import { PermissionPanel } from "./PermissionPanel";
 import { CodexCommandGuide } from "./CodexCommandGuide";
 import { HostCards } from "./HostCards";
 import { HostCodexInventory } from "./HostCodexInventory";
@@ -30,7 +28,7 @@ function profileValue(profile: Record<string, unknown> | undefined, ...keys: str
   return t("尚未上报");
 }
 
-export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, onChanged, renderCompatibility }: { machines: Machine[]; selectedId?: string; onSelect: (id: string) => void; onPair: () => void; onRemove: (machine: Machine) => void; onChanged: () => Promise<void>; renderCompatibility: (machine: Machine) => ReactNode }) {
+export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, onChanged, onConfigure, renderCompatibility }: { machines: Machine[]; onConfigure?: (id: string) => void; selectedId?: string; onSelect: (id: string) => void; onPair: () => void; onRemove: (machine: Machine) => void; onChanged: () => Promise<void>; renderCompatibility: (machine: Machine) => ReactNode }) {
   const machine = selectedId ? machines.find((item) => item.id === selectedId) : machines[0];
   const [operations, setOperations] = useState<HostOperation[]>([]);
   const [operationsOpen, setOperationsOpen] = useState(false);
@@ -65,11 +63,10 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
   }
   if (!machine) return <section className="wide-view"><h1>{selectedId ? t("该主机不存在或已移除") : t("连接你的 Codex 主机")}</h1><p>{selectedId ? t("请选择其他主机，或添加新主机。") : t("一条命令连接，自动发现已有项目和会话。")}</p><HostCards machines={machines} onSelect={onSelect} /><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></section>;
   const repair = repairCommand(machine, location.origin);
-  return <section className="wide-view hosts-view"><div className="wide-view__heading"><div><h1>{t("主机")}</h1><p>{t("选择一台主机，设置默认模型、修改名称或检查连接。")}</p></div><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></div>
+  return <section className="wide-view hosts-view"><div className="wide-view__heading"><div><h1>{t("主机")}</h1><p>{t("选择一台主机，修改名称或检查连接。")}</p></div><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></div>
     <HostCards machines={machines} selectedId={machine.id} onSelect={onSelect} />
     {machine.reachability !== "live" && <HostRecovery key={`recovery:${machine.id}`} machine={machine} />}
-    <CodexSettingsPanel key={`settings:${machine.id}`} machineId={machine.id} />
-    <PermissionPanel key={`permissions:${machine.id}`} machineId={machine.id} />
+    <section className="settings-block"><h2>{t("Codex 配置")}</h2><p>{t("默认模型和权限已集中到设置，项目与会话仍可单独覆盖。")}</p><button type="button" className="button button--primary" onClick={() => onConfigure?.(machine.id)}>{t("前往配置")}</button></section>
     <HostImageStorage key={`images:${machine.id}`} machineId={machine.id} name={machine.name} />
     <div className="host-workspace"><section className="settings-block"><div className="host-heading"><div><h2>{machine.name}</h2><span>{machine.os} · {machine.arch} · {machine.reachability === "live" ? t("在线") : machine.reachability === "reconciling" ? t("正在同步") : machine.reachability === "reconnecting" ? t("正在重连") : t("离线")}</span></div><button className="button machine-remove-trigger" type="button" onClick={() => onRemove(machine)}><Trash2 size={14} />{t("移除主机")}</button></div>
       <form className="host-alias" onSubmit={async (event) => { event.preventDefault(); setBusy(true); setSaved(false); try { await api.updateMachineAlias(machine.id, alias.trim() || null); await onChanged(); setSaved(true); } catch (reason) { setError((reason as Error).message); } finally { setBusy(false); } }}><label>{t("显示名称")}<input value={alias} maxLength={80} onChange={(event) => { setAlias(event.target.value); setSaved(false); }} /></label><button type="submit" className="button button--quiet" disabled={busy}>{saved ? t("已保存") : t("保存名称")}</button></form><p className="subtle">{t("系统主机名：")}{locale() === "en" ? " " : ""}{machine.hostname}</p>
@@ -83,7 +80,7 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
       <HostReadiness discovery={machine.discovery} online={machine.reachability === "live"} onAction={type => void operate(type)} disabled={busy || pending} capabilities={machine.maintenanceCapabilities} />
       <dl><div><dt>{t("面板使用的 Codex")}</dt><dd>{!machine.codexVersion || machine.codexVersion === "unknown" ? t("等待主机报告") : machine.codexVersion}</dd></div><div><dt>{t("连接服务版本")}</dt><dd>{machine.agentVersion}</dd></div></dl>
       <HostCodexInventory machine={machine} />
-      <p className="host-help">{t("Codex 版本是程序版本，不是模型名称。模型在上方「主机默认配置」中选择，单个会话仍可独立修改。")}</p>
+      <p className="host-help">{t("Codex 版本是程序版本，不是模型名称。模型和权限在「设置 → Codex 配置」中管理。")}</p>
       <details className="host-technical" key={`technical:${machine.id}`}><summary>{t("版本与兼容性详情")}</summary><dl><div><dt>{t("运行账号")}</dt><dd>{profileValue(machine.codexProfile, "account", "username", "osAccount")}</dd></div><div><dt>{t("Codex 数据目录")}</dt><dd>{profileValue(machine.codexProfile, "codexHome")}</dd></div><div><dt>{t("宿主机程序路径")}</dt><dd>{profileValue(machine.codexProfile, "hostCodexPath", "hostPath")}</dd></div><div><dt>{t("面板程序路径")}</dt><dd>{profileValue(machine.codexProfile, "runtimePath", "executablePath", "servicePath")}</dd></div></dl><p className="subtle">{t("面板和主机自装的 Codex 可以使用不同版本，以上均为主机报告的实际值。")}</p>{renderCompatibility(machine)}</details>
     </section></div>
     <CodexCommandGuide key={`commands:${machine.id}`} spacious />

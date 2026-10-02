@@ -10,10 +10,17 @@ export interface CodexCatalog {
   error?: string;
   modeNotice?: string;
 }
+export type SettingsScope = "workspace" | "machine" | "project" | "session";
+export type FieldOverrides = Partial<Record<keyof CodexSettings, string | null>>;
 export interface CodexPreferences {
+  catalogs?: { machineId: string; catalog: CodexCatalog | null }[];
+  sources?: Record<keyof CodexSettings, SettingsScope | "codex">;
+  effective?: FieldOverrides;
+  compatibilityIssue?: string;
+  resolutionIssue?: string;
   catalog: CodexCatalog | null;
-  preferences: Record<"machine" | "project" | "session", { settings: CodexSettings | null; revision: number }>;
-  source: "machine" | "project" | "session" | "codex";
+  preferences: Record<"machine" | "project" | "session", { settings: CodexSettings | null; overrides?: FieldOverrides; revision: number }> & Partial<Record<"workspace", { settings: CodexSettings | null; overrides?: FieldOverrides; revision: number }>>;
+  source: "workspace" | "machine" | "project" | "session" | "codex";
   desired: CodexSettings | null;
 }
 export interface RuntimeSettings {
