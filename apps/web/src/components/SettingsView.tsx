@@ -1,3 +1,5 @@
+import { SettingsSections } from "./SettingsSections";
+import { Settings2, MessageSquare, Palette, Database } from "lucide-react";
 import { count, t, locale } from "../i18n";
 import { useEffect, useState } from "react";
 import { Laptop, LoaderCircle, ShieldCheck, SunMoon } from "lucide-react";
@@ -37,6 +39,8 @@ function HistoryPolicy({ project, onSaved, onToast }: { project: Project; onSave
 }
 
 export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }: { initialMachineId?: string; dashboard: Dashboard; onUpdated: () => Promise<void>; onToast: Notice }) {
+  const [category, setCategory] = useState<"codex" | "writing" | "appearance" | "history" | "security">("codex");
+  useEffect(() => { if (initialMachineId) setCategory("codex"); }, [initialMachineId]);
   const [sessions, setSessions] = useState<ClientSessionInfo[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionError, setSessionError] = useState("");
@@ -91,12 +95,23 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
     finally { setRevoking(undefined); }
   }
   return <section className="wide-view settings-view">
-    <div className="wide-view__heading"><div><h1>{t("设置")}</h1><p>{t("管理界面外观、浏览器登录和云端历史。")}</p></div><ShieldCheck size={30} /></div>
-    <div className="settings-layout">
+    <div className="wide-view__heading"><div><h1>{t("设置")}</h1><p>{t("按用途管理默认配置、界面外观和数据。")}</p></div><ShieldCheck size={30} /></div>
+    <SettingsSections label={t("设置分类")} value={category} onChange={setCategory} items={[
+      {id:"codex",label:t("Codex 配置"),icon:<Settings2 size={19}/>,description:t("模型、语音与权限")},
+      {id:"writing",label:t("输入辅助"),icon:<MessageSquare size={19}/>,description:t("补全与提示词优化")},
+      {id:"appearance",label:t("界面外观"),icon:<Palette size={19}/>,description:t("主题与阅读体验")},
+      {id:"history",label:t("云端历史"),icon:<Database size={19}/>,description:t("内容同步与保留时长")},
+      {id:"security",label:t("登录安全"),icon:<ShieldCheck size={19}/>,description:t("管理已登录浏览器")},
+    ]}/>
+    <div className="settings-layout settings-layout--grouped">
+      <div className="settings-category" hidden={category !== "codex"}>
       <CodexConfiguration machines={dashboard.machines} initialMachineId={initialMachineId} />
+      </div><div className="settings-category settings-category--pair" hidden={category !== "writing"}>
       <WritingPreferencesPanel key={dashboard.user.id} owner={dashboard.user.id} />
       <WritingAISettings />
+      </div><div className="settings-category" hidden={category !== "appearance"}>
       <section className="settings-block theme-settings-block"><h2><SunMoon size={18} />{t("界面外观")}</h2><p className="subtle">{t("选择阅读更舒适的外观，自动保存在此浏览器。")}</p><ThemeSettings paginated /></section>
+      </div><div className="settings-category" hidden={category !== "history"}>
       <section className="settings-block"><h2>{t("云端历史")}</h2><p className="subtle">{t("按项目设置保存内容和时长。宿主机上的原始会话不受影响。")}</p>
         {machines.length === 0 ? <p className="subtle">{t("添加主机并发现项目后，可以设置历史保存方式。")}</p> : <>
           <label className="settings-field"><span>{t("主机")}</span><select aria-label={t("历史设置主机")} value={machineId} onChange={event => setSelectedMachineId(event.target.value)}>{machines.map(machine => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label>
@@ -105,6 +120,7 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
           {selected && <HistoryPolicy key={selected.id} project={selected} onToast={onToast} onSaved={project => { setProjects(items => items.map(item => item.id === project.id ? project : item)); void onUpdated().catch(() => undefined); }} />}
         </>}
       </section>
+      </div><div className="settings-category" hidden={category !== "security"}>
       <section className="settings-block browser-settings-block"><h2>{t("已登录浏览器")}</h2><p className="subtle">{t("退出不再使用的浏览器登录。")}</p>
         {loadingSessions ? <div className="loading-line"><LoaderCircle className="spin" size={17} />{t("读取中")}</div> : sessionError ? <p className="catalog-error" role="alert">{sessionError} <button type="button" className="button button--quiet" onClick={() => setReloadSessions(value => value + 1)}>{t("重试")}</button></p> : sessions.slice(visibleSessionPage * 3, visibleSessionPage * 3 + 3).map((session, offset) => { const index = visibleSessionPage * 3 + offset; return <div className="client-session-row" key={session.id}>
           <span className="client-icon"><Laptop size={17} /></span><div><strong>{session.current ? t("当前浏览器") : t("其他浏览器 {0}", index + 1)}</strong><span>{t("登录于")}{locale() === "en" ? " " : ""}{date(session.createdAt)}</span><span>{t("最近活动")}{locale() === "en" ? " " : ""}{date(session.lastSeenAt)}</span></div>
@@ -112,6 +128,7 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
         </div>; })}
         {!loadingSessions && !sessionError && <SettingsPagination page={visibleSessionPage} pages={sessionPages} onChange={setSessionPage} label={t("浏览器登录分页")} />}
       </section>
+      </div>
     </div>
   </section>;
 }

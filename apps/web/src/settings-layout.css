@@ -79,3 +79,87 @@ dialog.modal.usage-dialog > .usage-body { flex: 1 1 auto; min-height: 0; overflo
 @media (max-width: 600px) {
   .codex-configuration .codex-settings-fields { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Configuration pages use a compact directory, then one focused group of controls. */
+.settings-sections { display: flex; gap: 6px; padding: 6px; margin: 20px 0; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); overflow-x: auto; scrollbar-width: thin; }
+.settings-sections > button { display: flex; align-items: center; gap: 9px; flex: 1 0 auto; min-height: 48px; padding: 10px 14px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--muted); text-align: left; font: inherit; cursor: pointer; }
+.settings-sections > button > svg { flex-shrink: 0; }
+.settings-sections strong { display: block; font-size: var(--text-small); font-weight: 600; white-space: nowrap; }
+.settings-sections small { display: block; margin-top: 3px; font-size: var(--text-caption); white-space: nowrap; }
+.settings-sections > button[aria-pressed="true"] { background: var(--paper-solid); border-color: var(--component-line); color: var(--ink); box-shadow: 0 2px 5px #00000008; }
+.settings-sections > button[aria-pressed="true"] > svg { color: var(--cobalt); }
+.settings-sections > button:focus-visible, .host-settings-link:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+.settings-view .settings-layout--grouped { display: block; }
+.settings-category, .host-category, .config-subpanel { min-width: 0; }
+.settings-category[hidden], .host-category[hidden], .config-subpanel[hidden] { display: none !important; }
+.settings-category--pair { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.settings-category > .settings-block { margin: 0; }
+.settings-view .settings-block { padding: 24px; }
+.settings-view .settings-block h2 { font-size: 1.125rem; }
+.settings-view .settings-block p { line-height: 1.6; }
+.settings-view .codex-config-tabs { margin: 16px 0; gap: 8px; }
+.settings-view .codex-config-tabs .button { min-height: 40px; padding: 8px 12px; font-size: var(--text-small); }
+.settings-view .codex-configuration .settings-sections { margin: 16px 0 0; background: transparent; padding: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; gap: 16px; }
+.settings-view .codex-configuration .settings-sections > button { flex: 0 0 auto; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 12px 2px; background: transparent; box-shadow: none; }
+.settings-view .codex-configuration .settings-sections > button[aria-pressed="true"] { border-bottom-color: var(--cobalt); color: var(--cobalt); }
+.settings-view .config-subpanel > .codex-settings-panel, .settings-view .config-subpanel > .permission-panel { border: 0; border-radius: 0; background: transparent; padding: 16px 0 0; margin: 0; box-shadow: none; }
+.settings-view .config-subpanel .host-config-disclosure { border: 0; border-radius: 0; background: transparent; }
+.settings-view .config-subpanel .host-config-disclosure__body { padding: 0; }
+.settings-view .codex-settings-panel > summary, .settings-view .host-config-disclosure > summary { padding: 0; }
+.settings-view .codex-settings-fields { margin: 16px 0; align-items: start; }
+.settings-view .codex-configuration .codex-settings-fields > label { margin: 0; gap: 8px; }
+.settings-view .codex-configuration .codex-settings-fields select { margin: 0; }
+.settings-view .config-scope-hint { margin: 12px 0; color: var(--muted); font-size: var(--text-small); }
+.settings-view .codex-settings-panel > p, .settings-view .permission-panel p { margin: 12px 0; font-size: var(--text-small); }
+.config-source-details { margin: 16px 0; color: var(--muted); font-size: var(--text-caption); }
+.config-source-details > summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.config-source-details > summary::before { content: '›'; margin-right: 8px; }
+.config-source-details[open] > summary::before { transform: rotate(90deg); }
+.config-source-details dl { margin: 4px 0; }
+.config-source-details dl > div { display: grid; grid-template-columns: 100px minmax(0,1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.config-source-details dd { margin: 0; overflow-wrap: anywhere; }
+.settings-view .codex-settings-save, .settings-view .permission-actions { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.settings-view .codex-settings-save .button, .settings-view .permission-actions .button { min-height: 44px; }
+.host-settings-link { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 16px 20px; margin-bottom: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.host-settings-link small { display: block; margin-top: 4px; color: var(--muted); font-size: var(--text-caption); }
+.host-settings-link > span:last-child { display: flex; align-items: center; gap: 6px; color: var(--cobalt); font-size: var(--text-small); flex-shrink: 0; }
+.hosts-view .host-workspace { align-items: start; }
+.hosts-view .host-workspace .settings-block { margin: 0; padding: 24px; }
+.hosts-view .host-heading h2 { font-size: 1.125rem; }
+.hosts-view .host-runtime { grid-column: 2; grid-row: 1; }
+.hosts-view .host-workspace > .settings-block:first-child { grid-column: 1; grid-row: 1; }
+.hosts-view .host-operation-list, .hosts-view .host-operation-tools, .hosts-view .host-technical { margin-top: 20px; }
+@media(max-width: 900px) {
+  .hosts-view .host-runtime { grid-column: 1; grid-row: 1; }
+  .hosts-view .host-workspace > .settings-block:first-child { grid-column: 1; grid-row: 2; }
+}
+@media(max-width: 600px) {
+  .settings-sections { margin: 16px 0; }
+  .settings-sections > button { min-height: 44px; padding: 10px; gap: 6px; }
+  .settings-sections small { display: none; }
+  .settings-category--pair { grid-template-columns: minmax(0,1fr); gap: 16px; }
+  .settings-view .settings-block, .hosts-view .host-workspace .settings-block { padding: 16px; }
+  .settings-view .codex-configuration .settings-sections { gap: 12px; }
+  .settings-view .codex-configuration .settings-sections strong { font-size: .8125rem; }
+  .settings-view .codex-config-tabs .button { flex: 1 1 auto; }
+  .settings-view .codex-settings-fields { gap: 16px; }
+  .host-settings-link { padding: 14px 16px; }
+  .host-settings-link > span:last-child { font-size: 0; gap: 0; }
+  .host-settings-link > span:last-child > svg { width: 20px; height: 20px; }
+}
+.host-common-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 18px; }
+.host-common-actions > .button { min-width: 0; align-items: flex-start; text-align: left; white-space: normal; padding: 12px; }
+.host-common-actions svg { flex-shrink: 0; margin-top: 2px; }
+.host-common-actions small { display: block; margin-top: 6px; color: var(--muted); font-size: var(--text-caption); font-weight: normal; line-height: 1.5; }
+@media(max-width: 400px) { .host-common-actions { grid-template-columns: minmax(0,1fr); } }
+.config-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.config-heading p { color: var(--muted); font-size: var(--text-small); margin: 6px 0 0; }
+@media(max-width:600px) {
+  .settings-view > .settings-sections { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); overflow: visible; }
+  .settings-view > .settings-sections > button { padding: 10px 6px; justify-content: center; gap: 5px; }
+  .settings-view > .settings-sections strong { font-size: .8125rem; }
+  .settings-view > .settings-sections svg { width: 16px; height: 16px; }
+  .settings-view .codex-config-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .settings-view .codex-config-tabs .button { flex: 0 0 auto; white-space: nowrap; font-size: .8125rem; }
+}
+.settings-view .settings-layout--grouped { margin-top: 16px; }

@@ -1,3 +1,5 @@
+import { SettingsSections } from "./SettingsSections";
+import { SlidersHorizontal, Headphones, ShieldCheck } from "lucide-react";
 import { VoiceSettingsPanel } from "./VoiceSettingsPanel";
 import { useEffect, useRef, useState } from "react";
 import { Settings2 } from "lucide-react";
@@ -104,16 +106,25 @@ export function CodexConfiguration({ machines, initialMachineId }: { machines: M
   const [tab, setTab] = useState<"defaults" | "exceptions" | "native">(initialMachineId ? "exceptions" : "defaults");
   const [query, setQuery] = useState("");
   const [machineId, setMachineId] = useState(initialMachineId ?? "");
-  const [open, setOpen] = useState(!!initialMachineId);
+  const [defaultsSection, setDefaultsSection] = useState<"runtime" | "voice" | "permissions">("runtime");
   const hosts = machines.filter(m => m.identity === "paired");
   const selected = hosts.find(m => m.id === machineId);
-  return <section className="settings-block codex-configuration"><details open={open} onToggle={e => setOpen(e.currentTarget.open)}><summary><h2><Settings2 size={18} />{t("Codex 配置")}</h2><span>{t("统一默认、主机与项目例外、原生工具与账号")}</span></summary>
-    {open && <><div className="codex-config-tabs" role="group" aria-label={t("Codex 配置分类")}>{(["defaults", "exceptions", "native"] as const).map(key => <button type="button" key={key} aria-pressed={tab === key} className={`button ${tab === key ? "button--primary" : "button--quiet"}`} onClick={() => setTab(key)}>{t(({ defaults: "统一默认", exceptions: "主机与项目例外", native: "原生工具与账号" })[key])}</button>)}</div>
-      {tab === "defaults" ? <><CodexSettingsPanel workspace /><VoiceSettingsPanel /><PermissionPanel workspace /></> : <>
+  return <section className="settings-block codex-configuration"><header className="config-heading"><h2><Settings2 size={18} />{t("Codex 配置")}</h2><p>{t("设置新任务和通话的默认行为。")}</p></header>
+    <div className="codex-config-tabs" role="group" aria-label={t("Codex 配置分类")}>{(["defaults", "exceptions", "native"] as const).map(key => <button type="button" key={key} aria-pressed={tab === key} className={`button ${tab === key ? "button--primary" : "button--quiet"}`} onClick={() => setTab(key)}>{t(({ defaults: "统一默认", exceptions: "单独配置", native: "账号与工具" })[key])}</button>)}</div>
+      {tab === "defaults" ? <>
+        <p className="config-scope-hint">{t("作为所有会话的默认配置；主机、项目和会话仍可单独调整。")}</p>
+        <SettingsSections label={t("默认配置分类")} value={defaultsSection} onChange={setDefaultsSection} items={[
+          {id:"runtime",label:t("模型与回复"),icon:<SlidersHorizontal size={17}/>},
+          {id:"voice",label:t("语音音色"),icon:<Headphones size={17}/>},
+          {id:"permissions",label:t("执行权限"),icon:<ShieldCheck size={17}/>},
+        ]}/>
+        <div hidden={defaultsSection !== "runtime"} className="config-subpanel"><CodexSettingsPanel workspace /></div>
+        <div hidden={defaultsSection !== "voice"} className="config-subpanel"><VoiceSettingsPanel /></div>
+        <div hidden={defaultsSection !== "permissions"} className="config-subpanel"><PermissionPanel workspace /></div>
+      </> : <>
         <label>{t("搜索主机")}<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
         <label>{t("主机")}<select value={machineId} onChange={e => setMachineId(e.target.value)}><option value="">{t("选择主机")}</option>{hosts.filter(m => m.id === machineId || `${m.name} ${m.hostname}`.toLowerCase().includes(query.toLowerCase())).map(m => <option key={m.id} value={m.id}>{m.name} · {t(m.reachability === "live" ? "在线" : "离线")}</option>)}</select></label>
         {selected && <HostConfiguration key={`${selected.id}:${tab}`} machine={selected} native={tab === "native"} />}
       </>}
-    </>}
-  </details></section>;
+  </section>;
 }

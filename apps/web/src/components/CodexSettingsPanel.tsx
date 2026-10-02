@@ -72,20 +72,22 @@ export function CodexSettingsPanel({ sessionId = "", machineId, projectId, works
   };
   const labels = { model: "模型", effort: "推理强度", mode: "协作模式", serviceTier: "服务档位", personality: "沟通风格" };
   const changed = !!data && JSON.stringify(draft) !== JSON.stringify(overridesOf(data, scope));
-  return <details className="codex-settings-panel session-config-section" open={targetScope !== "session"}>
-    <summary><span>{t(targetScope === "session" ? "运行配置" : "默认运行配置")}<small>{data ? `${sourceLabel(data.source)} · ${data.desired?.model ?? t("继承 Codex")}` : t("读取中")}</small></span></summary>
-    <p>{t("逐项继承：统一默认 → 主机 → 项目 → 会话。只修改需要覆盖的选项。")}</p>
+  const Container = workspace ? "section" : "details";
+  return <Container className="codex-settings-panel session-config-section" {...(workspace ? {} : {open: targetScope !== "session"})}>
+    {!workspace && <summary><span>{t(targetScope === "session" ? "运行配置" : "默认运行配置")}<small>{data ? `${sourceLabel(data.source)} · ${data.desired?.model ?? t("继承 Codex")}` : t("读取中")}</small></span></summary>}
+    <p className="config-scope-hint">{t(workspace ? "选择默认模型和回复方式，留空使用 Codex 自身配置。" : "只调整需要不同的选项，其余沿用默认配置。")}</p>
     {targetScope === "session" && <label>{t("保存范围")}<select disabled={busy} value={scope} aria-label={t("配置保存范围")} onChange={e => setScope(e.target.value as SettingsScope)}><option value="session">{t("仅此会话")}</option><option value="project">{t("此项目中未单独覆盖的会话")}</option></select></label>}
     {data && <div className="codex-settings-fields">{fields.map(field => {
       const value = draft[field] === null ? "__clear__" : draft[field] ?? "";
       return <label key={field}>{t(labels[field])}<select aria-label={t(labels[field])} value={value} disabled={busy} onChange={e => setDraft(previous => {
         const next = { ...previous }; if (!e.target.value) delete next[field]; else next[field] = e.target.value === "__clear__" ? null : e.target.value; return next;
       })}>
-        <option value="">{t("继承上级")}</option><option value="__native__">{t("使用原生值（不继承上级）")}</option>
+        <option value="">{t(workspace ? "使用 Codex 默认" : "沿用默认配置")}</option><option value="__native__">{t("使用原生值（不继承上级）")}</option>
         {value && !["__native__", ...options[field].map(o => o.value)].includes(value) && <option value={value}>{value} · {t("当前目录未提供")}</option>}
         {options[field].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select><small>{t("已保存来源：")}{sourceLabel(data.sources?.[field] ?? data.source)} · {data.effective?.[field] === "__native__" || data.effective?.[field] === undefined ? t("原生值") : data.effective[field] === null ? t("恢复默认档位") : data.effective[field]}</small></label>;
+      </select></label>;
     })}</div>}
+    {data && <details className="config-source-details"><summary>{t("查看配置来源")}</summary><dl>{fields.map(field => <div key={field}><dt>{t(labels[field])}</dt><dd>{sourceLabel(data.sources?.[field] ?? data.source)} · {data.effective?.[field] === "__native__" || data.effective?.[field] === undefined ? t("原生值") : data.effective[field] === null ? t("恢复默认档位") : data.effective[field]}</dd></div>)}</dl></details>}
     {workspace && <p className="subtle">{t("选项来自各主机上报的目录；任务提交时按目标主机再次校验，不会自动替换模型。")}</p>}
     {!workspace && data?.compatibilityIssue && <p role="alert">{systemText(data.compatibilityIssue)}</p>}
     {data && !catalogs.length && <p>{t("暂无可用模型目录，可清除覆盖或刷新后重试。")}</p>}
@@ -93,5 +95,5 @@ export function CodexSettingsPanel({ sessionId = "", machineId, projectId, works
     <div className="codex-settings-save"><button className="button button--primary" type="button" disabled={!data || busy || !changed} onClick={() => void save()}>{t("保存配置")}</button><button className="button button--quiet" type="button" disabled={!data || busy || !Object.keys(overridesOf(data, scope)).length} onClick={() => void save({})}>{t("全部恢复继承")}</button><button className="button button--quiet" type="button" disabled={busy} onClick={() => setReload(n => n + 1)}>{t("重新读取配置")}</button></div>
     {observed?.accepted && <p className="subtle">{t("主机上次接受：")}{observed.accepted.model} · {observed.accepted.effort ?? t("继承强度")}</p>}
     {message && <p role="status">{systemText(message)}</p>}
-  </details>;
+  </Container>;
 }

@@ -5,6 +5,7 @@ import { SettingsView } from "./components/SettingsView";
 import { api } from "./lib/api";
 import type { ClientSessionInfo, Dashboard, Page, Project } from "./lib/types";
 vi.mock("./lib/api", () => ({ api: { projects: vi.fn(), clientSessions: vi.fn(), revokeClientSession: vi.fn(), updateProjectContentPolicy: vi.fn() } }));
+vi.mock("./components/CodexConfiguration", () => ({ CodexConfiguration: () => <div>Codex defaults</div> }));
 afterEach(cleanup);
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.clientSessions).mockResolvedValue({ sessions: [] }); });
 const project = (id: string, machineId = "a"): Project => ({ id, machineId, alias: id, pathHint: `/work/${id}`, syncContent: true, retentionDays: 7 });
@@ -16,6 +17,7 @@ it("paginates browser sessions and returns to the previous page after revoking t
  vi.mocked(api.clientSessions).mockResolvedValue({sessions:Array.from({length:4},(_,i)=>({id:String(i),current:i===0,createdAt:"2026-09-14T00:00:00Z",lastSeenAt:"2026-09-14T00:00:00Z"} as ClientSessionInfo))});
  vi.mocked(api.revokeClientSession).mockResolvedValue({} as never);
  render(<SettingsView dashboard={dashboard} onUpdated={onUpdated} onToast={onToast}/>);
+ fireEvent.click(screen.getByRole("button",{name:/登录安全/}));
  await screen.findByText("当前浏览器");
  const pager=within(screen.getByRole("navigation",{name:"浏览器登录分页"}));
  expect(screen.queryByText("其他浏览器 4")).toBeNull();
@@ -30,6 +32,7 @@ it("loads all project pages and saves only the selected project after explicit s
  vi.mocked(api.projects).mockResolvedValueOnce({ items: [project("first")], nextCursor: "next" }).mockResolvedValueOnce({ items: [project("second")], nextCursor: null });
  vi.mocked(api.updateProjectContentPolicy).mockResolvedValue({ project: {} });
  render(<SettingsView dashboard={dashboard} onUpdated={onUpdated} onToast={onToast} />);
+ fireEvent.click(screen.getByRole("button",{name:/云端历史/}));
  await screen.findByRole("option", { name: "second · /work/second" });
  fireEvent.change(screen.getByLabelText("历史设置项目"), { target: { value: "second" } });
  fireEvent.change(screen.getByLabelText("历史保存时长"), { target: { value: "30" } });
@@ -44,6 +47,7 @@ it("late project responses from another host cannot replace the selected host or
  let resolveOld!: (value: Page<Project>) => void;
  vi.mocked(api.projects).mockImplementation(options => options.machineId === "a" ? new Promise(resolve => { resolveOld = resolve; }) : Promise.resolve({ items: [project("new-host", "b")], nextCursor: null }));
  render(<SettingsView dashboard={dashboard} onUpdated={onUpdated} onToast={onToast} />);
+ fireEvent.click(screen.getByRole("button",{name:/云端历史/}));
  fireEvent.change(screen.getByLabelText("历史设置主机"), { target: { value: "b" } });
  await screen.findByRole("option", { name: "new-host · /work/new-host" });
  await act(async () => resolveOld({ items: [project("stale")], nextCursor: null }));
@@ -55,8 +59,11 @@ it("late project responses from another host cannot replace the selected host or
 it("dashboard heartbeats preserve unsaved policy choices and do not reload project settings", async () => {
  vi.mocked(api.projects).mockResolvedValue({ items: [project("first")], nextCursor: null });
  const view = render(<SettingsView dashboard={dashboard} onUpdated={onUpdated} onToast={onToast} />);
+ fireEvent.click(screen.getByRole("button",{name:/云端历史/}));
  await screen.findByLabelText("历史保存时长");
  fireEvent.change(screen.getByLabelText("历史保存时长"), { target: { value: "14" } });
+ fireEvent.click(screen.getByRole("button",{name:/界面外观/}));
+ fireEvent.click(screen.getByRole("button",{name:/云端历史/}));
  view.rerender(<SettingsView dashboard={{ ...dashboard, serverTime: "two" }} onUpdated={onUpdated} onToast={onToast} />);
  expect((screen.getByLabelText("历史保存时长") as HTMLSelectElement).value).toBe("14");
  expect(api.projects).toHaveBeenCalledTimes(1); expect(api.updateProjectContentPolicy).not.toHaveBeenCalled();
@@ -67,6 +74,8 @@ it("browser logout targets the chosen login and leaves the current login visible
  vi.mocked(api.clientSessions).mockResolvedValue({ sessions: [{ id: "current", current: true }, { id: "other", current: false }] as ClientSessionInfo[] });
  vi.mocked(api.revokeClientSession).mockResolvedValue({});
  render(<SettingsView dashboard={dashboard} onUpdated={onUpdated} onToast={onToast} />);
+ fireEvent.click(screen.getByRole("button",{name:/云端历史/}));
+ fireEvent.click(screen.getByRole("button",{name:/登录安全/}));
  fireEvent.click(await screen.findByRole("button", { name: "退出浏览器 2" }));
  await waitFor(() => expect(api.revokeClientSession).toHaveBeenCalledWith("other"));
  await waitFor(() => expect(screen.queryByRole("button", { name: "退出浏览器 2" })).toBeNull());
