@@ -29,7 +29,7 @@ export function RuntimeModeSelect({ sessionId, summary, running, onSaved }: { se
   return <div className="runtime-mode-select">
     <label><span>{t(running ? "下一轮模式" : "发送模式")}</span><select aria-label={t("切换协作模式")} disabled={busy || !current?.loaded} value={mode} onChange={event => void save(event.target.value)}>
       <option value="default">{t("普通执行")}</option><option value="plan">{t("规划模式")}</option><option value="inherit">{t("恢复继承模式")}</option>
-    </select></label><small>{t(source)}</small>
+    </select></label><small>{t(source)} · {t("用于后续发送")}</small>
     {error && <span role="alert">{systemText(error)}</span>}
   </div>;
 }

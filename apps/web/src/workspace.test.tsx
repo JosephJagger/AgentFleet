@@ -71,7 +71,8 @@ it("Codex uses the send-mode selector without a duplicate plan toggle", () => {
   const view=render(<SessionInspector {...props}/>);
   fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
   expect(screen.queryByRole("button",{name:/计划模式.*先分析并制定计划/})).toBeNull();
-  expect(screen.getByRole("combobox",{name:"切换协作模式"})).toBeTruthy();
+  expect(screen.getByRole("combobox",{name:"切换协作模式"}).closest(".composer-add-popover")).toBeTruthy();
+  expect(view.container.querySelector(".runtime-settings-bar select")).toBeNull();
 });
 it("会话核验期间保留禁用的追加入口，草稿保留", () => {
   const props = inspectorProps("A");

@@ -943,8 +943,13 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .codex-operations-panel dd { margin: 4px 0 0; overflow-wrap: anywhere; }
 .codex-operations-panel input, .codex-operations-panel select { min-width: 0; max-width: 100%; }
 
-.runtime-mode-select { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:var(--text-caption); color:var(--muted); }
-.runtime-mode-select label { display:flex; align-items:center; gap:6px; }
-.runtime-mode-select select { width:auto; min-height:32px; padding:3px 24px 3px 8px; border:1px solid var(--line); border-radius:8px; color:inherit; background:var(--canvas); font:inherit; }
-.runtime-mode-select [role="alert"] { flex-basis:100%; }
+/* Shared desktop/mobile composer mode control, aligned with attachment rows. */
+.composer-mode-field { display:grid; grid-template-columns:22px minmax(0,1fr); gap:9px; padding:10px 9px 14px; margin-bottom:4px; border-bottom:1px solid var(--line); color:var(--text); }
+.composer-mode-field > svg { margin-top:3px; }
+.runtime-mode-select { min-width:0; display:grid; gap:6px; color:var(--text); }
+.runtime-mode-select label { min-width:0; display:grid; gap:8px; font-weight:600; }
+.runtime-mode-select select { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:8px 32px 8px 12px; border:1px solid var(--line); border-radius:10px; color:var(--text); background:var(--canvas); font:inherit; font-weight:400; }
+.runtime-mode-select small { color:var(--muted); font-size:var(--text-caption); }
+.runtime-mode-select [role="alert"] { color:var(--danger); font-size:var(--text-caption); }
+
 .runtime-observed-mode { color:var(--muted); font-size:var(--text-caption); }

@@ -2967,5 +2967,6 @@
   "有条件额度重置": "Conditional quota reset",
   "有条件发放重置卡": "Conditional reset-card grant",
   "条件：{0}": "Condition: {0}",
-  "公告仅供参考，额度与日期以原生最新数据为准": "Announcements are advisory; quota and dates follow the latest native data."
+  "公告仅供参考，额度与日期以原生最新数据为准": "Announcements are advisory; quota and dates follow the latest native data.",
+  "用于后续发送": "Applies to future messages"
 }
