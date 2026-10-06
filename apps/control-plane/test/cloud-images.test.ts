@@ -181,3 +181,20 @@ test("attachment storage reports host and session files by actual extension", as
   const row = response.json().sessions.find((value:{logicalSessionId:string}) => value.logicalSessionId === session.logicalSessionId);
   assert.deepEqual(row.fileTypes, stats.fileTypes);
 });
+
+test("version maintenance is host scoped, capability gated and excludes concurrent cleanup",async t=>{
+ const {app,db,headers}=await fixture(t);
+ const start=(type:string,extra={})=>app.inject({method:'POST',url:'/api/machines/image-a/operations',headers,payload:{type,clientMutationId:crypto.randomUUID(),...extra}});
+ db.run("UPDATE machines SET reachability='online',maintenance_types_json='[]' WHERE machine_id='image-a'");
+ assert.equal((await start('versions.preview')).statusCode,409);
+ db.run("UPDATE machines SET maintenance_types_json=? WHERE machine_id='image-a'",JSON.stringify(['versions.preview','versions.clean']));
+ assert.equal((await start('versions.clean',{logicalSessionId:'anything'})).statusCode,400);
+ const first=await start('versions.preview');assert.equal(first.statusCode,202,first.body);
+ assert.equal((await start('versions.clean')).statusCode,409);
+ const {MaintenanceService}=await import('../src/maintenance.js');
+ const maintenance=new MaintenanceService(db);
+ maintenance.result('image-a',first.json().operation.operationId,'succeeded',{reclaimableBytes:123},undefined);
+ const cleaned=await start('versions.clean');assert.equal(cleaned.statusCode,202,cleaned.body);
+ assert.equal(db.all('PRAGMA foreign_key_check').length,0);
+ assert.equal((await app.inject({method:'POST',url:'/api/machines/image-a/operations',payload:{type:'versions.clean',clientMutationId:crypto.randomUUID()}})).statusCode,401);
+});

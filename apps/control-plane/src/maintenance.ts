@@ -5,7 +5,7 @@ import type { Principal } from "./auth.js";
 import { invariant } from "./errors.js";
 import { futureIso, newId, nowIso } from "./crypto.js";
 
-export const MAINTENANCE_TYPES = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host"] as const;
+export const MAINTENANCE_TYPES = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"] as const;
 export type MaintenanceType = (typeof MAINTENANCE_TYPES)[number];
 
 export class MaintenanceService {
@@ -29,7 +29,10 @@ export class MaintenanceService {
       invariant(machine.reachability==="online",409,"MACHINE_OFFLINE","Machine must be online");
       invariant((JSON.parse(machine.maintenance_types_json) as string[]).includes(type),409,"AGENT_CAPABILITY_UNAVAILABLE","Update the connection service to use this operation");
       let target: Record<string,unknown> | null = null;
-      if(type === "codex.host") {
+      if(type === "versions.preview" || type === "versions.clean") {
+        invariant(logicalSessionId === undefined && previewOperationId === undefined && nativeRequest === undefined && projectTarget === undefined,400,"INVALID_OPERATION_TARGET","版本清理不接受目录或会话参数");
+        invariant(!this.db.get("SELECT 1 FROM machine_operations WHERE machine_id=? AND type IN ('versions.preview','versions.clean','agent.update') AND state IN ('accepted','running','unknown') LIMIT 1", machineId),409,"VERSION_CLEANUP_BUSY","版本检查或升级正在进行，请稍后重试");
+      } else if(type === "codex.host") {
         invariant(logicalSessionId === undefined && previewOperationId === undefined,400,"INVALID_OPERATION_TARGET","Host operations do not accept a session target");
         invariant(!this.db.get("SELECT 1 FROM machine_operations WHERE machine_id=? AND type='codex.host' AND state IN ('accepted','running','unknown') LIMIT 1", machineId),409,"CODEX_OPERATION_PENDING","Wait for the previous host operation to be confirmed");
         target={...hostRequest!};
@@ -75,7 +78,7 @@ export class MaintenanceService {
         target={appServerEpoch:connection.app_server_epoch,logicalSessionId:session.logical_session_id,contentEpoch:session.content_epoch,executionSegmentId:session.execution_segment_id,nativeThreadId:session.native_thread_id,...(recoverableReservation?{nativeTurnId:reservation.native_turn_id,previousAppServerEpoch:reservation.bound_app_server_epoch}:{})};
       } else invariant(logicalSessionId === undefined,400,"INVALID_OPERATION_TARGET","This operation does not accept a session target");
       const timestamp=nowIso();const operationId=newId("op");
-      this.db.run("INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,'accepted',?,?,?)",operationId,machineId,principal.workspaceId,principal.clientSessionId,mutationId,type,timestamp,timestamp,futureIso(["codex.host","connection.repair","session.reconcile","images.preview","images.clean"].includes(type) ? 300 : 3600));
+      this.db.run("INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,'accepted',?,?,?)",operationId,machineId,principal.workspaceId,principal.clientSessionId,mutationId,type,timestamp,timestamp,futureIso(["codex.host","connection.repair","session.reconcile","images.preview","images.clean","versions.preview","versions.clean"].includes(type) ? 300 : 3600));
       if(target) this.db.run("UPDATE machine_operations SET request_json=? WHERE operation_id=?",JSON.stringify(target),operationId);
       this.db.audit({workspaceId:principal.workspaceId,actorUserId:principal.userId,actorClientSessionId:principal.clientSessionId,machineId,action:"machine.operation.request",metadata:{operationId,type}});
       return this.get(principal,operationId);

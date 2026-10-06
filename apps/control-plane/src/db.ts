@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 47) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 48) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1372,6 +1372,16 @@ export class ControlPlaneDatabase {
         workspace_id TEXT PRIMARY KEY REFERENCES workspaces(workspace_id),
         voice TEXT NOT NULL, revision INTEGER NOT NULL, updated_at TEXT NOT NULL
       ) STRICT; PRAGMA user_version=47`);
+    });
+    if (version < 48) this.transaction(() => {
+      const schema = this.get<{ sql: string }>("SELECT sql FROM sqlite_master WHERE type='table' AND name='machine_operations'")!.sql;
+      const indexes = this.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='machine_operations' AND sql IS NOT NULL");
+      this.sqlite.exec("ALTER TABLE machine_operations RENAME TO machine_operations_v47");
+      this.sqlite.exec(schema.replace("'codex.host'", "'codex.host','versions.preview','versions.clean'"));
+      this.sqlite.exec("INSERT INTO machine_operations SELECT * FROM machine_operations_v47; DROP TABLE machine_operations_v47");
+      for (const index of indexes) this.sqlite.exec(index.sql);
+      if (this.all("PRAGMA foreign_key_check").length) throw new Error("Version cleanup migration violated foreign keys");
+      this.sqlite.exec("PRAGMA user_version=48");
     });
   }
 

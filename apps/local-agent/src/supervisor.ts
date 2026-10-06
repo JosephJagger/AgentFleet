@@ -1,3 +1,4 @@
+import { withVersionLock } from "./version-cleanup.js";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { copyFile, lstat, mkdir, mkdtemp, readFile, readlink, rename, symlink, unlink, writeFile } from "node:fs/promises";
@@ -60,6 +61,9 @@ export async function writeUpdateTransaction(dataDir: string, value: UpdateTrans
 }
 
 export async function prepareUpdateTransaction(dataDir: string, targetVersion: string, launcher = stableAgentExecutable(dataDir)): Promise<UpdateTransaction> {
+  return withVersionLock(dataDir, () => prepareUpdateTransactionLocked(dataDir, targetVersion, launcher));
+}
+async function prepareUpdateTransactionLocked(dataDir: string, targetVersion: string, launcher: string): Promise<UpdateTransaction> {
   await mkdir(join(dataDir, "updates"), { recursive: true, mode: 0o700 });
   const metadata = await lstat(join(dataDir, "updates"));
   if (!metadata.isDirectory() || metadata.isSymbolicLink()) throw new AgentError("UPDATE_PATH_UNSAFE", "updates directory is not a regular directory");

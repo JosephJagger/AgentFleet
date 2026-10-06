@@ -1,3 +1,4 @@
+import { HostVersionStorage } from "./HostVersionStorage";
 import { SettingsSections } from "./SettingsSections";
 import { Server, Paperclip, BookOpen, ArrowRight } from "lucide-react";
 import { HostRecovery, repairCommand } from "./HostRecovery";
@@ -14,7 +15,7 @@ import { HostCodexInventory } from "./HostCodexInventory";
 import { HostReadiness } from "./HostReadiness";
 import { HostImageStorage } from "./HostImageStorage";
 
-const operationNames: Record<MaintenanceType, string> = localized(() => ({ "connection.repair":t("一键恢复连接"), "images.preview": t("预览会话图片"), "images.clean": t("清理会话图片"), "commands.reconcile": t("核验主机回执"), "session.reconcile": t("解除冻结"), "catalog.refresh": t("重新扫描"), "agent.update": t("检查并更新"), "runtime.reconnect": t("重新连接 Codex"), "diagnostics.collect": t("检查连接"), "codex.host": t("主机原生管理"), "project.add": t("创建项目") }));
+const operationNames: Record<MaintenanceType, string> = localized(() => ({ "versions.preview":t("检查版本"), "versions.clean":t("清理旧版本"), "connection.repair":t("一键恢复连接"), "images.preview": t("预览会话图片"), "images.clean": t("清理会话图片"), "commands.reconcile": t("核验主机回执"), "session.reconcile": t("解除冻结"), "catalog.refresh": t("重新扫描"), "agent.update": t("检查并更新"), "runtime.reconnect": t("重新连接 Codex"), "diagnostics.collect": t("检查连接"), "codex.host": t("主机原生管理"), "project.add": t("创建项目") }));
 const operationStates: Record<HostOperation["state"], string> = localized(() => ({ accepted: t("等待主机"), running: t("正在处理"), succeeded: t("主机已完成"), failed: t("操作未完成"), unknown: t("结果待核验"), expired: t("操作已过期") }));
 const operationDescriptions: Partial<Record<MaintenanceType, string>> = localized(() => ({
   "connection.repair":t("自动检查连接、核验旧任务、重连 Codex 并同步项目与会话。不会重发原命令。"),
@@ -71,11 +72,12 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
     {machine.reachability !== "live" && <HostRecovery key={`recovery:${machine.id}`} machine={machine} />}
     <SettingsSections label={t("主机管理分类")} value={section} onChange={setSection} items={[
       {id:"overview",label:t("状态与连接"),icon:<Server size={18}/>},
-      {id:"storage",label:t("附件存储"),icon:<Paperclip size={18}/>},
+      {id:"storage",label:t("附件和版本"),icon:<Paperclip size={18}/>},
       {id:"guide",label:t("使用帮助"),icon:<BookOpen size={18}/>},
     ]}/>
     <div hidden={section !== "storage"} className="host-category">
     <HostImageStorage key={`images:${machine.id}`} machineId={machine.id} name={machine.name} />
+    <HostVersionStorage key={`versions:${machine.id}`} machine={machine} />
     </div><div hidden={section !== "overview"} className="host-category">
     {onConfigure && <button className="host-settings-link" aria-label={t("前往配置")} type="button" onClick={() => onConfigure(machine.id)}><span><strong>{t("Codex 配置")}</strong><small>{t("模型、语音与权限在设置中统一管理")}</small></span><span>{t("前往配置")} <ArrowRight size={17}/></span></button>}
     <div className="host-workspace"><section className="settings-block"><div className="host-heading"><div><h2>{machine.name}</h2><span>{machine.os} · {machine.arch} · {machine.reachability === "live" ? t("在线") : machine.reachability === "reconciling" ? t("正在同步") : machine.reachability === "reconnecting" ? t("正在重连") : t("离线")}</span></div><button className="button machine-remove-trigger" type="button" onClick={() => onRemove(machine)}><Trash2 size={14} />{t("移除主机")}</button></div>

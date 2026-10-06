@@ -625,7 +625,7 @@ export class AgentRuntime {
           ? ["thread/list", "thread/read", "thread/resume", "thread/unsubscribe", "thread/start", "turn/start", "turn/steer", "turn/interrupt", "approval/reply-once"]
           : this.canRead() && this.appServer ? ["thread/list", "thread/read"] : [],
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
-        maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host"],
+        maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
         projectFiles: true,
         realtimeVoice: this.isWritable() && this.support.codexVersion === "0.159.2",
         queue: this.isWritable(),

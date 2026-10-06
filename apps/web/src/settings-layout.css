@@ -163,3 +163,16 @@ dialog.modal.usage-dialog > .usage-body { flex: 1 1 auto; min-height: 0; overflo
   .settings-view .codex-config-tabs .button { flex: 0 0 auto; white-space: nowrap; font-size: .8125rem; }
 }
 .settings-view .settings-layout--grouped { margin-top: 16px; }
+
+.host-version-storage { margin-top: 16px; }
+.version-storage-summary { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin: 20px 0; }
+.version-storage-summary div { display: grid; gap: 6px; }
+.version-storage-summary strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.version-storage-summary small,.version-storage-list small { color: var(--muted); }
+.version-storage-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.version-storage-status { display:flex; align-items:center; gap:8px; }
+.version-storage-list { list-style: none; padding: 0; max-height: 360px; overflow: auto; }
+.version-storage-list li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.version-storage-list li div { display:grid; gap:4px; min-width:0; overflow-wrap:anywhere; }
+.version-storage-list li div:last-child { text-align: right; flex-shrink:0; }
+@media(max-width:480px) { .version-storage-actions .button { flex:1 1 140px; } }

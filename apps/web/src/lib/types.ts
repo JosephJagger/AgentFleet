@@ -103,7 +103,7 @@ export interface HostCheck {
   action?: MaintenanceType;
 }
 
-export type MaintenanceType = "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host";
+export type MaintenanceType = "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host" | "versions.preview" | "versions.clean";
 export interface HostOperation {
   id: string;
   type: MaintenanceType;

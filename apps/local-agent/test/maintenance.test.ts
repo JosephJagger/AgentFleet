@@ -183,3 +183,13 @@ test("host native operations execute without a session, deduplicate and never re
   assert.equal(store.snapshot().maintenanceDrain,undefined);
   assert.equal(calls,1); assert.equal(store.snapshot().maintenanceOperations["interrupted-login"]?.state,"failed");
 });
+
+test("interrupted version cleanup is never replayed and clears its drain",async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'agentfleet-version-replay-'));const store=new StateStore(directory);await store.initialize();
+ t.after(async()=>{store.close();await rm(directory,{recursive:true,force:true});});
+ await store.recordMaintenance({operationId:'version-clean',operationType:'versions.clean',state:'running',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+ await store.setMaintenanceDrain('version-clean');
+ const reports:Record<string,unknown>[]=[];const maintenance=new AgentMaintenance({store,runtime:{} as AgentRuntime,signal:new AbortController().signal,report:r=>reports.push(r)});
+ await maintenance.replay();
+ assert.equal(store.snapshot().maintenanceDrain,undefined);assert.equal(reports.at(-1)?.state,'failed');assert.equal((reports.at(-1)?.error as {code:string}).code,'VERSION_CLEANUP_UNCONFIRMED');
+});

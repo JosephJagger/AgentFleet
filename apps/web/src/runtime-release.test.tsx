@@ -34,3 +34,10 @@ it("missing admin capability never exposes global controls", async () => {
   expect(screen.queryByRole("button", { name: "回退托管目标" })).toBeNull();
   expect(screen.queryByRole("button", { name: "暂停自动晋升" })).toBeNull();
 });
+
+it("offline checker labels its cached version and does not promise an expired next check",async()=>{
+ vi.mocked(api.runtimeRelease).mockResolvedValue({...state,workerOnline:false,lastCheckedAt:'2026-10-01T08:00:00Z',nextCheckAt:'2026-10-01T14:00:00Z'});
+ render(<RuntimeReleasePanel/>);
+ expect(await screen.findByText('上次获取的官方稳定版')).toBeTruthy();
+ expect(await screen.findByText(/检查服务离线，等待恢复/)).toBeTruthy();
+});

@@ -608,7 +608,7 @@ export class StateStore {
       if (previous && previous.operationType !== operation.operationType) throw new AgentError("MAINTENANCE_CONFLICT", "operation id was already used for a different action");
       state.maintenanceOperations[operation.operationId] = structuredClone(operation);
       const terminal = Object.values(state.maintenanceOperations).filter((item) => item.state !== "running").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-      for (const old of terminal.slice(200)) if (old.operationType !== "images.clean") delete state.maintenanceOperations[old.operationId];
+      for (const old of terminal.slice(200)) if (old.operationType !== "images.clean" && old.operationType !== "versions.clean") delete state.maintenanceOperations[old.operationId];
     });
   }
 
@@ -624,7 +624,7 @@ export class StateStore {
 
   canSafelyRestart(): boolean {
     const state = this.snapshot();
-    return !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean"].includes(operation.operationType)) &&
+    return !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean", "versions.clean"].includes(operation.operationType)) &&
       !Object.values(state.managedThreads).some((thread) => thread.activeTurnId !== undefined || thread.realtimeSessionId !== undefined) &&
       !Object.values(state.approvals).some((approval) => approval.state === "pending" || approval.state === "delivery_unknown") &&
       !Object.values(state.commandJournal).some((command) => ["claimed", "invoking", "responded", "unknown"].includes(command.state)) &&

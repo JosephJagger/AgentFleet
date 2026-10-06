@@ -22,6 +22,8 @@ services:
       RESEND_API_KEY: ""
       DJANGO_SECRET_KEY: ""
     depends_on:
+      runtime-validator:
+        condition: service_started
       identity:
         condition: service_healthy
     ports:

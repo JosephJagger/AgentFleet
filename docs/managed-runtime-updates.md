@@ -29,3 +29,11 @@ Codex 0.159.0 adds optional protocol fields while retaining the string history c
 0.159.2 是随后发布的稳定修订版；其 App Server v2 schema 哈希与 0.159.0 完全相同，也已完成官方文件摘要和隔离启动验证。托管验证器因此优先晋升 0.159.2。
 
 Codex 0.159.2 is the subsequent stable patch with the same App Server v2 schema hash as 0.159.0. The managed validator targets this later stable release.
+
+## 检查服务的运维
+
+`agentfleet-runtime-validator` 是常驻的稳定版检查和兼容验证服务，不是临时测试容器。删除它会停止定时检查；已有托管目标和主机上的运行版本不受影响。使用 `docker compose up -d runtime-validator` 恢复。正常启动 control-plane 也会启动该依赖，运维使用 `--no-deps` 时需明确包含 runtime-validator。
+
+面板在检查服务离线时会将版本标记为「上次获取的官方稳定版」，不再将已过期的检查时间显示为即将执行。恢复后会重新检查，但未通过兼容验证的新版本不会直接晋升。
+
+The runtime-validator is a persistent service, not a disposable test container. Restore it with `docker compose up -d runtime-validator`. A checker outage preserves the existing managed target; the panel labels the last known release as cached until checks resume. Compatibility validation remains required before promotion.

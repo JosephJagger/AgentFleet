@@ -337,6 +337,7 @@ async function run(args: ParsedArgs): Promise<void> {
     maintenance = new AgentMaintenance({ store, runtime, ...(updater ? { updater } : {}),
       report: (result) => relay.reportMaintenance(result), signal: abort.signal });
     let healthChecking = false;
+    let nextVersionCleanup = Date.now() + 60_000;
     let handledUpdateId: string | undefined;
     const healthTimer = setInterval(() => {
       if (!connected || !runtime?.readyForHealthCheck() || healthChecking) return;
@@ -346,6 +347,10 @@ async function run(args: ParsedArgs): Promise<void> {
         if (transaction?.targetRuntimeVersion && ["staged", "verifying"].includes(transaction.phase) &&
           (!runtime!.isWritable() || runtime!.support.codexVersion !== transaction.targetRuntimeVersion)) return;
         await writeWorkerHealth(dataDir, runtime!.support.codexVersion ?? undefined);
+        if (Date.now() >= nextVersionCleanup) {
+          nextVersionCleanup = Date.now() + 300_000;
+          await maintenance.automaticVersionCleanup().catch(error => logger.warn(publicError(error).message));
+        }
         if (transaction && transaction.updateId !== handledUpdateId && ["succeeded", "rolled_back", "failed"].includes(transaction.phase)) {
           if (runtime!.support.codexProfile && transaction.targetRuntimeVersion) {
             runtime!.support.codexProfile.runtimeUpdateState = transaction.phase;
