@@ -3,14 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { CodexPreferences, CodexSettings, RuntimeSettings, SettingsScope, FieldOverrides, CodexCatalog } from "../lib/codex-settings";
 
-export type RuntimeSummary = { sessionId: string; source?: CodexPreferences["source"]; settings?: CodexSettings; changed: boolean; loaded: boolean; failed?: boolean };
+export type RuntimeSummary = { sessionId: string; source?: CodexPreferences["source"]; settings?: CodexSettings; mode?: "default" | "plan"; modeSource?: string; changed: boolean; loaded: boolean; failed?: boolean };
 export type RuntimeChoice = { sessionId: string; settings?: CodexSettings };
 const ignoreChoice = (_choice: RuntimeChoice) => {};
 const fields = ["model", "effort", "mode", "serviceTier", "personality"] as const;
 const sourceLabel = (source: string) => t(({ workspace: "统一默认", machine: "主机默认", project: "项目默认", session: "会话覆盖", codex: "Codex 自身配置" } as Record<string, string>)[source] ?? source);
 function overridesOf(data: CodexPreferences, scope: SettingsScope): FieldOverrides {
   const pref = data.preferences[scope];
-  return pref?.overrides ?? (pref?.settings ? Object.fromEntries(fields.map(f => [f, pref.settings![f] === undefined ? "__native__" : pref.settings![f]])) : {});
+  const result = { ...(pref?.overrides ?? (pref?.settings ? Object.fromEntries(fields.map(f => [f, pref.settings![f] === undefined ? "__native__" : pref.settings![f]])) : {})) };
+  if (result.mode === "__native__") delete result.mode;
+  return result;
 }
 export function CodexSettingsPanel({ sessionId = "", machineId, projectId, workspace = false, observed, onChange = ignoreChoice, onSummary }: { sessionId?: string; machineId?: string; projectId?: string; workspace?: boolean; observed?: RuntimeSettings | null; onChange?: (choice: RuntimeChoice) => void; onSummary?: (summary: RuntimeSummary) => void }) {
   const targetScope: SettingsScope = workspace ? "workspace" : projectId ? "project" : machineId ? "machine" : "session";
@@ -34,7 +36,7 @@ export function CodexSettingsPanel({ sessionId = "", machineId, projectId, works
     }).catch(error => { if (!controller.signal.aborted) setMessage((error as Error).message); });
     return () => controller.abort();
   }, [id, targetScope, scope, reload, sessionId, onChange]);
-  useEffect(() => { onSummary?.({ sessionId, source: data?.source, settings: data?.desired ?? undefined, changed: false, loaded: !!data, failed: !data && !!message }); }, [data, message, sessionId, onSummary]);
+  useEffect(() => { onSummary?.({ sessionId, source: data?.source, mode: data?.effective?.mode === "plan" ? "plan" : "default", modeSource: data?.sources?.mode ?? "workspace", settings: data?.desired ?? undefined, changed: false, loaded: !!data, failed: !data && !!message }); }, [data, message, sessionId, onSummary]);
   async function save(overrides = draft) {
     if (!data || busy) return;
     const current = generation.current; setBusy(true); setMessage("");
@@ -75,14 +77,14 @@ export function CodexSettingsPanel({ sessionId = "", machineId, projectId, works
   const Container = workspace ? "section" : "details";
   return <Container className="codex-settings-panel session-config-section" {...(workspace ? {} : {open: targetScope !== "session"})}>
     {!workspace && <summary><span>{t(targetScope === "session" ? "运行配置" : "默认运行配置")}<small>{data ? `${sourceLabel(data.source)} · ${data.desired?.model ?? t("继承 Codex")}` : t("读取中")}</small></span></summary>}
-    <p className="config-scope-hint">{t(workspace ? "选择默认模型和回复方式，留空使用 Codex 自身配置。" : "只调整需要不同的选项，其余沿用默认配置。")}</p>
+    <p className="config-scope-hint">{t(workspace ? "选择默认模型和回复方式；协作模式默认普通执行，其余留空使用 Codex 自身配置。" : "只调整需要不同的选项，其余沿用默认配置。")}</p>
     {targetScope === "session" && <label>{t("保存范围")}<select disabled={busy} value={scope} aria-label={t("配置保存范围")} onChange={e => setScope(e.target.value as SettingsScope)}><option value="session">{t("仅此会话")}</option><option value="project">{t("此项目中未单独覆盖的会话")}</option></select></label>}
     {data && <div className="codex-settings-fields">{fields.map(field => {
       const value = draft[field] === null ? "__clear__" : draft[field] ?? "";
       return <label key={field}>{t(labels[field])}<select aria-label={t(labels[field])} value={value} disabled={busy} onChange={e => setDraft(previous => {
         const next = { ...previous }; if (!e.target.value) delete next[field]; else next[field] = e.target.value === "__clear__" ? null : e.target.value; return next;
       })}>
-        <option value="">{t(workspace ? "使用 Codex 默认" : "沿用默认配置")}</option><option value="__native__">{t("使用原生值（不继承上级）")}</option>
+        <option value="">{t(workspace ? field === "mode" ? "普通执行（默认）" : "使用 Codex 默认" : "沿用默认配置")}</option>{field !== "mode" && <option value="__native__">{t("使用原生值（不继承上级）")}</option>}
         {value && !["__native__", ...options[field].map(o => o.value)].includes(value) && <option value={value}>{value} · {t("当前目录未提供")}</option>}
         {options[field].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select></label>;

@@ -1470,7 +1470,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
     assert.equal(response.statusCode, 202, response.body);
     const commandId = json<{ command: { commandId: string } }>(response.body).command.commandId;
     const body = JSON.parse(db.get<{ body_json: string }>("SELECT body_json FROM command_contents WHERE command_id=?", commandId)!.body_json);
-    assert.deepEqual(body.settings, { model: "test-model" }); assert.equal(body.permissionProfile, "network"); assert.equal(body.permissionSource, "machine"); assert.equal(body.sessionTitle, "Concurrent A");
+    assert.deepEqual(body.settings, { model: "test-model", mode: "default" }); assert.equal(body.resolvedMode, "default"); assert.equal(body.permissionProfile, "network"); assert.equal(body.permissionSource, "machine"); assert.equal(body.sessionTitle, "Concurrent A");
     const hashes = db.get<{ request_hash: string; payload_hash: string }>("SELECT request_hash,payload_hash FROM commands WHERE command_id=?", commandId)!;
     assert.equal(hashes.request_hash, payloadHash({ type: request.type, precondition: request.precondition, payload: request.payload }));
     assert.equal(hashes.payload_hash, payloadHash({ type: request.type, precondition: request.precondition, payload: body }));
@@ -1499,11 +1499,11 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
     assert.equal(accepted.statusCode,202,accepted.body);
     const commandId=json<{command:{commandId:string}}>(accepted.body).command.commandId;
     const stored=()=>JSON.parse(db.get<{body_json:string}>("SELECT body_json FROM command_contents WHERE command_id=?",commandId)!.body_json);
-    assert.deepEqual(stored().settings,inherited.desired);
+    assert.deepEqual(stored().settings,inherited.desired); assert.equal(stored().resolvedMode,"plan");
     assert.equal((await saveDefault({model:"test-model",effort:"low",mode:"default"},1)).statusCode,200);
     const duplicate=await app.inject({method:"POST",url:commandUrl,headers:browserHeaders,payload:request});
     assert.equal(duplicate.statusCode,200,duplicate.body);
-    assert.deepEqual(stored().settings,inherited.desired,"accepted commands keep their snapshot after defaults change");
+    assert.deepEqual(stored().settings,inherited.desired,"accepted commands keep their snapshot after defaults change"); assert.equal(stored().resolvedMode,"plan");
     assert.equal((await app.inject({method:"GET",url:"/api/projects/missing/codex-settings",headers:browserHeaders})).statusCode,404);
     assert.equal((await app.inject({method:"GET",url:"/api/settings/permissions",headers:browserHeaders})).statusCode,200);
   } finally { db.sqlite.exec("ROLLBACK TO workspace_settings_test; RELEASE workspace_settings_test"); }

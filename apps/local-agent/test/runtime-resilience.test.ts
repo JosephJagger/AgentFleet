@@ -1692,3 +1692,17 @@ test("typed start during voice reuses the verified session without resuming or d
   await runtime.handleCommand(command(project, "other-attempt", "other-command", "other-session", server.appServerEpoch), 1);
   assert.equal(server.startTurnCount, 1);
 });
+
+test("newly claimed native Plan is reset even without a previous panel settings receipt", async t => {
+  const { store, projects } = await fixture();
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({store,identity,pairing,support,appServerFactory:callbacks=>(server=new FakeAppServer("epoch-native-mode",callbacks))});
+  runtime.setTransportGeneration(1); captureCallbacks(runtime); await runtime.initialize(); t.after(()=>runtime.shutdown());
+  await store.setManagedThread({nativeThreadId:"native-plan",projectId:projects[0]!.id,logicalSessionId:"claimed-plan",executionSegmentId:"segment-claimed-plan",appServerEpoch:server.appServerEpoch,policyVerified:true,policyVersion:"remote-restricted-v1",contentEpoch:1,createdAt:new Date().toISOString(),sessionCwd:projects[0]!.root,
+    observedSettings:{model:"host-model",effort:"high",observedAt:new Date().toISOString()}});
+  const next=command(projects[0]!,"attempt-native-mode","command-native-mode","claimed-plan",server.appServerEpoch);
+  next.payload.resolvedMode="default";
+  await runtime.handleCommand(next,1);
+  assert.deepEqual(server.receivedSettings,{model:"host-model",effort:"high",mode:"default"});
+  assert.equal(store.snapshot().managedThreads["native-plan"]?.acceptedSettings?.mode,"default");
+});

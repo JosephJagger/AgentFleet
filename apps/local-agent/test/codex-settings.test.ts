@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseModels, validateSettings, turnSettingsParams, readObservedSettings, settingsAfterPlan, type CodexCatalog } from "../src/codex-settings.js";
+import { parseModels, validateSettings, turnSettingsParams, readObservedSettings, settingsAfterPlan, resolveTurnMode, type CodexCatalog } from "../src/codex-settings.js";
 
 const catalog: CodexCatalog = { models: [{ model: "model-a", displayName: "A", efforts: ["low", "high"], defaultEffort: "low" }], modes: ["default", "plan"], fetchedAt: new Date().toISOString() };
 test("service tier and personality are capability-gated typed parameters, including explicit reset", () => {
@@ -48,4 +48,12 @@ test("observed settings only come from an actual model-bearing response", () => 
   assert.equal(actual?.effort, "high");
   assert.ok(actual?.observedAt);
   assert.equal(Object.hasOwn(actual!, "config"), false);
+});
+
+test("new panel turns explicitly leave native Plan without changing selected models or saved Plan", () => {
+  const observed = {model:"model-a",effort:"high",observedAt:new Date().toISOString()};
+  assert.deepEqual(resolveTurnMode(undefined,observed,undefined,"default",catalog),{model:"model-a",effort:"high",mode:"default"});
+  assert.deepEqual(resolveTurnMode({model:"model-a",effort:"low"},observed,undefined,"plan",catalog),{model:"model-a",effort:"low",mode:"plan"});
+  assert.throws(()=>resolveTurnMode(undefined,undefined,undefined,"default",catalog),{code:"CODEX_MODEL_UNRESOLVED"});
+  assert.throws(()=>resolveTurnMode(undefined,observed,undefined,"invented",catalog),{code:"CODEX_MODE_UNAVAILABLE"});
 });

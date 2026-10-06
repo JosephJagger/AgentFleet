@@ -36,12 +36,12 @@ test("five-layer field inheritance preserves independent fields, clears and revi
   assert.throws(() => service.read({...principal,workspaceId:"other"},"s1"),/not found/);
   assert.equal(service.readTarget({...principal,workspaceId:"other"},"workspace").desired,null);
 });
-test("legacy whole-group settings never acquire new global fields until restored to inheritance", t => {
+test("legacy model overrides inherit mode independently while other native fields stay unchanged", t => {
   const { db, service, principal } = fixture(t);
   db.run("INSERT INTO codex_preferences(workspace_id,scope,target_id,settings_json,revision,updated_at) VALUES(?,'machine','m',?,4,?)",principal.workspaceId,JSON.stringify({model:"a"}),new Date().toISOString());
   service.writeTarget(principal,"workspace",principal.workspaceId,{overrides:{model:"b",mode:"plan",effort:"high"},revision:0});
   const legacy = service.read(principal,"s1");
-  assert.deepEqual(legacy.desired,{model:"a"}); assert.equal(legacy.preferences.machine.overrides.mode,"__native__");
+  assert.deepEqual(legacy.desired,{model:"a",mode:"plan"}); assert.equal(legacy.preferences.machine.overrides.mode,undefined);
   service.writeTarget(principal,"machine","m",{overrides:{model:"a"},revision:4});
   assert.deepEqual(service.read(principal,"s1").desired,{model:"a",mode:"plan",effort:"high"});
 });
@@ -50,11 +50,11 @@ test("native value stops inheritance; missing or unsupported models are explicit
   service.writeTarget(principal,"workspace",principal.workspaceId,{overrides:{effort:"high"},revision:0});
   assert.ok(service.read(principal,"s1").resolutionIssue);
   db.run("UPDATE logical_sessions SET runtime_settings_json=? WHERE logical_session_id='s1'",JSON.stringify({observed:{model:"a",observedAt:new Date().toISOString()}}));
-  assert.deepEqual(service.read(principal,"s1").desired,{model:"a",effort:"high"});
+  assert.deepEqual(service.read(principal,"s1").desired,{model:"a",effort:"high",mode:"default"});
   service.write(principal,"s1",{scope:"session",overrides:{model:"unknown"},revision:0});
   assert.match(service.read(principal,"s1").compatibilityIssue!,/catalog/);
   service.write(principal,"s1",{scope:"session",overrides:{effort:"__native__"},revision:1});
-  assert.equal(service.read(principal,"s1").desired,null);
+  assert.deepEqual(service.read(principal,"s1").desired,{model:"a",mode:"default"});
   assert.throws(()=>parseFieldOverrides({mode:"invalid"})); assert.throws(()=>parseFieldOverrides({permissionProfile:"full"}));
 });
 test("workspace permissions are independent, confirmed, scoped and revisioned", t => {
@@ -76,11 +76,25 @@ test("schema 44 migration and reopen preserve legacy preferences and revisions",
   f.db.sqlite.exec("ALTER TABLE codex_preferences DROP COLUMN field_overrides_json; PRAGMA user_version=44");
   let migrated = f.reopen();
   let service = new CodexPreferencesService(migrated);
-  assert.deepEqual(service.read(f.principal,"s1").desired,{model:"a"});
+  assert.deepEqual(service.read(f.principal,"s1").desired,{model:"a",mode:"default"});
   assert.equal(service.read(f.principal,"s1").preferences.machine.revision,7);
   assert.equal(new PermissionPreferencesService(migrated).read(f.principal,"sessions","s1").profile,"network");
   service.writeTarget(f.principal,"workspace",f.principal.workspaceId,{overrides:{mode:"plan"},revision:0});
   migrated = f.reopen(); service = new CodexPreferencesService(migrated);
-  assert.deepEqual(service.read(f.principal,"s1").desired,{model:"a"});
+  assert.deepEqual(service.read(f.principal,"s1").desired,{model:"a",mode:"plan"});
   assert.equal(service.read(f.principal,"s1").preferences.workspace.overrides.mode,"plan");
+});
+
+test("default mode is explicit, native sentinels cannot retain stale Plan, and no model is invented", t => {
+  const { db, service, principal } = fixture(t);
+  const initial = service.read(principal,"s1");
+  assert.equal(initial.effective.mode,"default"); assert.equal(initial.sources.mode,"workspace");
+  assert.equal(initial.desired,null); assert.equal(initial.resolutionIssue,undefined);
+  db.run("UPDATE logical_sessions SET runtime_settings_json=? WHERE logical_session_id='s1'",JSON.stringify({observed:{model:"a",observedAt:new Date().toISOString()}}));
+  assert.deepEqual(service.read(principal,"s1").desired,{model:"a",mode:"default"});
+  service.writeTarget(principal,"workspace",principal.workspaceId,{overrides:{mode:"plan"},revision:0});
+  service.write(principal,"s1",{scope:"session",overrides:{model:"b",mode:"__native__"},revision:0});
+  assert.deepEqual(service.read(principal,"s1").desired,{model:"b",mode:"plan"});
+  service.write(principal,"s1",{scope:"session",overrides:{model:"b",mode:"default"},revision:1});
+  assert.equal(service.read(principal,"s1").desired?.mode,"default");
 });

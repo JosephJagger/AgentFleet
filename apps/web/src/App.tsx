@@ -755,6 +755,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const claudeEffort=claudePrefs.settings.effort ?? "";
   const claudePlan=claudePrefs.settings.mode === "plan";
   const [claudeSettingsOpen,setClaudeSettingsOpen]=useState(0);
+  const [modeSettingsRevision, setModeSettingsRevision] = useState(0);
   const [runtimeSummary, setRuntimeSummary] = useState<RuntimeSummary>();
   const [commandMessage, setCommandMessage] = useState("");
   const [rawView, setRawView] = useState(false);
@@ -1034,7 +1035,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
       <SessionConfiguration key={`config:${draftOwner}:${session.id}`} request={configuration} title={session.title} onClose={() => setConfiguration(undefined)}>
         {configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
-        {session.provider !== "claude" && <CodexSettingsPanel key={`${draftOwner}:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />}
+        {session.provider !== "claude" && <CodexSettingsPanel key={`${draftOwner}:${session.id}:${modeSettingsRevision}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />}
         {session.provider !== "claude" && <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />}
         <SessionWritingPreferencesPanel key={`writing:${draftOwner}:${session.id}`} settings={writingSettings} />
         {session.provider !== "claude" && <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
@@ -1054,7 +1055,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         {hasActiveTurn && <div className="composer-mode"><Activity size={14} />{t(session.provider === "claude" ? "Claude Code 正在处理：可排到下一轮" : "Codex 正在处理：可补充当前任务，或排到下一轮")}</div>}
         {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
 
-        {session.provider !== "claude" && <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} modeOverride={modeOverride === "plan" ? "plan" : undefined} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onClearMode={() => setModeOverride(undefined)} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>}
+        {session.provider !== "claude" && <RuntimeSettingsShortcut onModeSaved={session.collaborationModes?.includes("default") ? () => { setModeOverride(undefined); setModeSettingsRevision(n => n + 1); } : undefined} sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} modeOverride={modeOverride === "plan" ? "plan" : undefined} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onClearMode={() => setModeOverride(undefined)} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>}
         {referenceCards.length > 0 && <div className="session-reference-cards" aria-label={t("复用的会话")}>
           {referenceCards.map(card => { const source = card.identity; const candidate = referenceCandidates.find(item => item.id === card.sourceId); const failed = Boolean(card.error); return <article className="session-reference-card" key={card.key}>
             <div className="session-reference-card__head"><strong>{source?.title ?? candidate?.title ?? card.sourceId}</strong><button type="button" aria-label={t("删除引用卡片")} onClick={() => removeReference(card.key)}><X size={15} /></button></div>

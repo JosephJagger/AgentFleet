@@ -942,3 +942,9 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .codex-operations-panel dt small { display: block; font-weight: 400; opacity: .7; }
 .codex-operations-panel dd { margin: 4px 0 0; overflow-wrap: anywhere; }
 .codex-operations-panel input, .codex-operations-panel select { min-width: 0; max-width: 100%; }
+
+.runtime-mode-select { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:var(--text-caption); color:var(--muted); }
+.runtime-mode-select label { display:flex; align-items:center; gap:6px; }
+.runtime-mode-select select { width:auto; min-height:32px; padding:3px 24px 3px 8px; border:1px solid var(--line); border-radius:8px; color:inherit; background:var(--canvas); font:inherit; }
+.runtime-mode-select [role="alert"] { flex-basis:100%; }
+.runtime-observed-mode { color:var(--muted); font-size:var(--text-caption); }

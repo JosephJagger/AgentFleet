@@ -61,7 +61,7 @@ it("does not present a previous turn receipt or unbound observation as the curre
 it("hides duplicate follow-up settings and switches to send settings when the turn ends",()=>{
  const props={sessionId:"s",activeTurnId:"turn",summary:{sessionId:"s",settings:{model:"same-model",effort:"low"},changed:false,loaded:true},observed:{accepted:{nativeTurnId:"turn",acceptedAt:"2026-09-10T00:00:00Z",model:"same-model",effort:"low",mode:"default" as const}},onOpen:()=>{}};
  const view=render(<RuntimeSettingsShortcut {...props} running/>);
- expect(screen.queryByText("后续任务")).toBeNull();expect(screen.getByText("当前任务")).toBeTruthy();expect(screen.getByText("same-model · low · 默认模式")).toBeTruthy();
+ expect(screen.queryByText("后续任务")).toBeNull();expect(screen.getByText("当前任务")).toBeTruthy();expect(screen.getByText("same-model · low · 普通执行")).toBeTruthy();
  view.rerender(<RuntimeSettingsShortcut {...props} running={false}/>);
  expect(screen.getByText("发送使用")).toBeTruthy();expect(screen.queryByText("当前任务")).toBeNull();
 });
@@ -106,4 +106,21 @@ it("voice task uses only its bound native settings and never an old typed receip
  expect(screen.queryByText(/old-model/)).toBeNull();
  view.rerender(<RuntimeSettingsShortcut sessionId="s" running activeTurnId="different-turn" observed={observed} onOpen={()=>{}}/>);
  expect(screen.queryByText(/语音任务/)).toBeNull();
+});
+
+it("quick mode changes preserve the model and only affect future turns",async()=>{
+ const saved=vi.fn();
+ vi.mocked(api.codexPreferences).mockResolvedValue({...fixture,preferences:{...fixture.preferences,session:{settings:null,overrides:{model:"example-model",effort:"high"},revision:4}}});
+ vi.mocked(api.saveRuntimePreferences).mockResolvedValue(fixture);
+ render(<RuntimeSettingsShortcut sessionId="s" running activeTurnId="turn" summary={{sessionId:"s",loaded:true,changed:false,mode:"plan",modeSource:"workspace",settings:{model:"example-model",mode:"plan"}}} observed={{accepted:{model:"example-model",mode:"plan",nativeTurnId:"turn",acceptedAt:"2026-10-06T00:00:00Z"}}} onOpen={()=>{}} onModeSaved={saved}/>);
+ expect(screen.getByText("下一轮模式")).toBeTruthy();expect(screen.getByText("统一默认")).toBeTruthy();
+ fireEvent.change(screen.getByRole("combobox",{name:"切换协作模式"}),{target:{value:"default"}});
+ await waitFor(()=>expect(api.saveRuntimePreferences).toHaveBeenCalledWith("session","s",{scope:"session",overrides:{model:"example-model",effort:"high",mode:"default"},revision:4}));
+ await waitFor(()=>expect(saved).toHaveBeenCalledOnce());
+ expect(screen.getByText(/example-model · 强度未确认 · 计划模式/)).toBeTruthy();
+});
+it("an unknown native mode is not shown as confirmed execution",()=>{
+ render(<RuntimeSettingsShortcut sessionId="s" running={false} summary={{sessionId:"s",loaded:true,changed:false,mode:"default"}} observed={{observed:{model:"example-model",observedAt:"2026-10-06T00:00:00Z"}}} onOpen={()=>{}} onModeSaved={()=>{}}/>);
+ expect(screen.getByText("上次模式：模式未确认")).toBeTruthy();
+ expect((screen.getByRole("combobox",{name:"切换协作模式"}) as HTMLSelectElement).value).toBe("default");
 });

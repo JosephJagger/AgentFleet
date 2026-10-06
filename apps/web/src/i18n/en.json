@@ -2954,5 +2954,14 @@
   "最近 7 天暂无已分析帖子": "No analyzed posts in the last 7 days",
   "消息时间轴分页": "Message timeline pages",
   "历史消息": "Historical message",
-  "此版本此前在这台主机上安装失败，已暂停重复尝试；请查看首次失败原因并等待修正版。": "this release previously failed on this host; waiting for a corrected release"
+  "此版本此前在这台主机上安装失败，已暂停重复尝试；请查看首次失败原因并等待修正版。": "this release previously failed on this host; waiting for a corrected release",
+  "选择默认模型和回复方式；协作模式默认普通执行，其余留空使用 Codex 自身配置。": "Choose default models and response settings. Collaboration defaults to execution; other empty fields use native Codex settings.",
+  "普通执行（默认）": "Execution (default)",
+  "普通执行": "Execution",
+  "规划模式": "Plan mode",
+  "下一轮模式": "Next turn mode",
+  "发送模式": "Send mode",
+  "切换协作模式": "Switch collaboration mode",
+  "恢复继承模式": "Inherit mode",
+  "上次模式：{0}": "Last observed mode: {0}"
 }

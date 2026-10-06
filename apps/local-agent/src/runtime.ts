@@ -35,7 +35,7 @@ import { CatalogSyncScheduler, CodexCatalogWatcher, ClaudeCatalogWatcher, CATALO
 import { detectHostCodex } from "./host-codex.js";
 import { refreshEnvironmentChecks } from "./platform.js";
 import { check } from "./preflight.js";
-import { settingsAfterPlan, validateSettings } from "./codex-settings.js";
+import { resolveTurnMode, validateSettings } from "./codex-settings.js";
 import { inputAnswers, inputQuestions } from "./user-input.js";
 import type { MachineIdentity } from "./identity.js";
 import { addProjectFromPanel, discoverProjectFromCwd, projectById, verifyProjectIdentity, verifySessionCwd } from "./projects.js";
@@ -1699,7 +1699,7 @@ export class AgentRuntime {
           await this.syncManagedHistory(thread, resumed.history, false);
         }
         if (thread.activeTurnId !== undefined) throw new AgentError("THREAD_BUSY", "thread still has an active turn");
-        const turnSettings = isClaudeProject(project) ? settings : nativeAction ? settings : settingsAfterPlan(settings, thread.acceptedSettings, server.getCodexCatalog?.());
+        const turnSettings = isClaudeProject(project) ? settings : nativeAction ? settings : resolveTurnMode(settings, thread.observedSettings, thread.acceptedSettings, command.payload.resolvedMode, server.getCodexCatalog?.());
         const clientUserMessageId = optionalString(command.payload.clientUserMessageId, "payload.clientUserMessageId");
         const materialized = nativeAction ? [] : await materializeAttachments(project, command.commandId, rawAttachments);
         const referenced = referenceInputs(prompt, materialized);

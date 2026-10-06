@@ -84,6 +84,16 @@ export function settingsAfterPlan(settings: CodexSettings | undefined, previous:
   return validateSettings({ ...base, mode: "default" }, catalog);
 }
 
+/** Resolve a new panel turn after native thread creation/resume; never guess a model. */
+export function resolveTurnMode(settings: CodexSettings | undefined, observed: CodexObservedSettings | undefined, previous: CodexSettings | undefined, mode: unknown, catalog: CodexCatalog | undefined): CodexSettings | undefined {
+  // Previously queued commands retain their original semantics.
+  if (mode === undefined) return settingsAfterPlan(settings, previous, catalog);
+  if (mode !== "default" && mode !== "plan") throw new AgentError("CODEX_MODE_UNAVAILABLE", "Invalid resolved collaboration mode");
+  const base = settings ?? (observed ? { model: observed.model, ...(observed.effort ? { effort: observed.effort } : {}) } : previous);
+  if (!base) throw new AgentError("CODEX_MODEL_UNRESOLVED", "原生模型尚未上报；请选择模型或等待主机同步后再发送。");
+  return validateSettings({ ...base, mode }, catalog);
+}
+
 export function turnSettingsParams(settings: CodexSettings | undefined): Record<string, unknown> {
   if (!settings) return {};
   return { model: settings.model, ...(settings.effort ? { effort: settings.effort } : {}),

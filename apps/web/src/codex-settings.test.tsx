@@ -31,9 +31,9 @@ it("distinguishes inherited, native and explicit default tier clearing",async()=
   vi.mocked(api.saveRuntimePreferences).mockResolvedValue(fixture);
   render(<CodexSettingsPanel sessionId="s"/>);fireEvent.click(screen.getByText("运行配置"));await screen.findByLabelText("服务档位");
   fireEvent.change(screen.getByLabelText("服务档位"),{target:{value:"__clear__"}});
-  fireEvent.change(screen.getByLabelText("协作模式"),{target:{value:"__native__"}});
+  fireEvent.change(screen.getByLabelText("协作模式"),{target:{value:"default"}});
   fireEvent.click(screen.getByRole("button",{name:"保存配置"}));
-  await waitFor(()=>expect(api.saveRuntimePreferences).toHaveBeenCalledWith("session","s",{scope:"session",overrides:{serviceTier:null,mode:"__native__"},revision:0}));
+  await waitFor(()=>expect(api.saveRuntimePreferences).toHaveBeenCalledWith("session","s",{scope:"session",overrides:{serviceTier:null,mode:"default"},revision:0}));
 });
 it("editing project settings does not copy the session override into the project",async()=>{
   vi.mocked(api.codexPreferences).mockResolvedValue({...fixture,preferences:{...fixture.preferences,session:{settings:null,overrides:{effort:"high"},revision:3}}});

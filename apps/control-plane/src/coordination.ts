@@ -527,7 +527,7 @@ export class CoordinationService {
     invariant(typeof input.clientMutationId === "string" && input.clientMutationId.length >= 8 && input.clientMutationId.length <= 200, 400, "INVALID_MUTATION_ID", "clientMutationId is invalid");
     const precondition = { ...ensureRecord(input.precondition, "precondition must be an object") };
     const payload = { ...ensureRecord(input.payload, "payload must be an object") };
-    invariant(!Object.hasOwn(payload, "permissionProfile") && !Object.hasOwn(payload, "permissionSource") && !Object.hasOwn(payload, "sessionTitle"), 400, "SERVER_SETTINGS_ONLY", "Permissions and native title are resolved by the control plane");
+    invariant(!Object.hasOwn(payload, "resolvedMode") && !Object.hasOwn(payload, "permissionProfile") && !Object.hasOwn(payload, "permissionSource") && !Object.hasOwn(payload, "sessionTitle"), 400, "SERVER_SETTINGS_ONLY", "Permissions and native title are resolved by the control plane");
     const computedHash = hashPayload({ type: input.type, precondition, payload });
     invariant(!input.payloadHash || input.payloadHash === computedHash, 400, "PAYLOAD_HASH_MISMATCH", "payloadHash does not match the canonical command body", { computedHash });
 
@@ -545,10 +545,14 @@ export class CoordinationService {
       }
 
       const session = this.commandSession(principal, logicalSessionId);
-      if (session.provider !== "claude" && (input.type === "turn.start" || input.type === "turn.queue") && payload.settings === undefined) {
+      if (session.provider !== "claude" && (input.type === "turn.start" || input.type === "turn.queue")) {
         const preferences = new CodexPreferencesService(this.db).read(principal, logicalSessionId);
-        invariant(!preferences.resolutionIssue, 409, "CODEX_MODEL_UNRESOLVED", preferences.resolutionIssue ?? "Model unavailable");
-        if (preferences.desired) payload.settings = validateCodexSettings(preferences.desired, preferences.catalog);
+        payload.resolvedMode = (payload.settings as {mode?: string} | undefined)?.mode ?? preferences.effective.mode;
+        if (payload.settings === undefined) {
+          invariant(!preferences.resolutionIssue, 409, "CODEX_MODEL_UNRESOLVED", preferences.resolutionIssue ?? "Model unavailable");
+          if (preferences.desired) payload.settings = validateCodexSettings(preferences.desired, preferences.catalog);
+        }
+        if (payload.settings) payload.settings = { ...payload.settings as Record<string, unknown>, mode: payload.resolvedMode };
       }
       if(session.provider === "claude" && (input.type === "turn.start" || input.type === "turn.queue") && payload.settings === undefined){
         const saved=new ClaudePreferencesService(this.db).read(principal,logicalSessionId);

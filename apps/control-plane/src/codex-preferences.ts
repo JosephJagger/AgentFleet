@@ -49,10 +49,13 @@ export class CodexPreferencesService {
       // Legacy whole-group overrides pin missing fields to native, preserving behavior.
       const overrides = row?.field_overrides_json ? JSON.parse(row.field_overrides_json) as FieldOverrides : settings
         ? Object.fromEntries(settingFields.map(f => [f, settings[f] === undefined ? native : settings[f]])) as FieldOverrides : {};
+      // Missing/legacy-native mode inherits independently of the model.
+      if (overrides.mode === native) delete overrides.mode;
       return [s, { settings, overrides, revision: row?.revision ?? 0 }];
     })) as Record<SettingsScope, Preference>;
     const sources = Object.fromEntries(settingFields.map(f => [f, "codex"])) as Record<typeof settingFields[number], SettingsScope | "codex">;
-    const effective: FieldOverrides = {};
+    const effective: FieldOverrides = { mode: "default" };
+    sources.mode = "workspace";
     let source: SettingsScope | "codex" = "codex";
     for (const s of scopes) for (const f of settingFields) if (preferences[s].overrides[f] !== undefined) {
       effective[f] = preferences[s].overrides[f]; sources[f] = s; source = s;
@@ -65,7 +68,7 @@ export class CodexPreferencesService {
       const runtime = targets.runtime ? JSON.parse(targets.runtime) : null;
       const current = runtime?.accepted && (!runtime.observed || Date.parse(runtime.accepted.acceptedAt) > Date.parse(runtime.observed.observedAt)) ? runtime.accepted : runtime?.observed;
       if (current?.model) values.model = current.model;
-      else resolutionIssue = "原生模型尚未上报；请选择模型或等待主机同步后再发送。";
+      else if (Object.keys(values).some(field => field !== "mode")) resolutionIssue = "原生模型尚未上报；请选择模型或等待主机同步后再发送。";
     }
     const desired = values.model ? values as unknown as CodexSettings : null;
     let compatibilityIssue = resolutionIssue;
