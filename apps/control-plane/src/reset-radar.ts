@@ -114,6 +114,9 @@ export class ResetRadar {
     const retainedPosts = this.snapshot.posts.filter(p => retained(p.post, now));
     if (retainedPosts.length !== this.snapshot.posts.length) { this.snapshot.posts = retainedPosts; this.save(); }
   }
+  private paused(now: number): boolean {
+    return this.snapshot.pauseDay === day(now) && this.latest(now) !== null;
+  }
   start() {
     if (this.timer || !this.token || !this.aiKey) return;
     void this.refresh(); this.timer = setInterval(() => void this.refresh(), 60_000); this.timer.unref();
@@ -122,7 +125,7 @@ export class ResetRadar {
   status(now = this.now()): RadarStatus {
     this.prune(now);
     const configured = Boolean(this.token && this.aiKey), s = this.snapshot;
-    const next = s.pauseDay === day(now) ? (day(now) + 1) * DAY - 8 * HOUR : s.lastAttempt + HOUR;
+    const next = this.paused(now) ? (day(now) + 1) * DAY - 8 * HOUR : s.lastAttempt + HOUR;
     return { state: !configured ? "unconfigured" : s.error ? "error" : s.checkedAt ? "ready" : "pending",
       checkedAt: s.checkedAt ? new Date(s.checkedAt).toISOString() : null,
       nextCheckAt: configured ? new Date(Math.max(now, next)).toISOString() : null,
@@ -132,7 +135,7 @@ export class ResetRadar {
   refresh(now = this.now()): Promise<void> {
     this.prune(now);
     if (this.pending) return this.pending;
-    if (!this.token || !this.aiKey || this.controller.signal.aborted || this.snapshot.pauseDay === day(now) ||
+    if (!this.token || !this.aiKey || this.controller.signal.aborted || this.paused(now) ||
       now - this.snapshot.lastAttempt < HOUR) return Promise.resolve();
     this.pending = this.collect(now).catch(() => {
       this.snapshot.error = "重置信号采集或分析失败，将于下一小时重试";

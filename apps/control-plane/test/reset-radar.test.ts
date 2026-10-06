@@ -63,3 +63,27 @@ test("historical signals survive midnight and restart but never extend predictio
   const n=calls;now+=hour;await restarted.refresh();assert.equal(calls,n+1,"expired historical signal does not pause the hourly poll or reanalyze");
  } finally {rmSync(dir,{recursive:true,force:true});}
 });
+
+test("expired signal releases a same-day pause and collects new posts",async()=>{
+ let now=Date.parse("2026-09-29T16:01:00Z"),sourceCalls=0;
+ const old={...post,created_at:new Date(now-23*hour).toISOString()};
+ const recent={...post,id:"456",text:"New features",created_at:new Date(now+2*hour).toISOString()};
+ const fetcher=(async(url:string|URL|Request)=>{
+  if(String(url).includes("tikhub")){sourceCalls++;const p=sourceCalls===1?old:recent;return Response.json({code:200,data:{timeline:[{...p,tweet_id:p.id,author:{screen_name:"thsottiaux"}}]}});}
+  const result=sourceCalls===1?{id:old.id,signal:"announced",evidence:old.text,summary:"宣布重置"}:{id:recent.id,signal:"none",summary:"介绍新功能"};
+  return Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:[result]})}}]});
+ }) as typeof fetch;
+ const radar=new ResetRadar({token:"test",aiKey:"test",fetcher,now:()=>now});await radar.refresh();
+ now+=2*hour;await radar.refresh();assert.equal(sourceCalls,2);assert.equal(radar.status().timeline.length,2);
+ assert.equal(await radar.read("account",{remainingPercent:20,resetCardsAvailable:0}),null);
+});
+
+test("persisted pause without its signal cannot block collection",async()=>{
+ const dir=mkdtempSync(join(tmpdir(),"radar-stale-pause-"));
+ try {
+  const {writeFileSync}=await import("node:fs");const path=join(dir,"state.json");
+  writeFileSync(path,JSON.stringify({version:1,lastAttempt:initial-2*hour,checkedAt:initial-2*hour,pauseDay:Math.floor((initial+8*hour)/(24*hour)),callDay:0,calls:0,error:null,posts:[],seen:[],accounts:{}}));
+  let calls=0;const radar=new ResetRadar({token:"test",aiKey:"test",statePath:path,now:()=>initial,fetcher:(async()=>{calls++;return Response.json({code:200,data:{timeline:[]}});}) as typeof fetch});
+  await radar.refresh();assert.equal(calls,1);assert.equal(radar.status().checkedAt,new Date(initial).toISOString());
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
