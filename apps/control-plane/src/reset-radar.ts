@@ -24,6 +24,7 @@ interface Account { remainingPercent: number; resetCardsAvailable: number | null
 interface AccountState { baseline: Account; suppressed: string[] }
 interface CachedPost { post: RadarPost; summary: string; analyzed: boolean; prediction: ResetPrediction | null }
 interface Snapshot {
+  historyBackfilled?: boolean;
   version: 1; lastAttempt: number; checkedAt: number; pauseDay: number | null;
   callDay: number; calls: number; error: string | null;
   posts: CachedPost[]; seen: string[]; accounts: Record<string, AccountState>;
@@ -120,7 +121,7 @@ export class ResetRadar {
   }
   start() {
     if (this.timer || !this.token || !this.aiKey) return;
-    void this.refresh(); this.timer = setInterval(() => void this.refresh(), 60_000); this.timer.unref();
+    void this.refresh(this.now(), !this.snapshot.historyBackfilled && !this.snapshot.error); this.timer = setInterval(() => void this.refresh(), 60_000); this.timer.unref();
   }
   async stop() { if (this.timer) clearInterval(this.timer); this.controller.abort(); await this.pending; }
   status(now = this.now()): RadarStatus {
@@ -133,11 +134,11 @@ export class ResetRadar {
       message: !configured ? "重置信号数据源尚未配置" : s.error, dailyCalls: s.callDay === day(now) ? s.calls : 0,
       timeline: s.posts.filter(p => p.analyzed).map(p => ({ id: p.post.id, publishedAt: p.post.created_at, summary: p.summary, signal: p.prediction?.signal ?? "none", ...(p.prediction?.condition ? { condition: p.prediction.condition } : {}), sourceUrl: `https://x.com/thsottiaux/status/${p.post.id}` })) };
   }
-  refresh(now = this.now()): Promise<void> {
+  refresh(now = this.now(), backfill = false): Promise<void> {
     this.prune(now);
     if (this.pending) return this.pending;
     if (!this.token || !this.aiKey || this.controller.signal.aborted ||
-      now - this.snapshot.lastAttempt < HOUR) return Promise.resolve();
+      (now - this.snapshot.lastAttempt < HOUR && !backfill)) return Promise.resolve();
     this.pending = this.collect(now).catch(() => {
       this.snapshot.error = "重置信号采集或分析失败，将于下一小时重试";
       try { this.save(); } catch { /* Status remains visible; never expose provider bodies or secrets. */ }
@@ -164,6 +165,7 @@ export class ResetRadar {
     const seenCursors = new Set<string>();
     const previous = new Map(s.posts.map(p => [p.post.id, p]));
     const received = new Map<string, RadarPost>();
+    const backfill = !s.historyBackfilled;
     // Normal poll: one page. At most five pages to bridge a gap / bootstrap 100 posts.
     for (let page = 0; page < 5 && received.size < 100; page++) {
       if (s.calls >= 48) throw new Error("Daily collection budget reached");
@@ -172,18 +174,18 @@ export class ResetRadar {
       url.searchParams.set("screen_name", "thsottiaux"); if (cursor) url.searchParams.set("cursor", cursor);
       const result = parseTikHub(await this.json(url.href, { headers: { Authorization: `Bearer ${this.token}` } }, 45_000, 3_000_000));
       for (const post of result.posts) received.set(post.id, post);
-      const caughtUp = result.posts.some(p => s.seen.includes(p.id));
-      const oldPage = result.posts.length > 0 && result.posts.every(p => !fresh(p, now));
+      const caughtUp = result.posts.some(p => backfill ? previous.has(p.id) : s.seen.includes(p.id));
+      const oldPage = result.posts.length > 0 && result.posts.every(p => !(backfill ? retained(p, now) : fresh(p, now)));
       cursor = result.cursor;
-      if (caughtUp || oldPage || !cursor || seenCursors.has(cursor)) break;
+      if ((!backfill && caughtUp) || oldPage || !cursor || seenCursors.has(cursor)) break;
       seenCursors.add(cursor);
     }
     for (const post of received.values()) {
-      if (fresh(post, now) && !s.seen.includes(post.id) && !previous.has(post.id)) previous.set(post.id, { post, summary: "", analyzed: false, prediction: null });
+      if ((backfill ? retained(post, now) : fresh(post, now)) && (backfill || !s.seen.includes(post.id)) && !previous.has(post.id)) previous.set(post.id, { post, summary: "", analyzed: false, prediction: null });
     }
     s.posts = [...previous.values()].filter(p => retained(p.post, now)).sort((a,b) => Date.parse(b.post.created_at) - Date.parse(a.post.created_at));
     this.save();
-    const unprocessed = s.posts.filter(p => !p.analyzed && fresh(p.post, now));
+    const unprocessed = s.posts.filter(p => !p.analyzed && (backfill ? retained(p.post, now) : fresh(p.post, now)));
     for (let start = 0; start < unprocessed.length; start += 20) {
       const batch = unprocessed.slice(start, start + 20), posts = batch.map(p => p.post);
       const raw = object(await this.json("https://api.deepseek.com/chat/completions", {
@@ -206,6 +208,7 @@ export class ResetRadar {
       s.seen = [...new Set(s.seen)].slice(-10000);
       this.save();
     }
+    s.historyBackfilled = true;
     s.checkedAt = now; s.error = null;
     s.pauseDay = null; // Ignore legacy daily pauses; continue hourly collection after every signal.
     this.save();

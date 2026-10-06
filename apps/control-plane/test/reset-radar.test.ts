@@ -106,3 +106,15 @@ test("card grants and quota restoration suppress only their matching announcemen
   assert.equal(quota===null,signal==="announced");assert.equal(card===null,signal==="card-announced");
  }
 });
+
+test("one-time history backfill restores missing analyzed IDs then resumes hourly dedup",async()=>{
+ const dir=mkdtempSync(join(tmpdir(),"radar-backfill-"));let now=initial,source=0,analysis=0;
+ try {
+  const {writeFileSync}=await import("node:fs");const path=join(dir,"state.json");
+  writeFileSync(path,JSON.stringify({version:1,lastAttempt:0,checkedAt:0,pauseDay:null,callDay:0,calls:0,error:null,posts:[],seen:[post.id],accounts:{}}));
+  const old={...payload,data:{timeline:[{...payload.data.timeline[0],created_at:new Date(initial-3*24*hour).toISOString()}]}};
+  const fetcher=(async(url:string|URL|Request)=>{if(String(url).includes("tikhub")){source++;return Response.json(old);}analysis++;return Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:[{id:post.id,signal:"none",summary:"历史消息"}]})}}]});}) as typeof fetch;
+  const options={token:"t",aiKey:"t",statePath:path,fetcher,now:()=>now};const radar=new ResetRadar(options);await radar.refresh();assert.equal(radar.status().timeline.length,1);assert.equal(analysis,1);
+  now+=hour;const restarted=new ResetRadar(options);await restarted.refresh();assert.equal(source,2);assert.equal(analysis,1);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
