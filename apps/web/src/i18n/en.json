@@ -2953,5 +2953,6 @@
   "最近 7 天 · 最新在上": "Last 7 days · Newest first",
   "最近 7 天暂无已分析帖子": "No analyzed posts in the last 7 days",
   "消息时间轴分页": "Message timeline pages",
-  "历史消息": "Historical message"
+  "历史消息": "Historical message",
+  "此版本此前在这台主机上安装失败，已暂停重复尝试；请查看首次失败原因并等待修正版。": "this release previously failed on this host; waiting for a corrected release"
 }

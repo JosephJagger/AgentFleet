@@ -41,6 +41,16 @@ function Invoke-AgentFleetWebRequest([string]$Uri, [string]$OutFile) {
   Invoke-WebRequest @parameters
 }
 function Register-AgentFleetUpdateHandoff {
+  # Modern workers already have a persistent supervisor. It reloads the stable
+  # launcher after exit 75, verifies the new worker, and rolls back on failure.
+  # Do not require task-registration privileges for this normal update path.
+  if ($env:AGENTFLEET_SUPERVISED -eq '1' -and
+      $env:AGENTFLEET_SUPERVISOR_TOKEN -and
+      $env:AGENTFLEET_WORKER_DATA_DIR -eq $StateRoot -and
+      $env:AGENTFLEET_WORKER_EXECUTABLE -eq $StableLauncher) {
+    Write-Host 'The existing AgentFleet supervisor will restart and verify the staged worker.'
+    return
+  }
   # An older task wrapper may exit after this installer returns. Keep the
   # handoff independent of that wrapper until the new worker verifies itself.
   # A single Start-ScheduledTask can be ignored while the old task is still

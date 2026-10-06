@@ -5,6 +5,14 @@ import { join } from "node:path";
 import test from "node:test";
 import { AgentAutoUpdater, clearCompletedAgentUpdateDrain, compareReleaseVersions, stageAgentUpdate, windowsUpdateRestartScript } from "../src/updater.js";
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+test("Windows supervised staging does not require scheduled-task registration privileges", { skip: process.platform !== "win32" }, () => {
+  const script = fileURLToPath(new URL("../../../../packaging/test-windows-update-handoff.ps1", import.meta.url));
+  const result = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script], { encoding: "utf8", windowsHide: true });
+  assert.match(result, /PASS: supervised update avoids registration/);
+});
 
 test("Windows update handoff retries the background task after the current task exits", () => {
   const script=windowsUpdateRestartScript();
