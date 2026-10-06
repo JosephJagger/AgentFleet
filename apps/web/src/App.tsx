@@ -586,12 +586,12 @@ function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; se
   );
 }
 
-function ApprovalCard({ approval, onDecide, busy }: { approval: Approval; onDecide: (decision: "accept" | "decline") => void; busy: boolean }) {
+function ApprovalCard({ approval, provider, onDecide, busy }: { approval: Approval; provider?: string; onDecide: (decision: "accept" | "decline") => void; busy: boolean }) {
   return (
     <section className={`approval-card approval-card--${approval.risk}`}>
       <div className="approval-card__head">
         <span className="approval-icon"><KeyRound size={18} /></span>
-        <div><div className="eyebrow">{t("Codex 需要你确认")}</div><h3>{approval.summary}</h3></div>
+        <div><div className="eyebrow">{t("{0} 需要你确认", agentName(provider))}</div><h3>{approval.summary}</h3></div>
         <span className={`risk-label risk-label--${approval.risk}`}>{approval.risk === "high" ? t("高风险") : approval.risk === "medium" ? t("需确认") : t("低风险")}</span>
       </div>
       <dl className="approval-context">
@@ -1016,7 +1016,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
       <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? detail.events : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}</ConversationViewport>
       {approval?.status === "pending" && (approval.type === "user_input"
         ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} onChanged={onRefresh} />
-        : <ApprovalCard approval={approval} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
+        : <ApprovalCard approval={approval} provider={session.provider} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
       <OperationReceipts commands={detail.commands ?? []} mode="outstanding" />
       {(detail.session.state.unknownFreeze || (detail.commands ?? []).some(command => command.state === "unknown")) && <CommandRecovery key={`recovery:${draftOwner}:${session.machineId}`} machineId={session.machineId} online={session.state.reachability === "live"} supported={detail.commandRecoverySupported === true} onChanged={onRefresh} />}
       {detail.queue.some((item) => item.state === "queued" || item.state === "dispatching" || item.state === "unknown") && (
