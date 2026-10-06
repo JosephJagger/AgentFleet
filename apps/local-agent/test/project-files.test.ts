@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -57,4 +57,49 @@ test("rejects paths outside the bound project, including an in-project symlink",
   await assert.rejects(streamProjectFile(store, { logicalSessionId: "logical", projectId: project.id, path: "../secret.txt" }, callbacks), (error: unknown) => (error as { code?: string }).code === "FILE_OUTSIDE_PROJECT");
   await assert.rejects(streamProjectFile(store, { logicalSessionId: "logical", projectId: project.id, path: link }, callbacks), (error: unknown) => (error as { code?: string }).code === "FILE_OUTSIDE_PROJECT");
   await assert.rejects(streamProjectFile(store, { logicalSessionId: "another", projectId: project.id, path: link }, callbacks), (error: unknown) => (error as { code?: string }).code === "FILE_SESSION_BINDING_INVALID");
+});
+
+test("downloads only native images belonging to the bound Codex thread", async (t) => {
+  const { directory, store, project } = await fixture(t);
+  const threadId = "01a10f43-0761-7b51-b9ce-d3308bd28d99";
+  const thread = store.snapshot().managedThreads.native!;
+  await store.setManagedThread({ ...thread, nativeThreadId: threadId, logicalSessionId: "images" });
+  const home = join(directory, "custom-codex-home");
+  const images = join(home, "generated_images", threadId);
+  await mkdir(images, { recursive: true });
+  const png = Buffer.from("89504e470d0a1a0a00000000", "hex");
+  const path = join(images, "exec-image.png");
+  await writeFile(path, png);
+  const received: Buffer[] = [];
+  const callbacks = { signal: new AbortController().signal, onStart() {}, onChunk(chunk: Buffer) { received.push(chunk); } };
+  const request = { logicalSessionId: "images", projectId: project.id, path };
+  await streamProjectFile(store, request, callbacks, home);
+  assert.deepEqual(Buffer.concat(received), png);
+  const rejected = (candidate: string, session = "images") => assert.rejects(
+    streamProjectFile(store, { ...request, path: candidate, logicalSessionId: session }, callbacks, home),
+    (error: unknown) => (error as { code?: string }).code === "FILE_OUTSIDE_PROJECT",
+  );
+  await rejected(path, "logical");
+  const fake = join(images, "secret.png");
+  await writeFile(fake, "not an image");
+  await rejected(fake);
+  const other = join(home, "generated_images", "01a10f43-0761-7b51-b9ce-d3308bd28d98");
+  await mkdir(other);
+  await writeFile(join(other, "other.png"), png);
+  await symlink(join(other, "other.png"), join(images, "linked.png"));
+  await rejected(join(images, "linked.png"));
+  await rejected(join(other, "other.png"));
+  await writeFile(join(home, "auth.json"), "secret");
+  await rejected(join(home, "auth.json"));
+  await link(path, join(images, "hardlink.png"));
+  await rejected(join(images, "hardlink.png"));
+  await rm(join(images, "hardlink.png"));
+  const moved = join(directory, "redirected");
+  await rename(images, moved);
+  await symlink(moved, images);
+  await rejected(path);
+  await rm(images);
+  await rename(moved, images);
+  await store.update(state => { state.projects[0]!.provider = "claude"; });
+  await rejected(path);
 });

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { open, realpath } from "node:fs/promises";
-import { basename, isAbsolute, resolve } from "node:path";
+import { homedir } from "node:os";
+import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { AgentError } from "./errors.js";
 import { projectById, verifyProjectIdentity } from "./projects.js";
 import type { StateStore } from "./store.js";
@@ -20,6 +21,27 @@ export interface ProjectFileMetadata {
   size: number;
 }
 
+// This exception is deliberately tied to the native thread, not to arbitrary
+// links in assistant text. The runtime profile configures CODEX_HOME at startup.
+async function isSessionGeneratedImage(path: string, threadId: string, codexHome: string): Promise<boolean> {
+  if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(threadId)) return false;
+  const home = await realpath(codexHome).catch(() => undefined);
+  if (!home) return false;
+  const expected = join(home, "generated_images", threadId);
+  const canonicalRoot = await realpath(expected).catch(() => undefined);
+  // Reject redirected generated_images/thread directories and cross-thread links.
+  return canonicalRoot === expected && dirname(path) === expected;
+}
+
+function hasImageSignature(bytes: Buffer, filename: string): boolean {
+  switch (extname(filename).toLowerCase()) {
+    case ".png": return bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"));
+    case ".jpg": case ".jpeg": return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    case ".webp": return bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
+    default: return false;
+  }
+}
+
 /** Read one regular file through its already-authorized Session and Project binding. */
 export async function streamProjectFile(
   store: StateStore,
@@ -29,6 +51,7 @@ export async function streamProjectFile(
     onStart(metadata: ProjectFileMetadata): void | Promise<void>;
     onChunk(chunk: Buffer, sequence: number): void | Promise<void>;
   },
+  codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex"),
 ): Promise<{ sha256: string; size: number; chunks: number }> {
   const state = store.snapshot();
   const thread = Object.values(state.managedThreads).find(
@@ -43,7 +66,8 @@ export async function streamProjectFile(
   const canonical = await realpath(requested).catch(() => {
     throw new AgentError("FILE_NOT_FOUND", "File was not found on the host");
   });
-  if (!isPathInside(project.root, canonical)) {
+  const generatedImage = !isPathInside(project.root, canonical);
+  if (generatedImage && (project.provider === "claude" || !await isSessionGeneratedImage(canonical, thread.nativeThreadId, codexHome))) {
     throw new AgentError("FILE_OUTSIDE_PROJECT", "File is outside the Session Project");
   }
 
@@ -56,6 +80,13 @@ export async function streamProjectFile(
     const before = await handle.stat();
     if (!before.isFile()) throw new AgentError("FILE_NOT_REGULAR", "Only regular files can be previewed or downloaded");
     if (before.size > MAX_PROJECT_FILE_BYTES) throw new AgentError("FILE_TOO_LARGE", "File exceeds the 50 MB transfer limit");
+    if (generatedImage) {
+      const header = Buffer.alloc(12);
+      await handle.read(header, 0, header.length, 0);
+      if (before.nlink !== 1 || !hasImageSignature(header, canonical)) {
+        throw new AgentError("FILE_OUTSIDE_PROJECT", "Only this Session's generated images can be downloaded outside its Project");
+      }
+    }
     await callbacks.onStart({ filename: basename(canonical), size: before.size });
     const hash = createHash("sha256");
     const buffer = Buffer.allocUnsafe(PROJECT_FILE_CHUNK_BYTES);
