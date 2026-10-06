@@ -2949,5 +2949,9 @@
   "仅展示前 {0} 项，总占用已包含全部目录。": "Showing the first {0} entries. Totals include all directories.",
   "上次获取的官方稳定版": "Last observed official stable release",
   "检查服务离线，等待恢复": "Check service offline · Waiting to reconnect",
-  "一键清理": "Clean up"
+  "一键清理": "Clean up",
+  "最近 7 天 · 最新在上": "Last 7 days · Newest first",
+  "最近 7 天暂无已分析帖子": "No analyzed posts in the last 7 days",
+  "消息时间轴分页": "Message timeline pages",
+  "历史消息": "Historical message"
 }

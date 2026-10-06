@@ -15,7 +15,7 @@ test("trusted source and evidence; unknown reset time remains unknown",()=>{
  assert.equal(parseAnalysis(result,[post],initial).get("123")?.expectedAt,null);
  assert.throws(()=>parseAnalysis({results:[{...result.results[0],evidence:"invented evidence"}]},[post],initial));
 });
-test("persistent dedup, hourly collection, 24h retention and newest-first timeline",async()=>{
+test("persistent dedup, hourly collection, 7-day retention and newest-first timeline",async()=>{
  const dir=mkdtempSync(join(tmpdir(),"radar-")); let now=initial, sourceCalls=0, analysisCalls=0;
  const fetcher=(async (url: string|URL|Request)=>{
   if(String(url).includes("tikhub")){sourceCalls++;return Response.json(payload);}
@@ -27,7 +27,8 @@ test("persistent dedup, hourly collection, 24h retention and newest-first timeli
  assert.equal(sourceCalls,1);assert.equal(analysisCalls,1); assert.equal(radar.status().timeline.length,1);
  now+=hour;await radar.refresh();assert.equal(sourceCalls,2);assert.equal(analysisCalls,1);
  const restarted=new ResetRadar(options);await restarted.refresh();assert.equal(sourceCalls,2);
- now+=24*hour;await restarted.refresh();assert.equal(restarted.status().timeline.length,0);assert.equal(analysisCalls,1);
+ now+=24*hour;await restarted.refresh();assert.equal(restarted.status().timeline.length,1);assert.equal(analysisCalls,1);
+ now=Date.parse(post.created_at)+7*24*hour;await restarted.refresh();assert.equal(restarted.status().timeline.length,0);assert.equal(analysisCalls,1);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
 test("signal pauses collection until Beijing next day; quota is read-only",async()=>{
@@ -48,4 +49,17 @@ test("source errors are visible, missing config makes no requests",async()=>{
  const radar=new ResetRadar({token:"test",aiKey:"test",now:()=>initial,fetcher:(async()=>{throw Error("secret");}) as typeof fetch});
  await radar.refresh();assert.equal(radar.status().state,"error");assert.ok(!radar.status().message?.includes("secret"));
  const empty=new ResetRadar({token:"",aiKey:""});await empty.refresh();assert.equal(empty.status().state,"unconfigured");
+});
+
+test("historical signals survive midnight and restart but never extend prediction or pause collection",async()=>{
+ const dir=mkdtempSync(join(tmpdir(),"radar-history-"));let now=initial,calls=0;
+ const fetcher=(async(url:string|URL|Request)=>{calls++;return String(url).includes("tikhub")?Response.json(payload):Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:[{id:"123",signal:"announced",evidence:post.text,summary:"宣布重置用量"}]})}}]});}) as typeof fetch;
+ const options={token:"test",aiKey:"test",fetcher,now:()=>now,statePath:join(dir,"state.json")};
+ try {
+  const radar=new ResetRadar(options);await radar.refresh();
+  now=Date.parse("2026-09-29T16:00:00Z");assert.equal(radar.status().timeline.length,1);
+  now=initial+24*hour;const restarted=new ResetRadar(options);await restarted.refresh();
+  assert.equal(restarted.status().timeline.length,1);assert.equal(await restarted.read("new-account",{remainingPercent:20,resetCardsAvailable:0}),null);
+  const n=calls;now+=hour;await restarted.refresh();assert.equal(calls,n+1,"expired historical signal does not pause the hourly poll or reanalyze");
+ } finally {rmSync(dir,{recursive:true,force:true});}
 });

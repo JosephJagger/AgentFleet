@@ -30,6 +30,7 @@ interface Snapshot {
 interface Options { token?: string; aiKey?: string; model?: string; statePath?: string | undefined; fetcher?: typeof fetch; now?: () => number }
 const HOUR = 3_600_000, DAY = 24 * HOUR;
 const day = (now: number) => Math.floor((now + 8 * HOUR) / DAY);
+const retained = (post: RadarPost, now: number) => Date.parse(post.created_at) <= now && now - Date.parse(post.created_at) < 7 * DAY;
 const fresh = (post: RadarPost, now: number) => Date.parse(post.created_at) <= now && now - Date.parse(post.created_at) < DAY;
 const blank = (): Snapshot => ({ version: 1, lastAttempt: 0, checkedAt: 0, pauseDay: null, callDay: 0, calls: 0, error: null, posts: [], seen: [], accounts: {} });
 function object(value: unknown): Record<string, any> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {}; }
@@ -110,8 +111,8 @@ export class ResetRadar {
     writeFileSync(temporary, JSON.stringify(this.snapshot), { mode: 0o600 }); renameSync(temporary, this.path);
   }
   private prune(now: number) {
-    const retained = this.snapshot.posts.filter(p => fresh(p.post, now));
-    if (retained.length !== this.snapshot.posts.length) { this.snapshot.posts = retained; this.save(); }
+    const retainedPosts = this.snapshot.posts.filter(p => retained(p.post, now));
+    if (retainedPosts.length !== this.snapshot.posts.length) { this.snapshot.posts = retainedPosts; this.save(); }
   }
   start() {
     if (this.timer || !this.token || !this.aiKey) return;
@@ -176,7 +177,7 @@ export class ResetRadar {
     for (const post of received.values()) {
       if (fresh(post, now) && !s.seen.includes(post.id) && !previous.has(post.id)) previous.set(post.id, { post, summary: "", analyzed: false, prediction: null });
     }
-    s.posts = [...previous.values()].filter(p => fresh(p.post, now)).sort((a,b) => Date.parse(b.post.created_at) - Date.parse(a.post.created_at)).slice(0, 200);
+    s.posts = [...previous.values()].filter(p => retained(p.post, now)).sort((a,b) => Date.parse(b.post.created_at) - Date.parse(a.post.created_at));
     this.save();
     const unprocessed = s.posts.filter(p => !p.analyzed && fresh(p.post, now));
     for (let start = 0; start < unprocessed.length; start += 20) {

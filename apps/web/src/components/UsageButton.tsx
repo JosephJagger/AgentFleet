@@ -12,6 +12,12 @@ export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"co
   const dialog=useRef<HTMLDialogElement>(null);
   const [mobile,setMobile]=useState(()=>window.matchMedia?.("(max-width: 900px)").matches??false);
   const [radarOpen,setRadarOpen]=useState(false);
+  const [radarPage,setRadarPage]=useState(0);
+  const timeline=data?.resetRadar?.timeline??[];
+  const radarPages=Math.max(1,Math.ceil(timeline.length/5));
+  const currentRadarPage=Math.min(radarPage,radarPages-1);
+  useEffect(()=>{setRadarPage(0);},[radarOpen,id]);
+  useEffect(()=>{const body=radarDialog.current?.querySelector(".usage-body");if(body)body.scrollTop=0;},[currentRadarPage,radarOpen]);
   const radarDialog=useRef<HTMLDialogElement>(null);
   useEffect(()=>{if(radarOpen)radarDialog.current?.showModal?.();else radarDialog.current?.close?.();},[radarOpen]);
   const [expanded,setExpanded]=useState(false);
@@ -72,13 +78,18 @@ export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"co
       </>:<><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&!claude&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope!=="machine"&&!failed&&!claude&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",fiveHour[0].remainingPercent)}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
     </button>
     {scope==="machine"&&createPortal(<dialog ref={radarDialog} className="modal usage-dialog radar-dialog" aria-label={t("重置消息时间轴")} onClick={event=>{if(event.target===event.currentTarget){const r=event.currentTarget.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)setRadarOpen(false);}}} onCancel={()=>setRadarOpen(false)} onClose={()=>setRadarOpen(false)}>
-      <header className="modal-head"><div><h2>{t("重置消息时间轴")}</h2><p>{t("最近 24 小时 · 最新在上")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setRadarOpen(false)}><X size={18}/></button></header>
+      <header className="modal-head"><div><h2>{t("重置消息时间轴")}</h2><p>{t("最近 7 天 · 最新在上")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setRadarOpen(false)}><X size={18}/></button></header>
       <div className="usage-body"><p>{t("仅供参考，不改变原生重置时间")}</p>
         {data?.resetRadar?.checkedAt&&<small>{t("更新于 {0}",date(data.resetRadar.checkedAt))}</small>}
         {data?.resetRadar?.state==="error"&&<p role="status">{t("信号检查失败")}</p>}
-        {!data?.resetRadar?.timeline?.length&&<p>{t("最近 24 小时暂无已分析帖子")}</p>}
-        {data?.resetRadar?.timeline?.map(post=><section className="radar-timeline-item" data-signal={post.signal} key={post.id}><small>{date(post.publishedAt)} · {signalLabel(post.signal)}</small><p>{post.summary}</p><a href={post.sourceUrl} target="_blank" rel="noopener noreferrer">{t("查看原帖")}</a></section>)}
+        {!data?.resetRadar?.timeline?.length&&<p>{t("最近 7 天暂无已分析帖子")}</p>}
+        {timeline.slice(currentRadarPage*5,(currentRadarPage+1)*5).map(post=><section className="radar-timeline-item" data-signal={post.signal} key={post.id}><small>{date(post.publishedAt)} · {signalLabel(post.signal)}{Date.now()-Date.parse(post.publishedAt)>=86_400_000?` · ${t("历史消息")}`:""}</small><p>{post.summary}</p><a href={post.sourceUrl} target="_blank" rel="noopener noreferrer">{t("查看原帖")}</a></section>)}
       </div>
+      {timeline.length>0&&<nav className="radar-pagination" aria-label={t("消息时间轴分页")}>
+        <button type="button" className="button button--quiet" disabled={currentRadarPage===0} onClick={()=>setRadarPage(currentRadarPage-1)}>{t("上一页")}</button>
+        <span aria-live="polite">{t("第 {0} / {1} 页",currentRadarPage+1,radarPages)}</span>
+        <button type="button" className="button button--quiet" disabled={currentRadarPage===radarPages-1} onClick={()=>setRadarPage(currentRadarPage+1)}>{t("下一页")}</button>
+      </nav>}
     </dialog>,document.body)}
     {createPortal(<dialog ref={dialog} className="modal usage-dialog" aria-label={t("用量与剩余额度")} onClick={event=>{if(event.target!==event.currentTarget)return;const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)setOpen(false);}} onCancel={()=>setOpen(false)} onClose={()=>setOpen(false)}>
       <header className="modal-head"><div><h2>{agentName(provider)} · {t("用量与剩余额度")}</h2><p>{t("账号看额度，项目和会话看已记录 token")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setOpen(false)}><X size={18}/></button></header>

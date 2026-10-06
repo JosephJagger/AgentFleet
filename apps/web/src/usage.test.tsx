@@ -168,3 +168,17 @@ it("Claude shows native subscription limits without Codex credits or reset forec
  expect(screen.getByText("PRO · 由宿主机 Claude Code 原生查询")).toBeTruthy();
  expect(screen.queryByText("点数余额")).toBeNull();expect(screen.queryByText(/额度暂未接入/)).toBeNull();
 });
+
+it("timeline paginates cached history five at a time and resets on reopen without extra API calls",async()=>{
+ const timeline=Array.from({length:12},(_,i)=>({id:String(i),publishedAt:new Date(Date.now()-(i+1)*86_400_000/2).toISOString(),summary:`历史帖子内容 ${i}`,signal:"none",sourceUrl:`https://x.com/thsottiaux/status/${i}`}));
+ vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",accounts:[{...data.accounts[0],credits:{balance:"0",hasCredits:false,unlimited:false}}],resetRadar:{state:"ready",checkedAt:new Date().toISOString(),nextCheckAt:null,timeline}});
+ render(<UsageButton scope="machine" id="m1"/>);
+ const card=await screen.findByRole("button",{name:/周额度\s*38%/});fireEvent.click(within(card).getByText("临时重置预测"));
+ const dialog=screen.getByRole("dialog",{name:"重置消息时间轴"}),view=within(dialog);const calls=vi.mocked(api.usage).mock.calls.length;
+ expect(view.getByText("最近 7 天 · 最新在上")).toBeTruthy();expect(view.getAllByRole("link",{name:"查看原帖"})).toHaveLength(5);
+ expect(view.getByRole("button",{name:"上一页"}).hasAttribute("disabled")).toBe(true);
+ fireEvent.click(view.getByRole("button",{name:"下一页"}));expect(view.getByText("历史帖子内容 5")).toBeTruthy();expect(view.queryByText("历史帖子内容 0")).toBeNull();
+ fireEvent.click(view.getByRole("button",{name:"下一页"}));expect(view.getAllByRole("link",{name:"查看原帖"})).toHaveLength(2);expect(view.getByRole("button",{name:"下一页"}).hasAttribute("disabled")).toBe(true);
+ expect(api.usage).toHaveBeenCalledTimes(calls);
+ fireEvent.click(view.getByRole("button",{name:"关闭用量"}));fireEvent.click(within(card).getByText("临时重置预测"));expect(view.getByText("历史帖子内容 0")).toBeTruthy();expect(view.getByText("第 1 / 3 页")).toBeTruthy();
+});

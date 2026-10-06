@@ -1415,3 +1415,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 .panel-voice-control__floating { display:none; }
 @media(max-width:900px) { body:has(.app-shell--conversation) .panel-voice-control__floating { display:inline-flex; position:fixed; z-index:60; right:12px; top:calc(164px + env(safe-area-inset-top)); min-height:36px; gap:6px; padding:6px 10px; font-size:var(--text-caption); background:var(--paper-solid); border-color:var(--teal); color:var(--teal); box-shadow:0 3px 12px #0002; } }
+
+.radar-dialog { max-height: min(760px, 88dvh); }
+.radar-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; padding: 12px 18px; border-top: 1px solid var(--line); background: var(--paper-raised); color: var(--ink); font-size: var(--text-small); }
+.radar-pagination .button { padding: 8px 12px; white-space: nowrap; }
