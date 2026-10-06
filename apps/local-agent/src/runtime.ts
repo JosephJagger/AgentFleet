@@ -1,4 +1,4 @@
-import { parseRealtimeVoice } from "./voice-options.js";
+import { parseRealtimeVoice, supportsNativeVoice } from "./voice-options.js";
 import { PanelVoiceRuntime } from "./panel-voice.js";
 import { parseOutputSchema } from "./output-schema.js";
 import { parseHostCodexOperation, parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, parseReviewTarget, parseForkRange } from "./codex-operations.js";
@@ -627,7 +627,7 @@ export class AgentRuntime {
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
         maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
         projectFiles: true,
-        realtimeVoice: this.isWritable() && this.support.codexVersion === "0.159.2",
+        realtimeVoice: this.isWritable() && supportsNativeVoice(this.support.codexVersion),
         queue: this.isWritable(),
         steer: this.isWritable(),
         shell: false,
@@ -1880,7 +1880,7 @@ export class AgentRuntime {
     if(value.action==='tool.result'){this.panelVoice.result(id,String(value.requestId),value.result);return;}
     if(value.action==='report'&&typeof value.text==='string')return this.panelVoice.report(id,value.text,String(value.reportId));
     if(value.action!=='start'||typeof value.sdp!=='string'||value.sdp.length>65536||!value.sdp.startsWith('v=0\r\n'))throw new AgentError('VOICE_INVALID','Invalid voice offer');
-    if(!this.isWritable()||this.store.snapshot().maintenanceDrain||this.support.codexVersion!=='0.159.2')throw new AgentError('VOICE_UNAVAILABLE','Host voice unavailable');
+    if(!this.isWritable()||this.store.snapshot().maintenanceDrain||!supportsNativeVoice(this.support.codexVersion))throw new AgentError('VOICE_UNAVAILABLE','Host voice unavailable');
     return this.panelVoice.start(id,value.sdp,parseRealtimeVoice(value.voice));
   }
   handleVoice(value: Record<string, unknown>): Promise<void> {
@@ -1919,7 +1919,7 @@ export class AgentRuntime {
     }
     if(isClaudeThread(thread.nativeThreadId)) throw new AgentError("VOICE_UNAVAILABLE", "Native voice requires a Codex session");
     if(value.action!=="start" || typeof value.sdp!=="string" || value.sdp.length>65536 || !value.sdp.startsWith("v=0\r\n") || !value.sdp.includes("m=audio ")) throw new AgentError("VOICE_INVALID", "Invalid voice offer");
-    if(!this.isWritable() || this.store.snapshot().maintenanceDrain || this.support.codexVersion!=="0.159.2" || !this.appServer.startVoice) throw new AgentError("VOICE_UNAVAILABLE", "请先升级托管 Codex 到支持实时语音的版本并完成会话接管");
+    if(!this.isWritable() || this.store.snapshot().maintenanceDrain || !supportsNativeVoice(this.support.codexVersion) || !this.appServer.startVoice) throw new AgentError("VOICE_UNAVAILABLE", "请先升级托管 Codex 到支持实时语音的版本并完成会话接管");
     const snapshot=this.store.snapshot();
     if(Object.values(snapshot.managedThreads).some(t=>t.projectId===thread.projectId && (t.activeTurnId || t.realtimeSessionId)) || snapshot.projectReservations[thread.projectId] || Object.values(snapshot.commandJournal).some(c=>["claimed","invoking","responded","unknown"].includes(c.state))) throw new AgentError("VOICE_BUSY", "Project or host operations are still busy");
     await verifyProjectIdentity(projectById(this.store,thread.projectId));

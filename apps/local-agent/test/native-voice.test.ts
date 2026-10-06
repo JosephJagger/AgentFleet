@@ -71,3 +71,12 @@ test("selected voice reaches the native realtime request and invalid voices neve
   await server.startVoice(thread,"sdp","coral");
   assert.equal(requests[0]?.params.voice,"coral");
 });
+
+import { supportsNativeVoice } from "../src/voice-options.js";
+test("reviewed 0.160.1 retains native voice while unknown versions remain gated",()=>{
+ assert.equal(supportsNativeVoice("0.160.1"),true);
+ assert.equal(supportsNativeVoice("0.159.2"),true);
+ assert.equal(supportsNativeVoice("0.159.0"),false);
+ assert.equal(supportsNativeVoice("0.161.0"),false);
+ assert.equal(supportsNativeVoice(undefined),false);
+});

@@ -29,3 +29,13 @@ Isolated Linux native checks passed for legacy and paginated writer exclusion, r
 The promotion worker must still validate version/schema, isolated App Server interfaces and Code Mode execution, and verify all four platform artifacts and helpers before publishing the target. Windows/macOS activation remains subject to each host's local validation and health acknowledgement. Busy/offline hosts wait; version-specific destructive history cleanup support is not broadened.
 
 0.158.0 已完成上述 Linux 隔离测试；新增协议为兼容性扩展。Agent 0.30.50 包含对应验证清单，主机仍须空闲、本地验证通过后才能升级，失败保留回退机制。离线主机恢复连接后再处理。
+
+## Codex 0.160.1 review (2026-10-06)
+
+Official release: https://github.com/openai/codex/releases/tag/rust-v0.160.1
+
+The Linux musl archive passed its official SHA-256 (`9226581be592d18f7e7f740a352fdb63aa61e45e39f7eb9b09d3888c84bba33f`). Its generated App Server v2 schema is byte-identical to 0.159.2: `81a88c04ae4984b16d73080f4109d0477682bc76c8adbe483e371175ce54c054`, including realtime methods and voice enums. Isolated version, initialize, config/read and thread/list probes passed. Native legacy/paginated writer exclusion, release/resume, archive/restore, deletion isolation and image delivery through a local mock Responses server passed without real account credentials or model calls.
+
+Agent 0.30.75 adds the reviewed release and explicitly keeps native session/panel voice available on 0.160.1. Unknown versions remain gated. This verifies protocol compatibility, not a live microphone call. The central validator must still verify all platform binaries and helpers plus Code Mode execution before publishing the managed target. Hosts apply only after idle-time local validation and health acknowledgement; the previous runtime remains available for rollback. Version-specific destructive history adapters are unchanged.
+
+0.160.1 已通过 Linux 隔离验证，与 0.159.2 的 App Server v2 协议完全一致；连接服务 0.30.75 同时适配语音能力判断。托管验证器完成四平台文件及执行依赖校验后才晋升，主机继续按空闲、本地验证、健康确认的流程升级。
