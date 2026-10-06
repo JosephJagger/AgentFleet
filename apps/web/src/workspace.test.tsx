@@ -65,43 +65,13 @@ it("同账号另一个浏览器的租约不阻止发送，也不展示手动控�
   fireEvent.change(screen.getByRole("textbox", { name: "发送给 Codex 的消息" }), { target: { value: "继续任务" } });
   expect((screen.getByRole("button", { name: "发送" }) as HTMLButtonElement).disabled).toBe(false);
 });
-it("计划模式只应用于下一次发送，成功后清除待发送标记", async () => {
-  const props = inspectorProps("A");
-  props.detail = { ...props.detail, session: { ...props.detail.session,
-    collaborationModes: ["default", "plan"],
-    runtimeSettings: { observed: { model: "test-model", effort: "medium", observedAt: "2026-09-16T00:00:00Z" } },
-  } };
-  const send = vi.fn(noop);
-  const view = render(<SessionInspector {...props} onSend={send} />);
+it("Codex uses the send-mode selector without a duplicate plan toggle", () => {
+  const props=inspectorProps("A");
+  props.detail={...props.detail,session:{...props.detail.session,collaborationModes:["default","plan"]}};
+  const view=render(<SessionInspector {...props}/>);
   fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
-  fireEvent.click(screen.getByRole("button", { name: /计划模式.*先分析并制定计划/ }));
-  expect(screen.getByText("本次发送 · 计划模式")).toBeTruthy();
-  fireEvent.change(screen.getByRole("textbox", { name: "发送给 Codex 的消息" }), { target: { value: "先制定方案" } });
-  fireEvent.click(screen.getByRole("button", { name: "发送" }));
-  await waitFor(() => expect(send).toHaveBeenCalledWith("先制定方案", { model: "test-model", effort: "medium", mode: "plan" }, undefined));
-  await waitFor(() => expect(screen.queryByText("本次发送 · 计划模式")).toBeNull());
-});
-it("只从已保存配置取得模型时仍把计划模式发送给主机", async () => {
-  vi.mocked(api.codexPreferences).mockResolvedValue({
-    catalog: { models: [{ model: "saved-model", displayName: "Saved", efforts: ["medium"], defaultEffort: "medium" }], modes: ["default", "plan"], fetchedAt: "2026-09-23T00:00:00Z" },
-    preferences: { machine: { settings: { model: "saved-model", effort: "medium" }, revision: 1 }, project: { settings: null, revision: 0 }, session: { settings: null, revision: 0 } },
-    source: "machine", desired: { model: "saved-model", effort: "medium" },
-  });
-  const props = inspectorProps("A");
-  props.detail = { ...props.detail, session: { ...props.detail.session, collaborationModes: ["default", "plan"] } };
-  const send = vi.fn(noop);
-  const view = render(<SessionInspector {...props} onSend={send} />);
-  await waitFor(() => expect(screen.getByText(/saved-model · medium/)).toBeTruthy());
-  fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
-  fireEvent.click(screen.getByRole("button", { name: /计划模式.*先分析并制定计划/ }));
-  view.rerender(<SessionInspector {...props} detail={undefined} loading={true} onSend={send} />);
-  view.rerender(<SessionInspector {...props} onSend={send} />);
-  expect(screen.getByText("本次发送 · 计划模式")).toBeTruthy();
-  await waitFor(() => expect(screen.getByText(/saved-model · medium/)).toBeTruthy());
-  fireEvent.change(screen.getByRole("textbox", { name: "发送给 Codex 的消息" }), { target: { value: "只规划" } });
-  await waitFor(() => expect((screen.getByRole("button", { name: "发送" }) as HTMLButtonElement).disabled).toBe(false));
-  fireEvent.click(screen.getByRole("button", { name: "发送" }));
-  await waitFor(() => expect(send).toHaveBeenCalledWith("只规划", { model: "saved-model", effort: "medium", mode: "plan" }, undefined));
+  expect(screen.queryByRole("button",{name:/计划模式.*先分析并制定计划/})).toBeNull();
+  expect(screen.getByRole("combobox",{name:"切换协作模式"})).toBeTruthy();
 });
 it("会话核验期间保留禁用的追加入口，草稿保留", () => {
   const props = inspectorProps("A");
@@ -120,7 +90,7 @@ it("当前任务没有明确模式回执时不会显示默认模式", () => {
   expect(screen.getByText(/模式未确认/)).toBeTruthy();
   expect(screen.queryByText(/默认模式/)).toBeNull();
   view.rerender(<RuntimeSettingsShortcut {...props} observed={{ accepted: { ...observed.accepted, mode: "default" } }} />);
-  expect(screen.getByText(/默认模式/)).toBeTruthy();
+  expect(screen.getByText(/普通执行/)).toBeTruthy();
 });
 it("输入 @ 可按插件名部分匹配并将整个插件加入本次发送", async () => {
   const props = inspectorProps("A");
@@ -162,9 +132,7 @@ it("移动端选择插件或计划模式后立即收起添加菜单", () => {
     expect(menu.open).toBe(false);
     expect(screen.getByText("Shopify", { selector: ".attachment-chip span" })).toBeTruthy();
     fireEvent.click(view.container.querySelector(".composer-add-trigger")!);
-    fireEvent.click(screen.getByRole("button", { name: /计划模式.*先分析并制定计划/ }));
-    expect(menu.open).toBe(false);
-    expect(screen.getByText("本次发送 · 计划模式")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /计划模式.*先分析并制定计划/ })).toBeNull();
   } finally { window.matchMedia = original; }
 });
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
