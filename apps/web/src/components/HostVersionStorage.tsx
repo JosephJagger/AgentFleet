@@ -37,7 +37,7 @@ export function HostVersionStorage({ machine }: { machine: Machine }) {
     <p className="subtle">{t("安装或升级成功后会自动清理旧版本，保留当前版、一个回退版和仍被引用的文件。这里可检查是否还有可清理内容。")}</p>
     {!supported?<p role="status">{t("请先在「状态与连接」更新连接服务。")}</p>:<>
       <div className="version-storage-summary"><div><small>{t("版本文件占用")}</small><strong>{report?imageSpace(report.totalBytes):"—"}</strong></div><div><small>{t("可释放空间")}</small><strong>{report?imageSpace(report.reclaimableBytes):"—"}</strong></div></div>
-      <div className="version-storage-actions"><button className="button button--secondary" type="button" disabled={!online||pending} onClick={()=>void operate(false)}><RefreshCw size={16}/>{t("检查版本")}</button><button className="button button--primary" type="button" disabled={!online||pending||!report?.reclaimableBytes} onClick={()=>void operate(true)}><Trash2 size={16}/>{t("一键清理旧版本")}</button></div>
+      <div className="version-storage-actions"><button className="button button--secondary" type="button" disabled={!online||pending} onClick={()=>void operate(false)}><RefreshCw size={16}/>{t("检查版本")}</button><button className="button button--primary" type="button" disabled={!online||pending||!report?.reclaimableBytes} onClick={()=>void operate(true)}><Trash2 size={16}/>{t("一键清理")}</button></div>
       {!online&&<p role="status">{t("主机离线，连接后可检查和清理。")}</p>}
       {pending&&<p className="version-storage-status" role="status"><LoaderCircle size={16} className="spin"/>{operation?.state==="unknown"?t("结果待核验，请勿重复清理"):t("正在核查主机版本文件…")}</p>}
       {operation?.state==="succeeded"&&operation.type==="versions.clean"&&report&&<p role="status">{t("已清理 {0}，删除 {1} 个旧版本目录。",imageSpace(report.deletedBytes),report.deletedCount)}</p>}

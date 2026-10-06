@@ -2948,5 +2948,6 @@
   "查看保留和清理明细": "View retained and reclaimable versions",
   "仅展示前 {0} 项，总占用已包含全部目录。": "Showing the first {0} entries. Totals include all directories.",
   "上次获取的官方稳定版": "Last observed official stable release",
-  "检查服务离线，等待恢复": "Check service offline · Waiting to reconnect"
+  "检查服务离线，等待恢复": "Check service offline · Waiting to reconnect",
+  "一键清理": "Clean up"
 }
