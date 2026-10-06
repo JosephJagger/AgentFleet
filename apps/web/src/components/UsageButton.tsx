@@ -56,7 +56,7 @@ export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"co
   const resetAt=showWeeklyReset?weekly[0].w.resetsAt:null;
   const richMachineSummary=scope==="machine"&&!failed&&data?.accounts.length===1&&(weekly.length===1||fiveHour.length===1||accountCredits||data.resetPrediction);
   const updatedAt=data?.accounts.length?data.accounts.map(a=>a.observedAt).sort().at(-1):null;
-  const signalLabel=(signal:string)=>signal==="announced"?t("已宣布将重置"):signal==="confirmed"?t("已宣布完成重置"):signal==="card-announced"?t("已宣布发放重置卡"):signal==="card-confirmed"?t("已宣布重置卡发放完成"):t("无重置信号");
+  const signalLabel=(signal:string)=>signal==="conditional"?t("有条件额度重置"):signal==="card-conditional"?t("有条件发放重置卡"):signal==="announced"?t("已宣布将重置"):signal==="confirmed"?t("已宣布完成重置"):signal==="card-announced"?t("已宣布发放重置卡"):signal==="card-confirmed"?t("已宣布重置卡发放完成"):t("无重置信号");
   const radarEmpty=data?.resetRadar?.state==="error"?t("信号检查失败"):data?.resetRadar?.state==="unconfigured"?t("数据源未配置"):data?.resetRadar?.state==="pending"?t("正在检查信号"):t("暂无预测");
   const radarLabel=data?.resetPrediction?signalLabel(data.resetPrediction.signal):radarEmpty;
   const periodTokens=data?.quotaCycle?.recordedTokens;
@@ -71,7 +71,7 @@ export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"co
             {weekly.length===1&&<span className="host-quota-metric host-quota-metric--weekly"><small>{t("周额度")}</small><strong>{weekly[0].w.remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${weekly[0].w.remainingPercent}%`}}/></span><em>{weekly[0].w.resetsAt?t("下次重置：{0}",date(new Date(weekly[0].w.resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
             {fiveHour.length===1&&<span className="host-quota-metric host-quota-metric--five-hour"><small>{t("5 小时额度")}</small><strong>{fiveHour[0].remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${fiveHour[0].remainingPercent}%`}}/></span><em>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
             {showCreditBalance?<span className="host-quota-metric host-quota-metric--credits"><small>{t("点数余额")}</small><strong>{accountCredits?.balance!=null&&!accountCredits.unlimited?<>{creditBalance(accountCredits.balance)} <b>{t("点")}</b></>:creditText(accountCredits)}</strong><em>{t("由原生 Codex 上报")}</em></span>
-            :!claude?<span className="host-quota-metric host-quota-metric--forecast" onClick={event=>{event.stopPropagation();setRadarOpen(true);}}><small>{t("临时重置预测")}</small><strong>{radarLabel}</strong><em>{t("仅供参考，不改变原生重置时间")}</em></span>:null}
+            :!claude?<span className="host-quota-metric host-quota-metric--forecast" onClick={event=>{event.stopPropagation();setRadarOpen(true);}}><small>{t("临时重置预测")}</small><strong>{radarLabel}</strong><em>{t("公告仅供参考，额度与日期以原生最新数据为准")}</em></span>:null}
           </span>
           {updatedAt&&<span className="host-quota-updated"><i aria-hidden="true"/>{t("更新于 {0}",date(updatedAt))}<b aria-hidden="true">→</b></span>}
         </span>
@@ -79,11 +79,11 @@ export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"co
     </button>
     {scope==="machine"&&createPortal(<dialog ref={radarDialog} className="modal usage-dialog radar-dialog" aria-label={t("重置消息时间轴")} onClick={event=>{if(event.target===event.currentTarget){const r=event.currentTarget.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)setRadarOpen(false);}}} onCancel={()=>setRadarOpen(false)} onClose={()=>setRadarOpen(false)}>
       <header className="modal-head"><div><h2>{t("重置消息时间轴")}</h2><p>{t("最近 7 天 · 最新在上")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setRadarOpen(false)}><X size={18}/></button></header>
-      <div className="usage-body"><p>{t("仅供参考，不改变原生重置时间")}</p>
+      <div className="usage-body"><p>{t("公告仅供参考，额度与日期以原生最新数据为准")}</p>
         {data?.resetRadar?.checkedAt&&<small>{t("更新于 {0}",date(data.resetRadar.checkedAt))}</small>}
         {data?.resetRadar?.state==="error"&&<p role="status">{t("信号检查失败")}</p>}
         {!data?.resetRadar?.timeline?.length&&<p>{t("最近 7 天暂无已分析帖子")}</p>}
-        {timeline.slice(currentRadarPage*5,(currentRadarPage+1)*5).map(post=><section className="radar-timeline-item" data-signal={post.signal} key={post.id}><small>{date(post.publishedAt)} · {signalLabel(post.signal)}{Date.now()-Date.parse(post.publishedAt)>=86_400_000?` · ${t("历史消息")}`:""}</small><p>{post.summary}</p><a href={post.sourceUrl} target="_blank" rel="noopener noreferrer">{t("查看原帖")}</a></section>)}
+        {timeline.slice(currentRadarPage*5,(currentRadarPage+1)*5).map(post=><section className="radar-timeline-item" data-signal={post.signal} key={post.id}><small>{date(post.publishedAt)} · {signalLabel(post.signal)}{Date.now()-Date.parse(post.publishedAt)>=86_400_000?` · ${t("历史消息")}`:""}</small><p>{post.summary}</p>{post.condition&&<p>{t("条件：{0}",post.condition)}</p>}<a href={post.sourceUrl} target="_blank" rel="noopener noreferrer">{t("查看原帖")}</a></section>)}
       </div>
       {timeline.length>0&&<nav className="radar-pagination" aria-label={t("消息时间轴分页")}>
         <button type="button" className="button button--quiet" disabled={currentRadarPage===0} onClick={()=>setRadarPage(currentRadarPage-1)}>{t("上一页")}</button>

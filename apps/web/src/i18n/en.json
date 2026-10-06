@@ -2963,5 +2963,9 @@
   "发送模式": "Send mode",
   "切换协作模式": "Switch collaboration mode",
   "恢复继承模式": "Inherit mode",
-  "上次模式：{0}": "Last observed mode: {0}"
+  "上次模式：{0}": "Last observed mode: {0}",
+  "有条件额度重置": "Conditional quota reset",
+  "有条件发放重置卡": "Conditional reset-card grant",
+  "条件：{0}": "Condition: {0}",
+  "公告仅供参考，额度与日期以原生最新数据为准": "Announcements are advisory; quota and dates follow the latest native data."
 }

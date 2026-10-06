@@ -31,7 +31,7 @@ test("persistent dedup, hourly collection, 7-day retention and newest-first time
  now=Date.parse(post.created_at)+7*24*hour;await restarted.refresh();assert.equal(restarted.status().timeline.length,0);assert.equal(analysisCalls,1);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
-test("signal pauses collection until Beijing next day; quota is read-only",async()=>{
+test("signal never pauses hourly collection; quota is read-only",async()=>{
  let now=initial,calls=0;
  const fetcher=(async(url:string|URL|Request)=>{
  calls++;return String(url).includes("tikhub")?Response.json(payload):Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:[{id:"123",signal:"announced",evidence:post.text,expectedAt:null,summary:"宣布将重置 Codex 用量，时间未定"}]})}}]});
@@ -39,10 +39,10 @@ test("signal pauses collection until Beijing next day; quota is read-only",async
  const radar=new ResetRadar({token:"test",aiKey:"test",fetcher,now:()=>now});
  await radar.refresh();const account={remainingPercent:10,resetCardsAvailable:0};
  assert.ok(await radar.read("a",account)); assert.equal(account.remainingPercent,10);
- now+=2*hour;await radar.refresh();assert.equal(calls,2);
+ now+=2*hour;await radar.refresh();assert.equal(calls,3);
  assert.equal(await radar.read("a",{...account,remainingPercent:100}),null);
- await radar.refresh();assert.equal(calls,2);
- now=Date.parse("2026-09-29T16:01:00Z");await radar.refresh();assert.equal(calls,3);
+ await radar.refresh();assert.equal(calls,3);
+ now=Date.parse("2026-09-29T16:01:00Z");await radar.refresh();assert.equal(calls,4);
  assert.equal(radar.status().timeline.length,1);
 });
 test("source errors are visible, missing config makes no requests",async()=>{
@@ -86,4 +86,23 @@ test("persisted pause without its signal cannot block collection",async()=>{
   let calls=0;const radar=new ResetRadar({token:"test",aiKey:"test",statePath:path,now:()=>initial,fetcher:(async()=>{calls++;return Response.json({code:200,data:{timeline:[]}});}) as typeof fetch});
   await radar.refresh();assert.equal(calls,1);assert.equal(radar.status().checkedAt,new Date(initial).toISOString());
  }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test("conditional plans require a quoted condition and never invent a reset deadline",()=>{
+ const text="Over the next 28 days, each day we'll either ship an improvement or ship a full reset";
+ const p={...post,text};const row={id:p.id,signal:"conditional",evidence:text,condition:"当天未发布改进时才重置额度",conditionEvidence:"either ship an improvement or ship a full reset",expectedAt:new Date(initial+hour).toISOString(),timeEvidence:"28 days"};
+ const prediction=parseAnalysis({results:[row]},[p],initial).get(p.id)!;
+ assert.equal(prediction.signal,"conditional");assert.equal(prediction.condition,row.condition);assert.equal(prediction.expectedAt,null);
+ assert.throws(()=>parseAnalysis({results:[{...row,conditionEvidence:"made up"}]},[p],initial));
+ assert.equal(parseAnalysis({results:[{id:p.id,signal:"none"}]},[p],initial).get(p.id),null);
+});
+
+test("card grants and quota restoration suppress only their matching announcement",async()=>{
+ for(const signal of ["announced","card-announced","conditional","card-conditional"]){
+  const fetcher=(async(url:string|URL|Request)=>String(url).includes("tikhub")?Response.json(payload):Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:[{id:post.id,signal,evidence:post.text,condition:"满足公告条件时",conditionEvidence:"reset",summary:"重置消息"}]})}}]})) as typeof fetch;
+  const radar=new ResetRadar({token:"t",aiKey:"t",now:()=>initial,fetcher});await radar.refresh();
+  const base={remainingPercent:10,resetCardsAvailable:0};await radar.read("quota",base);await radar.read("card",base);
+  const quota=await radar.read("quota",{...base,remainingPercent:100});const card=await radar.read("card",{...base,resetCardsAvailable:1});
+  assert.equal(quota===null,signal==="announced");assert.equal(card===null,signal==="card-announced");
+ }
 });

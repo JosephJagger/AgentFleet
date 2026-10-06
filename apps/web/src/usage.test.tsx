@@ -182,3 +182,13 @@ it("timeline paginates cached history five at a time and resets on reopen withou
  expect(api.usage).toHaveBeenCalledTimes(calls);
  fireEvent.click(view.getByRole("button",{name:"关闭用量"}));fireEvent.click(within(card).getByText("临时重置预测"));expect(view.getByText("历史帖子内容 0")).toBeTruthy();expect(view.getByText("第 1 / 3 页")).toBeTruthy();
 });
+
+it("conditional predictions remain visible with their condition in the timeline",async()=>{
+ const now=new Date().toISOString();
+ vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",accounts:[{...data.accounts[0],credits:{balance:"0",hasCredits:false,unlimited:false}}],resetPrediction:{kind:"temporary-reset",signal:"conditional",condition:"当天没有重大更新时重置",expectedAt:null,publishedAt:now,observedAt:now,evidence:"either update or reset",sourceUrl:"https://x.com/thsottiaux/status/42"},resetRadar:{state:"ready",checkedAt:now,nextCheckAt:null,timeline:[{id:"42",publishedAt:now,summary:"未来每日更新或重置",condition:"当天没有重大更新时重置",signal:"conditional",sourceUrl:"https://x.com/thsottiaux/status/42"}]}});
+ render(<UsageButton scope="machine" id="m1"/>);
+ const card=await screen.findByRole("button",{name:/周额度\s*38%/});
+ expect(within(card).getByText("有条件额度重置")).toBeTruthy();
+ fireEvent.click(within(card).getByText("临时重置预测"));
+ expect(within(screen.getByRole("dialog",{name:"重置消息时间轴"})).getByText("条件：当天没有重大更新时重置")).toBeTruthy();
+});
