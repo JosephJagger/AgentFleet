@@ -3125,5 +3125,21 @@
   "任务已启动": "Task started",
   "任务未启动": "Task did not start",
   "任务是否启动尚未确认，请勿重复派发": "Task start is unconfirmed. Do not dispatch it again.",
-  "部分任务历史不可用": "Some task history is unavailable"
+  "部分任务历史不可用": "Some task history is unavailable",
+  "运行进度": "Run progress",
+  "实时更新": "Live updates",
+  "最后已知进度": "Last known progress",
+  "进度暂时无法更新": "Progress updates unavailable",
+  "执行命令": "Running command",
+  "修改文件": "Changing files",
+  "计划进展": "Plan progress",
+  "过程说明": "Progress commentary",
+  "等待你确认": "Waiting for your approval",
+  "未开启内容同步，仅显示运行状态": "Content sync is off; showing status only",
+  "等待新的过程事件": "Waiting for new progress events",
+  "最近更新": "Last update",
+  "查看最近过程": "Recent activity",
+  "仅展示最近过程摘要，完整记录见消息历史": "Recent activity summary only. See message history for full records.",
+  "此处是已收到的事件，不代表任务已停止或完成": "These are the last received events, not confirmation that the task stopped or finished.",
+  "已拒绝": "Declined"
 }

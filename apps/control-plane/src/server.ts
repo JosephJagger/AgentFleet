@@ -1,3 +1,4 @@
+import { SessionProgressService } from "./session-progress.js";
 import { editQueuedPrompt } from "./queue-edit.js";
 import { reorderQueue } from "./queue-order.js";
 import { VoicePreferencesService } from "./voice-preferences.js";
@@ -235,7 +236,8 @@ export async function buildControlPlane(
   const agents = new Map<string, AgentSocketState>();
   const clients = new Map<string, Set<ClientSocketState>>();
   const nativeVoice = new NativeVoiceService(db,registry);
-  const panelVoice = new PanelVoiceService(db,registry,coordination);
+  const sessionProgress = new SessionProgressService(db,registry);
+  const panelVoice = new PanelVoiceService(db,registry,coordination,sessionProgress);
   panelVoice.closeOrphans();
   const panelOwners=new Map<string,{socket:WebSocket;token:string;lastSeen:number;lastPing:number}>();
   const sendPanel=(voiceId:string,action:string,extra:Record<string,unknown>={})=>{
@@ -1149,6 +1151,10 @@ export async function buildControlPlane(
     });
     return reply.send(stream);
   });
+  app.get("/api/sessions/:id/progress", { preHandler: authenticate }, async (request,reply) => {
+    reply.header("cache-control","no-store");
+    return sessionProgress.read(request.principal as Principal,routeId(request));
+  });
   app.get("/api/sessions/:id", { preHandler: authenticate }, async (request) => {
     const principal = request.principal as Principal;
     const logicalSessionId = routeId(request);
@@ -1158,6 +1164,7 @@ export async function buildControlPlane(
     return {
       session: registry.getSession(principal, logicalSessionId),
       events: afterSeq === undefined ? [] : coordination.replayEvents(principal, logicalSessionId, afterSeq, projectionEpoch),
+      progress: sessionProgress.read(principal, logicalSessionId),
       commands: coordination.listCommands(principal, logicalSessionId),
       queue: coordination.listQueue(principal, logicalSessionId),
     };
@@ -1790,10 +1797,10 @@ export async function buildControlPlane(
             const projectId = requiredString(message.projectId, "projectId", 200);
             const nativeThreadId = requiredString(message.nativeThreadId, "nativeThreadId", 300);
             const nativeTurnId = requiredString(message.nativeTurnId, "nativeTurnId", 300);
-            const binding = db.get<{ native_thread_id: string | null }>(
-              `SELECT e.native_thread_id FROM logical_sessions s JOIN execution_segments e
+            const binding = db.get<{ native_thread_id: string | null; sync_content:number }>(
+              `SELECT e.native_thread_id,p.sync_content FROM logical_sessions s JOIN projects p ON p.project_id=s.project_id JOIN execution_segments e
                ON e.execution_segment_id=? AND e.logical_session_id=s.logical_session_id
-               WHERE s.logical_session_id=? AND s.machine_id=? AND s.project_id=?`,
+               WHERE s.logical_session_id=? AND s.machine_id=? AND s.project_id=? AND e.ended_at IS NULL AND s.deleted_at IS NULL`,
               executionSegmentId,
               logicalSessionId,
               identity.machineId,
@@ -1810,6 +1817,8 @@ export async function buildControlPlane(
             const field = message.eventType === "turn_diff.delta" ? "diff" : "delta";
             const content = requiredString(payload[field], field, 64_000);
             invariant(Buffer.byteLength(content, "utf8") <= 32_000, 413, "VOLATILE_TOO_LARGE", "Volatile content exceeds 32 KB");
+            if (!binding.sync_content) return;
+            sessionProgress.record(logicalSessionId,executionSegmentId,nativeTurnId,typeof message.nativeItemId==="string"?message.nativeItemId:undefined,message.eventType,content,payload.truncated===true);
             broadcastSession(logicalSessionId, {
               type: "volatile",
               eventType: message.eventType,

@@ -132,7 +132,9 @@ test('status is session-scoped, authorized, and never falls back to another sess
  const f=fixture();t.after(()=>f.db.close());const first=f.dispatch() as {jobId:string};
  const other=f.registry.createSession(f.principal,'m','p','Other session','other-session');
  const query=(input:Record<string,unknown>)=>f.service.tool(f.principal,f.call.voice_id,'status',{action:'status',...input}) as Record<string,unknown>;
- assert.deepEqual(query({sessionId:other.logicalSessionId}),{state:'idle',sessionId:other.logicalSessionId,scope:'session',message:'该会话没有总控派发的任务'});
+ assert.equal(query({sessionId:other.logicalSessionId}).state,'idle');
+ assert.equal(query({sessionId:other.logicalSessionId}).hasCoordinatorJob,false);
+ assert.equal(query({sessionId:other.logicalSessionId}).jobId,undefined);
  assert.equal(query({sessionId:f.session.logicalSessionId}).jobId,first.jobId);
  assert.equal(query({}).jobId,first.jobId);
  for(const sessionId of ['',null,42,'forbidden']) assert.throws(()=>query({sessionId}));

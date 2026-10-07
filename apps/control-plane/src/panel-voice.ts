@@ -1,3 +1,4 @@
+import { SessionProgressService } from "./session-progress.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import type { RegistryService } from "./registry.js";
 import type { CoordinationService } from "./coordination.js";
@@ -9,7 +10,7 @@ export interface PanelCall { voice_id:string; workspace_id:string; user_id:strin
 interface PanelJob { job_id:string; user_id:string; workspace_id:string; voice_id:string; request_id:string; session_id:string; command_id:string; native_turn_id:string|null; state:string; reported_call_id:string|null; created_at:string; }
 /** Global coordinator only routes work. Existing session commands enforce permissions and project exclusivity. */
 export class PanelVoiceService {
-  constructor(private db:ControlPlaneDatabase,private registry:RegistryService,private coordination:CoordinationService) {}
+  constructor(private db:ControlPlaneDatabase,private registry:RegistryService,private coordination:CoordinationService,private progress=new SessionProgressService(db,registry)) {}
   start(principal:Principal,machineId:string,binding:Record<string,unknown>) {
     const machine=this.registry.getMachine(principal,machineId);
     invariant(!machine.maintenance,409,"MACHINE_DRAINING","主机正在维护，等待安全重启；完成后才能开始新通话");
@@ -46,8 +47,8 @@ export class PanelVoiceService {
     // or a very fast task completed before the synthetic turn.started event was emitted.
     if(!turnId) turnId=this.db.get<{native_turn_id:string}>("SELECT COALESCE(json_extract(detail_json,'$.response.nativeTurnId'),json_extract(detail_json,'$.nativeTurnId')) AS native_turn_id FROM command_lifecycle WHERE command_id=? AND native_turn_id IS NOT NULL ORDER BY lifecycle_id DESC LIMIT 1",job.command_id)?.native_turn_id??null;
     if(turnId) {
-      const end=this.db.get<{body_json:string|null}>("SELECT b.body_json FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type='turn.completed' ORDER BY session_seq DESC LIMIT 1",job.session_id,turnId);
-      if(end) {const body=JSON.parse(end.body_json??'{}');state=['completed','failed','interrupted'].includes(body.turn?.status)?body.turn.status:'unknown';}
+      const end=this.db.get<{type:string;body_json:string|null}>("SELECT e.type,b.body_json FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type IN ('turn.completed','turn.failed','turn.interrupted') ORDER BY session_seq DESC LIMIT 1",job.session_id,turnId);
+      if(end) {const body=JSON.parse(end.body_json??'{}');state=['completed','failed','interrupted'].includes(body.turn?.status)?body.turn.status:end.type==='turn.failed'?'failed':end.type==='turn.interrupted'?'interrupted':'completed';}
       else state='running';
     } else if(command?.state==='invalidated' || command?.state==='expired' || command?.state==='cancelled') state='failed';
     else if(command?.state==='unknown') state='unknown';
@@ -73,7 +74,7 @@ export class PanelVoiceService {
       AND (json_extract(detail_json,'$.error') IS NOT NULL OR json_extract(detail_json,'$.code') IS NOT NULL)
       ORDER BY lifecycle_id DESC LIMIT 1`,job.command_id);
     const detail=JSON.parse(failure?.detail_json??'{}');
-    const end=job.native_turn_id?this.db.get<{body_json:string|null}>("SELECT b.body_json FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type='turn.completed' AND e.payload_state='present' AND b.deleted_at IS NULL ORDER BY session_seq DESC LIMIT 1",job.session_id,job.native_turn_id):undefined;
+    const end=job.native_turn_id?this.db.get<{body_json:string|null}>("SELECT b.body_json FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type IN ('turn.completed','turn.failed','turn.interrupted') AND e.payload_state='present' AND b.deleted_at IS NULL ORDER BY session_seq DESC LIMIT 1",job.session_id,job.native_turn_id):undefined;
     const nativeError=JSON.parse(end?.body_json??'{}').turn?.error;
     const source=nativeError??detail.error??detail;
     const error=(job.state==='failed'||job.state==='interrupted')&&typeof source.code==='string'
@@ -89,7 +90,7 @@ export class PanelVoiceService {
       const rows=this.db.all<{body_json:string}>("SELECT b.body_json FROM durable_events e JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type='item.completed' AND e.payload_state='present' AND b.deleted_at IS NULL ORDER BY e.session_seq DESC LIMIT 30",job.session_id,job.native_turn_id);
       for(const row of rows) {const p=JSON.parse(row.body_json);const item=p.item;if(item?.type==='agentMessage'&&typeof item.text==='string'){result=item.text.slice(-6000);break;}}
     }
-    return {jobId:job.job_id,commandId:job.command_id,nativeTurnId:job.native_turn_id,sessionId:job.session_id,title:session.title,project:session.projectAlias,host:this.registry.getMachine(principal,session.machineId).name,state:job.state,result,historyLimited,error,executionStarted,commandState:command?.state??null,resultStatus:result?'available':executionStarted===false?'not_started':historyLimited?'history_unavailable':terminal?'no_output':'pending',link:`/sessions/${job.session_id}`};
+    return {jobId:job.job_id,commandId:job.command_id,nativeTurnId:job.native_turn_id,sessionId:job.session_id,title:session.title,project:session.projectAlias,host:this.registry.getMachine(principal,session.machineId).name,state:job.state,progress:this.progress.read(principal,job.session_id,job.native_turn_id),result,historyLimited,error,executionStarted,commandState:command?.state??null,resultStatus:result?'available':executionStarted===false?'not_started':historyLimited?'history_unavailable':terminal?'no_output':'pending',link:`/sessions/${job.session_id}`};
   }
   tool(principal:Principal,voiceId:string,requestId:string,input:unknown) {
     this.own(principal,voiceId);
@@ -105,7 +106,9 @@ export class PanelVoiceService {
       const sessionId=typeof args.sessionId==='string'?args.sessionId:undefined;
       if(sessionId) this.registry.getSession(principal,sessionId);
       const job=this.current(principal,sessionId?{sessionId}:{voiceId});
-      return job?{...this.describe(principal,job),scope:sessionId?'session':'call'}:{state:'idle',sessionId:sessionId??null,scope:sessionId?'session':'call',message:sessionId?'该会话没有总控派发的任务':'本次通话没有已派发任务；查询其他任务请指定 sessionId'};
+      const sessionProgress=sessionId?this.progress.read(principal,sessionId):undefined;
+      return job?{...this.describe(principal,job),scope:sessionId?'session':'call',...(sessionProgress?{sessionProgress}:{})}
+        :{state:sessionProgress?.nativeTurnId?sessionProgress.state:'idle',hasCoordinatorJob:false,sessionId:sessionId??null,scope:sessionId?'session':'call',...(sessionProgress?{sessionProgress}:{}),message:sessionId?'该会话没有总控派发的任务；当前会话进度见 sessionProgress':'本次通话没有已派发任务；查询其他任务请指定 sessionId'};
     }
     const current=this.current(principal);
     invariant(args.action==='dispatch'&&typeof args.sessionId==='string'&&typeof args.prompt==='string'&&args.prompt.trim().length>0&&args.prompt.length<=20000,400,"PANEL_INPUT","目标会话和任务内容不能为空");

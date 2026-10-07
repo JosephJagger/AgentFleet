@@ -278,7 +278,15 @@ export interface Dashboard {
   serverTime: string;
 }
 
+export interface SessionProgress {
+  sessionId:string; nativeTurnId:string|null; state:string; source:string;
+  freshness:'live'|'stale'|'unavailable'; updatedAt:string|null; contentAvailable:boolean;
+  waitingForApproval:boolean; limited:boolean;
+  items:Array<{id:string;kind:string;status:string;title:string;output?:string;updatedAt:string}>;
+}
+
 export interface SessionDetail {
+  progress?:SessionProgress;
   hostOnline?: boolean;
   recoverySupported?: boolean;
   commandRecoverySupported?: boolean;

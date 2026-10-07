@@ -1,3 +1,4 @@
+import { RuntimeProgress } from "./components/RuntimeProgress";
 import { QueuedPromptEditor } from "./components/QueuedPromptEditor";
 import { PanelVoiceControl } from "./components/PanelVoiceControl";
 import { UserMessage } from "./components/UserMessage";
@@ -1017,6 +1018,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
       {approval?.status === "pending" && (approval.type === "user_input"
         ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} onChanged={onRefresh} />
         : <ApprovalCard approval={approval} provider={session.provider} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
+      {session.provider!=="claude" && <RuntimeProgress key={`progress:${session.id}:${session.activeTurnId??"none"}`} sessionId={session.id} active={Boolean(session.activeTurnId)||session.state.currentTurn==="in_progress"||session.state.unknownFreeze} initial={detail.progress}/>}
       <OperationReceipts commands={detail.commands ?? []} mode="outstanding" />
       {(detail.session.state.unknownFreeze || (detail.commands ?? []).some(command => command.state === "unknown")) && <CommandRecovery key={`recovery:${draftOwner}:${session.machineId}`} machineId={session.machineId} online={session.state.reachability === "live"} supported={detail.commandRecoverySupported === true} onChanged={onRefresh} />}
       {detail.queue.some((item) => item.state === "queued" || item.state === "dispatching" || item.state === "unknown") && (

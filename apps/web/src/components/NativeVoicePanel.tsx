@@ -1,3 +1,4 @@
+import type { SessionProgress } from "../lib/types";
 import { useDraggablePanel } from "../lib/use-draggable-panel";
 import { useEffect, useId, useRef, useState } from "react";
 import { Mic, MicOff, Headset, Phone, PhoneOff, LoaderCircle, X } from "lucide-react";
@@ -5,7 +6,7 @@ import { createPortal } from "react-dom";
 import { api } from "../lib/api";
 import { t } from "../i18n";
 
-export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;state:string;result:string;link:string;historyLimited?:boolean;executionStarted?:boolean|null;error?:{code:string;message:string}|null; }
+export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;state:string;result:string;link:string;progress?:SessionProgress;historyLimited?:boolean;executionStarted?:boolean|null;error?:{code:string;message:string}|null; }
 type Phase = "idle" | "connecting" | "connected" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
 export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask }: { globalMachineId?: string; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {

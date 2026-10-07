@@ -656,6 +656,18 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   await homeInbox.next("machine.changed");
   await clientInbox.next("event");
 
+  // The native stream is readable before completion, without replaying any host command.
+  const liveProgress = await app.inject({ method: "GET", url: `/api/sessions/${session.logicalSessionId}/progress`, headers: browserHeaders });
+  assert.equal(liveProgress.statusCode, 200, liveProgress.body);
+  assert.equal(liveProgress.headers["cache-control"], "no-store");
+  const progressBody = JSON.parse(liveProgress.body);
+  assert.equal(progressBody.nativeTurnId, "native-turn-1");
+  assert.equal(progressBody.source, "codex_app_server_events");
+  assert.equal(progressBody.items[0].title, "streamed, never persisted");
+  assert.equal(progressBody.items[0].status, "running");
+  const anonymousProgress = await app.inject({ method: "GET", url: `/api/sessions/${session.logicalSessionId}/progress` });
+  assert.equal(anonymousProgress.statusCode, 401);
+
   const gapPayload = { status: "done" };
   agentSocket.send(JSON.stringify({
     type: "event.append",

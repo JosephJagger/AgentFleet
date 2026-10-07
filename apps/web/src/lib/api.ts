@@ -16,6 +16,7 @@ import type {
   Machine,
   Project,
   SessionDetail,
+  SessionProgress,
   TimelineEvent,
   QueuedTurn,
   CommandReceipt,
@@ -778,6 +779,7 @@ export const api = {
     else if (session.state.unknownFreeze) writeBlockedReason = t("结果待核验，写入已冻结");
     return {
       session,
+      progress: rawDetail.progress as SessionProgress | undefined,
       hostOnline: machine?.reachability === "live",
       events: history.events,
       historyPage: { ...history, projectionEpoch: history.projectionEpoch || session.projectionEpoch, contentEpoch: history.contentEpoch || session.contentEpoch },
@@ -791,6 +793,9 @@ export const api = {
       queue,
       commands: commands.map(mapCommandReceipt),
     };
+  },
+  async sessionProgress(id:string,signal?:AbortSignal):Promise<SessionProgress> {
+    return request<SessionProgress>(`/api/sessions/${encodeURIComponent(id)}/progress`,{signal});
   },
   async createSession(machineId: string, projectId: string, title: string) {
     const raw = await request<JsonObject>("/api/sessions", {
