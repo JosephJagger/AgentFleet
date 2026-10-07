@@ -1,5 +1,5 @@
 import { REVIEWED_CODEX_SCHEMAS } from "./reviewed-codex-schemas.js";
-export const AGENT_VERSION = "0.30.82";
+export const AGENT_VERSION = "0.30.83";
 export const FLEET_PROTOCOL_VERSION = "1.0";
 export const STATE_SCHEMA_VERSION = 2;
 export const POLICY_VERSION = "remote-restricted-v1";

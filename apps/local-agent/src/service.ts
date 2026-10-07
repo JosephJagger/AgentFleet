@@ -347,6 +347,42 @@ export async function bootstrapLaunchdWithRetry(
   return last;
 }
 
+/** launchd teardown/start are asynchronous. Never kill a freshly bootstrapped job. */
+export async function bootoutLaunchdAndWait(
+  runCommand: CommandRunner, domain: string,
+  pause: (milliseconds: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)),
+): Promise<void> {
+  const target = `${domain}/${LAUNCHD_LABEL}`;
+  const removed = await runCommand("launchctl", ["bootout", target]);
+  for (let attempt = 0; attempt <= 30; attempt++) {
+    const status = await runCommand("launchctl", ["print", target]);
+    if ([3, 113].includes(status.exitCode ?? -1) || /could not find (?:specified )?service|service not found/i.test(status.stderr)) return;
+    if (status.exitCode !== 0) throw commandFailure("launchd unload status", status);
+    if (removed.exitCode !== 0 && removed.exitCode !== 37) throw commandFailure("launchd bootout", removed);
+    if (attempt < 30) await pause(1_000);
+  }
+  throw new AgentError("LAUNCHD_STOP_PENDING", "macOS 后台服务仍在退出，未重复启动或终止其他进程；请稍后重试。");
+}
+
+export async function activateLaunchdAndWait(
+  runCommand: CommandRunner, domain: string,
+  pause: (milliseconds: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)),
+): Promise<void> {
+  const target = `${domain}/${LAUNCHD_LABEL}`;
+  const enable = await runCommand("launchctl", ["enable", target]);
+  if (enable.exitCode !== 0) throw commandFailure("launchd enable", enable);
+  for (let attempt = 0; attempt <= 30; attempt++) {
+    const status = await runCommand("launchctl", ["print", target]);
+    if (status.exitCode === 0 && /^\s*state = running\s*$/m.test(status.stdout) && /^\s*pid = [1-9]\d*\s*$/m.test(status.stdout)) return;
+    if (attempt === 0) {
+      const started = await runCommand("launchctl", ["kickstart", target]);
+      if (started.exitCode !== 0 && started.exitCode !== 37) throw commandFailure("launchd kickstart", started);
+    }
+    if (attempt < 30) await pause(1_000);
+  }
+  throw new AgentError("LAUNCHD_START_PENDING", "macOS 尚未确认后台服务运行；已等待启动完成，请检查主机服务日志。");
+}
+
 export function buildLaunchdPlist(options: { launch: string[]; dataDir: string; codexExecutable?: string; codexHome?: string }): string {
   if (options.launch.length === 0 || !options.launch.every(isAbsolute)) {
     throw new AgentError("SERVICE_EXECUTABLE_INVALID", "launchd program paths must be absolute");
@@ -503,24 +539,21 @@ async function writeAndActivateLaunchd(options: {
   const runCommand = options.runCommand ?? defaultRunner;
   const domain = launchdDomain(uid);
   try {
-    await runCommand("launchctl", ["bootout", `${domain}/${LAUNCHD_LABEL}`]);
+    await bootoutLaunchdAndWait(runCommand, domain);
     const bootstrap = await bootstrapLaunchdWithRetry(runCommand, domain, path);
     if (bootstrap.exitCode !== 0) throw commandFailure("launchd bootstrap", bootstrap);
-    const enable = await runCommand("launchctl", ["enable", `${domain}/${LAUNCHD_LABEL}`]);
-    if (enable.exitCode !== 0) throw commandFailure("launchd enable", enable);
-    const kickstart = await runCommand("launchctl", ["kickstart", "-k", `${domain}/${LAUNCHD_LABEL}`]);
-    if (kickstart.exitCode !== 0) throw commandFailure("launchd kickstart", kickstart);
+    await activateLaunchdAndWait(runCommand, domain);
     return getLaunchdStatus({ ...(options.environment ? { environment: options.environment } : {}), runCommand, uid });
   } catch (error) {
     if (priorContents === undefined) await unlink(path).catch(() => undefined);
     else await atomicWrite(path, priorContents);
     if (priorContents !== undefined) {
-      await runCommand("launchctl", ["bootout", `${domain}/${LAUNCHD_LABEL}`]);
-      const restored = await bootstrapLaunchdWithRetry(runCommand, domain, path);
-      if (restored.exitCode === 0) {
-        await runCommand("launchctl", ["enable", `${domain}/${LAUNCHD_LABEL}`]);
-        await runCommand("launchctl", ["kickstart", "-k", `${domain}/${LAUNCHD_LABEL}`]);
-      }
+      // Preserve the original failure if restoring the previous service also fails.
+      try {
+        await bootoutLaunchdAndWait(runCommand, domain);
+        const restored = await bootstrapLaunchdWithRetry(runCommand, domain, path);
+        if (restored.exitCode === 0) await activateLaunchdAndWait(runCommand, domain);
+      } catch { /* The installer reports the original activation failure. */ }
     }
     throw error;
   }

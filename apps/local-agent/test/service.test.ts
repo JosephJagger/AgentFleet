@@ -8,6 +8,8 @@ import {
   buildLaunchdPlist,
   buildWindowsServiceLauncher,
   bootstrapLaunchdWithRetry,
+  bootoutLaunchdAndWait,
+  activateLaunchdAndWait,
   buildUserServiceUnit,
   installUserService,
   quoteSystemdArgument,
@@ -327,4 +329,38 @@ test("failed service update restores the previous unit", async () => {
     /restart rejected/,
   );
   assert.equal(await readFile(userServicePath(environment), "utf8"), originalUnit);
+});
+
+test("launchd activation waits through exit 37 without killing the new service", async () => {
+  const calls: string[][] = []; let reads = 0;
+  await activateLaunchdAndWait(async (_file,args) => {
+    calls.push(args);
+    if (args[0] === "print") return { exitCode: 0, stdout: ++reads < 3 ? "state = spawn scheduled" : "state = running\npid = 4321", stderr: "" };
+    return { exitCode: args[0] === "kickstart" ? 37 : 0, stdout: "", stderr: "" };
+  }, "gui/501", async () => {});
+  assert.equal(reads, 3);
+  assert.equal(calls.filter(args => args[0] === "kickstart").length, 1);
+  assert.ok(calls.every(args => !args.includes("-k")));
+});
+
+test("launchd registered but not running is never accepted as activation success", async () => {
+  await assert.rejects(activateLaunchdAndWait(async () => ({exitCode: 0, stdout: "state = waiting", stderr: ""}), "gui/501", async () => {}), /尚未确认后台服务运行/);
+  await assert.rejects(activateLaunchdAndWait(async (_file,args) => ({exitCode: args[0] === "kickstart" ? 5 : 0, stdout: "", stderr: "denied"}), "gui/501", async () => {}), /denied/);
+});
+
+test("launchd teardown waits for label removal, not just bootout acknowledgement", async () => {
+  let reads = 0;
+  await bootoutLaunchdAndWait(async (_file,args) => args[0] === "bootout" ? {exitCode:0,stdout:"",stderr:""} :
+    ++reads < 4 ? {exitCode:0,stdout:"state = running\npid = 1234",stderr:""} : {exitCode:113,stdout:"",stderr:"Could not find service"}, "gui/501", async () => {});
+  assert.equal(reads, 4);
+  await assert.rejects(bootoutLaunchdAndWait(async () => ({exitCode:0,stdout:"state = running",stderr:""}), "gui/501", async () => {}), /仍在退出/);
+});
+
+test("launchd bootout already-in-progress waits instead of rolling back immediately", async () => {
+  let reads = 0;
+  await bootoutLaunchdAndWait(async (_file,args) => {
+    if (args[0] === "bootout") return { exitCode: 37, stdout: "", stderr: "" };
+    return ++reads < 2 ? { exitCode: 0, stdout: "state = exiting", stderr: "" } : { exitCode: 113, stdout: "", stderr: "Could not find service" };
+  }, "gui/501", async () => {});
+  assert.equal(reads, 2);
 });
