@@ -124,7 +124,8 @@ export class PanelVoiceService {
       const rows=this.db.all<{body_json:string}>("SELECT b.body_json FROM durable_events e JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type='item.completed' AND e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY e.session_seq DESC LIMIT 30",job.session_id,job.native_turn_id);
       for(const row of rows) {const p=JSON.parse(row.body_json);const item=p.item;if(item?.type==='agentMessage'&&typeof item.text==='string'){result=item.text.slice(-6000);break;}}
     }
-    return {todoId:stored?.todo_id??null,originalIntent:stored?.original_intent??null,jobId:job.job_id,commandId:job.command_id,nativeTurnId:job.native_turn_id,sessionId:job.session_id,title:session.title,projectId:session.projectId,machineId:session.machineId,project:session.projectAlias,host:this.registry.getMachine(principal,session.machineId).name,state:job.state,progress:this.progress.read(principal,job.session_id,job.native_turn_id),result,historyLimited,error,executionStarted,commandState:command?.state??null,resultStatus:result?'available':executionStarted===false?'not_started':historyLimited?'history_unavailable':terminal?'no_output':'pending',link:`/sessions/${job.session_id}`};
+    const resolution=stored?.todo_id?this.memory.resolution(principal,stored.todo_id):null;
+    return {resolution,todoState:resolution?'completed':stored?'dispatched':null,todoId:stored?.todo_id??null,originalIntent:stored?.original_intent??null,jobId:job.job_id,commandId:job.command_id,nativeTurnId:job.native_turn_id,sessionId:job.session_id,title:session.title,projectId:session.projectId,machineId:session.machineId,project:session.projectAlias,host:this.registry.getMachine(principal,session.machineId).name,state:job.state,progress:this.progress.read(principal,job.session_id,job.native_turn_id),result,historyLimited,error,executionStarted,commandState:command?.state??null,resultStatus:result?'available':executionStarted===false?'not_started':historyLimited?'history_unavailable':terminal?'no_output':'pending',link:`/sessions/${job.session_id}`};
   }
   private describeSteer(principal:Principal,commandId:string,sessionId?:unknown) {
     const row=this.db.get<{logical_session_id:string;precondition_json:string}>("SELECT logical_session_id,precondition_json FROM commands WHERE command_id=? AND workspace_id=? AND actor_user_id=? AND type='turn.steer'",commandId,principal.workspaceId,principal.userId);
@@ -155,6 +156,7 @@ export class PanelVoiceService {
     if(args.action==='status'&&todo) {
       const linked=this.memory.linkedJob(todo.todo_id);
       invariant((args.sessionId===undefined||args.sessionId===todo.session_id)&&(args.jobId===undefined||args.jobId===linked?.job_id),404,'PANEL_JOB_NOT_FOUND','该待办范围内没有此任务');
+      if(this.memory.resolution(principal,todo.todo_id))return {...this.memory.describe(principal,todo),scope:'todo'};
       if(linked){const job=this.db.get<PanelJob>('SELECT * FROM panel_voice_jobs WHERE job_id=?',linked.job_id)!;return {...this.describe(principal,this.refresh(job)),scope:'todo'};}
       return {...this.memory.describe(principal,todo),scope:'todo'};
     }

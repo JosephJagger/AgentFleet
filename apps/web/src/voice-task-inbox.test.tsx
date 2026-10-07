@@ -30,3 +30,13 @@ it('pagination reads older records and a failed load is not shown as an empty in
  expect(api.voiceTasks).toHaveBeenLastCalledWith('recover','20',expect.any(AbortSignal));
  fireEvent.click(screen.getByText('刷新记录'));expect(await screen.findByRole('alert')).toBeTruthy();expect(screen.queryByText('暂无语音任务记录')).toBeNull();
 });
+it('manual completion displays the corrected outcome separately from the failed original job',async()=>{
+ vi.mocked(api.voiceTasks).mockResolvedValue(page([{...finished,state:'completed',resolution:{state:'completed',kind:'manual_continuation',nativeTurnId:'continued',createdAt:'2026-01-02',result:'Feature is shipped',historyLimited:false},job:{...finished.job!,state:'failed',error:{code:'CAPACITY',message:'Original capacity failure'}}}]));
+ render(<VoiceTaskInbox onOpenSession={()=>undefined}/>);
+ fireEvent.click(screen.getByText('待办与结果记录'));
+ expect(await screen.findByText('手动续办已完成')).toBeTruthy();
+ expect(screen.getByText('Feature is shipped')).toBeTruthy();
+ expect(screen.getByText('CAPACITY · Original capacity failure')).toBeTruthy();
+ expect(screen.queryByText('标记已知悉')).toBeNull();
+ expect(api.acknowledgeVoiceTodo).not.toHaveBeenCalled();
+});

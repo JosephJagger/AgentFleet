@@ -241,7 +241,7 @@ test('schema 49 migration preserves work and enables another host project after 
  let db=new ControlPlaneDatabase(path);
  db.sqlite.exec("DROP INDEX panel_voice_one_session_job; CREATE UNIQUE INDEX panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown'); PRAGMA user_version=49");db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,52);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,53);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_jobs')?.job_id,original.jobId);
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
  const registry=new RegistryService(db,config);const service=new PanelVoiceService(db,registry,new CoordinationService(db,config));
@@ -322,9 +322,9 @@ test('schema 50 backfills existing jobs without execution and recovery paginates
  const f=fixture();t.after(()=>f.db.close());const old=f.dispatch() as {jobId:string};
  const dir=mkdtempSync(join(tmpdir(),'voice-memory-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'test.sqlite');
  f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
- let db=new ControlPlaneDatabase(path);db.sqlite.exec('DROP TABLE panel_voice_task_records; DROP TABLE panel_voice_todos; PRAGMA user_version=50');db.close();
+ let db=new ControlPlaneDatabase(path);db.sqlite.exec('DROP TABLE panel_voice_todo_resolutions; DROP TABLE panel_voice_task_records; DROP TABLE panel_voice_todos; PRAGMA user_version=50');db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,52);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,53);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_task_records')?.job_id,old.jobId);
  assert.equal(db.get<{original_intent:string}>('SELECT original_intent FROM panel_voice_task_records')?.original_intent,'Read project status');
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
@@ -411,4 +411,66 @@ test('panel deployment fences new calls while active voice tools, task reports a
  f.db.run('DELETE FROM voice_deployment_guard');
  assert.equal(f.service.start(f.principal,'m',{}).state,'starting');
  assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,1);
+});
+
+function continuationFixture() {
+ const f=fixture(),task=f.dispatch() as {jobId:string;todoId:string};
+ f.db.run("UPDATE panel_voice_jobs SET state='failed',native_turn_id='original' WHERE job_id=?",task.jobId);
+ const at=new Date().toISOString();
+ const add=(seq:number,type:string,body:unknown,session=f.session.logicalSessionId)=>{
+  f.db.run('INSERT INTO content_blobs VALUES(?,?,?,?,?,?,NULL)',`continuation-${seq}`,f.principal.workspaceId,JSON.stringify(body),'hash',at,'9999-12-31T00:00:00Z');
+  f.db.run(`INSERT INTO durable_events(event_id,payload_hash,source_kind,workspace_id,logical_session_id,execution_segment_id,machine_id,project_id,session_seq,projection_epoch,native_thread_id,native_turn_id,type,schema_version,occurred_at,received_at,payload_ref,payload_state)
+   VALUES(?,'hash','agent',?,?,?,'m','p',?,1,'thread','continued',?,'1',?,?,?,'present')`,`continuation-event-${seq}`,f.principal.workspaceId,session,f.session.executionSegmentId,seq,type,at,at,`continuation-${seq}`);
+ };
+ add(1,'item.completed',{item:{type:'agentMessage',phase:'final_answer',text:'The requested feature is shipped.'}});
+ add(2,'turn.completed',{turn:{id:'continued',status:'completed'}});
+ const input={action:'todo.update',todoId:task.todoId,revision:2,sessionId:f.session.logicalSessionId,nativeTurnId:'continued',confirmed:true};
+ return {...f,task,input,add};
+}
+test('manual continuation resolves intent, preserves failed job, audits once and never dispatches on retry or recovery',t=>{
+ const f=continuationFixture();t.after(()=>f.db.close());
+ const update=()=>f.service.tool(f.principal,f.call.voice_id,'resolve',f.input) as {state:string;resolution:{result:string};job:{state:string}};
+ const result=update();assert.equal(result.state,'completed');assert.equal(result.job.state,'failed');
+ assert.equal(result.resolution.result,'The requested feature is shipped.');
+ assert.equal(f.service.recover(f.principal).total,0);
+ assert.equal(f.service.recover(f.principal,{view:'all'}).items[0]!.state,'completed');
+ assert.equal(update().state,'completed');
+ assert.equal(f.db.get<{n:number}>("SELECT count(*) n FROM audit_entries WHERE action='voice.todo.manual_completion'")!.n,1);
+ const status=f.service.tool(f.principal,f.call.voice_id,'status',{action:'status',todoId:f.task.todoId}) as {state:string;job:{state:string}};
+ assert.equal(status.state,'completed');assert.equal(status.job.state,'failed');
+ const exact=f.service.tool(f.principal,f.call.voice_id,'status',{action:'status',jobId:f.task.jobId}) as {state:string;todoState:string};
+ assert.equal(exact.state,'failed');assert.equal(exact.todoState,'completed');
+ const retried=f.service.tool(f.principal,f.call.voice_id,'retry',{action:'dispatch',todoId:f.task.todoId,sessionId:f.session.logicalSessionId,confirmed:true}) as {jobId:string};
+ assert.equal(retried.jobId,f.task.jobId);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')!.n,1);
+ assert.equal(f.db.all('PRAGMA foreign_key_check').length,0);
+});
+test('manual completion rejects missing consent, wrong owner/session/turn, stale revision and unfinished jobs',t=>{
+ const f=continuationFixture();t.after(()=>f.db.close());
+ const update=(extra:Record<string,unknown>)=>f.service.memory.update(f.principal,f.task.todoId,{...f.input,...extra});
+ assert.throws(()=>update({confirmed:false}),/明确确认/);
+ assert.throws(()=>update({sessionId:'different'}),/原会话/);
+ assert.throws(()=>update({jobId:'different'}),/任务标识/);
+ assert.throws(()=>update({revision:1}),/已变化/);
+ assert.throws(()=>update({nativeTurnId:'original'}),/独立/);
+ assert.throws(()=>update({nativeTurnId:'missing'}),/完成证据/);
+ assert.throws(()=>f.service.memory.update({...f.principal,userId:'other'},f.task.todoId,f.input),/没有此语音待办/);
+ f.db.run("UPDATE panel_voice_jobs SET state='unknown'");
+ assert.throws(()=>update({}),/尚未确定结束/);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM panel_voice_todo_resolutions')!.n,0);
+});
+test('completion evidence must be current, final, native and accessible; expiry removes content but not resolution',t=>{
+ const f=continuationFixture();t.after(()=>f.db.close());
+ const update=()=>f.service.memory.update(f.principal,f.task.todoId,f.input);
+ f.db.run("UPDATE projects SET sync_content=0");assert.throws(update,/未授权/);f.db.run("UPDATE projects SET sync_content=1");
+ f.db.run("UPDATE durable_events SET source_kind='control_plane' WHERE event_id='continuation-event-2'");
+ assert.throws(update,/完成证据/);f.db.run("UPDATE durable_events SET source_kind='agent'");
+ f.db.run("UPDATE content_blobs SET expires_at='2000-01-01' WHERE payload_ref='continuation-1'");
+ assert.throws(update,/最终回复/);f.db.run("UPDATE content_blobs SET expires_at='9999-12-31T00:00:00Z'");
+ update();
+ f.db.run("UPDATE content_blobs SET deleted_at=? WHERE payload_ref='continuation-1'",new Date().toISOString());
+ const record=f.service.recover(f.principal,{view:'all'}).items[0]!;
+ assert.equal(record.state,'completed');assert.equal(record.resolution!.result,'');assert.equal(record.resolution!.historyLimited,true);
+ assert.equal(f.service.recover(f.principal).total,0);
+ assert.throws(()=>f.service.memory.update(f.principal,f.task.todoId,{...f.input,nativeTurnId:'different'}),/不能覆盖/);
 });

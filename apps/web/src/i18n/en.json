@@ -3169,5 +3169,9 @@
   "主机状态未确认，显示最后已知任务状态": "Host status is unconfirmed; showing last-known task status.",
   "已取消": "Cancelled",
   "暂无本次通话派发的任务": "No tasks dispatched in this call",
-  "任务详情": "Task details"
+  "任务详情": "Task details",
+  "手动续办已完成": "Completed by manual continuation",
+  "完成轮次": "Completion turn",
+  "续办完成结果": "Continuation result",
+  "以下为原派发任务记录，保留原执行结果": "Original dispatched task and execution outcome"
 }

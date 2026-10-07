@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 52) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 53) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1422,6 +1422,17 @@ export class ControlPlaneDatabase {
       PRAGMA user_version=51`);
     });
     if (version < 52) this.transaction(() => { this.sqlite.exec(voiceDeploymentSchema); this.sqlite.exec("PRAGMA user_version=52"); });
+    if (version < 53) this.transaction(() => { this.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS panel_voice_todo_resolutions (
+        todo_id TEXT PRIMARY KEY REFERENCES panel_voice_todos(todo_id),
+        job_id TEXT NOT NULL REFERENCES panel_voice_jobs(job_id),
+        session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id),
+        native_turn_id TEXT NOT NULL, completion_event_id TEXT NOT NULL, final_event_id TEXT NOT NULL,
+        final_payload_ref TEXT NOT NULL, content_epoch INTEGER NOT NULL, result_hash TEXT NOT NULL,
+        actor_user_id TEXT NOT NULL REFERENCES users(user_id), created_at TEXT NOT NULL
+      ) STRICT;
+      PRAGMA user_version=53`); });
+
   }
 
   transaction<T>(operation: () => T): T {
