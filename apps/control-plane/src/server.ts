@@ -1592,8 +1592,10 @@ export async function buildControlPlane(
 
       socket.on("message", (data: RawData) => {
         if (closing) return;
+        let incomingType:string|undefined;
         try {
           const message = record(parseWsMessage(data), "WebSocket message must be an object") as unknown as AgentToServerMessage;
+          incomingType=typeof message.type==='string'&&/^[a-zA-Z0-9_.]{1,48}$/.test(message.type)?message.type:undefined;
           if(message.type === "session.history.result"){historyBroker.receive(identity.machineId,socket,message);return;}
           if (message.type === "hello") {
             state.reconciliationReady = false;
@@ -1891,7 +1893,8 @@ export async function buildControlPlane(
           }
         } catch (error) {
           const appError = error instanceof AppError ? error : new AppError(400, "WS_MESSAGE_INVALID", "Invalid WebSocket message");
-          request.log.warn({ code: appError.code, machineId: identity.machineId }, "agent message rejected");
+          const invalidField=appError.code==='INVALID_INPUT'?appError.message.match(/^([a-zA-Z][a-zA-Z0-9_.]{0,80}) (?:is invalid|must be a string)$/)?.[1]:undefined;
+          request.log.warn({ code: appError.code, frameType:incomingType, invalidField, machineId: identity.machineId }, "agent message rejected");
           sendJson(socket, { type: "error", code: appError.code, message: appError.message });
           if (appError.statusCode === 401 || appError.statusCode === 403) socket.close(1008, appError.code);
         }
