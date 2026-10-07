@@ -573,6 +573,8 @@ export async function buildControlPlane(
       schemaVersion: Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
       serverTime: nowIso(),
       uptimeSeconds: Math.floor(process.uptime()),
+      voiceDeploymentGuard: 1,
+      build: process.env.AGENTFLEET_BUILD_SHA ?? "unknown",
     };
   };
   app.get("/healthz", async () => readiness());

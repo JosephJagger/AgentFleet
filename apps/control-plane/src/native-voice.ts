@@ -1,3 +1,4 @@
+import { assertVoiceAdmission } from "./voice-deployment.js";
 import type { CoordinationService } from "./coordination.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
 import type { ControlPlaneDatabase } from "./db.js";
@@ -23,6 +24,7 @@ export class NativeVoiceService {
   constructor(private db: ControlPlaneDatabase, private registry: RegistryService) {}
   start(principal: Principal, id: string, leaseId: string, connection: Pick<VoiceBinding, "producerEpoch" | "appServerEpoch" | "transportGeneration">): VoiceBinding {
     return this.db.transaction(() => {
+      assertVoiceAdmission(this.db);
       const session = this.registry.getSession(principal, id);
       invariant(session.provider !== "claude" && session.managed && session.nativeThreadId && session.reachability === "live" && session.actions.start.allowed, 409, "VOICE_NOT_READY", "请等待主机在线、会话接管完成且项目空闲后开始语音");
       const lease=this.db.get<{holder_client_session_id:string}>("SELECT holder_client_session_id FROM control_leases WHERE control_lease_id=? AND logical_session_id=? AND state='active' AND expires_at>?",leaseId,id,nowIso());

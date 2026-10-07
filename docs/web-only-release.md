@@ -8,8 +8,9 @@ For changes confined to the web application, use `packaging/Dockerfile.web` with
 docker build -f packaging/Dockerfile.web \
   --build-arg BASE_IMAGE=agentfleet:previous \
   --build-arg AGENTFLEET_BUILD_SHA=<commit-sha> \
-  -t agentfleet:local .
-docker compose up -d --no-deps --no-build control-plane
+  -t agentfleet:prepared-web .
+python3 packaging/deploy-control-plane.py --database /path/to/control-plane.sqlite \
+  --image agentfleet:prepared-web --wait-seconds 60
 ```
 
 This replaces browser assets, including removal of obsolete bundles, while preserving backend code, installers, and published Agent downloads. Verify `/ready`, browser asset delivery, and unchanged download manifests and artifact checksums.
@@ -17,3 +18,5 @@ This replaces browser assets, including removal of obsolete bundles, while prese
 For backend and web changes without Agent changes, use `packaging/Dockerfile.control-plane` with a verified base image. Use the standard Dockerfile for Agent or packaging changes. Never rebuild different Agent bytes under an already published version; assign a new version instead.
 
 A control-plane restart may interrupt connections and leave unresolved actions frozen. Verify host reconnection and existing session state without replaying commands. Only unfreeze uncertain writes after checking their actual outcome.
+
+All panel publications, including web-only images, must follow [voice-safe deployment](voice-safe-deployment.md). A web-only container replacement still closes voice sockets. The verified base must support the deployment guard (schema 52); use the control-plane build to introduce it on older installations.

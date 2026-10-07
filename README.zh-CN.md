@@ -303,25 +303,27 @@ panel.example.com {
 
 ### 6. 更新、排错与备份
 
-如果搭建时遇到的问题已经在 GitHub 修复，不需要重新克隆项目。在原项目目录执行：
+如果搭建时遇到的问题已经在 GitHub 修复，不需要重新克隆项目。先按[安全发布流程](docs/voice-safe-deployment.md)构建并验证独立标签 `agentfleet:prepared`，再执行以下切换步骤。数据库路径必须替换为实际持久卷中的 SQLite 文件；有通话时等待，超时延后。
 
 ```sh
 cd AgentFleet
 git status --short
 git rev-parse --short HEAD
 git pull --ff-only
-docker compose up -d --build
+# 按安全发布文档构建并验证 agentfleet:prepared 后再切换
+python3 packaging/deploy-control-plane.py --database /path/to/control-plane.sqlite --image agentfleet:prepared --wait-seconds 60
 curl --fail http://127.0.0.1:3215/ready
 ```
 
-`git pull` 只更新 Git 管理的项目文件，不会替换已被忽略的 `.env`，也不会清空 Docker 命名卷。`docker compose up -d --build` 会用刚拉取的源码重新构建，并只重建需要更新的容器。
+`git pull` 只更新 Git 管理的项目文件，不会替换已被忽略的 `.env`，也不会清空 Docker 命名卷。发布脚本使用已经构建并验证的镜像，等待已有通话结束后只切换面板容器。
 
 如果 `git pull --ff-only` 提示存在本地代码改动，先安全暂存再更新：
 
 ```sh
 git stash push -u -m "before AgentFleets update"
 git pull --ff-only
-docker compose up -d --build
+# 按安全发布文档构建并验证 agentfleet:prepared 后再切换
+python3 packaging/deploy-control-plane.py --database /path/to/control-plane.sqlite --image agentfleet:prepared --wait-seconds 60
 ```
 
 使用 `git stash list` 和 `git stash show -p` 查看暂存内容。确认仍然需要时再执行 `git stash pop`；旧代码改动可能与新版本冲突。被 Git 忽略的 `.env` 不会被这条暂存命令收走。

@@ -1,3 +1,4 @@
+import voiceDeploymentSchema from "./voice-deployment-schema.json" with { type: "json" };
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
@@ -799,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 51) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 52) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1420,6 +1421,7 @@ export class ControlPlaneDatabase {
         FROM panel_voice_jobs j JOIN commands cmd ON cmd.command_id=j.command_id JOIN panel_voice_todos t ON t.todo_id='vtodo_'||j.job_id JOIN logical_sessions s ON s.logical_session_id=j.session_id;
       PRAGMA user_version=51`);
     });
+    if (version < 52) this.transaction(() => { this.sqlite.exec(voiceDeploymentSchema); this.sqlite.exec("PRAGMA user_version=52"); });
   }
 
   transaction<T>(operation: () => T): T {

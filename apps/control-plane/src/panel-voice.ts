@@ -1,3 +1,4 @@
+import { assertVoiceAdmission } from "./voice-deployment.js";
 import { VoiceTaskStore } from "./voice-task-store.js";
 import { SessionProgressService } from "./session-progress.js";
 import type { ControlPlaneDatabase } from "./db.js";
@@ -27,6 +28,7 @@ export class PanelVoiceService {
   recover(principal:Principal,options:{cursor?:unknown;view?:unknown}={}) {this.syncMemory(principal);return this.memory.list(principal,options);}
 
   start(principal:Principal,machineId:string,binding:Record<string,unknown>) {
+    assertVoiceAdmission(this.db);
     const machine=this.registry.getMachine(principal,machineId);
     invariant(!machine.maintenance,409,"MACHINE_DRAINING","主机正在维护，等待安全重启；完成后才能开始新通话");
     invariant(!this.db.get("SELECT 1 FROM panel_voice_calls WHERE user_id=? AND state<>'closed'",principal.userId),409,"PANEL_VOICE_BUSY","已有面板总控通话，请先结束原通话");

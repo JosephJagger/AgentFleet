@@ -303,25 +303,27 @@ The enrollment ticket is single-use and short-lived; do not share it. The Agent 
 
 ### 6. Update, recover, and back up
 
-When a setup problem has been fixed in GitHub, update the existing installation instead of cloning it again:
+Update the existing installation instead of cloning it again. After pulling source, build and verify the separate `agentfleet:prepared` image using [voice-safe deployment](docs/voice-safe-deployment.md). Replace the database placeholder with the actual persistent SQLite path. Active calls defer the switch:
 
 ```sh
 cd AgentFleet
 git status --short
 git rev-parse --short HEAD
 git pull --ff-only
-docker compose up -d --build
+# Build and verify agentfleet:prepared following the safe deployment guide first
+python3 packaging/deploy-control-plane.py --database /path/to/control-plane.sqlite --image agentfleet:prepared --wait-seconds 60
 curl --fail http://127.0.0.1:3215/ready
 ```
 
-`git pull` updates the tracked project files. It does not replace the ignored `.env` file or erase the Docker named volumes. `docker compose up -d --build` rebuilds the application from the newly downloaded source and recreates only the containers that need changing.
+`git pull` updates the tracked project files. It does not replace the ignored `.env` file or erase the Docker named volumes. The publisher uses an already built and verified image and replaces only the panel container after existing calls end.
 
 If `git pull --ff-only` reports local tracked changes, preserve them before updating:
 
 ```sh
 git stash push -u -m "before AgentFleets update"
 git pull --ff-only
-docker compose up -d --build
+# Build and verify agentfleet:prepared following the safe deployment guide first
+python3 packaging/deploy-control-plane.py --database /path/to/control-plane.sqlite --image agentfleet:prepared --wait-seconds 60
 ```
 
 Use `git stash list` and `git stash show -p` to review the saved changes. Apply them later with `git stash pop` only if they are still needed; old source changes may conflict with the new version. The ignored `.env` file is not included by this command.
