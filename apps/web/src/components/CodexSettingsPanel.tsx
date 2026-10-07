@@ -1,3 +1,4 @@
+import { ChevronDown, Plug, ListTree } from "lucide-react";
 import { t, systemText } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
@@ -94,11 +95,11 @@ export function CodexSettingsPanel({ sessionId = "", machineId, projectId, works
         {options[field].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select></label>;
     })}</div>}
-    {data && <details className="config-source-details"><summary>{t("本范围停用的插件")}</summary><p>{t("仅影响新任务，不卸载主机插件。其他未单独覆盖的会话沿用上级设置。")}</p>
+    {data && <details className="config-source-details config-disclosure"><summary><Plug size={18} aria-hidden="true"/><span>{t("本范围停用的插件")}</span><ChevronDown className="config-disclosure__chevron" size={18} aria-hidden="true"/></summary><div className="config-disclosure__body"><p>{t("仅影响新任务，不卸载主机插件。其他未单独覆盖的会话沿用上级设置。")}</p>
       <label>{t("插件使用方式")}<select value={draft.disabledPluginIds === undefined ? "inherit" : draft.disabledPluginIds === "__native__" ? "native" : "custom"} disabled={busy} onChange={e => setDraft(previous => { const next = { ...previous }; if(e.target.value === "inherit") delete next.disabledPluginIds; else next.disabledPluginIds = e.target.value === "native" ? "__native__" : []; return next; })}><option value="inherit">{t("沿用默认配置")}</option><option value="native">{t("使用原生值（不继承上级）")}</option><option value="custom">{t("选择要停用的插件")}</option></select></label>
       {Array.isArray(draft.disabledPluginIds) && <>{!plugins.length && <p>{t("主机尚未上报已安装插件")}</p>}{[...plugins, ...disabledPlugins.filter(id => !plugins.some(p => p.pluginId === id)).map(id => ({pluginId:id,pluginName:id}))].map(plugin => <label className="checkbox-row" key={plugin.pluginId}><input type="checkbox" checked={disabledPlugins.includes(plugin.pluginId)} disabled={busy} onChange={e => setDraft(previous => ({...previous,disabledPluginIds:e.target.checked ? [...disabledPlugins,plugin.pluginId] : disabledPlugins.filter(id => id !== plugin.pluginId)}))}/>{plugin.pluginName}</label>)}</>}
-    </details>}
-    {data && <details className="config-source-details"><summary>{t("查看配置来源")}</summary><dl>{fields.map(field => <div key={field}><dt>{t(labels[field])}</dt><dd>{sourceLabel(data.sources?.[field] ?? data.source)} · {data.effective?.[field] === "__native__" || data.effective?.[field] === undefined ? t("原生值") : data.effective[field] === null ? t("恢复默认档位") : data.effective[field]}</dd></div>)}</dl></details>}
+    </div></details>}
+    {data && <details className="config-source-details config-disclosure"><summary><ListTree size={18} aria-hidden="true"/><span>{t("查看配置来源")}</span><ChevronDown className="config-disclosure__chevron" size={18} aria-hidden="true"/></summary><div className="config-disclosure__body"><dl>{fields.map(field => <div key={field}><dt>{t(labels[field])}</dt><dd>{sourceLabel(data.sources?.[field] ?? data.source)} · {data.effective?.[field] === "__native__" || data.effective?.[field] === undefined ? t("原生值") : data.effective[field] === null ? t("恢复默认档位") : data.effective[field]}</dd></div>)}</dl></div></details>}
     {workspace && <p className="subtle">{t("选项来自各主机上报的目录；任务提交时按目标主机再次校验，不会自动替换模型。")}</p>}
     {!workspace && data?.compatibilityIssue && <p role="alert">{systemText(data.compatibilityIssue)}</p>}
     {data && !catalogs.length && <p>{t("暂无可用模型目录，可清除覆盖或刷新后重试。")}</p>}
