@@ -222,3 +222,7 @@ dialog.modal.usage-dialog > .usage-body { flex: 1 1 auto; min-height: 0; overflo
 .project-tools-panel { min-width: 0; }
 .project-tools-panel .settings-sections { position: sticky; top: 0; background: var(--paper); z-index: 1; margin-top: 0; }
 .project-tools-panel .settings-sections > button { flex: 1; min-width: 0; justify-content: center; padding-inline: 8px; }
+
+.voice-drag-handle { cursor: grab; touch-action: none; user-select: none; }
+.voice-drag-handle:active { cursor: grabbing; }
+.voice-drag-handle button { cursor: pointer; touch-action: manipulation; }

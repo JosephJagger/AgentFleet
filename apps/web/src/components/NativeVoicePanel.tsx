@@ -1,3 +1,4 @@
+import { useDraggablePanel } from "../lib/use-draggable-panel";
 import { useEffect, useId, useRef, useState } from "react";
 import { Mic, MicOff, Headset, Phone, PhoneOff, LoaderCircle, X } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -13,6 +14,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const panel = useRef<HTMLDivElement>(null);
   const [portalHost, setPortalHost] = useState<Element | null>(null);
   useEffect(() => { setPortalHost(globalMachineId ? document.body : control.current?.closest(".inspector") ?? null); }, [sessionId,globalMachineId]);
+  const dragging = useDraggablePanel(panel, expanded && Boolean(portalHost));
   const trigger = useRef<HTMLButtonElement>(null);
   const popoverId = useId();
   useEffect(() => {
@@ -142,8 +144,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   }
   const active = phase === "connecting" || phase === "connected";
   const status = active ? t(phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
-  const callPanel = expanded && <div ref={panel} id={popoverId} className={`native-voice__popover${globalMachineId ? " native-voice__popover--global" : ""}`} role="region" aria-label={t("原生实时语音")}>
-    <div className="native-voice__head"><strong>{t(globalMachineId ? "面板语音总控" : "语音通话")}</strong><button type="button" className="native-voice__close" aria-label={t("收起语音控制")} onClick={() => { setExpanded(false); trigger.current?.focus(); }}><X size={16} /></button></div>
+  const callPanel = expanded && <div ref={panel} style={dragging.style} id={popoverId} className={`native-voice__popover${globalMachineId ? " native-voice__popover--global" : ""}`} role="region" aria-label={t("原生实时语音")}>
+    <div className="native-voice__head voice-drag-handle" {...dragging.handle}><strong>{t(globalMachineId ? "面板语音总控" : "语音通话")}</strong><button type="button" className="native-voice__close" aria-label={t("收起语音控制")} onClick={() => { setExpanded(false); trigger.current?.focus(); }}><X size={16} /></button></div>
     <div className={`native-voice__orb${active && !muted ? " native-voice__orb--live" : ""}`} aria-hidden="true">{phase === "connecting" && <LoaderCircle className="spin" size={24} />}</div>
     <p className="native-voice__status" role="status">{status}</p>
     {message && <p className="native-voice__error" role="alert">{message}</p>}

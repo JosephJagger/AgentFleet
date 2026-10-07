@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useDraggablePanel } from "../lib/use-draggable-panel";
+import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Headset, X, ExternalLink } from "lucide-react";
 import { NativeVoicePanel, type PanelVoiceTask } from "./NativeVoicePanel";
@@ -7,6 +8,8 @@ import type { Dashboard } from "../lib/types";
 
 export function PanelVoiceControl({ machines, onOpenSession }: { machines:Dashboard['machines'];onOpenSession:(id:string)=>void }) {
   const [expanded,setExpanded]=useState(false);
+  const panel = useRef<HTMLElement>(null);
+  const dragging = useDraggablePanel(panel, expanded);
   const [host,setHost]=useState('');
   const [active,setActive]=useState(false);
   const [task,setTask]=useState<PanelVoiceTask>();
@@ -16,8 +19,8 @@ export function PanelVoiceControl({ machines, onOpenSession }: { machines:Dashbo
     <button className={`button button--secondary${active?' panel-voice-control--active':''}`} type="button" aria-label={t("面板语音总控")} aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}><Headset size={18}/><span>{t("语音总控")}</span>{active&&<i aria-hidden="true"/>}</button>
     {createPortal(<>
     {active&&<button type="button" className="button button--secondary panel-voice-control__floating" onClick={()=>setExpanded(true)} aria-label={t("面板语音总控")}><Headset size={16}/>{t("总控通话控制")}</button>}
-    <section className="panel-voice-control__settings" hidden={!expanded} aria-label={t("面板语音总控")}>
-      <header><strong className="panel-voice-control__title"><Headset size={22}/>{t("语音总控")}</strong><button className="icon-button" aria-label={t("关闭")} onClick={()=>setExpanded(false)}><X size={17}/></button></header>
+    <section ref={panel} style={dragging.style} className="panel-voice-control__settings" hidden={!expanded} aria-label={t("面板语音总控")}>
+      <header className="voice-drag-handle" {...dragging.handle}><strong className="panel-voice-control__title"><Headset size={22}/>{t("语音总控")}</strong><button className="icon-button" aria-label={t("关闭")} onClick={()=>setExpanded(false)}><X size={17}/></button></header>
       <p>{t("说出主机、项目和任务，总控帮你派发并汇报。")}</p>
       <label>{t("语音主机")}<select value={selected} disabled={active||!eligible.length} onChange={e=>setHost(e.target.value)}>{!eligible.length&&<option value="">{t("等待支持总控的主机上线")}</option>}{eligible.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
       <p className="panel-voice-control__hint">{t("使用此主机的 Codex 账号通话，可指挥其他主机。")}</p>
