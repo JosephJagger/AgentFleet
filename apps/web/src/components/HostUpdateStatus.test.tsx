@@ -1,6 +1,8 @@
-import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+// @vitest-environment jsdom
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, it, expect } from "vitest";
 import { HostUpdateStatus } from "./HostUpdateStatus";
+afterEach(cleanup);
 describe("host update truthfulness", () => {
   it("distinguishes a staged install from the actual running version", () => {
     render(<HostUpdateStatus machine={{agentVersion:"0.30.78",reachability:"live",codexProfile:{agentInstalledVersion:"0.30.84",agentUpdateTarget:"0.30.84",agentUpdateState:"verifying"}}}/>);

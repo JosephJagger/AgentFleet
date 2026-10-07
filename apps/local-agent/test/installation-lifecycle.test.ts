@@ -44,7 +44,7 @@ test("prepare may download during a task but activation waits and binds the exac
   let idle=false, prepared=0, activated=0;
   const updater = new AgentAutoUpdater({currentVersion:"0.1.0",controlPlaneUrl:"https://fleet.example",dataDir:"unused",
     canUpdate:()=>idle,onStaged:()=>{},logger:{info:()=>{},warn:()=>{}},
-    fetchImpl:async input => new Response(String(input).endsWith("manifest.json")?JSON.stringify({schemaVersion:1,version:"0.2.0"}):"#!/bin/sh\nexit 0\n"),
+    fetchImpl:async input => new Response(String(input).endsWith("manifest.json")?JSON.stringify({schemaVersion:1,version:"0.2.0"}):(process.platform==="win32"?"param()\nexit 0\n":"#!/bin/sh\nexit 0\n")),
     prepareUpdate:async options=>{assert.equal(options.prepareOnly,true);assert.equal(options.expectedVersion,"0.2.0");prepared++;},
     stageUpdate:async options=>{assert.equal(idle,true);assert.equal(options.expectedVersion,"0.2.0");activated++;},
   });

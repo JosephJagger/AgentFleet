@@ -229,7 +229,9 @@ export async function platformProcessStartToken(pid: number): Promise<string | u
       return started ? `darwin:${started}` : undefined;
     }
     if (process.platform === "win32") {
-      const script = `(Get-CimInstance Win32_Process -Filter \"ProcessId=${pid}\").CreationDate.ToUniversalTime().Ticks`;
+      // Same-user process identity does not need the WMI/CIM service, whose
+      // cold startup can exceed the ownership deadline on Windows.
+      const script = `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().Ticks`;
       const { stdout } = await execFileAsync(
         "powershell.exe",
         ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script],

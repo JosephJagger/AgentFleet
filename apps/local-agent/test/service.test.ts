@@ -113,7 +113,7 @@ test("launchd bootstrap waits for bootout completion and accepts an already regi
   assert.equal((await bootstrapLaunchdWithRetry(registered,"gui/501","/tmp/job.plist",async()=>{})).exitCode,0);
 });
 
-test("user service install, update, and uninstall use only systemctl --user", async () => {
+test("user service install, update, and uninstall use only systemctl --user", { skip: process.platform !== "linux" }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "agentfleet-service-test-"));
   const executable = join(directory, "agentfleet-bin");
   await writeFile(executable, "binary");
@@ -145,7 +145,7 @@ test("user service install, update, and uninstall use only systemctl --user", as
   assert.ok(calls.every(([file, first]) => file === "loginctl" || (file === "systemctl" && first === "--user")));
 });
 
-test("user service install persists the installer-selected Codex executable", async () => {
+test("user service install persists the installer-selected Codex executable", { skip: process.platform !== "linux" }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "agentfleet-service-codex-test-"));
   const executable = join(directory, "agentfleet-bin");
   const codexExecutable = join(directory, "managed-codex");
@@ -200,12 +200,12 @@ test("root lifecycle uses the system manager without user-scope flags", { skip: 
   assert.ok(calls.every(([file, first]) => file === "systemctl" && first !== "--user"));
 });
 
-test("root service data directory cannot be redirected by argv or API callers", () => {
+test("root service data directory cannot be redirected by argv or API callers", { skip: process.platform !== "linux" }, () => {
   assert.equal(resolveServiceDataDir("/home/untrusted/agentfleet", 0), ROOT_AGENT_DATA_DIR);
   assert.equal(resolveServiceDataDir("./relative-state", 1000), resolve("./relative-state"));
 });
 
-test("root Codex resolution prefers the root-managed executable", async () => {
+test("root Codex resolution prefers the root-managed executable", { skip: process.platform !== "linux" }, async () => {
   assert.equal(ROOT_MANAGED_CODEX_EXECUTABLE, "/root/.local/share/agentfleet/codex/codex");
   assert.equal(await resolveCodexExecutable(0, {}, "/bin/true"), resolve("/usr/bin/true"));
 });
@@ -217,7 +217,7 @@ test("system service unit uses the boot target", () => {
   assert.doesNotMatch(unit, /evil|untrusted/);
 });
 
-test("root runtime ignores inherited user HOME, XDG paths, PATH, and Node injection variables", () => {
+test("root runtime ignores inherited user HOME, XDG paths, PATH, and Node injection variables", { skip: process.platform !== "linux" }, () => {
   const environment: NodeJS.ProcessEnv = {
     HOME: "/home/untrusted",
     XDG_DATA_HOME: "/home/untrusted/data",
@@ -237,7 +237,7 @@ test("root runtime ignores inherited user HOME, XDG paths, PATH, and Node inject
   assert.equal(environment.CODEX_HOME, ROOT_CODEX_HOME);
 });
 
-test("system service rejects an executable reachable through a world-writable parent", async () => {
+test("system service rejects an executable reachable through a world-writable parent", { skip: process.platform !== "linux" }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "agentfleet-unsafe-root-exec-"));
   const executable = join(directory, "agentfleet");
   await writeFile(executable, "binary");
@@ -245,7 +245,7 @@ test("system service rejects an executable reachable through a world-writable pa
   await assert.rejects(resolveServiceLaunch(executable, "system"), /root-owned and not group\/world writable/);
 });
 
-test("service rollback swaps only installer-managed version links and restarts", async () => {
+test("service rollback swaps only installer-managed version links and restarts", { skip: process.platform !== "linux" }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "agentfleet-rollback-test-"));
   const dataHome = join(directory, "data");
   const binaryRoot = join(dataHome, "agentfleet", "bin");
@@ -292,7 +292,7 @@ test("service rollback swaps only installer-managed version links and restarts",
   assert.match(await readFile(userServicePath(environment), "utf8"), new RegExp(currentLink.replaceAll("/", "\\/")));
 });
 
-test("failed service update restores the previous unit", async () => {
+test("failed service update restores the previous unit", { skip: process.platform !== "linux" }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "agentfleet-service-update-fail-"));
   const oldExecutable = join(directory, "old-agentfleet");
   const newExecutable = join(directory, "new-agentfleet");
