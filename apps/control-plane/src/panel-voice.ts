@@ -116,6 +116,13 @@ export class PanelVoiceService {
     }
     return {todoId:stored?.todo_id??null,originalIntent:stored?.original_intent??null,jobId:job.job_id,commandId:job.command_id,nativeTurnId:job.native_turn_id,sessionId:job.session_id,title:session.title,projectId:session.projectId,machineId:session.machineId,project:session.projectAlias,host:this.registry.getMachine(principal,session.machineId).name,state:job.state,progress:this.progress.read(principal,job.session_id,job.native_turn_id),result,historyLimited,error,executionStarted,commandState:command?.state??null,resultStatus:result?'available':executionStarted===false?'not_started':historyLimited?'history_unavailable':terminal?'no_output':'pending',link:`/sessions/${job.session_id}`};
   }
+  private describeSteer(principal:Principal,commandId:string,sessionId?:unknown) {
+    const row=this.db.get<{logical_session_id:string;precondition_json:string}>("SELECT logical_session_id,precondition_json FROM commands WHERE command_id=? AND workspace_id=? AND actor_user_id=? AND type='turn.steer'",commandId,principal.workspaceId,principal.userId);
+    invariant(row&&(sessionId===undefined||sessionId===row.logical_session_id),404,'PANEL_COMMAND_NOT_FOUND','该范围内没有此追加指令');
+    const session=this.registry.getSession(principal,row.logical_session_id);
+    const command=this.coordination.getCommand(principal,commandId);
+    return {action:'steer',commandId,sessionId:session.logicalSessionId,projectId:session.projectId,machineId:session.machineId,nativeTurnId:JSON.parse(row.precondition_json).nativeTurnId,commandState:command.state,outcome:command.outcome,error:command.error??null,message:'追加指令状态以主机回执为准；不会启动新的任务'};
+  }
   tool(principal:Principal,voiceId:string,requestId:string,input:unknown) {
     invariant(typeof input==='object'&&input!==null&&!Array.isArray(input),400,"PANEL_INPUT","Invalid tool input");
     const args=input as Record<string,unknown>;
@@ -156,10 +163,31 @@ export class PanelVoiceService {
       args.sessionId=args.sessionId??todo.session_id;args.prompt=args.prompt??todo.intent;
     }
 
+    if(args.action==='status'&&typeof args.commandId==='string')return this.describeSteer(principal,args.commandId,args.sessionId);
+    if(args.action==='steer') {
+      invariant(typeof args.sessionId==='string'&&typeof args.nativeTurnId==='string'&&args.nativeTurnId.length>0&&typeof args.prompt==='string'&&args.prompt.trim().length>0&&args.prompt.length<=20000,400,'PANEL_INPUT','追加需要明确会话、当前 turn 和内容');
+      invariant(args.todoId===undefined,400,'PANEL_INPUT','追加当前任务不能派发历史待办');
+      const session=this.registry.getSession(principal,args.sessionId);
+      if(args.jobId!==undefined) {
+        const job=typeof args.jobId==='string'?this.db.get<PanelJob>('SELECT * FROM panel_voice_jobs WHERE job_id=? AND user_id=? AND workspace_id=? AND session_id=?',args.jobId,principal.userId,principal.workspaceId,args.sessionId):undefined;
+        invariant(job&&this.refresh(job).native_turn_id===args.nativeTurnId,409,'PANEL_JOB_TARGET','任务与当前会话 turn 不匹配');
+      }
+      invariant(args.idempotencyKey===undefined||typeof args.idempotencyKey==='string'&&args.idempotencyKey.length>0&&args.idempotencyKey.length<=200,400,'PANEL_INPUT','追加请求标识无效');
+      const mutation='panel-steer-'+hashPayload({user:principal.userId,key:args.idempotencyKey??`${voiceId}:${requestId}`});
+      const previous=this.db.get<{command_id:string;logical_session_id:string;precondition_json:string;body_json:string|null}>(`SELECT c.command_id,c.logical_session_id,c.precondition_json,cc.body_json FROM commands c LEFT JOIN command_contents cc ON cc.command_id=c.command_id AND cc.deleted_at IS NULL AND cc.expires_at>? WHERE c.workspace_id=? AND c.actor_user_id=? AND c.client_mutation_id=?`,nowIso(),principal.workspaceId,principal.userId,mutation);
+      if(previous) {
+        invariant(previous.logical_session_id===args.sessionId&&JSON.parse(previous.precondition_json).nativeTurnId===args.nativeTurnId&&previous.body_json&&JSON.parse(previous.body_json).prompt===args.prompt,409,'IDEMPOTENCY_KEY_REUSE','追加标识已使用且内容不同或已过期，请查询原指令');
+        return {...this.describeSteer(principal,previous.command_id,args.sessionId),duplicate:true};
+      }
+      invariant(session.activeTurnId===args.nativeTurnId,409,'ACTIVE_TURN_CONFLICT','当前任务已结束或发生变化，请重新查询；不会自动创建新任务');
+      invariant(session.managed&&session.actions.steer.allowed,409,session.actions.steer.reasonCode??'PANEL_TARGET_BUSY',session.actions.steer.message??'当前会话不能追加');
+      const result=this.coordination.createCommand(principal,session.logicalSessionId,{type:'turn.steer',clientMutationId:mutation,payload:{prompt:args.prompt},precondition:{nativeTurnId:args.nativeTurnId,turnControlVersion:session.turnControlVersion}},true);
+      return {...this.describeSteer(principal,String(result.command.commandId),args.sessionId),duplicate:result.duplicate};
+    }
     if(args.action==='search') {
       invariant(typeof args.query==='string'&&args.query.length<=200,400,"PANEL_QUERY","请提供主机、项目或会话关键词");
       const page=this.registry.listSessionsPage(principal,{q:args.query,limit:20,managed:true,...(typeof args.cursor==='string'?{cursor:args.cursor}:{})});
-      return {sessions:page.items.map(s=>({id:s.logicalSessionId,title:s.title,projectId:s.projectId,machineId:s.machineId,host:this.registry.getMachine(principal,s.machineId).name,project:s.projectAlias,available:s.actions.start.allowed,unavailableReason:s.actions.start.allowed?null:{code:s.actions.start.reasonCode,message:s.actions.start.message}})),nextCursor:page.nextCursor,total:page.total,instruction:"If ambiguous, ask the user. Never guess a target."};
+      return {sessions:page.items.map(s=>({id:s.logicalSessionId,title:s.title,projectId:s.projectId,machineId:s.machineId,host:this.registry.getMachine(principal,s.machineId).name,project:s.projectAlias,available:s.actions.start.allowed,canAppend:s.actions.steer.allowed,activeTurnId:s.activeTurnId,appendUnavailableReason:s.actions.steer.allowed?null:{code:s.actions.steer.reasonCode,message:s.actions.steer.message},unavailableReason:s.actions.start.allowed?null:{code:s.actions.start.reasonCode,message:s.actions.start.message}})),nextCursor:page.nextCursor,total:page.total,instruction:"If ambiguous, ask the user. Never guess a target."};
     }
     if(args.action==='status') {
       invariant(args.sessionId===undefined||(typeof args.sessionId==='string'&&args.sessionId.trim().length>0),400,'PANEL_INPUT','sessionId 必须是非空字符串');
@@ -172,7 +200,7 @@ export class PanelVoiceService {
       }
       if(!sessionId) {
         const tasks=this.jobs(principal,{voiceId}).map(job=>this.describe(principal,job));
-        if(tasks.length>1)return {scope:'call',state:'multiple',tasks,activeCount:tasks.filter(task=>!['completed','failed','interrupted'].includes(task.state)).length,message:'不同项目可并行；查询特定任务请指定 jobId 或 sessionId'};
+        if(tasks.length>1)return {scope:'call',state:'multiple',tasks,activeCount:tasks.filter(task=>!['completed','failed','interrupted'].includes(task.state)).length,message:'不同项目可并行；追加当前任务使用 steer，查询特定任务请指定 jobId 或 sessionId'};
       }
       if(sessionId) this.registry.getSession(principal,sessionId);
       const job=this.current(principal,sessionId?{sessionId}:{voiceId});

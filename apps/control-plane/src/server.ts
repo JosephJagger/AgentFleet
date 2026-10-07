@@ -1753,7 +1753,7 @@ export async function buildControlPlane(
                 try {
                   result=panelVoice.tool(principal,call.voice_id,requestId,message.args);
                   // A status/search request must never trigger command dispatch as a side effect.
-                  if ((message.args as {action?:unknown})?.action==='dispatch') {
+                  if (['dispatch','steer'].includes(String((message.args as {action?:unknown})?.action))) {
                     const task=result as {sessionId?:string};
                     if(task.sessionId){const target=registry.getSession(principal,task.sessionId);dispatchPendingCommands(target.machineId,principal.workspaceId);broadcastSession(target.logicalSessionId,{type:"session.changed",logicalSessionId:target.logicalSessionId});}
                   }

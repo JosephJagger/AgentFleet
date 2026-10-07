@@ -347,3 +347,40 @@ test('cancelled intent from an unsuccessful legacy dispatch cannot be resurrecte
  assert.throws(()=>f.dispatch(),/取消/);
  assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
 });
+
+test('voice steering appends to the exact running turn, deduplicates across calls, and never creates a second job',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const job=f.dispatch() as {jobId:string};
+ f.db.run("UPDATE machines SET command_types_json='[\"turn.start\",\"turn.steer\"]'");
+ f.db.run("UPDATE logical_sessions SET active_turn_id='live-turn',execution_state='running' WHERE logical_session_id=?",f.session.logicalSessionId);
+ f.db.run("UPDATE panel_voice_jobs SET native_turn_id='live-turn',state='running' WHERE job_id=?",job.jobId);
+ const args={action:'steer',sessionId:f.session.logicalSessionId,jobId:job.jobId,nativeTurnId:'live-turn',prompt:'Also check the tests',idempotencyKey:'explicit-addition-one'};
+ const first=f.service.tool(f.principal,f.call.voice_id,'steer-one',args) as {commandId:string;sessionId:string};
+ assert.equal(first.sessionId,f.session.logicalSessionId);
+ assert.equal(f.db.get<{type:string}>('SELECT type FROM commands WHERE command_id=?',first.commandId)?.type,'turn.steer');
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM panel_voice_jobs')?.n,1);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,2);
+ f.service.closeOrphans();const next=f.service.start(f.principal,'m',{});f.service.state(next.voice_id,'active');
+ f.db.run("UPDATE logical_sessions SET active_turn_id=NULL,execution_state='idle'");
+ const retry=f.service.tool(f.principal,next.voice_id,'steer-two',args) as {commandId:string;duplicate:boolean};
+ assert.equal(retry.commandId,first.commandId);assert.equal(retry.duplicate,true);
+ assert.throws(()=>f.service.tool(f.principal,next.voice_id,'changed',{...args,prompt:'Different instruction'}),/追加标识/);
+ assert.throws(()=>f.service.tool(f.principal,next.voice_id,'late',{...args,idempotencyKey:'new-key'}),/已结束/);
+ const status=f.service.tool(f.principal,next.voice_id,'read',{action:'status',commandId:first.commandId,sessionId:first.sessionId}) as {commandId:string};
+ assert.equal(status.commandId,first.commandId);
+ assert.throws(()=>f.service.tool(f.principal,next.voice_id,'wrong',{action:'status',commandId:first.commandId,sessionId:'other-session'}),/没有此/);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,2);
+});
+
+test('voice steering respects host maintenance, target turn, capability and user ownership',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.db.run("UPDATE logical_sessions SET active_turn_id='live-turn',execution_state='running'");
+ const args={action:'steer',sessionId:f.session.logicalSessionId,nativeTurnId:'live-turn',prompt:'Check tests',idempotencyKey:'one'};
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'unsupported',args));
+ f.db.run("UPDATE machines SET command_types_json='[\"turn.start\",\"turn.steer\"]',maintenance_json=?",JSON.stringify({operationId:'maintenance',startedAt:new Date().toISOString()}));
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'draining',args),/维护/);
+ f.db.run("UPDATE machines SET maintenance_json='null'");
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'wrong-turn',{...args,nativeTurnId:'old-turn'}),/发生变化/);
+ const created=f.service.tool(f.principal,f.call.voice_id,'ok',args) as {commandId:string};
+ assert.throws(()=>f.service['describeSteer']({...f.principal,userId:'someone-else'},created.commandId),/没有此/);
+});
