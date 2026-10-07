@@ -794,6 +794,10 @@ export class CoordinationService {
           if (name && !["New Codex session", "Codex session"].includes(name)) payload.sessionTitle = name;
         }
       }
+      if (session.provider === "claude" && !session.native_thread_id && ["turn.start", "turn.queue"].includes(input.type)) {
+        const name = this.db.get<{title:string}>("SELECT title FROM logical_sessions WHERE logical_session_id=?",logicalSessionId)?.title;
+        if (name && !["New Codex session", "Codex session"].includes(name)) payload.sessionTitle = name;
+      }
       if (input.type === "thread.rename") {
         precondition.expectedTitle = this.db.get<{ title: string }>("SELECT title FROM logical_sessions WHERE logical_session_id=?", logicalSessionId)!.title;
       }

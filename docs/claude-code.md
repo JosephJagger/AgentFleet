@@ -29,3 +29,7 @@ Agent 0.30.58 使用 `supportedModels()` 读取宿主机原生模型目录及每
 Agent 0.30.59 起支持 Claude 原生 default / auto / acceptEdits / dontAsk 权限模式。可选值来自宿主机 CLI --help，auto 选项还按原生模型 supportsAutoMode 判断。SDK permissionMode 在新轮次生效，plan 始终优先；原生 canUseTool 和 AskUserQuestion 继续处理仍需响应的操作。模型、effort、权限和计划模式在弹窗点击“保存”后按工作区和会话保存在控制面数据库；切换、刷新和换设备均重新读取。取消不改变已保存配置，版本冲突要求重新读取，读取失败不会回退继承并发送。未选择权限时保持 default。尚未更新的 Agent 不允许收到权限字段。
 
 Claude 回复中明确的行内代码文件路径、正文绝对路径与 Markdown 文件链接提供预览和下载按钮；沿用 /api/sessions/:id/files 和 projectFiles 原生传输。命令代码块、目录和远程 URL 不自动转成宿主机文件动作，复制回复保留原文。文件读取继续限制于该已接管会话的项目和在线宿主机。
+
+Agent 0.30.79 按 SDK 的 user_message_uuid / user_message_uuids 将完成结果关联到本次输入。恢复会话产生的后台通知、零轮结果和其他输入的结果不会结束当前面板任务；合并输入按全部 UUID 匹配，原生启动失败与取消仍正常结束。对支持消息归属的 CLI，不再将缺少归属的成功结果当作用户任务完成。
+
+Agent 0.30.80 将面板新建会话的名称随首轮命令快照传入 Claude SDK title。面板创建且明确命名的会话在目录同步时保留该名称；SDK customTitle 可能回退到 aiTitle，不能将其覆盖面板显式名称。原生接管会话继续使用原生标题。

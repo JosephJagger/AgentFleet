@@ -97,7 +97,7 @@ function messageItems(value: unknown): Array<{ nativeTurnId: string; nativeItemI
   return result;
 }
 
-interface Writer { query: Query; input: SDKUserMessage[]; wake?: () => void; closed: boolean; child?: ChildProcess; turnId?: string; interrupted: boolean; fresh: boolean; textItemId?: string; }
+interface Writer { query: Query; input: SDKUserMessage[]; wake?: () => void; closed: boolean; child?: ChildProcess; turnId?: string; interrupted: boolean; fresh: boolean; promptIds: Set<string>; textItemId?: string; }
 interface Pending { writer: Writer; resolve: (result: PermissionResult) => void; input: Record<string, unknown>; }
 
 const defaults = { query, listSessions, getSessionInfo, getSessionMessages, detectClaude, nativeClaudeRunning, inspectClaudeMetadata };
@@ -123,12 +123,18 @@ export class ClaudeRuntime implements AppServerClient {
   async start() { const { path, ...availability } = await this.sdk.detectClaude(); this.binary = path; this.availability = path ? {...this.availability,...availability} : availability; void this.refreshMetadata(); }
   async stop() { await Promise.all([...this.writers.keys()].map(id => this.unsubscribeThread(id))); }
   private available() { if (!this.binary) throw new AgentError("CLAUDE_NOT_INSTALLED", "宿主机未安装 Claude Code"); }
+  private panelTitle(id: string) {
+    const thread = this.callbacks.findManagedThread(id);
+    // SDK customTitle also includes aiTitle. A panel-authored name is stable
+    // even when discovery later returns a generated native summary.
+    return thread?.origin === "agentfleet" && thread.titleSource === "name" ? thread.title : undefined;
+  }
   async listThreads() {
     await this.start();
     if (!this.binary) return [];
     const running = new Map<string, Promise<boolean>>();
     const isRunning = (cwd: string) => { if (!running.has(cwd)) running.set(cwd, this.sdk.nativeClaudeRunning(cwd, this.owned)); return running.get(cwd)!; };
-    return Promise.all((await this.sdk.listSessions()).filter(s => s.cwd).map(async s => ({ nativeThreadId: CLAUDE_PREFIX + s.sessionId, cwd: s.cwd!, title: s.summary || s.firstPrompt || "Claude Code", titleSource: s.customTitle ? "name" as const : "preview" as const, executionState: await isRunning(s.cwd!) ? "running" as const : "idle" as const, historyMode: "paginated" as const })));
+    return Promise.all((await this.sdk.listSessions()).filter(s => s.cwd).map(async s => ({ nativeThreadId: CLAUDE_PREFIX + s.sessionId, cwd: s.cwd!, title: this.panelTitle(CLAUDE_PREFIX + s.sessionId) ?? s.customTitle ?? (s.summary || s.firstPrompt || "Claude Code"), titleSource: this.panelTitle(CLAUDE_PREFIX + s.sessionId) || s.customTitle ? "name" as const : "preview" as const, executionState: await isRunning(s.cwd!) ? "running" as const : "idle" as const, historyMode: "paginated" as const })));
   }
   async readHistoryPage(id: string, cursor: string | null): Promise<ThreadHistoryPage> {
     const offset = cursor ? Number(cursor) : 0;
@@ -196,13 +202,13 @@ export class ClaudeRuntime implements AppServerClient {
     if (this.writers.has(thread.nativeThreadId)) throw new AgentError("THREAD_BUSY", "Claude 会话仍在运行");
     const id = thread.nativeThreadId;
     const turnId = randomUUID();
-    const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), turnId } as unknown as Writer;
+    const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), promptIds: new Set<string>(), turnId } as unknown as Writer;
     const input = async function* () { while (!writer.closed) { const message = writer.input.shift(); if (message) yield message; else await new Promise<void>(resolve => { writer.wake = resolve; }); } };
     const options: Options = {
       cwd: thread.sessionCwd ?? project.root, pathToClaudeCodeExecutable: this.binary!,
       settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code" },
       includePartialMessages: true, permissionMode: settings?.mode === "plan" ? "plan" : (settings as ClaudeSettings|undefined)?.permissionMode ?? "default", permissionPrompts: "host",
-      ...(writer.fresh ? { sessionId: nativeId(id) } : { resume: nativeId(id) }),
+      ...(writer.fresh ? { sessionId: nativeId(id), ...(thread.titleSource === "name" && thread.title ? { title: thread.title } : {}) } : { resume: nativeId(id) }),
       ...(settings?.model && settings.model !== "host" ? { model: settings.model } : {}),
       ...(settings?.effort ? { effort: settings.effort as NonNullable<Options["effort"]> } : {}),
       canUseTool: async (name, input, context) => {
@@ -234,7 +240,8 @@ export class ClaudeRuntime implements AppServerClient {
     writer.query = this.sdk.query({ prompt: input(), options }); this.writers.set(id, writer);
     const content: SDKUserMessage["message"]["content"] = [{ type: "text", text: prompt + (extras?.goal ? `\n\n会话目标：${extras.goal}` : "") + (extras?.attachments?.length ? `\n\n附件路径：\n${extras.attachments.map(f => f.path).join("\n")}` : "") }];
     for (const url of images ?? []) { const m = /^data:(image\/(?:png|jpeg|gif|webp));base64,(.+)$/.exec(url); if (m) content.push({ type: "image", source: { type: "base64", media_type: m[1] as "image/png", data: m[2]! } }); }
-    writer.input.push({ type: "user", uuid: randomUUID(), session_id: nativeId(id), parent_tool_use_id: null, message: { role: "user", content } });
+    const promptId = randomUUID(); writer.promptIds.add(promptId);
+    writer.input.push({ type: "user", uuid: promptId, session_id: nativeId(id), parent_tool_use_id: null, message: { role: "user", content } });
     writer.wake?.();
     setImmediate(() => void this.pump(id, writer).catch(() => undefined));
     return { nativeTurnId: turnId, status: "inProgress" };
@@ -253,6 +260,16 @@ export class ClaudeRuntime implements AppServerClient {
         if (msg.type === "stream_event" && msg.event.type === "content_block_delta" && msg.event.delta.type === "text_delta") this.callbacks.onVolatile({ type: "agent_message.delta", payload: { delta: msg.event.delta.text }, nativeThreadId: id, nativeTurnId: turnId, nativeItemId: writer.textItemId ?? `${msg.uuid}:text` }, this.appServerEpoch);
         if (msg.type === "assistant" || msg.type === "user") for (const entry of messageItems(msg)) await emit("item.completed", { item: entry.item }, entry.nativeItemId);
         if (msg.type === "result") {
+          // A resumed CLI may finish an old background/meta turn before it
+          // consumes our queued prompt. Closing on that result loses the send.
+          // Match all consumed UUIDs because the CLI can merge prompt batches.
+          const ids = [...(msg.user_message_uuids ?? []), ...(msg.user_message_uuid ? [msg.user_message_uuid] : [])];
+          const matches = ids.some(uuid => writer.promptIds.has(uuid));
+          const version = /(?:^|\s)v?(\d+)\.(\d+)\.(\d+)/.exec(this.availability.version ?? "");
+          const attributesPrompts = Boolean(version && (Number(version[1]) > 2 || (Number(version[1]) === 2 && (Number(version[2]) > 1 || (Number(version[2]) === 1 && Number(version[3]) >= 265)))));
+          if (!matches && (ids.length > 0 || (!msg.is_error && !writer.interrupted && (attributesPrompts || (msg.queued_turn_count ?? 0) > 0 || msg.num_turns === 0)))) continue;
+          // Unattributed fatal startup errors and interrupt results still end
+          // the attempt; older CLIs without attribution retain legacy behavior.
           // Native modelUsage is conversation-cumulative; usage is this query's consumption.
           const models=Object.values(msg.modelUsage);
           const inputTokens=models.reduce((sum,model)=>sum+model.inputTokens+model.cacheCreationInputTokens+model.cacheReadInputTokens,0);
@@ -274,7 +291,8 @@ export class ClaudeRuntime implements AppServerClient {
   }
   async steerTurn(thread: ManagedThread, turnId: string, prompt: string, _clientUserMessageId?: string) {
     const writer = this.writers.get(thread.nativeThreadId); if (!writer || writer.turnId !== turnId) throw new AgentError("THREAD_BUSY", "Claude 没有正在运行的任务");
-    writer.input.push({ type: "user", uuid: randomUUID(), session_id: nativeId(thread.nativeThreadId), parent_tool_use_id: null, message: { role: "user", content: prompt } }); writer.wake?.();
+    const promptId = randomUUID(); writer.promptIds.add(promptId);
+    writer.input.push({ type: "user", uuid: promptId, session_id: nativeId(thread.nativeThreadId), parent_tool_use_id: null, message: { role: "user", content: prompt } }); writer.wake?.();
     return { nativeTurnId: turnId, status: "inProgress" };
   }
   async interruptTurn(id: string, turnId: string) { const writer = this.writers.get(id); if (!writer || writer.turnId !== turnId) throw new AgentError("TURN_PRECONDITION_FAILED", "任务已经变化"); writer.interrupted = true; await writer.query.interrupt(); return {}; }

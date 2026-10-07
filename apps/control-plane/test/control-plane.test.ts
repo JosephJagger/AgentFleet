@@ -1409,6 +1409,21 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
     assert.equal(fenced.statusCode, 409, fenced.body);
     assert.match(fenced.body, /CODEX_OPERATION_PENDING/);
   } finally { db.sqlite.exec("ROLLBACK TO codex_operation_test; RELEASE codex_operation_test"); }
+  db.sqlite.exec("SAVEPOINT claude_title_test");
+  try {
+    const session = sessions[0]!;
+    db.run("UPDATE projects SET provider='claude' WHERE project_id=?",projectId);
+    db.run("UPDATE machines SET agent_version='0.30.80',command_types_json=? WHERE machine_id=?",JSON.stringify(COMMAND_TYPES),machineId);
+    const input={...startPayload(session,leases[0]!.leaseId,"claude-title-snapshot"),payload:{prompt:"First task"}};
+    const url=`/api/sessions/${session.logicalSessionId}/commands`;
+    const result=await app.inject({method:"POST",url,headers:browserHeaders,payload:input});
+    assert.equal(result.statusCode,202,result.body);
+    assert.equal(result.json().command.payload.sessionTitle,"Concurrent A");
+    db.run("UPDATE logical_sessions SET title='Later title' WHERE logical_session_id=?",session.logicalSessionId);
+    const retried=await app.inject({method:"POST",url,headers:browserHeaders,payload:input});
+    assert.equal(retried.statusCode,200,retried.body);
+    assert.equal(retried.json().command.payload.sessionTitle,"Concurrent A","retry retains the accepted native title");
+  } finally { db.sqlite.exec("ROLLBACK TO claude_title_test; RELEASE claude_title_test"); }
   db.sqlite.exec("SAVEPOINT codex_output_test");
   try {
     const session = sessions[0]!;
