@@ -200,6 +200,7 @@ export class AgentMaintenance {
             await progress({ phase: "restarting" });
             return;
           }
+          if (outcome === "deferred") { result = { version: AGENT_VERSION, phase: "rollout_wait", message: "新版正在分批发布，本机尚未进入本次批次，当前版本继续运行。" }; break; }
           if (outcome === "current") { result = { version: AGENT_VERSION, phase: "current" }; break; }
           await delay(5_000, this.options.signal);
         }

@@ -1,9 +1,11 @@
+import { syncDirectory } from "./durable-file.js";
+import { open } from "node:fs/promises";
 import { withVersionLock } from "./version-cleanup.js";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { copyFile, lstat, mkdir, mkdtemp, readFile, readlink, rename, symlink, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { AGENT_VERSION } from "./constants.js";
 import { acquireSupervisorLease, hasLiveRuntimeOwner } from "./supervisor-ownership.js";
 import { AgentError } from "./errors.js";
@@ -11,6 +13,8 @@ import { isPathInside } from "./util.js";
 
 export interface UpdateTransaction {
   updateId: string;
+  ownerPid?: number;
+  history?: Array<{phase: string; at: string}>;
   phase: "preparing" | "staged" | "verifying" | "succeeded" | "rolled_back" | "failed";
   previousVersion: string;
   targetVersion?: string;
@@ -24,6 +28,12 @@ export interface UpdateTransaction {
   sandboxHelperPresent?: boolean;
   startedAt: string;
   error?: string;
+  failureCode?: string;
+  retryable?: boolean;
+  attempts?: number;
+  updatedAt?: string;
+  verifiedAt?: string;
+  rollbackVerifiedAt?: string;
 }
 
 async function regularFile(path: string): Promise<boolean> {
@@ -56,14 +66,28 @@ export async function writeUpdateTransaction(dataDir: string, value: UpdateTrans
   const path = join(dataDir, "update-state.json");
   await regularFile(path);
   const temporary = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temporary, JSON.stringify(value), { mode: 0o600, flag: "wx" });
+  const at = new Date().toISOString();
+  const previous = await readUpdateTransaction(dataDir);
+  if (previous && previous.updateId !== value.updateId && value.phase !== "preparing") throw new AgentError("UPDATE_TARGET_CHANGED", "升级事务已变化，禁止旧事务覆盖新结果。");
+  if (previous?.updateId === value.updateId && previous.phase !== value.phase) {
+    const transitions: Record<string, string[]> = { preparing:["staged","rolled_back","failed"], staged:["verifying","rolled_back","failed"], verifying:["succeeded","rolled_back","failed"], succeeded:[], rolled_back:[], failed:["rolled_back"] };
+    if (!transitions[previous.phase]?.includes(value.phase)) throw new AgentError("UPDATE_PHASE_CHANGED", "升级状态已变化，已忽略迟到的状态写入。");
+  }
+  const history = [...(previous?.updateId === value.updateId ? previous.history ?? [] : [])];
+  if (history.at(-1)?.phase !== value.phase) history.push({ phase: value.phase, at });
+  const file = await open(temporary, "wx", 0o600);
+  try { await file.writeFile(JSON.stringify({ ...value, history: history.slice(-32), updatedAt: at })); await file.sync(); }
+  finally { await file.close(); }
   await rename(temporary, path);
+  await syncDirectory(dataDir);
 }
 
 export async function prepareUpdateTransaction(dataDir: string, targetVersion: string, launcher = stableAgentExecutable(dataDir)): Promise<UpdateTransaction> {
   return withVersionLock(dataDir, () => prepareUpdateTransactionLocked(dataDir, targetVersion, launcher));
 }
 async function prepareUpdateTransactionLocked(dataDir: string, targetVersion: string, launcher: string): Promise<UpdateTransaction> {
+  const current = await readUpdateTransaction(dataDir);
+  if (current && ["preparing","staged","verifying"].includes(current.phase)) throw new AgentError("UPDATE_IN_PROGRESS", "已有升级事务尚未确认，不能再次切换版本。");
   await mkdir(join(dataDir, "updates"), { recursive: true, mode: 0o700 });
   const metadata = await lstat(join(dataDir, "updates"));
   if (!metadata.isDirectory() || metadata.isSymbolicLink()) throw new AgentError("UPDATE_PATH_UNSAFE", "updates directory is not a regular directory");
@@ -85,13 +109,15 @@ async function prepareUpdateTransactionLocked(dataDir: string, targetVersion: st
     !isPathInside(join(homedir(), ".local", "share", "agentfleet", "bin"), previousTarget)) {
     throw new AgentError("UPDATE_PATH_UNSAFE", "current launcher does not target an AgentFleet release");
   }
-  const transaction: UpdateTransaction = { updateId: randomUUID(), phase: "preparing", previousVersion: AGENT_VERSION,
+  const transaction: UpdateTransaction = { updateId: randomUUID(), ownerPid: Number(process.env.AGENTFLEET_INSTALLER_PID) || process.pid, phase: "preparing", previousVersion: process.platform === "win32" ? previousTarget : basename(dirname(previousTarget)),
     targetVersion, backupDir, launcher, previousTarget, profilePresent, codexPresent, ...(sandboxHelperPresent !== undefined ? { sandboxHelperPresent } : {}), startedAt: new Date().toISOString() };
   await writeUpdateTransaction(dataDir, transaction);
   return transaction;
 }
 
 export async function restoreUpdateTransaction(dataDir: string, transaction: UpdateTransaction, reason: string): Promise<void> {
+  const current = await readUpdateTransaction(dataDir);
+  if (current && (current.updateId !== transaction.updateId || current.phase === "succeeded")) throw new AgentError("UPDATE_TARGET_CHANGED", "升级事务已变化，禁止回退已确认的新版本。");
   if (!isPathInside(join(dataDir, "updates"), transaction.backupDir) || transaction.launcher !== stableAgentExecutable(dataDir)) {
     throw new AgentError("UPDATE_PATH_UNSAFE", "rollback transaction does not belong to this installation");
   }
@@ -110,7 +136,10 @@ export async function restoreUpdateTransaction(dataDir: string, transaction: Upd
   }
   if (process.platform === "win32") {
     if (!/^\d+\.\d+\.\d+$/.test(transaction.previousTarget)) throw new AgentError("UPDATE_STATE_INVALID", "Windows rollback pointer is invalid");
-    await writeFile(join(dataDir, "bin", "current.txt"), transaction.previousTarget, { mode: 0o600 });
+    const pointer = join(dataDir, "bin", "current.txt");
+    const temporary = `${pointer}.${randomUUID()}.restore`;
+    await writeFile(temporary, transaction.previousTarget, { mode: 0o600 });
+    await rename(temporary, pointer);
   } else {
     const binaryRoot = join(homedir(), ".local", "share", "agentfleet", "bin");
     const otherRoot = join(dataDir, "bin");
@@ -140,7 +169,9 @@ export async function workerHealthDiagnostics(dataDir: string): Promise<Record<s
 export async function writeWorkerHealth(dataDir: string, runtimeVersion?: string): Promise<void> {
   const token = process.env.AGENTFLEET_SUPERVISOR_TOKEN;
   if (!token || !/^[0-9a-f-]{36}$/i.test(token)) return;
-  await writeFile(join(dataDir, `worker-health-${token}.json`), JSON.stringify({ token, version: AGENT_VERSION, runtimeVersion }), { mode: 0o600 });
+  const path = join(dataDir, `worker-health-${token}.json`), temporary = `${path}.tmp`;
+  await writeFile(temporary, JSON.stringify({ token, version: AGENT_VERSION, runtimeVersion, observedAt: new Date().toISOString() }), { mode: 0o600 });
+  await rename(temporary, path);
 }
 
 /** This parent uses its already-running version even when the child launcher is upgraded. */
@@ -201,9 +232,12 @@ async function superviseOwnedAgent(dataDir: string, signal: AbortSignal): Promis
         const health = JSON.parse(await readFile(healthPath, "utf8")) as { token?: string; version?: string; runtimeVersion?: string };
         if (health.token !== token || (verifying && health.version !== transaction?.targetVersion)) return;
         if (verifying && transaction?.targetRuntimeVersion && health.runtimeVersion !== transaction.targetRuntimeVersion) return;
+        if (!verifying && transaction?.phase === "rolled_back" && health.version === transaction.previousVersion) {
+          await writeUpdateTransaction(dataDir, { ...transaction, rollbackVerifiedAt: new Date().toISOString() });
+        }
         healthy = true;
         if (timeout) clearTimeout(timeout);
-        if (verifying && transaction) await writeUpdateTransaction(dataDir, { ...transaction, phase: "succeeded" });
+        if (verifying && transaction) await writeUpdateTransaction(dataDir, { ...transaction, phase: "succeeded", verifiedAt: new Date().toISOString() });
       })().catch(() => undefined).finally(() => { checking = false; });
     }, 1_000);
     const code = await new Promise<number | null>((finish) => {

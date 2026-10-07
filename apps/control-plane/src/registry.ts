@@ -46,7 +46,7 @@ import { MAINTENANCE_TYPES } from "./maintenance.js";
 function parseCodexProfile(input: Record<string, unknown>): Record<string, unknown> {
   const profile: Record<string, unknown> = {};
   const required = ["id", "osAccount", "codexHome", "hostCodexPath", "hostCodexVersion", "runtimePath", "runtimeVersion", "source"];
-  for (const key of [...required, "hostCodexDefaultPath", "hostCodexDefaultVersion", "hostCodexCheckedAt", "hostCodexDetection", "hostCodexVersionSource", "hostCodexMetadataPath", "hostCodexDefaultVersionSource", "runtimeUpdateState", "runtimeUpdateTarget", "runtimeUpdateError"]) {
+  for (const key of [...required, "hostCodexDefaultPath", "hostCodexDefaultVersion", "hostCodexCheckedAt", "hostCodexDetection", "hostCodexVersionSource", "hostCodexMetadataPath", "hostCodexDefaultVersionSource", "runtimeUpdateState", "runtimeUpdateTarget", "runtimeUpdateError", "agentRunningVersion", "agentInstalledVersion", "agentUpdateState", "agentUpdateTarget", "agentUpdateError", "agentUpdateCheckedAt", "agentRollbackVersion", "agentUpdateVerifiedAt"]) {
     const value = input[key];
     if (value === undefined && !required.includes(key)) continue;
     invariant(value === null || typeof value === "string", 400, "INVALID_CODEX_PROFILE", `Invalid profile ${key}`);

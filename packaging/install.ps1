@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('Onboard','Update','Stage','Repair','Rollback','Uninstall')] [string]$Mode = 'Onboard',
+  [ValidateSet('Onboard','Update','Stage','Prepare','Repair','Rollback','Uninstall')] [string]$Mode = 'Onboard',
   [string]$Url,
   [string]$Ticket,
   [string]$Name = $env:COMPUTERNAME,
@@ -8,6 +8,7 @@ param(
   [switch]$Purge
 )
 $ErrorActionPreference = 'Stop'
+$env:AGENTFLEET_INSTALLER_PID = [string]$PID
 $ProgressPreference = 'SilentlyContinue'
 $StateRoot = Join-Path $env:LOCALAPPDATA 'AgentFleet'
 $BinRoot = Join-Path $StateRoot 'bin'
@@ -15,6 +16,15 @@ $CurrentFile = Join-Path $BinRoot 'current.txt'
 $PreviousFile = Join-Path $BinRoot 'previous.txt'
 $StableLauncher = Join-Path $StateRoot 'agentfleet.cmd'
 $RuntimeProfile = Join-Path $StateRoot 'runtime-profile.json'
+
+# The OS releases this exclusive handle on crash or forced termination.
+New-Item -ItemType Directory -Force -Path $StateRoot | Out-Null
+if ((Get-Item -LiteralPath $StateRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'installer: unsafe state directory' }
+$installLockPath = Join-Path $StateRoot '.installer.lock'
+if ((Test-Path $installLockPath) -and ((Get-Item -LiteralPath $installLockPath).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'installer: unsafe install lock' }
+try { $installLock = [IO.File]::Open($installLockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }
+catch { throw 'installer: another installation, repair or rollback is running' }
+try {
 
 # Windows PowerShell 5 does not consistently honor HTTPS_PROXY for its web
 # cmdlets. The background Agent detects the enabled Windows proxy and passes it
@@ -30,15 +40,26 @@ foreach ($candidate in @($env:HTTPS_PROXY, $env:HTTP_PROXY, $env:https_proxy, $e
     }
   } catch { }
 }
+function Invoke-AgentFleetDownload([scriptblock]$Request) {
+  for ($attempt = 0; $attempt -lt 3; $attempt++) {
+    try { return (& $Request) }
+    catch {
+      $status = 0
+      if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+      if ($attempt -eq 2 -or ($status -ge 400 -and $status -lt 500 -and $status -ne 429)) { throw }
+      Start-Sleep -Seconds ([int][Math]::Pow(2, $attempt + 1))
+    }
+  }
+}
 function Invoke-AgentFleetRestMethod([string]$Uri) {
-  $parameters = @{ Uri = $Uri }
+  $parameters = @{ Uri = $Uri; TimeoutSec = 30; UseBasicParsing = $true }
   if ($DownloadProxy) { $parameters.Proxy = $DownloadProxy }
-  Invoke-RestMethod @parameters
+  Invoke-AgentFleetDownload { Invoke-RestMethod @parameters }
 }
 function Invoke-AgentFleetWebRequest([string]$Uri, [string]$OutFile) {
-  $parameters = @{ Uri = $Uri; OutFile = $OutFile }
+  $parameters = @{ Uri = $Uri; OutFile = $OutFile; TimeoutSec = 300; UseBasicParsing = $true }
   if ($DownloadProxy) { $parameters.Proxy = $DownloadProxy }
-  Invoke-WebRequest @parameters
+  Invoke-AgentFleetDownload { Invoke-WebRequest @parameters }
 }
 function Register-AgentFleetUpdateHandoff {
   # Modern workers already have a persistent supervisor. It reloads the stable
@@ -114,7 +135,10 @@ if ($Mode -eq 'Uninstall') {
   }
   if (Test-Path $BinRoot) { Remove-Item -LiteralPath $BinRoot -Recurse -Force }
   if (Test-Path $StableLauncher) { Remove-Item -LiteralPath $StableLauncher -Force }
-  if ($Purge -and (Test-Path $StateRoot)) { Remove-Item -LiteralPath $StateRoot -Recurse -Force }
+  if ($Purge -and (Test-Path $StateRoot)) {
+    Get-ChildItem -LiteralPath $StateRoot -Force | Where-Object { $_.FullName -ne $installLockPath } | Remove-Item -Recurse -Force
+    # Keep the empty lock file so another installer cannot race a root deletion.
+  }
   Write-Host 'Removed AgentFleet. Codex history and project files were not changed.'
   exit 0
 }
@@ -141,16 +165,30 @@ try {
   }
   if ($hadManagedCodex) { Copy-Item -LiteralPath $managedCodexPath -Destination $codexBackup }
   $manifest = Invoke-AgentFleetRestMethod "$BaseUrl/downloads/manifest.json"
+  if ($env:AGENTFLEET_EXPECTED_VERSION -and [string]$manifest.version -ne $env:AGENTFLEET_EXPECTED_VERSION) { throw 'installer: release channel changed; retry preparation' }
   $artifact = $manifest.artifacts.'win32-x64'
   if ($manifest.schemaVersion -ne 1 -or -not $artifact) { throw 'installer: invalid Windows release manifest' }
   $expectedName = "agentfleet-win32-x64-$($manifest.version).tar.gz"
   if ($artifact.file -ne $expectedName) { throw 'installer: release name/version mismatch' }
+  $drive = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($StateRoot))
+  if ($drive.AvailableFreeSpace -lt ([long]$artifact.size * 3 + 536870912)) { throw 'installer: insufficient disk space; free space before retrying' }
   $archive = Join-Path $temp $artifact.file
   # Key CDN downloads by the verified digest so an earlier cached 404 cannot
   # hide a newly published immutable release.
-  Invoke-AgentFleetWebRequest "$BaseUrl/downloads/$($artifact.file)?sha256=$($artifact.sha256)" $archive
+  $cacheDir = Join-Path $StateRoot 'download-cache'
+  New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
+  if ((Get-Item $cacheDir).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'installer: unsafe download cache' }
+  $cacheFile = Join-Path $cacheDir $artifact.file
+  if (Test-Path $cacheFile) {
+    if ((Get-Item $cacheFile).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'installer: unsafe cache file' }
+    if ((Get-Item $cacheFile).Length -ne [long]$artifact.size -or (Get-FileHash -Algorithm SHA256 $cacheFile).Hash.ToLowerInvariant() -ne $artifact.sha256) { Remove-Item -LiteralPath $cacheFile -Force }
+  }
+  if (Test-Path $cacheFile -PathType Leaf) { Copy-Item -LiteralPath $cacheFile -Destination $archive }
+  else { Invoke-AgentFleetWebRequest "$BaseUrl/downloads/$($artifact.file)?sha256=$($artifact.sha256)" $archive }
   if ((Get-Item $archive).Length -ne [long]$artifact.size) { throw 'installer: release size mismatch' }
   if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne $artifact.sha256) { throw 'installer: release SHA-256 mismatch' }
+  Copy-Item -LiteralPath $archive -Destination "$cacheFile.new-$PID"
+  Move-Item -Force -LiteralPath "$cacheFile.new-$PID" -Destination $cacheFile
   $entries = & tar.exe -tzf $archive
   $tarListExit = $LASTEXITCODE
   $unsafeEntries = @($entries | Where-Object { $_ -notlike 'agentfleet/*' -or $_ -match '(^|/)\.\.?(\/|$)' })
@@ -172,13 +210,20 @@ try {
     }
   }
   $launcher = Join-Path $target 'agentfleet.cmd'
+  if ($Mode -eq 'Prepare') { Write-Host "Prepared AgentFleet $($manifest.version); running service unchanged."; exit 0 }
   $previousVersion = if (Test-Path $CurrentFile) {
     $priorValue = (Get-Content -Raw $CurrentFile).Trim()
     if ([IO.Path]::IsPathRooted($priorValue)) { Split-Path (Split-Path $priorValue -Parent) -Leaf } else { $priorValue }
   } else { $null }
   $stableContents = "@echo off`r`nsetlocal`r`nset /p AGENTFLEET_CURRENT=<`"%~dp0bin\current.txt`"`r`ncall `"%~dp0bin\%AGENTFLEET_CURRENT%\agentfleet.cmd`" %*`r`nexit /b %errorlevel%`r`n"
 
-  if ($Mode -eq 'Stage') {
+  $transaction = $false
+  if ($Mode -in @('Stage','Update','Repair') -and $previousVersion) {
+    & $launcher service prepare-update --data-dir $StateRoot
+    if ($LASTEXITCODE -ne 0) { throw 'installer: could not prepare safe activation' }
+    $transaction = $true
+  }
+  if ($Mode -eq 'Stage' -or ($Mode -in @('Update','Repair') -and $existingProfile)) {
     if (-not $existingProfile) { throw 'installer: existing runtime profile is required for an update' }
     $codexVersion = if ($existingProfile.managedVersion) { [string]$existingProfile.managedVersion } else { 'preserved' }
     Write-Host 'Preserving the existing Codex runtime, profile and companion tools.'
@@ -232,28 +277,32 @@ try {
   [IO.File]::WriteAllText("$StableLauncher.new", $stableContents, [Text.ASCIIEncoding]::new())
   Move-Item -Force -LiteralPath "$StableLauncher.new" -Destination $StableLauncher
 
-  Write-Host "Installed AgentFleet $($manifest.version) with Codex $codexVersion."
+  if ($transaction) {
+    & $launcher service mark-staged --data-dir $StateRoot
+    if ($LASTEXITCODE -ne 0) { throw 'installer: could not persist staged activation' }
+  }
+  Write-Host "Installed AgentFleet $($manifest.version); awaiting connection and health confirmation."
   if ($Mode -eq 'Repair') {
-    # Restore a missing/partially installed task using the existing pairing.
-    # Unlike Onboard, this does not register a project or redeem another ticket.
-    & $StableLauncher service install --executable $StableLauncher --data-dir $StateRoot
+    & $launcher service install --executable $StableLauncher --data-dir $StateRoot
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning 'Background service installation failed. Starting the repaired agent in this window; keep it open.'
-      & $StableLauncher run --data-dir $StateRoot
-    } else {
-      Write-Host 'The Windows task is running. Panel connectivity is confirmed only after the host appears online; allow startup and connection time.'
+      if ($transaction) { & $launcher service abort-update --data-dir $StateRoot }
+      & $launcher service install --executable $StableLauncher --data-dir $StateRoot
+      throw 'installer: service activation failed; rollback was requested. Check host connectivity to confirm recovery.'
     }
-    exit $LASTEXITCODE
+    if ($transaction) { & $launcher service verify-update --data-dir $StateRoot; exit $LASTEXITCODE }
+    Write-Host 'Service installed; wait for the panel to confirm the host is online.'
+    exit 0
   }
   if ($Mode -eq 'Update') {
-    & $StableLauncher service update --executable $StableLauncher --data-dir $StateRoot
-    if ($LASTEXITCODE -eq 0) { exit 0 }
+    & $launcher service update --executable $StableLauncher --data-dir $StateRoot
+    if ($LASTEXITCODE -eq 0) { & $launcher service verify-update --data-dir $StateRoot; exit $LASTEXITCODE }
     [Console]::Error.WriteLine('installer: service update failed; restoring the previous binary')
+    if ($transaction) { & $launcher service abort-update --data-dir $StateRoot }
     if ($hadProfile) { Copy-Item -Force -LiteralPath $profileBackup -Destination $RuntimeProfile } else { Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $RuntimeProfile }
     if ($hadManagedCodex) { Copy-Item -Force -LiteralPath $codexBackup -Destination $managedCodexPath } else { Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $managedCodexPath }
     if ($previousVersion) {
       [IO.File]::WriteAllText($CurrentFile, $previousVersion, [Text.ASCIIEncoding]::new())
-      & $StableLauncher service update --executable $StableLauncher --data-dir $StateRoot
+      & $launcher service update --executable $StableLauncher --data-dir $StateRoot
     }
     exit 1
   }
@@ -261,6 +310,7 @@ try {
     & $StableLauncher service stage-background --executable $StableLauncher --data-dir $StateRoot
     if ($LASTEXITCODE -ne 0) { throw 'Could not schedule background service migration' }
     Register-AgentFleetUpdateHandoff
+    Remove-Item -LiteralPath $cacheFile -Force
     Write-Host "Staged AgentFleet $($manifest.version); the task will restart into it."; exit 0 }
   $args = @('onboard','--url',$BaseUrl,'--ticket',$Ticket,'--name',$Name,'--project',$Project,'--data-dir',$StateRoot,'--executable',$StableLauncher)
   if ($Alias) { $args += @('--alias',$Alias) }
@@ -269,3 +319,5 @@ try {
 } finally {
   if (Test-Path $temp) { Remove-Item -LiteralPath $temp -Recurse -Force }
 }
+
+} finally { if ($installLock) { $installLock.Dispose() } }

@@ -545,6 +545,11 @@ async function writeAndActivateLaunchd(options: {
     await activateLaunchdAndWait(runCommand, domain);
     return getLaunchdStatus({ ...(options.environment ? { environment: options.environment } : {}), runCommand, uid });
   } catch (error) {
+    const { readUpdateTransaction, restoreUpdateTransaction } = await import("./supervisor.js");
+    const transaction = await readUpdateTransaction(options.dataDir);
+    if (transaction && ["preparing","staged","verifying"].includes(transaction.phase)) {
+      await restoreUpdateTransaction(options.dataDir, transaction, error instanceof Error ? error.message : "launchd activation failed");
+    }
     if (priorContents === undefined) await unlink(path).catch(() => undefined);
     else await atomicWrite(path, priorContents);
     if (priorContents !== undefined) {

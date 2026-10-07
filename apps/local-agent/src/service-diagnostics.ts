@@ -12,7 +12,7 @@ export async function collectServiceDiagnostics(dataDir: string): Promise<Record
   const transaction=await readUpdateTransaction(dataDir);
   const report:Record<string,unknown>={worker:await workerHealthDiagnostics(dataDir),
     savedRuntime:profile ? {source:profile.source,executable:profile.codexExecutable}:null,
-    update:transaction ? {phase:transaction.phase,targetVersion:transaction.targetVersion,targetRuntimeVersion:transaction.targetRuntimeVersion,startedAt:transaction.startedAt,error:transaction.error}:null};
+    update:transaction ? {phase:transaction.phase,targetVersion:transaction.targetVersion,targetRuntimeVersion:transaction.targetRuntimeVersion,startedAt:transaction.startedAt,error:transaction.error,failureCode:transaction.failureCode,retryable:transaction.retryable,attempts:transaction.attempts,verifiedAt:transaction.verifiedAt,rollbackVerifiedAt:transaction.rollbackVerifiedAt,history:transaction.history}:null};
   if(profile) {
     try {const {stdout}=await promisify(execFile)(profile.codexExecutable,['--version'],{timeout:5000,maxBuffer:4096,windowsHide:true});report.savedRuntimeVersion=/^codex-cli (\d+\.\d+\.\d+)\s*$/.exec(stdout)?.[1]??'unrecognized';}
     catch {report.savedRuntimeVersion='unavailable';}

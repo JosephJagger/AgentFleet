@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { installationStep, agentUpdateDiagnostics } from "./installation.js";
 import { homedir, hostname } from "node:os";
 import { isAbsolute, join, resolve, posix, win32 } from "node:path";
 import { isSea } from "node:sea";
@@ -310,12 +311,15 @@ async function run(args: ParsedArgs): Promise<void> {
     const updater = process.env.AGENTFLEET_AUTO_UPDATE === "1"
       ? new AgentAutoUpdater({
           currentVersion: AGENT_VERSION,
+          machineId: pairing.machineId,
           controlPlaneUrl: pairing.controlPlaneUrl,
           dataDir,
           store,
           ...(support.codexProfile ? { runtimeSource: support.codexProfile.source, ...(support.codexProfile.runtimeVersion ? { currentRuntimeVersion: support.codexProfile.runtimeVersion } : {}) } : {}),
-          onPhase: (phase, version) => { if (support.codexProfile) { support.codexProfile.runtimeUpdateState = phase; support.codexProfile.runtimeUpdateTarget = version; support.codexProfile.runtimeUpdateError = null; } },
-          onError: message => { if (support.codexProfile) { support.codexProfile.runtimeUpdateState = "failed"; support.codexProfile.runtimeUpdateError = message; } },
+          onPhase: (phase, version) => { if (support.codexProfile) { support.codexProfile.agentUpdateState = phase; support.codexProfile.agentUpdateTarget = version; support.codexProfile.agentUpdateError = ""; } },
+          onError: message => { if (support.codexProfile) { support.codexProfile.agentUpdateState = "failed"; support.codexProfile.agentUpdateError = message; } },
+          onRuntimePhase: (phase, version) => { if (support.codexProfile) { support.codexProfile.runtimeUpdateState = phase; support.codexProfile.runtimeUpdateTarget = version; support.codexProfile.runtimeUpdateError = null; } },
+          onRuntimeError: message => { if (support.codexProfile) { support.codexProfile.runtimeUpdateState = "failed"; support.codexProfile.runtimeUpdateError = message; } },
           canUpdate: () => store.canSafelyRestart(),
           needsRuntimeRepair: () => runtime!.support.checks?.some(check => check.id === "tools" && check.state === "failed") ?? false,
           onStaged: (version) => {
@@ -337,13 +341,21 @@ async function run(args: ParsedArgs): Promise<void> {
     maintenance = new AgentMaintenance({ store, runtime, ...(updater ? { updater } : {}),
       report: (result) => relay.reportMaintenance(result), signal: abort.signal });
     let healthChecking = false;
+    let healthySince = 0;
     let nextVersionCleanup = Date.now() + 60_000;
     let handledUpdateId: string | undefined;
+    let nextUpdateDiagnostics = 0;
     const healthTimer = setInterval(() => {
-      if (!connected || !runtime?.readyForHealthCheck() || healthChecking) return;
+      if (!connected || !relay.isReady() || !runtime?.readyForHealthCheck()) { healthySince = 0; return; }
+      if (!healthySince) healthySince = Date.now();
+      if (Date.now() - healthySince < 10_000 || healthChecking) return;
       healthChecking = true;
       void (async () => {
         const transaction = await readUpdateTransaction(dataDir);
+        if (Date.now() >= nextUpdateDiagnostics && runtime!.support.codexProfile) {
+          Object.assign(runtime!.support.codexProfile, await agentUpdateDiagnostics(dataDir));
+          nextUpdateDiagnostics = Date.now() + 5_000;
+        }
         if (transaction?.targetRuntimeVersion && ["staged", "verifying"].includes(transaction.phase) &&
           (!runtime!.isWritable() || runtime!.support.codexVersion !== transaction.targetRuntimeVersion)) return;
         await writeWorkerHealth(dataDir, runtime!.support.codexVersion ?? undefined);
@@ -499,6 +511,11 @@ async function service(args: ParsedArgs): Promise<void> {
   const action = args.words[1];
   if (!action || args.words.length !== 2) {
     throw new AgentError("ARGUMENT_INVALID", "usage: service install|status|update|rollback|uninstall");
+  }
+  if (["prepare-update", "mark-staged", "verify-update", "abort-update"].includes(action)) {
+    ensureOptions(args, ["data-dir"]);
+    await installationStep(requestedDataDir(args), action === "prepare-update" ? "prepare" : action === "mark-staged" ? "staged" : action === "abort-update" ? "abort" : "wait");
+    return;
   }
   if (action === "stage-background") {
     ensureOptions(args, ["data-dir", "executable"]);

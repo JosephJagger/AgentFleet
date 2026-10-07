@@ -90,6 +90,7 @@ export function captureReconciliationStreams(store: StateStore): ReconciliationS
 }
 
 export class RelayConnection {
+  isReady(): boolean { return this.socket?.readyState === WebSocket.OPEN && this.reconciliationReady; }
   private readonly runtime: AgentRuntime;
   private readonly store: StateStore;
   private readonly identity: MachineIdentity;

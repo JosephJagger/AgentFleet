@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+AGENTFLEET_INSTALLER_PID=$$
+export AGENTFLEET_INSTALLER_PID
 
 MODE=onboard
 SERVICE_ACTION=update
@@ -7,6 +9,7 @@ case "${1:-}" in
   --update-only) MODE=update; shift ;;
   --repair) MODE=update; SERVICE_ACTION=install; shift ;;
   --stage-only) MODE=stage; shift ;;
+  --prepare-only) MODE=prepare; shift ;;
   --rollback) MODE=rollback; shift ;;
   --uninstall) MODE=uninstall; shift ;;
 esac
@@ -20,9 +23,47 @@ CURRENT_LINK="$USER_BIN/agentfleet"
 PREVIOUS_LINK="$USER_BIN/agentfleet.previous"
 RUNTIME_PROFILE="$DATA_ROOT/runtime-profile.json"
 
+INSTALL_LOCK="$DATA_ROOT/.installer-lock"
+INSTALL_LOCK_ACQUIRED=no
+TEMP_DIR=""
+cleanup_install() {
+  if [ -n "$TEMP_DIR" ]; then rm -rf -- "$TEMP_DIR"; fi
+  if [ "$INSTALL_LOCK_ACQUIRED" = yes ] && [ "$(cat "$INSTALL_LOCK/pid" 2>/dev/null)" = "$$" ]; then rm -f "$INSTALL_LOCK/pid"; rmdir "$INSTALL_LOCK" 2>/dev/null || true; fi
+}
+acquire_install_lock() {
+  mkdir -p "$(dirname "$INSTALL_LOCK")"
+  if ! mkdir "$INSTALL_LOCK" 2>/dev/null; then
+    [ ! -L "$INSTALL_LOCK" ] && [ -f "$INSTALL_LOCK/pid" ] && [ ! -L "$INSTALL_LOCK/pid" ] || { echo "installer: install lock cannot be verified" >&2; exit 1; }
+    LOCK_PID=$(cat "$INSTALL_LOCK/pid")
+    case "$LOCK_PID" in ''|*[!0-9]*) echo "installer: invalid install lock" >&2; exit 1 ;; esac
+    if kill -0 "$LOCK_PID" 2>/dev/null; then echo "installer: another installation is running (PID $LOCK_PID)" >&2; exit 1; fi
+    # A recovery guard prevents two installers from deleting a newly acquired lock.
+    if ! mkdir "$INSTALL_LOCK.recovery" 2>/dev/null; then echo "installer: lock recovery in progress" >&2; exit 1; fi
+    if [ "$(cat "$INSTALL_LOCK/pid" 2>/dev/null)" != "$LOCK_PID" ]; then rmdir "$INSTALL_LOCK.recovery"; exit 1; fi
+    rm -f "$INSTALL_LOCK/pid"
+    rmdir "$INSTALL_LOCK" || { rmdir "$INSTALL_LOCK.recovery"; exit 1; }
+    mkdir "$INSTALL_LOCK" || { rmdir "$INSTALL_LOCK.recovery"; exit 1; }
+    printf '%s\n' "$$" > "$INSTALL_LOCK/pid"
+    rmdir "$INSTALL_LOCK.recovery"
+  else
+    printf '%s\n' "$$" > "$INSTALL_LOCK/pid"
+  fi
+  INSTALL_LOCK_ACQUIRED=yes
+}
+trap cleanup_install EXIT HUP INT TERM
+acquire_install_lock
+
+atomic_link() {
+  LINK_TEMP="$1.tmp-$$"
+  [ ! -e "$LINK_TEMP" ] && [ ! -L "$LINK_TEMP" ] || { echo "installer: temporary link already exists" >&2; exit 1; }
+  ln -s "$2" "$LINK_TEMP"
+  mv -f "$LINK_TEMP" "$1"
+}
+
 if [ "$MODE" = rollback ]; then
   [ -L "$CURRENT_LINK" ] && [ -x "$CURRENT_LINK" ] || { echo "installer: no managed installation to roll back" >&2; exit 1; }
-  exec "$CURRENT_LINK" service rollback --data-dir "$DATA_ROOT"
+  "$CURRENT_LINK" service rollback --data-dir "$DATA_ROOT"
+  exit $?
 fi
 
 if [ "$MODE" = uninstall ]; then
@@ -53,7 +94,7 @@ CONTROL_URL=${CONTROL_URL%/}
 case "$(uname -m)" in arm64) PLATFORM=darwin-arm64; CODEX_NAME=codex-aarch64-apple-darwin ;; x86_64) PLATFORM=darwin-x64; CODEX_NAME=codex-x86_64-apple-darwin ;; *) echo "installer: unsupported macOS architecture" >&2; exit 1 ;; esac
 
 TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/agentfleet-install.XXXXXX")
-trap 'rm -rf -- "$TEMP_DIR"' EXIT HUP INT TERM
+trap cleanup_install EXIT HUP INT TERM
 mkdir -p "$DATA_ROOT"
 chmod 700 "$DATA_ROOT"
 [ ! -L "$DATA_ROOT" ] && [ ! -L "$RUNTIME_PROFILE" ] || { echo "installer: refusing a symlinked runtime profile" >&2; exit 1; }
@@ -94,12 +135,26 @@ SIZE=$(printf '%s' "$BLOCK" | sed -n 's/.*"size":\([0-9]*\).*/\1/p')
 case "$FILE" in "agentfleet-$PLATFORM-$VERSION.tar.gz") ;; *) echo "installer: invalid macOS release manifest" >&2; exit 1 ;; esac
 test "${#SHA256}" -eq 64 && test -n "$SIZE" || { echo "installer: invalid release digest" >&2; exit 1; }
 ARTIFACT="$TEMP_DIR/$FILE"
-download "$CONTROL_URL/downloads/$FILE" "$ARTIFACT"
+CACHE_DIR="$DATA_ROOT/download-cache"
+[ ! -L "$CACHE_DIR" ] || { echo "installer: unsafe download cache" >&2; exit 1; }
+mkdir -p "$CACHE_DIR"
+AVAILABLE_KB=$(df -Pk "$CACHE_DIR" | awk 'END { print $4 }')
+REQUIRED_KB=$((SIZE / 1024 * 3 + 524288))
+[ "$AVAILABLE_KB" -ge "$REQUIRED_KB" ] || { echo "installer: insufficient disk space; free at least $REQUIRED_KB KB before retrying" >&2; exit 1; }
+CACHE_FILE="$CACHE_DIR/$FILE"
+[ ! -L "$CACHE_FILE" ] || { echo "installer: unsafe cache file" >&2; exit 1; }
+if [ -f "$CACHE_FILE" ] && { [ "$(wc -c < "$CACHE_FILE" | tr -d ' ')" != "$SIZE" ] || [ "$(shasum -a 256 "$CACHE_FILE" | awk '{print $1}')" != "$SHA256" ]; }; then
+  rm -f "$CACHE_FILE"
+fi
+if [ -f "$CACHE_FILE" ]; then cp "$CACHE_FILE" "$ARTIFACT"; else download "$CONTROL_URL/downloads/$FILE" "$ARTIFACT"; fi
 test "$(wc -c < "$ARTIFACT" | tr -d ' ')" = "$SIZE" || { echo "installer: release size mismatch" >&2; exit 1; }
 test "$(shasum -a 256 "$ARTIFACT" | awk '{print $1}')" = "$SHA256" || { echo "installer: release SHA-256 mismatch" >&2; exit 1; }
+cp "$ARTIFACT" "$CACHE_FILE.new-$$"
+mv -f "$CACHE_FILE.new-$$" "$CACHE_FILE"
 tar -tzf "$ARTIFACT" | awk '{ if ($0 !~ /^agentfleet\// || $0 ~ /(^|\/)\.\.?(\/|$)/) bad=1 } END { exit bad ? 1 : 0 }' || { echo "installer: unsafe release archive" >&2; exit 1; }
 tar -tvzf "$ARTIFACT" | awk 'substr($1,1,1) != "-" && substr($1,1,1) != "d" { bad=1 } END { exit bad ? 1 : 0 }' || { echo "installer: release archive contains a link or special file" >&2; exit 1; }
 
+if [ -n "${AGENTFLEET_EXPECTED_VERSION:-}" ] && [ "$VERSION" != "$AGENTFLEET_EXPECTED_VERSION" ]; then echo "installer: release channel changed; retry preparation" >&2; exit 1; fi
 TARGET="$BIN_ROOT/$VERSION"
 mkdir -p "$BIN_ROOT" "$USER_BIN"
 if [ ! -d "$TARGET" ]; then
@@ -111,17 +166,25 @@ if [ ! -d "$TARGET" ]; then
 else
   [ ! -L "$TARGET" ] && [ -f "$TARGET/agentfleet" ] && [ ! -L "$TARGET/agentfleet" ] && [ -x "$TARGET/agentfleet" ] && [ "$("$TARGET/agentfleet" --version)" = "$VERSION" ] || { echo "installer: existing release directory is invalid" >&2; exit 1; }
 fi
+if [ "$MODE" = prepare ]; then echo "Prepared AgentFleet $VERSION; running service unchanged."; exit 0; fi
 OLD_TARGET=""
 if [ -L "$CURRENT_LINK" ]; then OLD_TARGET=$(readlink "$CURRENT_LINK"); fi
 if [ "$MODE" = stage ] || [ "$MODE" = update ]; then
   [ "$PROFILE_EXISTED" = yes ] || { echo "installer: existing runtime profile is required for an update" >&2; exit 1; }
-  if [ -n "$OLD_TARGET" ] && [ "$OLD_TARGET" != "$TARGET/agentfleet" ]; then ln -sfn "$OLD_TARGET" "$PREVIOUS_LINK"; fi
-  ln -sfn "$TARGET/agentfleet" "$CURRENT_LINK"
-  echo "Installed AgentFleet $VERSION. The existing Codex runtime was preserved."
-  if [ "$MODE" = stage ]; then echo "Staged AgentFleet $VERSION; launchd will restart into it."; exit 0; fi
-  if "$CURRENT_LINK" service "$SERVICE_ACTION" --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT"; then exit 0; fi
+  "$TARGET/agentfleet" service prepare-update --data-dir "$DATA_ROOT"
+  if [ -n "$OLD_TARGET" ] && [ "$OLD_TARGET" != "$TARGET/agentfleet" ]; then atomic_link "$PREVIOUS_LINK" "$OLD_TARGET"; fi
+  atomic_link "$CURRENT_LINK" "$TARGET/agentfleet"
+  "$TARGET/agentfleet" service mark-staged --data-dir "$DATA_ROOT"
+  echo "Installed AgentFleet $VERSION. The existing Codex runtime was preserved; awaiting health confirmation."
+  if [ "$MODE" = stage ]; then rm -f "$CACHE_FILE"; echo "Staged AgentFleet $VERSION; launchd will restart into it."; exit 0; fi
+  if "$CURRENT_LINK" service "$SERVICE_ACTION" --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT"; then
+    "$TARGET/agentfleet" service verify-update --data-dir "$DATA_ROOT"
+    echo "AgentFleet $VERSION is connected and healthy."
+    exit 0
+  fi
   echo "installer: service update failed; restoring the previous binary" >&2
-  if [ -n "$OLD_TARGET" ]; then ln -sfn "$OLD_TARGET" "$CURRENT_LINK"; "$CURRENT_LINK" service update --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT" || true; fi
+  "$TARGET/agentfleet" service abort-update --data-dir "$DATA_ROOT" || true
+  if [ -n "$OLD_TARGET" ]; then atomic_link "$CURRENT_LINK" "$OLD_TARGET"; "$TARGET/agentfleet" service update --executable "$CURRENT_LINK" --data-dir "$DATA_ROOT" || true; fi
   exit 1
 fi
 HOST_CODEX=${EXISTING_CODEX_EXECUTABLE:-}
@@ -165,8 +228,8 @@ PROFILE_HOME=$(escape_json "${EXISTING_CODEX_HOME:-${CODEX_HOME:-$HOME/.codex}}"
   "$PROFILE_EXECUTABLE" "$PROFILE_HOME" "$CODEX_SOURCE" > "$RUNTIME_PROFILE.new")
 mv -f "$RUNTIME_PROFILE.new" "$RUNTIME_PROFILE"
 
-if [ -n "$OLD_TARGET" ] && [ "$OLD_TARGET" != "$TARGET/agentfleet" ]; then ln -sfn "$OLD_TARGET" "$PREVIOUS_LINK"; fi
-ln -sfn "$TARGET/agentfleet" "$CURRENT_LINK"
+if [ -n "$OLD_TARGET" ] && [ "$OLD_TARGET" != "$TARGET/agentfleet" ]; then atomic_link "$PREVIOUS_LINK" "$OLD_TARGET"; fi
+atomic_link "$CURRENT_LINK" "$TARGET/agentfleet"
 
 echo "Installed AgentFleet $VERSION with Codex $CODEX_VERSION."
 echo "Registering this Mac. Keep the Add Host dialog open until this command finishes."

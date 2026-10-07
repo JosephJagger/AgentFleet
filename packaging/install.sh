@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+AGENTFLEET_INSTALLER_PID=$$
+export AGENTFLEET_INSTALLER_PID
 
 MODE=onboard
 SERVICE_ACTION=update
@@ -7,6 +9,7 @@ case "${1:-}" in
   --update-only) MODE=update; shift ;;
   --repair) MODE=update; SERVICE_ACTION=install; shift ;;
   --stage-only) MODE=stage; shift ;;
+  --prepare-only) MODE=prepare; shift ;;
   --rollback) MODE=rollback; shift ;;
   --uninstall) MODE=uninstall; shift ;;
   --self-test) MODE=self-test; shift ;;
@@ -117,7 +120,7 @@ HELPER_EXISTED=no
 SELECTED_CODEX_SOURCE_KIND=managed
 release_install_lock() {
   if [ "$INSTALL_LOCK_ACQUIRED" = yes ]; then
-    rmdir -- "$INSTALL_LOCK" 2>/dev/null || true
+    if [ "$(cat "$INSTALL_LOCK/pid" 2>/dev/null)" = "$$" ]; then rm -f "$INSTALL_LOCK/pid"; rmdir -- "$INSTALL_LOCK" 2>/dev/null || true; fi
     INSTALL_LOCK_ACQUIRED=no
   fi
 }
@@ -159,10 +162,22 @@ cleanup() {
   release_install_lock
 }
 acquire_install_lock() {
-  mkdir -p "$DATA_ROOT/agentfleet"
-  if ! mkdir "$INSTALL_LOCK"; then
-    echo "installer: another AgentFleet install/update/rollback/uninstall is already running" >&2
-    exit 1
+  mkdir -p "$(dirname "$INSTALL_LOCK")"
+  if ! mkdir "$INSTALL_LOCK" 2>/dev/null; then
+    [ ! -L "$INSTALL_LOCK" ] && [ -f "$INSTALL_LOCK/pid" ] && [ ! -L "$INSTALL_LOCK/pid" ] || { echo "installer: install lock cannot be verified" >&2; exit 1; }
+    LOCK_PID=$(cat "$INSTALL_LOCK/pid")
+    case "$LOCK_PID" in ''|*[!0-9]*) echo "installer: invalid install lock" >&2; exit 1 ;; esac
+    if kill -0 "$LOCK_PID" 2>/dev/null; then echo "installer: another installation is running (PID $LOCK_PID)" >&2; exit 1; fi
+    # A recovery guard prevents two installers from deleting a newly acquired lock.
+    if ! mkdir "$INSTALL_LOCK.recovery" 2>/dev/null; then echo "installer: lock recovery in progress" >&2; exit 1; fi
+    if [ "$(cat "$INSTALL_LOCK/pid" 2>/dev/null)" != "$LOCK_PID" ]; then rmdir "$INSTALL_LOCK.recovery"; exit 1; fi
+    rm -f "$INSTALL_LOCK/pid"
+    rmdir "$INSTALL_LOCK" || { rmdir "$INSTALL_LOCK.recovery"; exit 1; }
+    mkdir "$INSTALL_LOCK" || { rmdir "$INSTALL_LOCK.recovery"; exit 1; }
+    printf '%s\n' "$$" > "$INSTALL_LOCK/pid"
+    rmdir "$INSTALL_LOCK.recovery"
+  else
+    printf '%s\n' "$$" > "$INSTALL_LOCK/pid"
   fi
   INSTALL_LOCK_ACQUIRED=yes
 }
@@ -463,7 +478,9 @@ if [ "$MODE" = "uninstall" ]; then
   else
     "$CURRENT_LINK" service uninstall
   fi
-  if [ -e "$CURRENT_LINK" ] && [ ! -L "$CURRENT_LINK" ]; then
+  if [ "$MODE" = prepare ]; then echo "Prepared AgentFleet $VERSION; running service unchanged."; exit 0; fi
+
+if [ -e "$CURRENT_LINK" ] && [ ! -L "$CURRENT_LINK" ]; then
     echo "installer: refusing to remove non-symlink $CURRENT_LINK" >&2
     exit 1
   fi
@@ -568,16 +585,29 @@ esac
 EXPECTED_ARTIFACT_METADATA="$TEMP_DIR/artifact-metadata.expected"
 artifact_metadata_record "$FILE" "$FORMAT" "$SHA256" "$SIZE" > "$EXPECTED_ARTIFACT_METADATA"
 
+acquire_install_lock
 ARTIFACT="$TEMP_DIR/$FILE"
-download "$CONTROL_URL/downloads/$FILE" "$ARTIFACT"
+CACHE_DIR="$DATA_ROOT/agentfleet/download-cache"
+[ ! -L "$CACHE_DIR" ] || { echo "installer: unsafe download cache" >&2; exit 1; }
+mkdir -p "$CACHE_DIR"
+AVAILABLE_KB=$(df -Pk "$CACHE_DIR" | awk 'END { print $4 }')
+REQUIRED_KB=$((SIZE / 1024 * 3 + 524288))
+[ "$AVAILABLE_KB" -ge "$REQUIRED_KB" ] || { echo "installer: insufficient disk space; free at least $REQUIRED_KB KB before retrying" >&2; exit 1; }
+CACHE_FILE="$CACHE_DIR/$FILE"
+[ ! -L "$CACHE_FILE" ] || { echo "installer: unsafe cache file" >&2; exit 1; }
+if [ -f "$CACHE_FILE" ] && { [ "$(wc -c < "$CACHE_FILE" | tr -d ' ')" != "$SIZE" ] || [ "$(sha256sum "$CACHE_FILE" | awk '{print $1}')" != "$SHA256" ]; }; then
+  rm -f "$CACHE_FILE"
+fi
+if [ -f "$CACHE_FILE" ]; then cp "$CACHE_FILE" "$ARTIFACT"; else download "$CONTROL_URL/downloads/$FILE" "$ARTIFACT"; fi
 ACTUAL_SIZE=$(wc -c < "$ARTIFACT" | tr -d ' ')
 if [ "$ACTUAL_SIZE" != "$SIZE" ]; then
   echo "installer: artifact size does not match manifest" >&2
   exit 1
 fi
 printf '%s  %s\n' "$SHA256" "$ARTIFACT" | sha256sum -c - >/dev/null
+cp "$ARTIFACT" "$CACHE_FILE.new-$$"
+mv -f "$CACHE_FILE.new-$$" "$CACHE_FILE"
 
-acquire_install_lock
 mkdir -p "$BIN_ROOT" "$USER_BIN"
 if [ -e "$MANAGED_MARKER" ]; then
   if [ -L "$MANAGED_MARKER" ] || [ ! -f "$MANAGED_MARKER" ] || [ "$(sed -n '1p' "$MANAGED_MARKER")" != "agentfleet-binaries-v1" ]; then
@@ -588,6 +618,7 @@ else
   printf '%s\n' agentfleet-binaries-v1 > "$MANAGED_MARKER"
   chmod 600 "$MANAGED_MARKER"
 fi
+if [ -n "${AGENTFLEET_EXPECTED_VERSION:-}" ] && [ "$VERSION" != "$AGENTFLEET_EXPECTED_VERSION" ]; then echo "installer: release channel changed; retry preparation" >&2; exit 1; fi
 TARGET="$BIN_ROOT/$VERSION"
 if [ -e "$TARGET" ]; then
   ARTIFACT_METADATA="$TARGET/.artifact-metadata"
@@ -688,6 +719,11 @@ atomic_link() {
   mv -f "$LINK_TEMP" "$1"
 }
 
+TRANSACTION=no
+if { [ "$MODE" = update ] || [ "$MODE" = stage ]; } && [ -n "$OLD_TARGET" ]; then
+  "$TARGET/agentfleet" service prepare-update --data-dir "${SERVICE_DATA_DIR:-$DATA_ROOT/agentfleet}"
+  TRANSACTION=yes
+fi
 # Prepare every dependency before changing the executable used by the service.
 PROFILE_DIRECTORY=${SERVICE_DATA_DIR:-"$DATA_ROOT/agentfleet"}
 PROFILE_TARGET="$PROFILE_DIRECTORY/runtime-profile.json"
@@ -766,7 +802,8 @@ if [ -n "$OLD_TARGET" ] && [ "$OLD_TARGET" != "$TARGET/agentfleet" ]; then
 fi
 atomic_link "$CURRENT_LINK" "$TARGET/agentfleet"
 
-echo "Installed AgentFleet $VERSION at $CURRENT_LINK"
+if [ "$TRANSACTION" = yes ]; then "$TARGET/agentfleet" service mark-staged --data-dir "${SERVICE_DATA_DIR:-$DATA_ROOT/agentfleet}"; fi
+echo "Installed AgentFleet $VERSION at $CURRENT_LINK; awaiting health confirmation"
 case ":${PATH:-}:" in
   *":$USER_BIN:"*) ;;
   *) echo "warning: add $USER_BIN to PATH" >&2 ;;
@@ -782,21 +819,24 @@ if [ "$MODE" = "update" ]; then
   fi
   if [ "$UPDATE_RESULT" = ok ]; then
     ACTIVATION_PENDING=no
-    echo "Updated and restarted the AgentFleet background service."
+    "$TARGET/agentfleet" service verify-update --data-dir "${SERVICE_DATA_DIR:-$DATA_ROOT/agentfleet}"
+    echo "Updated AgentFleet; panel connection and health confirmed."
     exit 0
   fi
   echo "installer: service update failed; restoring the previous binary" >&2
+  "$TARGET/agentfleet" service abort-update --data-dir "${SERVICE_DATA_DIR:-$DATA_ROOT/agentfleet}" || true
   atomic_link "$CURRENT_LINK" "$OLD_TARGET"
   if [ -n "$OLDER_TARGET" ]; then atomic_link "$PREVIOUS_LINK" "$OLDER_TARGET"; else unlink "$PREVIOUS_LINK" 2>/dev/null || true; fi
   if [ -n "$SERVICE_DATA_DIR" ]; then
-    "$CURRENT_LINK" service update --executable "$CURRENT_LINK" --data-dir "$SERVICE_DATA_DIR" || true
+    "$TARGET/agentfleet" service update --executable "$CURRENT_LINK" --data-dir "$SERVICE_DATA_DIR" || true
   else
-    "$CURRENT_LINK" service update --executable "$CURRENT_LINK" || true
+    "$TARGET/agentfleet" service update --executable "$CURRENT_LINK" || true
   fi
   exit 1
 fi
 
 if [ "$MODE" = "stage" ]; then
+  rm -f "$CACHE_FILE"
   ACTIVATION_PENDING=no
   echo "Staged AgentFleet $VERSION; the service will restart into this version."
   exit 0

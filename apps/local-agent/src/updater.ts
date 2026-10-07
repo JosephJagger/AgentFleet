@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { recordUpdateProgress } from "./installation.js";
 import { retryUpdateDownload } from "./update-network.js";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -15,7 +17,7 @@ const UPDATE_TIMEOUT_MS = 10 * 60_000;
 
 type FetchLike = typeof fetch;
 
-export type UpdateCheckResult = "current" | "busy" | "staged";
+export type UpdateCheckResult = "current" | "busy" | "staged" | "deferred";
 
 export function windowsUpdateRestartScript(): string {
   return "$ErrorActionPreference='SilentlyContinue'; for($i=0;$i -lt 24;$i++){ Start-Sleep -Seconds 5; $task=Get-ScheduledTask -TaskName 'AgentFleet-Background' -ErrorAction SilentlyContinue; if($task -and $task.State -ne 'Running'){ Start-ScheduledTask -TaskName 'AgentFleet-Background'; exit 0 } }; exit 1";
@@ -92,11 +94,32 @@ function releaseVersionFromManifest(contents: string): string {
   return version;
 }
 
+export function retryableUpdateFailure(code: string, message: string): boolean {
+  if (/SHA-256|checksum|digest|schema|version mismatch|unsafe/i.test(message)) return false;
+  return code === "UPDATE_INSTALL_TIMEOUT" || /ECONNRESET|ETIMEDOUT|curl: \((?:6|7|18|28|35|56)\)|HTTP (?:429|5\d\d)|connection reset|timed out/i.test(message);
+}
+
+export function eligibleForAgentRollout(manifest: string, machineId?: string, platform = `${process.platform}-${process.arch}`, now = Date.now()): boolean {
+  const value = JSON.parse(manifest).rollout;
+  if (value === undefined) return true; // Older manifests mean a full release.
+  if (!value || !Number.isInteger(value.percentage) || value.percentage < 0 || value.percentage > 100 || typeof value.seed !== "string" || !value.seed || value.seed.length > 100) throw new AgentError("UPDATE_ROLLOUT_INVALID", "发布批次配置无效，已保留原版本。");
+  if (value.platforms !== undefined && (!Array.isArray(value.platforms) || value.platforms.some((item: unknown) => typeof item !== "string"))) throw new AgentError("UPDATE_ROLLOUT_INVALID", "发布平台配置无效");
+  if (value.notBefore !== undefined && (typeof value.notBefore !== "string" || !Number.isFinite(Date.parse(value.notBefore)))) throw new AgentError("UPDATE_ROLLOUT_INVALID", "发布时间无效");
+  if (value.notBefore && now < Date.parse(value.notBefore)) return false;
+  if (value.platforms && !value.platforms.includes(platform)) return false;
+  if (value.percentage === 100) return true;
+  if (!machineId) return false;
+  const bucket = createHash("sha256").update(`${value.seed}:${machineId}`).digest().readUInt32BE(0) % 100;
+  return bucket < value.percentage;
+}
+
 export async function stageAgentUpdate(options: {
   installer: string;
   controlPlaneUrl: string;
   dataDir: string;
   signal?: AbortSignal;
+  prepareOnly?: boolean;
+  expectedVersion?: string;
 }): Promise<void> {
   if (process.platform === "win32") {
     const temporaryDirectory = await mkdtemp(join(tmpdir(), "agentfleet-update-"));
@@ -105,16 +128,16 @@ export async function stageAgentUpdate(options: {
       await writeFile(installerPath, options.installer, { encoding: "utf8", mode: 0o600 });
       await runInstaller("powershell.exe", [
         "-NoLogo", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass",
-        "-File", installerPath, "-Mode", "Stage", "-Url", options.controlPlaneUrl,
-      ], undefined, options.signal, await codexNetworkEnvironment(process.env));
+        "-File", installerPath, "-Mode", options.prepareOnly ? "Prepare" : "Stage", "-Url", options.controlPlaneUrl,
+      ], undefined, options.signal, await codexNetworkEnvironment({ ...process.env, ...(options.expectedVersion ? { AGENTFLEET_EXPECTED_VERSION: options.expectedVersion } : {}) }));
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
     return;
   }
   await runInstaller("/bin/sh", [
-    "-s", "--", "--stage-only", "--url", options.controlPlaneUrl, "--data-dir", options.dataDir,
-  ], options.installer, options.signal);
+    "-s", "--", options.prepareOnly ? "--prepare-only" : "--stage-only", "--url", options.controlPlaneUrl, "--data-dir", options.dataDir,
+  ], options.installer, options.signal, { ...process.env, ...(options.expectedVersion ? { AGENTFLEET_EXPECTED_VERSION: options.expectedVersion } : {}) });
 }
 
 async function runInstaller(
@@ -124,22 +147,31 @@ async function runInstaller(
   signal?: AbortSignal,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
+  if (signal?.aborted) throw signal.reason;
   await new Promise<void>((resolve, reject) => {
     const child = spawn(executable, args, {
       env: environment,
       stdio: [stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
       windowsHide: true,
+      detached: process.platform !== "win32",
     });
+    const terminate = (kind: NodeJS.Signals) => {
+      try {
+        if (process.platform !== "win32" && child.pid) process.kill(-child.pid, kind);
+        else if (child.pid) { const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" }); killer.on("error", () => child.kill()); }
+      } catch { /* Installer already exited. */ }
+    };
     let output = "";
     const capture = (chunk: Buffer) => {
-      if (output.length < 64 * 1_024) output += chunk.toString("utf8");
+      output = (output + chunk.toString("utf8")).slice(-64 * 1_024);
     };
     child.stdout?.on("data", capture);
     child.stderr?.on("data", capture);
     child.stdin?.on("error", () => undefined);
-    const timeout = setTimeout(() => child.kill("SIGKILL"), UPDATE_TIMEOUT_MS);
+    let timedOut = false;
+    const timeout = setTimeout(() => { timedOut = true; terminate("SIGKILL"); }, UPDATE_TIMEOUT_MS);
     timeout.unref();
-    const abort = () => child.kill("SIGTERM");
+    const abort = () => terminate("SIGTERM");
     signal?.addEventListener("abort", abort, { once: true });
     child.once("error", (error) => {
       clearTimeout(timeout);
@@ -155,7 +187,7 @@ async function runInstaller(
         resolve();
       } else {
         reject(new AgentError(
-          "UPDATE_INSTALL_FAILED",
+          timedOut ? "UPDATE_INSTALL_TIMEOUT" : "UPDATE_INSTALL_FAILED",
           `AgentFleet update installer failed (${closeSignal ?? `exit ${code ?? "unknown"}`}): ${output.trim().slice(-2_000)}`,
         ));
       }
@@ -166,6 +198,7 @@ async function runInstaller(
 
 export interface AgentAutoUpdaterOptions {
   currentVersion: string;
+  machineId?: string;
   controlPlaneUrl: string;
   dataDir: string;
   canUpdate(): boolean;
@@ -175,8 +208,11 @@ export interface AgentAutoUpdaterOptions {
   intervalMs?: number;
   fetchImpl?: FetchLike;
   stageUpdate?: typeof stageAgentUpdate;
+  prepareUpdate?: typeof stageAgentUpdate;
   store?: StateStore;
   onPhase?: (phase: string, version: string) => void;
+  onRuntimePhase?: (phase: string, version: string) => void;
+  onRuntimeError?: (message: string) => void;
   runtimeSource?: "managed" | "host";
   currentRuntimeVersion?: string;
   needsRuntimeRepair?: () => boolean;
@@ -193,6 +229,9 @@ export class AgentAutoUpdater {
   private controller: AbortController | undefined;
   private stopped = false;
   private staged = false;
+  private preparedVersion: string | undefined;
+  private targetVersion = "";
+  private checkingRuntime = false;
   private checkActive: Promise<UpdateCheckResult> | undefined;
 
   constructor(options: AgentAutoUpdaterOptions) {
@@ -218,14 +257,24 @@ export class AgentAutoUpdater {
     if (this.staged) return "staged";
     if (this.checkActive) return this.checkActive;
     this.checkActive = this.performCheck(signal).catch(async (error) => {
-      this.options.onError?.(error instanceof Error ? error.message.slice(0, 500) : "更新失败");
-      await this.options.store?.setMaintenanceDrain(undefined);
+      const message = error instanceof Error ? error.message.slice(0, 500) : "更新失败";
+      if (!this.checkingRuntime && this.options.store) await recordUpdateProgress(this.options.dataDir, "failed", this.targetVersion, message).catch(() => undefined);
+      if (this.checkingRuntime) this.options.onRuntimeError?.(message); else this.options.onError?.(message);
+      const drain = this.options.store?.snapshot().maintenanceDrain;
+      if (drain?.operationId.startsWith("agent-update-") || drain?.operationId.startsWith("runtime-update-")) await this.options.store?.setMaintenanceDrain(undefined);
       throw error;
     }).finally(() => { this.checkActive = undefined; });
     return this.checkActive;
   }
 
+  private async phase(phase: string, version: string): Promise<void> {
+    this.targetVersion = version;
+    if (this.options.store) await recordUpdateProgress(this.options.dataDir, phase, version);
+    this.options.onPhase?.(phase, version);
+  }
+
   private async performCheck(signal?: AbortSignal): Promise<UpdateCheckResult> {
+    this.checkingRuntime = false;
     if (this.options.store) await clearCompletedAgentUpdateDrain(this.options.store, this.options.currentVersion);
     const baseUrl = this.options.controlPlaneUrl.replace(/\/$/, "");
     const manifest = await fetchBoundedText(
@@ -236,18 +285,34 @@ export class AgentAutoUpdater {
     );
     const availableVersion = releaseVersionFromManifest(manifest);
     if (compareReleaseVersions(availableVersion, this.options.currentVersion) <= 0) return this.performRuntimeCheck(signal);
+    if (!eligibleForAgentRollout(manifest, this.options.machineId)) { await this.phase("rollout_wait", availableVersion); return "deferred"; }
     const failed = this.options.store ? await readUpdateTransaction(this.options.dataDir) : undefined;
-    if (failed && ["rolled_back", "failed"].includes(failed.phase) && failed.targetVersion === availableVersion) {
+    if (failed && ["rolled_back", "failed"].includes(failed.phase) && failed.targetVersion === availableVersion && (!failed.retryable || (failed.attempts ?? 1) >= 3)) {
       throw new AgentError("UPDATE_ROLLOUT_PAUSED", "此版本此前在本机升级失败，已保留原运行版本并暂停重复安装；请使用主机安装命令修复，或等待修正版");
+    }
+    if (failed?.targetVersion === availableVersion && failed.retryable && Date.now() - Date.parse(failed.updatedAt ?? failed.startedAt) < 60_000) {
+      throw new AgentError("UPDATE_RETRY_PENDING", "上次更新因临时错误中断，稍后可重试；原版本仍保留。");
+    }
+    const installerPath = process.platform === "darwin" ? "/install-macos" : process.platform === "win32" ? "/install.ps1" : "/install";
+    const prepare = this.options.prepareUpdate ?? (this.options.stageUpdate ? undefined : stageAgentUpdate);
+    let preparedInstaller: string | undefined;
+    if (prepare && this.preparedVersion !== availableVersion) {
+      await this.phase("downloading", availableVersion);
+      preparedInstaller = await fetchBoundedText(this.fetchImpl, `${baseUrl}${installerPath}`, MAX_INSTALLER_BYTES, signal);
+      await prepare({ installer: preparedInstaller, controlPlaneUrl: baseUrl, dataDir: this.options.dataDir, prepareOnly: true, expectedVersion: availableVersion, ...(signal ? { signal } : {}) });
+      this.preparedVersion = availableVersion;
+      await this.phase("prepared", availableVersion);
+    }
+    if (this.options.store && Object.values(this.options.store.snapshot().commandJournal).some(command => command.state === "unknown")) {
+      throw new AgentError("UPDATE_RECOVERY_REQUIRED", "主机有结果待核验的操作，升级未开始。请先点击「一键恢复连接」，再检查更新；不会重发原任务。");
     }
     if (this.options.store) {
       const drain = this.options.store.snapshot().maintenanceDrain;
       await this.options.store.setMaintenanceDrain(drain?.operationId ?? `agent-update-${availableVersion}`);
     }
-    this.options.onPhase?.("waiting_for_idle", availableVersion);
+    await this.phase("waiting_for_idle", availableVersion);
     if (!this.options.canUpdate()) return "busy";
-    const installerPath = process.platform === "darwin" ? "/install-macos" : process.platform === "win32" ? "/install.ps1" : "/install";
-    const installer = await fetchBoundedText(
+    const installer = preparedInstaller ?? await fetchBoundedText(
       this.fetchImpl,
       `${baseUrl}${installerPath}`,
       MAX_INSTALLER_BYTES,
@@ -257,19 +322,26 @@ export class AgentAutoUpdater {
       throw new AgentError("UPDATE_INSTALLER_INVALID", "downloaded installer is not an AgentFleet platform installer");
     }
     if (!this.options.canUpdate()) return "busy";
-    const transaction = this.options.store ? await prepareUpdateTransaction(this.options.dataDir, availableVersion) : undefined;
+    const transaction = this.options.store ? { ...await prepareUpdateTransaction(this.options.dataDir, availableVersion), attempts: failed?.targetVersion === availableVersion ? (failed.attempts ?? 1) + 1 : 1 } : undefined;
+    if (transaction) await writeUpdateTransaction(this.options.dataDir, transaction);
     try {
-      this.options.onPhase?.("installing", availableVersion);
+      await this.phase("installing", availableVersion);
       await this.stageUpdate({
         installer,
         controlPlaneUrl: baseUrl,
         dataDir: this.options.dataDir,
+        expectedVersion: availableVersion,
         ...(signal === undefined ? {} : { signal }),
       });
       if (transaction) await writeUpdateTransaction(this.options.dataDir, { ...transaction, phase: "staged" });
-      this.options.onPhase?.("restarting", availableVersion);
+      await this.phase("restarting", availableVersion);
     } catch (error) {
-      if (transaction) await restoreUpdateTransaction(this.options.dataDir, transaction, error instanceof Error ? error.message : String(error));
+      if (transaction) {
+        const message = error instanceof Error ? error.message : String(error);
+        const code = error instanceof AgentError ? error.code : "UPDATE_INSTALL_FAILED";
+        const retryable = retryableUpdateFailure(code, message);
+        await restoreUpdateTransaction(this.options.dataDir, { ...transaction, failureCode: code, retryable }, message);
+      }
       await this.options.store?.setMaintenanceDrain(undefined);
       throw error;
     }
@@ -279,6 +351,7 @@ export class AgentAutoUpdater {
   }
 
   private async performRuntimeCheck(signal?: AbortSignal): Promise<UpdateCheckResult> {
+    this.checkingRuntime = true;
     if (this.options.runtimeSource !== "managed" || !this.options.currentRuntimeVersion || !this.options.store) return "current";
     const response = await retryUpdateDownload(() => this.fetchImpl(`${this.options.controlPlaneUrl.replace(/\/$/, "")}/api/runtime-release/target`, { redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(15_000), ...(signal ? [signal] : [])]) }), signal);
     if (response.status === 404) return "current";
@@ -287,16 +360,16 @@ export class AgentAutoUpdater {
     const target = parseManagedRuntimeTarget(JSON.parse(contents).target);
     if (!target || (target.version === this.options.currentRuntimeVersion && !this.options.needsRuntimeRepair?.()) || (!target.rollback && compareReleaseVersions(target.version, this.options.currentRuntimeVersion) < 0)) {
       if (this.options.store.snapshot().maintenanceDrain?.operationId.startsWith("runtime-update-")) await this.options.store.setMaintenanceDrain(undefined);
-      this.options.onPhase?.("current", this.options.currentRuntimeVersion);
+      this.options.onRuntimePhase?.("current", this.options.currentRuntimeVersion);
       return "current";
     }
     const failed = await readUpdateTransaction(this.options.dataDir);
     if (failed && ["rolled_back", "failed"].includes(failed.phase) && failed.targetRuntimeRevision === target.revision) throw new AgentError("RUNTIME_ROLLOUT_PAUSED", "这个托管版本在本机更新失败并已回退，等待新的验证目标");
     const drain = this.options.store.snapshot().maintenanceDrain;
     await this.options.store.setMaintenanceDrain(drain?.operationId ?? `runtime-update-${target.revision}`);
-    this.options.onPhase?.("waiting_for_idle", target.version);
+    this.options.onRuntimePhase?.("waiting_for_idle", target.version);
     if (!this.options.canUpdate()) return "busy";
-    this.options.onPhase?.("validating_runtime", target.version);
+    this.options.onRuntimePhase?.("validating_runtime", target.version);
     const activate = await (this.options.prepareRuntime ?? prepareManagedRuntime)({ dataDir: this.options.dataDir, controlPlaneUrl: this.options.controlPlaneUrl, target, ...(signal ? { signal } : {}) });
     if (signal?.aborted) throw signal.reason;
     if (!this.options.canUpdate()) return "busy";

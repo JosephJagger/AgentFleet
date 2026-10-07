@@ -9,6 +9,32 @@ permissions:
   contents: read
 
 jobs:
+  installation-lifecycle:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - run: npm ci --prefix apps/local-agent --no-audit --no-fund
+      - run: npm run build --prefix apps/local-agent
+      - run: node --test apps/local-agent/dist/test/installation-lifecycle.test.js apps/local-agent/dist/test/installer-lock.test.js apps/local-agent/dist/test/update-network.test.js apps/local-agent/dist/test/service.test.js apps/local-agent/dist/test/supervisor-ownership.test.js
+      - name: Validate POSIX installer syntax
+        if: runner.os != 'Windows'
+        run: sh -n packaging/install.sh && sh -n packaging/install-macos.sh
+      - name: Validate Windows installer and supervised handoff
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $tokens = $null; $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path packaging/install.ps1), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+          & ./packaging/test-windows-update-handoff.ps1
   windows-installer:
     runs-on: windows-2022
     timeout-minutes: 5

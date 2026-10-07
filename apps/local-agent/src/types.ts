@@ -314,6 +314,14 @@ export interface SupportReport {
     hostCodexVersionSource?: "command" | "package-record" | null;
     hostCodexMetadataPath?: string | null;
     hostCodexDefaultVersionSource?: "command" | "package-record" | null;
+    agentRunningVersion?: string;
+    agentInstalledVersion?: string;
+    agentUpdateState?: string;
+    agentUpdateTarget?: string;
+    agentUpdateError?: string;
+    agentUpdateCheckedAt?: string;
+    agentRollbackVersion?: string;
+    agentUpdateVerifiedAt?: string;
     runtimeUpdateState?: string;
     runtimeUpdateTarget?: string;
     runtimeUpdateError?: string | null;

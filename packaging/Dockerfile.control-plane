@@ -29,3 +29,7 @@ COPY --from=control-plane-build --chown=agentfleet:agentfleet /build/apps/contro
 COPY --from=control-plane-build --chown=agentfleet:agentfleet /build/apps/control-plane/dist/ /app/control-plane/dist/
 COPY --from=control-plane-deps --chown=agentfleet:agentfleet /build/apps/control-plane/node_modules/ /app/control-plane/node_modules/
 COPY --from=web-build --chown=agentfleet:agentfleet /build/apps/web/dist/ /app/web/
+
+COPY --chown=agentfleet:agentfleet --chmod=0555 packaging/install.sh /app/web/install
+COPY --chown=agentfleet:agentfleet --chmod=0555 packaging/install-macos.sh /app/web/install-macos
+COPY --chown=agentfleet:agentfleet packaging/install.ps1 /app/web/install.ps1
