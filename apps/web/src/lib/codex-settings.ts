@@ -1,4 +1,4 @@
-export interface CodexSettings { model: string; effort?: string; mode?: "default" | "plan"; serviceTier?: string | null; personality?: "none" | "friendly" | "pragmatic" }
+export interface CodexSettings { model: string; effort?: string; mode?: "default" | "plan"; serviceTier?: string | null; disabledPluginIds?: string[]; summary?: "auto" | "concise" | "detailed" | "none"; multiAgentMode?: "explicitRequestOnly" | "proactive"; personality?: "none" | "friendly" | "pragmatic" }
 export interface CodexCatalog {
   imageInput?: boolean;
   fileInput?: boolean;
@@ -11,10 +11,10 @@ export interface CodexCatalog {
   modeNotice?: string;
 }
 export type SettingsScope = "workspace" | "machine" | "project" | "session";
-export type FieldOverrides = Partial<Record<keyof CodexSettings, string | null>>;
+export type FieldOverrides = Partial<Record<Exclude<keyof CodexSettings, "disabledPluginIds">, string | null>> & { disabledPluginIds?: string[] | "__native__" };
 export interface CodexPreferences {
   catalogs?: { machineId: string; catalog: CodexCatalog | null }[];
-  sources?: Record<keyof CodexSettings, SettingsScope | "codex">;
+  sources?: Partial<Record<keyof CodexSettings, SettingsScope | "codex">>;
   effective?: FieldOverrides;
   compatibilityIssue?: string;
   resolutionIssue?: string;

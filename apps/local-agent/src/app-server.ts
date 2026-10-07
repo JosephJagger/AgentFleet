@@ -1,6 +1,8 @@
+import { WorkspaceTerminals } from "./workspace-terminals.js";
 import { parseRealtimeVoice } from "./voice-options.js";
 import { PANEL_VOICE_TOOL, PANEL_VOICE_INSTRUCTIONS, PANEL_REALTIME_PROMPT } from "./panel-voice-tools.js";
 import { voiceErrorCode } from "./voice-errors.js";
+import { projectWorkspaceFiles } from "./project-workspace-files.js";
 import { executeCodexWorkspaceOperation } from "./codex-workspace-operations.js";
 import { codexNotification } from "./codex-notifications.js";
 import { elicitationForm, elicitationContent, type ElicitationField } from "./mcp-elicitation.js";
@@ -43,7 +45,9 @@ import {
 } from "./util.js";
 
 const APP_SERVER_METHODS = new Set([
-  "thread/realtime/start", "thread/realtime/stop", "thread/realtime/appendText",
+  "account/bedrock/discover", "account/bedrock/setup",
+  "externalAgentConfig/detect", "externalAgentConfig/import", "externalAgentConfig/import/readHistories", "windowsSandbox/setupStart",
+  "thread/realtime/listVoices", "plugin/search", "account/gatewayOAuth/read", "remoteControl/status/read", "thread/realtime/start", "thread/realtime/stop", "thread/realtime/appendText",
   "initialize",
   "model/list",
   "collaborationMode/list",
@@ -63,12 +67,12 @@ const APP_SERVER_METHODS = new Set([
   "turn/start",
   "thread/compact/start",
   "review/start",
-  "account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "plugin/read", "plugin/skill/read", "thread/goal/set",
+  "account/read", "account/rateLimits/read", "config/read", "skills/extraRoots/set", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "plugin/read", "plugin/skill/read", "thread/goal/set",
   "permissionProfile/list", "experimentalFeature/list", "thread/goal/get", "thread/backgroundTerminals/list", "thread/backgroundTerminals/clean",
-  "fuzzyFileSearch", "fs/readDirectory", "command/exec", "mcpServer/resource/read", "mcpServer/tool/call", "account/workspaceMessages/read", "windowsSandbox/readiness", "app/read", "app/installed", "server/diagnostics", "threadSection/list", "threadSection/create", "threadSection/update", "threadSection/delete", "thread/section/move", "thread/attachment/add", "thread/attachment/remove", "thread/queue/update", "thread/queue/delete", "thread/queue/reorder",
+  "fuzzyFileSearch", "fs/readDirectory", "command/exec", "command/exec/write", "command/exec/resize", "command/exec/terminate", "mcpServer/resource/read", "mcpServer/tool/call", "account/workspaceMessages/read", "windowsSandbox/readiness", "app/read", "app/installed", "server/diagnostics", "threadSection/list", "threadSection/create", "threadSection/update", "threadSection/delete", "thread/section/move", "thread/attachment/add", "thread/attachment/remove", "thread/queue/update", "thread/queue/delete", "thread/queue/reorder",
   "turn/steer",
   "turn/interrupt",
-  "account/login/start", "account/login/cancel", "account/logout", "account/usage/read", "modelProvider/capabilities/read", "configRequirements/read", "config/value/write", "thread/attachment/list", "memory/status", "thread/memoryMode/set", "memory/reset", "plugin/reconcile", "marketplace/add", "marketplace/remove", "marketplace/upgrade", "thread/searchOccurrences", "thread/timeline/list", "thread/queue/list", "turn/settings/update", "account/rateLimitResetCredit/consume", "thread/goal/clear", "plugin/install", "plugin/uninstall", "mcpServer/oauth/login", "config/mcpServer/reload", "skills/config/write",
+  "account/login/start", "account/login/cancel", "account/logout", "account/usage/read", "modelProvider/capabilities/read", "configRequirements/read", "config/value/write", "config/batchWrite", "thread/attachment/list", "memory/status", "thread/memoryMode/set", "memory/reset", "plugin/reconcile", "marketplace/add", "marketplace/remove", "marketplace/upgrade", "thread/searchOccurrences", "thread/timeline/list", "thread/queue/list", "turn/settings/update", "account/rateLimitResetCredit/consume", "thread/goal/clear", "plugin/install", "plugin/uninstall", "mcpServer/oauth/login", "config/mcpServer/reload", "skills/config/write",
 ]);
 const APPROVAL_METHODS = new Set([
   "item/permissions/requestApproval",
@@ -114,6 +118,8 @@ export interface VolatileAppEvent {
 }
 
 export interface AppServerCallbacks {
+  getExtraSkillRoots?(): string[];
+  onAuxiliaryActivity?(id: string, active: boolean): void;
   onPanelTool?(args: unknown): Promise<unknown>;
   findManagedThread(threadId: string): ManagedThread | undefined;
   findProject(projectId: string): ProjectRecord | undefined;
@@ -425,6 +431,7 @@ export class CodexAppServer implements AppServerClient {
   private codexCatalog: CodexCatalog = { models: [], modes: [], fetchedAt: nowIso(), error: "尚未读取模型列表" };
   getCodexCatalog(): CodexCatalog { return { ...structuredClone(this.codexCatalog), imageInput: true, fileInput: true }; }
   private stopping = false;
+  private readonly workspaceTerminals = new WorkspaceTerminals();
   private pending = new Map<JsonId, PendingRpc>();
   private approvalTimers = new Map<string, NodeJS.Timeout>();
   private inputRegistrations = new Map<JsonId, Promise<void>>();
@@ -502,6 +509,8 @@ export class CodexAppServer implements AppServerClient {
     }
     await this.writeLine({ method: "initialized" });
     this.initialized = true;
+    const extraRoots = this.callbacks.getExtraSkillRoots?.() ?? [];
+    if (extraRoots.length) await this.request("skills/extraRoots/set", { extraRoots });
     await this.refreshCodexCatalog();
   }
 
@@ -724,12 +733,23 @@ export class CodexAppServer implements AppServerClient {
   async manageCodex(thread: ManagedThread, value: unknown, mutationId: string): Promise<CodexOperationResult> {
     this.assertInitialized();
     const request = parseCodexOperation(value);
+    if ((request.operation.startsWith("skills.roots.") || request.operation.startsWith("migration.") || request.operation.startsWith("bedrock.") || request.operation.startsWith("experiments.") || request.operation === "windows.setup")) throw new AgentError("HOST_OPERATION_REQUIRED", "请在主机或设置页面管理此主机能力");
     if (request.operation === "turn.settings" && ["model", "effort", "serviceTier"].some(key => key in request.arguments)) {
       const modelId = request.arguments.model ?? thread.observedSettings?.model ?? thread.acceptedSettings?.model;
       const model = this.codexCatalog.models.find(item => item.model === modelId);
       if (!model || this.codexCatalog.error) throw new AgentError("CODEX_MODEL_UNAVAILABLE", "请刷新宿主机模型列表，选择当前可用模型");
       if (request.arguments.effort !== undefined && !model.efforts.includes(String(request.arguments.effort))) throw new AgentError("CODEX_EFFORT_UNAVAILABLE", "所选模型不支持此推理强度");
       if (request.arguments.serviceTier != null && !model.serviceTiers?.some(tier => tier.id === request.arguments.serviceTier)) throw new AgentError("CODEX_SETTINGS_INVALID", "所选模型不支持此服务档位");
+    }
+    if (["terminal.start", "terminal.status", "terminal.write", "terminal.stop", "terminal.resize"].includes(request.operation)) {
+      const project = this.callbacks.findProject(thread.projectId);
+      if (!project) throw new AgentError("PROJECT_NOT_FOUND", "Project is missing");
+      return this.workspaceTerminals.run(request, thread, project, (method, params) => this.request(method, params), this.callbacks.onAuxiliaryActivity);
+    }
+    if (["files.trash", "files.restore", "files.read", "files.write", "files.create", "files.mkdir", "files.copy", "files.remove"].includes(request.operation)) {
+      const project = this.callbacks.findProject(thread.projectId);
+      if (!project) throw new AgentError("PROJECT_NOT_FOUND", "Project is missing");
+      return projectWorkspaceFiles(request, project);
     }
     if (["files.search", "files.list", "terminal.run"].includes(request.operation)) {
       const project = this.callbacks.findProject(thread.projectId);
@@ -1099,7 +1119,7 @@ export class CodexAppServer implements AppServerClient {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new AgentError("APP_SERVER_TIMEOUT", `${method} did not respond in time`));
-      }, method === "mcpServer/oauth/login" ? 150_000 : method === "initialize" ? 15_000 : ["model/list", "collaborationMode/list"].includes(method) ? 5_000 : ["account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "plugin/read", "plugin/skill/read", "permissionProfile/list", "experimentalFeature/list", "thread/goal/get", "thread/backgroundTerminals/list"].includes(method) ? 15_000 : 60_000);
+      }, method === "command/exec" && params?.processId ? 130_000 : method === "mcpServer/oauth/login" ? 150_000 : method === "initialize" ? 15_000 : ["model/list", "collaborationMode/list"].includes(method) ? 5_000 : ["account/read", "account/rateLimits/read", "config/read", "skills/list", "hooks/list", "mcpServerStatus/list", "app/list", "plugin/list", "plugin/read", "plugin/skill/read", "permissionProfile/list", "experimentalFeature/list", "thread/goal/get", "thread/backgroundTerminals/list"].includes(method) ? 15_000 : 60_000);
       this.pending.set(id, { method, resolve, reject, timer });
     });
     try {
@@ -1373,6 +1393,7 @@ export class CodexAppServer implements AppServerClient {
   }
 
   private async handleNotification(method: string, params: Record<string, unknown>): Promise<void> {
+    if (method === "command/exec/outputDelta") { this.workspaceTerminals.output(params); return; }
     if (["thread/started", "thread/archived", "thread/unarchived", "thread/name/updated", "thread/status/changed", "turn/started", "turn/completed", "mcpServer/oauthLogin/completed", "mcpServer/startupStatus/updated"].includes(method)) {
       this.callbacks.onCatalogChanged?.(this.appServerEpoch);
     }

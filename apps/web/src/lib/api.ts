@@ -888,6 +888,12 @@ export const api = {
     });
     return { command: mapCommandReceipt(response.command) };
   },
+  editQueuedTurn(logicalSessionId: string, queueItemId: string, queueVersion: number, prompt: string, clientMutationId: string) {
+    return request<JsonObject>(`/api/sessions/${encodeURIComponent(logicalSessionId)}/queue/${encodeURIComponent(queueItemId)}`, { method: "PUT", body: JSON.stringify({ queueVersion, prompt, clientMutationId }) });
+  },
+  reorderQueuedTurns(logicalSessionId: string, queueVersion: number, ids: string[]) {
+    return request<JsonObject>(`/api/sessions/${encodeURIComponent(logicalSessionId)}/queue/order`, { method: "PUT", body: JSON.stringify({ queueVersion, ids }) });
+  },
   cancelQueuedTurn(logicalSessionId: string, queueItemId: string) {
     return request<JsonObject>(
       `/api/sessions/${encodeURIComponent(logicalSessionId)}/queue/${encodeURIComponent(queueItemId)}`,

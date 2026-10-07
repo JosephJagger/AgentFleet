@@ -98,3 +98,34 @@ test("default mode is explicit, native sentinels cannot retain stale Plan, and n
   service.write(principal,"s1",{scope:"session",overrides:{model:"b",mode:"default"},revision:1});
   assert.equal(service.read(principal,"s1").desired?.mode,"default");
 });
+
+test("summary and delegation preferences inherit independently and reject unknown policies", t => {
+  const { service, principal } = fixture(t);
+  service.writeTarget(principal, "workspace", principal.workspaceId, { overrides: { model: "a", summary: "concise", multiAgentMode: "explicitRequestOnly" }, revision: 0 });
+  const inherited = service.read(principal, "s1");
+  assert.equal(inherited.desired?.summary, "concise");
+  assert.equal(inherited.desired?.multiAgentMode, "explicitRequestOnly");
+  const changed = service.write(principal, "s1", { scope: "session", overrides: { multiAgentMode: "proactive" }, revision: 0 });
+  assert.equal(changed.desired?.summary, "concise");
+  assert.equal(changed.desired?.multiAgentMode, "proactive");
+  assert.equal(service.read(principal, "s2").desired?.multiAgentMode, "explicitRequestOnly");
+  assert.throws(() => parseFieldOverrides({ multiAgentMode: "arbitrary" }));
+});
+
+test("legacy model-only preferences inherit newly added summary and delegation fields", t => {
+ const { service, principal, db } = fixture(t);
+ db.run("INSERT INTO codex_preferences(workspace_id,scope,target_id,settings_json,revision,updated_at) VALUES(?,'machine','m',?,1,?)", principal.workspaceId, JSON.stringify({model:"a"}), new Date().toISOString());
+ service.writeTarget(principal,"workspace",principal.workspaceId,{overrides:{summary:"detailed",multiAgentMode:"explicitRequestOnly"},revision:0});
+ const result=service.read(principal,"s1");
+ assert.equal(result.desired?.summary,"detailed"); assert.equal(result.desired?.multiAgentMode,"explicitRequestOnly");
+});
+
+test("disabled plugins inherit and can be cleared without uninstalling", t => {
+ const {service,principal}=fixture(t);
+ service.writeTarget(principal,"workspace",principal.workspaceId,{overrides:{model:"a",disabledPluginIds:["plugin@market"]},revision:0});
+ assert.deepEqual(service.read(principal,"s1").desired?.disabledPluginIds,["plugin@market"]);
+ const next=service.write(principal,"s1",{scope:"session",overrides:{disabledPluginIds:[]},revision:0});
+ assert.deepEqual(next.desired?.disabledPluginIds,[]);
+ assert.deepEqual(service.read(principal,"s2").desired?.disabledPluginIds,["plugin@market"]);
+ assert.throws(()=>parseFieldOverrides({disabledPluginIds:"plugin@market"}));
+});

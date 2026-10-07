@@ -33,19 +33,17 @@ it("host and project search loads next pages instead of restricting choices to d
  await waitFor(()=>expect(api.projects).toHaveBeenLastCalledWith(expect.objectContaining({q:"needle",machineId:"m"}),expect.any(AbortSignal)));
  expect(screen.getByText("settings:m")).toBeTruthy();
 });
-it("native management never borrows or claims a session automatically",async()=>{
+it("native configuration uses the selected host without borrowing a session",async()=>{
  vi.mocked(api.projects).mockResolvedValue({items:[],nextCursor:null,total:0});
  vi.mocked(api.hostOperations).mockResolvedValue([]);
- vi.mocked(api.sessions).mockResolvedValue({items:[],nextCursor:null,total:0});
  render(<CodexConfiguration machines={machines} initialMachineId="m"/>);
- fireEvent.click(screen.getByRole("button",{name:"账号与工具"}));
- await screen.findByLabelText("操作会话");
- await waitFor(()=>expect(api.sessions).toHaveBeenCalledWith(expect.objectContaining({machineId:"m",managed:true,provider:"codex"}),expect.any(AbortSignal)));
+ fireEvent.click(screen.getByRole("button",{name:"原生配置"}));
+ await screen.findByRole("button",{name:"读取原生配置"});
+ await waitFor(()=>expect(api.hostOperations).toHaveBeenCalledWith("m",expect.any(AbortSignal)));
+ expect(api.sessions).not.toHaveBeenCalled();
  expect(api.codexManagementContext).not.toHaveBeenCalled();
- fireEvent.change(screen.getByLabelText("搜索会话"),{target:{value:"deploy"}});
- await waitFor(()=>expect(api.sessions).toHaveBeenLastCalledWith(expect.objectContaining({q:"deploy"}),expect.any(AbortSignal)));
  fireEvent.change(screen.getByLabelText("主机"),{target:{value:"n"}});
- await waitFor(()=>expect(api.sessions).toHaveBeenLastCalledWith(expect.objectContaining({machineId:"n",q:undefined}),expect.any(AbortSignal)));
+ await waitFor(()=>expect(api.hostOperations).toHaveBeenLastCalledWith("n",expect.any(AbortSignal)));
  expect(api.codexManagementContext).not.toHaveBeenCalled();
 });
 

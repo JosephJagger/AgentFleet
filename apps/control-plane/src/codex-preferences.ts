@@ -4,9 +4,9 @@ import { invariant } from "./errors.js";
 import { nowIso } from "./crypto.js";
 import { parseCodexCatalog, validateCodexSettings, type CodexSettings, type CodexCatalog } from "./codex-settings.js";
 
-export const settingFields = ["model", "effort", "mode", "serviceTier", "personality"] as const;
+export const settingFields = ["model", "effort", "mode", "serviceTier", "personality", "summary", "multiAgentMode", "disabledPluginIds"] as const;
 export type SettingsScope = "workspace" | "machine" | "project" | "session";
-export type FieldOverrides = Partial<Record<typeof settingFields[number], string | null>>;
+export type FieldOverrides = Partial<Record<Exclude<typeof settingFields[number], "disabledPluginIds">, string | null>> & { disabledPluginIds?: string[] | "__native__" };
 const scopes: SettingsScope[] = ["workspace", "machine", "project", "session"];
 const native = "__native__";
 type Preference = { settings: CodexSettings | null; overrides: FieldOverrides; revision: number };
@@ -20,8 +20,11 @@ export function parseFieldOverrides(value: unknown): FieldOverrides {
   for (const field of settingFields) {
     const v = raw[field];
     if (v === undefined || v === native) continue;
+    if (field === "disabledPluginIds") { invariant(Array.isArray(v) && v.length <= 100 && v.every(id => typeof id === "string" && id.length > 0 && id.length <= 256 && !id.includes("\0")), 400, "INVALID_CODEX_SETTINGS", "Invalid disabled plugins"); continue; }
     invariant(field === "serviceTier" && v === null || typeof v === "string" && v.length > 0 && v.length <= 256 && !v.includes("\0"), 400, "INVALID_CODEX_SETTINGS", "Invalid setting value");
     if (field === "mode") invariant(v === "plan" || v === "default", 400, "INVALID_CODEX_SETTINGS", "Invalid mode");
+    if (field === "summary") invariant(["auto", "concise", "detailed", "none"].includes(String(v)), 400, "INVALID_CODEX_SETTINGS", "Invalid summary");
+    if (field === "multiAgentMode") invariant(["explicitRequestOnly", "proactive"].includes(String(v)), 400, "INVALID_CODEX_SETTINGS", "Invalid delegation mode");
     if (field === "personality") invariant(["none", "friendly", "pragmatic"].includes(String(v)), 400, "INVALID_CODEX_SETTINGS", "Invalid personality");
   }
   return raw;
@@ -48,7 +51,7 @@ export class CodexPreferencesService {
       const settings = row?.settings_json ? JSON.parse(row.settings_json) as CodexSettings : null;
       // Legacy whole-group overrides pin missing fields to native, preserving behavior.
       const overrides = row?.field_overrides_json ? JSON.parse(row.field_overrides_json) as FieldOverrides : settings
-        ? Object.fromEntries(settingFields.map(f => [f, settings[f] === undefined ? native : settings[f]])) as FieldOverrides : {};
+        ? Object.fromEntries(settingFields.filter(f => !["summary", "multiAgentMode", "disabledPluginIds"].includes(f) || settings[f] !== undefined).map(f => [f, settings[f] === undefined ? native : settings[f]])) as FieldOverrides : {};
       // Missing/legacy-native mode inherits independently of the model.
       if (overrides.mode === native) delete overrides.mode;
       return [s, { settings, overrides, revision: row?.revision ?? 0 }];
@@ -58,7 +61,7 @@ export class CodexPreferencesService {
     sources.mode = "workspace";
     let source: SettingsScope | "codex" = "codex";
     for (const s of scopes) for (const f of settingFields) if (preferences[s].overrides[f] !== undefined) {
-      effective[f] = preferences[s].overrides[f]; sources[f] = s; source = s;
+      Object.assign(effective, { [f]: preferences[s].overrides[f] }); sources[f] = s; source = s;
     }
     const values = Object.fromEntries(Object.entries(effective).filter(([, v]) => v !== native));
     let resolutionIssue: string | undefined;

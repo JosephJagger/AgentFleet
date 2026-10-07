@@ -1,9 +1,10 @@
+import { QueuedPromptEditor } from "./components/QueuedPromptEditor";
 import { PanelVoiceControl } from "./components/PanelVoiceControl";
 import { UserMessage } from "./components/UserMessage";
 import { NativeVoicePanel } from "./components/NativeVoicePanel";
 import { parseOutputSchema } from "./lib/output-schema";
 import { CodexOutputPanel } from "./components/CodexOutputPanel";
-import { CodexOperationsPanel } from "./components/CodexOperationsPanel";
+import { SessionWorkspace } from "./components/SessionWorkspace";
 import { useClaudePreferences } from "./lib/claude-preferences";
 import { ClaudeControls } from "./components/ClaudeControls";
 import { agentName } from "./lib/agent-provider";
@@ -1023,11 +1024,19 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             <div className="turn-queue__item" key={item.id}>
               <span className="turn-queue__position">{index + 1}</span>
               <div><strong>{item.state === "unknown" ? t("结果待核验，不会自动重发") : item.state === "dispatching" ? (item.waitingForHost ? t("等待主机同步后派发") : t("正在派发")) : item.prompt}</strong><span>{item.mine ? t("当前浏览器") : t("其他浏览器")} · {t("{0} 前有效", new Date(item.expiresAt).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }))}</span></div>
-              {item.state === "queued" && <button type="button" disabled={busy} onClick={async () => { setBusy(true); try { await onCancelQueued(item.id); } finally { setBusy(false); } }}>{t("取消")}</button>}
+              {item.state === "queued" && <div className="workspace-actions">{[[-1, "上移"], [1, "下移"]].map(([delta, label]) => {
+                const waiting = detail.queue.filter(q => q.state === "queued");
+                const position = waiting.findIndex(q => q.id === item.id); const next = position + Number(delta);
+                return <button type="button" key={label} disabled={busy || next < 0 || next >= waiting.length} onClick={async () => {
+                  const ids = waiting.map(q => q.id); [ids[position], ids[next]] = [ids[next], ids[position]];
+                  setBusy(true); try { await api.reorderQueuedTurns(session.id, session.queueVersion, ids); onRefresh(); } catch (e) { setCommandMessage((e as Error).message); } finally { setBusy(false); }
+                }}>{t(String(label))}</button>;
+              })}<QueuedPromptEditor sessionId={session.id} itemId={item.id} prompt={item.prompt} version={session.queueVersion} onChanged={onRefresh}/><button type="button" disabled={busy} onClick={async () => { setBusy(true); try { await onCancelQueued(item.id); } finally { setBusy(false); } }}>{t("取消")}</button></div>}
             </div>
           ))}
         </section>
       )}
+      {session.provider !== "claude" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
       <SessionConfiguration key={`config:${draftOwner}:${session.id}`} request={configuration} title={session.title} onClose={() => setConfiguration(undefined)}>
         {configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
@@ -1037,7 +1046,6 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         {session.provider !== "claude" && <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
           <CodexOutputPanel value={outputSchemaDraft} error={outputSchemaError} onChange={setOutputSchemaDraft} />
-          <CodexOperationsPanel key={`codex-tools:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh} />
           <CodexInspectionPanel key={`inspect:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} request={inspectionRequest?.sessionId === session.id ? inspectionRequest : undefined} onChanged={onRefresh} />
           <CodexCommandGuide key={`commands:${draftOwner}:${session.id}`} />
         </details>}

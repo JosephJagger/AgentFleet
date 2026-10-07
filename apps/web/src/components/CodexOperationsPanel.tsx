@@ -5,6 +5,9 @@ import { t, systemText } from "../i18n";
 import type { CommandReceipt, FleetSession, Machine, HostOperation } from "../lib/types";
 
 const operations = {
+  "windows.setup": "安装或修复 Windows 原生沙箱",
+  "gateway.read": "查看网关账号状态", "remote.status": "查看原生远程控制状态", "voice.catalog": "实验：查看原生音色目录", "plugin.search": "实验：搜索原生插件",
+  "subagents.read": "查看当前会话子代理",
   "files.search": "搜索项目原生文件", "files.list": "浏览项目原生目录", "terminal.run": "运行独立原生命令",
   "mcp.resource": "读取已列出的 MCP 资源", "mcp.call": "调用已列出的 MCP 工具",
   "workspaceMessages.read": "查看原生工作区公告", "windows.readiness": "检查 Windows 原生沙箱", "mcp.catalog": "查看 MCP 工具与资源",
@@ -18,21 +21,21 @@ const operations = {
 } as const;
 type Operation = keyof typeof operations;
 const statusLabel = (status: string) => ({ available: "已读取", partialFailure: "部分未完成，请检查原生状态后再操作", notConfigured: "未配置原生管理限制", notApplicable: "此平台不适用", savedRequiresReconnect: "已保存；重新连接 Codex 后生效", unavailable: "未上报", completed: "主机已完成", reset: "重置卡已使用，额度已重新读取", alreadyRedeemed: "此操作已使用过重置卡，没有重复消耗", noCredit: "当前没有可用重置卡", nothingToReset: "当前额度无需重置，没有消耗卡片", loggedIn: "已登录", notLoggedIn: "未登录", awaitingAuthorization: "等待完成官方授权", applied: "设置已发布，本轮后续步骤按原生规则生效", targetUnavailable: "目标任务已不可更新，未修改设置" }[status] ?? status);
-const experimentalOperation = (op: Operation) => ["memory.status", "history.search", "timeline.read", "nativeQueue.read", "turn.settings", "experiment.configure", "memory.mode", "memory.reset", "nativeQueue.update", "nativeQueue.delete", "nativeQueue.reorder", "diagnostics.read"].includes(op);
-const needsConfirmation = (op: Operation) => !["account.read", "usage.read", "resetCards.read", "goal.set", "mcp.login", "provider.read", "attachments.read", "memory.status", "history.search", "timeline.read", "nativeQueue.read", "config.requirements", "plugin.catalog", "goal.read", "apps.installed", "apps.read", "sections.read", "diagnostics.read", "workspaceMessages.read", "windows.readiness", "mcp.catalog", "mcp.resource", "files.search", "files.list"].includes(op);
+const experimentalOperation = (op: Operation) => ["voice.catalog", "plugin.search", "memory.status", "history.search", "timeline.read", "nativeQueue.read", "turn.settings", "experiment.configure", "memory.mode", "memory.reset", "nativeQueue.update", "nativeQueue.delete", "nativeQueue.reorder", "diagnostics.read"].includes(op);
+const needsConfirmation = (op: Operation) => !["gateway.read", "remote.status", "voice.catalog", "plugin.search", "subagents.read", "account.read", "usage.read", "resetCards.read", "goal.set", "mcp.login", "provider.read", "attachments.read", "memory.status", "history.search", "timeline.read", "nativeQueue.read", "config.requirements", "plugin.catalog", "goal.read", "apps.installed", "apps.read", "sections.read", "diagnostics.read", "workspaceMessages.read", "windows.readiness", "mcp.catalog", "mcp.resource", "files.search", "files.list"].includes(op);
 
 const operationGroups = { account: "账号与额度", session: "会话与目标", integrations: "插件、应用与 MCP", workspace: "项目文件与命令", environment: "原生环境检查", experimental: "已验证的实验能力" } as const;
 function operationGroup(op: Operation): keyof typeof operationGroups {
   if (experimentalOperation(op)) return "experimental";
-  if (/^(account\.|usage\.|resetCard)/.test(op)) return "account";
-  if (/^(goal\.|attachment|section)/.test(op)) return "session";
+  if (/^(gateway\.|account\.|usage\.|resetCard)/.test(op)) return "account";
+  if (/^(subagents\.|goal\.|attachment|section)/.test(op)) return "session";
   if (/^(plugin\.|marketplace\.|apps\.|mcp\.|skill\.)/.test(op)) return "integrations";
   if (/^(files\.|terminal\.)/.test(op)) return "workspace";
   return "environment";
 }
 
-export function CodexOperationsPanel({ session, commands = [], machine, hostOperations = [], onChanged }: { session?: FleetSession; commands?: CommandReceipt[]; machine?: Machine; hostOperations?: HostOperation[]; onChanged: () => void }) {
-  const [operation, setOperation] = useState<Operation>("usage.read");
+export function CodexOperationsPanel({ session, commands = [], machine, hostOperations = [], onChanged, groups, title, initialOperation }: { groups?: (keyof typeof operationGroups)[]; title?: string; initialOperation?: Operation; session?: FleetSession; commands?: CommandReceipt[]; machine?: Machine; hostOperations?: HostOperation[]; onChanged: () => void }) {
+  const [operation, setOperation] = useState<Operation>(initialOperation ?? "usage.read");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [experimental, setExperimental] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -52,6 +55,7 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
     const args: Record<string, unknown> = {};
     if (experimentalOperation(operation)) args.experimental = true;
     if (cursor) args.cursor = cursor;
+    if (operation === "windows.setup") args.mode = fields.mode ?? "unelevated";
     if (operation === "files.search") args.query = fields.query?.trim();
     if (operation === "files.list" && fields.path?.trim()) args.path = fields.path.trim();
     if (operation === "terminal.run") {
@@ -71,7 +75,7 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
     if (["attachment.note", "nativeQueue.update"].includes(operation)) args.text = fields.text?.trim();
     if (["nativeQueue.update", "nativeQueue.delete"].includes(operation)) args.submissionId = fields.submissionId?.trim();
     if (operation === "nativeQueue.reorder") args.submissionIds = (fields.submissionIds ?? "").split(/[\s,]+/).filter(Boolean);
-    if (operation === "history.search") args.searchTerm = fields.searchTerm?.trim();
+    if (["history.search", "plugin.search"].includes(operation)) args.searchTerm = fields.searchTerm?.trim();
     if (operation === "turn.settings") {
       for (const key of ["model", "effort"]) if (fields[key]?.trim()) args[key] = fields[key].trim();
       if (fields.serviceTier) args.serviceTier = fields.serviceTier === "clear" ? null : fields.serviceTier;
@@ -106,10 +110,11 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
     } catch (e) { setMessage(e instanceof Error ? e.message : t("操作失败")); }
     finally { setBusy(false); }
   }
-  return <details className="codex-settings-panel codex-operations-panel"><summary>{t("Codex 工具与账号")}</summary>
+  return <details className="codex-settings-panel codex-operations-panel"><summary>{t(title ?? "Codex 工具与账号")}</summary>
     <form className="stack-form" onSubmit={event => { event.preventDefault(); void run(); }}>
-      <label className="checkbox-row"><input type="checkbox" checked={experimental} disabled={busy || pending} onChange={e => { setExperimental(e.target.checked); if (!e.target.checked && experimentalOperation(operation)) { setOperation("usage.read"); setFields({}); setSubmitted(undefined); } setConfirmed(false); }} />{t("显示已验证的 Codex 实验接口")}</label>
-      <label>{t("操作")}<select value={operation} disabled={busy || pending} onChange={event => { setOperation(event.target.value as Operation); setFields({}); setConfirmed(false); setMessage(""); setSubmitted(undefined); }}>{Object.entries(operationGroups).map(([group, title]) => { const entries = Object.entries(operations).filter(([key]) => operationGroup(key as Operation) === group && (!machine || HOST_CODEX_OPERATIONS.includes(key)) && (experimental || !experimentalOperation(key as Operation))); return entries.length ? <optgroup key={group} label={t(title)}>{entries.map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</optgroup> : null; })}</select></label>
+      <label className="checkbox-row"><input type="checkbox" checked={experimental} disabled={busy || pending} onChange={e => { setExperimental(e.target.checked); if (!e.target.checked && experimentalOperation(operation)) { setOperation(initialOperation ?? "usage.read"); setFields({}); setSubmitted(undefined); } setConfirmed(false); }} />{t("显示已验证的 Codex 实验接口")}</label>
+      <label>{t("操作")}<select value={operation} disabled={busy || pending} onChange={event => { setOperation(event.target.value as Operation); setFields({}); setConfirmed(false); setMessage(""); setSubmitted(undefined); }}>{Object.entries(operationGroups).map(([group, title]) => { const entries = Object.entries(operations).filter(([key]) => operationGroup(key as Operation) === group && (!groups || groups.includes(group as keyof typeof operationGroups)) && (!groups || !session || !HOST_CODEX_OPERATIONS.includes(key)) && (!groups || !["nativeQueue.update", "nativeQueue.delete", "nativeQueue.reorder"].includes(key)) && (!machine || HOST_CODEX_OPERATIONS.includes(key)) && (experimental || !experimentalOperation(key as Operation))); return entries.length ? <optgroup key={group} label={t(title)}>{entries.map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</optgroup> : null; })}</select></label>
+      {operation === "windows.setup" && <label>{t("安装方式")}<select value={fields.mode ?? "unelevated"} onChange={e=>{setFields({...fields,mode:e.target.value});setConfirmed(false);}}><option value="unelevated">{t("当前用户")}</option><option value="elevated">{t("管理员安装（需主机本地确认）")}</option></select></label>}
       {["account.login", "account.logout"].includes(operation) && <p>{t("这会修改宿主机默认 Codex 环境的登录状态，并影响使用该环境的其他原生会话。登录只在 OpenAI 官方页面完成，面板不接收密码或认证文件。")}</p>}
       {operation === "files.search" && input("query", "文件搜索词")}
       {operation === "files.list" && input("path", "项目内相对目录（留空使用会话目录）", true)}
@@ -135,6 +140,7 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
       {operation === "memory.mode" && <label>{t("本会话记忆")}<select value={fields.enabled ?? "true"} onChange={e => setFields({ ...fields, enabled: e.target.value })}><option value="true">{t("启用")}</option><option value="false">{t("停用")}</option></select></label>}
       {operation === "memory.reset" && <p>{t("清除宿主机默认环境的原生记忆数据，影响使用此环境的其他会话；不是清空对话历史。")}</p>}
       {operation === "experiment.configure" && <><p>{t("修改原生用户配置中的 step_model_switching；主机空闲时才允许保存。重新连接 Codex 后生效，已有任务不会被中断。")}</p><label>{t("开关状态")}<select value={fields.enabled ?? "true"} onChange={e => setFields({ ...fields, enabled: e.target.value })}><option value="true">{t("启用")}</option><option value="false">{t("停用")}</option></select></label></>}
+      {operation === "plugin.search" && input("searchTerm", "插件关键词")}
       {operation === "history.search" && input("searchTerm", "查找本会话用户消息和最终回复")}
       {operation === "turn.settings" && <><p>{t("仅修改本轮后续步骤，不改下一轮，不切换计划模式。宿主机必须已启用 step_model_switching；原生拒绝时不会假装成功。")}</p>{input("model", "模型名称（留空不改）", true)}{input("effort", "推理强度（留空不改）", true)}<label>{t("服务档位")}<select value={fields.serviceTier ?? ""} onChange={e => setFields({ ...fields, serviceTier: e.target.value })}><option value="">{t("保持不变")}</option><option value="clear">{t("清除档位")}</option><option value="fast">Fast</option><option value="flex">Flex</option></select></label><label>{t("推理摘要")}<select value={fields.summary ?? ""} onChange={e => setFields({ ...fields, summary: e.target.value })}><option value="">{t("保持不变")}</option>{["auto", "concise", "detailed", "none"].map(v => <option key={v} value={v}>{v}</option>)}</select></label>{!session?.activeTurnId && <p>{t("当前没有运行中的任务。")}</p>}</>}
       {operation === "nativeQueue.read" && <p>{t("这里显示宿主机原生队列，面板加入队列的任务仍在原来的队列中。")}</p>}

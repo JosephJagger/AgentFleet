@@ -1,10 +1,53 @@
+import { hostCapabilityOperation } from "./host-capability-operations.js";
 import { AgentError } from "./errors.js";
 import { parseCodexOperation, sanitizeCodexResult, type CodexOperationResult } from "./codex-operations.js";
 const object = (v: unknown): Record<string, unknown> => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 
 export async function executeCodexOperation(value: unknown, threadId: string, mutationId: string, rpc: (method: string, params: Record<string, unknown> | null) => Promise<unknown>, refreshQuota: () => Promise<void>, activeTurnId?: string, cwd?: string): Promise<CodexOperationResult> {
   const { operation, arguments: args } = parseCodexOperation(value);
+  const hostResult = await hostCapabilityOperation({ operation, arguments: args }, rpc);
+  if (hostResult) return hostResult;
   let raw: Record<string, unknown>;
+  if (operation === "skills.roots.save") {
+    await rpc("skills/extraRoots/set", { extraRoots: args.roots });
+    return { operation, status: "savedRequiresReconnect", rows: [] };
+  }
+  if (operation === "gateway.read" || operation === "remote.status") {
+    raw = object(await rpc(operation === "gateway.read" ? "account/gatewayOAuth/read" : "remoteControl/status/read", null));
+    const keys = operation === "gateway.read" ? ["providerName", "required", "status"] : ["status", "serverName"];
+    return sanitizeCodexResult({ operation, status: "available", rows: keys.filter(k => k in raw).map(k => ({ name: k, detail: typeof raw[k] === "string" || typeof raw[k] === "boolean" ? String(raw[k]) : "未上报", status: "原生状态" })) })!;
+  }
+  if (operation === "voice.catalog") {
+    raw = object(await rpc("thread/realtime/listVoices", {}));
+    const voices = object(raw.voices);
+    return sanitizeCodexResult({ operation, status: "available", rows: ["v1", "v2"].map(version => ({ name: version, detail: Array.isArray(voices[version]) ? voices[version].filter(v => typeof v === "string").join(", ") : "未上报", status: "原生目录；不代表当前 v3 通话的可用性验证" })) })!;
+  }
+  if (operation === "plugin.search") {
+    raw = object(await rpc("plugin/search", { searchTerm: args.searchTerm, limit: 25, ...(args.cursor ? { cursor: args.cursor } : {}) }));
+    const entries = Array.isArray(raw.data) ? raw.data : Array.isArray(raw.plugins) ? raw.plugins : [];
+    return sanitizeCodexResult({ operation, status: "available", rows: entries.map(object).map(item => { const plugin = object(item.plugin); const info = object(plugin.interface); return { name: String(info.displayName ?? plugin.name ?? plugin.id ?? "插件"), detail: `${String(info.shortDescription ?? "")} · ${String(plugin.name ?? "")} · ${String(item.marketplaceName ?? "")}`, status: plugin.installed ? "已安装" : String(plugin.availability ?? "原生搜索结果") }; }), nextCursor: raw.nextCursor })!;
+  }
+  if (operation === "history.turns") {
+    raw = object(await rpc("thread/turns/list", { threadId, limit: 25, sortDirection: "desc", itemsView: "summary", ...(args.cursor ? { cursor: args.cursor } : {}) }));
+    const rows = (Array.isArray(raw.data) ? raw.data : []).map(object).map(turn => {
+      const message = (Array.isArray(turn.items) ? turn.items : []).map(object).find(item => item.type === "userMessage");
+      const preview = (Array.isArray(message?.content) ? message.content : []).map(object).filter(item => item.type === "text").map(item => String(item.text ?? "")).join(" ");
+      return { name: String(turn.id ?? ""), detail: preview || "原生任务", status: String(turn.status ?? "未上报") };
+    });
+    return sanitizeCodexResult({ operation, status: "available", rows, nextCursor: raw.nextCursor })!;
+  }
+  if (operation === "subagents.history") {
+    const child = object(object(await rpc("thread/read", { threadId: args.threadId, includeTurns: false })).thread);
+    if (child.parentThreadId !== threadId || !cwd || child.cwd !== cwd) throw new AgentError("CODEX_CHILD_CHANGED", "目标不属于当前项目会话的子代理");
+    raw = object(await rpc("thread/turns/list", { threadId: args.threadId, limit: 10, sortDirection: "desc", itemsView: "full", ...(args.cursor ? { cursor: args.cursor } : {}) }));
+    const rows = (Array.isArray(raw.data) ? raw.data : []).map(object).flatMap(turn => (Array.isArray(turn.items) ? turn.items : []).map(object).filter(item => ["userMessage", "agentMessage"].includes(String(item.type))).map(item => ({ name: item.type === "userMessage" ? "任务" : "回复", detail: typeof item.text === "string" ? item.text : (Array.isArray(item.content) ? item.content : []).map(object).filter(c => c.type === "text").map(c => c.text).join("\n"), status: String(turn.status ?? "") })));
+    return sanitizeCodexResult({ operation, status: "available", rows, nextCursor: raw.nextCursor })!;
+  }
+  if (operation === "subagents.read") {
+    raw = object(await rpc("thread/list", { limit: 100, sourceKinds: ["subAgent"], ...(cwd ? { cwd } : {}), ...(args.cursor ? { cursor: args.cursor } : {}) }));
+    const children = (Array.isArray(raw.data) ? raw.data : []).map(object).filter(child => child.parentThreadId === threadId);
+    return sanitizeCodexResult({ operation, status: "available", rows: children.slice(0, 49).map(child => ({ name: String(child.id), detail: [child.agentNickname ?? child.name, child.preview].filter(Boolean).join(" · "), status: String(object(child.status).type ?? "未上报") })), nextCursor: raw.nextCursor })!;
+  }
   if (operation === "windows.readiness") {
     if (process.platform !== "win32") return { operation, status: "notApplicable", rows: [] };
     raw = object(await rpc("windowsSandbox/readiness", null));
@@ -128,6 +171,25 @@ export async function executeCodexOperation(value: unknown, threadId: string, mu
       return sanitizeCodexResult({ operation, status: Array.isArray(raw.errors) && raw.errors.length ? "partialFailure" : "completed", rows: [{ name: "插件市场", detail: String(raw.marketplaceName ?? args.marketplaceName ?? "全部已配置市场"), status: raw.alreadyAdded === true ? "已存在；未重复添加" : "主机已完成" }] })!;
     }
     return { operation, status: "completed", rows: [] };
+  }
+  if (operation === "config.read" || operation === "config.save") {
+    const current = object(await rpc("config/read", { includeLayers: true }));
+    const config = object(current.config);
+    const origins = object(current.origins);
+    const user = (Array.isArray(current.layers) ? current.layers : []).map(object).find(layer => object(layer.name).type === "user" && !object(layer.name).profile);
+    if (operation === "config.save") {
+      if (!user || user.version !== args.version) throw new AgentError("CODEX_CONFIG_CHANGED", "原生配置已变化，请重新读取后保存");
+      const saved = object(await rpc("config/batchWrite", { expectedVersion: args.version, edits: [
+        { keyPath: "model_reasoning_summary", value: args.summary, mergeStrategy: "replace" },
+        { keyPath: "model_verbosity", value: args.verbosity, mergeStrategy: "replace" },
+      ], reloadUserConfig: false }));
+      return sanitizeCodexResult({ operation, status: saved.status === "ok" ? "savedRequiresReconnect" : saved.status, rows: [] })!;
+    }
+    const keys = ["model", "model_reasoning_effort", "model_reasoning_summary", "model_verbosity", "personality", "service_tier"];
+    return sanitizeCodexResult({ operation, status: "available", rows: [
+      { name: "version", detail: typeof user?.version === "string" ? user.version : "", status: "用户配置版本" },
+      ...keys.map(key => ({ name: key, detail: typeof config[key] === "string" ? config[key] : "", status: String(object(object(origins[key]).name).type ?? "原生默认") })),
+    ] })!;
   }
   if (operation === "config.requirements") {
     raw = object(await rpc("configRequirements/read", {}));

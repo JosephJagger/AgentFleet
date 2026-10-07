@@ -6,12 +6,12 @@ import { parseClaudeSettings } from "./claude-settings.js";
 import { readNativeSessionCwd, readNativeUsage } from "./native-usage.js";
 import { nativeImageCleanup } from "./native-image-cleanup.js";
 import { homedir } from "node:os";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { setImmediate as yieldToIO } from "node:timers/promises";
 import { parseImages } from "./images.js";
 import { parseAttachments, parsePlugins, parsePluginSkills, type MaterializedAttachment, type PluginReference, type PluginSkillReference } from "./attachments.js";
-import { lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { realpath, stat, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { isAbsolute, dirname, join, resolve, sep } from "node:path";
 import { permissionProfile } from "./permissions.js";
 import {
   AGENT_VERSION,
@@ -462,6 +462,22 @@ export class AgentRuntime {
     await this.store.setMaintenanceDrain(operationId);
     try {
       if (!readOnlyCodexOperation(request.operation) && !this.store.canSafelyRestart()) throw new AgentError("HOST_BUSY", "请等待主机任务及通话结束后修改原生环境");
+      if (request.operation === "skills.roots.read" || request.operation === "skills.roots.save") {
+        const roots = this.store.snapshot().extraSkillRoots ?? [];
+        const version = createHash("sha256").update(JSON.stringify(roots)).digest("hex");
+        if (request.operation === "skills.roots.read") return { codexResult: { operation: request.operation, status: "available", rows: [{ name: "version", detail: version, status: "目录配置版本" }, ...roots.map(root => ({ name: "root", detail: root, status: "主机持久配置" }))] } };
+        if (request.arguments.version !== version) throw new AgentError("CODEX_CONFIG_CHANGED", "技能目录已变化，请重新读取");
+        const next: string[] = [];
+        for (const value of request.arguments.roots as string[]) {
+          if (!isAbsolute(value)) throw new AgentError("SKILL_ROOT_INVALID", "技能目录必须是此主机上的绝对路径");
+          const root = await realpath(value);
+          if (dirname(root) === root || !(await stat(root)).isDirectory()) throw new AgentError("SKILL_ROOT_INVALID", "请选择具体技能目录，不能使用磁盘根目录");
+          if (!next.includes(root)) next.push(root);
+        }
+        const codexResult = await this.appServer.manageHostCodex({ ...request, arguments: { ...request.arguments, roots: next } }, operationId);
+        await this.store.update(state => { state.extraSkillRoots = next; });
+        return { codexResult };
+      }
       return { codexResult: await this.appServer.manageHostCodex(request, operationId) };
     } finally {
       if (this.store.snapshot().maintenanceDrain?.operationId === operationId) await this.store.setMaintenanceDrain(undefined);
@@ -1284,6 +1300,8 @@ export class AgentRuntime {
     this.discoveryStatus = { ...this.discoveryStatus, state: "scanning" };
     const server = this.appServerFactory({
       findManagedThread: (threadId) => this.store.snapshot().managedThreads[threadId],
+      getExtraSkillRoots: () => this.store.snapshot().extraSkillRoots ?? [],
+      onAuxiliaryActivity: (id, active) => this.store.setAuxiliaryActivity(id, active),
       findProject: (projectId) => this.store.snapshot().projects.find((project) => project.id === projectId),
       onEvent: (event, epoch) => this.handleAppEvent(event, epoch),
       onVolatile: (event, epoch) => this.handleVolatile(event, epoch),

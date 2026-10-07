@@ -6,7 +6,7 @@ export interface CodexSettings {
   effort?: string;
   mode?: "default" | "plan";
   serviceTier?: string | null;
-  personality?: "none" | "friendly" | "pragmatic";
+  disabledPluginIds?: string[]; summary?: "auto" | "concise" | "detailed" | "none"; multiAgentMode?: "explicitRequestOnly" | "proactive"; personality?: "none" | "friendly" | "pragmatic";
 }
 export interface CodexModel {
   inputModalities?: string[];
@@ -61,9 +61,11 @@ export function parseModels(value: unknown): CodexModel[] {
 
 export function validateSettings(value: unknown, catalog: CodexCatalog | undefined): CodexSettings | undefined {
   if (value === undefined) return undefined;
-  if (!isRecord(value) || Object.keys(value).some((key) => !["model", "effort", "mode", "serviceTier", "personality"].includes(key)) || typeof value.model !== "string") {
+  if (!isRecord(value) || Object.keys(value).some((key) => !["model", "effort", "mode", "serviceTier", "personality", "summary", "multiAgentMode", "disabledPluginIds"].includes(key)) || typeof value.model !== "string") {
     throw new AgentError("CODEX_SETTINGS_INVALID", "Only documented runtime settings are accepted");
   }
+  if (value.summary !== undefined && !["auto", "concise", "detailed", "none"].includes(String(value.summary)) || value.multiAgentMode !== undefined && !["explicitRequestOnly", "proactive"].includes(String(value.multiAgentMode))) throw new AgentError("CODEX_SETTINGS_INVALID", "Invalid summary or delegation mode");
+  if (value.disabledPluginIds !== undefined && (!Array.isArray(value.disabledPluginIds) || value.disabledPluginIds.length > 100 || value.disabledPluginIds.some(id => typeof id !== "string" || !id || id.length > 256 || id.includes("\0")))) throw new AgentError("CODEX_SETTINGS_INVALID", "Invalid disabled plugins");
   const model = catalog?.models.find((item) => item.model === value.model);
   if (!model || catalog?.error) throw new AgentError("CODEX_MODEL_UNAVAILABLE", "Refresh the host model catalog before selecting a model");
   if (value.effort !== undefined && (typeof value.effort !== "string" || !model.efforts.includes(value.effort))) {
@@ -74,7 +76,7 @@ export function validateSettings(value: unknown, catalog: CodexCatalog | undefin
   }
   if (value.serviceTier !== undefined && value.serviceTier !== null && !model.serviceTiers?.some((tier) => tier.id === value.serviceTier)) throw new AgentError("CODEX_SETTINGS_INVALID", "Host model does not advertise this service tier");
   if (value.personality !== undefined && (!model.supportsPersonality || !["none", "friendly", "pragmatic"].includes(String(value.personality)))) throw new AgentError("CODEX_SETTINGS_INVALID", "Host model does not support this personality");
-  return { model: model.model, ...(value.effort === undefined ? {} : { effort: value.effort as string }), ...(value.mode === undefined ? {} : { mode: value.mode as "default" | "plan" }),
+  return { ...(value.disabledPluginIds === undefined ? {} : { disabledPluginIds: [...value.disabledPluginIds as string[]] }), ...(value.summary === undefined ? {} : { summary: value.summary as NonNullable<CodexSettings["summary"]> }), ...(value.multiAgentMode === undefined ? {} : { multiAgentMode: value.multiAgentMode as NonNullable<CodexSettings["multiAgentMode"]> }), model: model.model, ...(value.effort === undefined ? {} : { effort: value.effort as string }), ...(value.mode === undefined ? {} : { mode: value.mode as "default" | "plan" }),
     ...(value.serviceTier === undefined ? {} : { serviceTier: value.serviceTier as string | null }), ...(value.personality === undefined ? {} : { personality: value.personality as NonNullable<CodexSettings["personality"]> }) };
 }
 
@@ -96,7 +98,7 @@ export function resolveTurnMode(settings: CodexSettings | undefined, observed: C
 
 export function turnSettingsParams(settings: CodexSettings | undefined): Record<string, unknown> {
   if (!settings) return {};
-  return { model: settings.model, ...(settings.effort ? { effort: settings.effort } : {}),
+  return { ...(settings.disabledPluginIds === undefined ? {} : { disabledPluginIds: settings.disabledPluginIds }), ...(settings.summary ? { summary: settings.summary } : {}), ...(settings.multiAgentMode ? { multiAgentMode: settings.multiAgentMode } : {}), model: settings.model, ...(settings.effort ? { effort: settings.effort } : {}),
     ...(settings.serviceTier === undefined ? {} : { serviceTier: settings.serviceTier }), ...(settings.personality ? { personality: settings.personality } : {}),
     ...(settings.mode ? { collaborationMode: { mode: settings.mode, settings: {
       model: settings.model, reasoning_effort: settings.effort ?? null, developer_instructions: null,

@@ -93,6 +93,7 @@ function validateState(value: unknown): AgentState {
   ) {
     throw new AgentError("STATE_CORRUPT", "state is missing a required collection");
   }
+  if (candidate.extraSkillRoots !== undefined && (!Array.isArray(candidate.extraSkillRoots) || candidate.extraSkillRoots.length > 16 || candidate.extraSkillRoots.some(p => typeof p !== "string" || !p || p.length > 1024 || p.includes("\0")))) throw new AgentError("STATE_CORRUPT", "Invalid additional skill directories");
   if (candidate.discoveredThreads === undefined) candidate.discoveredThreads = {};
   if (candidate.projectDiscovery === undefined) candidate.projectDiscovery = {};
   if (candidate.projectContentPolicies === undefined) candidate.projectContentPolicies = {};
@@ -622,9 +623,12 @@ export class StateStore {
 
   async setPanelVoiceRuntime(value: {voiceId:string;pid?:number} | undefined) { await this.update(state=>{if(value)state.panelVoiceRuntime=value;else delete state.panelVoiceRuntime;}); }
 
+  private auxiliaryActivities = new Set<string>();
+  setAuxiliaryActivity(id: string, active: boolean) { if (active) this.auxiliaryActivities.add(id); else this.auxiliaryActivities.delete(id); }
+
   canSafelyRestart(): boolean {
     const state = this.snapshot();
-    return !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean", "versions.clean"].includes(operation.operationType)) &&
+    return this.auxiliaryActivities.size === 0 && !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean", "versions.clean"].includes(operation.operationType)) &&
       !Object.values(state.managedThreads).some((thread) => thread.activeTurnId !== undefined || thread.realtimeSessionId !== undefined) &&
       !Object.values(state.approvals).some((approval) => approval.state === "pending" || approval.state === "delivery_unknown") &&
       !Object.values(state.commandJournal).some((command) => ["claimed", "invoking", "responded", "unknown"].includes(command.state)) &&

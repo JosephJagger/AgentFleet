@@ -1,3 +1,5 @@
+import { editQueuedPrompt } from "./queue-edit.js";
+import { reorderQueue } from "./queue-order.js";
 import { VoicePreferencesService } from "./voice-preferences.js";
 import { PanelVoiceService } from "./panel-voice.js";
 import { NativeVoiceService, validVoiceOffer, VOICE_CONTROL_TTL_SECONDS, type VoiceBinding } from "./native-voice.js";
@@ -1197,6 +1199,18 @@ export async function buildControlPlane(
   app.get("/api/sessions/:id/queue", { preHandler: authenticate }, async (request) => ({
     queue: coordination.listQueue(request.principal as Principal, routeId(request)),
   }));
+  app.put("/api/sessions/:id/queue/order", { preHandler: mutate }, async request => {
+    const logicalSessionId = routeId(request);
+    const result = reorderQueue(db, request.principal as Principal, logicalSessionId, record(request.body));
+    broadcastSession(logicalSessionId, { type: "queue.changed", logicalSessionId, queue: coordination.listQueue(request.principal as Principal, logicalSessionId) });
+    return result;
+  });
+  app.put("/api/sessions/:id/queue/:queueItemId", { preHandler: mutate }, async request => {
+    const logicalSessionId = routeId(request);
+    const result = editQueuedPrompt(db, coordination, request.principal as Principal, logicalSessionId, routeId(request, "queueItemId"), record(request.body));
+    broadcastSession(logicalSessionId, { type: "queue.changed", logicalSessionId, queue: coordination.listQueue(request.principal as Principal, logicalSessionId) });
+    return result;
+  });
   app.delete("/api/sessions/:id/queue/:queueItemId", { preHandler: mutate }, async (request) => {
     const logicalSessionId = routeId(request);
     const queueItemId = requiredString((request.params as Record<string, unknown>).queueItemId, "queueItemId", 200);

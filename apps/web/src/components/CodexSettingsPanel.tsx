@@ -6,11 +6,12 @@ import type { CodexPreferences, CodexSettings, RuntimeSettings, SettingsScope, F
 export type RuntimeSummary = { sessionId: string; source?: CodexPreferences["source"]; settings?: CodexSettings; mode?: "default" | "plan"; modeSource?: string; changed: boolean; loaded: boolean; failed?: boolean };
 export type RuntimeChoice = { sessionId: string; settings?: CodexSettings };
 const ignoreChoice = (_choice: RuntimeChoice) => {};
-const fields = ["model", "effort", "mode", "serviceTier", "personality"] as const;
+const fields = ["model", "effort", "mode", "serviceTier", "personality", "summary", "multiAgentMode"] as const;
 const sourceLabel = (source: string) => t(({ workspace: "统一默认", machine: "主机默认", project: "项目默认", session: "会话覆盖", codex: "Codex 自身配置" } as Record<string, string>)[source] ?? source);
 function overridesOf(data: CodexPreferences, scope: SettingsScope): FieldOverrides {
   const pref = data.preferences[scope];
-  const result = { ...(pref?.overrides ?? (pref?.settings ? Object.fromEntries(fields.map(f => [f, pref.settings![f] === undefined ? "__native__" : pref.settings![f]])) : {})) };
+  const result = { ...(pref?.overrides ?? (pref?.settings ? Object.fromEntries(fields.filter(f => !["summary", "multiAgentMode"].includes(f) || pref.settings![f] !== undefined).map(f => [f, pref.settings![f] === undefined ? "__native__" : pref.settings![f]])) : {})) };
+  if (!pref?.overrides && pref?.settings?.disabledPluginIds !== undefined) result.disabledPluginIds = pref.settings.disabledPluginIds;
   if (result.mode === "__native__") delete result.mode;
   return result;
 }
@@ -65,14 +66,18 @@ export function CodexSettingsPanel({ sessionId = "", machineId, projectId, works
   const modelId = effective.model && effective.model !== "__native__" ? effective.model : data?.desired?.model ?? observed?.observed?.model;
   const supportedModels = catalogs.flatMap(c => c.models.filter(m => m.model === modelId));
   const unique = (values: string[]) => [...new Set(values)];
-  const options: Record<keyof CodexSettings, { value: string; label: string }[]> = {
+  const options: Record<typeof fields[number], { value: string; label: string }[]> = {
+    summary: [["auto", "自动"], ["concise", "简短"], ["detailed", "详细"], ["none", "不显示"]].map(([value, label]) => ({ value, label: t(label) })),
+    multiAgentMode: [{ value: "explicitRequestOnly", label: t("明确要求时才使用子代理") }, { value: "proactive", label: t("允许主动委派子代理") }],
     model: models.map(m => ({ value: m.model, label: m.displayName })),
     effort: unique(supportedModels.flatMap(m => m.efforts)).map(value => ({ value, label: value })),
     mode: unique(catalogs.flatMap(c => c.modes)).map(value => ({ value, label: t(value === "plan" ? "计划" : "执行") })),
     serviceTier: [{ value: "__clear__", label: t("恢复默认档位") }, ...[...new Map(supportedModels.flatMap(m => m.serviceTiers ?? []).map(v => [v.id, v])).values()].map(v => ({ value: v.id, label: v.name }))],
     personality: supportedModels.some(m => m.supportsPersonality) ? ["none", "friendly", "pragmatic"].map(value => ({ value, label: t(({ none: "不指定风格", friendly: "友好", pragmatic: "务实" })[value as "none"] ) })) : [],
   };
-  const labels = { model: "模型", effort: "推理强度", mode: "协作模式", serviceTier: "服务档位", personality: "沟通风格" };
+  const labels = { model: "模型", effort: "推理强度", mode: "协作模式", serviceTier: "服务档位", personality: "沟通风格", summary: "推理摘要", multiAgentMode: "子代理协作" };
+  const plugins = [...new Map(catalogs.flatMap(c => c.plugins ?? []).map(p => [p.pluginId, p])).values()];
+  const disabledPlugins = Array.isArray(draft.disabledPluginIds) ? draft.disabledPluginIds : [];
   const changed = !!data && JSON.stringify(draft) !== JSON.stringify(overridesOf(data, scope));
   const Container = workspace ? "section" : "details";
   return <Container className="codex-settings-panel session-config-section" {...(workspace ? {} : {open: targetScope !== "session"})}>
@@ -89,6 +94,10 @@ export function CodexSettingsPanel({ sessionId = "", machineId, projectId, works
         {options[field].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select></label>;
     })}</div>}
+    {data && <details className="config-source-details"><summary>{t("本范围停用的插件")}</summary><p>{t("仅影响新任务，不卸载主机插件。其他未单独覆盖的会话沿用上级设置。")}</p>
+      <label>{t("插件使用方式")}<select value={draft.disabledPluginIds === undefined ? "inherit" : draft.disabledPluginIds === "__native__" ? "native" : "custom"} disabled={busy} onChange={e => setDraft(previous => { const next = { ...previous }; if(e.target.value === "inherit") delete next.disabledPluginIds; else next.disabledPluginIds = e.target.value === "native" ? "__native__" : []; return next; })}><option value="inherit">{t("沿用默认配置")}</option><option value="native">{t("使用原生值（不继承上级）")}</option><option value="custom">{t("选择要停用的插件")}</option></select></label>
+      {Array.isArray(draft.disabledPluginIds) && <>{!plugins.length && <p>{t("主机尚未上报已安装插件")}</p>}{[...plugins, ...disabledPlugins.filter(id => !plugins.some(p => p.pluginId === id)).map(id => ({pluginId:id,pluginName:id}))].map(plugin => <label className="checkbox-row" key={plugin.pluginId}><input type="checkbox" checked={disabledPlugins.includes(plugin.pluginId)} disabled={busy} onChange={e => setDraft(previous => ({...previous,disabledPluginIds:e.target.checked ? [...disabledPlugins,plugin.pluginId] : disabledPlugins.filter(id => id !== plugin.pluginId)}))}/>{plugin.pluginName}</label>)}</>}
+    </details>}
     {data && <details className="config-source-details"><summary>{t("查看配置来源")}</summary><dl>{fields.map(field => <div key={field}><dt>{t(labels[field])}</dt><dd>{sourceLabel(data.sources?.[field] ?? data.source)} · {data.effective?.[field] === "__native__" || data.effective?.[field] === undefined ? t("原生值") : data.effective[field] === null ? t("恢复默认档位") : data.effective[field]}</dd></div>)}</dl></details>}
     {workspace && <p className="subtle">{t("选项来自各主机上报的目录；任务提交时按目标主机再次校验，不会自动替换模型。")}</p>}
     {!workspace && data?.compatibilityIssue && <p role="alert">{systemText(data.compatibilityIssue)}</p>}

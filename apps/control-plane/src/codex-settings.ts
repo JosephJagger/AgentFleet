@@ -11,7 +11,7 @@ export interface CodexCatalog {
   error?: string;
   modeNotice?: string;
 }
-export interface CodexSettings { model: string; effort?: string; mode?: "default" | "plan"; serviceTier?: string | null; personality?: "none" | "friendly" | "pragmatic" }
+export interface CodexSettings { model: string; effort?: string; mode?: "default" | "plan"; serviceTier?: string | null; disabledPluginIds?: string[]; summary?: "auto" | "concise" | "detailed" | "none"; multiAgentMode?: "explicitRequestOnly" | "proactive"; personality?: "none" | "friendly" | "pragmatic" }
 function object(value: unknown): Record<string, unknown> {
   invariant(value !== null && typeof value === "object" && !Array.isArray(value), 400, "INVALID_CODEX_SETTINGS", "Expected an object");
   return value as Record<string, unknown>;
@@ -39,14 +39,17 @@ export function parseCodexCatalog(value: unknown): CodexCatalog | null {
 export function validateCodexSettings(value: unknown, catalog: CodexCatalog | null): CodexSettings | undefined {
   if (value === undefined) return undefined;
   const raw = object(value);
-  invariant(Object.keys(raw).every((key) => ["model", "effort", "mode", "serviceTier", "personality"].includes(key)), 400, "INVALID_CODEX_SETTINGS", "Only documented runtime settings are configurable");
+  invariant(Object.keys(raw).every((key) => ["model", "effort", "mode", "serviceTier", "personality", "summary", "multiAgentMode", "disabledPluginIds"].includes(key)), 400, "INVALID_CODEX_SETTINGS", "Only documented runtime settings are configurable");
+  invariant(raw.summary === undefined || ["auto", "concise", "detailed", "none"].includes(String(raw.summary)), 400, "INVALID_CODEX_SETTINGS", "Invalid summary");
+  invariant(raw.multiAgentMode === undefined || ["explicitRequestOnly", "proactive"].includes(String(raw.multiAgentMode)), 400, "INVALID_CODEX_SETTINGS", "Invalid delegation mode");
+  invariant(raw.disabledPluginIds === undefined || Array.isArray(raw.disabledPluginIds) && raw.disabledPluginIds.length <= 100 && raw.disabledPluginIds.every(id => typeof id === "string" && id.length > 0 && id.length <= 256 && !id.includes("\0")), 400, "INVALID_CODEX_SETTINGS", "Invalid disabled plugins");
   const model = catalog?.models.find((item) => item.model === raw.model);
   invariant(model && !catalog?.error, 409, "CODEX_MODEL_UNAVAILABLE", "Host model catalog is unavailable or does not contain this model; update or reconnect the host");
   invariant(raw.effort === undefined || (typeof raw.effort === "string" && model.efforts.includes(raw.effort)), 400, "CODEX_EFFORT_UNAVAILABLE", "Model does not support this reasoning effort");
   invariant(raw.mode === undefined || ((raw.mode === "default" || raw.mode === "plan") && catalog?.modes.includes(raw.mode)), 400, "CODEX_MODE_UNAVAILABLE", "Host does not support this collaboration mode");
   invariant(raw.serviceTier === undefined || raw.serviceTier === null || model.serviceTiers?.some((tier) => tier.id === raw.serviceTier), 400, "CODEX_TIER_UNAVAILABLE", "Host model does not advertise this service tier");
   invariant(raw.personality === undefined || (model.supportsPersonality && ["none", "friendly", "pragmatic"].includes(String(raw.personality))), 400, "CODEX_PERSONALITY_UNAVAILABLE", "Host model does not support this personality");
-  return { model: model.model, ...(raw.effort === undefined ? {} : { effort: raw.effort as string }), ...(raw.mode === undefined ? {} : { mode: raw.mode as "default" | "plan" }),
+  return { ...(raw.disabledPluginIds === undefined ? {} : { disabledPluginIds: [...raw.disabledPluginIds as string[]] }), ...(raw.summary === undefined ? {} : { summary: raw.summary as NonNullable<CodexSettings["summary"]> }), ...(raw.multiAgentMode === undefined ? {} : { multiAgentMode: raw.multiAgentMode as NonNullable<CodexSettings["multiAgentMode"]> }), model: model.model, ...(raw.effort === undefined ? {} : { effort: raw.effort as string }), ...(raw.mode === undefined ? {} : { mode: raw.mode as "default" | "plan" }),
     ...(raw.serviceTier === undefined ? {} : { serviceTier: raw.serviceTier as string | null }), ...(raw.personality === undefined ? {} : { personality: raw.personality as NonNullable<CodexSettings["personality"]> }) };
 }
 export function parseRuntimeSettings(value: unknown): Record<string, unknown> | null {
@@ -59,13 +62,14 @@ export function parseRuntimeSettings(value: unknown): Record<string, unknown> | 
     invariant(["project", "network", "full"].includes(String(permissions.profile)), 400, "INVALID_PERMISSION_PROFILE", "Unknown accepted permission profile");
     result.permissions = { profile: permissions.profile, source: text(permissions.source, 32), acceptedAt: text(permissions.acceptedAt, 64), nativeTurnId: text(permissions.nativeTurnId) };
   }
-  for (const [key, fields] of [["observed", ["model", "provider", "effort", "observedAt"]], ["accepted", ["model", "effort", "mode", "personality", "serviceTier", "acceptedAt", "nativeTurnId"]], ["active", ["model", "effort", "serviceTier", "summary", "changedAt", "nativeTurnId"]]] as const) {
+  for (const [key, fields] of [["observed", ["model", "provider", "effort", "observedAt"]], ["accepted", ["model", "effort", "mode", "personality", "serviceTier", "summary", "multiAgentMode", "acceptedAt", "nativeTurnId"]], ["active", ["model", "effort", "serviceTier", "summary", "changedAt", "nativeTurnId"]]] as const) {
     if (raw[key] == null) continue;
     const entry = object(raw[key]);
     const clean: Record<string, string | null> = {};
     for (const field of fields) if (entry[field] !== undefined && entry[field] !== null) clean[field] = text(entry[field]);
     if ((key === "accepted" || key === "active") && entry.serviceTier === null) clean.serviceTier = null;
     if (key === "active" && object(raw[key]).source === "native_voice") clean.source = "native_voice";
+    if (key === "accepted" && Array.isArray(entry.disabledPluginIds)) (clean as Record<string, unknown>).disabledPluginIds = entry.disabledPluginIds.filter((id): id is string => typeof id === "string" && id.length <= 256).slice(0,100);
     if (key === "active" ? clean.nativeTurnId && clean.changedAt : clean.model) result[key] = clean;
   }
   return result;

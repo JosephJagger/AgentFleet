@@ -1,3 +1,4 @@
+import { HostNativeManagement } from "./HostNativeManagement";
 import { HostVersionStorage } from "./HostVersionStorage";
 import { SettingsSections } from "./SettingsSections";
 import { Server, Paperclip, BookOpen, ArrowRight } from "lucide-react";
@@ -33,7 +34,7 @@ function profileValue(profile: Record<string, unknown> | undefined, ...keys: str
 
 export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, onChanged, onConfigure, renderCompatibility }: { machines: Machine[]; onConfigure?: (id: string) => void; selectedId?: string; onSelect: (id: string) => void; onPair: () => void; onRemove: (machine: Machine) => void; onChanged: () => Promise<void>; renderCompatibility: (machine: Machine) => ReactNode }) {
   const machine = selectedId ? machines.find((item) => item.id === selectedId) : machines[0];
-  const [section, setSection] = useState<"overview" | "storage" | "guide">("overview");
+  const [section, setSection] = useState<"overview" | "storage" | "guide" | "environment">("overview");
   const [operations, setOperations] = useState<HostOperation[]>([]);
   const [operationsOpen, setOperationsOpen] = useState(false);
   const [error, setError] = useState("");
@@ -72,9 +73,11 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
     {machine.reachability !== "live" && <HostRecovery key={`recovery:${machine.id}`} machine={machine} />}
     <SettingsSections label={t("主机管理分类")} value={section} onChange={setSection} items={[
       {id:"overview",label:t("状态与连接"),icon:<Server size={18}/>},
+      {id:"environment",label:t("账号与工具"),icon:<Server size={18}/>},
       {id:"storage",label:t("附件和版本"),icon:<Paperclip size={18}/>},
       {id:"guide",label:t("使用帮助"),icon:<BookOpen size={18}/>},
     ]}/>
+    {section === "environment" && <section className="settings-block"><HostNativeManagement key={machine.id} machine={machine}/></section>}
     <div hidden={section !== "storage"} className="host-category">
     <HostImageStorage key={`images:${machine.id}`} machineId={machine.id} name={machine.name} />
     <HostVersionStorage key={`versions:${machine.id}`} machine={machine} />
