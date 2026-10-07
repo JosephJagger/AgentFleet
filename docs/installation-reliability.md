@@ -27,3 +27,5 @@ CI 包含 Linux、macOS 和 Windows 的升级生命周期测试，Windows PowerS
 可选 manifest.rollout: percentage (0–100 整数)、seed、platforms、notBefore。按机器身份稳定分组；不匹配的主机显示等待分批发布，0 暂停。缺省保持全量发布兼容。
 
 **0.30.84 之前的客户端不支持 rollout 字段。** 首次引入此版本不能依赖该字段限制旧客户端；先完成 CI 与候选包验证，再更新公共 manifest。后续全部客户端支持后，按平台先小批、观察在线版本与回退率、再扩大；发现失败暂停新激活，保留旧的不可变下载链接。已开始的任务与激活不靠修改 manifest 强制中止。
+
+发布后必须运行 `node packaging/verify-published-installers.mjs https://your-panel.example <版本>`。它核对公共 manifest、四平台校验文件和三个安装脚本的实际字节；反向代理的独立 alias 也必须随发布更新。仅重建容器不能保证公开安装入口同步，本次发现并纠正了网站仍指向 0.30.72/0.30.76 安装脚本的遗留路由。
