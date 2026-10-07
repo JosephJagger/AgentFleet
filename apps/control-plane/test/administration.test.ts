@@ -75,6 +75,7 @@ test("system release follows the published channel after startup and never falls
   t.after(() => new Promise<void>(resolve => channel.close(() => resolve())));
   const address = channel.address() as { port: number };
   const config = loadConfig({ AUTH_MODE:"password", ADMIN_EMAIL:"owner@example.test", ADMIN_PASSWORD:"test-admin-password-long", PUBLIC_ORIGIN:"http://admin.test", COOKIE_SECURE:"false", DATABASE_PATH:":memory:", LOG_LEVEL:"silent", AGENTFLEET_RELEASE_MANIFEST_URL:`http://127.0.0.1:${address.port}/manifest.json` });
+  config.databasePath = ":memory:";
   const {app,db} = await buildControlPlane(config);
   t.after(() => app.close());
   const auth = new AuthService(db,config);
