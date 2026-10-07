@@ -27,7 +27,7 @@ it("workspace separates files, commands and integrations from session configurat
  fireEvent.click(screen.getByText("项目工作区", { selector: "summary" }));
  expect(screen.getByRole("button", { name: "文件" })).toBeTruthy();
  fireEvent.click(screen.getByRole("button", { name: "集成" }));
- fireEvent.click(screen.getByText("项目集成", { selector: "summary" }));
+ fireEvent.click(screen.getByText("项目集成", { selector: "summary > span" }));
  expect(screen.queryByRole("option", { name: "退出原生账号" })).toBeNull();
  expect(screen.getByRole("option", { name: "查看 MCP 工具与资源" })).toBeTruthy();
 });

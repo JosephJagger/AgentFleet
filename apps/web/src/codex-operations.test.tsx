@@ -13,7 +13,7 @@ it("reading usage is explicit and unavailable telemetry is not rendered as zero"
   vi.mocked(api.command).mockResolvedValue({ command: { id: "request" } as CommandReceipt });
   const changed = vi.fn();
   const view = render(<CodexOperationsPanel session={session} commands={[]} onChanged={changed} />);
-  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary" }));
+  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary > span" }));
   expect(api.command).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "读取官方用量" }));
   await waitFor(() => expect(changed).toHaveBeenCalledOnce());
@@ -25,7 +25,7 @@ it("reading usage is explicit and unavailable telemetry is not rendered as zero"
 it("reset credit consumption requires a separate explicit confirmation and exact session precondition", async () => {
   vi.mocked(api.command).mockResolvedValue({ command: { id: "reset" } as CommandReceipt });
   render(<CodexOperationsPanel session={session} commands={[]} onChanged={vi.fn()} />);
-  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary" }));
+  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary > span" }));
   fireEvent.change(screen.getByLabelText("操作"), { target: { value: "resetCard.consume" } });
   const button = screen.getByRole("button", { name: "使用重置卡" });
   expect((button as HTMLButtonElement).disabled).toBe(true);
@@ -36,7 +36,7 @@ it("reset credit consumption requires a separate explicit confirmation and exact
 
 it("unknown prior receipt blocks another mutation", () => {
   render(<CodexOperationsPanel session={session} commands={[{ id: "old", type: "codex.manage", createdAt: "now", state: "unknown" } as CommandReceipt]} onChanged={vi.fn()} />);
-  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary" }));
+  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary > span" }));
   expect((screen.getByRole("button", { name: "等待主机回执" }) as HTMLButtonElement).disabled).toBe(true);
   expect(api.command).not.toHaveBeenCalled();
 });
@@ -44,7 +44,7 @@ it("unknown prior receipt blocks another mutation", () => {
 it("experimental interfaces require opt-in and live settings carry the exact active turn", async () => {
   vi.mocked(api.command).mockResolvedValue({ command: { id: "live" } as CommandReceipt });
   render(<CodexOperationsPanel session={{ ...session, activeTurnId: "active-turn" }} commands={[]} onChanged={vi.fn()} />);
-  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary" }));
+  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary > span" }));
   expect(screen.queryByRole("option", { name: "实验：调整当前任务设置" })).toBeNull();
   fireEvent.click(screen.getByLabelText("显示已验证的 Codex 实验接口"));
   fireEvent.change(screen.getByLabelText("操作"), { target: { value: "turn.settings" } });
@@ -78,7 +78,7 @@ it("fork range requires a native task and preserves the exact target in the requ
 it("goal management defaults to paused and has no autonomous activation option", async () => {
   vi.mocked(api.command).mockResolvedValue({ command: { id: "goal" } as CommandReceipt });
   render(<CodexOperationsPanel session={session} commands={[]} onChanged={vi.fn()} />);
-  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary" }));
+  fireEvent.click(screen.getByText("Codex 工具与账号", { selector: "summary > span" }));
   fireEvent.change(screen.getByLabelText("操作"), { target: { value: "goal.set" } });
   expect((screen.getByLabelText("目标状态") as HTMLSelectElement).value).toBe("paused");
   expect(screen.queryByRole("option", { name: "进行中" })).toBeNull();
@@ -92,7 +92,7 @@ it("host account management needs only a host and preserves explicit confirmatio
  const machine={id:"host",reachability:"live",maintenanceCapabilities:["codex.host"]} as Machine;
  vi.mocked(api.hostCodexOperation).mockResolvedValue({id:"host-result",type:"codex.host",state:"accepted"} as HostOperation);
  render(<CodexOperationsPanel machine={machine} onChanged={vi.fn()}/>);
- fireEvent.click(screen.getByText("Codex 工具与账号",{selector:"summary"}));
+ fireEvent.click(screen.getByText("Codex 工具与账号",{selector:"summary > span"}));
  expect(screen.queryByRole("option",{name:"当前会话"})).toBeNull();
  expect(screen.queryByRole("option",{name:"查看目标与预算进度"})).toBeNull();
  expect(api.hostCodexOperation).not.toHaveBeenCalled();
