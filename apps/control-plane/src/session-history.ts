@@ -53,6 +53,9 @@ export class SessionHistoryService {
   }catch(error){if(!(error instanceof AppError))throw error;nativeError=error.code;
     if(input.source==='native'||position?.source==='native'||['HISTORY_TARGET_CHANGED','HISTORY_INVALID','HISTORY_CONTENT_DISABLED','HISTORY_FORBIDDEN'].includes(error.code))throw error;
   }
+  // A failed native read can race policy changes too. Recheck before returning cloud content.
+  const fallbackSession=this.registry.getSession(principal,session.logicalSessionId);
+  invariant(fallbackSession.contentEpoch===binding.contentEpoch&&fallbackSession.executionSegmentId===binding.executionSegmentId&&this.db.get<{sync_content:number}>('SELECT sync_content FROM projects WHERE project_id=?',fallbackSession.projectId)?.sync_content,409,'HISTORY_TARGET_CHANGED','读取期间会话或正文权限已变化');
   const mode=input.mode??'latest';
   let turnId=position?.turnId;
   if(!position&&mode==='latest') {
@@ -83,7 +86,7 @@ export class SessionHistoryService {
   const final=latestMessages.findLast(item=>item.role==='assistant'&&item.phase==='final_answer')??(turnStatus==='completed'?latestMessages.findLast(item=>item.role==='assistant'&&item.phase!=='commentary'):undefined);
   const roundId=turnId??final?.turnId??items.at(-1)?.turnId??null;
   const user=latestMessages.findLast(item=>item.role==='user'&&item.turnId===roundId);
-  const unavailable=items.some(item=>item.unavailableReason);
-  return {...base,source,availability:items.length?(unavailable||truncated||!authoritative?'partial':'available'):authoritative?'empty':nativeError==='HISTORY_HOST_OFFLINE'?'offline':nativeError==='HISTORY_UNSUPPORTED'?'unsupported':'no_synced_history',nativeError,latestRound:{turnId:roundId,turnStatus,userInput:user??null,finalReply:final??null,complete:Boolean(user&&final&&!user.unavailableReason&&!final.unavailableReason&&!user.truncated&&!final.truncated)},items,nextCursor,hasMore:nextCursor!==null,truncated,authoritative,scope:'dialogue_messages',unavailableReasons:[...new Set(items.flatMap(item=>item.unavailableReason?[item.unavailableReason]:[]))],timeNote:'缺失原生消息时间时明确使用事件时间或 null；不推测时间。'};
+  const unavailable=[...items,...latestMessages].some(item=>item.unavailableReason);
+  return {...base,source,availability:items.length?(unavailable||truncated||!authoritative?'partial':'available'):authoritative?'empty':nativeError==='HISTORY_HOST_OFFLINE'?'offline':nativeError==='HISTORY_UNSUPPORTED'?'unsupported':'no_synced_history',nativeError,latestRound:{turnId:roundId,turnStatus,userInput:user??null,finalReply:final??null,complete:Boolean(user&&final&&!user.unavailableReason&&!final.unavailableReason&&!user.truncated&&!final.truncated)},items,nextCursor,hasMore:nextCursor!==null,truncated,authoritative,scope:'dialogue_messages',unavailableReasons:[...new Set([...items,...latestMessages].flatMap(item=>item.unavailableReason?[item.unavailableReason]:[]))],timeNote:'缺失原生消息时间时明确使用事件时间或 null；不推测时间。'};
  }
 }

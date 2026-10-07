@@ -115,3 +115,10 @@ test('authenticated HTTP history route uses the requested session and rejects an
  assert.equal((await app.inject({method:'GET',url,headers:{cookie:`${config.cookieName}=${guest.sessionToken}`}})).statusCode,404);
  assert.equal(db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
 });
+
+import {AppError} from '../src/errors.js';
+test('failed native reads cannot fall back after content sharing is revoked',async t=>{
+ const f=fixture();t.after(()=>f.db.close());dialogue(f);f.db.run("UPDATE execution_segments SET native_thread_id='native'");
+ const service=new SessionHistoryService(f.db,f.registry,async()=>{f.db.run('UPDATE projects SET sync_content=0');throw new AppError(504,'HISTORY_TIMEOUT','fixture');});
+ await assert.rejects(service.read(f.principal,{sessionId:f.session.logicalSessionId}),{code:'HISTORY_TARGET_CHANGED'});
+});
