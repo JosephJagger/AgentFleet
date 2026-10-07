@@ -1,3 +1,4 @@
+import { panelVoiceBindingMatches, type PanelTransportBinding } from './panel-voice-binding.js';
 import { SessionHistoryService } from './session-history.js';
 import { SessionHistoryBroker } from './session-history-broker.js';
 import { SessionProgressService } from "./session-progress.js";
@@ -65,6 +66,7 @@ interface AgentSocketState {
   projectFiles?: boolean;
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
+  verifiedVoiceBinding?: PanelTransportBinding;
 }
 
 interface PendingProjectFile {
@@ -253,7 +255,7 @@ export async function buildControlPlane(
   const sendPanel=(voiceId:string,action:string,extra:Record<string,unknown>={})=>{
     const call=panelVoice.get(voiceId);if(!call||call.state==='closed')return false;
     const agent=agents.get(call.machine_id);const binding=JSON.parse(call.binding_json);
-    if(!agent?.reconciliationReady||agent.producerEpoch!==binding.producerEpoch||agent.appServerEpoch!==binding.appServerEpoch||agent.identity.transportGeneration!==binding.transportGeneration)return false;
+    if(!agent||!panelVoiceBindingMatches(agent,binding,action))return false;
     return sendJson(agent.socket,{type:'voice.control',kind:'panel',voiceId,action,...binding,...extra});
   };
   const panelReports=new Map<string,number>();
@@ -1630,6 +1632,7 @@ export async function buildControlPlane(
               message.reconciliationStreams,
             );
             state.reconciliationReady = true;
+            state.verifiedVoiceBinding={transportGeneration:state.identity.transportGeneration,producerEpoch:state.producerEpoch,appServerEpoch:state.appServerEpoch};
             state.dispatchPaused = false;
             sendJson(socket, {
               type: "reconciliation.ack",
@@ -1753,12 +1756,12 @@ export async function buildControlPlane(
               if (result.code === "SOURCE_STREAM_CORRUPT") broadcastMachine(identity.machineId);
             }
           } else if (message.type === "voice.event") {
-            invariant(agents.get(identity.machineId)===state && state.reconciliationReady && message.producerEpoch===state.producerEpoch && message.appServerEpoch===state.appServerEpoch,409,"VOICE_FENCED","Stale voice event");
+            invariant(agents.get(identity.machineId)===state,409,"VOICE_FENCED","Stale voice connection");
             if(message.voiceId.startsWith('pvoice_')) {
               const call=panelVoice.get(message.voiceId);
               invariant(call&&call.machine_id===identity.machineId,403,"VOICE_TARGET_CHANGED","Wrong panel voice host");
               const binding=JSON.parse(call.binding_json);
-              invariant(binding.producerEpoch===message.producerEpoch&&binding.appServerEpoch===message.appServerEpoch&&binding.transportGeneration===state.identity.transportGeneration,409,"VOICE_FENCED","Stale coordinator");
+              invariant(panelVoiceBindingMatches(state,binding,'tool.result')&&binding.producerEpoch===message.producerEpoch&&binding.appServerEpoch===message.appServerEpoch,409,"VOICE_FENCED","Stale coordinator");
               if(message.event==='error')panelVoice.recordFailure(call.voice_id,message.message);
               if(call.state==='closed')return;
               const owner=panelOwners.get(call.voice_id);
@@ -1785,6 +1788,7 @@ export async function buildControlPlane(
               else if(message.event==='error'){const code=panelVoice.recordFailure(call.voice_id,message.message);app.log.warn({voiceId:call.voice_id,machineId:identity.machineId,code},'Panel voice failed');sendJson(owner.socket,{type:'error',message:`总控语音连接失败（${code}），请重新连接`});stopPanel(call.voice_id);}
               return;
             }
+            invariant(state.reconciliationReady&&message.producerEpoch===state.producerEpoch&&message.appServerEpoch===state.appServerEpoch,409,"VOICE_FENCED","Stale voice event");
             const row=nativeVoice.get(message.voiceId);
             invariant(row && row.machine_id===identity.machineId,403,"VOICE_TARGET_CHANGED","Voice belongs to another host");
             const binding=JSON.parse(row.binding_json) as VoiceBinding;
@@ -1893,7 +1897,7 @@ export async function buildControlPlane(
           }
         } catch (error) {
           const appError = error instanceof AppError ? error : new AppError(400, "WS_MESSAGE_INVALID", "Invalid WebSocket message");
-          const invalidField=appError.code==='INVALID_INPUT'?appError.message.match(/^([a-zA-Z][a-zA-Z0-9_.]{0,80}) (?:is invalid|must be a string)$/)?.[1]:undefined;
+          const invalidField=appError.code==='INVALID_INPUT'?appError.message.match(/^([a-zA-Z][a-zA-Z0-9_.]{0,80}) (?:is invalid|is required|must be a string|must be an integer)$/)?.[1]:undefined;
           request.log.warn({ code: appError.code, frameType:incomingType, invalidField, machineId: identity.machineId }, "agent message rejected");
           sendJson(socket, { type: "error", code: appError.code, message: appError.message });
           if (appError.statusCode === 401 || appError.statusCode === 403) socket.close(1008, appError.code);

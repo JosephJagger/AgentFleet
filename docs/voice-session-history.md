@@ -77,3 +77,13 @@ already synchronized history. The voice coordinator host also needs 0.30.89 and
 a new call to load the new tool schema/instructions. Existing calls are preserved
 and are not force-refreshed. No new database migration is needed for history;
 the preceding voice-safe publication migration remains required.
+
+## Voice during catalog resynchronization
+
+An existing panel call keeps its verified host/process/generation binding for
+heartbeat, stop and tool replies while the same socket resynchronizes its catalog.
+New calls, task admission and native history requests still require completed
+reconciliation. The retained verification is never reused after a transport or
+native process change. Older Agents can briefly defer controls until reconciliation
+completes; their existing 120-second voice watchdog still applies to prolonged
+loss of contact. This does not promise audio survival through a real host restart.
