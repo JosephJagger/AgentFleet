@@ -24,6 +24,9 @@ jobs:
       - run: npm ci --prefix apps/local-agent --no-audit --no-fund
       - run: npm run build --prefix apps/local-agent
       - run: node --test apps/local-agent/dist/test/installation-lifecycle.test.js apps/local-agent/dist/test/installer-lock.test.js apps/local-agent/dist/test/update-network.test.js apps/local-agent/dist/test/service.test.js apps/local-agent/dist/test/supervisor-ownership.test.js
+      - name: Verify Linux preparation leaves active installation untouched
+        if: runner.os == 'Linux'
+        run: python3 packaging/test-linux-prepare.py
       - name: Validate POSIX installer syntax
         if: runner.os != 'Windows'
         run: sh -n packaging/install.sh && sh -n packaging/install-macos.sh
@@ -101,6 +104,8 @@ jobs:
         run: .github/scripts/smoke-install.sh
       - name: Smoke-test root installation mode
         run: docker run --rm -v "$PWD:/workspace" -w /workspace node:24-bookworm .github/scripts/smoke-install.sh
+      - name: Verify root preparation in a disposable container
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo python:3.13-bookworm python3 packaging/test-linux-prepare.py --isolated-root
       - name: Verify immutable release and install semantics
         run: packaging/test-immutability.sh
       - run: docker build -t agentfleet:ci .

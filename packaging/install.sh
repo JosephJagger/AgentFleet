@@ -478,9 +478,7 @@ if [ "$MODE" = "uninstall" ]; then
   else
     "$CURRENT_LINK" service uninstall
   fi
-  if [ "$MODE" = prepare ]; then echo "Prepared AgentFleet $VERSION; running service unchanged."; exit 0; fi
-
-if [ -e "$CURRENT_LINK" ] && [ ! -L "$CURRENT_LINK" ]; then
+  if [ -e "$CURRENT_LINK" ] && [ ! -L "$CURRENT_LINK" ]; then
     echo "installer: refusing to remove non-symlink $CURRENT_LINK" >&2
     exit 1
   fi
@@ -682,6 +680,13 @@ else
     exit 1
   fi
   STAGED_TARGET=""
+fi
+
+# Preparation ends after the immutable candidate is validated. Everything below
+# can touch the active installation or start services and must require activation.
+if [ "$MODE" = prepare ]; then
+  echo "Prepared AgentFleet $VERSION; running service unchanged."
+  exit 0
 fi
 
 if [ -e "$CURRENT_LINK" ] && [ ! -L "$CURRENT_LINK" ]; then
