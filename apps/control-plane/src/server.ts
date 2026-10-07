@@ -1678,6 +1678,11 @@ export async function buildControlPlane(
               if (!result.duplicate) {
                 try { writingMemory.learnEvent(result.eventId); } catch { app.log.warn("Writing memory extraction failed; event remains acknowledged"); }
                 broadcastSession(message.event.logicalSessionId, { type: "event", event: result.event });
+                // Fleet views do not subscribe to every conversation. Notify authorized
+                // viewers when execution state changes, without streaming other histories.
+                if (["turn.started", "turn.completed", "turn.failed", "turn.interrupted", "thread.status_changed", "approval.requested", "approval.resolved"].includes(message.event.type)) {
+                  broadcastMachine(identity.machineId);
+                }
                 if (["turn.completed", "turn.failed", "turn.interrupted"].includes(message.event.type)) {
                   dispatchReadyQueues(identity.machineId, identity.workspaceId);
                 }

@@ -1407,6 +1407,7 @@ function App() {
   const detailRequest = useRef<{ generation: number; controller?: AbortController }>({ generation: 0 });
   const inFlightDetail = useRef<{ id: string; promise: Promise<void>; queued: boolean } | undefined>(undefined);
   const dashboardRequest = useRef(0);
+  const dashboardRefresh = useRef({ running: false, queued: false });
   dashboardRef.current = dashboard;
   detailRef.current = detail;
   selectedSessionRef.current = selectedSessionId;
@@ -1458,7 +1459,9 @@ function App() {
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 4200);
   }, []);
 
-  const loadDashboard = useCallback(async (silent = false) => {
+  const loadDashboard = useCallback(async function refreshDashboard(silent = false): Promise<void> {
+    if (dashboardRefresh.current.running) { dashboardRefresh.current.queued = true; return; }
+    dashboardRefresh.current.running = true;
     const generation = ++dashboardRequest.current;
     try {
       const next = await api.dashboard();
@@ -1471,6 +1474,11 @@ function App() {
       else if (!silent) toast("danger", errorMessage(error));
     } finally {
       setAuthKnown(true);
+      dashboardRefresh.current.running = false;
+      if (dashboardRefresh.current.queued) {
+        dashboardRefresh.current.queued = false;
+        void refreshDashboard(true);
+      }
     }
   }, [toast]);
 
@@ -1561,8 +1569,9 @@ function App() {
     if (!dashboard) return;
     let refreshTimer: number | undefined;
     const unsubscribe = subscribeToFleet(() => { const focused = detailRef.current?.session ?? dashboardRef.current?.sessions.find((session) => session.id === selectedSessionRef.current); return focused ? [focused] : []; }, () => {
-      window.clearTimeout(refreshTimer);
-      refreshTimer = window.setTimeout(() => { void loadDashboard(true); void loadDetail(selectedSessionRef.current, true); }, 120);
+      // Coalesce bursts without indefinitely postponing refresh during streaming.
+      if (refreshTimer !== undefined) return;
+      refreshTimer = window.setTimeout(() => { refreshTimer = undefined; void loadDashboard(true); void loadDetail(selectedSessionRef.current, true); }, 120);
     }, setConnected, applyVolatile);
     return () => { window.clearTimeout(refreshTimer); unsubscribe(); };
   }, [dashboard?.user.id, loadDashboard, loadDetail, applyVolatile]);

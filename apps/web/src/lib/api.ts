@@ -1029,7 +1029,7 @@ export function subscribeToFleet(
               payload: record(message.payload),
             });
           }
-        } else if (["snapshot", "event", "lease.changed", "queue.changed", "machine.changed", "command.changed", "approval.changed", "content.deleted"].includes(string(message.type))) {
+        } else if (["snapshot", "event", "session.changed", "lease.changed", "queue.changed", "machine.changed", "command.changed", "approval.changed", "content.deleted"].includes(string(message.type))) {
           onChange();
         }
       } catch {

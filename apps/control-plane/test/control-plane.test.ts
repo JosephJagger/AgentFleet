@@ -617,6 +617,13 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
     schemaVersion: "1.0",
     occurredAt: new Date().toISOString(),
   };
+  // Home page has no conversation subscriptions and must still observe turn starts.
+  const homeInbox = new WsInbox();
+  const homeSocket = await app.injectWS("/ws/client", { headers: { cookie, origin } }, {
+    onInit: socket => homeInbox.attach(socket),
+  });
+  sockets.push(homeSocket);
+  await homeInbox.next("welcome");
   const startedPayload = { commandId: startCommandId, status: "running" };
   agentSocket.send(JSON.stringify({
     type: "event.append",
@@ -633,6 +640,7 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   }));
   const eventOneAck = await agentInbox.next("event.ack");
   assert.equal(eventOneAck.sessionSeq, 1);
+  await homeInbox.next("machine.changed");
   await clientInbox.next("event");
 
   const gapPayload = { status: "done" };
