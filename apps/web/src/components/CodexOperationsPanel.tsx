@@ -1,3 +1,5 @@
+import { Settings2 } from "lucide-react";
+import { ConfigDisclosureSummary } from "./ConfigDisclosureSummary";
 import { HOST_CODEX_OPERATIONS } from "../lib/host-codex";
 import { useState } from "react";
 import { api } from "../lib/api";
@@ -110,7 +112,7 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
     } catch (e) { setMessage(e instanceof Error ? e.message : t("操作失败")); }
     finally { setBusy(false); }
   }
-  return <details className="codex-settings-panel codex-operations-panel"><summary>{t(title ?? "Codex 工具与账号")}</summary>
+  return <details className="codex-settings-panel codex-operations-panel config-disclosure"><ConfigDisclosureSummary icon={Settings2}>{t(title ?? "Codex 工具与账号")}</ConfigDisclosureSummary><div className="config-disclosure__body">
     <form className="stack-form" onSubmit={event => { event.preventDefault(); void run(); }}>
       <label className="checkbox-row"><input type="checkbox" checked={experimental} disabled={busy || pending} onChange={e => { setExperimental(e.target.checked); if (!e.target.checked && experimentalOperation(operation)) { setOperation(initialOperation ?? "usage.read"); setFields({}); setSubmitted(undefined); } setConfirmed(false); }} />{t("显示已验证的 Codex 实验接口")}</label>
       <label>{t("操作")}<select value={operation} disabled={busy || pending} onChange={event => { setOperation(event.target.value as Operation); setFields({}); setConfirmed(false); setMessage(""); setSubmitted(undefined); }}>{Object.entries(operationGroups).map(([group, title]) => { const entries = Object.entries(operations).filter(([key]) => operationGroup(key as Operation) === group && (!groups || groups.includes(group as keyof typeof operationGroups)) && (!groups || !session || !HOST_CODEX_OPERATIONS.includes(key)) && (!groups || !["nativeQueue.update", "nativeQueue.delete", "nativeQueue.reorder"].includes(key)) && (!machine || HOST_CODEX_OPERATIONS.includes(key)) && (experimental || !experimentalOperation(key as Operation))); return entries.length ? <optgroup key={group} label={t(title)}>{entries.map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</optgroup> : null; })}</select></label>
@@ -158,5 +160,5 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
     {hostReceipt?.error && <p role="alert">{systemText(hostReceipt.error.message)}</p>}
     {receipt?.message ? <p role="alert">{systemText(receipt.message)}</p> : message && !result && <p role="status">{message}</p>}
     {result && <div aria-live="polite"><p>{t("宿主机返回")}: {t(statusLabel(result.status))}</p>{result.rows.length > 0 && <dl>{result.rows.map((row, index) => <div key={index}><dt>{systemText(row.name)}<small>{systemText(row.status)}</small></dt><dd>{row.detail}</dd></div>)}</dl>}{result.url && <a className="button button--quiet" href={result.url} target="_blank" rel="noopener noreferrer">{t("打开授权页面")}</a>}{result.nextCursor && <button className="button button--quiet" disabled={!editable} onClick={() => void run(result.nextCursor)}>{t("下一页")}</button>}{result.status === "unavailable" && <p>{t("当前账号未返回此项数据，无法据此计算用量。")}</p>}</div>}
-  </details>;
+  </div></details>;
 }

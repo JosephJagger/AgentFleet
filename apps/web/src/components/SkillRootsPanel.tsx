@@ -1,3 +1,5 @@
+import { FolderOpen } from "lucide-react";
+import { ConfigDisclosureSummary } from "./ConfigDisclosureSummary";
 import { useEffect, useRef, useState } from "react";
 import type { Machine, HostOperation } from "../lib/types";
 import { t, systemText } from "../i18n";
@@ -10,7 +12,7 @@ export function SkillRootsPanel(props: { machine: Machine; hostOperations: HostO
   if (op.result.operation === "skills.roots.read") { setRoots(op.result.rows.filter(r => r.name === "root").map(r => r.detail).join("\n")); setVersion(op.result.rows.find(r => r.name === "version")?.detail ?? ""); }
   else { setVersion(""); setConfirmed(false); }
  }, [op.result, op.id]);
- return <details className="codex-settings-panel"><summary>{t("额外技能目录")}</summary><div className="stack-form"><p>{t("添加此主机上的技能文件夹，每行一个绝对路径。目录由连接服务保存，新 Codex 进程自动加载；已有连接重新连接后生效。")}</p>
+ return <details className="codex-settings-panel config-disclosure"><ConfigDisclosureSummary icon={FolderOpen}>{t("额外技能目录")}</ConfigDisclosureSummary><div className="stack-form config-disclosure__body"><p>{t("添加此主机上的技能文件夹，每行一个绝对路径。目录由连接服务保存，新 Codex 进程自动加载；已有连接重新连接后生效。")}</p>
   <button type="button" className="button button--quiet" disabled={op.pending || !op.allowed} onClick={() => void op.run("skills.roots.read")}>{t("读取技能目录")}</button>
   <label>{t("技能目录")}<textarea value={roots} disabled={op.pending || !version} onChange={e => { setRoots(e.target.value); setConfirmed(false); }}/></label>
   <label className="checkbox-row"><input type="checkbox" checked={confirmed} disabled={op.pending} onChange={e => setConfirmed(e.target.checked)}/>{t("确认使用这些目录中的技能；留空会移除额外目录")}</label>
