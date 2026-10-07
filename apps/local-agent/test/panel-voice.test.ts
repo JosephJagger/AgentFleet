@@ -7,7 +7,7 @@ import type { StateStore } from '../src/store.js';
 
 test('coordinator native notifications and dynamic tool calls are confined to its ephemeral thread', async()=>{
   const events:Record<string,unknown>[]=[];const replies:Record<string,unknown>[]=[];const calls:string[]=[];
-  const server=new CodexAppServer({findManagedThread:()=>undefined,findProject:()=>undefined,onEvent:async()=>undefined,onVolatile:(e:{payload:Record<string,unknown>})=>events.push(e.payload),onPanelTool:async()=>{calls.push('tool');return {state:'idle'};}} as unknown as AppServerCallbacks);
+  const server=new CodexAppServer({findManagedThread:()=>undefined,findProject:()=>undefined,onEvent:async()=>undefined,onVolatile:(e:{payload:Record<string,unknown>})=>events.push(e.payload),onPanelTool:async(args:Record<string,unknown>)=>{calls.push(String(args.action));return {items:[{todoId:'saved',intent:'Deferred task',state:'pending'}]};}} as unknown as AppServerCallbacks);
   const internal=server as unknown as {request(method:string,params:Record<string,unknown>):Promise<unknown>;handleLine(line:string):Promise<void>;writeLine(value:Record<string,unknown>):Promise<void>};
   let configuration:Record<string,unknown>={};let selectedVoice:unknown;
   internal.request=async(method,params)=>{if(method==='thread/realtime/start')selectedVoice=params.voice;if(method==='config/read')return {config:{mcp_servers:{personal:{command:'node',args:['mcp.js'],tool_timeout_sec:null},'node.repl':{url:'https://example.test/mcp'}}}};if(method==='thread/start'){configuration=params;return {thread:{id:'coordinator'}};}return {};};
@@ -23,7 +23,7 @@ test('coordinator native notifications and dynamic tool calls are confined to it
   assert.equal(events[0]?.event,'sdp');
   await internal.handleLine(JSON.stringify({method:'item/tool/call',id:1,params:{threadId:'coordinator',tool:'agentfleets_panel',arguments:{action:'status'}}}));
   await internal.handleLine(JSON.stringify({method:'item/tool/call',id:2,params:{threadId:'foreign',tool:'agentfleets_panel',arguments:{action:'status'}}}));
-  assert.equal(calls.length,1);assert.equal((replies[1]?.result as {success:boolean}).success,false);
+  assert.deepEqual(calls,['recover','status']);assert.match(String(configuration.developerInstructions),/Deferred task/);assert.match(String(configuration.developerInstructions),/no execution authorized/);assert.equal((replies[1]?.result as {success:boolean}).success,false);
 });
 
 test('hangup during startup waits for cleanup, rejects overlapping calls, and does not start realtime afterward',async()=>{

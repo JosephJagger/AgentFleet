@@ -595,6 +595,19 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   });
   assert.equal(mutationReuse.statusCode, 409, mutationReuse.body);
 
+  // Server voice memory is available without an active call, but remains authenticated and CSRF-protected.
+  const deniedTodo=await app.inject({method:'POST',url:'/api/voice-tasks',headers:{cookie,origin},payload:{intent:'Remember for later',clientMutationId:'memory-api'}});
+  assert.equal(deniedTodo.statusCode,403);
+  const savedTodo=await app.inject({method:'POST',url:'/api/voice-tasks',headers:browserHeaders,payload:{intent:'Remember for later',clientMutationId:'memory-api'}});
+  assert.equal(savedTodo.statusCode,200,savedTodo.body);
+  const savedId=JSON.parse(savedTodo.body).todoId;
+  const readMemory=await app.inject({method:'GET',url:'/api/voice-tasks',headers:browserHeaders});
+  assert.equal(readMemory.statusCode,200);assert.equal(readMemory.headers['cache-control'],'no-store');
+  assert.ok(JSON.parse(readMemory.body).items.some((item:{todoId:string})=>item.todoId===savedId));
+  const anonymousMemory=await app.inject({method:'GET',url:'/api/voice-tasks'});assert.equal(anonymousMemory.statusCode,401);
+  const cancelledTodo=await app.inject({method:'PATCH',url:`/api/voice-tasks/${savedId}`,headers:browserHeaders,payload:{revision:1,state:'cancelled'}});
+  assert.equal(cancelledTodo.statusCode,200);assert.equal(JSON.parse(cancelledTodo.body).state,'cancelled');
+
   const clientInbox = new WsInbox();
   const clientSocket = await app.injectWS("/ws/client", { headers: { cookie, origin } }, {
     onInit: (socket) => clientInbox.attach(socket),
@@ -1185,7 +1198,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
   await app.ready();
   assert.equal(
     Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    50,
+    51,
   );
 
   const login = await app.inject({

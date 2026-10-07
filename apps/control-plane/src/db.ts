@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 50) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 51) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1392,6 +1392,33 @@ export class ControlPlaneDatabase {
       this.sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS panel_voice_one_session_job ON panel_voice_jobs(session_id) WHERE state IN ('submitted','running','unknown')");
       this.sqlite.exec("CREATE INDEX IF NOT EXISTS panel_voice_call_jobs ON panel_voice_jobs(voice_id,created_at)");
       this.sqlite.exec("PRAGMA user_version=50");
+    });
+    if (version < 51) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS panel_voice_todos (
+        todo_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        user_id TEXT NOT NULL REFERENCES users(user_id), source_voice_id TEXT REFERENCES panel_voice_calls(voice_id),
+        mutation_key TEXT NOT NULL, create_hash TEXT NOT NULL, intent TEXT NOT NULL,
+        session_id TEXT REFERENCES logical_sessions(logical_session_id),
+        state TEXT NOT NULL CHECK(state IN ('pending','dispatched','cancelled')), revision INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(workspace_id,user_id,mutation_key)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS panel_voice_task_records (
+        job_id TEXT PRIMARY KEY REFERENCES panel_voice_jobs(job_id), todo_id TEXT NOT NULL UNIQUE REFERENCES panel_voice_todos(todo_id),
+        machine_id TEXT NOT NULL, project_id TEXT NOT NULL, session_id TEXT NOT NULL,
+        original_intent TEXT NOT NULL, dispatch_prompt TEXT NOT NULL, native_turn_id TEXT, state TEXT NOT NULL,
+        result_json TEXT NOT NULL DEFAULT '{}', result_payload_ref TEXT, result_expires_at TEXT,
+        content_epoch INTEGER NOT NULL, acknowledged_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS panel_voice_todos_owner ON panel_voice_todos(workspace_id,user_id,created_at,todo_id);
+      CREATE INDEX IF NOT EXISTS panel_voice_records_session ON panel_voice_task_records(session_id);
+      INSERT OR IGNORE INTO panel_voice_todos(todo_id,workspace_id,user_id,source_voice_id,mutation_key,create_hash,intent,session_id,state,created_at,updated_at)
+        SELECT 'vtodo_'||j.job_id,j.workspace_id,j.user_id,j.voice_id,'legacy:'||j.job_id,'legacy',
+        COALESCE(CASE WHEN c.deleted_at IS NULL AND c.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') THEN json_extract(c.body_json,'$.prompt') END,''),j.session_id,'dispatched',j.created_at,j.created_at
+        FROM panel_voice_jobs j LEFT JOIN command_contents c ON c.command_id=j.command_id;
+      INSERT OR IGNORE INTO panel_voice_task_records(job_id,todo_id,machine_id,project_id,session_id,original_intent,dispatch_prompt,native_turn_id,state,content_epoch,created_at,updated_at)
+        SELECT j.job_id,t.todo_id,s.machine_id,s.project_id,j.session_id,t.intent,t.intent,j.native_turn_id,j.state,cmd.content_epoch,j.created_at,j.created_at
+        FROM panel_voice_jobs j JOIN commands cmd ON cmd.command_id=j.command_id JOIN panel_voice_todos t ON t.todo_id='vtodo_'||j.job_id JOIN logical_sessions s ON s.logical_session_id=j.session_id;
+      PRAGMA user_version=51`);
     });
   }
 

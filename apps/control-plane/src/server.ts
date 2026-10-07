@@ -1021,6 +1021,23 @@ export async function buildControlPlane(
     }
     return {sessions:registry.listSessions(request.principal as Principal)};
   });
+  app.get("/api/voice-tasks", {preHandler:authenticate}, async (request,reply)=>{
+    reply.header('cache-control','no-store');return panelVoice.recover(request.principal as Principal,request.query as {cursor?:unknown;view?:unknown});
+  });
+  app.get("/api/voice-tasks/:id", {preHandler:authenticate}, async (request,reply)=>{
+    reply.header('cache-control','no-store');const principal=request.principal as Principal;
+    const todo=panelVoice.memory.get(principal,routeId(request));panelVoice.syncMemory(principal);return panelVoice.memory.describe(principal,todo);
+  });
+  app.post("/api/voice-tasks", {preHandler:mutate}, async request=>{
+    const body=record(request.body),principal=request.principal as Principal;
+    return panelVoice.memory.describe(principal,panelVoice.memory.save(principal,{intent:body.intent,sessionId:body.sessionId,key:body.clientMutationId}));
+  });
+  app.patch("/api/voice-tasks/:id", {preHandler:mutate}, async request=>{
+    const principal=request.principal as Principal;return panelVoice.memory.describe(principal,panelVoice.memory.update(principal,routeId(request),record(request.body)));
+  });
+  app.post("/api/voice-tasks/:id/acknowledge", {preHandler:mutate}, async request=>{
+    const principal=request.principal as Principal;panelVoice.syncMemory(principal);return panelVoice.memory.acknowledge(principal,routeId(request));
+  });
   app.get("/api/scheduled-tasks", { preHandler: authenticate }, async request => {
     const query = request.query as Record<string, unknown>;
     return scheduledTasks.list(request.principal as Principal, typeof query.projectId === "string" ? query.projectId : undefined);
@@ -1698,6 +1715,9 @@ export async function buildControlPlane(
               });
               if (!result.duplicate) {
                 try { writingMemory.learnEvent(result.eventId); } catch { app.log.warn("Writing memory extraction failed; event remains acknowledged"); }
+                if (["turn.started","turn.completed","turn.failed","turn.interrupted","item.completed"].includes(message.event.type)) {
+                  try { panelVoice.syncSessionMemory(message.event.logicalSessionId); } catch { app.log.warn("Voice task record projection failed; durable event will be reconciled"); }
+                }
                 broadcastSession(message.event.logicalSessionId, { type: "event", event: result.event });
                 // Fleet views do not subscribe to every conversation. Notify authorized
                 // viewers when execution state changes, without streaming other histories.
@@ -1734,8 +1754,8 @@ export async function buildControlPlane(
                   result=panelVoice.tool(principal,call.voice_id,requestId,message.args);
                   // A status/search request must never trigger command dispatch as a side effect.
                   if ((message.args as {action?:unknown})?.action==='dispatch') {
-                    const task=panelVoice.current(principal,{voiceId:call.voice_id});
-                    if(task){const target=registry.getSession(principal,task.session_id);dispatchPendingCommands(target.machineId,principal.workspaceId);broadcastSession(target.logicalSessionId,{type:"session.changed",logicalSessionId:target.logicalSessionId});}
+                    const task=result as {sessionId?:string};
+                    if(task.sessionId){const target=registry.getSession(principal,task.sessionId);dispatchPendingCommands(target.machineId,principal.workspaceId);broadcastSession(target.logicalSessionId,{type:"session.changed",logicalSessionId:target.logicalSessionId});}
                   }
                 }catch(error){result={error:error instanceof AppError?error.message:'请求未完成，请查询任务状态后再试',errorCode:error instanceof AppError?error.code:'PANEL_REQUEST_FAILED',...(error instanceof AppError?{details:error.details}:{}),executionStarted:error instanceof AppError&&error.code==='MACHINE_DRAINING'?false:null};}
                 sendPanel(call.voice_id,'tool.result',{requestId,result});
@@ -1879,6 +1899,7 @@ export async function buildControlPlane(
   const runMaintenance = (): { offlineMachines: string[]; expiredContent: number; expiredAudit: number; inactiveTakeoversReleased: number } => {
     db.expireTransientState();
     sweepVoice();
+    panelVoice.syncMemory();
     sweepPanel();
     coordination.expireUndispatchedCommands();
     const offlineMachines = registry.sweepOffline();

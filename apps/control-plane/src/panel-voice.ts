@@ -1,16 +1,31 @@
+import { VoiceTaskStore } from "./voice-task-store.js";
 import { SessionProgressService } from "./session-progress.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import type { RegistryService } from "./registry.js";
 import type { CoordinationService } from "./coordination.js";
 import type { Principal } from "./auth.js";
 import { invariant } from "./errors.js";
-import { newId, nowIso } from "./crypto.js";
+import { newId, nowIso, payloadHash as hashPayload } from "./crypto.js";
 
 export interface PanelCall { voice_id:string; workspace_id:string; user_id:string; owner_id:string; machine_id:string; binding_json:string; state:string; created_at:string; }
 interface PanelJob { job_id:string; user_id:string; workspace_id:string; voice_id:string; request_id:string; session_id:string; command_id:string; native_turn_id:string|null; state:string; reported_call_id:string|null; created_at:string; }
 /** Global coordinator only routes work. Existing session commands enforce permissions and project exclusivity. */
 export class PanelVoiceService {
-  constructor(private db:ControlPlaneDatabase,private registry:RegistryService,private coordination:CoordinationService,private progress=new SessionProgressService(db,registry)) {}
+  readonly memory:VoiceTaskStore;
+  private memoryCursor=0;
+  constructor(private db:ControlPlaneDatabase,private registry:RegistryService,private coordination:CoordinationService,private progress=new SessionProgressService(db,registry)) {this.memory=new VoiceTaskStore(db,registry);}
+  syncSessionMemory(sessionId:string) {
+    for(const job of this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE session_id=?",sessionId))this.refresh(job);
+  }
+  syncMemory(principal?:Principal) {
+    this.memory.purgeUnavailable();
+    const jobs=principal?this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE workspace_id=? AND user_id=?",principal.workspaceId,principal.userId)
+      :this.db.all<PanelJob&{rowid:number}>("SELECT j.rowid,j.* FROM panel_voice_jobs j JOIN panel_voice_task_records r USING(job_id) WHERE j.rowid>? AND (j.state NOT IN ('completed','failed','interrupted') OR r.result_json='{}') ORDER BY j.rowid LIMIT 100",this.memoryCursor);
+    for(const job of jobs)this.refresh(job);
+    if(!principal)this.memoryCursor=jobs.length===100?(jobs.at(-1) as PanelJob&{rowid:number}).rowid:0;
+  }
+  recover(principal:Principal,options:{cursor?:unknown;view?:unknown}={}) {this.syncMemory(principal);return this.memory.list(principal,options);}
+
   start(principal:Principal,machineId:string,binding:Record<string,unknown>) {
     const machine=this.registry.getMachine(principal,machineId);
     invariant(!machine.maintenance,409,"MACHINE_DRAINING","主机正在维护，等待安全重启；完成后才能开始新通话");
@@ -32,14 +47,14 @@ export class PanelVoiceService {
     this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.closeReason',?,'$.closeRequestedAt',?) WHERE voice_id=? AND json_extract(binding_json,'$.closeReason') IS NULL",code,nowIso(),id);
   }
   closeOrphans() {this.db.run("UPDATE panel_voice_calls SET state='closed' WHERE state<>'closed'");}
-  private own(principal:Principal,voiceId:string) {
+  private own(principal:Principal,voiceId:string,allowStarting=false) {
     const call=this.get(voiceId);
-    invariant(call && call.workspace_id===principal.workspaceId && call.user_id===principal.userId && call.owner_id===principal.clientSessionId && call.state==='active',403,"PANEL_VOICE_OWNER","总控通话已结束或无权操作");
+    invariant(call && call.workspace_id===principal.workspaceId && call.user_id===principal.userId && call.owner_id===principal.clientSessionId && (call.state==='active'||allowStarting&&call.state==='starting'),403,"PANEL_VOICE_OWNER","总控通话已结束或无权操作");
     this.registry.getMachine(principal,call.machine_id);
     return call;
   }
   private refresh(job:PanelJob):PanelJob {
-    if(["completed","failed","interrupted"].includes(job.state))return job;
+    if(["completed","failed","interrupted"].includes(job.state)){this.memory.capture(job);return job;}
     const command=this.db.get<{state:string}>("SELECT state FROM command_projection WHERE command_id=?",job.command_id);
     let state=job.state, turnId=job.native_turn_id;
     if(!turnId) turnId=this.db.get<{native_turn_id:string}>("SELECT native_turn_id FROM durable_events e JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.type='turn.started' AND json_extract(b.body_json,'$.commandId')=? ORDER BY session_seq LIMIT 1",job.session_id,job.command_id)?.native_turn_id??null;
@@ -57,7 +72,7 @@ export class PanelVoiceService {
       if(failure) state='failed';
     }
     this.db.run("UPDATE panel_voice_jobs SET state=?,native_turn_id=? WHERE job_id=?",state,turnId,job.job_id);
-    return {...job,state,native_turn_id:turnId};
+    const updated={...job,state,native_turn_id:turnId};this.memory.capture(updated);return updated;
   }
   private jobs(principal:Principal, scope: {sessionId?:string;voiceId?:string}) {
     const filter=scope.sessionId ? "session_id=?" : "voice_id=?";
@@ -74,6 +89,8 @@ export class PanelVoiceService {
   }
   describe(principal:Principal,job:PanelJob) {
     const session=this.registry.getSession(principal,job.session_id);
+    const stored=this.db.get<{todo_id:string;original_intent:string;content_epoch:number}>("SELECT todo_id,original_intent,content_epoch FROM panel_voice_task_records WHERE job_id=?",job.job_id);
+    const canReadContent=Boolean(this.db.get<{sync_content:number}>("SELECT sync_content FROM projects WHERE project_id=?",session.projectId)?.sync_content && (!stored||stored.content_epoch===session.contentEpoch));
     let result='';
     const terminal=['completed','failed','interrupted'].includes(job.state);
     const command=this.db.get<{state:string}>("SELECT state FROM command_projection WHERE command_id=?",job.command_id);
@@ -81,7 +98,7 @@ export class PanelVoiceService {
       AND (json_extract(detail_json,'$.error') IS NOT NULL OR json_extract(detail_json,'$.code') IS NOT NULL)
       ORDER BY lifecycle_id DESC LIMIT 1`,job.command_id);
     const detail=JSON.parse(failure?.detail_json??'{}');
-    const end=job.native_turn_id?this.db.get<{body_json:string|null}>("SELECT b.body_json FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type IN ('turn.completed','turn.failed','turn.interrupted') AND e.payload_state='present' AND b.deleted_at IS NULL ORDER BY session_seq DESC LIMIT 1",job.session_id,job.native_turn_id):undefined;
+    const end=canReadContent&&job.native_turn_id?this.db.get<{body_json:string|null}>("SELECT b.body_json FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type IN ('turn.completed','turn.failed','turn.interrupted') AND e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY session_seq DESC LIMIT 1",job.session_id,job.native_turn_id):undefined;
     const nativeError=JSON.parse(end?.body_json??'{}').turn?.error;
     const source=nativeError??detail.error??detail;
     const error=(job.state==='failed'||job.state==='interrupted')&&typeof source.code==='string'
@@ -90,19 +107,55 @@ export class PanelVoiceService {
         ? {code:'TASK_FAILED',message:source.message} : null;
     // Missing turn evidence is not proof that execution never began (timeouts/unknown outcomes).
     const executionStarted=job.native_turn_id?true:error?.code==='MACHINE_DRAINING'?false:null;
-    const historyLimited=Boolean(job.native_turn_id&&terminal&&this.db.get(`SELECT 1 FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref)
+    const historyLimited=Boolean(job.native_turn_id&&terminal&&(!canReadContent||this.db.get(`SELECT 1 FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref)
       WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type IN ('item.completed','turn.completed')
-      AND (e.payload_state<>'present' OR b.payload_ref IS NULL OR b.deleted_at IS NOT NULL) LIMIT 1`,job.session_id,job.native_turn_id));
-    if(job.native_turn_id && ['completed','failed','interrupted'].includes(job.state)) {
-      const rows=this.db.all<{body_json:string}>("SELECT b.body_json FROM durable_events e JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type='item.completed' AND e.payload_state='present' AND b.deleted_at IS NULL ORDER BY e.session_seq DESC LIMIT 30",job.session_id,job.native_turn_id);
+      AND (e.payload_state<>'present' OR b.payload_ref IS NULL OR b.deleted_at IS NOT NULL) LIMIT 1`,job.session_id,job.native_turn_id)));
+    if(canReadContent && job.native_turn_id && ['completed','failed','interrupted'].includes(job.state)) {
+      const rows=this.db.all<{body_json:string}>("SELECT b.body_json FROM durable_events e JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type='item.completed' AND e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY e.session_seq DESC LIMIT 30",job.session_id,job.native_turn_id);
       for(const row of rows) {const p=JSON.parse(row.body_json);const item=p.item;if(item?.type==='agentMessage'&&typeof item.text==='string'){result=item.text.slice(-6000);break;}}
     }
-    return {jobId:job.job_id,commandId:job.command_id,nativeTurnId:job.native_turn_id,sessionId:job.session_id,title:session.title,projectId:session.projectId,machineId:session.machineId,project:session.projectAlias,host:this.registry.getMachine(principal,session.machineId).name,state:job.state,progress:this.progress.read(principal,job.session_id,job.native_turn_id),result,historyLimited,error,executionStarted,commandState:command?.state??null,resultStatus:result?'available':executionStarted===false?'not_started':historyLimited?'history_unavailable':terminal?'no_output':'pending',link:`/sessions/${job.session_id}`};
+    return {todoId:stored?.todo_id??null,originalIntent:stored?.original_intent??null,jobId:job.job_id,commandId:job.command_id,nativeTurnId:job.native_turn_id,sessionId:job.session_id,title:session.title,projectId:session.projectId,machineId:session.machineId,project:session.projectAlias,host:this.registry.getMachine(principal,session.machineId).name,state:job.state,progress:this.progress.read(principal,job.session_id,job.native_turn_id),result,historyLimited,error,executionStarted,commandState:command?.state??null,resultStatus:result?'available':executionStarted===false?'not_started':historyLimited?'history_unavailable':terminal?'no_output':'pending',link:`/sessions/${job.session_id}`};
   }
   tool(principal:Principal,voiceId:string,requestId:string,input:unknown) {
-    this.own(principal,voiceId);
     invariant(typeof input==='object'&&input!==null&&!Array.isArray(input),400,"PANEL_INPUT","Invalid tool input");
     const args=input as Record<string,unknown>;
+    this.own(principal,voiceId,args.action==='recover');
+    if(args.action==='recover')return this.recover(principal,{cursor:args.cursor,view:args.view});
+    if(args.action==='todo.save') {
+      const key=typeof args.idempotencyKey==='string'?args.idempotencyKey:`${voiceId}:${hashPayload({intent:args.intent,sessionId:args.sessionId??null})}`;
+      return this.memory.describe(principal,this.memory.save(principal,{intent:args.intent,sessionId:args.sessionId,key},voiceId));
+    }
+    if(args.action==='todo.update') {
+      invariant(typeof args.todoId==='string',400,'VOICE_TODO_INPUT','需要待办标识');
+      return this.memory.describe(principal,this.memory.update(principal,args.todoId,args));
+    }
+    if(args.action==='acknowledge') {
+      invariant(typeof args.todoId==='string'&&args.confirmed===true,400,'VOICE_RESULT_CONFIRM','请在用户确认已知悉结果后标记');
+      this.syncMemory(principal);return this.memory.acknowledge(principal,args.todoId);
+    }
+    invariant(args.todoId===undefined||typeof args.todoId==='string'&&args.todoId.length>0,400,'VOICE_TODO_INPUT','待办标识无效');
+    let todo=typeof args.todoId==='string'?this.memory.get(principal,args.todoId):undefined;
+    if(args.action==='status'&&todo) {
+      const linked=this.memory.linkedJob(todo.todo_id);
+      invariant((args.sessionId===undefined||args.sessionId===todo.session_id)&&(args.jobId===undefined||args.jobId===linked?.job_id),404,'PANEL_JOB_NOT_FOUND','该待办范围内没有此任务');
+      if(linked){const job=this.db.get<PanelJob>('SELECT * FROM panel_voice_jobs WHERE job_id=?',linked.job_id)!;return {...this.describe(principal,this.refresh(job)),scope:'todo'};}
+      return {...this.memory.describe(principal,todo),scope:'todo'};
+    }
+
+    if(args.action==='dispatch'&&todo) {
+      const linked=this.memory.linkedJob(todo.todo_id);
+      if(linked) {
+        invariant((args.sessionId===undefined||args.sessionId===linked.session_id)&&(args.prompt===undefined||args.prompt===linked.dispatch_prompt),409,'VOICE_TODO_LINKED','此待办已关联其他派发内容，请查询原任务');
+        const job=this.db.get<PanelJob>('SELECT * FROM panel_voice_jobs WHERE job_id=?',linked.job_id)!;
+        return {...this.describe(principal,this.refresh(job)),duplicate:true};
+      }
+      invariant(todo.state==='pending',409,'VOICE_TODO_CANCELLED','该待办已取消，不能派发');
+      invariant(args.confirmed===true,409,'VOICE_DISPATCH_CONFIRM','恢复记录不是执行授权；需要当前用户明确确认后派发');
+      invariant(args.revision===todo.revision,409,'VOICE_TODO_STALE','待办已变化，请重新读取并确认');
+      if(todo.session_id)invariant(args.sessionId===undefined||args.sessionId===todo.session_id,409,'VOICE_TODO_TARGET','目标不同，请先修改待办并重新确认');
+      args.sessionId=args.sessionId??todo.session_id;args.prompt=args.prompt??todo.intent;
+    }
+
     if(args.action==='search') {
       invariant(typeof args.query==='string'&&args.query.length<=200,400,"PANEL_QUERY","请提供主机、项目或会话关键词");
       const page=this.registry.listSessionsPage(principal,{q:args.query,limit:20,managed:true,...(typeof args.cursor==='string'?{cursor:args.cursor}:{})});
@@ -136,6 +189,10 @@ export class PanelVoiceService {
       return this.describe(principal,this.refresh(previous));
     }
     const session=this.registry.getSession(principal,String(args.sessionId));
+    // Legacy immediate dispatch still records intent before admission; a rejected start stays a pending todo.
+    todo=todo??this.memory.save(principal,{intent:args.prompt,sessionId:session.logicalSessionId,key:`dispatch:${voiceId}:${requestId}`},voiceId);
+    invariant(todo.state==='pending',409,'VOICE_TODO_CANCELLED','该待办已取消，不能派发');
+    if(args.todoId===undefined)invariant(todo.intent===args.prompt&&todo.session_id===session.logicalSessionId,409,'VOICE_TODO_STALE','待办已修改，请读取最新版本并确认');
     const competing=this.db.all<PanelJob>(`SELECT j.* FROM panel_voice_jobs j JOIN logical_sessions s ON s.logical_session_id=j.session_id
       WHERE j.workspace_id=? AND s.project_id=? AND j.state NOT IN ('completed','failed','interrupted')`,principal.workspaceId,session.projectId)
       .map(job=>this.refresh(job)).find(job=>!['completed','failed','interrupted'].includes(job.state));
@@ -147,7 +204,9 @@ export class PanelVoiceService {
     const command=this.coordination.createCommand(principal,session.logicalSessionId,{type:'turn.start',controlLeaseId:lease.leaseId,clientMutationId:`panel-${voiceId}-${requestId}`.slice(0,200),payload:{prompt:args.prompt},precondition:{executionSegmentId:session.executionSegmentId,threadControlVersion:session.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:session.projectLeaseVersion}},true).command;
     const jobId=newId('pjob');
     this.db.run("INSERT INTO panel_voice_jobs VALUES(?,?,?,?,?,?,?,NULL,'submitted',NULL,?)",jobId,principal.userId,principal.workspaceId,voiceId,requestId,session.logicalSessionId,String(command.commandId),nowIso());
-    return this.describe(principal,this.db.get<PanelJob>("SELECT * FROM panel_voice_jobs WHERE job_id=?",jobId)!);
+    const inserted=this.db.get<PanelJob>("SELECT * FROM panel_voice_jobs WHERE job_id=?",jobId)!;
+    this.memory.link(todo!,inserted,session,args.prompt as string);
+    return this.describe(principal,inserted);
     });
   }
   private shouldAutoReport(job:PanelJob,voiceId:string) {

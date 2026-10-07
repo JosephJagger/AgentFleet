@@ -1457,3 +1457,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .runtime-progress li p { margin:4px 0; overflow-wrap:anywhere; white-space:pre-wrap; }
 .runtime-progress pre { max-height:140px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
 .panel-voice-control__task .runtime-progress { margin:0; }
+
+.voice-task-inbox { border-top: 1px solid var(--border); padding-top: 1rem; }
+.voice-task-inbox__records { max-height: 360px; overflow-y: auto; margin-block: .75rem; }
+.voice-task-inbox__records p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.voice-task-inbox__records small { overflow-wrap: anywhere; }
+.voice-task-inbox__pages { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }

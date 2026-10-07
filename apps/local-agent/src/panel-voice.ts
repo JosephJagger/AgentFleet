@@ -46,7 +46,7 @@ export class PanelVoiceRuntime {
         if (this.current?.id !== id || this.current.cancelled) throw new AgentError('VOICE_FENCED', 'Call ended');
         const requestId = randomUUID();
         return new Promise(resolve => {
-          const timer = setTimeout(() => { this.pending.delete(requestId); resolve({ error: 'Result unknown; query status before retrying dispatch.' }); }, 30000);
+          const timer = setTimeout(() => { this.pending.delete(requestId); resolve({ error: 'Result unknown; query status before retrying dispatch.' }); }, typeof args==='object'&&args!==null&&'action' in args&&args.action==='recover'&&!this.current?.threadId?5000:30000);
           this.pending.set(requestId, { resolve, timer });
           this.emit({ type: 'voice.event', voiceId: id, event: 'panel_tool', requestId, args });
         });

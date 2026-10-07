@@ -621,6 +621,16 @@ export interface RuntimeReleaseStatus {
 }
 
 export const api = {
+  async voiceTasks(view='recover',cursor?:string,signal?:AbortSignal):Promise<import('./types').VoiceTaskPage> {
+    const query=new URLSearchParams({view,...(cursor?{cursor}:{})});return request(`/api/voice-tasks?${query}`,{signal});
+  },
+  async cancelVoiceTodo(todoId:string,revision:number):Promise<import('./types').VoiceTaskRecord> {
+    return request(`/api/voice-tasks/${encodeURIComponent(todoId)}`,{method:'PATCH',body:JSON.stringify({revision,state:'cancelled'})});
+  },
+  async acknowledgeVoiceTodo(todoId:string):Promise<import('./types').VoiceTaskRecord> {
+    return request(`/api/voice-tasks/${encodeURIComponent(todoId)}/acknowledge`,{method:'POST',body:'{}'});
+  },
+
   scheduledTasks: (projectId?: string) => request<{tasks: import("./types").ScheduledTask[]}>(`/api/scheduled-tasks${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`),
   scheduledHistory: () => request<{runs:import("./types").ScheduledHistoryRun[]}>("/api/scheduled-runs"),
   scheduledTask: (id: string) => request<{task: import("./types").ScheduledTask; runs: import("./types").ScheduledRun[]}>(`/api/scheduled-tasks/${encodeURIComponent(id)}`),

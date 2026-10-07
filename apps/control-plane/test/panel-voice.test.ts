@@ -241,7 +241,7 @@ test('schema 49 migration preserves work and enables another host project after 
  let db=new ControlPlaneDatabase(path);
  db.sqlite.exec("DROP INDEX panel_voice_one_session_job; CREATE UNIQUE INDEX panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown'); PRAGMA user_version=49");db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,50);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,51);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_jobs')?.job_id,original.jobId);
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
  const registry=new RegistryService(db,config);const service=new PanelVoiceService(db,registry,new CoordinationService(db,config));
@@ -252,4 +252,98 @@ test('schema 49 migration preserves work and enables another host project after 
  assert.equal(result.machineId,'m2');assert.notEqual(result.jobId,original.jobId);
  assert.equal(service.poll(f.principal,f.call.voice_id).tasks.length,2);
  assert.equal(db.all('PRAGMA foreign_key_check').length,0);
+});
+
+test('pending voice intent survives hangup and recovery; dispatch requires confirmation and is unique across calls',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const save=()=>f.service.tool(f.principal,f.call.voice_id,'save-retry',{action:'todo.save',intent:'Develop the requested feature later',sessionId:f.session.logicalSessionId}) as {todoId:string;revision:number};
+ const todo=save();assert.equal(save().todoId,todo.todoId);assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
+ f.service.closeOrphans();const restarted=new PanelVoiceService(f.db,f.registry,f.coordination);
+ const call=restarted.start(f.principal,'m',{});
+ const before=f.db.get<{n:number}>('SELECT count(*) n FROM commands')!.n;
+ const restored=restarted.tool(f.principal,call.voice_id,'startup-read',{action:'recover'}) as {items:{todoId:string;state:string}[]};
+ assert.equal(restored.items[0]!.todoId,todo.todoId);assert.equal(restored.items[0]!.state,'pending');
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,before);
+ assert.throws(()=>restarted.tool(f.principal,call.voice_id,'bad-start',{action:'dispatch',todoId:todo.todoId,revision:todo.revision,confirmed:true}),/总控通话/);
+ restarted.state(call.voice_id,'active');
+ assert.equal((restarted.tool(f.principal,call.voice_id,'todo-status',{action:'status',todoId:todo.todoId}) as {todoId:string}).todoId,todo.todoId);
+ assert.throws(()=>restarted.tool(f.principal,call.voice_id,'no-consent',{action:'dispatch',todoId:todo.todoId,revision:todo.revision}),/明确确认/);
+ const sent=restarted.tool(f.principal,call.voice_id,'confirmed',{action:'dispatch',todoId:todo.todoId,revision:todo.revision,confirmed:true}) as {jobId:string;todoId:string};
+ assert.equal(sent.todoId,todo.todoId);restarted.state(call.voice_id,'closed');
+ const third=restarted.start(f.principal,'m',{});restarted.state(third.voice_id,'active');
+ const retry=restarted.tool(f.principal,third.voice_id,'different-request',{action:'dispatch',todoId:todo.todoId}) as {jobId:string;duplicate:boolean};
+ assert.equal(retry.jobId,sent.jobId);assert.equal(retry.duplicate,true);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,1);
+ assert.equal(restarted.poll(f.principal,third.voice_id).report,null);
+ assert.throws(()=>restarted.memory.get({...f.principal,userId:'someone-else'},todo.todoId),/没有此/);
+ assert.equal(restarted.recover({...f.principal,userId:'someone-else'}).total,0);
+});
+
+test('pending todo edits use revisions, cancellations cannot dispatch, and failed command insertion leaves a recoverable todo',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const todo=f.service.memory.save(f.principal,{intent:'Draft a feature',key:'stable-key'});
+ assert.throws(()=>f.service.memory.save(f.principal,{intent:'Different feature',key:'stable-key'}),/不同内容/);
+ const updated=f.service.memory.update(f.principal,todo.todo_id,{revision:1,intent:'Draft clarified feature',sessionId:f.session.logicalSessionId});
+ assert.throws(()=>f.service.memory.update(f.principal,todo.todo_id,{revision:1,state:'cancelled'}),/已变化/);
+ f.db.sqlite.exec("CREATE TRIGGER reject_memory_job BEFORE INSERT ON panel_voice_jobs BEGIN SELECT RAISE(ABORT,'test failure'); END;");
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'dispatch',{action:'dispatch',todoId:todo.todo_id,revision:updated.revision,confirmed:true}),/test failure/);
+ assert.equal(f.service.memory.get(f.principal,todo.todo_id).state,'pending');
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM panel_voice_task_records')?.n,0);
+ f.service.memory.update(f.principal,todo.todo_id,{revision:updated.revision,state:'cancelled'});
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'dispatch-again',{action:'dispatch',todoId:todo.todo_id,revision:3,confirmed:true}),/取消/);
+ assert.equal(f.service.recover(f.principal).total,0);assert.equal(f.service.recover(f.principal,{view:'all'}).total,1);
+});
+
+test('results persist after call closure; recovery does not acknowledge, speak or dispatch; deleted output never resurrects',t=>{
+ const f=fixture();t.after(()=>f.db.close());const task=f.dispatch() as {jobId:string;todoId:string};
+ const job=f.service.current(f.principal)!;f.service.closeOrphans();
+ const at=new Date().toISOString();
+ for(const [seq,type,body] of [[1,'turn.started',{commandId:job.command_id}],[2,'item.completed',{item:{type:'agentMessage',text:'Verified task result'}}],[3,'turn.completed',{turn:{status:'completed'}}]] as const){
+  f.db.run('INSERT INTO content_blobs VALUES(?,?,?,?,?,?,NULL)',`memory-${seq}`,f.principal.workspaceId,JSON.stringify(body),'hash',at,'9999-12-31T00:00:00Z');
+  f.db.run(`INSERT INTO durable_events(event_id,payload_hash,source_kind,workspace_id,logical_session_id,execution_segment_id,machine_id,project_id,session_seq,projection_epoch,native_thread_id,native_turn_id,type,schema_version,occurred_at,received_at,payload_ref,payload_state)
+   VALUES(?,'hash','agent',?,?,?,'m','p',?,1,'thread','memory-turn',?,'1',?,?,?,'present')`,`memory-event-${seq}`,f.principal.workspaceId,f.session.logicalSessionId,f.session.executionSegmentId,seq,type,at,at,`memory-${seq}`);
+ }
+ f.service.syncMemory();
+ assert.match(f.db.get<{result_json:string}>('SELECT result_json FROM panel_voice_task_records WHERE job_id=?',task.jobId)!.result_json,/Verified task result/);
+ const call=f.service.start(f.principal,'m',{});f.service.state(call.voice_id,'active');
+ const recovered=f.service.recover(f.principal).items[0]!;assert.equal(recovered.job!.result,'Verified task result');assert.equal(recovered.job!.acknowledgedAt,null);
+ assert.equal(f.service.report(f.principal,call.voice_id),null);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,1);
+ assert.throws(()=>f.service.tool(f.principal,call.voice_id,'ack',{action:'acknowledge',todoId:task.todoId}),/用户确认/);
+ f.service.tool(f.principal,call.voice_id,'ack',{action:'acknowledge',todoId:task.todoId,confirmed:true});assert.equal(f.service.recover(f.principal).total,0);
+ assert.equal(f.service.recover(f.principal,{view:'all'}).items[0]!.job!.result,'Verified task result');
+ f.db.run("UPDATE content_blobs SET deleted_at=? WHERE payload_ref='memory-2'",at);
+ assert.equal(f.service.recover(f.principal,{view:'all'}).items[0]!.job!.result,'');
+ assert.doesNotMatch(f.db.get<{result_json:string}>('SELECT result_json FROM panel_voice_task_records WHERE job_id=?',task.jobId)!.result_json,/Verified task result/);
+});
+
+test('schema 50 backfills existing jobs without execution and recovery paginates unbound pending intents',t=>{
+ const f=fixture();t.after(()=>f.db.close());const old=f.dispatch() as {jobId:string};
+ const dir=mkdtempSync(join(tmpdir(),'voice-memory-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'test.sqlite');
+ f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
+ let db=new ControlPlaneDatabase(path);db.sqlite.exec('DROP TABLE panel_voice_task_records; DROP TABLE panel_voice_todos; PRAGMA user_version=50');db.close();
+ db=new ControlPlaneDatabase(path);t.after(()=>db.close());
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,51);
+ assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_task_records')?.job_id,old.jobId);
+ assert.equal(db.get<{original_intent:string}>('SELECT original_intent FROM panel_voice_task_records')?.original_intent,'Read project status');
+ const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
+ const registry=new RegistryService(db,config),service=new PanelVoiceService(db,registry,new CoordinationService(db,config));
+ for(let i=0;i<25;i++)service.memory.save(f.principal,{intent:`Deferred task ${i}`,key:`intent-${i}`});
+ const first=service.recover(f.principal);assert.equal(first.items.length,20);assert.equal(first.total,26);
+ const second=service.recover(f.principal,{cursor:first.nextCursor});assert.equal(second.items.length,6);
+ assert.equal(new Set([...first.items,...second.items].map(item=>item.todoId)).size,26);
+ assert.equal(db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,1);
+ assert.equal(db.all('PRAGMA foreign_key_check').length,0);
+});
+
+test('cancelled intent from an unsuccessful legacy dispatch cannot be resurrected by retrying the original request',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.db.run("UPDATE machines SET maintenance_json=? WHERE machine_id='m'",JSON.stringify({operationId:'safe-update',startedAt:new Date().toISOString()}));
+ assert.throws(()=>f.dispatch());
+ const todo=f.service.recover(f.principal).items[0]!;assert.equal(todo.state,'pending');
+ f.service.memory.update(f.principal,todo.todoId,{revision:todo.revision,state:'cancelled'});
+ f.db.run("UPDATE machines SET maintenance_json=NULL WHERE machine_id='m'");
+ assert.throws(()=>f.dispatch(),/取消/);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
 });
