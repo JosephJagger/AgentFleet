@@ -72,6 +72,10 @@ export class SessionAppServer implements AppServerClient {
   readPluginSkill(reference: { name: string; path: string }) { return this.catalog.readPluginSkill!(reference); }
   listThreads() { return this.catalog.listThreads(); }
   listThreadPage(cursor: string | null, options?: { useStateDbOnly: boolean }) { return this.catalog.listThreadPage!(cursor, options); }
+  readConversation(id:string,cursor:string|null) {
+    if(!this.catalog.readConversation)throw new AgentError('HISTORY_UNSUPPORTED','Native conversation reading is unavailable');
+    return this.catalog.readConversation(id,cursor);
+  }
   readTurnOutcome(id: string, turnId: string) { return this.catalog.readTurnOutcome!(id, turnId); }
   readThread(id: string, metadataOnly?: boolean) { return (this.writers.get(id)?.client ?? this.catalog).readThread(id, metadataOnly); }
   readHistoryPage(id: string, cursor: string | null) {

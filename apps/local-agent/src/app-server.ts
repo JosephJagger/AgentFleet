@@ -1,3 +1,5 @@
+import { serializePanelToolResult } from "./panel-voice-tools.js";
+import { readConversation, type ConversationPage } from "./conversation-history.js";
 import { WorkspaceTerminals } from "./workspace-terminals.js";
 import { parseRealtimeVoice } from "./voice-options.js";
 import { PANEL_VOICE_TOOL, PANEL_VOICE_INSTRUCTIONS, PANEL_REALTIME_PROMPT } from "./panel-voice-tools.js";
@@ -212,6 +214,7 @@ export interface AppServerClient {
   listThreads(): Promise<DiscoveredThreadSummary[]>;
   listThreadPage?(cursor: string | null, options?: { useStateDbOnly: boolean }): Promise<ThreadListPage>;
   readThread(threadId: string, metadataOnly?: boolean): Promise<ThreadHistorySnapshot>;
+  readConversation?(threadId:string,cursor:string|null):Promise<ConversationPage>;
   readHistoryPage?(threadId: string, cursor: string | null): Promise<ThreadHistoryPage>;
   readTurnOutcome?(threadId: string, turnId: string): Promise<{ cwd: string; status: string } | null>;
   resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile?: PermissionProfile, metadataOnly?: boolean, realtime?: boolean): Promise<ThreadResumeResult>;
@@ -860,6 +863,19 @@ export class CodexAppServer implements AppServerClient {
     return {...snapshot, ...(metadataOnly ? {paged:true} : {})};
   }
 
+  async readConversation(threadId:string,cursor:string|null):Promise<ConversationPage> {
+    this.assertInitialized();
+    try {return await readConversation((method,params)=>this.request(method,params),threadId,cursor);}
+    catch(error) {
+      if(error instanceof AgentError&&error.code==='APP_SERVER_RPC_ERROR') {
+        if(/method not found|unknown method|unsupported|not supported/i.test(error.message))throw new AgentError('HISTORY_UNSUPPORTED','Native history method unsupported');
+        if(/thread.*not found|no rollout found|does not exist|no such file/i.test(error.message))throw new AgentError('HISTORY_NOT_FOUND','Native history no longer available');
+        if(/permission denied|access denied|forbidden/i.test(error.message))throw new AgentError('HISTORY_FORBIDDEN','Native history access denied');
+      }
+      throw error;
+    }
+  }
+
   async readHistoryPage(threadId: string, cursor: string | null): Promise<ThreadHistoryPage> {
     this.assertInitialized();
     const raw = resultObject(await this.request("thread/items/list", {threadId,cursor,limit:100,sortDirection:"asc"}),"thread/items/list");
@@ -1183,7 +1199,7 @@ export class CodexAppServer implements AppServerClient {
       if (message.method === "item/tool/call") {
         if (this.panelThreadId && params.threadId===this.panelThreadId && params.tool===PANEL_VOICE_TOOL.name && !params.namespace && this.callbacks.onPanelTool) {
           let value:unknown;try {value=await this.callbacks.onPanelTool(params.arguments);}catch {value={error:"Panel request failed; query status before retrying."};}
-          await this.writeLine({id:requestId,result:{success:true,contentItems:[{type:"inputText",text:JSON.stringify(value).slice(0,24000)}]}});return;
+          await this.writeLine({id:requestId,result:{success:true,contentItems:[{type:"inputText",text:serializePanelToolResult(value,isRecord(params.arguments)&&params.arguments.action==='history')}]}});return;
         }
         const thread = typeof params.threadId === "string" ? this.callbacks.findManagedThread(params.threadId) : undefined;
         const granted = typeof params.turnId === "string" && thread?.policyVerified && thread.nativeThreadId === params.threadId && thread.appServerEpoch === this.appServerEpoch && params.tool === REFERENCE_TOOL.name && !params.namespace && (params.turnId === thread.activeTurnId || params.turnId === this.referenceTurns.get(thread.nativeThreadId));

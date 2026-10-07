@@ -306,6 +306,13 @@ export class RelayConnection {
       return;
     }
     switch (value.type) {
+      case "session.history.read": {
+        if(!this.reconciliationReady)return;
+        const source=this.socket;
+        void this.runtime.readSessionConversation(value).then(result=>{if(this.socket===source)this.send({type:'session.history.result',requestId:value.requestId,result});}).catch(error=>{if(this.socket===source)this.send({type:'session.history.result',requestId:value.requestId,error:{code:error instanceof AgentError?error.code:'HISTORY_READ_FAILED',message:'Native history read failed'}});});
+        return;
+      }
+
       case "voice.control": {
         if(!this.reconciliationReady) return;
         const source=this.socket;

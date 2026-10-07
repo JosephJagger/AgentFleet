@@ -1,3 +1,4 @@
+import type { SessionHistoryService } from './session-history.js';
 import { assertVoiceAdmission } from "./voice-deployment.js";
 import { VoiceTaskStore } from "./voice-task-store.js";
 import { SessionProgressService } from "./session-progress.js";
@@ -14,7 +15,14 @@ interface PanelJob { job_id:string; user_id:string; workspace_id:string; voice_i
 export class PanelVoiceService {
   readonly memory:VoiceTaskStore;
   private memoryCursor=0;
-  constructor(private db:ControlPlaneDatabase,private registry:RegistryService,private coordination:CoordinationService,private progress=new SessionProgressService(db,registry)) {this.memory=new VoiceTaskStore(db,registry);}
+  constructor(private db:ControlPlaneDatabase,private registry:RegistryService,private coordination:CoordinationService,private progress=new SessionProgressService(db,registry),private historyService?:SessionHistoryService) {this.memory=new VoiceTaskStore(db,registry);}
+  async history(principal:Principal,voiceId:string,input:Record<string,unknown>) {
+    this.own(principal,voiceId);
+    invariant(this.historyService,409,'HISTORY_UNSUPPORTED','会话历史查询尚未接通');
+    const result=await this.historyService.read(principal,input);
+    this.own(principal,voiceId);
+    return result;
+  }
   syncSessionMemory(sessionId:string) {
     for(const job of this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE session_id=?",sessionId))this.refresh(job);
   }

@@ -367,6 +367,26 @@ export class AgentRuntime {
   private readonly historySyncJobs = new Set<string>();
   private readonly imageMaintenanceSessions = new Set<string>();
 
+  async readSessionConversation(target:Record<string,unknown>):Promise<unknown> {
+    const server=this.appServer,id=requireString(target.nativeThreadId,'nativeThreadId',{maxLength:256});
+    const state=this.store.snapshot(),binding=state.nativeThreadBindings[id];
+    if(!this.canRead()||!server?.readConversation)throw new AgentError('HISTORY_UNSUPPORTED','Native history reader unavailable');
+    if(!binding||binding.codexProfileId!==this.support.codexProfile?.id||binding.logicalSessionId!==target.logicalSessionId||binding.executionSegmentId!==target.executionSegmentId||binding.contentEpoch!==target.contentEpoch||binding.projectId!==target.projectExternalId)throw new AgentError('HISTORY_TARGET_CHANGED','History session binding changed');
+    const project=state.projects.find(p=>p.id===binding.projectId);
+    if(!project||state.projectContentPolicies[binding.projectId]?.syncContent===false)throw new AgentError('HISTORY_CONTENT_DISABLED','Project content sharing disabled');
+    if(target.transportGeneration!==this.transportGeneration||target.producerEpoch!==this.producerEpoch||target.appServerEpoch!==this.getAppServerEpoch())throw new AgentError('HISTORY_TARGET_CHANGED','History connection changed');
+    if(target.cursor!==null&&(typeof target.cursor!=='string'||target.cursor.length>12000))throw new AgentError('HISTORY_CURSOR_INVALID','Invalid cursor');
+    const activity='history-'+String(target.requestId);this.store.setAuxiliaryActivity(activity,true);
+    try {
+      const page=await server.readConversation(id,target.cursor as string|null);
+      const current=this.store.snapshot().nativeThreadBindings[id];
+      if(this.appServer!==server||!current||canonicalJson(current)!==canonicalJson(binding)||this.store.snapshot().projectContentPolicies[binding.projectId]?.syncContent===false)throw new AgentError('HISTORY_TARGET_CHANGED','History binding changed during read');
+      const expected=state.managedThreads[id]?.sessionCwd??state.discoveredThreads[id]?.sessionCwd??project.root;
+      if(page.nativeThreadId!==id||page.cwd!==expected)throw new AgentError('HISTORY_TARGET_CHANGED','Native history project changed');
+      return page;
+    } finally {this.store.setAuxiliaryActivity(activity,false);}
+  }
+
   async manageSessionImages(target: Record<string, unknown>, clean: boolean): Promise<Record<string, unknown>> {
     const server = this.appServer;
     const id = requireString(target.nativeThreadId, "nativeThreadId", { maxLength: 256 });
@@ -656,6 +676,7 @@ export class AgentRuntime {
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
         maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
         projectFiles: true,
+        conversationHistory: this.canRead() && Boolean(this.appServer?.readConversation),
         realtimeVoice: this.isWritable() && supportsNativeVoice(this.support.codexVersion),
         queue: this.isWritable(),
         steer: this.isWritable(),

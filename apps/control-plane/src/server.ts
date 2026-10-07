@@ -1,3 +1,5 @@
+import { SessionHistoryService } from './session-history.js';
+import { SessionHistoryBroker } from './session-history-broker.js';
 import { SessionProgressService } from "./session-progress.js";
 import { editQueuedPrompt } from "./queue-edit.js";
 import { reorderQueue } from "./queue-order.js";
@@ -62,6 +64,7 @@ interface AgentSocketState {
   dispatchPaused?: boolean;
   projectFiles?: boolean;
   realtimeVoice?: boolean;
+  conversationHistory?: boolean;
 }
 
 interface PendingProjectFile {
@@ -237,7 +240,14 @@ export async function buildControlPlane(
   const clients = new Map<string, Set<ClientSocketState>>();
   const nativeVoice = new NativeVoiceService(db,registry);
   const sessionProgress = new SessionProgressService(db,registry);
-  const panelVoice = new PanelVoiceService(db,registry,coordination,sessionProgress);
+  const historyBroker=new SessionHistoryBroker(machineId=>{
+    const state=agents.get(machineId);
+    if(!state?.reconciliationReady||!state.producerEpoch||!state.appServerEpoch)return undefined;
+    return {key:state.socket,generation:state.identity.transportGeneration,producerEpoch:state.producerEpoch,appServerEpoch:state.appServerEpoch,supported:state.conversationHistory===true,send:(value)=>sendJson(state.socket,value)};
+  });
+  const sessionHistory=new SessionHistoryService(db,registry,(binding,cursor)=>historyBroker.read(binding,cursor));
+  app.addHook('onClose',async()=>historyBroker.close());
+  const panelVoice = new PanelVoiceService(db,registry,coordination,sessionProgress,sessionHistory);
   panelVoice.closeOrphans();
   const panelOwners=new Map<string,{socket:WebSocket;token:string;lastSeen:number;lastPing:number}>();
   const sendPanel=(voiceId:string,action:string,extra:Record<string,unknown>={})=>{
@@ -1170,6 +1180,10 @@ export async function buildControlPlane(
     });
     return reply.send(stream);
   });
+  app.get('/api/sessions/:id/conversation-history',{preHandler:authenticate},async(request,reply)=>{
+    reply.header('cache-control','no-store');
+    return sessionHistory.read(request.principal as Principal,{...request.query as Record<string,unknown>,sessionId:routeId(request)});
+  });
   app.get("/api/sessions/:id/progress", { preHandler: authenticate }, async (request,reply) => {
     reply.header("cache-control","no-store");
     return sessionProgress.read(request.principal as Principal,routeId(request));
@@ -1580,10 +1594,12 @@ export async function buildControlPlane(
         if (closing) return;
         try {
           const message = record(parseWsMessage(data), "WebSocket message must be an object") as unknown as AgentToServerMessage;
+          if(message.type === "session.history.result"){historyBroker.receive(identity.machineId,socket,message);return;}
           if (message.type === "hello") {
             state.reconciliationReady = false;
             state.projectFiles = message.capabilities?.projectFiles === true;
             state.realtimeVoice = message.capabilities?.realtimeVoice === true;
+            state.conversationHistory = message.capabilities?.conversationHistory === true;
             delete state.reconciliationId;
             delete state.producerEpoch;
             delete state.appServerEpoch;
@@ -1751,16 +1767,17 @@ export async function buildControlPlane(
               if(message.event==='sdp'){invariant(call.state==='starting'&&validVoiceOffer(message.sdp),400,"VOICE_INVALID","Invalid voice answer");panelVoice.state(call.voice_id,'active');sendJson(owner.socket,{type:'answer',sdp:message.sdp});}
               else if(message.event==='reported'){if(typeof message.requestId==='string')panelVoice.acknowledgeReport(call.voice_id,message.requestId);}
               else if(message.event==='panel_tool'){
-                const requestId=requiredString(message.requestId,'requestId',80);let result:unknown;
+                const requestId=requiredString(message.requestId,'requestId',80);
+                void (async()=>{let result:unknown;
                 try {
-                  result=panelVoice.tool(principal,call.voice_id,requestId,message.args);
+                  result=(message.args as {action?:unknown})?.action==='history'?await panelVoice.history(principal,call.voice_id,record(message.args)):panelVoice.tool(principal,call.voice_id,requestId,message.args);
                   // A status/search request must never trigger command dispatch as a side effect.
                   if (['dispatch','steer'].includes(String((message.args as {action?:unknown})?.action))) {
                     const task=result as {sessionId?:string};
                     if(task.sessionId){const target=registry.getSession(principal,task.sessionId);dispatchPendingCommands(target.machineId,principal.workspaceId);broadcastSession(target.logicalSessionId,{type:"session.changed",logicalSessionId:target.logicalSessionId});}
                   }
                 }catch(error){result={error:error instanceof AppError?error.message:'请求未完成，请查询任务状态后再试',errorCode:error instanceof AppError?error.code:'PANEL_REQUEST_FAILED',...(error instanceof AppError?{details:error.details}:{}),executionStarted:error instanceof AppError&&error.code==='MACHINE_DRAINING'?false:null};}
-                sendPanel(call.voice_id,'tool.result',{requestId,result});
+                sendPanel(call.voice_id,'tool.result',{requestId,result});})();
               }
               else if(message.event==='transcript'){if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role)))sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final)});}
               else if(message.event==='error'){const code=panelVoice.recordFailure(call.voice_id,message.message);app.log.warn({voiceId:call.voice_id,machineId:identity.machineId,code},'Panel voice failed');sendJson(owner.socket,{type:'error',message:`总控语音连接失败（${code}），请重新连接`});stopPanel(call.voice_id);}
@@ -1880,6 +1897,7 @@ export async function buildControlPlane(
         }
       });
       socket.on("close", (_code: number, reason: Buffer) => {
+        historyBroker.disconnect(identity.machineId,socket);
         cancelMachineFiles(identity.machineId, identity.transportGeneration);
         if (agents.get(identity.machineId) === state) agents.delete(identity.machineId);
         if (closing) return;
