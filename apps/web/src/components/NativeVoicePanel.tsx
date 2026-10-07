@@ -9,7 +9,7 @@ import { t } from "../i18n";
 export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;state:string;result:string;link:string;progress?:SessionProgress;historyLimited?:boolean;executionStarted?:boolean|null;error?:{code:string;message:string}|null; }
 type Phase = "idle" | "connecting" | "connected" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
-export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask }: { globalMachineId?: string; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
+export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks }: { globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
   const [expanded, setExpanded] = useState(false);
   const control = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -67,7 +67,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     const attempt = generation.current;
     const current = () => attempt === generation.current;
     const fail = (reason: string, code = "CLIENT_START_FAILED") => { if (current()) { cleanup.current(code); setMessage(reason); setPhase("error"); setExpanded(true); } };
-    setExpanded(true); setPhase("connecting"); setMessage(""); setMuted(false); setPlayBlocked(false); setTranscript([]); setTaskPhase("idle"); onPanelTask?.(undefined);
+    setExpanded(true); setPhase("connecting"); setMessage(""); setMuted(false); setPlayBlocked(false); setTranscript([]); setTaskPhase("idle"); onPanelTask?.(undefined); onPanelTasks?.([]);
     activeCallback.current(true);
     resources.current.starting=true;
     try {
@@ -112,7 +112,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       socket.onmessage = event => {
         if (!current()) return;
         void (async () => {
-          const value = JSON.parse(String(event.data)) as { type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask };
+          const value = JSON.parse(String(event.data)) as { type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
           if (value.type === "ready" && !offerSent) {
             offerSent = true;
             socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
@@ -131,7 +131,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
           }
           else if (value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
           else if(value.type==="task_status_unavailable") setTaskPhase("unknown");
-          else if(value.type==="panel_task" && value.task) { onPanelTask?.(value.task); setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
+          else if(value.type==="panel_task") { const tasks=Array.isArray(value.tasks)?value.tasks:value.task?[value.task]:[]; onPanelTasks?.(tasks); onPanelTask?.(value.task); if(!value.task){setTaskPhase("idle");return;} setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
           else if (value.type === "error") fail(value.message ?? t("原生实时语音暂不可用"), "SERVER_ERROR");
           else if (value.type === "closed") { cleanup.current("NATIVE_CLOSED"); setPhase("idle"); }
         })().catch(() => fail(t("原生实时语音暂不可用"), "SIGNAL_INVALID"));

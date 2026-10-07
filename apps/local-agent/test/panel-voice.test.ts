@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { PANEL_VOICE_TOOL, PANEL_VOICE_INSTRUCTIONS, PANEL_REALTIME_PROMPT } from '../src/panel-voice-tools.js';
 import { PanelVoiceRuntime } from '../src/panel-voice.js';
 import { CodexAppServer, type AppServerCallbacks } from '../src/app-server.js';
 import type { StateStore } from '../src/store.js';
@@ -84,3 +85,12 @@ test('stop of a rejected start is acknowledged without stopping another call; un
   await runtime.stop('pvoice_unknown');assert.equal(events.length,n);
   await runtime.close();
 });
+
+ test('coordinator and realtime instructions allow cross-project concurrency with exact task queries',()=>{
+  assert.ok('jobId' in PANEL_VOICE_TOOL.inputSchema.properties);
+  assert.match(PANEL_VOICE_INSTRUCTIONS,/Different projects may run concurrently/);
+  assert.match(PANEL_VOICE_INSTRUCTIONS,/same project\/session/);
+  assert.match(PANEL_VOICE_INSTRUCTIONS,/query jobId/);
+  assert.match(PANEL_REALTIME_PROMPT,/Different projects may run concurrently/);
+  assert.doesNotMatch(PANEL_VOICE_INSTRUCTIONS+PANEL_REALTIME_PROMPT,/One outstanding task at a time|Only one dispatched/);
+ });

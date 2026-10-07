@@ -59,10 +59,17 @@ export class PanelVoiceService {
     this.db.run("UPDATE panel_voice_jobs SET state=?,native_turn_id=? WHERE job_id=?",state,turnId,job.job_id);
     return {...job,state,native_turn_id:turnId};
   }
+  private jobs(principal:Principal, scope: {sessionId?:string;voiceId?:string}) {
+    const filter=scope.sessionId ? "session_id=?" : "voice_id=?";
+    // Include every outstanding job, even if many newer jobs have finished.
+    return this.db.all<PanelJob>(`SELECT * FROM panel_voice_jobs WHERE user_id=? AND workspace_id=? AND ${filter}
+      AND (state NOT IN ('completed','failed','interrupted') OR job_id IN
+        (SELECT job_id FROM panel_voice_jobs WHERE user_id=? AND workspace_id=? AND ${filter} ORDER BY created_at DESC,rowid DESC LIMIT 20))
+      ORDER BY created_at DESC,rowid DESC`,principal.userId,principal.workspaceId,scope.sessionId??scope.voiceId??null,
+      principal.userId,principal.workspaceId,scope.sessionId??scope.voiceId??null).map(job=>this.refresh(job));
+  }
   current(principal:Principal, scope?: {sessionId?:string;voiceId?:string}) {
-    const filter=scope?.sessionId ? " AND session_id=?" : scope?.voiceId ? " AND voice_id=?" : "";
-    const value=scope?.sessionId??scope?.voiceId;
-    const jobs=this.db.all<PanelJob>(`SELECT * FROM panel_voice_jobs WHERE user_id=? AND workspace_id=?${filter} ORDER BY created_at DESC,rowid DESC LIMIT 20`,principal.userId,principal.workspaceId,...(value?[value]:[])).map(job=>this.refresh(job));
+    const jobs=scope?this.jobs(principal,scope):this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE user_id=? AND workspace_id=? ORDER BY created_at DESC,rowid DESC",principal.userId,principal.workspaceId).map(job=>this.refresh(job));
     return jobs.find(j=>!['completed','failed','interrupted'].includes(j.state))??jobs[0];
   }
   describe(principal:Principal,job:PanelJob) {
@@ -90,7 +97,7 @@ export class PanelVoiceService {
       const rows=this.db.all<{body_json:string}>("SELECT b.body_json FROM durable_events e JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type='item.completed' AND e.payload_state='present' AND b.deleted_at IS NULL ORDER BY e.session_seq DESC LIMIT 30",job.session_id,job.native_turn_id);
       for(const row of rows) {const p=JSON.parse(row.body_json);const item=p.item;if(item?.type==='agentMessage'&&typeof item.text==='string'){result=item.text.slice(-6000);break;}}
     }
-    return {jobId:job.job_id,commandId:job.command_id,nativeTurnId:job.native_turn_id,sessionId:job.session_id,title:session.title,project:session.projectAlias,host:this.registry.getMachine(principal,session.machineId).name,state:job.state,progress:this.progress.read(principal,job.session_id,job.native_turn_id),result,historyLimited,error,executionStarted,commandState:command?.state??null,resultStatus:result?'available':executionStarted===false?'not_started':historyLimited?'history_unavailable':terminal?'no_output':'pending',link:`/sessions/${job.session_id}`};
+    return {jobId:job.job_id,commandId:job.command_id,nativeTurnId:job.native_turn_id,sessionId:job.session_id,title:session.title,projectId:session.projectId,machineId:session.machineId,project:session.projectAlias,host:this.registry.getMachine(principal,session.machineId).name,state:job.state,progress:this.progress.read(principal,job.session_id,job.native_turn_id),result,historyLimited,error,executionStarted,commandState:command?.state??null,resultStatus:result?'available':executionStarted===false?'not_started':historyLimited?'history_unavailable':terminal?'no_output':'pending',link:`/sessions/${job.session_id}`};
   }
   tool(principal:Principal,voiceId:string,requestId:string,input:unknown) {
     this.own(principal,voiceId);
@@ -99,23 +106,40 @@ export class PanelVoiceService {
     if(args.action==='search') {
       invariant(typeof args.query==='string'&&args.query.length<=200,400,"PANEL_QUERY","请提供主机、项目或会话关键词");
       const page=this.registry.listSessionsPage(principal,{q:args.query,limit:20,managed:true,...(typeof args.cursor==='string'?{cursor:args.cursor}:{})});
-      return {sessions:page.items.map(s=>({id:s.logicalSessionId,title:s.title,host:this.registry.getMachine(principal,s.machineId).name,project:s.projectAlias,available:s.actions.start.allowed,unavailableReason:s.actions.start.allowed?null:{code:s.actions.start.reasonCode,message:s.actions.start.message}})),nextCursor:page.nextCursor,total:page.total,instruction:"If ambiguous, ask the user. Never guess a target."};
+      return {sessions:page.items.map(s=>({id:s.logicalSessionId,title:s.title,projectId:s.projectId,machineId:s.machineId,host:this.registry.getMachine(principal,s.machineId).name,project:s.projectAlias,available:s.actions.start.allowed,unavailableReason:s.actions.start.allowed?null:{code:s.actions.start.reasonCode,message:s.actions.start.message}})),nextCursor:page.nextCursor,total:page.total,instruction:"If ambiguous, ask the user. Never guess a target."};
     }
     if(args.action==='status') {
       invariant(args.sessionId===undefined||(typeof args.sessionId==='string'&&args.sessionId.trim().length>0),400,'PANEL_INPUT','sessionId 必须是非空字符串');
+      invariant(args.jobId===undefined||(typeof args.jobId==='string'&&args.jobId.trim().length>0),400,'PANEL_INPUT','jobId 必须是非空字符串');
       const sessionId=typeof args.sessionId==='string'?args.sessionId:undefined;
+      if(typeof args.jobId==='string') {
+        const job=this.db.get<PanelJob>("SELECT * FROM panel_voice_jobs WHERE job_id=? AND user_id=? AND workspace_id=?",args.jobId,principal.userId,principal.workspaceId);
+        invariant(job && (!sessionId||job.session_id===sessionId),404,'PANEL_JOB_NOT_FOUND','该范围内没有此任务');
+        return {...this.describe(principal,this.refresh(job)),scope:'job'};
+      }
+      if(!sessionId) {
+        const tasks=this.jobs(principal,{voiceId}).map(job=>this.describe(principal,job));
+        if(tasks.length>1)return {scope:'call',state:'multiple',tasks,activeCount:tasks.filter(task=>!['completed','failed','interrupted'].includes(task.state)).length,message:'不同项目可并行；查询特定任务请指定 jobId 或 sessionId'};
+      }
       if(sessionId) this.registry.getSession(principal,sessionId);
       const job=this.current(principal,sessionId?{sessionId}:{voiceId});
       const sessionProgress=sessionId?this.progress.read(principal,sessionId):undefined;
       return job?{...this.describe(principal,job),scope:sessionId?'session':'call',...(sessionProgress?{sessionProgress}:{})}
         :{state:sessionProgress?.nativeTurnId?sessionProgress.state:'idle',hasCoordinatorJob:false,sessionId:sessionId??null,scope:sessionId?'session':'call',...(sessionProgress?{sessionProgress}:{}),message:sessionId?'该会话没有总控派发的任务；当前会话进度见 sessionProgress':'本次通话没有已派发任务；查询其他任务请指定 sessionId'};
     }
-    const current=this.current(principal);
     invariant(args.action==='dispatch'&&typeof args.sessionId==='string'&&typeof args.prompt==='string'&&args.prompt.trim().length>0&&args.prompt.length<=20000,400,"PANEL_INPUT","目标会话和任务内容不能为空");
     const previous=this.db.get<PanelJob>("SELECT * FROM panel_voice_jobs WHERE voice_id=? AND request_id=?",voiceId,requestId);
-    if(previous)return this.describe(principal,this.refresh(previous));
-    invariant(!current||['completed','failed','interrupted'].includes(current.state),409,"PANEL_TASK_BUSY","总控已有任务，请先等待完成或在目标会话处理；不会重复派发",current?{jobId:current.job_id,sessionId:current.session_id}:undefined);
+    if(previous) {
+      invariant(previous.session_id===args.sessionId,409,'IDEMPOTENCY_KEY_REUSE','请求标识已用于其他会话');
+      const payload=this.db.get<{body_json:string}>("SELECT body_json FROM command_contents WHERE command_id=? AND deleted_at IS NULL",previous.command_id);
+      invariant(payload && JSON.parse(payload.body_json).prompt===args.prompt,409,'IDEMPOTENCY_KEY_REUSE','请求标识已使用且内容不同或已过期，请先查询原任务');
+      return this.describe(principal,this.refresh(previous));
+    }
     const session=this.registry.getSession(principal,String(args.sessionId));
+    const competing=this.db.all<PanelJob>(`SELECT j.* FROM panel_voice_jobs j JOIN logical_sessions s ON s.logical_session_id=j.session_id
+      WHERE j.workspace_id=? AND s.project_id=? AND j.state NOT IN ('completed','failed','interrupted')`,principal.workspaceId,session.projectId)
+      .map(job=>this.refresh(job)).find(job=>!['completed','failed','interrupted'].includes(job.state));
+    invariant(!competing,409,"PANEL_TASK_BUSY","该项目已有任务，请等待完成或在目标会话处理；其他项目仍可派发",competing?{jobId:competing.job_id,sessionId:competing.session_id,projectId:session.projectId}:undefined);
     invariant(session.managed&&session.actions.start.allowed,409,session.actions.start.reasonCode??"PANEL_TARGET_BUSY",session.actions.start.message??"目标会话不可执行，请选择已接管且空闲的会话");
     const lease=this.coordination.acquireLease(principal,session.logicalSessionId);
     return this.db.transaction(() => {
@@ -137,17 +161,20 @@ export class PanelVoiceService {
   poll(principal:Principal,voiceId:string) {
     this.own(principal,voiceId);
     try {
-      const job=this.current(principal,{voiceId});
-      const task=job?this.describe(principal,job):null;
-      const report=job&&task&&this.shouldAutoReport(job,voiceId)?{reportId:job.job_id,result:task}:null;
-      return {task,report,unavailable:false};
+      const tasks=this.jobs(principal,{voiceId}).map(job=>this.describe(principal,job));
+      const task=tasks.find(task=>!['completed','failed','interrupted'].includes(task.state))??tasks[0]??null;
+      const report=this.report(principal,voiceId);
+      return {task,tasks,report,unavailable:false};
     } catch {
       this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.taskStatusError','TASK_STATUS_UNAVAILABLE','$.taskStatusErrorAt',?) WHERE voice_id=?",nowIso(),voiceId);
-      return {task:null,report:null,unavailable:true};
+      return {task:null,tasks:[],report:null,unavailable:true};
     }
   }
   report(principal:Principal,voiceId:string) {
-    this.own(principal,voiceId);const job=this.current(principal,{voiceId});
+    this.own(principal,voiceId);
+    // Reports have their own queue: a running project must not starve completed projects.
+    const job=this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE user_id=? AND workspace_id=? AND voice_id=? AND reported_call_id IS NULL ORDER BY created_at,rowid",principal.userId,principal.workspaceId,voiceId)
+      .map(job=>this.refresh(job)).find(job=>this.shouldAutoReport(job,voiceId));
     if(!job)return null;
     const result=this.describe(principal,job);
     if(this.shouldAutoReport(job,voiceId)) return {result,reportId:job.job_id};

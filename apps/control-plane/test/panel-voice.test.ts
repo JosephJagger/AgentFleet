@@ -1,4 +1,7 @@
 import test from 'node:test';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import assert from 'node:assert/strict';
 import {ControlPlaneDatabase} from '../src/db.js';
 import {loadConfig} from '../src/config.js';
@@ -183,4 +186,70 @@ test('host rejection exposes its exact cause and does not claim missing history;
  const unknown=f.service.describe(f.principal,f.service.current(f.principal)!);
  assert.equal(unknown.executionStarted,null);assert.equal(unknown.historyLimited,false);
  assert.throws(()=>f.dispatch('retry'),/已有任务/);
+});
+
+function otherProject(f:ReturnType<typeof fixture>, id:string, machine='m') {
+ const at=new Date().toISOString();
+ f.db.run("INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,created_at,last_reported_at) VALUES(?,?,?,?,?,?,?,?,?)",id,f.principal.workspaceId,machine,id,`Project ${id}`,`/fixture/${id}`,`hash-${id}`,at,at);
+ return f.registry.createSession(f.principal,machine,id,`Session ${id}`,`fixture-${id}`);
+}
+test('distinct projects run concurrently; same project, uncertain outcomes and changed retry targets remain fenced',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const first=f.dispatch() as {jobId:string};
+ const second=otherProject(f,'other');
+ f.db.run("UPDATE command_projection SET state='unknown'");
+ const next=f.service.tool(f.principal,f.call.voice_id,'request-other',{action:'dispatch',sessionId:second.logicalSessionId,prompt:'Check other project'}) as {jobId:string;projectId:string};
+ assert.notEqual(next.jobId,first.jobId);assert.equal(next.projectId,'other');
+ const sameProject=f.registry.createSession(f.principal,'m','p','Another session','fixture-same-project');
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'same-project',{action:'dispatch',sessionId:sameProject.logicalSessionId,prompt:'Check'}),/该项目已有任务/);
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'request-one',{action:'dispatch',sessionId:second.logicalSessionId,prompt:'Read project status'}),/请求标识/);
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'request-one',{action:'dispatch',sessionId:f.session.logicalSessionId,prompt:'Changed instruction'}),/请求标识/);
+ assert.equal((f.dispatch() as {jobId:string}).jobId,first.jobId);
+ const all=f.service.tool(f.principal,f.call.voice_id,'status',{action:'status'}) as {tasks:{jobId:string}[];activeCount:number};
+ assert.equal(all.activeCount,2);assert.deepEqual(new Set(all.tasks.map(j=>j.jobId)),new Set([first.jobId,next.jobId]));
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'status',{action:'status',jobId:first.jobId,sessionId:second.logicalSessionId}),/没有此任务/);
+ const exact=f.service.tool(f.principal,f.call.voice_id,'status',{action:'status',jobId:next.jobId}) as {jobId:string;sessionId:string};
+ assert.equal(exact.jobId,next.jobId);assert.equal(exact.sessionId,second.logicalSessionId);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,2);
+ f.service.state(f.call.voice_id,'closed');const call=f.service.start(f.principal,'m',{});f.service.state(call.voice_id,'active');
+ assert.equal(f.service.poll(f.principal,call.voice_id).tasks.length,0);
+ assert.throws(()=>f.service.tool(f.principal,call.voice_id,'new-call',{action:'dispatch',sessionId:second.logicalSessionId,prompt:'Duplicate'}),/该项目已有任务/);
+});
+test('parallel results and progress remain turn-scoped; reports are independent of unfinished work and not lost after 20 jobs',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const a=f.dispatch() as {jobId:string};const second=otherProject(f,'other');
+ const b=f.service.tool(f.principal,f.call.voice_id,'request-other',{action:'dispatch',sessionId:second.logicalSessionId,prompt:'Check other'}) as {jobId:string};
+ f.db.run("UPDATE panel_voice_jobs SET native_turn_id='turn-a',state='running' WHERE job_id=?",a.jobId);
+ f.db.run("UPDATE panel_voice_jobs SET native_turn_id='turn-b',state='completed' WHERE job_id=?",b.jobId);
+ // Many newer completed jobs must not evict outstanding work or unreported results.
+ for(let i=0;i<25;i++) f.db.run("INSERT INTO panel_voice_jobs SELECT ?,user_id,workspace_id,voice_id,?,session_id,command_id,NULL,'completed',voice_id,'9999-01-01' FROM panel_voice_jobs WHERE job_id=?",`history-${i}`,`history-request-${i}`,b.jobId);
+ const poll=f.service.poll(f.principal,f.call.voice_id);
+ assert.ok(poll.tasks.some(j=>j.jobId===a.jobId&&j.progress.nativeTurnId==='turn-a'));
+ assert.equal(poll.report?.reportId,b.jobId);assert.equal(poll.report?.result.progress.nativeTurnId,'turn-b');
+ f.service.acknowledgeReport('wrong-call',b.jobId);assert.equal(f.service.report(f.principal,f.call.voice_id)?.reportId,b.jobId);
+ f.service.acknowledgeReport(f.call.voice_id,b.jobId);assert.equal(f.service.report(f.principal,f.call.voice_id),null);
+ assert.throws(()=>f.dispatch('repeat-old-active'),/该项目已有任务/);
+ f.db.run("UPDATE panel_voice_jobs SET state='interrupted' WHERE job_id=?",a.jobId);
+ assert.equal(f.service.report(f.principal,f.call.voice_id)?.reportId,a.jobId);
+ f.service.acknowledgeReport(f.call.voice_id,a.jobId);assert.equal(f.service.report(f.principal,f.call.voice_id),null);
+});
+
+test('schema 49 migration preserves work and enables another host project after reopening',t=>{
+ const f=fixture();t.after(()=>f.db.close());const original=f.dispatch() as {jobId:string};
+ const dir=mkdtempSync(join(tmpdir(),'panel-parallel-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'test.sqlite');
+ f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
+ let db=new ControlPlaneDatabase(path);
+ db.sqlite.exec("DROP INDEX panel_voice_one_session_job; CREATE UNIQUE INDEX panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown'); PRAGMA user_version=49");db.close();
+ db=new ControlPlaneDatabase(path);t.after(()=>db.close());
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,50);
+ assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_jobs')?.job_id,original.jobId);
+ const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
+ const registry=new RegistryService(db,config);const service=new PanelVoiceService(db,registry,new CoordinationService(db,config));
+ db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,agent_version,reachability,compatibility,command_types_json,last_heartbeat_at,created_at,updated_at)
+ SELECT 'm2',workspace_id,'key2','fingerprint2','Second host',platform,platform_release,architecture,agent_version,reachability,compatibility,command_types_json,last_heartbeat_at,created_at,updated_at FROM machines WHERE machine_id='m'`);
+ const second=otherProject({...f,db,registry},'remote','m2');
+ const result=service.tool(f.principal,f.call.voice_id,'remote-job',{action:'dispatch',sessionId:second.logicalSessionId,prompt:'Check remote project'}) as {machineId:string;jobId:string};
+ assert.equal(result.machineId,'m2');assert.notEqual(result.jobId,original.jobId);
+ assert.equal(service.poll(f.principal,f.call.voice_id).tasks.length,2);
+ assert.equal(db.all('PRAGMA foreign_key_check').length,0);
 });

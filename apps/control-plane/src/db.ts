@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 49) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 50) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1386,6 +1386,12 @@ export class ControlPlaneDatabase {
     if (version < 49) this.transaction(() => {
       if (!this.all<{name:string}>("PRAGMA table_info(machines)").some(column=>column.name==="maintenance_json")) this.sqlite.exec("ALTER TABLE machines ADD COLUMN maintenance_json TEXT");
       this.sqlite.exec("PRAGMA user_version=49");
+    });
+    if (version < 50) this.transaction(() => {
+      this.sqlite.exec("DROP INDEX IF EXISTS panel_voice_one_job");
+      this.sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS panel_voice_one_session_job ON panel_voice_jobs(session_id) WHERE state IN ('submitted','running','unknown')");
+      this.sqlite.exec("CREATE INDEX IF NOT EXISTS panel_voice_call_jobs ON panel_voice_jobs(voice_id,created_at)");
+      this.sqlite.exec("PRAGMA user_version=50");
     });
   }
 

@@ -220,6 +220,15 @@ it("panel control keeps the chosen voice host across dashboard refreshes and tar
   act(()=>socket.receive({type:'panel_task',task:{jobId:'job',sessionId:'target',title:'Target session',host:'Demo',project:'Demo',state:'running'}}));
   fireEvent.click(screen.getByRole('button',{name:'打开目标会话'}));
   expect(open).toHaveBeenCalledWith('target');expect(socket.readyState).toBe(1);
+  const first={jobId:'job',sessionId:'target',title:'Target session',host:'Demo',project:'Demo',state:'completed'};
+  const second={jobId:'job-two',sessionId:'target-two',title:'Second target',host:'Demo',project:'Other',state:'running'};
+  act(()=>socket.receive({type:'panel_task',task:second,tasks:[second,first]}));
+  expect(screen.getByText('Target session')).toBeTruthy();expect(screen.getByText('Second target')).toBeTruthy();
+  expect(screen.getAllByRole('button',{name:'打开目标会话'})).toHaveLength(2);
+  act(()=>socket.receive({type:'panel_task',task:second,tasks:[second,first]}));
+  expect(screen.getAllByRole('button',{name:'打开目标会话'})).toHaveLength(2);
+  expect(socket.readyState).toBe(1);expect(track.stop).not.toHaveBeenCalled();
+
 });
 
 it("panel task status failures and completion keep audio connected",async()=>{
