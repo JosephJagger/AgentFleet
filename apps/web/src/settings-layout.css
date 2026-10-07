@@ -217,3 +217,8 @@ dialog.modal.usage-dialog > .usage-body { flex: 1 1 auto; min-height: 0; overflo
 
 .codex-settings-panel.config-disclosure { padding: 0; }
 .codex-settings-panel.config-disclosure > .config-disclosure__body { margin: 0; }
+
+.project-tools-description { margin: 0 0 16px; color: var(--muted); line-height: 1.7; font-size: var(--text-small); }
+.project-tools-panel { min-width: 0; }
+.project-tools-panel .settings-sections { position: sticky; top: 0; background: var(--paper); z-index: 1; margin-top: 0; }
+.project-tools-panel .settings-sections > button { flex: 1; min-width: 0; justify-content: center; padding-inline: 8px; }

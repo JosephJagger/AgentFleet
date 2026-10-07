@@ -972,6 +972,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             </div>
           </div>
         <div className="inspector-head__actions">
+      {session.provider !== "claude" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span>{t("会话配置")}</span></button>
           <SessionActions>
             <button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(new URL(sessionPath(session.id), window.location.origin).href); setCommandMessage(t("已复制会话链接")); } catch { setCommandMessage(t("浏览器未允许复制会话链接")); } }}><Copy size={16} />{t("复制会话链接")}</button>
@@ -1036,7 +1037,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           ))}
         </section>
       )}
-      {session.provider !== "claude" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
+
       <SessionConfiguration key={`config:${draftOwner}:${session.id}`} request={configuration} title={session.title} onClose={() => setConfiguration(undefined)}>
         {configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />

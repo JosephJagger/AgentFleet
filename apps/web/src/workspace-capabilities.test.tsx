@@ -8,7 +8,9 @@ import type { CommandReceipt, FleetSession } from "./lib/types";
 vi.mock("./lib/api", () => ({ api: { command: vi.fn() } }));
 const session = { id: "s", nativeThreadId: "t", executionSegmentId: "e", threadControlVersion: 1, projectLeaseVersion: 1, actions: { manage: { allowed: true } } } as FleetSession;
 afterEach(cleanup);
-beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.command).mockResolvedValue({ command: { id: "read" } as CommandReceipt }); });
+beforeEach(() => {
+ HTMLDialogElement.prototype.showModal = function() { this.setAttribute("open", ""); };
+ HTMLDialogElement.prototype.close = function() { this.removeAttribute("open"); }; vi.clearAllMocks(); vi.mocked(api.command).mockResolvedValue({ command: { id: "read" } as CommandReceipt }); });
 it("refreshing an identical file receipt preserves unsaved edits", async () => {
  const props = { session, commands: [] as CommandReceipt[], onChanged: vi.fn() };
  const view = render(<ProjectFilesPanel {...props}/>);
@@ -24,7 +26,9 @@ it("refreshing an identical file receipt preserves unsaved edits", async () => {
 });
 it("workspace separates files, commands and integrations from session configuration", () => {
  render(<SessionWorkspace session={session} commands={[]} onChanged={vi.fn()}/>);
- fireEvent.click(screen.getByText("项目工作区", { selector: "summary" }));
+ expect(screen.queryByRole("dialog")).toBeNull();
+ fireEvent.click(screen.getByRole("button", {name:"项目工具"}));
+ expect(screen.getByRole("dialog", {name:"项目工具"})).toBeTruthy();
  expect(screen.getByRole("button", { name: "文件" })).toBeTruthy();
  fireEvent.click(screen.getByRole("button", { name: "集成" }));
  fireEvent.click(screen.getByText("项目集成", { selector: "summary > span" }));

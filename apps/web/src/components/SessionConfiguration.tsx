@@ -5,8 +5,8 @@ import { X } from "lucide-react";
 export type ConfigurationRequest = { section: "all" | "settings" | "permissions" | "tools" | "help"; nonce: number };
 
 /** Keep controls mounted when closed so configuration drafts survive dismissal. */
-export function SessionConfiguration({ request, title, onClose, children }: {
-  request?: ConfigurationRequest; title: string; onClose: () => void; children: ReactNode;
+export function SessionConfiguration({ request, title, onClose, children, heading = t("会话配置"), closeLabel = t("关闭会话配置") }: {
+  request?: ConfigurationRequest; title: string; onClose: () => void; children: ReactNode; heading?: string; closeLabel?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -26,12 +26,12 @@ export function SessionConfiguration({ request, title, onClose, children }: {
       if (guide) { guide.open = true; guide.scrollIntoView({ block: "nearest" }); }
     }
   }, [request]);
-  return <dialog ref={dialog} className="modal session-config-dialog" aria-label={t("会话配置")} onCancel={onClose} onClose={event => { if (!event.currentTarget.open) onClose(); }} onClick={event => {
+  return <dialog ref={dialog} className="modal session-config-dialog" aria-label={heading} onCancel={onClose} onClose={event => { if (!event.currentTarget.open) onClose(); }} onClick={event => {
     if (event.target !== event.currentTarget) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose();
   }}>
-    <header className="modal-head"><div><h2>{t("会话配置")}</h2><p>{title}</p></div><button type="button" className="icon-button" aria-label={t("关闭会话配置")} onClick={onClose} autoFocus><X size={18} /></button></header>
+    <header className="modal-head"><div><h2>{heading}</h2><p>{title}</p></div><button type="button" className="icon-button" aria-label={closeLabel} onClick={onClose} autoFocus><X size={18} /></button></header>
     <div className="session-config-body">{children}</div>
   </dialog>;
 }

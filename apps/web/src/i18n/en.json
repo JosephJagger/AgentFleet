@@ -3095,5 +3095,8 @@
   "稳定版": "Stable",
   "开发中（只读）": "Under development (read-only)",
   "已废弃（只读）": "Deprecated (read-only)",
-  "已移除（只读）": "Removed (read-only)"
+  "已移除（只读）": "Removed (read-only)",
+  "项目工具": "Project tools",
+  "关闭项目工具": "Close project tools",
+  "手动查看项目文件、执行命令，或查看会话历史与子代理。日常对话直接使用消息框即可。": "Browse project files, run commands, or view conversation history and subagents. Use the message box for everyday conversation."
 }
