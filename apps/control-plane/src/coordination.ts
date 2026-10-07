@@ -1,3 +1,4 @@
+import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
 import { parseOutputSchema } from "./output-schema.js";
 import { parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, sanitizeCodexResult, parseReviewTarget, parseForkRange } from "./codex-operations.js";
 import {ClaudePreferencesService} from "./claude-preferences.js";
@@ -85,6 +86,7 @@ interface SessionCommandRow {
   command_types_json: string | null;
   provider: string;
   runtime_read_only: number;
+  maintenance_json: string | null;
   machine_reachability: string;
   project_lease_version: number;
   execution_segment_id: string;
@@ -545,6 +547,7 @@ export class CoordinationService {
       }
 
       const session = this.commandSession(principal, logicalSessionId);
+      invariant(!blocksDuringMaintenance(session.maintenance_json,input.type),409,"MACHINE_DRAINING",MAINTENANCE_MESSAGE);
       if (session.provider !== "claude" && (input.type === "turn.start" || input.type === "turn.queue")) {
         const preferences = new CodexPreferencesService(this.db).read(principal, logicalSessionId);
         payload.resolvedMode = (payload.settings as {mode?: string} | undefined)?.mode ?? preferences.effective.mode;
@@ -955,7 +958,7 @@ export class CoordinationService {
 
   private commandSession(principal: Principal, logicalSessionId: string): SessionCommandRow {
     const row = this.db.get<SessionCommandRow>(
-      `SELECT s.*,m.security_state,m.identity_state,m.compatibility,m.agent_version,m.command_types_json,m.runtime_read_only,m.paginated_history,m.reachability AS machine_reachability,
+      `SELECT s.*,m.security_state,m.identity_state,m.compatibility,m.agent_version,m.command_types_json,m.runtime_read_only,m.maintenance_json,m.paginated_history,m.reachability AS machine_reachability,
         p.provider,p.lease_version AS project_lease_version,p.sync_content,p.retention_days,
         e.execution_segment_id,e.native_thread_id,e.history_mode
        FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id
@@ -1248,7 +1251,7 @@ export class CoordinationService {
   activateNextQueued(logicalSessionId: string): { commandId: string } | null {
     return this.db.transaction(() => {
       const session = this.db.get<SessionCommandRow>(
-        `SELECT s.*,m.security_state,m.identity_state,m.compatibility,m.agent_version,m.runtime_read_only,m.reachability AS machine_reachability,
+        `SELECT s.*,m.security_state,m.identity_state,m.compatibility,m.agent_version,m.runtime_read_only,m.maintenance_json,m.reachability AS machine_reachability,
           p.provider,p.lease_version AS project_lease_version,p.sync_content,p.retention_days,
           e.execution_segment_id,e.native_thread_id,e.history_mode
          FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id
@@ -1259,7 +1262,7 @@ export class CoordinationService {
       );
       if (!session || session.active_turn_id !== null || !["idle", "completed", "interrupted", "failed"].includes(session.execution_state) || session.managed !== 1 || session.reachability !== "live" ||
           session.identity_state !== "active" || session.security_state !== "normal" || session.compatibility !== "compatible" ||
-          session.machine_reachability !== "online" || session.runtime_read_only === 1) return null;
+          session.machine_reachability !== "online" || session.runtime_read_only === 1 || blocksDuringMaintenance(session.maintenance_json,"turn.start")) return null;
       if (this.db.get("SELECT 1 FROM project_turn_reservations WHERE project_id=?", session.project_id)) return null;
       if (this.pendingCodexMutation(session.machine_id) || this.db.get("SELECT 1 FROM voice_sessions WHERE project_id=? AND state<>'closed'",session.project_id)) return null;
       if (this.db.get("SELECT 1 FROM turn_queue WHERE logical_session_id=? AND state='unknown'", logicalSessionId)) return null;

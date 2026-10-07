@@ -349,7 +349,7 @@ test("v7 enrollment schema upgrades with explicit credential recovery fields", (
   });
   assert.equal(
     Number((upgraded.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    48,
+    49,
   );
   const columns = upgraded.all<{ name: string }>("PRAGMA table_info(enrollment_transactions)").map((column) => column.name);
   assert.ok(columns.includes("credential_id"));
@@ -503,7 +503,7 @@ test("v4 through v8 migration freezes a Project with multiple legacy active Sess
   });
   assert.equal(
     Number((upgraded.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    48,
+    49,
   );
   const reservation = upgraded.get<{
     state: string;
@@ -1087,6 +1087,19 @@ test("voice queues wait through native close reconciliation and activate only af
  db.run("UPDATE logical_sessions SET execution_state='running',active_turn_id='voice-turn'");
  assert.equal(service.activateNextQueued("queue-session"),null);
  db.run("UPDATE logical_sessions SET execution_state='completed',active_turn_id=NULL");
+ assert.ok(service.activateNextQueued("queue-session"));
+ assert.equal(service.activateNextQueued("queue-session"),null);
+});
+
+
+test("maintenance defers queued work without discarding or replaying it", t=>{
+ const db=new ControlPlaneDatabase(":memory:");t.after(()=>db.close());seedQueuedCommand(db);
+ const service=new CoordinationService(db,config(":memory:"));
+ db.run("UPDATE machines SET maintenance_json=?",JSON.stringify({operationId:"upgrade",startedAt:new Date().toISOString()}));
+ assert.equal(service.activateNextQueued("queue-session"),null);
+ assert.equal(db.get<{state:string}>("SELECT state FROM turn_queue")?.state,"queued");
+ assert.equal(db.get<{n:number}>("SELECT count(*) AS n FROM project_turn_reservations")?.n,0);
+ db.run("UPDATE machines SET maintenance_json='null'");
  assert.ok(service.activateNextQueued("queue-session"));
  assert.equal(service.activateNextQueued("queue-session"),null);
 });

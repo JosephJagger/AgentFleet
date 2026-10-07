@@ -298,7 +298,7 @@ function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPa
               <span className={`rail-node${transportConnected ? " rail-node--live" : ""}${live && (machine.capacity === "busy" || machine.capacity === "saturated") ? " rail-node--running" : ""}`}><Server size={15} /></span>
               <span className="machine-link__copy">
                 <strong>{machine.name}</strong>
-                <small>{live ? machine.capacity === "busy" || machine.capacity === "saturated" ? t("正在执行") : t("在线可用") : machine.reachability === "reconciling" ? t("正在同步") : machine.reachability === "reconnecting" ? t("正在重连") : t("不可达 · {0}", timeAgo(machine.lastSeenAt))}</small>
+                <small>{live ? machine.maintenance ? t("维护中 · 等待安全重启") : machine.capacity === "busy" || machine.capacity === "saturated" ? t("正在执行") : t("在线可用") : machine.reachability === "reconciling" ? t("正在同步") : machine.reachability === "reconnecting" ? t("正在重连") : t("不可达 · {0}", timeAgo(machine.lastSeenAt))}</small>
               </span>
               {warning ? <AlertTriangle className="machine-warning" size={15} /> : <StatusDot tone={transportConnected ? "live" : "muted"} pulse={live && (machine.capacity === "busy" || machine.capacity === "saturated")} />}
             </button>
@@ -850,7 +850,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const hasActiveTurn = Boolean(session.activeTurnId);
   const canSend = !hasActiveTurn && !pendingCommand && (session.actions?.start?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.threadRuntime === "idle" && !session.state.unknownFreeze));
   const canCancel = !pendingCommand && (session.actions?.cancel?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.currentTurn === "in_progress" && session.activeTurnId));
-  const canQueueOrSteer = Boolean(detail.writable && session.state.reachability === "live" && session.state.currentTurn === "in_progress" && session.activeTurnId);
+  const canQueueOrSteer = session.actions?.queue?.reasonCode !== "MACHINE_DRAINING" && Boolean(detail.writable && session.state.reachability === "live" && session.state.currentTurn === "in_progress" && session.activeTurnId);
   const slashCommand = session.provider === "claude" ? undefined : parseCodexCommand(prompt);
   let outputSchema: Record<string, unknown> | undefined;
   let outputSchemaError = false;
@@ -967,6 +967,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
           <div className="session-facts">
             <StatePill session={session} />
             <span className={`history-mark history-mark--${session.state.history}`}>{{ complete: t("完整历史"), partial: t("部分历史"), summary_only: t("历史摘要"), metadata_only: t("仅会话信息"), unavailable: t("历史暂不可用") }[session.state.history]}</span>
+            {session.actions?.start?.reasonCode === "MACHINE_DRAINING" && <span role="status">{t("主机正在维护，等待安全重启；当前任务可继续，暂不接受新任务")}</span>}
             <div className="session-call-actions"><UsageButton scope="session" id={session.id} provider={session.provider}/>
       {session.provider !== "claude" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
             </div>

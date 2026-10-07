@@ -3119,5 +3119,11 @@
   "等待主机核验": "Waiting for host verification",
   "保留回退版本": "Retained rollback version",
   "主机离线，以上为最后上报状态，尚未确认当前版本。": "Host is offline. These are its last reported values; the current version is unconfirmed.",
-  "本机修复安装命令": "Local repair installation command"
+  "本机修复安装命令": "Local repair installation command",
+  "维护中 · 等待安全重启": "Maintenance · waiting for a safe restart",
+  "主机正在维护，等待安全重启；当前任务可继续，暂不接受新任务": "Host maintenance is waiting for a safe restart. Current tasks may continue; new tasks are paused.",
+  "任务已启动": "Task started",
+  "任务未启动": "Task did not start",
+  "任务是否启动尚未确认，请勿重复派发": "Task start is unconfirmed. Do not dispatch it again.",
+  "部分任务历史不可用": "Some task history is unavailable"
 }

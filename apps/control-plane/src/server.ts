@@ -1602,7 +1602,7 @@ export async function buildControlPlane(
           } else if (message.type === "heartbeat") {
             invariant(state.producerEpoch, 409, "AGENT_HELLO_REQUIRED", "Agent must send hello first");
             invariant(state.reconciliationReady, 409, "RECONCILIATION_REQUIRED", "Heartbeat is disabled until reconciliation completes");
-            registry.heartbeat(identity, message.capacity, message.activeTurns, message.unreachableReason, message.codexProfile, { readOnly: message.readOnly, readOnlyReasons: message.readOnlyReasons });
+            registry.heartbeat(identity, message.capacity, message.activeTurns, message.unreachableReason, message.codexProfile, { readOnly: message.readOnly, readOnlyReasons: message.readOnlyReasons, maintenance: message.maintenance });
             usage.quota(identity.machineId,message.quota);
             if(message.discovery) registry.updateDiscovery(identity.machineId,message.discovery);
             sendJson(socket, { type: "heartbeat.ack", serverTime: nowIso() });
@@ -1723,9 +1723,14 @@ export async function buildControlPlane(
               else if(message.event==='reported'){if(typeof message.requestId==='string')panelVoice.acknowledgeReport(call.voice_id,message.requestId);}
               else if(message.event==='panel_tool'){
                 const requestId=requiredString(message.requestId,'requestId',80);let result:unknown;
-                try {result=panelVoice.tool(principal,call.voice_id,requestId,message.args);dispatchPendingCommands(call.machine_id,principal.workspaceId);
-                  const task=panelVoice.current(principal);if(task){const target=registry.getSession(principal,task.session_id);dispatchPendingCommands(target.machineId,principal.workspaceId);broadcastSession(target.logicalSessionId,{type:"session.changed",logicalSessionId:target.logicalSessionId});}
-                }catch(error){result={error:error instanceof AppError?error.message:'请求未完成，请查询任务状态后再试'};}
+                try {
+                  result=panelVoice.tool(principal,call.voice_id,requestId,message.args);
+                  // A status/search request must never trigger command dispatch as a side effect.
+                  if ((message.args as {action?:unknown})?.action==='dispatch') {
+                    const task=panelVoice.current(principal,{voiceId:call.voice_id});
+                    if(task){const target=registry.getSession(principal,task.session_id);dispatchPendingCommands(target.machineId,principal.workspaceId);broadcastSession(target.logicalSessionId,{type:"session.changed",logicalSessionId:target.logicalSessionId});}
+                  }
+                }catch(error){result={error:error instanceof AppError?error.message:'请求未完成，请查询任务状态后再试',errorCode:error instanceof AppError?error.code:'PANEL_REQUEST_FAILED',...(error instanceof AppError?{details:error.details}:{}),executionStarted:error instanceof AppError&&error.code==='MACHINE_DRAINING'?false:null};}
                 sendPanel(call.voice_id,'tool.result',{requestId,result});
               }
               else if(message.event==='transcript'){if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role)))sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final)});}

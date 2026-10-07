@@ -1,3 +1,4 @@
+import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
 import type { ActionAvailability, CommandType, SessionAction, SessionActions } from "./api-schema.js";
@@ -29,10 +30,10 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     native_thread_id: string | null; history_mode: string | null; machine_reachability: string;
     identity_state: string; security_state: string; compatibility: string; runtime_read_only: number;
     command_types_json: string | null; holder: string | null; pending_approvals: number; queued: number; frozen: number;
-    runtime_settings_json: string | null;
+    runtime_settings_json: string | null; maintenance_json: string | null;
     paginated_history: number; provider: string; discovery_json: string | null;
   }>(`SELECT s.*,p.provider,m.discovery_json,e.native_thread_id,e.history_mode,m.reachability AS machine_reachability,
-      m.identity_state,m.security_state,m.compatibility,m.runtime_read_only,m.command_types_json,m.paginated_history,
+      m.identity_state,m.security_state,m.compatibility,m.runtime_read_only,m.maintenance_json,m.command_types_json,m.paginated_history,
       (SELECT holder_client_session_id FROM control_leases WHERE logical_session_id=s.logical_session_id
         AND state='active' AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY acquired_at DESC LIMIT 1) AS holder,
       (SELECT count(*) FROM approvals WHERE logical_session_id=s.logical_session_id AND state='pending') AS pending_approvals,
@@ -68,6 +69,7 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     else if (!supportsCommand(row.command_types_json, command)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "主机尚未报告支持此操作，请更新连接服务");
     else if (row.identity_state !== "active") availability = blocked("MACHINE_REVOKED", "主机连接已移除");
     else if (row.machine_reachability !== "online") availability = blocked("MACHINE_OFFLINE", "等待主机重新连接");
+    else if (blocksDuringMaintenance(row.maintenance_json,command)) availability = blocked("MACHINE_DRAINING", MAINTENANCE_MESSAGE);
     else if (row.reachability !== "live") availability = blocked("SESSION_RECONCILING", "会话正在同步");
     else if (row.security_state !== "normal" || row.runtime_read_only) availability = blocked("MACHINE_READ_ONLY", "主机当前只能读取会话");
     else if (row.compatibility !== "compatible") availability = blocked("MACHINE_INCOMPATIBLE", "当前运行环境尚未验证此操作");

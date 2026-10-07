@@ -1,3 +1,4 @@
+import { parseMaintenance } from "./host-maintenance.js";
 import { parseClaudeMetadata } from "./claude-metadata.js";
 import { supportsClaudeControls } from "./claude-settings.js";
 import { UsageService } from "./usage.js";
@@ -147,6 +148,7 @@ interface MachineRow {
   unreachable_reason: string | null;
   last_heartbeat_at: string | null;
   maintenance_types_json: string;
+  maintenance_json: string | null;
   discovery_json: string | null;
   codex_profile_json: string | null;
 }
@@ -270,6 +272,7 @@ function mapMachine(row: MachineRow): MachineSummary {
     schemaHash: row.schema_hash,
     credentialProtectionLevel: row.credential_protection_level,
     lastHeartbeatAt: row.last_heartbeat_at,
+    maintenance: row.maintenance_json ? JSON.parse(row.maintenance_json) : null,
     maintenanceCapabilities: JSON.parse(row.maintenance_types_json ?? "[]") as string[],
     discovery: row.discovery_json ? JSON.parse(row.discovery_json) as Record<string,unknown> : null,
     codexProfile: row.codex_profile_json ? JSON.parse(row.codex_profile_json) as Record<string,unknown> : null,
@@ -1563,6 +1566,7 @@ export class RegistryService {
       capabilities?: AgentCapabilities;
       readOnly?: boolean;
       readOnlyReasons?: string[];
+      maintenance?: {operationId:string;startedAt:string} | null;
       discovery?: Record<string, unknown>;
       codexProfile?: Record<string, unknown>;
       codexCatalog?: unknown;
@@ -1801,6 +1805,7 @@ export class RegistryService {
         "UPDATE machines SET command_types_json=?,runtime_read_only=?,runtime_read_only_reasons_json=?,paginated_history=?,permission_profiles=? WHERE machine_id=?",
         commandTypesJson, hello.readOnly ? 1 : 0, JSON.stringify(hello.readOnlyReasons ?? []), hello.capabilities?.paginatedHistory === true ? 1 : 0, hello.capabilities?.permissionProfiles === true ? 1 : 0, connection.machineId,
       );
+      this.db.run("UPDATE machines SET maintenance_json=? WHERE machine_id=?",JSON.stringify(parseMaintenance(hello.maintenance)),connection.machineId);
       this.db.run("UPDATE machines SET maintenance_types_json=? WHERE machine_id=?",JSON.stringify((maintenanceTypes??[]).filter(type=>MAINTENANCE_TYPES.includes(type as typeof MAINTENANCE_TYPES[number]))),connection.machineId);
       this.db.run("UPDATE machines SET codex_catalog_json=? WHERE machine_id=?", JSON.stringify(parseCodexCatalog(hello.codexCatalog)), connection.machineId);
       if(hello.discovery) this.updateDiscovery(connection.machineId,hello.discovery);
@@ -2340,8 +2345,9 @@ export class RegistryService {
     });
   }
 
-  heartbeat(connection: AgentConnectionIdentity, capacity: MachineCapacity, activeTurns: number, unreachableReason?: string | null, codexProfile?: Record<string, unknown>, runtime?: { readOnly?: unknown; readOnlyReasons?: unknown }): void {
+  heartbeat(connection: AgentConnectionIdentity, capacity: MachineCapacity, activeTurns: number, unreachableReason?: string | null, codexProfile?: Record<string, unknown>, runtime?: { readOnly?: unknown; readOnlyReasons?: unknown; maintenance?: unknown }): void {
     const profile = codexProfile ? parseCodexProfile(codexProfile) : undefined;
+    const maintenance=runtime?.maintenance===undefined?undefined:parseMaintenance(runtime.maintenance);
     if (runtime?.readOnly !== undefined) {
       invariant(typeof runtime.readOnly === "boolean" && Array.isArray(runtime.readOnlyReasons) && runtime.readOnlyReasons.length <= 32 &&
         runtime.readOnlyReasons.every(reason => typeof reason === "string" && reason.length <= 2000), 400, "INVALID_RUNTIME_STATE", "Invalid runtime readiness report");
@@ -2369,6 +2375,7 @@ export class RegistryService {
       connection.machineId,
     );
     invariant(Number(result.changes) === 1, 409, "MACHINE_REVOKED", "Machine is revoked or missing");
+    if (maintenance!==undefined) this.db.run("UPDATE machines SET maintenance_json=? WHERE machine_id=?",JSON.stringify(maintenance),connection.machineId);
     if (profile) this.db.run("UPDATE machines SET codex_profile_json=? WHERE machine_id=?", JSON.stringify(profile), connection.machineId);
     // Runtime readiness may recover or fail without changing the relay connection.
     // Never modify independent credential/security/compatibility gates here.

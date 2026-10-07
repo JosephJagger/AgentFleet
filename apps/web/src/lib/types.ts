@@ -72,6 +72,7 @@ export interface Machine {
   projects: Project[];
   discovery?: DiscoveryProgress;
   maintenanceCapabilities?: string[];
+  maintenance?: {operationId:string;startedAt:string} | null;
   codexProfile?: Record<string, unknown>;
   updateStatus?: Record<string, unknown>;
 }

@@ -799,7 +799,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 48) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 49) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1382,6 +1382,10 @@ export class ControlPlaneDatabase {
       for (const index of indexes) this.sqlite.exec(index.sql);
       if (this.all("PRAGMA foreign_key_check").length) throw new Error("Version cleanup migration violated foreign keys");
       this.sqlite.exec("PRAGMA user_version=48");
+    });
+    if (version < 49) this.transaction(() => {
+      if (!this.all<{name:string}>("PRAGMA table_info(machines)").some(column=>column.name==="maintenance_json")) this.sqlite.exec("ALTER TABLE machines ADD COLUMN maintenance_json TEXT");
+      this.sqlite.exec("PRAGMA user_version=49");
     });
   }
 

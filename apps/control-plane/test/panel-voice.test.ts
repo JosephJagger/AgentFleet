@@ -77,10 +77,13 @@ test('completion follows the exact native turn; deleted content is never spoken 
   event(4,'turn.completed',{turn:{status:'completed'}});
   const report=f.service.report(f.principal,f.call.voice_id)!;
   assert.equal(report.result.result,'Verified deployment result');
+  assert.equal(report.result.executionStarted,true);
+  assert.equal(report.result.historyLimited,false);
   f.service.acknowledgeReport(f.call.voice_id,report.reportId);
   assert.equal(f.service.report(f.principal,f.call.voice_id),null);
   f.db.run("UPDATE content_blobs SET deleted_at='now' WHERE payload_ref='payload-3'");
   assert.equal(f.service.describe(f.principal,f.service.current(f.principal)!).result,'');
+  assert.equal(f.service.describe(f.principal,f.service.current(f.principal)!).historyLimited,true);
   f.db.run("UPDATE content_blobs SET body_json='{}' WHERE payload_ref='payload-4'");
   assert.equal(f.service.current(f.principal)?.state,'completed','confirmed terminal state survives content expiration');
 });
@@ -112,7 +115,7 @@ for (const previouslyReported of [false,true]) test(`reconnecting never automati
  const next=f.service.start(f.principal,'m',{});f.service.state(next.voice_id,'active');
  assert.equal(f.service.poll(f.principal,next.voice_id).report,null);
  assert.equal(f.service.report(f.principal,next.voice_id),null);
- assert.equal((f.service.tool(f.principal,next.voice_id,'ask-status',{action:'status'}) as {jobId:string}).jobId,job.jobId,'explicit status remains available');
+ assert.equal((f.service.tool(f.principal,next.voice_id,'ask-status',{action:'status',sessionId:f.session.logicalSessionId}) as {jobId:string}).jobId,job.jobId,'explicit session status remains available');
  f.service.acknowledgeReport(next.voice_id,job.jobId);
  assert.equal(f.db.get<{reported_call_id:string|null}>("SELECT reported_call_id FROM panel_voice_jobs WHERE job_id=?",job.jobId)?.reported_call_id,previouslyReported?f.call.voice_id:null,'new calls cannot steal report acknowledgements');
 });
@@ -121,6 +124,61 @@ test('a previous-call task finishing during a new call remains silent',t=>{
  f.service.state(f.call.voice_id,'closed');const next=f.service.start(f.principal,'m',{});f.service.state(next.voice_id,'active');
  assert.equal(f.service.poll(f.principal,next.voice_id).report,null);
  f.db.run("UPDATE panel_voice_jobs SET state='completed' WHERE job_id=?",job.jobId);
- assert.equal(f.service.poll(f.principal,next.voice_id).task?.state,'completed');
+ assert.equal(f.service.poll(f.principal,next.voice_id).task,null);
  assert.equal(f.service.poll(f.principal,next.voice_id).report,null);
+});
+
+test('status is session-scoped, authorized, and never falls back to another session or call',t=>{
+ const f=fixture();t.after(()=>f.db.close());const first=f.dispatch() as {jobId:string};
+ const other=f.registry.createSession(f.principal,'m','p','Other session','other-session');
+ const query=(input:Record<string,unknown>)=>f.service.tool(f.principal,f.call.voice_id,'status',{action:'status',...input}) as Record<string,unknown>;
+ assert.deepEqual(query({sessionId:other.logicalSessionId}),{state:'idle',sessionId:other.logicalSessionId,scope:'session',message:'该会话没有总控派发的任务'});
+ assert.equal(query({sessionId:f.session.logicalSessionId}).jobId,first.jobId);
+ assert.equal(query({}).jobId,first.jobId);
+ for(const sessionId of ['',null,42,'forbidden']) assert.throws(()=>query({sessionId}));
+ f.db.run("UPDATE panel_voice_jobs SET state='completed'");
+ assert.equal(query({sessionId:other.logicalSessionId}).state,'idle');
+ f.service.state(f.call.voice_id,'closed');const next=f.service.start(f.principal,'m',{});f.service.state(next.voice_id,'active');
+ assert.equal((f.service.tool(f.principal,next.voice_id,'status',{action:'status'}) as {state:string}).state,'idle');
+ assert.equal((f.service.tool(f.principal,next.voice_id,'status',{action:'status',sessionId:f.session.logicalSessionId}) as {jobId:string}).jobId,first.jobId);
+ assert.equal(f.service.poll(f.principal,next.voice_id).task,null);
+ const previous=f.service.current(f.principal)!;
+ f.db.run("INSERT INTO panel_voice_jobs VALUES('other-job',?,?,?,?,?,?,NULL,'completed',NULL,?)",f.principal.userId,f.principal.workspaceId,next.voice_id,'other-request',other.logicalSessionId,previous.command_id,new Date().toISOString());
+ assert.equal((f.service.tool(f.principal,next.voice_id,'status',{action:'status',sessionId:f.session.logicalSessionId}) as {jobId:string}).jobId,first.jobId);
+ assert.equal((f.service.tool(f.principal,next.voice_id,'status',{action:'status',sessionId:other.logicalSessionId}) as {jobId:string}).jobId,'other-job');
+});
+
+test('maintenance gates dispatch and search without blocking cancellation, and clears on recovery',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.db.run("UPDATE machines SET command_types_json=?",JSON.stringify(['turn.start','turn.cancel','turn.queue','turn.steer']));
+ f.db.run("UPDATE machines SET maintenance_json=?",JSON.stringify({operationId:'update-test',startedAt:new Date().toISOString()}));
+ const session=f.registry.getSession(f.principal,f.session.logicalSessionId);
+ assert.equal(session.actions.start.reasonCode,'MACHINE_DRAINING');
+ assert.equal(session.actions.queue.reasonCode,'MACHINE_DRAINING');
+ assert.throws(()=>f.dispatch(),/主机正在维护/);
+ assert.throws(()=>f.coordination.createCommand(f.principal,f.session.logicalSessionId,{type:'turn.start',clientMutationId:'maintenance-direct',payload:{prompt:'Test only'},precondition:{}}),/主机正在维护/);
+ const found=f.service.tool(f.principal,f.call.voice_id,'search',{action:'search',query:'Test'}) as {sessions:{available:boolean;unavailableReason:{code:string}}[]};
+ assert.equal(found.sessions[0]?.available,false);assert.equal(found.sessions[0]?.unavailableReason.code,'MACHINE_DRAINING');
+ f.db.run("UPDATE logical_sessions SET active_turn_id='turn-active',execution_state='running'");
+ assert.equal(f.registry.getSession(f.principal,f.session.logicalSessionId).actions.cancel.allowed,true);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,0);
+ f.service.state(f.call.voice_id,'closed');assert.throws(()=>f.service.start(f.principal,'m',{}),/维护/);
+ f.db.run("UPDATE logical_sessions SET active_turn_id=NULL,execution_state='idle'");
+ f.db.run("UPDATE machines SET maintenance_json='null'");
+ assert.equal(f.registry.getSession(f.principal,f.session.logicalSessionId).actions.start.allowed,true);
+});
+
+test('host rejection exposes its exact cause and does not claim missing history; unknown is not unstarted',t=>{
+ const f=fixture();t.after(()=>f.db.close());f.dispatch();const job=f.service.current(f.principal)!;
+ f.db.run("UPDATE command_projection SET state='invalidated'");
+ f.db.run("INSERT INTO command_lifecycle(command_id,state,detail_json,created_at) VALUES(?,'invalidated',?,?)",job.command_id,JSON.stringify({code:'MACHINE_DRAINING',message:'the agent is waiting for a safe maintenance restart'}),new Date().toISOString());
+ const result=f.service.describe(f.principal,f.service.current(f.principal)!);
+ assert.equal(result.state,'failed');assert.equal(result.executionStarted,false);
+ assert.equal(result.error?.code,'MACHINE_DRAINING');assert.equal(result.error?.message,'the agent is waiting for a safe maintenance restart');
+ assert.equal(result.historyLimited,false);assert.equal(result.result,'');assert.equal(result.resultStatus,'not_started');
+ f.db.run("UPDATE panel_voice_jobs SET state='unknown'");f.db.run("UPDATE command_projection SET state='unknown'");
+ f.db.run("DELETE FROM command_lifecycle WHERE state='invalidated'");
+ const unknown=f.service.describe(f.principal,f.service.current(f.principal)!);
+ assert.equal(unknown.executionStarted,null);assert.equal(unknown.historyLimited,false);
+ assert.throws(()=>f.dispatch('retry'),/已有任务/);
 });

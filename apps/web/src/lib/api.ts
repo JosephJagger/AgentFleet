@@ -154,6 +154,7 @@ function mapMachine(rawValue: unknown, projects: Project[]): Machine {
     id: string(raw.machineId),
     discovery: mapDiscovery(raw.discovery),
     agentRuntimes: record(record(raw.discovery).agentRuntimes) as Machine["agentRuntimes"],
+    maintenance: raw.maintenance && typeof raw.maintenance === "object" ? raw.maintenance as Machine["maintenance"] : null,
     maintenanceCapabilities: list(raw.maintenanceCapabilities).filter((item): item is string => typeof item === "string"),
     codexProfile: Object.keys(record(raw.codexProfile)).length ? record(raw.codexProfile) : undefined,
     codexCatalog: raw.codexCatalog as Machine["codexCatalog"],

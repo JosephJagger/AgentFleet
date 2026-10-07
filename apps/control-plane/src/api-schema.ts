@@ -83,6 +83,7 @@ export interface MachineSummary {
   credentialProtectionLevel: "unknown" | "os_keychain" | "software_protected" | "file_restricted";
   lastHeartbeatAt: string | null;
   maintenanceCapabilities: string[];
+  maintenance?: {operationId:string;startedAt:string} | null;
   discovery: Record<string, unknown> | null;
   codexProfile: Record<string, unknown> | null;
 }
@@ -303,6 +304,7 @@ export type AgentToServerMessage =
       capabilities?: AgentCapabilities;
       readOnly?: boolean;
       readOnlyReasons?: string[];
+      maintenance?: {operationId:string;startedAt:string} | null;
       discovery?: Record<string, unknown>;
       codexProfile?: Record<string, unknown>;
       codexCatalog?: unknown;
@@ -326,6 +328,7 @@ export type AgentToServerMessage =
       quota?: unknown;
       readOnly?: boolean;
       readOnlyReasons?: string[];
+      maintenance?: {operationId:string;startedAt:string} | null;
       codexProfile?: Record<string, unknown>;
       discovery?: Record<string, unknown>;
       capacity: MachineCapacity;

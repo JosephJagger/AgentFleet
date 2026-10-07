@@ -209,6 +209,7 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   assert.equal((await agentInbox.next("welcome")).machineId, agentCredential.machineId);
   agentSocket.send(JSON.stringify({
     type: "hello",
+    maintenance: {operationId:"initial-maintenance",startedAt:new Date().toISOString()},
     producerEpoch: "producer-epoch-1",
     appServerEpoch: "app-server-epoch-1",
     agentVersion: "0.16.2",
@@ -234,6 +235,7 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   }));
   const helloAck = await agentInbox.next("hello.ack");
   assert.equal(db.get<{ compatibility: string }>("SELECT compatibility FROM machines WHERE machine_id=?", agentCredential.machineId)?.compatibility, "compatible", "Ubuntu 25.04 is gated by architecture and validated runtime, not an obsolete distro whitelist");
+  assert.equal(JSON.parse(db.get<{maintenance_json:string}>("SELECT maintenance_json FROM machines WHERE machine_id=?",agentCredential.machineId)!.maintenance_json).operationId,"initial-maintenance");
   const projectId = (helloAck.projects as Record<string, string>)["local-project-a"] as string;
   assert.ok(projectId);
 
@@ -249,6 +251,17 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
     helloAck,
     [{ producerEpoch: "producer-epoch-1", throughHostSeq: 0 }],
   );
+
+  const maintenance={operationId:'upgrade-fixture',startedAt:new Date().toISOString()};
+  const savedMaintenance=()=>JSON.parse(db.get<{maintenance_json:string}>("SELECT maintenance_json FROM machines WHERE machine_id=?",agentCredential.machineId)!.maintenance_json);
+  agentSocket.send(JSON.stringify({type:"heartbeat",capacity:"idle",activeTurns:0,maintenance}));
+  await agentInbox.next("heartbeat.ack");assert.deepEqual(savedMaintenance(),maintenance);
+  agentSocket.send(JSON.stringify({type:"heartbeat",capacity:"idle",activeTurns:0}));
+  await agentInbox.next("heartbeat.ack");assert.deepEqual(savedMaintenance(),maintenance,"legacy heartbeats do not clear a known maintenance gate");
+  agentSocket.send(JSON.stringify({type:"heartbeat",capacity:"idle",activeTurns:0,maintenance:{operationId:42,startedAt:'bad'}}));
+  assert.equal((await agentInbox.next("error")).code,"INVALID_MAINTENANCE");assert.deepEqual(savedMaintenance(),maintenance);
+  agentSocket.send(JSON.stringify({type:"heartbeat",capacity:"idle",activeTurns:0,maintenance:null}));
+  await agentInbox.next("heartbeat.ack");assert.equal(savedMaintenance(),null);
 
   const reportedProfile = { id: "default", osAccount: "developer", codexHome: "/home/developer/.codex", hostCodexPath: "/home/developer/.nvm/versions/node/v24/bin/codex", hostCodexVersion: "0.153.4", runtimePath: "/home/developer/.local/share/agentfleet/codex/codex", runtimeVersion: "0.153.2", source: "managed", hostCodexDefaultPath: "/home/developer/.local/bin/codex", hostCodexDefaultVersion: "0.145.0", hostCodexCheckedAt: new Date().toISOString(), hostCodexDetection: "highest-detected", hostCodexVersionSource: "package-record", hostCodexMetadataPath: "/home/developer/.codex/packages/standalone/current/codex-package.json", hostCodexDefaultVersionSource: "command" };
   agentSocket.send(JSON.stringify({ type: "heartbeat", capacity: "idle", activeTurns: 0, codexProfile: reportedProfile }));
@@ -1160,7 +1173,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
   await app.ready();
   assert.equal(
     Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    48,
+    49,
   );
 
   const login = await app.inject({

@@ -5,10 +5,10 @@ import { createPortal } from "react-dom";
 import { api } from "../lib/api";
 import { t } from "../i18n";
 
-export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;state:string;result:string;link:string; }
+export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;state:string;result:string;link:string;historyLimited?:boolean;executionStarted?:boolean|null;error?:{code:string;message:string}|null; }
 type Phase = "idle" | "connecting" | "connected" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
-export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask }: { globalMachineId?: string; onPanelTask?: (task: PanelVoiceTask) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
+export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask }: { globalMachineId?: string; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
   const [expanded, setExpanded] = useState(false);
   const control = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -66,7 +66,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     const attempt = generation.current;
     const current = () => attempt === generation.current;
     const fail = (reason: string, code = "CLIENT_START_FAILED") => { if (current()) { cleanup.current(code); setMessage(reason); setPhase("error"); setExpanded(true); } };
-    setExpanded(true); setPhase("connecting"); setMessage(""); setMuted(false); setPlayBlocked(false); setTranscript([]); setTaskPhase("idle");
+    setExpanded(true); setPhase("connecting"); setMessage(""); setMuted(false); setPlayBlocked(false); setTranscript([]); setTaskPhase("idle"); onPanelTask?.(undefined);
     activeCallback.current(true);
     resources.current.starting=true;
     try {
