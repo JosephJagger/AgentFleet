@@ -62,3 +62,28 @@ test("platform administration is isolated, paginated, CSRF protected and revokes
   const audit = db.all<{ action: string }>("SELECT action FROM audit_entries WHERE action LIKE 'admin.user.%'");
   assert.equal(audit.length, 3);
 });
+
+test("system release follows the published channel after startup and never falls back on channel failure", async t => {
+  const { createServer } = await import("node:http");
+  let version = "0.30.81", available = true;
+  const channel = createServer((_req, res) => {
+    if (!available) { res.writeHead(503); res.end(); return; }
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({schemaVersion:1, version, artifacts:{linux:{file:"agent.tar.gz",sha256:"a".repeat(64),size:1}}}));
+  });
+  await new Promise<void>(resolve => channel.listen(0,"127.0.0.1",resolve));
+  t.after(() => new Promise<void>(resolve => channel.close(() => resolve())));
+  const address = channel.address() as { port: number };
+  const config = loadConfig({ AUTH_MODE:"password", ADMIN_EMAIL:"owner@example.test", ADMIN_PASSWORD:"test-admin-password-long", PUBLIC_ORIGIN:"http://admin.test", COOKIE_SECURE:"false", DATABASE_PATH:":memory:", LOG_LEVEL:"silent", AGENTFLEET_RELEASE_MANIFEST_URL:`http://127.0.0.1:${address.port}/manifest.json` });
+  const {app,db} = await buildControlPlane(config);
+  t.after(() => app.close());
+  const auth = new AuthService(db,config);
+  const admin=auth.login(config.adminEmail,config.adminPassword,"127.0.0.1","test");
+  const read=async()=>(await app.inject({method:"GET",url:"/api/release",headers:{cookie:`${config.cookieName}=${admin.sessionToken}`}})).json();
+  assert.equal((await read()).agentVersion,"0.30.81");
+  version="0.30.82";
+  assert.equal((await read()).agentVersion,"0.30.82");
+  available=false;
+  assert.equal((await read()).agentVersion,null);
+  assert.notEqual((await read()).agentManifest.status,"ready");
+});

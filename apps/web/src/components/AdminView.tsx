@@ -29,7 +29,7 @@ export function AdminView() {
       if (active) { setRelease(version); setSystem(config); setSystemError(""); }
     }).catch(reason => { if (active) setSystemError(systemText(reason instanceof Error ? reason.message : t("操作未完成"))); });
     return () => { active = false; };
-  }, [reload]);
+  }, [reload, section]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(""); setData(undefined); setPending(undefined);

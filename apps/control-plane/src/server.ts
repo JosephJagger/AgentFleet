@@ -583,15 +583,25 @@ export async function buildControlPlane(
   }));
 
   app.get("/api/schema", async () => ({ apiVersion: "p0b-v1", schemas: apiSchemas }));
+  const readPublishedAgent = async () => {
   let agentManifestVersion: string|null=null;
   let manifestStatus: "ready"|"unavailable"|"invalid"="unavailable";
-  if(config.webDistDir) {
-    const manifestPath=resolve(config.webDistDir,"downloads/manifest.json");
-    if(existsSync(manifestPath)) {
+  if(config.releaseManifestUrl || config.webDistDir) {
+    const manifestPath=config.webDistDir ? resolve(config.webDistDir,"downloads/manifest.json") : "";
+    if(config.releaseManifestUrl || existsSync(manifestPath)) {
       manifestStatus="invalid";
       try {
-        invariant(statSync(manifestPath).size<=1_000_000,500,"INVALID_RELEASE_MANIFEST","Release manifest exceeds limit");
-        const manifest=JSON.parse(readFileSync(manifestPath,"utf8")) as Record<string,unknown>;
+        let content: string;
+        if (config.releaseManifestUrl) {
+          const response = await fetch(config.releaseManifestUrl, { signal: AbortSignal.timeout(5000), redirect: "error", cache: "no-store" });
+          if (!response.ok) throw new Error("Release channel unavailable");
+          content = await response.text();
+        } else {
+          invariant(statSync(manifestPath).size<=1_000_000,500,"INVALID_RELEASE_MANIFEST","Release manifest exceeds limit");
+          content = readFileSync(manifestPath,"utf8");
+        }
+        invariant(content.length<=1_000_000,500,"INVALID_RELEASE_MANIFEST","Release manifest exceeds limit");
+        const manifest=JSON.parse(content) as Record<string,unknown>;
         if(manifest.schemaVersion===1 && typeof manifest.version==="string" && /^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(manifest.version) && manifest.artifacts && typeof manifest.artifacts==="object") {
           const artifacts=Object.values(manifest.artifacts as Record<string,unknown>);
           if(artifacts.length>0 && artifacts.every(artifact=>{
@@ -603,6 +613,8 @@ export async function buildControlPlane(
       } catch { /* Report invalid packaged metadata without exposing filesystem paths. */ }
     }
   }
+    return { agentManifestVersion, manifestStatus };
+  };
   const authenticateAdmin = async (request: FastifyRequest) => { await authenticate(request); auth.requirePlatformAdmin(request.principal!); };
   const mutateAdmin = async (request: FastifyRequest) => { await mutate(request); auth.requirePlatformAdmin(request.principal!); };
   const administration = new AdministrationService(db, auth);
@@ -618,13 +630,15 @@ export async function buildControlPlane(
   app.get("/api/admin/system", { preHandler: authenticateAdmin }, async () => ({
     authMode: config.authMode, registration: config.authMode === "email" ? "email-verification" : "administrator-provisioned",
   }));
-  app.get("/api/release",{preHandler:authenticateAdmin},async()=>({
+  app.get("/api/release",{preHandler:authenticateAdmin},async()=>{
+    const { agentManifestVersion, manifestStatus } = await readPublishedAgent();
+    return ({
     controlPlaneBuild:/^[a-f0-9]{7,40}$/.test(process.env.AGENTFLEET_BUILD_SHA??"")?process.env.AGENTFLEET_BUILD_SHA:"development",
     dbSchemaVersion:Number((db.sqlite.prepare("PRAGMA user_version").get() as {user_version:number}).user_version),
     agentVersion:agentManifestVersion,
     agentManifest:{version:agentManifestVersion,status:manifestStatus},
     compatibilityProfile:channelProfile(config.runtimeReleaseDir),
-  }));
+  }); });
 
   app.get("/api/runtime-release", { preHandler: authenticateAdmin }, async () => ({ ...channelStatus(config.runtimeReleaseDir), canControl: true }));
   app.post("/api/runtime-release/control", { preHandler: mutate }, async request => {

@@ -15,6 +15,7 @@ services:
       PORT: 3000
       DATABASE_PATH: /app/data/control-plane.sqlite
       WEB_DIST_DIR: /app/web
+      AGENTFLEET_RELEASE_MANIFEST_URL: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN in .env}/downloads/manifest.json
       RUNTIME_RELEASE_DIR: /app/runtime-releases
       AUTH_MODE: email
       DJANGO_AUTH_URL: http://identity:8000

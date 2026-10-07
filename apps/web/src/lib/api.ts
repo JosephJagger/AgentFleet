@@ -698,7 +698,7 @@ export const api = {
   },
   async release() {
     const raw = await request<JsonObject>("/api/release");
-    return { build: string(raw.controlPlaneBuild, t("未上报")), schema: integer(raw.dbSchemaVersion), agentVersion: string(raw.agentVersion, t("未发布")), manifestStatus: string(record(raw.agentManifest).status, "unavailable") };
+    return { build: string(raw.controlPlaneBuild, t("未上报")), schema: integer(raw.dbSchemaVersion), agentVersion: string(raw.agentVersion, t("未确认")), manifestStatus: string(record(raw.agentManifest).status, "unavailable") };
   },
   async projects(options: { provider?: "codex" | "claude"; machineId?: string; cursor?: string | null; q?: string; limit?: number; offset?: number }, signal?: AbortSignal): Promise<Page<Project>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 8) });

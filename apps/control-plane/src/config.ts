@@ -9,6 +9,7 @@ export interface ControlPlaneConfig {
   port: number;
   databasePath: string;
   webDistDir?: string;
+  releaseManifestUrl?: string;
   runtimeReleaseDir?: string;
   trustedProxies?: string[];
   publicOrigin: string;
@@ -111,6 +112,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ControlPlaneCo
     host: env.HOST ?? "127.0.0.1",
     port: positiveInt(env.PORT, 3000, "PORT"),
     databasePath: resolve(env.DATABASE_PATH ?? "data/control-plane.sqlite"),
+    ...(env.AGENTFLEET_RELEASE_MANIFEST_URL ? { releaseManifestUrl: new URL(env.AGENTFLEET_RELEASE_MANIFEST_URL).toString() } : {}),
     ...(env.WEB_DIST_DIR ? { webDistDir: resolve(env.WEB_DIST_DIR) } : {}),
     ...(env.RUNTIME_RELEASE_DIR ? { runtimeReleaseDir: resolve(env.RUNTIME_RELEASE_DIR) } : {}),
     ...(proxyTrust ? { trustedProxies: proxyTrust } : {}),
