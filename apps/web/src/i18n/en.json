@@ -3167,5 +3167,7 @@
   "标记已知悉": "Mark acknowledged",
   "条记录": "records",
   "主机状态未确认，显示最后已知任务状态": "Host status is unconfirmed; showing last-known task status.",
-  "已取消": "Cancelled"
+  "已取消": "Cancelled",
+  "暂无本次通话派发的任务": "No tasks dispatched in this call",
+  "任务详情": "Task details"
 }

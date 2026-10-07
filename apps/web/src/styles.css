@@ -1463,3 +1463,17 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .voice-task-inbox__records p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .voice-task-inbox__records small { overflow-wrap: anywhere; }
 .voice-task-inbox__pages { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+
+/* Voice dispatch overview stays compact even with parallel projects. */
+.panel-voice-control__task-summary { display:flex; align-items:center; gap:12px; width:100%; padding:12px 14px; margin-top:12px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper); color:var(--ink); cursor:pointer; text-align:left; }
+.panel-voice-control__task-summary strong { font-size:1.3rem; color:var(--success, var(--ink)); font-variant-numeric:tabular-nums; }
+.panel-voice-control__task-summary span { flex:1; }
+.panel-voice-control__task-summary .is-expanded { transform:rotate(180deg); }
+.panel-voice-control__task-list { max-height: min(380px, 45dvh); overflow:auto; overscroll-behavior:contain; }
+.panel-voice-control__task-list[hidden] { display:none; }
+.panel-voice-control__task-target { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:0; border:0; background:transparent; color:var(--ink); text-align:left; cursor:pointer; }
+.panel-voice-control__task-target span { display:grid; gap:5px; min-width:0; overflow-wrap:anywhere; }
+.panel-voice-control__task-target small { color:var(--muted); }
+.panel-voice-control__task-target svg { flex-shrink:0; }
+.panel-voice-control__task-target:hover strong { text-decoration:underline; }
+.panel-voice-control__task-detail { font-size:var(--text-small); }
