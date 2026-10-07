@@ -384,3 +384,16 @@ test('voice steering respects host maintenance, target turn, capability and user
  const created=f.service.tool(f.principal,f.call.voice_id,'ok',args) as {commandId:string};
  assert.throws(()=>f.service['describeSteer']({...f.principal,userId:'someone-else'},created.commandId),/没有此/);
 });
+
+test('text-panel user can supplement a voice-dispatched turn from another browser of the same account',t=>{
+ const f=fixture();t.after(()=>f.db.close());f.dispatch();
+ const browser=f.auth.servicePrincipal('text-browser');
+ f.db.run("UPDATE machines SET command_types_json='[\"turn.start\",\"turn.steer\"]'");
+ f.db.run("UPDATE logical_sessions SET active_turn_id='voice-started-turn',execution_state='running'");
+ const session=f.registry.getSession(browser,f.session.logicalSessionId);
+ assert.equal(session.actions.steer.allowed,true);assert.equal(session.controlLease?.isMine,true);
+ const response=f.coordination.createCommand(browser,session.logicalSessionId,{type:'turn.steer',clientMutationId:'manual-append',payload:{prompt:'Additional requirement from the text panel'},precondition:{nativeTurnId:session.activeTurnId!,turnControlVersion:session.turnControlVersion}},true);
+ assert.equal(response.command.type,'turn.steer');
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM panel_voice_jobs')?.n,1);
+ assert.equal(f.db.get<{n:number}>("SELECT count(*) n FROM commands WHERE type='turn.start'")?.n,1);
+});
