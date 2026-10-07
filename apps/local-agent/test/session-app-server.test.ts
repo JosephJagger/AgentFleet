@@ -151,3 +151,17 @@ test("typed work shares the live voice writer and rejects a concurrently started
   assert.equal(turns, 1);
   await server.stop();
 });
+
+test("repair releases idle writers but retains an unproven writer and preserves its failure", async () => {
+  const f = fixture(); await f.server.resumeThread("a", project); await f.server.resumeThread("b", project);
+  f.clients[2]!.failRelease = true;
+  await assert.rejects(f.server.releaseIdleWriters(), /still active/);
+  assert.equal(f.clients[1]!.released, 1);
+  assert.equal(f.clients[2]!.released, 0);
+  assert.equal(f.clients[2]!.stopped, 0);
+  f.clients[2]!.failRelease = false;
+  await f.server.releaseIdleWriters();
+  assert.equal(f.clients[2]!.released, 1);
+  assert.equal(f.clients[0]!.stopped, 0);
+  await f.server.stop();
+});

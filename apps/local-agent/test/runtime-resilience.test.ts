@@ -1706,3 +1706,26 @@ test("newly claimed native Plan is reset even without a previous panel settings 
   assert.deepEqual(server.receivedSettings,{model:"host-model",effort:"high",mode:"default"});
   assert.equal(store.snapshot().managedThreads["native-plan"]?.acceptedSettings?.mode,"default");
 });
+
+for (const releaseFails of [false, true]) test(`claim resume timeout only clears uncertainty after writer release: ${releaseFails}`, async () => {
+  const { store, projects } = await fixture(); const project = projects[0]!;
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: callbacks => {
+    server = new FakeAppServer("claim-timeout", callbacks);
+    server.listThreadsHook = async () => [{ nativeThreadId: "idle-host", cwd: project.root, title: "Original", executionState: "idle", historyMode: "legacy" }];
+    server.resumeThread = async () => { throw new AgentError("APP_SERVER_TIMEOUT", "thread/resume did not respond in time"); };
+    server.unsubscribeThread = async () => { server.unsubscribeCount++; if (releaseFails) throw new Error("exit unproven"); };
+    return server;
+  }});
+  runtime.setTransportGeneration(1); captureCallbacks(runtime); await runtime.initialize();
+  const request = claimCommand(project, "idle-host", "timeout-session", server.appServerEpoch);
+  await runtime.handleCommand(request, 1);
+  const state = store.snapshot();
+  assert.equal(state.commandJournal[request.commandId]?.state, releaseFails ? "unknown" : "applied");
+  assert.equal(state.commandJournal[request.commandId]?.error?.code, releaseFails ? "APP_SERVER_TIMEOUT" : "THREAD_CLAIM_ABORTED");
+  assert.equal(store.canSafelyRestart(), !releaseFails);
+  assert.equal(state.managedThreads["idle-host"], undefined);
+  assert.equal(state.discoveredThreads["idle-host"]?.title, "Original");
+  assert.equal(server.startTurnCount, 0);
+  await runtime.shutdown();
+});

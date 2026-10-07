@@ -177,6 +177,14 @@ export class SessionAppServer implements AppServerClient {
     this.forget(writer);
   }
 
+  async releaseIdleWriters(): Promise<void> {
+    // Native release verifies all loaded work is idle and waits for actual exit.
+    // Never use stop(), which can terminate a live task.
+    for (const writer of [...this.allWriters]) {
+      await this.serial(writer.threadId ?? writer.token, () => this.release(writer));
+    }
+  }
+
   async createThread(project: ProjectRecord, profile?: import("./permissions.js").PermissionProfile, name?: string): Promise<ThreadStartResult> {
     const writer = await this.newWriter();
     try {

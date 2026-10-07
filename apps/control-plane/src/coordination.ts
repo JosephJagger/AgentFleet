@@ -1096,13 +1096,15 @@ export class CoordinationService {
   /** Reconcile only persisted, authenticated host journal evidence. Never redispatch. */
   recoverCommandResults(machineId: string, operationId: string): string[] {
     return this.db.transaction(() => {
-      const operation = this.db.get<{result_json:string|null;workspace_id:string;created_at:string}>(
-        "SELECT result_json,workspace_id,created_at FROM machine_operations WHERE operation_id=? AND machine_id=? AND type='commands.reconcile' AND state='succeeded'", operationId,machineId);
+      const operation = this.db.get<{type:string;result_json:string|null;workspace_id:string;created_at:string}>(
+        "SELECT type,result_json,workspace_id,created_at FROM machine_operations WHERE operation_id=? AND machine_id=? AND type IN ('commands.reconcile','connection.repair') AND state='succeeded'", operationId,machineId);
       if (!operation?.result_json) return [];
-      const result = JSON.parse(operation.result_json);
-      if (result.readOnly !== true || !Array.isArray(result.commands) || result.commands.length > 20) return [];
+      const payload = JSON.parse(operation.result_json);
+      const result = operation.type === "connection.repair" ? payload.commandReceipts : payload;
+      if (!result || result.readOnly !== true || !Array.isArray(result.commands) || result.commands.length > 20) return [];
       const changed = new Set<string>();
       for (const evidence of result.commands) {
+        if (operation.type === "connection.repair" && (evidence?.commandType !== "thread.claim" || evidence?.error?.code !== "THREAD_CLAIM_ABORTED")) continue;
         if (!evidence || typeof evidence.commandId !== "string" || typeof evidence.attemptId !== "string" || !["applied","rejected"].includes(evidence.state)) continue;
         const command = this.db.get<{logical_session_id:string;project_id:string;type:string;active_turn_id:string|null;native_thread_id:string|null}>(
           `SELECT c.logical_session_id,s.project_id,c.type,s.active_turn_id,e.native_thread_id FROM commands c

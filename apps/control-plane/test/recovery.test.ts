@@ -153,7 +153,7 @@ test("cold start reconciles persisted reachability and dispatch attempts", async
       "client-recovery",
       sessionId,
       segmentId,
-      "turn.start",
+      state === "claimed" ? "thread.claim" : "turn.start",
       timestamp,
       expiresAt,
     );
@@ -289,6 +289,18 @@ test("cold start reconciles persisted reachability and dispatch attempts", async
     assert.deepEqual(service.recoverCommandResults(machineId,operationId),[]);
     assert.equal(handle.db.get<{n:number}>("SELECT count(*) n FROM dispatch_attempts")!.n,attempts,"no new execution attempt");
     assert.equal(handle.db.get<{state:string}>("SELECT state FROM command_projection WHERE command_id='command_recovery_invoking'")?.state,"unknown","unproven commands stay frozen");
+    const repairId = "repair-claim";
+    const receipt = { commandId: "command_recovery_claimed", attemptId: "attempt_recovery_claimed", commandType: "thread.claim", state: "applied", error: { code: "APP_SERVER_TIMEOUT", message: "unproven" } };
+    const repairPayload = () => JSON.stringify({ commandReceipts: { readOnly: true, commands: [receipt] } });
+    handle.db.run("INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at,result_json) VALUES(?,?,?,?,?,'connection.repair','succeeded',?,?,?,?)", repairId,machineId,owner.workspaceId,"client-recovery","repair-mutation",timestamp,timestamp,expiresAt,repairPayload());
+    assert.deepEqual(service.recoverCommandResults(machineId,repairId),[], "a timeout alone is not proof of release");
+    receipt.error = { code: "THREAD_CLAIM_ABORTED", message: "writer released" };
+    handle.db.run("UPDATE machine_operations SET result_json=? WHERE operation_id=?", repairPayload(), repairId);
+    assert.deepEqual(service.recoverCommandResults(machineId,repairId),["session_recovery_claimed"]);
+    assert.equal(handle.db.get("SELECT 1 FROM project_turn_reservations WHERE command_id=?",receipt.commandId),undefined);
+    assert.deepEqual(service.recoverCommandResults(machineId,repairId),[]);
+    assert.equal(handle.db.get<{n:number}>("SELECT count(*) n FROM dispatch_attempts")!.n,attempts, "repair never replays the original command");
+
   });
 
 });

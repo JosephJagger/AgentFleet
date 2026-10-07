@@ -217,6 +217,7 @@ export interface AppServerClient {
   resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile?: PermissionProfile, metadataOnly?: boolean, realtime?: boolean): Promise<ThreadResumeResult>;
   unsubscribeThread(threadId: string): Promise<void>;
   releaseWriter?(): Promise<void>;
+  releaseIdleWriters?(): Promise<void>;
   startTurn(
     thread: ManagedThread,
     project: ProjectRecord,

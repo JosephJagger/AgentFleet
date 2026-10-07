@@ -238,7 +238,7 @@ export class AgentAutoUpdater {
     if (compareReleaseVersions(availableVersion, this.options.currentVersion) <= 0) return this.performRuntimeCheck(signal);
     const failed = this.options.store ? await readUpdateTransaction(this.options.dataDir) : undefined;
     if (failed && ["rolled_back", "failed"].includes(failed.phase) && failed.targetVersion === availableVersion) {
-      throw new AgentError("UPDATE_ROLLOUT_PAUSED", "this release previously failed on this host; waiting for a corrected release");
+      throw new AgentError("UPDATE_ROLLOUT_PAUSED", "此版本此前在本机升级失败，已保留原运行版本并暂停重复安装；请使用主机安装命令修复，或等待修正版");
     }
     if (this.options.store) {
       const drain = this.options.store.snapshot().maintenanceDrain;

@@ -626,13 +626,45 @@ export class StateStore {
   private auxiliaryActivities = new Set<string>();
   setAuxiliaryActivity(id: string, active: boolean) { if (active) this.auxiliaryActivities.add(id); else this.auxiliaryActivities.delete(id); }
 
-  canSafelyRestart(): boolean {
+  canSafelyRestart(recoverableClaims: readonly string[] = []): boolean {
     const state = this.snapshot();
+    const ignored = new Set(recoverableClaims.filter(id => {
+      const journal = state.commandJournal[id];
+      return journal?.state === "unknown" && journal.commandType === "thread.claim" &&
+        journal.error?.code === "APP_SERVER_TIMEOUT" && journal.error.message === "thread/resume did not respond in time";
+    }));
     return this.auxiliaryActivities.size === 0 && !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean", "versions.clean"].includes(operation.operationType)) &&
       !Object.values(state.managedThreads).some((thread) => thread.activeTurnId !== undefined || thread.realtimeSessionId !== undefined) &&
       !Object.values(state.approvals).some((approval) => approval.state === "pending" || approval.state === "delivery_unknown") &&
-      !Object.values(state.commandJournal).some((command) => ["claimed", "invoking", "responded", "unknown"].includes(command.state)) &&
-      Object.keys(state.projectReservations).length === 0;
+      !Object.values(state.commandJournal).some((command) => ["claimed", "invoking", "responded", "unknown"].includes(command.state) && !ignored.has(command.commandId)) &&
+      Object.values(state.projectReservations).every(reservation => ignored.has(reservation.commandId));
+  }
+
+  /** Caller must first prove every native writer idle and released under maintenance drain. */
+  async settleReleasedClaimTimeouts(commandIds: readonly string[]): Promise<number> {
+    if (!this.snapshot().maintenanceDrain || !this.canSafelyRestart(commandIds)) return 0;
+    return this.update(state => {
+      if (!state.maintenanceDrain || !this.canSafelyRestart(commandIds)) return 0;
+      let count = 0;
+      for (const id of commandIds) {
+        const journal = state.commandJournal[id];
+        if (journal?.state !== "unknown" || journal.commandType !== "thread.claim" ||
+            journal.error?.code !== "APP_SERVER_TIMEOUT" || journal.error.message !== "thread/resume did not respond in time") continue;
+        const error = { code: "THREAD_CLAIM_ABORTED", message: "接管超时；已确认会话执行连接释放。原会话和历史保留，可以重新接管。" };
+        journal.state = "applied";
+        journal.error = error;
+        journal.updatedAt = nowIso();
+        for (const entry of Object.values(state.inbox)) {
+          if (entry.commandId !== id || entry.envelopeHash !== journal.envelopeHash) continue;
+          entry.state = "applied"; entry.error = error; entry.updatedAt = journal.updatedAt;
+        }
+        for (const [projectId, reservation] of Object.entries(state.projectReservations)) {
+          if (reservation.commandId === id && reservation.envelopeHash === journal.envelopeHash) delete state.projectReservations[projectId];
+        }
+        count++;
+      }
+      return count;
+    });
   }
 
   /**

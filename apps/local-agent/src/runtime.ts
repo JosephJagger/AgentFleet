@@ -216,6 +216,7 @@ function parseCommand(value: unknown): FleetCommand {
 }
 
 const KNOWN_FAILED_INVOCATION_CODES = new Set([
+  "THREAD_CLAIM_ABORTED",
   "CODEX_TARGET_CHANGED", "CODEX_OPERATION_INVALID", "HOST_BUSY", "AGENT_CAPABILITY_UNAVAILABLE", "NO_ACTIVE_TURN", "CODEX_CONFIG_UNAVAILABLE", "MCP_FORM_UNSUPPORTED",
   "INPUT_ANSWERS_INVALID", "INPUT_QUESTIONS_INVALID", "INPUT_RESPONSE_REQUIRED",
   "CODEX_SETTINGS_INVALID", "CODEX_MODEL_UNAVAILABLE", "CODEX_EFFORT_UNAVAILABLE", "CODEX_MODE_UNAVAILABLE",
@@ -500,6 +501,13 @@ export class AgentRuntime {
 
   async repairConnection(target: Record<string, unknown>): Promise<Record<string, unknown>> {
     await this.refreshDiagnostics();
+    const claimIds = Array.isArray(target.commands) ? target.commands.filter((id): id is string => typeof id === "string").slice(0, 20) : [];
+    let recoveredClaims = 0;
+    const recoveryServer = this.appServer;
+    if (claimIds.length && this.store.snapshot().maintenanceDrain && recoveryServer?.releaseIdleWriters && this.store.canSafelyRestart(claimIds)) {
+      await recoveryServer.releaseIdleWriters();
+      if (this.appServer === recoveryServer) recoveredClaims = await this.store.settleReleasedClaimTimeouts(claimIds);
+    }
     const sessions = Array.isArray(target.sessions) && target.sessions.length <= 50 ? target.sessions : [];
     const recovered: Record<string, unknown>[] = [];
     for (const value of sessions) {
@@ -520,7 +528,12 @@ export class AgentRuntime {
       reconnectSkipped=failure.message;
     }
     const discovery = await this.refreshCatalog();
-    return { repaired:true,reconnected,...(reconnectSkipped?{reconnectSkipped}:{}),recoveredCount:recovered.filter(item=>item.recovered===true).length,checkedSessions:recovered.length,recoveries:recovered,discovery };
+    const commandReceipts = { readOnly: true, commands: claimIds.flatMap(id => {
+      const journal = this.store.snapshot().commandJournal[id];
+      return journal?.state === "applied" && journal.commandType === "thread.claim" && journal.error?.code === "THREAD_CLAIM_ABORTED"
+        ? [{ commandId: id, attemptId: journal.canonicalAttemptId, state: journal.state, commandType: journal.commandType, error: journal.error }] : [];
+    }) };
+    return { commandReceipts,repaired:reconnected || recoveredClaims > 0 || recovered.some(item=>item.recovered===true),recoveredClaims,reconnected,...(reconnectSkipped?{reconnectSkipped}:{}),recoveredCount:recovered.filter(item=>item.recovered===true).length,checkedSessions:recovered.length,recoveries:recovered,discovery };
   }
 
   async reconnectRuntime(): Promise<void> {
@@ -1513,7 +1526,18 @@ export class AgentRuntime {
         if (discovered.archived) throw new AgentError("THREAD_ARCHIVED", "请先在宿主机恢复归档，再接管原会话");
         const sessionCwd = await verifySessionCwd(project, discovered.sessionCwd ?? project.root);
         const profile = permissionProfile(command.payload.permissionProfile);
-        const resumed = await server.resumeThread(nativeThreadId, project, sessionCwd, profile);
+        let resumed;
+        try { resumed = await server.resumeThread(nativeThreadId, project, sessionCwd, profile); }
+        catch (error) {
+          if (error instanceof AgentError && error.code === "APP_SERVER_TIMEOUT" && error.message === "thread/resume did not respond in time") {
+            // This claim has not bound a managed thread or started a task yet.
+            // Keep uncertainty if native release cannot prove the writer exited.
+            try { await server.unsubscribeThread(nativeThreadId); }
+            catch { throw error; }
+            throw new AgentError("THREAD_CLAIM_ABORTED", "接管超时；已确认执行连接释放，原会话保留，请重新接管。");
+          }
+          throw error;
+        }
         if (!resumed.policyVerified) {
           await server.unsubscribeThread(nativeThreadId).catch(() => undefined);
           throw new AgentError("POLICY_NOT_PROVEN", resumed.policyFailure ?? "effective thread policy could not be proven");
