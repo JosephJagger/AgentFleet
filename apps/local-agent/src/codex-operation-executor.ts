@@ -236,7 +236,13 @@ export async function executeCodexOperation(value: unknown, threadId: string, mu
     const cards = object(raw.rateLimitResetCredits);
     const rows = [{ name: "可用重置卡", detail: typeof cards.availableCount === "number" ? String(cards.availableCount) : "未上报", status: Array.isArray(cards.credits) ? "详情已读取" : "详情未上报" }];
     for (const value of Array.isArray(cards.credits) ? cards.credits.slice(0, 30) : []) {
-      const card = object(value); rows.push({ name: typeof card.title === "string" ? card.title : "重置卡", detail: typeof card.id === "string" ? card.id : "", status: typeof card.status === "string" ? card.status : "unknown" });
+      const card = object(value);
+      // Native expiresAt is Unix seconds; explicit null means non-expiring, absence is unknown.
+      const expires = card.expiresAt;
+      const date = typeof expires === "number" && Number.isSafeInteger(expires) ? new Date(expires * 1000) : null;
+      const expiry = expires === null ? "不过期（原生注明）" : date && Number.isFinite(date.getTime()) ? date.toISOString().replace("T", " ").replace(".000Z", " UTC") : "未返回有效期";
+      const status = ({available:"可用",redeeming:"使用中",redeemed:"已使用",unknown:"状态未知"} as Record<string,string>)[String(card.status)] ?? "状态未知";
+      rows.push({ name: typeof card.title === "string" ? card.title : "重置卡", detail: `失效日期：${expiry}${typeof card.id === "string" ? `\n卡片 ID：${card.id}` : ""}`, status });
     }
     return sanitizeCodexResult({ operation, status: "available", rows })!;
   }

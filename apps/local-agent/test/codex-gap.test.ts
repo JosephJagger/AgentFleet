@@ -298,3 +298,20 @@ test("goal management saves paused metadata and rejects autonomous activation", 
     assert.equal(method, "thread/goal/set"); assert.deepEqual(params, { threadId: "thread", objective: "work", status: "paused" }); return { goal: { status: "paused" } };
   }, async () => {});
 });
+
+test("reset card expiry preserves native seconds, distinguishes null and missing, and never consumes a card",async()=>{
+ const result=await executeCodexOperation({operation:'resetCards.read'},'thread','read-only',async(method,params)=>{
+  assert.equal(method,'account/rateLimits/read');assert.equal(params,null);
+  return {rateLimitResetCredits:{availableCount:4,credits:[
+   {id:'dated',title:'Full reset',status:'available',expiresAt:1791417600},
+   {id:'permanent',status:'available',expiresAt:null},
+   {id:'missing',status:'unknown'},
+   {id:'invalid',status:'available',expiresAt:1e30},
+  ]}};
+ },async()=>assert.fail('Reading cards must not refresh through consumption'));
+ assert.match(result.rows[1]!.detail,/2026-10-08 00:00:00 UTC/);
+ assert.match(result.rows[2]!.detail,/不过期（原生注明）/);
+ assert.match(result.rows[3]!.detail,/未返回有效期/);
+ assert.match(result.rows[4]!.detail,/未返回有效期/);
+ assert.equal(result.rows[1]!.status,'可用');
+});

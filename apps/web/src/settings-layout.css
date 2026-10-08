@@ -226,3 +226,17 @@ dialog.modal.usage-dialog > .usage-body { flex: 1 1 auto; min-height: 0; overflo
 .voice-drag-handle { cursor: grab; touch-action: none; user-select: none; }
 .voice-drag-handle:active { cursor: grabbing; }
 .voice-drag-handle button { cursor: pointer; touch-action: manipulation; }
+
+/* Expanded tools use the full disclosure width and the page's scroll area. */
+.codex-settings-panel.config-disclosure { max-height: none; }
+.codex-settings-panel.config-disclosure > .config-disclosure__body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.codex-operations-panel .stack-form { width: 100%; margin: 0; }
+.codex-operations-panel .stack-form > label:not(.checkbox-row) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 0; }
+.codex-operations-panel .stack-form > label select, .codex-operations-panel .stack-form > label input { width: 100%; min-height: 44px; }
+.codex-operations-panel .stack-form > button { justify-self: start; min-height: 44px; }
+.codex-operation-result { min-width: 0; border-top: 1px solid var(--line); padding-top: 16px; }
+.codex-operations-panel .codex-operation-result dl { max-height: none; overflow: visible; }
+.codex-operations-panel .codex-operation-result dd { white-space: pre-wrap; line-height: 1.7; }
+@media (max-width: 600px) { .codex-operations-panel .stack-form > button { width: 100%; } }
+.codex-operations-panel .stack-form > .checkbox-row { display: flex; align-items: center; gap: 10px; }
+.codex-operations-panel .stack-form > .checkbox-row > input { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; margin: 0; }
