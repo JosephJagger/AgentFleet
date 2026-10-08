@@ -1,3 +1,4 @@
+import {LongTermPreferences} from './long-term-preferences.js';
 import type { SessionHistoryService } from './session-history.js';
 import { assertVoiceAdmission } from "./voice-deployment.js";
 import { VoiceTaskStore } from "./voice-task-store.js";
@@ -138,6 +139,7 @@ export class PanelVoiceService {
     invariant(typeof input==='object'&&input!==null&&!Array.isArray(input),400,"PANEL_INPUT","Invalid tool input");
     const args=input as Record<string,unknown>;
     this.own(principal,voiceId,args.action==='recover');
+    if(typeof args.action==='string'&&['preference.list','preference.save','preference.update','preference.delete'].includes(args.action))return new LongTermPreferences(this.db).tool(principal,args);
     if(args.action==='recover')return this.recover(principal,{cursor:args.cursor,view:args.view});
     if(args.action==='todo.save') {
       const key=typeof args.idempotencyKey==='string'?args.idempotencyKey:`${voiceId}:${hashPayload({intent:args.intent,sessionId:args.sessionId??null})}`;

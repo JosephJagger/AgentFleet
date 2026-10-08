@@ -205,7 +205,7 @@ export class SessionAppServer implements AppServerClient {
       catch (error) { await this.release(writer).catch(() => undefined); throw error; }
     });
   }
-  startVoice(thread: ManagedThread, sdp: string, voice?: string) {
+  startVoice(thread: ManagedThread, sdp: string, voice?: string, preferences?:string) {
     return this.serial(thread.nativeThreadId, async () => {
       if (this.writers.has(thread.nativeThreadId)) throw new AgentError("VOICE_BUSY", "Session writer is still occupied");
       const project=this.callbacks.findProject(thread.projectId);
@@ -219,7 +219,7 @@ export class SessionAppServer implements AppServerClient {
         const pid=writer.client.getProcessId?.();
         if(!pid) throw new AgentError("VOICE_PROCESS_UNVERIFIED", "Cannot verify native voice writer identity");
         await this.callbacks.onVoiceWriter?.(thread.nativeThreadId,pid,restored.observedSettings);
-        await writer.client.startVoice(thread,sdp,voice);
+        await writer.client.startVoice(thread,sdp,voice,preferences);
       } catch(error) {
         // A timeout may still have started native voice. Confirm its closure first.
         if(writer.client.stopVoice) {
@@ -228,6 +228,13 @@ export class SessionAppServer implements AppServerClient {
         }
         throw error;
       }
+    });
+  }
+  updateVoicePreferences(id:string,preferences:string,requestId:string) {
+    return this.serial(id,async()=>{
+      const writer=this.writers.get(id);if(!writer)throw new AgentError("VOICE_FENCED","Voice writer ended");
+      if(!writer.client.updateVoicePreferences)throw new AgentError('VOICE_UNAVAILABLE','Preference updates unsupported');
+      await writer.client.updateVoicePreferences(id,preferences,requestId);
     });
   }
   stopVoice(id: string) {

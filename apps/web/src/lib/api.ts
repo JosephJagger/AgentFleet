@@ -1,3 +1,5 @@
+export type LongTermPreference={id:string;body:string;conditions:string;enabled:boolean;expiresAt:string|null;revision:number};
+export type LongTermPreferenceList={revision:number;items:LongTermPreference[];bytes:number;budget:number};
 export type VoicePreferences = { voice: string; revision: number; voices: string[] };
 import type { CompletionPreferences, WritingPreferencesState } from "./completion-preferences";
 import type { TokenCounts, UsageSummary } from "./usage";
@@ -672,6 +674,9 @@ export const api = {
   adminSystem: () => request<{ authMode: string; registration: string }>("/api/admin/system"),
   runtimeRelease: (signal?: AbortSignal) => request<RuntimeReleaseStatus>("/api/runtime-release", { signal }),
   runtimeReleaseControl: (action: "check" | "pause" | "resume" | "rollback") => request<RuntimeReleaseStatus>("/api/runtime-release/control", { method: "POST", body: JSON.stringify({ action }) }),
+  longTermPreferences: (signal?:AbortSignal)=>request<LongTermPreferenceList>('/api/long-term-preferences',{signal}),
+  saveLongTermPreference: (input:Record<string,unknown>,id?:string)=>request<LongTermPreferenceList>('/api/long-term-preferences'+(id?'/'+encodeURIComponent(id):''),{method:id?'PATCH':'POST',body:JSON.stringify(input)}),
+  deleteLongTermPreference: (id:string,revision:number)=>request<LongTermPreferenceList>('/api/long-term-preferences/'+encodeURIComponent(id),{method:'DELETE',body:JSON.stringify({revision})}),
   voicePreferences: (signal?: AbortSignal) => request<VoicePreferences>("/api/settings/codex/voice", { signal }),
   saveVoicePreferences: (input: { voice: string; revision: number }) => request<VoicePreferences>("/api/settings/codex/voice", { method: "PUT", body: JSON.stringify(input) }),
   runtimePreferences: (scope: import("./codex-settings").SettingsScope, id: string, signal?: AbortSignal) => request<import("./codex-settings").CodexPreferences>(scope === "workspace" ? "/api/settings/codex" : `/api/${scope === "machine" ? "machines" : scope === "project" ? "projects" : "sessions"}/${encodeURIComponent(id)}/codex-settings`, { signal }),

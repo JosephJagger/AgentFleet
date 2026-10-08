@@ -1,3 +1,4 @@
+import {LongTermPreferencesPanel} from './LongTermPreferencesPanel';
 import { SettingsSections } from "./SettingsSections";
 import { Settings2, MessageSquare, Palette, Database } from "lucide-react";
 import { count, t, locale } from "../i18n";
@@ -39,7 +40,7 @@ function HistoryPolicy({ project, onSaved, onToast }: { project: Project; onSave
 }
 
 export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }: { initialMachineId?: string; dashboard: Dashboard; onUpdated: () => Promise<void>; onToast: Notice }) {
-  const [category, setCategory] = useState<"codex" | "writing" | "appearance" | "history" | "security">("codex");
+  const [category, setCategory] = useState<"memory" | "codex" | "writing" | "appearance" | "history" | "security">("codex");
   useEffect(() => { if (initialMachineId) setCategory("codex"); }, [initialMachineId]);
   const [sessions, setSessions] = useState<ClientSessionInfo[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
@@ -98,12 +99,14 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
     <div className="wide-view__heading"><div><h1>{t("设置")}</h1><p>{t("按用途管理默认配置、界面外观和数据。")}</p></div><ShieldCheck size={30} /></div>
     <SettingsSections label={t("设置分类")} value={category} onChange={setCategory} items={[
       {id:"codex",label:t("Codex 配置"),icon:<Settings2 size={19}/>,description:t("模型、语音与权限")},
+      {id:"memory",label:t("长期偏好"),icon:<MessageSquare size={19}/>,description:t("语音规则与跨通话恢复")},
       {id:"writing",label:t("输入辅助"),icon:<MessageSquare size={19}/>,description:t("补全与提示词优化")},
       {id:"appearance",label:t("界面外观"),icon:<Palette size={19}/>,description:t("主题与阅读体验")},
       {id:"history",label:t("云端历史"),icon:<Database size={19}/>,description:t("内容同步与保留时长")},
       {id:"security",label:t("登录安全"),icon:<ShieldCheck size={19}/>,description:t("管理已登录浏览器")},
     ]}/>
     <div className="settings-layout settings-layout--grouped">
+      {category==="memory"&&<LongTermPreferencesPanel key={dashboard.user.id}/>}
       <div className="settings-category" hidden={category !== "codex"}>
       <CodexConfiguration machines={dashboard.machines} initialMachineId={initialMachineId} />
       </div><div className="settings-category settings-category--pair" hidden={category !== "writing"}>

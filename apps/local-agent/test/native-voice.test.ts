@@ -80,3 +80,21 @@ test("reviewed 0.160.1 retains native voice while unknown versions remain gated"
  assert.equal(supportsNativeVoice("0.161.0"),false);
  assert.equal(supportsNativeVoice(undefined),false);
 });
+
+test('voice starts with only explicit preference snapshot; updates use developer role, deduplicate and never start tasks',async()=>{
+ const thread={nativeThreadId:'pref-thread',realtimeSessionId:'voice_pref'} as ManagedThread;
+ const server=new CodexAppServer({} as AppServerCallbacks,'epoch');
+ const requests:{method:string;params:Record<string,unknown>}[]=[];
+ const internal=server as unknown as {request(method:string,params:Record<string,unknown>):Promise<unknown>};
+ internal.request=async(method,params)=>{requests.push({method,params});return {};};
+ const snapshot=JSON.stringify([{id:'english',body:'Correct English before responding. Ask when unclear.',conditions:'When the user speaks English'}]);
+ await server.startVoice(thread,'v=0\r\nm=audio 9\r\n','sol',snapshot);
+ assert.equal(requests[0]!.params.includeStartupContext,false);
+ assert.match(String(requests[0]!.params.prompt),/Correct English before responding/);
+ await server.updateVoicePreferences('pref-thread','[]','revision-2');
+ await server.updateVoicePreferences('pref-thread','[]','revision-2');
+ assert.equal(requests.length,2);assert.equal(requests[1]!.method,'thread/realtime/appendText');assert.equal(requests[1]!.params.role,'developer');
+ assert.match(String(requests[1]!.params.text),/empty list means no saved rules/);
+ await assert.rejects(server.updateVoicePreferences('different','[]','revision-2'),/Voice ended/);
+ assert.equal(requests.some(r=>r.method==='turn/start'),false);
+});

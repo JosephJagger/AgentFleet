@@ -1,3 +1,4 @@
+import {preferenceRules} from './voice-preference-rules.js';
 import { parseRealtimeVoice, supportsNativeVoice } from "./voice-options.js";
 import { PanelVoiceRuntime } from "./panel-voice.js";
 import { parseOutputSchema } from "./output-schema.js";
@@ -1941,10 +1942,12 @@ export class AgentRuntime {
     if(value.action==='stop')return this.panelVoice.stop(id);
     if(value.action==='heartbeat'){this.panelVoice.heartbeat(id);return;}
     if(value.action==='tool.result'){this.panelVoice.result(id,String(value.requestId),value.result);return;}
+    if(value.action==='preferences')return this.panelVoice.preferences(id,preferenceRules(value.preferenceText),String(value.preferenceRequestId));
     if(value.action==='report'&&typeof value.text==='string')return this.panelVoice.report(id,value.text,String(value.reportId));
     if(value.action!=='start'||typeof value.sdp!=='string'||value.sdp.length>65536||!value.sdp.startsWith('v=0\r\n'))throw new AgentError('VOICE_INVALID','Invalid voice offer');
     if(!this.isWritable()||this.store.snapshot().maintenanceDrain||!supportsNativeVoice(this.support.codexVersion))throw new AgentError('VOICE_UNAVAILABLE','Host voice unavailable');
-    return this.panelVoice.start(id,value.sdp,parseRealtimeVoice(value.voice));
+    await this.panelVoice.start(id,value.sdp,parseRealtimeVoice(value.voice),preferenceRules(value.preferenceText));
+    if(typeof value.preferenceRequestId==='string')this.callbacks.onVolatile({type:'voice.event',voiceId:id,event:'reported',requestId:value.preferenceRequestId,producerEpoch:this.producerEpoch,appServerEpoch:this.getAppServerEpoch()});
   }
   handleVoice(value: Record<string, unknown>): Promise<void> {
     const operation=this.voiceLane.catch(()=>undefined).then(()=>this.invokeVoice(value));
@@ -1980,6 +1983,12 @@ export class AgentRuntime {
       this.callbacks.onVolatile({type:"voice.event",voiceId,event:"stopped",throughHostSeq:proof.throughHostSeq,throughProducerEpoch:proof.producerEpoch,previousWriterExitConfirmed:true,producerEpoch:this.producerEpoch,appServerEpoch:this.appServer.appServerEpoch});
       return;
     }
+    if(value.action==='preferences') {
+      if(thread.realtimeSessionId!==voiceId||!this.appServer.updateVoicePreferences)throw new AgentError('VOICE_FENCED','Voice changed');
+      await this.appServer.updateVoicePreferences(thread.nativeThreadId,preferenceRules(value.preferenceText),String(value.preferenceRequestId));
+      this.callbacks.onVolatile({type:'voice.event',voiceId,event:'reported',requestId:value.preferenceRequestId,producerEpoch:this.producerEpoch,appServerEpoch:this.appServer.appServerEpoch});
+      return;
+    }
     if(isClaudeThread(thread.nativeThreadId)) throw new AgentError("VOICE_UNAVAILABLE", "Native voice requires a Codex session");
     if(value.action!=="start" || typeof value.sdp!=="string" || value.sdp.length>65536 || !value.sdp.startsWith("v=0\r\n") || !value.sdp.includes("m=audio ")) throw new AgentError("VOICE_INVALID", "Invalid voice offer");
     if(!this.isWritable() || this.store.snapshot().maintenanceDrain || !supportsNativeVoice(this.support.codexVersion) || !this.appServer.startVoice) throw new AgentError("VOICE_UNAVAILABLE", "请先升级托管 Codex 到支持实时语音的版本并完成会话接管");
@@ -1987,7 +1996,8 @@ export class AgentRuntime {
     if(Object.values(snapshot.managedThreads).some(t=>t.projectId===thread.projectId && (t.activeTurnId || t.realtimeSessionId)) || snapshot.projectReservations[thread.projectId] || Object.values(snapshot.commandJournal).some(c=>["claimed","invoking","responded","unknown"].includes(c.state))) throw new AgentError("VOICE_BUSY", "Project or host operations are still busy");
     await verifyProjectIdentity(projectById(this.store,thread.projectId));
     await this.store.updateManagedThread(thread.nativeThreadId,t=>{ t.appServerEpoch=this.appServer!.appServerEpoch;t.realtimeSessionId=voiceId;t.realtimeWriterEpoch=this.appServer!.appServerEpoch;t.realtimeProducerEpoch=this.producerEpoch;t.subscribed=true; });
-    try { await this.appServer.startVoice({...thread,appServerEpoch:this.appServer.appServerEpoch,realtimeSessionId:voiceId},value.sdp,parseRealtimeVoice(value.voice)); }
+    try { await this.appServer.startVoice({...thread,appServerEpoch:this.appServer.appServerEpoch,realtimeSessionId:voiceId},value.sdp,parseRealtimeVoice(value.voice),preferenceRules(value.preferenceText));
+      if(typeof value.preferenceRequestId==="string")this.callbacks.onVolatile({type:"voice.event",voiceId,event:"reported",requestId:value.preferenceRequestId,producerEpoch:this.producerEpoch,appServerEpoch:this.appServer.appServerEpoch}); }
     catch(error) {
       // A confirmed stop is the only route to a durable exit receipt.
       await this.invokeVoice({...value,action:"stop"});

@@ -30,7 +30,7 @@ test('hangup during startup waits for cleanup, rejects overlapping calls, and do
   let state:unknown;let release!:()=>void;let stops=0;let realtime=0;
   const gate=new Promise<void>(r=>{release=r;});
   const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(value:unknown)=>{state=value;}} as unknown as StateStore;
-  const runtime=new PanelVoiceRuntime(store,()=>undefined,()=>({start:()=>gate,stop:async()=>{stops++;},getProcessId:()=>123,startPanelVoice:async()=>{realtime++;return 'thread';},reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined}));
+  const runtime=new PanelVoiceRuntime(store,()=>undefined,()=>({start:()=>gate,stop:async()=>{stops++;},getProcessId:()=>123,startPanelVoice:async()=>{realtime++;return 'thread';},updateVoicePreferences:async()=>undefined,reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined}));
   const start=runtime.start('pvoice_a','sdp');
   await new Promise(r=>setTimeout(r,10));
   const stop=runtime.stop('pvoice_a');
@@ -43,7 +43,7 @@ test('hangup during startup waits for cleanup, rejects overlapping calls, and do
 test('duplicate delivery acknowledgments append a completion report only once',async()=>{
   let state:unknown;let reports=0;const events:Record<string,unknown>[]=[];
   const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(value:unknown)=>{state=value;}} as unknown as StateStore;
-  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),()=>({start:async()=>undefined,stop:async()=>undefined,getProcessId:()=>123,startPanelVoice:async()=>'thread',reportPanelVoice:async()=>{reports++;},stopVoice:async()=>undefined}));
+  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),()=>({start:async()=>undefined,stop:async()=>undefined,getProcessId:()=>123,startPanelVoice:async()=>'thread',updateVoicePreferences:async()=>undefined,reportPanelVoice:async()=>{reports++;},stopVoice:async()=>undefined}));
   await runtime.start('pvoice_a','sdp');
   await Promise.all([runtime.report('pvoice_a','done','job'),runtime.report('pvoice_a','done','job')]);
   assert.equal(reports,1);assert.equal(events.filter(e=>e.event==='reported').length,2);
@@ -53,7 +53,7 @@ test('duplicate delivery acknowledgments append a completion report only once',a
 test('startup configuration failure is reported before cleanup closes the owner',async()=>{
   let state:unknown;const events:Record<string,unknown>[]=[];
   const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(value:unknown)=>{state=value;}} as unknown as StateStore;
-  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),()=>({start:async()=>undefined,stop:async()=>undefined,getProcessId:()=>123,startPanelVoice:async()=>{throw Error('failed to load configuration: invalid transport SECRET');},reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined}));
+  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),()=>({start:async()=>undefined,stop:async()=>undefined,getProcessId:()=>123,startPanelVoice:async()=>{throw Error('failed to load configuration: invalid transport SECRET');},updateVoicePreferences:async()=>undefined,reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined}));
   await assert.rejects(runtime.start('pvoice_error','sdp'),/invalid transport/);
   assert.deepEqual(events.map(e=>e.event),['error','stopped']);
   assert.equal(events[0]?.message,'VOICE_CONFIG');assert.ok(!JSON.stringify(events).includes('SECRET'));
@@ -63,7 +63,7 @@ test('startup configuration failure is reported before cleanup closes the owner'
 test('native closure disposes the coordinator and allows a new call without waiting for heartbeat expiry',async()=>{
   let state:unknown;let cb!:AppServerCallbacks;let stopped=0;const events:Record<string,unknown>[]=[];
   const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(v:unknown)=>{state=v;}} as unknown as StateStore;
-  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),callbacks=>{cb=callbacks;return {start:async()=>undefined,stop:async()=>{stopped++;},getProcessId:()=>123,startPanelVoice:async()=>'thread',reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined};});
+  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),callbacks=>{cb=callbacks;return {start:async()=>undefined,stop:async()=>{stopped++;},getProcessId:()=>123,startPanelVoice:async()=>'thread',updateVoicePreferences:async()=>undefined,reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined};});
   await runtime.start('pvoice_first','sdp');
   cb.onVolatile({type:'voice.event',payload:{event:'closed'}} as never,'epoch');
   await new Promise(r=>setTimeout(r,20));
@@ -75,7 +75,7 @@ test('native closure disposes the coordinator and allows a new call without wait
 test('stop of a rejected start is acknowledged without stopping another call; unknown persisted ownership remains fenced',async()=>{
   let state:unknown;let stops=0;const events:Record<string,unknown>[]=[];
   const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(v:unknown)=>{state=v;}} as unknown as StateStore;
-  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),()=>({start:async()=>undefined,stop:async()=>{stops++;},getProcessId:()=>123,startPanelVoice:async()=>'thread',reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined}));
+  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),()=>({start:async()=>undefined,stop:async()=>{stops++;},getProcessId:()=>123,startPanelVoice:async()=>'thread',updateVoicePreferences:async()=>undefined,reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined}));
   await runtime.start('pvoice_live','sdp');
   await assert.rejects(runtime.start('pvoice_rejected','sdp'),/active/);
   await runtime.stop('pvoice_rejected');assert.equal(stops,0);assert.equal(events.at(-1)?.voiceId,'pvoice_rejected');

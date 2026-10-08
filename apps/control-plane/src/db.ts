@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 53) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 54) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1432,6 +1432,24 @@ export class ControlPlaneDatabase {
         actor_user_id TEXT NOT NULL REFERENCES users(user_id), created_at TEXT NOT NULL
       ) STRICT;
       PRAGMA user_version=53`); });
+
+    if (version < 54) this.transaction(() => { this.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS voice_preference_versions (
+       workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id), user_id TEXT NOT NULL REFERENCES users(user_id),
+       revision INTEGER NOT NULL, reset_revision INTEGER NOT NULL, PRIMARY KEY(workspace_id,user_id)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS voice_long_term_preferences (
+       id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id), user_id TEXT NOT NULL REFERENCES users(user_id),
+       body TEXT NOT NULL, conditions TEXT NOT NULL, enabled INTEGER NOT NULL, expires_at TEXT, mutation_key TEXT NOT NULL,
+       revision INTEGER NOT NULL, fingerprint TEXT NOT NULL, created_at TEXT NOT NULL, deleted_at TEXT, updated_at TEXT NOT NULL,
+       UNIQUE(workspace_id,user_id,mutation_key)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS voice_preference_save_keys (
+       workspace_id TEXT NOT NULL, user_id TEXT NOT NULL, mutation_key TEXT NOT NULL,
+       preference_id TEXT NOT NULL REFERENCES voice_long_term_preferences(id), fingerprint TEXT NOT NULL,
+       PRIMARY KEY(workspace_id,user_id,mutation_key)
+      ) STRICT;
+      PRAGMA user_version=54`); });
 
   }
 

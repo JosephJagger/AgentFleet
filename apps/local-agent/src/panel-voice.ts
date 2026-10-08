@@ -7,7 +7,7 @@ import { voiceErrorCode } from "./voice-errors.js";
 import { AgentError } from "./errors.js";
 import type { StateStore } from "./store.js";
 
-type PanelClient = Pick<CodexAppServer, 'start'|'stop'|'getProcessId'|'startPanelVoice'|'reportPanelVoice'|'stopVoice'>;
+type PanelClient = Pick<CodexAppServer, 'start'|'stop'|'getProcessId'|'startPanelVoice'|'reportPanelVoice'|'stopVoice'|'updateVoicePreferences'>;
 interface Call { id: string; client: PanelClient; threadId?: string; directory?: string; lastSeen: number; cancelled: boolean; ready: Promise<void>; }
 
 /** A dedicated ephemeral native writer, separate from all project sessions. */
@@ -26,7 +26,7 @@ export class PanelVoiceRuntime {
     this.watchdog.unref();
   }
 
-  async start(id: string, sdp: string, voice?: string) {
+  async start(id: string, sdp: string, voice?: string, preferences?:string) {
     if (this.current || this.stopping || this.store.snapshot().panelVoiceRuntime) throw new AgentError('VOICE_BUSY', 'Panel voice is active or awaiting cleanup');
     const client = this.factory({
       findManagedThread: () => undefined, findProject: () => undefined, onEvent: async () => undefined,
@@ -61,7 +61,7 @@ export class PanelVoiceRuntime {
       await client.start();
       await this.store.setPanelVoiceRuntime({ voiceId: id, ...(client.getProcessId() ? { pid: client.getProcessId()! } : {}) });
       if (call.cancelled) return;
-      call.threadId = await client.startPanelVoice(call.directory, id, sdp, voice);
+      call.threadId = await client.startPanelVoice(call.directory, id, sdp, voice, preferences);
     })();
     try { await call.ready; } catch (error) {
       // Deliver the sanitized cause before stopped, which releases the browser owner.
@@ -83,6 +83,13 @@ export class PanelVoiceRuntime {
     if (!sent) { sent = call.client.reportPanelVoice(call.threadId, text); this.reports.set(reportId, sent); }
     await sent;
     this.emit({type:"voice.event",voiceId:id,event:"reported",requestId:reportId});
+  }
+  async preferences(id:string,text:string,requestId:string) {
+    const call=this.current;if(!call||call.id!==id||call.cancelled)throw new AgentError('VOICE_FENCED','Call ended');
+    await call.ready;
+    if(!call.threadId||call.cancelled)throw new AgentError('VOICE_FENCED','Call ended');
+    await call.client.updateVoicePreferences(call.threadId,text,requestId);
+    this.emit({type:'voice.event',voiceId:id,event:'reported',requestId});
   }
   stop(id?: string): Promise<void> {
     const call = this.current;

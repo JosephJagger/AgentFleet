@@ -28,6 +28,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const [phase, setPhase] = useState<Phase>("idle");
   const [message, setMessage] = useState("");
   const [taskPhase, setTaskPhase] = useState("idle");
+  const [preferenceState,setPreferenceState]=useState('');
+  const [skipPreferences,setSkipPreferences]=useState(false);
   const [muted, setMuted] = useState(false);
   const [transcript,setTranscript] = useState<{role:string;text:string;done:boolean}[]>([]);
   const transcriptArea=useRef<HTMLDivElement>(null);
@@ -40,6 +42,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   activeCallback.current = onActiveChange;
   const cleanup = useRef<(reason?: string) => void>(() => undefined);
   cleanup.current = (reason = "CLIENT_DISPOSED") => {
+    setPreferenceState("");
     generation.current++;
     const owned = resources.current;
     resources.current = {};
@@ -112,10 +115,10 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       socket.onmessage = event => {
         if (!current()) return;
         void (async () => {
-          const value = JSON.parse(String(event.data)) as { type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
+          const value = JSON.parse(String(event.data)) as { status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
           if (value.type === "ready" && !offerSent) {
             offerSent = true;
-            socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
+            socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",skipPreferences,machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", skipPreferences, logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
             resources.current.heartbeat = setInterval(() => {
               if (!current() || socket.readyState !== WebSocket.OPEN) return;
               socket.send(JSON.stringify({ type: "heartbeat" }));
@@ -132,6 +135,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
           else if (value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
           else if(value.type==="task_status_unavailable") setTaskPhase("unknown");
           else if(value.type==="panel_task") { const tasks=Array.isArray(value.tasks)?value.tasks:value.task?[value.task]:[]; onPanelTasks?.(tasks); onPanelTask?.(value.task); if(!value.task){setTaskPhase("idle");return;} setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
+          else if(value.type==="preferences")setPreferenceState(value.status??"unavailable");
           else if (value.type === "error") fail(value.message ?? t("原生实时语音暂不可用"), "SERVER_ERROR");
           else if (value.type === "closed") { cleanup.current("NATIVE_CLOSED"); setPhase("idle"); }
         })().catch(() => fail(t("原生实时语音暂不可用"), "SIGNAL_INVALID"));
@@ -149,6 +153,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     <div className="native-voice__head voice-drag-handle" {...dragging.handle}><strong>{t(globalMachineId ? "面板语音总控" : "语音通话")}</strong><button type="button" className="native-voice__close" aria-label={t("收起语音控制")} onClick={() => { setExpanded(false); trigger.current?.focus(); }}><X size={16} /></button></div>
     <div className={`native-voice__orb${active && !muted ? " native-voice__orb--live" : ""}`} aria-hidden="true">{phase === "connecting" && <LoaderCircle className="spin" size={24} />}</div>
     <p className="native-voice__status" role="status">{status}</p>
+    {!active&&<label className="native-voice__status"><input type="checkbox" checked={skipPreferences} onChange={e=>setSkipPreferences(e.target.checked)}/>{t('本次通话不加载长期偏好')}</label>}
+    {active&&preferenceState&&<p className="native-voice__status" role="status">{t(preferenceState==='disabled'?'本次通话不加载长期偏好':preferenceState==='loaded'?'长期偏好已加载':preferenceState==='reconnect_required'?'偏好已更新，请挂断重连以清除旧规则上下文':preferenceState==='pending'?'长期偏好同步中':'长期偏好暂未加载；通话仍保持连接')}</p>}
     {message && <p className="native-voice__error" role="alert">{message}</p>}
     {active && <p className="native-voice__task" role="status">{t(activeTurnId || taskPhase === "running" ? "项目任务正在执行" : taskPhase === "delegated" ? "已派发，等待项目任务启动" : taskPhase === "completed" ? "项目任务已完成，结果见会话" : taskPhase === "failed" ? "项目任务未完成，请查看会话结果" : taskPhase === "unknown" ? "任务状态暂不可用，通话可继续" : "尚未派发项目任务")}</p>}
     {active && <div className="native-voice__actions">

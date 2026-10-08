@@ -1,3 +1,4 @@
+import {LongTermPreferences,supportsVoicePreferences} from './long-term-preferences.js';
 import { panelVoiceBindingMatches, type PanelTransportBinding } from './panel-voice-binding.js';
 import { SessionHistoryService } from './session-history.js';
 import { SessionHistoryBroker } from './session-history-broker.js';
@@ -258,8 +259,42 @@ export async function buildControlPlane(
     if(!agent||!panelVoiceBindingMatches(agent,binding,action))return false;
     return sendJson(agent.socket,{type:'voice.control',kind:'panel',voiceId,action,...binding,...extra});
   };
+
+  const longTermPreferences=new LongTermPreferences(db);
+  const preferenceCalls=new Map<string,{userId:string;workspaceId:string;initialReset:number;hash:string;pending:string;received:string;needsReconnect:boolean;rules:Set<string>;disabled:boolean}>();
+  function preferenceStart(principal:Principal,agentVersion:string,disabled=false) {
+    if(disabled)return {revision:0,resetRevision:0,rules:[],text:'[]',bytes:2,budget:8192};
+    const snapshot=longTermPreferences.snapshot(principal);
+    invariant(!snapshot.revision||supportsVoicePreferences(agentVersion),409,'VOICE_PREFERENCE_UPGRADE','长期偏好需要连接服务 0.30.90 或更新版本，请在通话结束后更新主机');
+    return snapshot;
+  }
+  function trackPreferences(id:string,p:Principal,snapshot:ReturnType<LongTermPreferences['snapshot']>,agentVersion:string,disabled=false) {
+    if(!supportsVoicePreferences(agentVersion))return {};
+    const hash=sha256(snapshot.text),requestId='pref:'+snapshot.revision+':'+hash;
+    preferenceCalls.set(id,{userId:p.userId,workspaceId:p.workspaceId,initialReset:snapshot.resetRevision,disabled,hash,pending:requestId,received:'',needsReconnect:false,rules:new Set(snapshot.rules.map(r=>r.id))});
+    return {preferenceText:snapshot.text,preferenceRequestId:requestId};
+  }
+  function preferenceStatus(id:string,socket:WebSocket) {
+    const state=preferenceCalls.get(id);if(state)sendJson(socket,{type:'preferences',status:state.disabled?'disabled':state.needsReconnect?'reconnect_required':state.received===state.pending?'loaded':'pending'});
+  }
+  function refreshPreferences(id:string,p:Principal,socket:WebSocket) {
+    const state=preferenceCalls.get(id);if(!state||state.userId!==p.userId||state.workspaceId!==p.workspaceId)return;
+    if(state.disabled){preferenceStatus(id,socket);return;}
+    try {
+      const snapshot=longTermPreferences.snapshot(p),hash=sha256(snapshot.text);
+      if(hash!==state.hash){
+        state.needsReconnect ||=snapshot.resetRevision>state.initialReset||[...state.rules].some(rule=>!snapshot.rules.some(r=>r.id===rule));
+        state.hash=hash;state.pending='pref:'+snapshot.revision+':'+hash;state.rules=new Set(snapshot.rules.map(r=>r.id));
+      }
+      if(state.received!==state.pending){
+        if(id.startsWith('pvoice_'))sendPanel(id,'preferences',{preferenceText:snapshot.text,preferenceRequestId:state.pending});
+        else {const row=nativeVoice.get(id);if(row){const binding=JSON.parse(row.binding_json),agent=agents.get(row.machine_id);if(agent?.reconciliationReady)sendJson(agent.socket,{type:'voice.control',...binding,action:'preferences',preferenceText:snapshot.text,preferenceRequestId:state.pending});}}
+      }
+      preferenceStatus(id,socket);
+    }catch{sendJson(socket,{type:'preferences',status:'unavailable'});}
+  }
   const panelReports=new Map<string,number>();
-  const stopPanel=(id:string)=>{const call=panelVoice.get(id);if(!call||call.state==='closed')return;const sent=sendPanel(id,'stop');panelVoice.state(id,sent?'closing':'closed');panelOwners.delete(id);panelReports.delete(id);};
+  const stopPanel=(id:string)=>{const call=panelVoice.get(id);if(!call||call.state==='closed')return;const sent=sendPanel(id,'stop');panelVoice.state(id,sent?'closing':'closed');panelOwners.delete(id);panelReports.delete(id);preferenceCalls.delete(id);};
   const sweepPanel=()=>{
     for(const call of panelVoice.pending()) {
       const owner=panelOwners.get(call.voice_id);
@@ -1035,6 +1070,12 @@ export async function buildControlPlane(
     }
     return {sessions:registry.listSessions(request.principal as Principal)};
   });
+  app.get('/api/long-term-preferences',{preHandler:authenticate},async(request,reply)=>{
+    reply.header('cache-control','no-store');return longTermPreferences.list(request.principal as Principal);
+  });
+  app.post('/api/long-term-preferences',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body)));
+  app.patch('/api/long-term-preferences/:id',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body),routeId(request)));
+  app.delete('/api/long-term-preferences/:id',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body),routeId(request),true));
   app.get("/api/voice-tasks", {preHandler:authenticate}, async (request,reply)=>{
     reply.header('cache-control','no-store');return panelVoice.recover(request.principal as Principal,request.query as {cursor?:unknown;view?:unknown});
   });
@@ -1459,12 +1500,13 @@ export async function buildControlPlane(
           const agent=agents.get(machineId);
           invariant(agent?.realtimeVoice&&agent.reconciliationReady&&!agent.dispatchPaused&&agent.producerEpoch&&agent.appServerEpoch,409,"VOICE_UNAVAILABLE","语音主机暂不可用");
           const voice=new VoicePreferencesService(db).forStart(principal,String(machine.agentVersion));
+          const preferenceSnapshot=preferenceStart(principal,String(machine.agentVersion),value.skipPreferences===true);
           const call=panelVoice.start(principal,machineId,{producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,transportGeneration:agent.identity.transportGeneration});
           voiceId=call.voice_id;panelOwners.set(voiceId,{socket,token,lastSeen:Date.now(),lastPing:Date.now()});
-          invariant(sendPanel(voiceId,'start',{sdp:value.sdp,voice}),409,"VOICE_OFFLINE","主机连接中断");
+          invariant(sendPanel(voiceId,'start',{sdp:value.sdp,voice,...trackPreferences(voiceId,principal,preferenceSnapshot,String(machine.agentVersion),value.skipPreferences===true)}),409,"VOICE_OFFLINE","主机连接中断");
         } else if(voiceId?.startsWith('pvoice_')) {
           const owner=panelOwners.get(voiceId);invariant(owner?.socket===socket,403,"VOICE_NOT_OWNER","总控通话已结束");
-          if(value.type==='heartbeat'){owner.lastSeen=Date.now();sendPanel(voiceId,'heartbeat');sendJson(socket,{type:'heartbeat'});}
+          if(value.type==='heartbeat'){owner.lastSeen=Date.now();sendPanel(voiceId,'heartbeat');refreshPreferences(voiceId,principal,socket);sendJson(socket,{type:'heartbeat'});}
           else if(value.type==='stop'){panelVoice.recordCloseReason(voiceId,value.reason);stopPanel(voiceId);}
           else throw new AppError(400,'VOICE_INVALID','Invalid global voice action');
         } else if(value.type==="start") {
@@ -1475,14 +1517,16 @@ export async function buildControlPlane(
           const agent=agents.get(session.machineId);
           invariant(agent?.realtimeVoice && agent.reconciliationReady && !agent.dispatchPaused && agent.producerEpoch && agent.appServerEpoch && agent.socket.readyState===WebSocket.OPEN,409,"VOICE_UNAVAILABLE","主机暂不支持原生实时语音，请更新连接服务与托管 Codex");
           const voice=new VoicePreferencesService(db).forStart(principal,String(registry.getMachine(principal,session.machineId).agentVersion));
+          const preferenceSnapshot=preferenceStart(principal,String(registry.getMachine(principal,session.machineId).agentVersion),value.skipPreferences===true);
           const binding=nativeVoice.start(principal,id,requiredString(value.leaseId,"leaseId",200),{producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,transportGeneration:agent.identity.transportGeneration});
           voiceId=binding.voiceId;
           voiceOwners.set(voiceId,{socket,lastSeen:Date.now(),lastPing:Date.now(),controlHeartbeat:value.controlHeartbeat===true,token});
           refreshVoiceControl(voiceId);
-          invariant(sendJson(agent.socket,{type:"voice.control",...binding,action:"start",sdp:value.sdp,voice}),409,"VOICE_OFFLINE","主机语音连接未完成");
+          invariant(sendJson(agent.socket,{type:"voice.control",...binding,action:"start",sdp:value.sdp,voice,...trackPreferences(voiceId,principal,preferenceSnapshot,String(registry.getMachine(principal,session.machineId).agentVersion),value.skipPreferences===true)}),409,"VOICE_OFFLINE","主机语音连接未完成");
         } else if(value.type==="heartbeat" && voiceId) {
           const owner=voiceOwners.get(voiceId);
           invariant(owner?.socket===socket,403,"VOICE_NOT_OWNER","Voice owner changed");
+          refreshPreferences(voiceId,principal,socket);
           if (owner.controlHeartbeat) refreshVoiceControl(voiceId);
           else owner.lastSeen=Date.now();
           sendJson(socket,{type:"heartbeat"});
@@ -1499,7 +1543,7 @@ export async function buildControlPlane(
       if (!voiceId || !voiceOwners.get(voiceId)?.controlHeartbeat) return;
       try { refreshVoiceControl(voiceId); } catch { stopVoice(voiceId); }
     });
-    socket.on("close",()=>{if(voiceId?.startsWith("pvoice_")){panelVoice.recordCloseReason(voiceId,"SIGNAL_CLOSED");stopPanel(voiceId);return;}if(voiceId) { nativeVoice.recordCloseReason(voiceId,"SIGNAL_CLOSED"); voiceOwners.delete(voiceId);stopVoice(voiceId); }});
+    socket.on("close",()=>{if(voiceId)preferenceCalls.delete(voiceId);if(voiceId?.startsWith("pvoice_")){panelVoice.recordCloseReason(voiceId,"SIGNAL_CLOSED");stopPanel(voiceId);return;}if(voiceId) { nativeVoice.recordCloseReason(voiceId,"SIGNAL_CLOSED"); voiceOwners.delete(voiceId);stopVoice(voiceId); }});
   });
 
   app.get(
@@ -1770,7 +1814,7 @@ export async function buildControlPlane(
               if(!owner){stopPanel(call.voice_id);return;}
               const principal=auth.authenticateToken(owner.token);
               if(message.event==='sdp'){invariant(call.state==='starting'&&validVoiceOffer(message.sdp),400,"VOICE_INVALID","Invalid voice answer");panelVoice.state(call.voice_id,'active');sendJson(owner.socket,{type:'answer',sdp:message.sdp});}
-              else if(message.event==='reported'){if(typeof message.requestId==='string')panelVoice.acknowledgeReport(call.voice_id,message.requestId);}
+              else if(message.event==='reported'){if(message.requestId?.startsWith('pref:')){const state=preferenceCalls.get(call.voice_id);if(state&&state.pending===message.requestId)state.received=message.requestId;preferenceStatus(call.voice_id,owner.socket);}else if(typeof message.requestId==='string')panelVoice.acknowledgeReport(call.voice_id,message.requestId);}
               else if(message.event==='panel_tool'){
                 const requestId=requiredString(message.requestId,'requestId',80);
                 void (async()=>{let result:unknown;
@@ -1800,6 +1844,8 @@ export async function buildControlPlane(
               if(row.state!=="starting" || !owner) return;
               invariant(typeof message.sdp==="string" && message.sdp.length<=65536 && message.sdp.startsWith("v=0\r\n"),400,"VOICE_INVALID","Invalid voice answer");
               nativeVoice.state(row.voice_id,"active");sendJson(owner.socket,{type:"answer",sdp:message.sdp});
+            } else if(message.event==="reported"&&message.requestId?.startsWith('pref:')&&owner) {
+              const state=preferenceCalls.get(row.voice_id);if(state&&state.pending===message.requestId)state.received=message.requestId;preferenceStatus(row.voice_id,owner.socket);
             } else if(message.event==="transcript") {
               if(row.state!=="active" || !owner) return;
               invariant(["user","assistant"].includes(String(message.role)) && typeof message.text==="string" && message.text.length<=8000 && typeof message.final==="boolean",400,"VOICE_INVALID","Invalid voice transcript");

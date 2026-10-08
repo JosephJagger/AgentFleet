@@ -1477,3 +1477,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .panel-voice-control__task-target svg { flex-shrink:0; }
 .panel-voice-control__task-target:hover strong { text-decoration:underline; }
 .panel-voice-control__task-detail { font-size:var(--text-small); }
+
+.long-term-preferences > header { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.long-term-preferences__entry { padding:18px 0; border-top:1px solid var(--line); overflow-wrap:anywhere; }
+.long-term-preferences__entry p { white-space:pre-wrap; margin:0 0 8px; }
+.long-term-preferences__actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+.long-term-preferences__editor { padding:18px; margin:16px 0; border:1px solid var(--line); border-radius:var(--radius-md); display:grid; gap:14px; }
+.long-term-preferences__editor label { display:grid; gap:7px; }
+.long-term-preferences__editor textarea,.long-term-preferences__editor input { width:100%; min-width:0; background:var(--paper); color:var(--ink); border:1px solid var(--line); border-radius:var(--radius-sm); padding:10px; box-sizing:border-box; }

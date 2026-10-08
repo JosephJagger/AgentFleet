@@ -245,3 +245,17 @@ it("panel task status failures and completion keep audio connected",async()=>{
  await waitFor(()=>expect(screen.getByText('项目任务已完成，结果见会话')).toBeTruthy());
  expect(socket.readyState).toBe(1);expect(track.stop).not.toHaveBeenCalled();
 });
+
+it('preference changes and read failures keep audio alive and clearly require reconnect to clear old context',async()=>{
+ render(<NativeVoicePanel sessionId="session" canStart onActiveChange={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'开始语音'}));
+ await waitFor(()=>expect(Socket.all).toHaveLength(1));
+ const socket=Socket.all[0]!;
+ await act(async()=>{socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});socket.receive({type:'preferences',status:'loaded'});});
+ expect(screen.getByText('长期偏好已加载')).toBeTruthy();
+ act(()=>socket.receive({type:'preferences',status:'reconnect_required'}));
+ expect(screen.getByText('偏好已更新，请挂断重连以清除旧规则上下文')).toBeTruthy();
+ act(()=>socket.receive({type:'preferences',status:'unavailable'}));
+ expect(screen.getByText('长期偏好暂未加载；通话仍保持连接')).toBeTruthy();
+ expect(track.stop).not.toHaveBeenCalled();expect(Peer.all[0]!.closed).toBe(false);expect(socket.readyState).toBe(1);
+});
