@@ -1,3 +1,4 @@
+import { resetCardDetail } from "../lib/reset-card-time";
 import { Settings2 } from "lucide-react";
 import { ConfigDisclosureSummary } from "./ConfigDisclosureSummary";
 import { HOST_CODEX_OPERATIONS } from "../lib/host-codex";
@@ -159,6 +160,6 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
     </form>
     {hostReceipt?.error && <p role="alert">{systemText(hostReceipt.error.message)}</p>}
     {receipt?.message ? <p role="alert">{systemText(receipt.message)}</p> : message && !result && <p role="status">{message}</p>}
-    {result && <div className="codex-operation-result" aria-live="polite"><p>{t("宿主机返回")}: {t(statusLabel(result.status))}</p>{result.rows.length > 0 && <dl>{result.rows.map((row, index) => <div key={index}><dt>{systemText(row.name)}<small>{systemText(row.status)}</small></dt><dd>{row.detail}</dd></div>)}</dl>}{result.url && <a className="button button--quiet" href={result.url} target="_blank" rel="noopener noreferrer">{t("打开授权页面")}</a>}{result.nextCursor && <button className="button button--quiet" disabled={!editable} onClick={() => void run(result.nextCursor)}>{t("下一页")}</button>}{result.status === "unavailable" && <p>{t("当前账号未返回此项数据，无法据此计算用量。")}</p>}</div>}
+    {result && <div className="codex-operation-result" aria-live="polite"><p>{t("宿主机返回")}: {t(statusLabel(result.status))}</p>{result.rows.length > 0 && <dl>{result.rows.map((row, index) => <div key={index}><dt>{systemText(row.name)}<small>{systemText(row.status)}</small></dt><dd>{result.operation === "resetCards.read" ? resetCardDetail(row.detail, t("北京时间（UTC+8）")) : row.detail}</dd></div>)}</dl>}{result.url && <a className="button button--quiet" href={result.url} target="_blank" rel="noopener noreferrer">{t("打开授权页面")}</a>}{result.nextCursor && <button className="button button--quiet" disabled={!editable} onClick={() => void run(result.nextCursor)}>{t("下一页")}</button>}{result.status === "unavailable" && <p>{t("当前账号未返回此项数据，无法据此计算用量。")}</p>}</div>}
   </div></details>;
 }

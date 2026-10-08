@@ -3193,5 +3193,6 @@
   "偏好已更新，请挂断重连以清除旧规则上下文": "Preferences changed. Reconnect to clear old rule context.",
   "长期偏好同步中": "Syncing long-term preferences",
   "长期偏好暂未加载；通话仍保持连接": "Preferences not loaded; call stays connected",
-  "本次通话不加载长期偏好": "Do not load preferences for this call"
+  "本次通话不加载长期偏好": "Do not load preferences for this call",
+  "北京时间（UTC+8）": "Beijing time (UTC+8)"
 }
