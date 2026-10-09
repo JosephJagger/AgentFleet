@@ -1,3 +1,4 @@
+import { deliveryPlan, deliveredPath } from './file-delivery.js';
 import {LongTermPreferences,supportsVoicePreferences} from './long-term-preferences.js';
 import { panelVoiceBindingMatches, type PanelTransportBinding } from './panel-voice-binding.js';
 import { SessionHistoryService } from './session-history.js';
@@ -1162,6 +1163,21 @@ export async function buildControlPlane(
       return {...summary,resetPrediction,resetRadar:resetRadar.status()};
     });
   }
+  app.post("/api/sessions/:id/file-deliveries", { preHandler: mutate }, async request => {
+    const principal = request.principal as Principal, sessionId = routeId(request), body = record(request.body);
+    invariant(body.confirmed === true, 400, "FILE_DELIVERY_CONFIRMATION_REQUIRED", "请确认将所选文件复制到本项目，原文件会保留");
+    const binding = db.get<{canonical_root:string; platform:string; provider:string}>(
+      `SELECT p.canonical_root,m.platform,p.provider FROM logical_sessions s JOIN projects p ON p.project_id=s.project_id JOIN machines m ON m.machine_id=s.machine_id WHERE s.logical_session_id=? AND s.workspace_id=? AND s.deleted_at IS NULL`,sessionId,principal.workspaceId);
+    invariant(binding,404,"SESSION_NOT_FOUND","Logical Session was not found");
+    const mutationId=requiredString(body.clientMutationId,"clientMutationId",200);
+    const plan=deliveryPlan({path:requiredString(body.path,"path",1800),root:binding.canonical_root,platform:binding.platform,provider:binding.provider,sessionId,userId:principal.userId,mutationId});
+    const result=coordination.createCommand(principal,sessionId,{type:"codex.manage",clientMutationId:mutationId,
+      controlLeaseId:requiredString(body.controlLeaseId,"controlLeaseId",200),precondition:record(body.precondition),
+      payload:{operation:"terminal.run",arguments:{argv:plan.argv,confirmed:true}}});
+    if (!result.duplicate) dispatchCommand(result.command);
+    broadcastSession(sessionId,{type:"command.changed",logicalSessionId:sessionId,command:result.command});
+    return {...result,path:plan.path};
+  });
   app.get("/api/sessions/:id/files", { preHandler: authenticate }, async (request, reply) => {
     const principal = request.principal as Principal;
     const logicalSessionId = routeId(request);
@@ -1203,7 +1219,7 @@ export async function buildControlPlane(
     };
     transfer.timer.unref();
     projectFiles.set(requestId, transfer);
-    if (!sendJson(agent.socket, { type: "file.read", requestId, logicalSessionId, projectExternalId: binding.external_id, path })) {
+    if (!sendJson(agent.socket, { type: "file.read", requestId, logicalSessionId, projectExternalId: binding.external_id, path: deliveredPath(db,principal,logicalSessionId,path,id=>coordination.getCommand(principal,id)) ?? path })) {
       failProjectFile(requestId, new AppError(503, "FILE_TRANSPORT_LOST", "Host connection was lost before file transfer"));
     }
     const metadata = await started;

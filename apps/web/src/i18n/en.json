@@ -3196,5 +3196,20 @@
   "本次通话不加载长期偏好": "Do not load preferences for this call",
   "北京时间（UTC+8）": "Beijing time (UTC+8)",
   "正在读取配置": "Reading configuration",
-  "确认删除": "Confirm deletion"
+  "确认删除": "Confirm deletion",
+  "文件保存在项目外。可将此文件复制到项目内交付，原文件会保留。": "This file is outside the project. You can copy it into the project for delivery while keeping the original.",
+  "文件已移动或删除，请在会话中重新准备交付文件。": "The file was moved or deleted. Prepare a new delivery in this session.",
+  "主机暂不可用，请连接主机后重试。": "The host is unavailable. Reconnect it and try again.",
+  "文件超过 50 MiB，请压缩或拆分后下载。": "The file exceeds 50 MiB. Compress or split it before downloading.",
+  "文件传输超时，请检查主机连接后重试。": "The transfer timed out. Check the host connection and try again.",
+  "文件读取失败，请检查主机和文件状态后重试。": "Could not read the file. Check the host and file, then try again.",
+  "文件传输不完整，请重试。": "The file transfer was incomplete. Please try again.",
+  "文件读取失败，请重试。": "Could not read the file. Please try again.",
+  "将此文件复制到当前项目内用于下载？保留原文件，不覆盖已有文件；仅在主机空闲且权限允许时执行。": "Copy this file into the current project for download? The original is kept and existing files are not overwritten. This requires an idle host and sufficient session permissions.",
+  "交付未完成，请在操作记录中查看主机返回；不会自动重试。": "Delivery did not complete. Check the host response in operation history. It will not retry automatically.",
+  "交付结果待核验，请查看操作记录；不会自动重试。": "The delivery outcome needs verification. Check operation history. It will not retry automatically.",
+  "交付未完成，请查看操作记录。": "Delivery did not complete. Check operation history.",
+  "正在读取或准备文件…": "Reading or preparing the file…",
+  "复制到项目交付": "Copy into project for delivery",
+  "交付副本已准备好，请点击预览或下载。": "The delivery copy is ready. Click Preview or Download."
 }

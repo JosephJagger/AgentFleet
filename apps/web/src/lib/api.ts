@@ -822,6 +822,15 @@ export const api = {
     const projects = machines.flatMap((machine) => machine.projects);
     return { session: mapSession(raw, machines, projects, cached?.user.clientSessionId ?? "") };
   },
+  async prepareFileDelivery(id: string, path: string, mutationId: string) {
+    const { session } = await api.codexManagementContext(id);
+    const { lease } = await api.acquireLease(id);
+    const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}/file-deliveries`, { method: "POST", body: JSON.stringify({
+      path, confirmed: true, clientMutationId: mutationId, controlLeaseId: lease.id,
+      precondition: { nativeThreadId: session.nativeThreadId, executionSegmentId: session.executionSegmentId, threadControlVersion: session.threadControlVersion, expectedActiveTurnId: session.activeTurnId ?? null, projectLeaseVersion: session.projectLeaseVersion }
+    }) });
+    return { command: mapCommandReceipt(raw.command), path: string(raw.path) };
+  },
   async acquireLease(logicalSessionId: string, expectedVersion?: number) {
     const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(logicalSessionId)}/control-lease`, {
       method: "POST",

@@ -535,6 +535,11 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   assert.equal(downloadedFile.response.body, downloadedFile.bytes.toString());
   assert.match(String(downloadedFile.response.headers["content-disposition"]), /^attachment;/u);
 
+  const unconfirmedDelivery = await app.inject({method:"POST",url:`/api/sessions/${session.logicalSessionId}/file-deliveries`,headers:browserHeaders,payload:{path:"/outside/report.pdf"}});
+  assert.equal(unconfirmedDelivery.statusCode,400);
+  assert.equal(JSON.parse(unconfirmedDelivery.body).error.code,"FILE_DELIVERY_CONFIRMATION_REQUIRED");
+  const missingDelivery = await app.inject({method:"POST",url:"/api/sessions/other-workspace-session/file-deliveries",headers:browserHeaders,payload:{confirmed:true,path:"/outside/report.pdf"}});
+  assert.equal(missingDelivery.statusCode,404);
   const leaseResponse = await app.inject({
     method: "POST",
     url: `/api/sessions/${session.logicalSessionId}/control-lease`,

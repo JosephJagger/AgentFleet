@@ -1,5 +1,6 @@
+import { api } from "./lib/api";
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MarkdownMessage } from "./components/MarkdownMessage";
 
@@ -88,4 +89,45 @@ it("does not turn commands, directories, remote URLs or fenced code into host fi
 it("keeps file paths inert without a session binding",()=>{
  render(<MarkdownMessage body='文件：`/root/blog-cs/PRD.md`。'/>);
  expect(screen.queryByRole("link",{name:"下载"})).toBeNull();
+});
+
+it('shows a scoped delivery recovery action only for outside-project errors', async () => {
+  const fetchMock=vi.fn().mockResolvedValue({ok:false,json:async()=>({error:{code:'FILE_OUTSIDE_PROJECT'}})});
+  vi.stubGlobal('fetch',fetchMock);
+  try {
+    render(<MarkdownMessage sessionId="session" body="[report.pdf](/outside/report.pdf)" />);
+    fireEvent.click(screen.getByRole('link',{name:'下载'}));
+    await waitFor(()=>expect(screen.getByRole('alert').textContent).toContain('FILE_OUTSIDE_PROJECT'));
+    expect(screen.getByRole('button',{name:'复制到项目交付'})).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty('method','POST');
+  } finally {vi.unstubAllGlobals();}
+});
+it('does not offer exporting missing files',async()=>{
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:false,json:async()=>({error:{code:'FILE_NOT_FOUND'}})}));
+ try {render(<MarkdownMessage sessionId="session" body="[report.pdf](/outside/report.pdf)" />);
+ fireEvent.click(screen.getByRole('link',{name:'下载'}));
+ await waitFor(()=>expect(screen.getByRole('alert').textContent).toContain('FILE_NOT_FOUND'));
+ expect(screen.queryByRole('button',{name:'复制到项目交付'})).toBeNull();
+ }finally{vi.unstubAllGlobals();}
+});
+
+it('only enables the delivery copy after its exact command succeeds', async () => {
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:false,json:async()=>({error:{code:'FILE_OUTSIDE_PROJECT'}})}));
+ const confirm=vi.spyOn(window,'confirm').mockReturnValue(true);
+ const prepare=vi.spyOn(api,'prepareFileDelivery').mockResolvedValue({path:'/project/delivery/report.pdf',command:{id:'copy-1',type:'codex.manage',state:'accepted',createdAt:''}});
+ const receipts=vi.spyOn(api,'commandReceipts').mockResolvedValue([{id:'other-copy',type:'codex.manage',state:'applied',outcome:'succeeded',createdAt:'',codexResult:{operation:'terminal.run',status:'completed',rows:[]}}]);
+ try {
+  render(<MarkdownMessage sessionId="session" body="[report.pdf](/outside/report.pdf)" />);
+  fireEvent.click(screen.getByRole('link',{name:'下载'}));
+  await screen.findByRole('button',{name:'复制到项目交付'});
+  vi.useFakeTimers();
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'复制到项目交付'}));});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1500);});
+  expect(screen.queryByText('交付副本已准备好，请点击预览或下载。')).toBeNull();
+  receipts.mockResolvedValue([{id:'copy-1',type:'codex.manage',state:'applied',outcome:'succeeded',createdAt:'',codexResult:{operation:'terminal.run',status:'completed',rows:[]}}]);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1500);});
+  expect(screen.getByRole('link',{name:'下载'}).getAttribute('href')).toContain(encodeURIComponent('/project/delivery/report.pdf'));
+  expect(prepare).toHaveBeenCalledTimes(1);
+ }finally{vi.useRealTimers();confirm.mockRestore();prepare.mockRestore();receipts.mockRestore();vi.unstubAllGlobals();}
 });

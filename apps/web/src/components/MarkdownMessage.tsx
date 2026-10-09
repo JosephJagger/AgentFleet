@@ -1,3 +1,4 @@
+import { api } from "../lib/api";
 import { Children, isValidElement, memo, useMemo, useState, type ReactNode } from "react";
 import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -126,12 +127,75 @@ function remarkHostFilePaths() {
 }
 
 function LocalFileLink({ sessionId, path, children }: { sessionId: string; path: string; children?: ReactNode }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [outside, setOutside] = useState(false);
+  const [delivered, setDelivered] = useState<string>();
+  async function read(download: boolean) {
+    if (busy) return;
+    setBusy(true); setError(""); setOutside(false);
+    const preview = !download ? window.open("about:blank", "_blank") : null;
+    if (preview) preview.opener = null;
+    try {
+      const response = await fetch(fileUrl(sessionId, delivered ?? path, download), { credentials: "same-origin", headers: { Accept: "application/json" } });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const code = body.error?.code;
+        setOutside(code === "FILE_OUTSIDE_PROJECT");
+        const messages: Record<string, string> = {
+          FILE_OUTSIDE_PROJECT: "文件保存在项目外。可将此文件复制到项目内交付，原文件会保留。",
+          FILE_NOT_FOUND: "文件已移动或删除，请在会话中重新准备交付文件。",
+          FILE_HOST_UNAVAILABLE: "主机暂不可用，请连接主机后重试。",
+          FILE_TOO_LARGE: "文件超过 50 MiB，请压缩或拆分后下载。",
+          FILE_TRANSFER_TIMEOUT: "文件传输超时，请检查主机连接后重试。",
+        };
+        throw new Error(t(messages[code] ?? "文件读取失败，请检查主机和文件状态后重试。") + (code ? ` (${code})` : ""));
+      }
+      const blob = await response.blob();
+      const expected = response.headers.get("content-length");
+      if (expected && blob.size !== Number(expected)) throw new Error(t("文件传输不完整，请重试。"));
+      const mime = response.headers.get("content-type")?.split(";")[0] ?? "";
+      const safePreview = /^(application\/pdf|image\/(png|jpeg|webp|gif)|video\/(mp4|webm|quicktime)|text\/plain)$/.test(mime);
+      const url = URL.createObjectURL(new Blob([blob], { type: safePreview ? mime : "application/octet-stream" }));
+      if (preview && safePreview) {
+        preview.location.replace(url);
+        const timer = window.setInterval(() => { if (preview.closed) { URL.revokeObjectURL(url); window.clearInterval(timer); } }, 3000);
+      } else {
+        preview?.close();
+        const link = document.createElement("a"); link.href = url; link.download = (delivered ?? path).split(/[\\/]/).at(-1) || "download";
+        document.body.append(link); link.click(); link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+    } catch (e) { preview?.close(); setError(e instanceof Error ? e.message : t("文件读取失败，请重试。")); }
+    finally { setBusy(false); }
+  }
+  async function prepare() {
+    if (busy || !window.confirm(t("将此文件复制到当前项目内用于下载？保留原文件，不覆盖已有文件；仅在主机空闲且权限允许时执行。") + `\n${path}`)) return;
+    setBusy(true); setError("");
+    try {
+      const result = await api.prepareFileDelivery(sessionId, path, crypto.randomUUID());
+      for (let i = 0; i < 35; i++) {
+        await new Promise(resolve => window.setTimeout(resolve, 1500));
+        const receipt = (await api.commandReceipts(sessionId)).find(c => c.id === result.command.id);
+        if (receipt?.outcome === "succeeded") {
+          if (receipt.codexResult?.status !== "completed") throw new Error(t("交付未完成，请在操作记录中查看主机返回；不会自动重试。"));
+          setDelivered(result.path); setOutside(false); return;
+        }
+        if (receipt?.outcome === "failed" || receipt?.outcome === "unknown") throw new Error(receipt.message || t("交付结果待核验，请查看操作记录；不会自动重试。"));
+      }
+      throw new Error(t("交付结果待核验，请查看操作记录；不会自动重试。"));
+    } catch (e) { setOutside(false); setError(e instanceof Error ? e.message : t("交付未完成，请查看操作记录。")); }
+    finally { setBusy(false); }
+  }
   return <span className="markdown-file">
     <span className="markdown-file__name">{children}</span>
     <span className="markdown-file__actions">
-      <a href={fileUrl(sessionId, path)} target="_blank" rel="noopener noreferrer" title={t("预览文件")}><Eye size={13} />{t("预览")}</a>
-      <a href={fileUrl(sessionId, path, true)} target="_blank" rel="noopener noreferrer" title={t("下载文件")}><Download size={13} />{t("下载")}</a>
+      <a href={fileUrl(sessionId, delivered ?? path)} target="_blank" rel="noopener noreferrer" aria-disabled={busy} onClick={e => { e.preventDefault(); void read(false); }} title={t("预览文件")}><Eye size={13} />{t("预览")}</a>
+      <a href={fileUrl(sessionId, delivered ?? path, true)} target="_blank" rel="noopener noreferrer" aria-disabled={busy} onClick={e => { e.preventDefault(); void read(true); }} title={t("下载文件")}><Download size={13} />{t("下载")}</a>
     </span>
+    {busy && <span role="status">{t("正在读取或准备文件…")}</span>}
+    {error && <span className="markdown-file__error" role="alert">{error}{outside && <button type="button" disabled={busy} onClick={() => void prepare()}>{t("复制到项目交付")}</button>}</span>}
+    {delivered && <span className="markdown-file__notice" role="status">{t("交付副本已准备好，请点击预览或下载。")}</span>}
   </span>;
 }
 
