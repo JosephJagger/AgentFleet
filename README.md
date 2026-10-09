@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/hero.svg" alt="AgentFleets for Codex — Your hosts. One workspace." width="100%">
+  <img src="docs/assets/hero.svg" alt="AgentFleets — Codex + Claude Code. Voice coordination across hosts." width="100%">
 </p>
 
 <p align="center">
@@ -13,11 +13,11 @@
   <a href="https://www.agentfleets.cn">Try it free</a> · <a href="#self-host">Self-host</a> · <a href="#built-for-your-native-sessions">Features</a> · <a href="#how-it-compares-to-codex">Compare with Codex</a> · <a href="#our-vision">Vision</a> · <a href="CONTRIBUTING.md">Contribute</a> · <a href="SECURITY.md">Security</a>
 </p>
 
-<p align="center"><strong>Pick up your Codex work from any browser.</strong><br>
-Follow conversations across your machines. Continue the same native session.<br>
+<p align="center"><strong>One workspace for Codex and Claude Code.</strong><br>
+Coordinate hosts, projects and sessions by voice. Continue the original conversation.<br>
 Keep execution in your own environment.</p>
 
-<p align="center">A self-hosted operations console for Codex CLI across Linux servers and personal computers.<br>Manage native sessions, send files and images, use installed plugin skills, and track usage from one English or Chinese web interface.</p>
+<p align="center">A self-hosted workspace for Codex and Claude Code on Linux, macOS and Windows.<br>Manage native sessions, send files and images, use installed plugin skills, and track usage from one English or Chinese web interface.</p>
 
 ![AgentFleets workspace showing native quota, credit balance, session usage and a running Codex conversation with fictional demo data](docs/assets/workspace-en.png)
 
@@ -33,17 +33,28 @@ Visit **[https://www.agentfleets.cn](https://www.agentfleets.cn)** to try the ho
 
 Tasks execute on your connected host. Bring your own Codex account and available quota; the free panel experience does not include Codex credits. If you prefer to run the panel yourself, follow [Self-host](#self-host).
 
-## Recent improvements you can use
+## Recently shipped: coordinate projects by voice
 
-- **Panel-wide voice control (experimental).** The globe button in the top toolbar opens a separate call that stays connected as you navigate the panel. Choose the voice host, then name an authorized host, project and managed session. The coordinator searches for the target, dispatches and follows one task at a time, and reports verified results. Your existing per-session calls remain available. Hanging up does not cancel dispatched work; reconnect to query its status. Requires Agent 0.30.71 and Codex 0.159.2 on the voice host. Closing the page or backgrounding the browser ends the call.
-- **Talk to native Codex in realtime (experimental).** In a managed, idle Codex session, choose **Start voice**, allow microphone access, then talk, mute, or end the connection. Requires a supported host runtime (currently validated with Agent 0.30.71 and Codex 0.159.2) and a modern HTTPS browser. Calls use Sol by default and renew control in the background. Closing the page or moving the browser to the background ends the call. Voice can start development tasks using the session’s permissions and approvals; ending voice closes the microphone without cancelling tasks already started. During calls, send text or images immediately when idle, or add them to the active task; queued messages wait until the call and active task finish. Voice tasks show the model and reasoning effort read from the native session.
-- **Schedule routine work.** Search for a project or an existing managed session, choose the destination first, then set the prompt and schedule. Review each run in **Scheduled tasks → History**. For example, ask Codex to check a project every weekday morning.
-- **Give another task relevant conversation context.** Paste a copied session link or use **+ → Reuse session**. Send the reference card with your instructions; Codex consults the readable conversation snapshot as needed, without waiting for a separate AI summary.
-- **Send screenshots from your phone.** Choose an image from the **+** menu or paste it on desktop. Improved browser compatibility for automatic resizing and compression reduces oversized-image failures on mobile.
-- **Use the panel on smaller screens.** Mobile navigation uses compact labels; login forms fit narrow screens; scheduled-task cards follow the selected theme. Mobile usage dialogs show concise details first and provide a close button.
-- **Find one clear recovery entry.** Switching between offline hosts no longer accumulates duplicate repair panels. Recovery guidance explains when local repair is needed; simply leaving the panel unused does not require repairing a host.
+**Name the host, project and session. Let different projects move in parallel.** Experimental panel-wide voice control finds authorized target sessions, dispatches tasks and retrieves progress and results. Keep talking while tasks run, or add instructions to a supported active turn. Same-project and same-session conflict protection remains in place.
 
-## One console for Codex across your machines
+For example: “Check the API project's tests on the Linux server and update the website navigation on the Mac. Tell me how each task is going.” This is an illustrative workflow, not a real task record.
+
+| Available feature | Where to use it |
+| --- | --- |
+| **Voice across hosts, projects and sessions** | Choose a Codex voice host from the top toolbar. Different projects run concurrently; task entries open their exact target sessions. |
+| **Live process and follow-up instructions** | Open session progress for available command output, file changes and process messages. Add voice or typed instructions to supported active turns. |
+| **To-dos, results and conversation history** | Open voice task records, or ask a new call to retrieve saved work and exact session history, including typed tasks. Recovery never automatically redispatches tasks. |
+| **Long-term voice preferences** | Settings → Long-term preferences: inspect, edit, disable or delete explicit rules. New calls load them; changes requiring old context removal take effect after reconnection. |
+| **Native Claude Code sessions** | Choose Claude Code beside the host to read history, continue original sessions, send attachments and respond to approvals or questions, using the host's existing CLI and account. |
+| **Reset predictions and reset cards** | Host quota view: conditional signals and a seven-day paginated timeline. Host account tools: available native cards, with expiry in UTC and Beijing time. |
+| **Shared defaults and voice selection** | Settings → Codex configuration: common defaults with host, project and session overrides. Voice choices follow the host's supported catalog. |
+| **Storage, versions and safe maintenance** | Hosts → Attachments and versions: inspect and clean redundant data. Safe publication waits for calls; host updates respect running work. |
+
+For the complete feature set, use Agent **0.30.91** and validated managed Codex **0.160.1**; availability follows reported host capabilities. Voice requires HTTPS and microphone permission and remains experimental. Closing or backgrounding the page can end a call without cancelling dispatched work. Claude Code does not imply parity with Codex-only voice, configuration or maintenance features.
+
+Details: [October 2026 release summary](docs/recent-updates-2026-10.md) · [Parallel voice and task records](docs/panel-voice-status.md) · [Read-only history](docs/voice-session-history.md) · [Preferences](docs/voice-long-term-preferences.md) · [Claude Code](docs/claude-code.md) · [Reset signals](docs/reset-radar.md)
+
+## One console for AI work across your machines
 
 Running Codex on several machines creates a management task of its own: finding the right session, checking which jobs are still running, returning to finished results, and keeping track of settings and usage. **AgentFleets brings those everyday operations into one graphical workspace.**
 
@@ -262,7 +273,7 @@ Replace the email, sender and example domain with your own values. Generate the 
 
 If the reverse proxy passes client-address headers, add only its verified direct address to `TRUSTED_PROXIES`. Leave that setting unset when you do not need forwarded client addresses.
 
-The host usage dialog can show a tentative **temporary Codex quota reset** forecast based on explicit public announcements. To enable its hourly check, set `AGENTFLEET_X_BEARER_TOKEN` in the private `.env` to an X API bearer token and restart the control plane. Without a usable source it shows **No forecast yet**. The forecast is unofficial; normal weekly resets are shown separately, and reset-card grants cannot be predicted. Available reset cards, when reported by the native Codex account API, appear in the same dialog. The public-signal approach is inspired by [Codex Reset Radar](https://github.com/JosephJagger/Codex-Reset-Radar).
+Host quota views can show **temporary Codex reset predictions** from hourly public-announcement checks. Conditional plans, confirmed resets and reset-card announcements remain distinct. Review seven days of paginated history. Predictions never change native quota or reset dates and are not official guarantees. For self-hosting, configure `AGENTFLEET_TIKHUB_API_KEY` and `AGENTFLEET_RADAR_DEEPSEEK_KEY` in the ignored `.env` and apply through the safe publication flow. Missing configuration and provider failures are explicit. See [reset feed setup](docs/reset-radar.md). Available cards and expiry come from native reports.
 
 ### 3. Build and start
 
@@ -398,6 +409,6 @@ See [contributing](CONTRIBUTING.md), [security reporting](SECURITY.md), and [pac
 <p align="center">Built for people who run Codex on their own machines.<br>
 <a href="LICENSE">MIT licensed</a> · <a href="THIRD_PARTY_NOTICES.md">Third-party notices</a> · <a href="CONTRIBUTING.md">Contributions welcome</a></p>
 
-<sub>Independent project, not an official OpenAI product. Deploy your own instance and use your own Codex credentials. No shared service or default login is provided.</sub>
+<sub>Independent project, not an official OpenAI or Anthropic product. Use the hosted panel or self-host; bring your own execution-tool accounts and quota.</sub>
 
 Unreachable hosts show a **Restore host connection** card with a repair command matched to Windows, macOS or Linux. Run it on that host using the original installation account. Repair retains pairing and session data; copying a command does not run it remotely. Power, network or operating-system failures still require local attention.

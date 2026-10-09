@@ -3194,5 +3194,7 @@
   "长期偏好同步中": "Syncing long-term preferences",
   "长期偏好暂未加载；通话仍保持连接": "Preferences not loaded; call stays connected",
   "本次通话不加载长期偏好": "Do not load preferences for this call",
-  "北京时间（UTC+8）": "Beijing time (UTC+8)"
+  "北京时间（UTC+8）": "Beijing time (UTC+8)",
+  "正在读取配置": "Reading configuration",
+  "确认删除": "Confirm deletion"
 }
