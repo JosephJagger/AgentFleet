@@ -163,7 +163,7 @@ it("acquires fresh control after microphone preparation and keeps alive without 
   }finally{vi.useRealTimers();}
 });
 
-it("hiding the page ends the call, while closing just the popover keeps it alive",async()=>{
+it("leaving the document ends the call, while closing just the popover keeps it alive",async()=>{
   render(<NativeVoicePanel sessionId="session" canStart onActiveChange={()=>undefined}/>);
   fireEvent.click(screen.getByRole("button",{name:"开始语音"}));
   await waitFor(()=>expect(Socket.all).toHaveLength(1));
@@ -172,7 +172,7 @@ it("hiding the page ends the call, while closing just the popover keeps it alive
   expect(track.stop).not.toHaveBeenCalled();
   fireEvent(window,new Event("pagehide"));
   expect(track.stop).toHaveBeenCalled();
-  expect(socket.sent.at(-1)).toEqual({type:"stop",reason:"PAGE_HIDDEN"});
+  expect(socket.sent.at(-1)).toEqual({type:"stop",reason:"PAGE_LEFT"});
 });
 
 it("audio failure reports a bounded reason and late callbacks cannot overwrite it",async()=>{
@@ -258,4 +258,46 @@ it('preference changes and read failures keep audio alive and clearly require re
  act(()=>socket.receive({type:'preferences',status:'unavailable'}));
  expect(screen.getByText('长期偏好暂未加载；通话仍保持连接')).toBeTruthy();
  expect(track.stop).not.toHaveBeenCalled();expect(Peer.all[0]!.closed).toBe(false);expect(socket.readyState).toBe(1);
+});
+
+for (const global of [false, true]) it(`hidden and visible retain ${global ? 'global' : 'session'} audio, connection and heartbeat without another start`, async () => {
+ const visible=vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');
+ const play=vi.spyOn(HTMLMediaElement.prototype,'play').mockResolvedValue();
+ const view=render(<NativeVoicePanel sessionId={global?'panel:host':'session'} globalMachineId={global?'host':undefined} canStart onActiveChange={()=>undefined}/>);
+ fireEvent.click(screen.getByRole('button',{name:global?'开始总控通话':'开始语音'}));
+ await waitFor(()=>expect(Socket.all).toHaveLength(1));
+ const socket=Socket.all[0]!,peer=Peer.all[0]!;
+ vi.useFakeTimers();
+ await act(async()=>{socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});});
+ const audio=view.container.querySelector('audio')!;audio.srcObject=stream;
+ const pause=vi.mocked(HTMLMediaElement.prototype.pause);pause.mockClear();
+ try {
+  visible.mockReturnValue('hidden');fireEvent(document,new Event('visibilitychange'));
+  act(()=>vi.advanceTimersByTime(90000));
+  expect(track.stop).not.toHaveBeenCalled();expect(peer.closed).toBe(false);expect(socket.readyState).toBe(1);
+  expect(audio.srcObject).toBe(stream);expect(pause).not.toHaveBeenCalled();
+  expect(socket.sent.filter(x=>x.type==='heartbeat')).toHaveLength(6);
+  visible.mockReturnValue('visible');await act(async()=>{fireEvent(document,new Event('visibilitychange'));});
+  expect(socket.sent.filter(x=>x.type==='heartbeat')).toHaveLength(7);expect(play).toHaveBeenCalledTimes(1);
+  expect(socket.sent.filter(x=>['start','panel.start'].includes(x.type))).toHaveLength(1);
+  expect(getUserMedia).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button',{name:'挂断'}));
+  expect(track.stop).toHaveBeenCalledTimes(1);expect(peer.closed).toBe(true);expect(socket.readyState).toBe(3);
+  expect(socket.sent.at(-1)).toMatchObject({type:'stop',reason:'USER_HANGUP'});
+  const sent=socket.sent.length;fireEvent(document,new Event('visibilitychange'));act(()=>vi.advanceTimersByTime(30000));
+  expect(socket.sent).toHaveLength(sent);expect(getUserMedia).toHaveBeenCalledTimes(1);
+ } finally {vi.useRealTimers();}
+});
+
+for(const action of ['logout','pagehide','unmount'] as const) it(`${action} releases hidden call exactly once`,async()=>{
+ const view=render(<NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart onActiveChange={()=>undefined}/>);
+ fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));
+ await waitFor(()=>expect(Socket.all).toHaveLength(1));
+ const socket=Socket.all[0]!;await act(async()=>socket.receive({type:'ready'}));
+ vi.spyOn(document,'visibilityState','get').mockReturnValue('hidden');fireEvent(document,new Event('visibilitychange'));
+ expect(track.stop).not.toHaveBeenCalled();
+ if(action==='unmount')view.unmount();else fireEvent(window,new Event(action==='logout'?'agentfleet:logout':'pagehide'));
+ expect(track.stop).toHaveBeenCalledTimes(1);expect(Peer.all[0]!.closed).toBe(true);
+ expect(socket.sent.at(-1)).toMatchObject({type:'stop',reason:action==='logout'?'USER_LOGOUT':action==='pagehide'?'PAGE_LEFT':'CLIENT_DISPOSED'});
+ view.unmount();expect(socket.sent.filter(x=>x.type==='stop')).toHaveLength(1);
 });

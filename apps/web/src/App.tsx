@@ -1745,7 +1745,7 @@ function App() {
           {dashboard.user.platformAdmin === true && <button aria-current={view === "admin" ? "page" : undefined} aria-label={t("管理")} className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><ShieldCheck size={16} /><NavText full="管理" compact="管理" /></button>}
         </nav>
         <WorldClocks side="right" />
-        <div className="topbar-actions"><PanelVoiceControl machines={dashboard.machines} onOpenSession={id=>{setView("fleet");selectSession(id);}}/><LanguageSwitcher compact /><span className="account-label">{dashboard.user.displayName}</span><IconButton label={t("退出登录")} onClick={async () => { await api.logout(); setDashboard(undefined); setConnected(false); }}><LogOut size={16} /></IconButton></div>
+        <div className="topbar-actions"><PanelVoiceControl machines={dashboard.machines} onOpenSession={id=>{setView("fleet");selectSession(id);}}/><LanguageSwitcher compact /><span className="account-label">{dashboard.user.displayName}</span><IconButton label={t("退出登录")} onClick={async () => { window.dispatchEvent(new Event("agentfleet:logout")); await api.logout(); setDashboard(undefined); setConnected(false); }}><LogOut size={16} /></IconButton></div>
       </header>
       {view === "fleet" ? <div className={`fleet-layout${catalogCollapsed ? " fleet-layout--catalog-collapsed" : ""}`}>
         <MachineRail machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} selectedId={selectedMachineId} onSession={selectSession} onHost={id => navigate({ view: "hosts", machineId: id })} onSelect={selectMachine} onPair={() => setPairOpen(true)} />

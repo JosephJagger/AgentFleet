@@ -37,7 +37,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const [playBlocked, setPlayBlocked] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
   const generation = useRef(0);
-  const resources = useRef<{ starting?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
+  const resources = useRef<{ starting?: boolean; signalingReady?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
   const activeCallback = useRef(onActiveChange);
   activeCallback.current = onActiveChange;
   const cleanup = useRef<(reason?: string) => void>(() => undefined);
@@ -55,13 +55,31 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     activeCallback.current(false);
   };
   useEffect(() => {
-    const hide = () => { if (resources.current.starting || resources.current.peer || resources.current.stream) { cleanup.current("PAGE_HIDDEN"); setPhase("idle"); } };
-    const otherCall = (event:Event) => {if((event as CustomEvent).detail!==popoverId&&(resources.current.starting||resources.current.peer)){cleanup.current("USER_HANGUP");setPhase("idle");}};
+    const leavePage = () => { if (resources.current.starting || resources.current.peer || resources.current.stream) { cleanup.current("PAGE_LEFT"); setPhase("idle"); } };
+    const logout = () => { cleanup.current("USER_LOGOUT"); setPhase("idle"); };
+    const otherCall = (event:Event) => {if((event as CustomEvent).detail!==popoverId&&(resources.current.starting||resources.current.peer)){cleanup.current("OTHER_CALL_STARTED");setPhase("idle");}};
+    // Hidden is not destroyed: keep microphone, playback, WebRTC and signaling.
+    // The server's protocol ping/pong already tolerates throttled UI timers.
+    const visibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const owned = resources.current;
+      if (owned.signalingReady && owned.socket?.readyState === WebSocket.OPEN) owned.socket.send(JSON.stringify({ type: "heartbeat" }));
+      const attempt = generation.current;
+      if (owned.peer && audio.current?.srcObject) void audio.current.play().then(() => {
+        if (generation.current === attempt) setPlayBlocked(false);
+      }).catch(() => { if (generation.current === attempt) setPlayBlocked(true); });
+    };
     window.addEventListener("agentfleet:voice-start",otherCall);
-    const visibility = () => { if (document.visibilityState === "hidden") hide(); };
-    window.addEventListener("pagehide", hide);
+    window.addEventListener("agentfleet:logout",logout);
+    window.addEventListener("pagehide", leavePage);
     document.addEventListener("visibilitychange", visibility);
-    return () => { cleanup.current(); window.removeEventListener("agentfleet:voice-start",otherCall); window.removeEventListener("pagehide", hide); document.removeEventListener("visibilitychange", visibility); };
+    return () => {
+      cleanup.current("CLIENT_DISPOSED");
+      window.removeEventListener("agentfleet:voice-start",otherCall);
+      window.removeEventListener("agentfleet:logout",logout);
+      window.removeEventListener("pagehide", leavePage);
+      document.removeEventListener("visibilitychange", visibility);
+    };
   }, [sessionId]);
 
   async function start() {
@@ -119,6 +137,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
           if (value.type === "ready" && !offerSent) {
             offerSent = true;
             socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",skipPreferences,machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", skipPreferences, logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
+            resources.current.signalingReady = true;
             resources.current.heartbeat = setInterval(() => {
               if (!current() || socket.readyState !== WebSocket.OPEN) return;
               socket.send(JSON.stringify({ type: "heartbeat" }));

@@ -142,3 +142,9 @@ test("voice close diagnostics preserve the first bounded cause and reject arbitr
  f.voice.recordCloseReason(binding.voiceId,"SIGNAL_CLOSED");
  assert.equal(JSON.parse(f.voice.get(binding.voiceId)!.binding_json).closeReason,"AUDIO_FAILED");
 });
+
+for (const reason of ['PAGE_LEFT','USER_LOGOUT','OTHER_CALL_STARTED']) test(`session voice preserves ${reason} before socket close`,t=>{
+ const f=fixture();t.after(()=>f.db.close());const binding=f.voice.start(f.principal,'s','lease',f.connection);
+ f.voice.recordCloseReason(binding.voiceId,reason);f.voice.recordCloseReason(binding.voiceId,'SIGNAL_CLOSED');
+ assert.equal(JSON.parse(f.voice.get(binding.voiceId)!.binding_json).closeReason,reason);
+});

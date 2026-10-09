@@ -3211,5 +3211,6 @@
   "交付未完成，请查看操作记录。": "Delivery did not complete. Check operation history.",
   "正在读取或准备文件…": "Reading or preparing the file…",
   "复制到项目交付": "Copy into project for delivery",
-  "交付副本已准备好，请点击预览或下载。": "The delivery copy is ready. Click Preview or Download."
+  "交付副本已准备好，请点击预览或下载。": "The delivery copy is ready. Click Preview or Download.",
+  "切换页面、标签或收起面板可继续通话；请保留通话网页。刷新、关闭或系统休眠可能中断，已派发任务继续执行。": "Calls continue when switching views or tabs, or minimizing the panel. Keep this page open. Reloading, closing or system sleep may interrupt the call; dispatched tasks continue."
 }

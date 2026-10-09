@@ -54,7 +54,7 @@ export class PanelVoiceService {
     return code;
   }
   recordCloseReason(id:string,reason:unknown) {
-    const code=typeof reason==='string'&&['USER_HANGUP','PAGE_HIDDEN','CLIENT_DISPOSED','SIGNAL_CLOSED','NATIVE_CLOSED','HOST_DISCONNECTED','OWNER_EXPIRED','SERVER_ERROR'].includes(reason)?reason:'SERVER_ERROR';
+    const code=typeof reason==='string'&&['USER_HANGUP','PAGE_HIDDEN','PAGE_LEFT','USER_LOGOUT','OTHER_CALL_STARTED','CLIENT_START_FAILED','AUDIO_DISCONNECTED','AUDIO_FAILED','CONNECT_TIMEOUT','SIGNAL_INVALID','SIGNAL_FAILED','CLIENT_DISPOSED','SIGNAL_CLOSED','NATIVE_CLOSED','HOST_DISCONNECTED','OWNER_EXPIRED','SERVER_ERROR'].includes(reason)?reason:'SERVER_ERROR';
     this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.closeReason',?,'$.closeRequestedAt',?) WHERE voice_id=? AND json_extract(binding_json,'$.closeReason') IS NULL",code,nowIso(),id);
   }
   closeOrphans() {this.db.run("UPDATE panel_voice_calls SET state='closed' WHERE state<>'closed'");}

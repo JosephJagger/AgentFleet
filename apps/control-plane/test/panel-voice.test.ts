@@ -474,3 +474,8 @@ test('completion evidence must be current, final, native and accessible; expiry 
  assert.equal(f.service.recover(f.principal).total,0);
  assert.throws(()=>f.service.memory.update(f.principal,f.task.todoId,{...f.input,nativeTurnId:'different'}),/不能覆盖/);
 });
+
+for (const reason of ['PAGE_LEFT','USER_LOGOUT','OTHER_CALL_STARTED','AUDIO_DISCONNECTED','CONNECT_TIMEOUT']) test(`panel voice keeps precise ${reason} diagnostic`,t=>{
+ const f=fixture();t.after(()=>f.db.close());f.service.recordCloseReason(f.call.voice_id,reason);f.service.recordCloseReason(f.call.voice_id,'SIGNAL_CLOSED');
+ assert.equal(JSON.parse(f.service.get(f.call.voice_id)!.binding_json).closeReason,reason);
+});

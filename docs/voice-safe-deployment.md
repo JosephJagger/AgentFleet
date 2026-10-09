@@ -37,3 +37,31 @@ python3 packaging/deploy-control-plane.py --database /actual/volume/control-plan
 All normal backend and web container publications must use this entry point. Raw Docker restart/kill, host reboot, network outage, OOM, unrelated proxy shutdown and external deployment systems bypass it. It is not zero-downtime migration or automatic voice reconnection. Existing browser background/heartbeat/audio-error closure rules are unchanged. A stale/unknown call can defer deployment indefinitely and needs evidence-based lifecycle reconciliation, never forced deletion just to publish.
 
 Tests: `python3 packaging/test-voice-deployment.py` and control-plane voice/deployment tests exercise old-binary fencing, simultaneous publishers, persistence after publisher loss, natural closure, timeout and ongoing-call tools.
+
+## Background calls and browser lifecycle
+
+The web client keeps microphone tracks, audio playback, WebRTC and signaling when
+`visibilitychange` reports `hidden`. The global coordinator remains in the app
+header outside view routing; minimizing either control panel only hides its UI.
+Returning to `visible` sends a heartbeat on the existing started connection and
+attempts audio playback again. A rejected autoplay attempt exposes the existing
+manual playback button. It does not create a new call or replay tasks.
+
+The existing 15-second client heartbeat, server protocol ping/pong and 120-second
+owner/host watchdogs remain unchanged. Background timer throttling alone is not
+used as a reason to stop a live connection; protocol pong can renew ownership.
+There is no unbounded keepalive or automatic redispatch. Audio connection failures
+still use the existing bounded disconnection handling.
+
+`pagehide` means leaving the document (including back/forward-cache navigation)
+and closes with `PAGE_LEFT`. Explicit logout uses `USER_LOGOUT`, another call
+uses `OTHER_CALL_STARTED`, and component disposal uses `CLIENT_DISPOSED`.
+Legacy `PAGE_HIDDEN` receipts remain readable for older clients. Do not use
+`beforeunload` to stop audio: a navigation may still be cancelled. Socket loss and
+watchdogs provide fallback cleanup when the browser cannot deliver `pagehide`.
+
+This supports ordinary background tabs and window minimization, not guaranteed
+capture through OS sleep, mobile app suspension, process eviction, page refresh
+or closure. A resumed page whose call actually ended requires an explicit new
+call. New frontend code takes effect on a later page load; never force-refresh
+an existing call to apply this update. Publication still waits for all calls.

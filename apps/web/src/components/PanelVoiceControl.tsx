@@ -47,7 +47,7 @@ export function PanelVoiceControl({ machines, onOpenSession }: { machines:Dashbo
       {tasks.map(task=><div key={task.jobId} className="panel-voice-control__task"><button type="button" className="panel-voice-control__task-target" onClick={()=>onOpenSession(task.sessionId)}><span><strong>{task.title}</strong><small>{task.host} · {task.project}</small></span><ExternalLink size={16}/></button><span>{task.state==='submitted'?t("等待主机"):task.state==='running'?t("执行中"):task.state==='completed'?t("已完成"):task.state==='failed'?t("失败"):task.state==='interrupted'?t("已停止"):t("状态待确认")}</span><details className="panel-voice-control__task-detail"><summary>{t("任务详情")}</summary>{task.progress&&["submitted","running","unknown"].includes(task.state)&&<ProgressView progress={task.progress}/>} {task.error&&<p role="alert">{task.error.code === 'MACHINE_DRAINING' ? t("主机正在维护，等待安全重启；当前任务可继续，暂不接受新任务") : task.error.message}<br/><code>{task.error.code}</code></p>}{(task.state==='failed'||task.state==='interrupted'||task.state==='unknown')&&<span>{task.executionStarted===true?t("任务已启动"):task.executionStarted===false?t("任务未启动"):t("任务是否启动尚未确认，请勿重复派发")}</span>}{task.historyLimited&&<span>{t("部分任务历史不可用")}</span>}{task.result&&<details><summary>{t("任务结果")}</summary><p>{task.result}</p></details>}</details></div>)}
       </div>
       {expanded&&<VoiceTaskInbox onOpenSession={onOpenSession}/>}
-      <p className="panel-voice-control__hint panel-voice-control__footer">{t("切换面板页面不断线，挂断后任务继续。关闭网页或切到后台会结束通话。")}</p>
+      <p className="panel-voice-control__hint panel-voice-control__footer">{t("切换页面、标签或收起面板可继续通话；请保留通话网页。刷新、关闭或系统休眠可能中断，已派发任务继续执行。")}</p>
     </section>
     </>,document.body)}
   </div>;

@@ -47,7 +47,7 @@ export class NativeVoiceService {
   }
   recordCloseReason(id: string, reason: unknown) {
     // Fixed categories only: never persist browser text, SDP, audio or transcripts.
-    const allowed = ["USER_HANGUP", "PAGE_HIDDEN", "CLIENT_DISPOSED", "CLIENT_START_FAILED", "AUDIO_DISCONNECTED", "AUDIO_FAILED", "CONNECT_TIMEOUT", "SERVER_ERROR", "SIGNAL_INVALID", "SIGNAL_FAILED", "SIGNAL_CLOSED", "NATIVE_CLOSED"];
+    const allowed = ["USER_HANGUP", "PAGE_HIDDEN", "PAGE_LEFT", "USER_LOGOUT", "OTHER_CALL_STARTED", "CLIENT_DISPOSED", "CLIENT_START_FAILED", "AUDIO_DISCONNECTED", "AUDIO_FAILED", "CONNECT_TIMEOUT", "SERVER_ERROR", "SIGNAL_INVALID", "SIGNAL_FAILED", "SIGNAL_CLOSED", "NATIVE_CLOSED"];
     if (typeof reason !== "string" || !allowed.includes(reason)) return;
     this.db.run("UPDATE voice_sessions SET binding_json=json_set(binding_json,'$.closeReason',?,'$.closeRecordedAt',?) WHERE voice_id=? AND json_extract(binding_json,'$.closeReason') IS NULL",reason,nowIso(),id);
   }
