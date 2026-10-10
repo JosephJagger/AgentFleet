@@ -25,6 +25,7 @@ interface AccountState { baseline: Account; suppressed: string[] }
 interface CachedPost { post: RadarPost; summary: string; analyzed: boolean; prediction: ResetPrediction | null }
 interface Snapshot {
   historyBackfilled?: boolean;
+  allowanceGranted?: number;
   version: 1; lastAttempt: number; checkedAt: number; pauseDay: number | null;
   callDay: number; calls: number; error: string | null;
   posts: CachedPost[]; seen: string[]; accounts: Record<string, AccountState>;
@@ -134,11 +135,19 @@ export class ResetRadar {
       message: !configured ? "重置信号数据源尚未配置" : s.error, dailyCalls: s.callDay === day(now) ? s.calls : 0,
       timeline: s.posts.filter(p => p.analyzed).map(p => ({ id: p.post.id, publishedAt: p.post.created_at, summary: p.summary, signal: p.prediction?.signal ?? "none", ...(p.prediction?.condition ? { condition: p.prediction.condition } : {}), sourceUrl: `https://x.com/thsottiaux/status/${p.post.id}` })) };
   }
+  // Operator-only, dated grant. Preserve actual spend; never carry extra quota into another day.
+  private allowance(now: number): number {
+    if (!this.path) return 0;
+    try {
+      const grant = JSON.parse(readFileSync(this.path + ".allowance.json", "utf8"));
+      return grant.day === day(now) && Number.isInteger(grant.requests) && grant.requests > 0 && grant.requests <= 48 ? grant.requests : 0;
+    } catch { return 0; }
+  }
   refresh(now = this.now(), backfill = false): Promise<void> {
     this.prune(now);
     if (this.pending) return this.pending;
     if (!this.token || !this.aiKey || this.controller.signal.aborted ||
-      (now - this.snapshot.lastAttempt < HOUR && !backfill)) return Promise.resolve();
+      (now - this.snapshot.lastAttempt < HOUR && !backfill && this.allowance(now) <= (this.snapshot.allowanceGranted ?? 0))) return Promise.resolve();
     this.pending = this.collect(now).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : "";
       const reason = message === "Daily collection budget reached" ? "daily_budget"
@@ -164,6 +173,9 @@ export class ResetRadar {
   private async collect(now: number) {
     const s = this.snapshot;
     s.lastAttempt = now; s.error = null;
+    const allowance = this.allowance(now);
+    s.allowanceGranted = allowance;
+    const dailyLimit = 48 + allowance;
     if (s.callDay !== day(now)) { s.callDay = day(now); s.calls = 0; }
     this.save();
     let cursor: string | null = null;
@@ -171,14 +183,14 @@ export class ResetRadar {
     const seenPages = new Set<string>();
     // Reserve one request for every remaining hourly poll today (Beijing time).
     const remainingHours = 23 - Math.floor(((now + 8 * HOUR) % DAY) / HOUR);
-    const paginationBudget = 48 - remainingHours;
+    const paginationBudget = dailyLimit - remainingHours;
     const previous = new Map(s.posts.map(p => [p.post.id, p]));
     const received = new Map<string, RadarPost>();
     const backfill = !s.historyBackfilled;
     // Normal poll: one page. At most five pages to bridge a gap / bootstrap 100 posts.
     for (let page = 0; page < 5 && received.size < 100; page++) {
       if (page > 0 && s.calls >= paginationBudget) break;
-      if (s.calls >= 48) throw new Error("Daily collection budget reached");
+      if (s.calls >= dailyLimit) throw new Error("Daily collection budget reached");
       s.calls++; this.save(); // Persist before the paid request, including failures.
       const url = new URL("https://api.tikhub.io/api/v1/twitter/web/fetch_user_post_tweet");
       url.searchParams.set("screen_name", "thsottiaux"); if (cursor) url.searchParams.set("cursor", cursor);

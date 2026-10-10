@@ -160,3 +160,36 @@ test("a failed hourly request preserves prior prediction and timeline",async()=>
  await radar.refresh();fail=true;now+=hour;await radar.refresh();
  assert.equal(radar.status().state,"error");assert.equal(radar.status().checkedAt,new Date(initial).toISOString());assert.equal(radar.status().timeline.length,1);assert.ok(await radar.read("account",{remainingPercent:10,resetCardsAvailable:0}));
 });
+
+test("dated grant resumes exhausted polling once, preserves spend and expires at Beijing midnight",async()=>{
+ const dir=mkdtempSync(join(tmpdir(),"radar-grant-"));
+ try {
+  const {writeFileSync,readFileSync}=await import("node:fs");const statePath=join(dir,"state.json");let now=initial,calls=0;
+  writeFileSync(statePath,JSON.stringify({version:1,lastAttempt:now,checkedAt:now-hour,callDay:Math.floor((now+8*hour)/(24*hour)),calls:48,error:"budget",posts:[],seen:[],accounts:{},historyBackfilled:true}));
+  const options={statePath,token:"test",aiKey:"test",now:()=>now,fetcher:(async()=>{calls++;return Response.json({code:200,data:{timeline:[]}})}) as typeof fetch};
+  const radar=new ResetRadar(options);await radar.refresh();assert.equal(calls,0);
+  writeFileSync(statePath+".allowance.json",JSON.stringify({day:Math.floor((now+8*hour)/(24*hour)),requests:8}));
+  await radar.refresh();assert.equal(calls,1);assert.equal(radar.status().dailyCalls,49);assert.equal(radar.status().state,"ready");
+  await radar.refresh();assert.equal(calls,1);
+  const restarted=new ResetRadar(options);await restarted.refresh();assert.equal(calls,1,"restart does not reapply grant as fresh credit");
+  for(let i=0;i<7;i++){now+=hour;await restarted.refresh();}
+  assert.equal(restarted.status().dailyCalls,56);
+  now=Date.parse("2026-09-29T16:00:00Z");await restarted.refresh();assert.equal(restarted.status().dailyCalls,1);
+  assert.equal(JSON.parse(readFileSync(statePath,"utf8")).allowanceGranted,0);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test("invalid or expired operator grants never bypass the daily cap",async()=>{
+ const dir=mkdtempSync(join(tmpdir(),"radar-bad-grant-"));
+ try{
+  const {writeFileSync}=await import("node:fs");const statePath=join(dir,"state.json");let calls=0;
+  const today=Math.floor((initial+8*hour)/(24*hour));
+  for(const grant of [{day:today,requests:49},{day:today,requests:-1},{day:today,requests:1.5},{day:today-1,requests:12}]){
+   writeFileSync(statePath,JSON.stringify({version:1,lastAttempt:initial-hour,checkedAt:initial-hour,callDay:today,calls:48,error:null,posts:[],seen:[],accounts:{}}));
+   writeFileSync(statePath+".allowance.json",JSON.stringify(grant));
+   const radar=new ResetRadar({statePath,token:"test",aiKey:"test",now:()=>initial,fetcher:(async()=>{calls++;return Response.json({})}) as typeof fetch});
+   await radar.refresh();assert.equal(radar.status().state,"error");
+  }
+  assert.equal(calls,0);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
