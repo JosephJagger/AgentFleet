@@ -26,6 +26,7 @@ interface CachedPost { post: RadarPost; summary: string; analyzed: boolean; pred
 interface Snapshot {
   historyBackfilled?: boolean;
   allowanceGranted?: number;
+  sourceParserVersion?: number;
   version: 1; lastAttempt: number; checkedAt: number; pauseDay: number | null;
   callDay: number; calls: number; error: string | null;
   posts: CachedPost[]; seen: string[]; accounts: Record<string, AccountState>;
@@ -43,14 +44,21 @@ export function parseTikHub(value: unknown): { posts: RadarPost[]; cursor: strin
   const body = object(value), data = object(body.data);
   if (body.code !== 200 || !Array.isArray(data.timeline)) throw new Error("TikHub 返回的数据格式无效");
   const posts: RadarPost[] = [];
+  const user = object(data.user);
+  const sourceId = String(user.profile ?? "").toLowerCase() === "thsottiaux" && /^\d{1,30}$/.test(String(user.rest_id ?? "")) ? String(user.rest_id) : null;
   for (const raw of data.timeline) {
     const p = object(raw);
-    if (String(object(p.author).screen_name).toLowerCase() !== "thsottiaux") continue;
+    const author = object(p.author), name = author.screen_name;
+    const namedAuthor = typeof name === "string" && name.toLowerCase() === "thsottiaux";
+    const identifiedAuthor = (name == null || name === "") && sourceId !== null && String(author.rest_id ?? "") === sourceId;
+    if (!namedAuthor && !identifiedAuthor) continue;
+    if (namedAuthor && sourceId && author.rest_id != null && String(author.rest_id) !== sourceId) continue;
     if (!/^\d{1,30}$/.test(String(p.tweet_id)) || typeof p.text !== "string" || !Number.isFinite(Date.parse(p.created_at))) continue;
     const quoted = object(p.quoted);
     posts.push({ id: String(p.tweet_id), text: p.text.slice(0, 12000), created_at: new Date(p.created_at).toISOString(),
       context: typeof quoted.text === "string" ? `Quoted @${String(object(quoted.author).screen_name).slice(0,50)}: ${quoted.text.slice(0,4000)}` : "" });
   }
+  if (data.timeline.length > 0 && posts.length === 0) throw new Error("Source posts could not be verified");
   return { posts, cursor: typeof data.next_cursor === "string" && data.next_cursor.length < 4096 && data.next_cursor ? data.next_cursor : null };
 }
 
@@ -147,7 +155,7 @@ export class ResetRadar {
     this.prune(now);
     if (this.pending) return this.pending;
     if (!this.token || !this.aiKey || this.controller.signal.aborted ||
-      (now - this.snapshot.lastAttempt < HOUR && !backfill && this.allowance(now) <= (this.snapshot.allowanceGranted ?? 0))) return Promise.resolve();
+      (now - this.snapshot.lastAttempt < HOUR && !backfill && this.allowance(now) <= (this.snapshot.allowanceGranted ?? 0) && this.snapshot.sourceParserVersion === 2)) return Promise.resolve();
     this.pending = this.collect(now).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : "";
       const reason = message === "Daily collection budget reached" ? "daily_budget"
@@ -172,6 +180,9 @@ export class ResetRadar {
   }
   private async collect(now: number) {
     const s = this.snapshot;
+    const repairHistory = s.sourceParserVersion !== 2;
+    s.sourceParserVersion = 2; // Attempt migration once; failures retain the normal hourly retry.
+    if (repairHistory) s.historyBackfilled = false;
     s.lastAttempt = now; s.error = null;
     const allowance = this.allowance(now);
     s.allowanceGranted = allowance;
@@ -186,7 +197,7 @@ export class ResetRadar {
     const paginationBudget = dailyLimit - remainingHours;
     const previous = new Map(s.posts.map(p => [p.post.id, p]));
     const received = new Map<string, RadarPost>();
-    const backfill = !s.historyBackfilled;
+    const backfill = !s.historyBackfilled || repairHistory;
     // Normal poll: one page. At most five pages to bridge a gap / bootstrap 100 posts.
     for (let page = 0; page < 5 && received.size < 100; page++) {
       if (page > 0 && s.calls >= paginationBudget) break;

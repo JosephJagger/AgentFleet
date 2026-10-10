@@ -10,7 +10,7 @@ const post={id:"123",text:"We will reset Codex usage limits",created_at:new Date
 const payload={code:200,data:{timeline:[{tweet_id:post.id,text:post.text,created_at:post.created_at,author:{screen_name:"thsottiaux"}}]}};
 test("trusted source and evidence; unknown reset time remains unknown",()=>{
  assert.equal(parseTikHub(payload).posts.length,1);
- assert.equal(parseTikHub({code:200,data:{timeline:[{...payload.data.timeline[0],author:{screen_name:"other"}}]}}).posts.length,0);
+ assert.throws(()=>parseTikHub({code:200,data:{timeline:[{...payload.data.timeline[0],author:{screen_name:"other"}}]}}));
  const result={results:[{id:"123",signal:"announced",evidence:post.text,expectedAt:null}]};
  assert.equal(parseAnalysis(result,[post],initial).get("123")?.expectedAt,null);
  assert.throws(()=>parseAnalysis({results:[{...result.results[0],evidence:"invented evidence"}]},[post],initial));
@@ -82,7 +82,7 @@ test("persisted pause without its signal cannot block collection",async()=>{
  const dir=mkdtempSync(join(tmpdir(),"radar-stale-pause-"));
  try {
   const {writeFileSync}=await import("node:fs");const path=join(dir,"state.json");
-  writeFileSync(path,JSON.stringify({version:1,lastAttempt:initial-2*hour,checkedAt:initial-2*hour,pauseDay:Math.floor((initial+8*hour)/(24*hour)),callDay:0,calls:0,error:null,posts:[],seen:[],accounts:{}}));
+  writeFileSync(path,JSON.stringify({version:1,sourceParserVersion:2,lastAttempt:initial-2*hour,checkedAt:initial-2*hour,pauseDay:Math.floor((initial+8*hour)/(24*hour)),callDay:0,calls:0,error:null,posts:[],seen:[],accounts:{}}));
   let calls=0;const radar=new ResetRadar({token:"test",aiKey:"test",statePath:path,now:()=>initial,fetcher:(async()=>{calls++;return Response.json({code:200,data:{timeline:[]}});}) as typeof fetch});
   await radar.refresh();assert.equal(calls,1);assert.equal(radar.status().checkedAt,new Date(initial).toISOString());
  }finally{rmSync(dir,{recursive:true,force:true});}
@@ -111,7 +111,7 @@ test("one-time history backfill restores missing analyzed IDs then resumes hourl
  const dir=mkdtempSync(join(tmpdir(),"radar-backfill-"));let now=initial,source=0,analysis=0;
  try {
   const {writeFileSync}=await import("node:fs");const path=join(dir,"state.json");
-  writeFileSync(path,JSON.stringify({version:1,lastAttempt:0,checkedAt:0,pauseDay:null,callDay:0,calls:0,error:null,posts:[],seen:[post.id],accounts:{}}));
+  writeFileSync(path,JSON.stringify({version:1,sourceParserVersion:2,lastAttempt:0,checkedAt:0,pauseDay:null,callDay:0,calls:0,error:null,posts:[],seen:[post.id],accounts:{}}));
   const old={...payload,data:{timeline:[{...payload.data.timeline[0],created_at:new Date(initial-3*24*hour).toISOString()}]}};
   const fetcher=(async(url:string|URL|Request)=>{if(String(url).includes("tikhub")){source++;return Response.json(old);}analysis++;return Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:[{id:post.id,signal:"none",summary:"历史消息"}]})}}]});}) as typeof fetch;
   const options={token:"t",aiKey:"t",statePath:path,fetcher,now:()=>now};const radar=new ResetRadar(options);await radar.refresh();assert.equal(radar.status().timeline.length,1);assert.equal(analysis,1);
@@ -139,7 +139,7 @@ test("pagination reserves hourly polls, preserves collected pages, and resets at
  const dir=mkdtempSync(join(tmpdir(),"radar-budget-"));
  try{
   const {writeFileSync}=await import("node:fs");const statePath=join(dir,"state.json");let now=Date.parse("2026-09-29T02:00:00Z"),calls=0;
-  writeFileSync(statePath,JSON.stringify({version:1,lastAttempt:now-2*hour,checkedAt:now-2*hour,callDay:Math.floor((now+8*hour)/(24*hour)),calls:34,error:null,posts:[],seen:[],accounts:{},historyBackfilled:true}));
+  writeFileSync(statePath,JSON.stringify({version:1,sourceParserVersion:2,lastAttempt:now-2*hour,checkedAt:now-2*hour,callDay:Math.floor((now+8*hour)/(24*hour)),calls:34,error:null,posts:[],seen:[],accounts:{},historyBackfilled:true}));
   const radar=new ResetRadar({token:"test",aiKey:"test",statePath,now:()=>now,fetcher:(async(url,init)=>{
    if(String(url).includes("tikhub")){calls++;return Response.json({code:200,data:{timeline:[{...payload.data.timeline[0],tweet_id:String(1000+calls),created_at:new Date(now).toISOString()}],next_cursor:`cursor-${calls}`}});}
    const request=JSON.parse(String(init?.body));const posts=JSON.parse(request.messages[1].content).posts;
@@ -165,7 +165,7 @@ test("dated grant resumes exhausted polling once, preserves spend and expires at
  const dir=mkdtempSync(join(tmpdir(),"radar-grant-"));
  try {
   const {writeFileSync,readFileSync}=await import("node:fs");const statePath=join(dir,"state.json");let now=initial,calls=0;
-  writeFileSync(statePath,JSON.stringify({version:1,lastAttempt:now,checkedAt:now-hour,callDay:Math.floor((now+8*hour)/(24*hour)),calls:48,error:"budget",posts:[],seen:[],accounts:{},historyBackfilled:true}));
+  writeFileSync(statePath,JSON.stringify({version:1,sourceParserVersion:2,lastAttempt:now,checkedAt:now-hour,callDay:Math.floor((now+8*hour)/(24*hour)),calls:48,error:"budget",posts:[],seen:[],accounts:{},historyBackfilled:true}));
   const options={statePath,token:"test",aiKey:"test",now:()=>now,fetcher:(async()=>{calls++;return Response.json({code:200,data:{timeline:[]}})}) as typeof fetch};
   const radar=new ResetRadar(options);await radar.refresh();assert.equal(calls,0);
   writeFileSync(statePath+".allowance.json",JSON.stringify({day:Math.floor((now+8*hour)/(24*hour)),requests:8}));
@@ -185,11 +185,34 @@ test("invalid or expired operator grants never bypass the daily cap",async()=>{
   const {writeFileSync}=await import("node:fs");const statePath=join(dir,"state.json");let calls=0;
   const today=Math.floor((initial+8*hour)/(24*hour));
   for(const grant of [{day:today,requests:49},{day:today,requests:-1},{day:today,requests:1.5},{day:today-1,requests:12}]){
-   writeFileSync(statePath,JSON.stringify({version:1,lastAttempt:initial-hour,checkedAt:initial-hour,callDay:today,calls:48,error:null,posts:[],seen:[],accounts:{}}));
+   writeFileSync(statePath,JSON.stringify({version:1,sourceParserVersion:2,lastAttempt:initial-hour,checkedAt:initial-hour,callDay:today,calls:48,error:null,posts:[],seen:[],accounts:{}}));
    writeFileSync(statePath+".allowance.json",JSON.stringify(grant));
    const radar=new ResetRadar({statePath,token:"test",aiKey:"test",now:()=>initial,fetcher:(async()=>{calls++;return Response.json({})}) as typeof fetch});
    await radar.refresh();assert.equal(radar.status().state,"error");
   }
   assert.equal(calls,0);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test("missing author names require matching IDs from the verified source profile",()=>{
+ const row={...payload.data.timeline[0],author:{screen_name:null,rest_id:"9001"}};
+ const response={code:200,data:{user:{profile:"thsottiaux",rest_id:"9001"},timeline:[row]}};
+ assert.equal(parseTikHub(response).posts[0]?.id,post.id);
+ for(const user of [{profile:"other",rest_id:"9001"},{profile:"thsottiaux"},{}])assert.throws(()=>parseTikHub({...response,data:{...response.data,user}}));
+ for(const author of [{screen_name:null,rest_id:"9002"},{screen_name:"other",rest_id:"9001"},{screen_name:"thsottiaux",rest_id:"9002"}])assert.throws(()=>parseTikHub({...response,data:{...response.data,timeline:[{...row,author}]}}));
+ assert.deepEqual(parseTikHub({code:200,data:{timeline:[]}}).posts,[]);
+});
+
+test("parser migration immediately backfills missed older posts once, without repeated startup requests",async()=>{
+ const dir=mkdtempSync(join(tmpdir(),"radar-parser-"));
+ try{
+ const {writeFileSync}=await import("node:fs");const statePath=join(dir,"state.json");let calls=0;
+ writeFileSync(statePath,JSON.stringify({version:1,lastAttempt:initial,checkedAt:initial,callDay:0,calls:0,error:null,posts:[],seen:[],accounts:{},historyBackfilled:true}));
+ const options={statePath,token:"test",aiKey:"test",now:()=>initial,fetcher:(async(url)=>{
+ if(String(url).includes("tikhub")){calls++;return Response.json({code:200,data:{user:{profile:"thsottiaux",rest_id:"9001"},timeline:[{...payload.data.timeline[0],created_at:new Date(initial-48*hour).toISOString(),author:{screen_name:null,rest_id:"9001"}}]}});}
+ return Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:[{id:post.id,signal:"none",summary:"历史动态"}]})}}]});
+ }) as typeof fetch};
+ const radar=new ResetRadar(options);await radar.refresh();assert.equal(radar.status().timeline.length,1);assert.equal(calls,1);
+ await new ResetRadar(options).refresh();assert.equal(calls,1);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
