@@ -192,3 +192,13 @@ it("conditional predictions remain visible with their condition in the timeline"
  fireEvent.click(within(card).getByText("临时重置预测"));
  expect(within(screen.getByRole("dialog",{name:"重置消息时间轴"})).getByText("条件：当天没有重大更新时重置")).toBeTruthy();
 });
+
+it("shows delayed refresh while retaining the last analyzed timeline",async()=>{
+ vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",accounts:[{...data.accounts[0],credits:{balance:"0",hasCredits:false,unlimited:false}}],resetRadar:{state:"error",checkedAt:"2026-10-10T00:36:00Z",nextCheckAt:null,timeline:[{id:"42",publishedAt:"2026-10-09T00:00:00Z",summary:"已保存的重置公告",signal:"announced",sourceUrl:"https://example.test/post"}]}});
+ render(<UsageButton scope="machine" id="m1"/>);
+ fireEvent.click(await screen.findByText("更新暂时延迟",{selector:"strong"}));
+ const dialog=screen.getByRole("dialog",{name:"重置消息时间轴"});
+ expect(within(dialog).getByText("已保存的重置公告")).toBeTruthy();
+ expect(within(dialog).getByText(/更新于/)).toBeTruthy();
+ expect(screen.queryByText("信号检查失败")).toBeNull();
+});

@@ -118,3 +118,45 @@ test("one-time history backfill restores missing analyzed IDs then resumes hourl
   now+=hour;const restarted=new ResetRadar(options);await restarted.refresh();assert.equal(source,2);assert.equal(analysis,1);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+
+test("empty source pages with changing cursors use only one request per hourly poll",async()=>{
+ let now=initial,calls=0;
+ const radar=new ResetRadar({token:"test",aiKey:"test",now:()=>now,fetcher:(async()=>{calls++;return Response.json({code:200,data:{timeline:[],next_cursor:`cursor-${calls}`}});}) as typeof fetch});
+ for(let i=0;i<24;i++){await radar.refresh();assert.equal(radar.status().state,"ready");now+=hour;}
+ assert.equal(calls,24);
+});
+
+test("repeated posts with changing cursors stop pagination without duplicate analysis",async()=>{
+ let calls=0,analyzed=0;
+ const radar=new ResetRadar({token:"test",aiKey:"test",now:()=>initial,fetcher:(async(url)=>{
+  if(String(url).includes("tikhub")){calls++;return Response.json({...payload,data:{...payload.data,next_cursor:`cursor-${calls}`}});}
+  analyzed++;return Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:[{id:post.id,signal:"none",summary:"最新动态"}]})}}]});
+ }) as typeof fetch});
+ await radar.refresh();assert.equal(calls,2);assert.equal(analyzed,1);assert.equal(radar.status().timeline.length,1);
+});
+
+test("pagination reserves hourly polls, preserves collected pages, and resets at Beijing midnight",async()=>{
+ const dir=mkdtempSync(join(tmpdir(),"radar-budget-"));
+ try{
+  const {writeFileSync}=await import("node:fs");const statePath=join(dir,"state.json");let now=Date.parse("2026-09-29T02:00:00Z"),calls=0;
+  writeFileSync(statePath,JSON.stringify({version:1,lastAttempt:now-2*hour,checkedAt:now-2*hour,callDay:Math.floor((now+8*hour)/(24*hour)),calls:34,error:null,posts:[],seen:[],accounts:{},historyBackfilled:true}));
+  const radar=new ResetRadar({token:"test",aiKey:"test",statePath,now:()=>now,fetcher:(async(url,init)=>{
+   if(String(url).includes("tikhub")){calls++;return Response.json({code:200,data:{timeline:[{...payload.data.timeline[0],tweet_id:String(1000+calls),created_at:new Date(now).toISOString()}],next_cursor:`cursor-${calls}`}});}
+   const request=JSON.parse(String(init?.body));const posts=JSON.parse(request.messages[1].content).posts;
+   return Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:posts.map((p:{id:string})=>({id:p.id,signal:"none",summary:"最新动态"}))})}}]});
+  }) as typeof fetch});
+  for(let i=0;i<14;i++){await radar.refresh();assert.equal(radar.status().state,"ready");now+=hour;}
+  assert.equal(calls,14);assert.equal(radar.status(now-hour).dailyCalls,48);assert.equal(radar.status().timeline.length,14);
+  await radar.refresh();assert.equal(radar.status().state,"ready");assert.equal(radar.status().dailyCalls,5);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test("a failed hourly request preserves prior prediction and timeline",async()=>{
+ let now=initial,fail=false;
+ const radar=new ResetRadar({token:"test",aiKey:"test",now:()=>now,fetcher:(async(url)=>{
+  if(fail)throw Error("provider unavailable");
+  return String(url).includes("tikhub")?Response.json(payload):Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({results:[{id:post.id,signal:"announced",evidence:post.text,summary:"宣布重置"}]})}}]});
+ }) as typeof fetch});
+ await radar.refresh();fail=true;now+=hour;await radar.refresh();
+ assert.equal(radar.status().state,"error");assert.equal(radar.status().checkedAt,new Date(initial).toISOString());assert.equal(radar.status().timeline.length,1);assert.ok(await radar.read("account",{remainingPercent:10,resetCardsAvailable:0}));
+});

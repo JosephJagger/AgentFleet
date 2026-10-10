@@ -2561,6 +2561,7 @@
   "已宣布重置卡发放完成": "Reset card grant completed",
   "无重置信号": "No reset signal",
   "信号检查失败": "Signal check failed",
+  "更新暂时延迟": "Update temporarily delayed",
   "数据源未配置": "Source not configured",
   "正在检查信号": "Checking signals",
   "临时重置信号": "Extra reset signals",

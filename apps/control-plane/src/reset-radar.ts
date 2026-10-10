@@ -139,7 +139,12 @@ export class ResetRadar {
     if (this.pending) return this.pending;
     if (!this.token || !this.aiKey || this.controller.signal.aborted ||
       (now - this.snapshot.lastAttempt < HOUR && !backfill)) return Promise.resolve();
-    this.pending = this.collect(now).catch(() => {
+    this.pending = this.collect(now).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "";
+      const reason = message === "Daily collection budget reached" ? "daily_budget"
+        : /^Provider HTTP [0-9]{3}$/.test(message) ? message
+        : error instanceof Error && error.name === "TimeoutError" ? "provider_timeout" : "collection_or_analysis";
+      console.warn("reset-radar refresh deferred", { reason });
       this.snapshot.error = "重置信号采集或分析失败，将于下一小时重试";
       try { this.save(); } catch { /* Status remains visible; never expose provider bodies or secrets. */ }
     }).finally(() => { this.pending = undefined; });
@@ -163,18 +168,28 @@ export class ResetRadar {
     this.save();
     let cursor: string | null = null;
     const seenCursors = new Set<string>();
+    const seenPages = new Set<string>();
+    // Reserve one request for every remaining hourly poll today (Beijing time).
+    const remainingHours = 23 - Math.floor(((now + 8 * HOUR) % DAY) / HOUR);
+    const paginationBudget = 48 - remainingHours;
     const previous = new Map(s.posts.map(p => [p.post.id, p]));
     const received = new Map<string, RadarPost>();
     const backfill = !s.historyBackfilled;
     // Normal poll: one page. At most five pages to bridge a gap / bootstrap 100 posts.
     for (let page = 0; page < 5 && received.size < 100; page++) {
+      if (page > 0 && s.calls >= paginationBudget) break;
       if (s.calls >= 48) throw new Error("Daily collection budget reached");
       s.calls++; this.save(); // Persist before the paid request, including failures.
       const url = new URL("https://api.tikhub.io/api/v1/twitter/web/fetch_user_post_tweet");
       url.searchParams.set("screen_name", "thsottiaux"); if (cursor) url.searchParams.set("cursor", cursor);
       const result = parseTikHub(await this.json(url.href, { headers: { Authorization: `Bearer ${this.token}` } }, 45_000, 3_000_000));
+      // Empty/filtered pages and repeated pages cannot justify following another cursor.
+      // Providers may return a new cursor even when the underlying page never changes.
+      const pageKey = result.posts.map(p => p.id).sort().join(",");
+      if (!pageKey || seenPages.has(pageKey)) break;
+      seenPages.add(pageKey);
       for (const post of result.posts) received.set(post.id, post);
-      const caughtUp = result.posts.some(p => backfill ? previous.has(p.id) : s.seen.includes(p.id));
+      const caughtUp = result.posts.some(p => previous.has(p.id) || s.seen.includes(p.id));
       const oldPage = result.posts.length > 0 && result.posts.every(p => !(backfill ? retained(p, now) : fresh(p, now)));
       cursor = result.cursor;
       if ((!backfill && caughtUp) || oldPage || !cursor || seenCursors.has(cursor)) break;

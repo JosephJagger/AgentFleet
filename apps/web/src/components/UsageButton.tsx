@@ -57,7 +57,7 @@ export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"co
   const richMachineSummary=scope==="machine"&&!failed&&data?.accounts.length===1&&(weekly.length===1||fiveHour.length===1||accountCredits||data.resetPrediction);
   const updatedAt=data?.accounts.length?data.accounts.map(a=>a.observedAt).sort().at(-1):null;
   const signalLabel=(signal:string)=>signal==="conditional"?t("有条件额度重置"):signal==="card-conditional"?t("有条件发放重置卡"):signal==="announced"?t("已宣布将重置"):signal==="confirmed"?t("已宣布完成重置"):signal==="card-announced"?t("已宣布发放重置卡"):signal==="card-confirmed"?t("已宣布重置卡发放完成"):t("无重置信号");
-  const radarEmpty=data?.resetRadar?.state==="error"?t("信号检查失败"):data?.resetRadar?.state==="unconfigured"?t("数据源未配置"):data?.resetRadar?.state==="pending"?t("正在检查信号"):t("暂无预测");
+  const radarEmpty=data?.resetRadar?.state==="error"?t("更新暂时延迟"):data?.resetRadar?.state==="unconfigured"?t("数据源未配置"):data?.resetRadar?.state==="pending"?t("正在检查信号"):t("暂无预测");
   const radarLabel=data?.resetPrediction?signalLabel(data.resetPrediction.signal):radarEmpty;
   const periodTokens=data?.quotaCycle?.recordedTokens;
   const weeklyCacheRate=cacheRate(data?.quotaCycle?.inputTokens,data?.quotaCycle?.cachedInputTokens);
@@ -81,7 +81,7 @@ export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"co
       <header className="modal-head"><div><h2>{t("重置消息时间轴")}</h2><p>{t("最近 7 天 · 最新在上")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setRadarOpen(false)}><X size={18}/></button></header>
       <div className="usage-body"><p>{t("公告仅供参考，额度与日期以原生最新数据为准")}</p>
         {data?.resetRadar?.checkedAt&&<small>{t("更新于 {0}",date(data.resetRadar.checkedAt))}</small>}
-        {data?.resetRadar?.state==="error"&&<p role="status">{t("信号检查失败")}</p>}
+        {data?.resetRadar?.state==="error"&&<p role="status">{t("更新暂时延迟")}</p>}
         {!data?.resetRadar?.timeline?.length&&<p>{t("最近 7 天暂无已分析帖子")}</p>}
         {timeline.slice(currentRadarPage*5,(currentRadarPage+1)*5).map(post=><section className="radar-timeline-item" data-signal={post.signal} key={post.id}><small>{date(post.publishedAt)} · {signalLabel(post.signal)}{Date.now()-Date.parse(post.publishedAt)>=86_400_000?` · ${t("历史消息")}`:""}</small><p>{post.summary}</p>{post.condition&&<p>{t("条件：{0}",post.condition)}</p>}<a href={post.sourceUrl} target="_blank" rel="noopener noreferrer">{t("查看原帖")}</a></section>)}
       </div>
