@@ -63,3 +63,15 @@
  .buzhou-session-row__label { flex-basis:80px; }
  .buzhou-session-window { flex-basis:190px; }
 }
+
+/* Keep the empty-state action beside the picker, not centred in a full-height
+   conversation canvas. Large bottom-aligned scene images create a false seam. */
+:root .host-session-editor.buzhou-editor > .inspector.inspector--empty {
+ flex:0 0 auto;
+ min-height:0;
+ justify-content:flex-start;
+ padding:24px 20px;
+ gap:6px;
+ background-image:none;
+ border:0;
+}
