@@ -3268,5 +3268,12 @@
   "上次健康核验": "Last health verification",
   "检查完成，未执行升级": "Check complete; no upgrade performed",
   "正在回复": "Replying",
-  "回复已完成，等待后续进度": "Reply complete; waiting for further progress"
+  "回复已完成，等待后续进度": "Reply complete; waiting for further progress",
+  "正在运行": "Running",
+  "暂无运行会话": "No running sessions",
+  "暂无已接管会话": "No managed sessions",
+  "向左查看更多会话": "Show more sessions to the left",
+  "向右查看更多会话": "Show more sessions to the right",
+  "当前主机会话切换": "Sessions on this host",
+  "推理中": "Reasoning"
 }

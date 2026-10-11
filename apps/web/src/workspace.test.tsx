@@ -6,12 +6,13 @@ import { OperationReceipts, receiptStatus } from "./components/OperationReceipts
 import { RuntimeSettingsShortcut } from "./components/RuntimeSettingsShortcut";
 import { api, subscribeToFleet } from "./lib/api";
 import { draftKey } from "./lib/session-workspace";
+import { setTheme } from "./lib/theme";
 import { setLocale } from "./i18n";
 import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -1012,4 +1013,26 @@ it("idle voice send reaches the API with text and images, preserving draft on re
     if (previous) Object.defineProperty(navigator, "mediaDevices", previous);
     else Reflect.deleteProperty(navigator, "mediaDevices");
   }
+});
+
+it("不周山切主机优先选择完整活动列表中的运行会话，返回恢复已查看会话", async()=>{
+ const original=window.matchMedia;
+ vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){} unobserve(){}});
+ window.matchMedia=vi.fn().mockReturnValue({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()});
+ setTheme('buzhoushan');
+ try {
+  const running={...session('outside-recent','2'),activeTurnId:'active',state:{...session('x','2').state,currentTurn:'in_progress' as const}};
+  const data={...dashboard(),activitySessions:[...sessions,running]};
+  vi.mocked(api.dashboard).mockResolvedValue(data);
+  vi.mocked(api.session).mockImplementation(async id=>id===running.id?{...detail('B'),session:running}:detail(id));
+  history.replaceState(null,'','/sessions/A');render(<App/>);
+  await screen.findByRole('heading',{name:'会话A'});
+  fireEvent.click(screen.getByRole('button',{name:'主机2 在线可用'}));
+  await screen.findByRole('heading',{name:'会话outside-recent'});
+  expect(location.pathname).toBe('/sessions/outside-recent');
+  fireEvent.click(screen.getByRole('button',{name:'主机1 在线可用'}));
+  await screen.findByRole('heading',{name:'会话A'});
+  expect(location.pathname).toBe('/sessions/A');
+  expect(api.command).not.toHaveBeenCalled();
+ } finally {cleanup();setTheme('daylight');window.matchMedia=original;vi.unstubAllGlobals();}
 });

@@ -1,3 +1,5 @@
+import { BuzhoushanSessions } from "./components/BuzhoushanSessions";
+import { hostSessionGroups, preferredHostSession, rememberedHostSession, rememberHostSession } from "./lib/host-session-selection";
 import { preserveBuzhoushanStream } from "./lib/buzhoushan-stream";
 import { isConversationEvent, isBuzhoushanChatEvent } from "./lib/buzhoushan-events";
 import { BuzhoushanHeartbeat } from "./components/BuzhoushanHeartbeat";
@@ -1472,7 +1474,7 @@ function App() {
       setDetail(undefined);
       setDetailLoading(Boolean(id));
     }
-    const session = dashboardRef.current?.sessions.find((item) => item.id === id);
+    const session = (dashboardRef.current?.activitySessions ?? dashboardRef.current?.sessions)?.find((item) => item.id === id);
     setSelectedMachineId((current) => next.machineId ?? session?.machineId ?? (id ? undefined : ["security", "approvals"].includes(next.view) ? current : dashboardRef.current?.machines[0]?.id));
   }, []);
 
@@ -1487,6 +1489,12 @@ function App() {
   }, [navigate, selectedMachineId]);
 
   const selectMachine = useCallback((id: string) => {
+    const data=dashboardRef.current;
+    if(buzhouDesktopRef.current && routeRef.current.view!=="hosts" && data) {
+      const groups=hostSessionGroups(data.activitySessions??data.sessions,data.machines.find(m=>m.id===id));
+      const chosen=preferredHostSession(groups,rememberedHostSession(`${data.user.id}:${data.user.clientSessionId}`,id));
+      if(chosen) {navigate({view:"fleet",sessionId:chosen});return;}
+    }
     navigate({ view: routeRef.current.view === "hosts" ? "hosts" : "fleet", machineId: id });
   }, [navigate]);
 
@@ -1515,7 +1523,7 @@ function App() {
       const next = await api.dashboard();
       if (generation !== dashboardRequest.current) return;
       setDashboard(next);
-      const selected = next.sessions.find((session) => session.id === selectedSessionRef.current);
+      const selected = (next.activitySessions ?? next.sessions).find((session) => session.id === selectedSessionRef.current);
       setSelectedMachineId((current) => routeRef.current.machineId ?? selected?.machineId ?? (current && next.machines.some((machine) => machine.id === current) ? current : next.machines[0]?.id));
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) setDashboard(undefined);
@@ -1666,6 +1674,9 @@ function App() {
   }
 
   const displayedSession = detail && detail.session.id === selectedSessionId ? detail.session : undefined;
+  useEffect(()=>{
+    if(buzhouDesktop && dashboard && displayedSession) rememberHostSession(`${dashboard.user.id}:${dashboard.user.clientSessionId}`,displayedSession.machineId,displayedSession.id);
+  },[buzhouDesktop,dashboard?.user.id,dashboard?.user.clientSessionId,displayedSession?.id,displayedSession?.machineId]);
   useEffect(() => {
     if (!displayedSession) return;
     const provider = displayedSession.provider ?? "codex";
@@ -1804,7 +1815,9 @@ function App() {
           {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog key={`${selectedMachineId}:${selectedProvider}`} provider={selectedProvider} machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} onSchedule={project => openScheduled(project.id)} />}
           </div>
         </main>
+        <BuzhoushanSessions key={`${dashboard.user.id}:${dashboard.user.clientSessionId}`} enabled={buzhouDesktop} machine={selectedMachine} sessions={dashboard.activitySessions ?? dashboard.sessions} selectedId={selectedSessionId} detail={detail} onSelect={selectSession} onBrowse={()=>setCatalogCollapsed(false)} onCreate={()=>openCreate()}>
         <SessionInspector referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
+        </BuzhoushanSessions>
         {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong><FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayName(displayedSession?.projectAlias)}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}
       </div> : view === "hosts" ? <HostsView onConfigure={id => { setSettingsMachineId(id); setView("security"); }} machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView initialMachineId={settingsMachineId} dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />

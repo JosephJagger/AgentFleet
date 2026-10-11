@@ -180,3 +180,18 @@ it('shows turn outcomes in workbench chat while reasoning and commands remain in
  for(const itemType of ['reasoning','commandExecution','fileChange']) expect(isBuzhoushanChatEvent({...base,type:'item.completed',itemType})).toBe(false);
  expect(isBuzhoushanChatEvent({...base,type:'item.completed',itemType:'agentMessage'})).toBe(true);
 });
+
+it('reasoning lifecycle and duplicate completion receipts never restart a settled heartbeat',()=>{
+ vi.useFakeTimers();const d=detail();
+ const done={id:'done',nativeItemId:'reply',sessionSeq:1,type:'item.completed',itemType:'agentMessage',actor:'agent' as const,nativeTurnId:'turn-a',body:'Progress update',occurredAt:'2026-01-01'};
+ d.events=[done];const view=render(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);
+ act(()=>vi.advanceTimersByTime(1000));
+ for(const type of ['item.started','item.completed','message','agent_message.delta']) {
+  const reason={...done,id:`reason-${type}`,nativeItemId:'reason',sessionSeq:d.events.length+1,type,itemType:'reasoning',body:'Reasoning summary'};
+  d.events.push(reason);view.rerender(<BuzhoushanHeartbeat detail={d} messages={[done,reason]}/>);
+  expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
+ }
+ d.events.push({...done,id:'duplicate',sessionSeq:99});
+ view.rerender(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);
+ expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
+});

@@ -1,7 +1,8 @@
 import type {SessionDetail, TimelineEvent} from './types';
 const terminal = new Set(['turn.completed','turn.failed','turn.interrupted','turn.cancelled']);
 const readable = (e:TimelineEvent) => e.payloadState!=='deleted' && e.payloadState!=='suppressed';
-const reply = (e:TimelineEvent) => e.itemType==='agentMessage' || (e.actor==='agent' && ['agent_message.delta','message'].includes(e.type));
+// Explicit native item types take precedence over legacy message envelopes.
+const reply = (e:TimelineEvent) => e.itemType ? e.itemType==='agentMessage' : e.actor==='agent' && ['agent_message.delta','message'].includes(e.type);
 const identity = (e:TimelineEvent) => e.nativeItemId || e.id;
 
 /** Keep in-flight text through snapshots, only in the desktop workbench. Never cross content epochs. */
@@ -21,6 +22,6 @@ export function buzhoushanReplyState(detail:SessionDetail,messages:TimelineEvent
   const open=replies.some(e=>['agent_message.delta','item.started'].includes(e.type)&&!completed.has(identity(e)));
   const last=replies.filter(e=>e.type!=='agent_message.delta'||!completed.has(identity(e))).at(-1);
   const finished=last && (last.type==='item.completed'||last.type==='message');
-  const completionKey=finished ? JSON.stringify([detail.session.id,detail.session.nativeThreadId,detail.session.contentEpoch,detail.session.projectionEpoch,turn,identity(last),last.sessionSeq]) : undefined;
+  const completionKey=finished ? JSON.stringify([detail.session.id,detail.session.nativeThreadId,detail.session.contentEpoch,detail.session.projectionEpoch,turn,identity(last)]) : undefined;
   return {ended,open,hasReply:replies.length>0,completionKey};
 }
