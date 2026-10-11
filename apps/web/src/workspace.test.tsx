@@ -1015,7 +1015,7 @@ it("idle voice send reaches the API with text and images, preserving draft on re
   }
 });
 
-it("不周山切主机优先选择完整活动列表中的运行会话，返回恢复已查看会话", async()=>{
+it("不周山切主机优先选择运行会话，返回不自动恢复空闲接管会话", async()=>{
  const original=window.matchMedia;
  vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){} unobserve(){}});
  window.matchMedia=vi.fn().mockReturnValue({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()});
@@ -1031,8 +1031,8 @@ it("不周山切主机优先选择完整活动列表中的运行会话，返回�
   await screen.findByRole('heading',{name:'会话outside-recent'});
   expect(location.pathname).toBe('/sessions/outside-recent');
   fireEvent.click(screen.getByRole('button',{name:'主机1 在线可用'}));
-  await screen.findByRole('heading',{name:'会话A'});
-  expect(location.pathname).toBe('/sessions/A');
+  await screen.findByRole('button',{name:'选择一个会话'});
+  expect(location.pathname).toBe('/workbench/1');
   expect(api.command).not.toHaveBeenCalled();
  } finally {cleanup();setTheme('daylight');window.matchMedia=original;vi.unstubAllGlobals();}
 });

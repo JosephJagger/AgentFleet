@@ -16,7 +16,7 @@ it('selects one running session, remembers among several, never falls back to an
  const groups=hostSessionGroups([a,b,idle,{...a,machineId:'other'}],machine);
  expect(groups.running.map(s=>s.id)).toEqual(['a','b']);expect(groups.managed.map(s=>s.id)).toEqual(['idle']);
  expect(preferredHostSession(groups,'b')).toBe('b');expect(preferredHostSession(groups,'idle')).toBeUndefined();expect(preferredHostSession(groups,'deleted')).toBeUndefined();
- expect(preferredHostSession(hostSessionGroups([idle],machine),'idle')).toBe('idle');
+ expect(preferredHostSession(hostSessionGroups([idle],machine),'idle')).toBeUndefined();
  expect(preferredHostSession(hostSessionGroups([idle],machine))).toBeUndefined();
 });
 it('excludes unmanaged idle and drafts; marks offline/frozen tasks as managed instead of claiming they run',()=>{
@@ -63,4 +63,19 @@ it('hides the switcher for a sole running session without remounting the convers
   view.rerender(<BuzhoushanSessions {...props}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
  }
  expect(mounted).toHaveBeenCalledOnce();expect(unmounted).not.toHaveBeenCalled();
+});
+
+it('clears manual card highlighting after host changes and remount, not dashboard refreshes',()=>{
+ vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
+ const idle=session('idle');const props={enabled:true,machine,sessions:[idle],selectedId:'idle',onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<div>Conversation</div>};
+ const view=render(<BuzhoushanSessions {...props}/>);
+ const open=()=>fireEvent.click(screen.getByRole('button',{name:'切换会话'}));
+ const card=()=>document.querySelector<HTMLButtonElement>('.buzhou-session-window')!;
+ open();expect(card().getAttribute('aria-pressed')).toBe('false');
+ fireEvent.click(card());open();expect(card().getAttribute('aria-pressed')).toBe('true');
+ view.rerender(<BuzhoushanSessions {...props} sessions={[{...idle,lastActivityAt:'2026-02-01'}]}/>);expect(card().getAttribute('aria-pressed')).toBe('true');
+ view.rerender(<BuzhoushanSessions {...props} machine={{...machine,id:'other'}}/>);
+ view.rerender(<BuzhoushanSessions {...props}/>);open();expect(card().getAttribute('aria-pressed')).toBe('false');
+ fireEvent.click(card());view.unmount();render(<BuzhoushanSessions {...props}/>);open();expect(card().getAttribute('aria-pressed')).toBe('false');
+ fireEvent.click(card());open();expect(card().getAttribute('aria-pressed')).toBe('true');
 });

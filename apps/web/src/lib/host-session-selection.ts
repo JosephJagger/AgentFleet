@@ -9,7 +9,7 @@ export function hostSessionGroups(sessions:FleetSession[], machine?:Pick<Machine
 }
 export function preferredHostSession(groups:ReturnType<typeof hostSessionGroups>, remembered?:string) {
   if(groups.running.length===1)return groups.running[0].id;
-  return (groups.running.length?groups.running:groups.managed).find(s=>s.id===remembered)?.id;
+  return groups.running.find(s=>s.id===remembered)?.id;
 }
 const key=(owner:string)=>`agentfleet.host-session:${owner}`;
 export function rememberedHostSession(owner:string,host:string):string|undefined {
