@@ -282,3 +282,7 @@
   :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-live="false"] .buzhou-heartbeat__visual svg { animation-play-state:paused; }
   :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-live="false"] { color:#d7ba7d; }
 }
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .buzhou-heartbeat__pulse > strong { font-weight:400; }
+}
