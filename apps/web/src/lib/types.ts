@@ -291,6 +291,7 @@ export interface SessionProgress {
 export interface SessionDetail {
   progress?:SessionProgress;
   hostOnline?: boolean;
+  runtimeSyncUntil?: number | null;
   recoverySupported?: boolean;
   commandRecoverySupported?: boolean;
   session: FleetSession;

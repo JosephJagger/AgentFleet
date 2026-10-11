@@ -139,6 +139,8 @@ export interface ControlLeaseView {
 }
 
 export interface LogicalSessionSummary {
+  hostOnline?: boolean;
+  runtimeSyncUntil?: number | null;
   claudePermissionModes?:string[];
   claudeModels?: Array<{model:string;displayName:string;efforts:string[];supportsAutoMode?:boolean}>;
   provider?: "codex" | "claude";

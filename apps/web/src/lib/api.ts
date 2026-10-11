@@ -759,7 +759,8 @@ export const api = {
     const machines = cached?.machines ?? [];
     const projects = machines.flatMap((machine) => machine.projects);
     const clientSessionId = cached?.user.clientSessionId ?? "";
-    const session = mapSession(rawDetail.session, machines, projects, clientSessionId);
+    const rawSession = record(rawDetail.session);
+    const session = mapSession(rawSession, machines, projects, clientSessionId);
     const approvals = list(rawApprovals.approvals).map((approval) => mapApproval(approval, [session], machines, projects));
     const machine = machines.find((item) => item.id === session.machineId);
     const releaseManagementSupported = session.actions?.release?.reasonCode !== "UNSUPPORTED_COMMAND" && (session.actions?.release !== undefined || versionAtLeast(machine?.agentVersion, "0.16.2"));
@@ -799,7 +800,8 @@ export const api = {
     return {
       session,
       progress: rawDetail.progress as SessionProgress | undefined,
-      hostOnline: machine?.reachability === "live",
+      hostOnline: typeof rawSession.hostOnline === "boolean" ? rawSession.hostOnline : machine?.reachability === "live",
+      runtimeSyncUntil: typeof rawSession.runtimeSyncUntil === "number" ? rawSession.runtimeSyncUntil : null,
       events: history.events,
       historyPage: { ...history, projectionEpoch: history.projectionEpoch || session.projectionEpoch, contentEpoch: history.contentEpoch || session.contentEpoch },
       approval: approvals.find((approval) => approval.logicalSessionId === id) ?? null,

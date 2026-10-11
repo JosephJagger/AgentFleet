@@ -250,3 +250,19 @@ it('uses explicit completion despite stale active ID and ignores other turns or 
  d.events.push({...d.events[0],id:'resume',nativeTurnId:'turn-a',sessionSeq:3,type:'turn.started'});expect(isBuzhoushanTurnActive(d)).toBe(true);
  d.session.state.reachability='reconciling';expect(isBuzhoushanTurnActive(d)).toBe(true);
 });
+
+it('keeps routine synchronization green but expires it and honors uncertainty and disconnect',()=>{
+ vi.useFakeTimers();
+ const d=detail();d.session.state.reachability='reconciling';d.hostOnline=false;d.runtimeSyncUntil=Date.now()+15000;
+ const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+ expect(screen.getByRole('status').getAttribute('data-live')).toBe('true');
+ d.session.state.unknownFreeze=true;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+ expect(screen.getByRole('status').getAttribute('data-live')).toBe('false');
+ d.session.state.unknownFreeze=false;d.session.state.reachability='unreachable';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+ expect(screen.getByRole('status').getAttribute('data-live')).toBe('false');
+ d.session.state.reachability='reconciling';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+ act(()=>vi.advanceTimersByTime(15001));
+ expect(screen.getByRole('status').getAttribute('data-live')).toBe('false');
+ d.session.state.reachability='live';d.hostOnline=true;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+ expect(screen.getByRole('status').getAttribute('data-live')).toBe('true');
+});

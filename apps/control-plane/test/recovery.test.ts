@@ -1103,3 +1103,56 @@ test("maintenance defers queued work without discarding or replaying it", t=>{
  assert.ok(service.activateNextQueued("queue-session"));
  assert.equal(service.activateNextQueued("queue-session"),null);
 });
+
+test("routine same-runtime hello preserves presentation only, with bounded expiry and failure fencing", (t) => {
+  const db = new ControlPlaneDatabase(":memory:");
+  t.after(() => db.close());
+  const cfg = config(":memory:");
+  const owner = db.bootstrap(cfg);
+  const machineId = "mach_routine_sync";
+  const timestamp = new Date().toISOString();
+  insertMachine(db, owner.workspaceId, machineId, timestamp);
+  const registry = new RegistryService(db, cfg);
+  const connection: AgentConnectionIdentity = { connectionId: "routine-connection", machineId, workspaceId: owner.workspaceId, transportGeneration: 1, publicKey: "test" };
+  db.run("INSERT INTO agent_connections(connection_id,machine_id,transport_generation,connected_at) VALUES(?,?,1,?)", connection.connectionId, machineId, timestamp);
+  const streams = [{ producerEpoch: "routine-producer", throughHostSeq: 0 }];
+  const hello = { producerEpoch: "routine-producer", appServerEpoch: "routine-app", agentVersion: "0.30.93", codexVersion: "0.153.2",
+    schemaHash: "d3eace08be5dca386bfd1f1e8df650058b4113f1e10870a284d775d75517576a", credentialProtectionLevel: "software_protected" as const,
+    platform: "linux", platformRelease: "24.04", architecture: "x86_64", capacity: "busy" as const, projects: [], sessions: [], reconciliationStreams: streams };
+  let ack = registry.registerHello(connection, hello);
+  assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, null, "first connection is not routine sync");
+  registry.completeReconciliation(connection, ack.reconciliationId, streams);
+  assert.equal(registry.heartbeatPresentation(machineId).hostOnline, true);
+  ack = registry.registerHello(connection, hello);
+  const until = registry.heartbeatPresentation(machineId).runtimeSyncUntil;
+  assert.ok(until && until > Date.now());
+  db.run("UPDATE machines SET runtime_read_only=1 WHERE machine_id=?", machineId);
+  assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, null, "read-only runtime cannot appear healthy");
+  db.run("UPDATE machines SET runtime_read_only=0,last_heartbeat_at=? WHERE machine_id=?", new Date(Date.now()-60000).toISOString(), machineId);
+  assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, null, "stale heartbeat cannot appear healthy");
+  db.run("UPDATE machines SET last_heartbeat_at=? WHERE machine_id=?", timestamp, machineId);
+  assert.equal(db.get<{reachability:string}>("SELECT reachability FROM machines WHERE machine_id=?", machineId)?.reachability, "reconnecting", "write admission remains fenced");
+  registry.registerHello(connection, hello);
+  assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, until, "repeated snapshots cannot extend the grace period");
+  const originalNow = Date.now;
+  Date.now = () => until + 1;
+  try { assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, null); }
+  finally { Date.now = originalNow; }
+  ack = registry.registerHello(connection, hello);
+  assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, null, "stalled cycle stays uncertain");
+  registry.completeReconciliation(connection, ack.reconciliationId, streams);
+  registry.registerHello(connection, hello);
+  assert.ok(registry.heartbeatPresentation(machineId).runtimeSyncUntil);
+  assert.throws(() => registry.registerHello(connection, {...hello, reconciliationStreams: []}));
+  assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, null, "invalid hello removes presentation continuity");
+  ack = registry.registerHello(connection, hello);
+  registry.completeReconciliation(connection, ack.reconciliationId, streams);
+  ack = registry.registerHello(connection, {...hello, appServerEpoch: "new-app"});
+  assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, null, "native restart remains uncertain");
+  registry.completeReconciliation(connection, ack.reconciliationId, streams);
+  registry.registerHello(connection, {...hello, appServerEpoch: "new-app"});
+  assert.ok(registry.heartbeatPresentation(machineId).runtimeSyncUntil);
+  registry.disconnect(connection, "test disconnect");
+  assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, null);
+  assert.equal(new RegistryService(db, cfg).heartbeatPresentation(machineId).runtimeSyncUntil, null, "panel restart cannot restore stale continuity");
+});

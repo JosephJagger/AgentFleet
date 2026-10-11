@@ -1,3 +1,4 @@
+import {useEffect, useState} from 'react';
 import {Heart} from 'lucide-react';
 import type {SessionDetail, TimelineEvent} from '../lib/types';
 import {isBuzhoushanTurnActive} from '../lib/buzhoushan-events';
@@ -6,7 +7,15 @@ import {t} from '../i18n';
 export function BuzhoushanHeartbeat({detail}:{detail:SessionDetail;messages:TimelineEvent[]}) {
   const session=detail.session;
   const running=isBuzhoushanTurnActive(detail);
-  const live=session.state.reachability==='live' && !session.state.unknownFreeze && detail.hostOnline!==false;
+  const [, setClock]=useState(0);
+  const syncUntil=detail.runtimeSyncUntil ?? 0;
+  useEffect(()=>{
+    if(syncUntil<=Date.now())return;
+    const timer=setTimeout(()=>setClock(value=>value+1),syncUntil-Date.now()+1);
+    return ()=>clearTimeout(timer);
+  },[syncUntil]);
+  const routineSync=session.state.reachability==='reconciling' && syncUntil>Date.now();
+  const live=!session.state.unknownFreeze && (routineSync || (session.state.reachability==='live' && detail.hostOnline!==false));
   if(!running)return null;
   const label=!live?t('正在核验运行状态'):session.state.waitReason==='approval'?t('等待确认'):session.state.waitReason==='user_input'?t('等待回答'):t('对话消息在人机对话查看');
   return <div className="buzhou-heartbeat" data-mode="heartbeat" data-live={live} role="status" aria-label={label}>

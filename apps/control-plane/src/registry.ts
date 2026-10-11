@@ -281,6 +281,24 @@ function mapMachine(row: MachineRow): MachineSummary {
 }
 
 export class RegistryService {
+  // Presentation only: command admission and event reconciliation remain fenced.
+  private readonly routineSync = new Map<string, { connectionId: string; until: number }>();
+
+  heartbeatPresentation(machineId: string): { hostOnline: boolean; runtimeSyncUntil: number | null } {
+    const sync = this.routineSync.get(machineId);
+    if (sync && sync.until <= Date.now()) this.routineSync.delete(machineId);
+    const host = this.db.get<{ reachability: string; healthy: number }>(
+      `SELECT reachability,(identity_state='active' AND security_state='normal'
+        AND compatibility='compatible' AND runtime_read_only=0 AND last_heartbeat_at>=?) AS healthy
+       FROM machines WHERE machine_id=?`,
+      new Date(Date.now() - this.config.heartbeatOfflineSeconds * 1000).toISOString(), machineId,
+    );
+    const pending = sync && sync.until > Date.now() && host?.healthy === 1 && host.reachability === "reconnecting"
+      && this.db.get(`SELECT 1 FROM agent_connections c JOIN reconciliation_cycles r ON r.connection_id=c.connection_id
+        WHERE c.connection_id=? AND c.machine_id=? AND c.disconnected_at IS NULL AND r.state='pending'`, sync.connectionId, machineId);
+    return { hostOnline: host?.reachability === "online" && host.healthy === 1, runtimeSyncUntil: pending ? sync!.until : null };
+  }
+
   constructor(
     private readonly db: ControlPlaneDatabase,
     private readonly config: ControlPlaneConfig,
@@ -1596,6 +1614,15 @@ export class RegistryService {
     reconciliationId: string;
   } {
     const timestamp = nowIso();
+    const previousSync = this.heartbeatPresentation(connection.machineId).runtimeSyncUntil;
+    const continuous = this.db.get(`SELECT 1 FROM agent_connections c JOIN machines m ON m.machine_id=c.machine_id
+      WHERE c.connection_id=? AND c.machine_id=? AND c.disconnected_at IS NULL
+        AND c.producer_epoch=? AND c.app_server_epoch=? AND c.hello_at IS NOT NULL
+        AND m.identity_state='active' AND m.security_state='normal' AND m.compatibility='compatible'
+        AND m.runtime_read_only=0 AND m.last_heartbeat_at>=? AND (m.reachability='online' OR ? IS NOT NULL)`,
+      connection.connectionId, connection.machineId, typeof hello.producerEpoch === "string" ? hello.producerEpoch : null, typeof hello.appServerEpoch === "string" ? hello.appServerEpoch : null,
+      new Date(Date.now() - this.config.heartbeatOfflineSeconds * 1000).toISOString(), previousSync);
+    this.routineSync.delete(connection.machineId);
     // Receipt of any new hello immediately withdraws prior replay grants and
     // freezes reachability, even if the rest of that hello is malformed. This
     // prevents an invalid re-hello from leaving HTTP command admission open.
@@ -2185,6 +2212,11 @@ export class RegistryService {
         },
       });
     });
+    if (continuous) this.routineSync.set(connection.machineId, {
+      connectionId: connection.connectionId,
+      // Repeated snapshots must not indefinitely conceal a stalled reconciliation.
+      until: previousSync ?? Date.now() + 15_000,
+    });
     return { projects: projectMap, sessions: sessionMap, sessionContentEpochs, projectContentPolicies, reconciliationId };
   }
 
@@ -2384,6 +2416,7 @@ export class RegistryService {
   }
 
   disconnect(connection: AgentConnectionIdentity, reason: string): void {
+    if (this.routineSync.get(connection.machineId)?.connectionId === connection.connectionId) this.routineSync.delete(connection.machineId);
     const timestamp = nowIso();
     this.db.transaction(() => {
       this.db.run(
@@ -2831,6 +2864,7 @@ export class RegistryService {
     const host=this.db.get<{codex_catalog_json:string|null;agent_version:string;discovery_json:string|null}>("SELECT codex_catalog_json,agent_version,discovery_json FROM machines WHERE machine_id=?",row.machine_id);
     const machineCatalog=parseCodexCatalog(JSON.parse(host?.codex_catalog_json ?? "null"));
     return {
+      ...this.heartbeatPresentation(row.machine_id),
       weeklyTokens: usageCycle?.recordedTokens ?? null,
       weeklyBoundaryIncomplete: usageCycle?.boundaryIncomplete ?? false,
       logicalSessionId: row.logical_session_id,
