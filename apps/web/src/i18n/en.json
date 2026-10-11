@@ -1,4 +1,5 @@
 {
+  "执行过程": "Execution",
   "对话消息在人机对话查看": "View messages in Conversation",
   "任务执行时，在这里查看命令与推理摘要": "View commands and reasoning summaries here while the task runs",
   "中途回复见人机对话，本轮结束后展示完整对话": "Interim replies appear in Conversation; the full conversation appears here when the turn ends",

@@ -57,7 +57,7 @@ export function BuzhoushanActivity({detail, conversation}: {detail: SessionDetai
       onKeyDown={event=>{if(event.key==="ArrowUp"||event.key==="ArrowDown"){event.preventDefault();setHeight(h=>clamp(h+(event.key==="ArrowUp"?20:-20)));}}}/>} 
     <header className="buzhou-dock__head" onClick={event=>{if (!(event.target as HTMLElement).closest("button")) setCollapsed(false);}}>
       <div className="buzhou-dock__tabs" role="group" aria-label={t("活动筛选")}>
-        {([["commandExecution","终端"],["conversation","人机对话"]] as const).map(([value,label])=><button type="button" aria-pressed={tab===value} key={value} onClick={()=>{setTab(value);setFollowing(true);setCollapsed(false);}}>{t(label)}</button>)}
+        {([["commandExecution","执行过程"],["conversation","人机对话"]] as const).map(([value,label])=><button type="button" aria-pressed={tab===value} key={value} onClick={()=>{setTab(value);setFollowing(true);setCollapsed(false);}}>{t(label)}</button>)}
       </div>
       <small>{status}</small>
       <button type="button" onClick={reset} title={t("重置活动布局")} aria-label={t("重置活动布局")}><RotateCcw size={14}/></button>

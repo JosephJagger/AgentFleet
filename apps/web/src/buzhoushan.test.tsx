@@ -68,7 +68,7 @@ it('omits file changes and restores idle terminal activity with a single read',a
 it('replaces file changes with conversation while leaving terminal output separate',async()=>{
  vi.mocked(api.sessionProgress).mockResolvedValue({...progress,items:[...progress.items,{id:'edit',kind:'fileChange',status:'completed',title:'src/example.ts',output:'+ changed',updatedAt:progress.updatedAt!}]});
  const view=render(<BuzhoushanActivity detail={detail()} conversation={<div>Interim reply</div>}/>);await act(async()=>{});
- fireEvent.click(screen.getByRole('button',{name:'终端'}));
+ fireEvent.click(screen.getByRole('button',{name:'执行过程'}));
  expect(screen.getByText(/partial check output/)).toBeTruthy();
  expect(screen.queryByRole('button',{name:'文件修改'})).toBeNull();
  expect(screen.queryByText(/changed/)).toBeNull();
@@ -80,7 +80,7 @@ it('replaces file changes with conversation while leaving terminal output separa
  expect(screen.getByText('Full reply')).toBeTruthy();
  expect(screen.getByRole('button',{name:'收起代码活动'})).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:'重置活动布局'}));
- expect(screen.getByRole('button',{name:'终端'}).getAttribute('aria-pressed')).toBe('true');
+ expect(screen.getByRole('button',{name:'执行过程'}).getAttribute('aria-pressed')).toBe('true');
 });
 
 it('keeps reasoning and command output in the terminal and conversation text in chat',()=>{
@@ -154,7 +154,7 @@ it('keeps dock closed across turn start and completion until the user opens it',
  d.session.activeTurnId='next';d.session.state.currentTurn='in_progress';view.rerender(<BuzhoushanActivity detail={d}/>);
  expect(screen.queryByRole('separator')).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'重置活动布局'}));expect(screen.queryByRole('separator')).toBeNull();
- fireEvent.click(screen.getByRole('button',{name:'终端'}));expect(screen.getByRole('separator')).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'执行过程'}));expect(screen.getByRole('separator')).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:'收起代码活动'}));
  fireEvent.click(screen.getByText('最后已知进度'));expect(screen.getByRole('separator')).toBeTruthy();
 });
