@@ -1,4 +1,6 @@
 {
+  "正在同步状态": "Syncing status",
+  "运行状态待确认": "Execution status unconfirmed",
   "正在核验运行状态": "Checking execution status",
   "执行过程": "Execution",
   "对话消息在人机对话查看": "View messages in Conversation",

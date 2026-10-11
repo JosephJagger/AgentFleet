@@ -280,7 +280,10 @@
 
 @media (min-width:1101px) {
   :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-live="false"] .buzhou-heartbeat__visual svg { animation-play-state:paused; }
-  :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-live="false"] { color:#d7ba7d; }
+  :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-status="syncing"] { color:#d7ba7d; }
+  :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-status="syncing"] .buzhou-heartbeat__heart { fill:#393322; }
+  :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-status="uncertain"] { color:#a0a0a0; }
+  :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-status="uncertain"] .buzhou-heartbeat__heart { fill:#292929; }
 }
 
 @media (min-width:1101px) {

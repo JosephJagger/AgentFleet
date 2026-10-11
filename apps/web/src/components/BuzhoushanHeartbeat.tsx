@@ -17,8 +17,9 @@ export function BuzhoushanHeartbeat({detail}:{detail:SessionDetail;messages:Time
   const routineSync=session.state.reachability==='reconciling' && syncUntil>Date.now();
   const live=!session.state.unknownFreeze && (routineSync || (session.state.reachability==='live' && detail.hostOnline!==false));
   if(!running)return null;
-  const label=!live?t('正在核验运行状态'):session.state.waitReason==='approval'?t('等待确认'):session.state.waitReason==='user_input'?t('等待回答'):t('对话消息在人机对话查看');
-  return <div className="buzhou-heartbeat" data-mode="heartbeat" data-live={live} role="status" aria-label={label}>
+  const status=!live?'uncertain':routineSync?'syncing':'running';
+  const label=!live?t('运行状态待确认'):routineSync?t('正在同步状态'):session.state.waitReason==='approval'?t('等待确认'):session.state.waitReason==='user_input'?t('等待回答'):t('对话消息在人机对话查看');
+  return <div className="buzhou-heartbeat" data-mode="heartbeat" data-status={status} data-live={live} role="status" aria-label={label}>
     <div className="buzhou-heartbeat__layer buzhou-heartbeat__pulse" aria-hidden={false}>
       <div className="buzhou-heartbeat__visual" aria-hidden="true">
         <svg viewBox="0 0 800 140" preserveAspectRatio="none"><path d="M0 70H110L130 58L145 82L164 70H240L264 70L280 30L296 112L316 54L334 70H470L494 70L510 30L526 112L546 54L564 70H800"/></svg>

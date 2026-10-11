@@ -7,7 +7,9 @@ has stopped.
 `LogicalSessionSummary.runtimeSyncUntil` is a presentation-only deadline. It is
 issued after a valid hello only when the same connected transport, producer epoch
 and App Server epoch were already healthy and online. During its pending
-reconciliation, the Buzhoushan heartbeat remains green for at most 15 seconds.
+reconciliation, the Buzhoushan heartbeat turns gold and continues animating for at most 15 seconds,
+with the label “正在同步状态”. Healthy execution outside synchronization is green.
+Uncertain state uses a paused gray heartbeat labelled “运行状态待确认”.
 Repeated pending snapshots retain the original deadline. The browser schedules
 expiry even if no subsequent response arrives.
 
@@ -19,5 +21,5 @@ dashboard snapshot cannot prolong an already resolved warning.
 
 This changes presentation only. Reconciliation watermarks, replay grants, command
 admission, queue dispatch, unknown-outcome recovery and connection timeouts retain
-their existing rules. A green heartbeat during routine sync is not permission to
+their existing rules. An animated gold heartbeat during routine sync is not permission to
 write or evidence that a native turn has completed.
