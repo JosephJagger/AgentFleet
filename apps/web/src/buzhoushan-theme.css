@@ -85,7 +85,6 @@
   :root[data-theme="buzhoushan"] .buzhou-focus { padding-left:0; }
   :root[data-theme="buzhoushan"] .buzhou-focus .primary-nav,
   :root[data-theme="buzhoushan"] .buzhou-focus .account-label,
-  :root[data-theme="buzhoushan"] .buzhou-focus .machine-rail,
   :root[data-theme="buzhoushan"] .buzhou-focus .fleet-main { display:none; }
   :root[data-theme="buzhoushan"] .buzhou-focus .fleet-layout { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) 24px; grid-template-areas:"editor" "status"; }
   :root[data-theme="buzhoushan"] .buzhou-dock { order:100; flex:0 1 auto; min-height:130px; max-height:36dvh; background:#181818; border-top:1px solid #454545; position:relative; display:flex; flex-direction:column; overflow:visible; font-size:12px; }
@@ -200,4 +199,41 @@
   :root[data-theme="buzhoushan"] .buzhou-session-provider > header small { font-size:10px; color:#999; }
   :root[data-theme="buzhoushan"] .buzhou-session-provider .buzhou-session-row { min-height:94px; }
   :root[data-theme="buzhoushan"] .buzhou-session-provider .buzhou-session-row__label { flex-basis:92px; gap:5px; white-space:nowrap; }
+}
+
+/* Livestream focus keeps host navigation, while reserving height for conversation. */
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .buzhou-focus .fleet-layout { grid-template-rows:36px minmax(0,1fr) 24px; grid-template-areas:"hosts" "editor" "status"; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .machine-rail { gap:6px; padding:0 10px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .rail-heading .icon-button { width:26px; height:26px; min-width:26px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .machine-link { min-width:110px; min-height:28px; height:28px; padding:2px 8px; gap:6px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .machine-link__copy { display:flex; align-items:center; gap:6px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .machine-link small { margin:0; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .rail-node { width:16px; height:16px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-host-scroll { height:26px; flex-basis:22px; width:22px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-head { display:grid; grid-template-columns:minmax(100px,1fr) minmax(120px,2fr) auto; align-items:center; gap:4px 12px; padding:4px 12px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-title-row { display:contents; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-context { grid-column:1; grid-row:1; margin:0; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-title-row > h2 { grid-column:2; grid-row:1; font-size:14px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-head__actions { position:static; grid-column:3; grid-row:1; gap:4px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-head__actions :is(.button,.icon-button) { min-height:26px; height:26px; padding:3px 7px; font-size:11px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-head__actions .icon-button { width:26px; min-width:26px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-facts { grid-column:1/-1; grid-row:2; gap:8px; min-width:0; font-size:11px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-facts .state-pill { padding:2px 6px; font-size:11px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .history-mark { font-size:11px; padding:0; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-session-quota { flex:0 1 auto; max-width:none; gap:8px; margin:0; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-quota-card { flex:0 1 auto; padding:3px 8px; gap:0; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-quota-card > span:first-child { flex-wrap:nowrap; gap:8px; white-space:nowrap; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-quota-card strong { font-size:12px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-quota-card > :is(small,.host-quota-meter) { display:none; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-call-actions .usage-trigger { min-height:26px; padding:3px 7px; font-size:11px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .usage-trigger-text { flex-direction:row; gap:8px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .usage-trigger-text small { font-size:11px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-call-actions .icon-button { min-height:26px; min-width:26px; height:26px; width:26px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-session-toggle { padding:0 8px; }
+}
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .buzhou-focus .rail-track { margin:0; scrollbar-width:none; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-call-actions .native-voice__trigger { width:26px; min-width:26px; height:26px; min-height:26px; padding:3px; }
 }
