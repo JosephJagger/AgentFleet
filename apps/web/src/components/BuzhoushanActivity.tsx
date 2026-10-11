@@ -19,7 +19,7 @@ export function workbenchItems(detail: SessionDetail, progress?: SessionProgress
   for (const event of timelineItems(detail.events)) {
     const id = event.nativeItemId || event.id;
     if (hidden.has(id) || (turn && event.nativeTurnId && event.nativeTurnId !== turn) || isConversationEvent(event)) continue;
-    items.set(id,{id,kind:event.diff || event.fileChanges?.length?"fileChange":event.command?"commandExecution":event.itemType || "process",status:event.status || (event.type==="item.completed"?"completed":"unknown"),
+    items.set(id,{id,source:event.changeSource,limited:event.changeLimited,supported:event.changeSupported,kind:event.diff || event.fileChanges?.length?"fileChange":event.command?"commandExecution":event.itemType || "process",status:event.status || (event.type==="item.completed"?"completed":"unknown"),
       title:event.command || event.fileChanges?.map(change=>change.path).join(", ") || event.title || event.type,
       output:event.output || event.body || event.fileChanges?.map(change=>change.diff).join("\n") || undefined,updatedAt:event.occurredAt});
   }
@@ -40,6 +40,7 @@ export function BuzhoushanActivity({detail}: {detail: SessionDetail}) {
   const output = useRef<HTMLPreElement>(null);
   const drag = useRef<{y:number;height:number} | undefined>(undefined);
   const visible = items.filter(item => tab === "fileChange" ? item.kind === "fileChange" : item.kind !== "fileChange");
+  const itemTitle=(item:ActivityItem)=>item.source==="workspace_snapshot"?t("工作区变化（本轮期间）")+(item.title?` · ${item.title}`:""):item.title;
   const current = following ? visible.at(-1) : visible.find(item=>item.id===selected);
   useEffect(() => { if (following && output.current) output.current.scrollTop = output.current.scrollHeight; }, [following,current?.id,current?.output,collapsed]);
   const isLive = active && scoped?.freshness === "live" && !unavailable && detail.hostOnline !== false;
@@ -65,13 +66,13 @@ export function BuzhoushanActivity({detail}: {detail: SessionDetail}) {
     {!collapsed && <div className="buzhou-dock__body">
       <div className="buzhou-dock__list" aria-label={t("最近活动")}>
         {[...visible].reverse().map(item=><button type="button" key={item.id} aria-pressed={current?.id===item.id} onClick={()=>{setSelected(item.id);setFollowing(false);}}>
-          {item.kind==="fileChange"?<FileCode2 size={15}/>:<Terminal size={15}/>}<span><strong>{item.title.slice(0,240)}</strong><small>{stateLabel(item.status)}</small></span>
+          {item.kind==="fileChange"?<FileCode2 size={15}/>:<Terminal size={15}/>}<span><strong>{itemTitle(item).slice(0,240)}</strong><small>{stateLabel(item.status)}</small></span>
         </button>)}
         {!visible.length&&<p>{scoped?.contentAvailable===false?t("未开启内容同步，仅显示运行状态"):tab==="fileChange"?t("本轮未收到原生文件变更事件，脚本操作请查看终端"):t("尚无可展示的代码活动")}</p>}
       </div>
       <div className="buzhou-dock__output">
         <div className="buzhou-dock__caption"><span>{current ? stateLabel(current.status) : t("等待过程事件")}{current?.updatedAt&&` · ${new Date(current.updatedAt).toLocaleTimeString()}`}</span><button type="button" aria-pressed={following} onClick={()=>setFollowing(!following)}>{following?t("跟随最新"):t("查看最新活动")}</button></div>
-        {current?<pre key={current.id} ref={output} onWheel={event=>{if(event.deltaY<0){setSelected(current.id);setFollowing(false);}}}><code>{current.title.slice(0,4000)}{"\n\n"}{current.output?.slice(-16000)||t("暂无输出正文；完整内容见会话记录")}</code></pre>:<p>{!following?t("所选活动已离开最近记录，可查看最新活动"):t("任务执行时，在这里查看实际命令与文件变更")}</p>}
+        {current?<pre key={current.id} ref={output} onWheel={event=>{if(event.deltaY<0){setSelected(current.id);setFollowing(false);}}}><code>{itemTitle(current).slice(0,4000)}{"\n\n"}{current.source==="workspace_snapshot" ? `${t("对比任务开始前的工作区；可能包含其他程序同期写入的变化")}\n${current.limited?t("部分文件或差异未采集（大小、数量或读取限制）")+"\n":""}${current.supported===false?t("此工作区暂无法采集：需要 Git 工作区和可用的 Git"):current.output?.slice(-16000)||t("截至本次采样，未发现相对任务开始前的文件变化")}` : current.output?.slice(-16000)||t("暂无输出正文；完整内容见会话记录")}</code></pre>:<p>{!following?t("所选活动已离开最近记录，可查看最新活动"):t("任务执行时，在这里查看实际命令与文件变更")}</p>}
         <small className="buzhou-dock__limit">{t("最近 60 条活动 · 输出最多 16000 字符 · 完整记录见会话")}</small>
       </div>
     </div>}

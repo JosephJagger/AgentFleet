@@ -433,6 +433,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     occurredAt: string(raw.occurredAt, new Date().toISOString()),
     actor,
     itemType: itemType || undefined,
+    ...(item.source === "workspace_snapshot" ? {changeSource:"workspace_snapshot",changeLimited:item.limited===true,changeSupported:item.supported===true}:{}),
     title: eventTitle(type, item),
     ...(type === "thread.history.order" ? {historyOrder:list(payload.items).map(record).filter(x=>typeof x.itemId === "string" && Number.isSafeInteger(x.index)).map(x=>({itemId:String(x.itemId),index:Number(x.index),...(typeof x.occurredAt === "string" ? {occurredAt:x.occurredAt} : {})}))} : {}),
     images: list(item.content).map(record).filter(entry => entry.type === "image" && isInlineImage(entry.url)).slice(0, 4).map(entry => entry.url as string),

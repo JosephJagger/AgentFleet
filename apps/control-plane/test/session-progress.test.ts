@@ -92,3 +92,10 @@ test('activity projection restores idle last turn and retains file edits beyond 
  assert.throws(()=>f.progress.read({...f.principal,workspaceId:'other'},f.session.logicalSessionId,undefined,true));
  f.db.run('UPDATE projects SET sync_content=0');assert.equal(f.progress.read(f.principal,f.session.logicalSessionId,undefined,true).items.length,0);
 });
+
+test('workspace snapshot provenance, empty result and partial capture survive progress projection',t=>{
+ const f=fixture();t.after(()=>f.db.close());f.running();
+ f.event('item.completed',{item:{id:'workspace-turn',type:'fileChange',source:'workspace_snapshot',limited:true,supported:true,changes:[{path:'script.txt',diff:'+ actual edit'}]}});
+ const item=f.progress.read(f.principal,f.session.logicalSessionId,undefined,true).items[0]!;
+ assert.equal(item.source,'workspace_snapshot');assert.equal(item.limited,true);assert.equal(item.supported,true);assert.match(item.output!,/actual edit/);
+});

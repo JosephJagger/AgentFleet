@@ -1,3 +1,5 @@
+import {execFile as workspaceExecFile} from "node:child_process";
+import {promisify as workspacePromisify} from "node:util";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -1728,4 +1730,26 @@ for (const releaseFails of [false, true]) test(`claim resume timeout only clears
   assert.equal(state.discoveredThreads["idle-host"]?.title, "Original");
   assert.equal(server.startTurnCount, 0);
   await runtime.shutdown();
+});
+
+test("workspace snapshot is captured before execution and delivered on completion without changing task identity",async t=>{
+ const {store,projects}=await fixture();const project=projects[0]!;
+ await workspacePromisify(workspaceExecFile)('git',['init',project.root]);
+ await writeFile(join(project.root,'demo.txt'),'prior edits\n');
+ let server!:FakeAppServer;
+ const runtime=new AgentRuntime({store,identity,pairing,support,appServerFactory:cb=>{server=new FakeAppServer('epoch-diff',cb);server.startTurnHook=async thread=>{
+  await server.callbacks.onEvent({type:'turn.started',nativeThreadId:thread.nativeThreadId,nativeTurnId:'diff-turn',payload:{}},server.appServerEpoch);
+  await writeFile(join(project.root,'demo.txt'),'prior edits\nnew change\n');
+  await server.callbacks.onEvent({type:'turn.completed',nativeThreadId:thread.nativeThreadId,nativeTurnId:'diff-turn',payload:{turn:{status:'completed'}}},server.appServerEpoch);
+  return {nativeTurnId:'diff-turn',status:'completed'};
+ };return server;}});
+ runtime.setTransportGeneration(1);captureCallbacks(runtime);await runtime.initialize();t.after(()=>runtime.shutdown());
+ await runtime.handleCommand(command(project,'snapshot-attempt','snapshot-command','snapshot-session','epoch-diff'),1);
+ const events=store.snapshot().outbox.filter(e=>e.nativeItemId==='workspace-diff-turn');
+ assert.equal(events.length,1);assert.equal(events[0]!.logicalSessionId,'snapshot-session');
+ assert.match(JSON.stringify(events[0]!.payload),/new change/);
+ assert.equal(Object.values(store.snapshot().managedThreads)[0]?.activeTurnId,undefined);
+ await runtime.setProjectContentPolicy(project.id,false,7);
+ await runtime.handleCommand(command(project,'private-attempt','private-command','private-session','epoch-diff'),1);
+ assert.equal(store.snapshot().outbox.filter(e=>e.nativeItemId==='workspace-diff-turn').length,1,'content-disabled task must not emit a snapshot');
 });

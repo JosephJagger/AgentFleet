@@ -3,6 +3,7 @@ import type { RegistryService } from "./registry.js";
 import type { Principal } from "./auth.js";
 
 export interface ProgressItem {
+  source?:string; limited?:boolean; supported?:boolean;
   id: string; kind: string; status: string; title: string; output?: string; updatedAt: string;
 }
 export interface SessionProgress {
@@ -76,8 +77,14 @@ export class SessionProgressService {
         output=changes.slice(0,2).map((change:{diff?:unknown})=>text(change.diff,2000)).join('\n');
       } else if(item.type==='agentMessage'||item.type==='plan')title=text(item.text);
       else continue; // never expose raw reasoning or arbitrary tool arguments
+      const snapshot=item.source==='workspace_snapshot';
+      if(snapshot){
+        title=(item.changes??[]).map((change:{path?:unknown})=>text(change.path,200)).join(', ').slice(0,1000);
+        const full=(item.changes??[]).map((change:{diff?:unknown})=>text(change.diff,16000)).join('\n');output=full.slice(0,16000);
+        limited ||= Boolean(item.limited)||full.length>16000;
+      }
       if(row.type==='item.completed')completed.add(id);
-      items.delete(id);items.set(id,{id,kind:item.type,status,title, ...(output?{output}:{}),updatedAt:row.received_at});
+      items.delete(id);items.set(id,{id,kind:item.type,status,title,...(snapshot?{source:"workspace_snapshot",limited:Boolean(item.limited)||(item.changes??[]).map((x:{diff?:string})=>x.diff??"").join("\n").length>16000,supported:item.supported===true}:{}), ...(output?{output}:{}),updatedAt:row.received_at});
     }
     if(policy?.sync_content && !end && turnId===session.activeTurnId) for(const stream of this.streams.values()) {
       if(stream.sessionId!==sessionId||stream.segmentId!==session.executionSegmentId||stream.contentEpoch!==session.contentEpoch||stream.turnId!==turnId||hidden.has(stream.itemId)||completed.has(stream.itemId))continue;

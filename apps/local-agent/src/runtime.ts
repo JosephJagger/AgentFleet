@@ -1,3 +1,4 @@
+import {snapshotWorkspace, workspaceChanges, type WorkspaceSnapshot} from "./workspace-changes.js";
 import {preferenceRules} from './voice-preference-rules.js';
 import { parseRealtimeVoice, supportsNativeVoice } from "./voice-options.js";
 import { PanelVoiceRuntime } from "./panel-voice.js";
@@ -322,6 +323,39 @@ export class AgentRuntime {
   private restartController: AbortController | undefined;
   private restartLoop: Promise<void> | undefined;
   private shuttingDown = false;
+  private workspaceWatches = new Map<string,{before:WorkspaceSnapshot; thread:ManagedThread; turnId?:string; epoch:string; lastDigest?:string; timer:ReturnType<typeof setInterval>; lane:Promise<void>}>();
+  private discardWorkspaceWatch(id:string):void {
+    const watch=this.workspaceWatches.get(id);if(watch)clearInterval(watch.timer);
+    this.workspaceWatches.delete(id);
+  }
+  private async beginWorkspaceWatch(thread:ManagedThread,root:string,epoch:string):Promise<void> {
+    this.discardWorkspaceWatch(thread.nativeThreadId);
+    if(this.store.snapshot().projectContentPolicies[thread.projectId]?.syncContent===false)return;
+    const before=await snapshotWorkspace(root);
+    const timer=setInterval(()=>{void this.sampleWorkspaceWatch(thread.nativeThreadId,false);},15_000);timer.unref();
+    this.workspaceWatches.set(thread.nativeThreadId,{before,thread,epoch,timer,lane:Promise.resolve()});
+  }
+  private async sampleWorkspaceWatch(id:string,final:boolean):Promise<void> {
+    const watch=this.workspaceWatches.get(id);if(!watch||!watch.turnId)return;
+    if(final)clearInterval(watch.timer);
+    const sample=async()=>{
+      const current=this.store.snapshot().managedThreads[id];
+      if(this.workspaceWatches.get(id)!==watch||!current||current.appServerEpoch!==watch.epoch||current.logicalSessionId!==watch.thread.logicalSessionId||current.projectId!==watch.thread.projectId||current.contentEpoch!==watch.thread.contentEpoch||current.executionSegmentId!==watch.thread.executionSegmentId||this.store.snapshot().projectContentPolicies[current.projectId]?.syncContent===false)return;
+      const after=watch.before.supported?await snapshotWorkspace(watch.before.root):watch.before;
+      const result=workspaceChanges(watch.before,after);
+      const digest=sha256(canonicalJson(result));
+      if(!final&&digest===watch.lastDigest)return;
+      // Content policy may change while reading files. Never publish that stale snapshot.
+      const fresh=this.store.snapshot().managedThreads[id];
+      if(this.workspaceWatches.get(id)!==watch||!fresh||fresh.appServerEpoch!==watch.epoch||fresh.logicalSessionId!==current.logicalSessionId||fresh.executionSegmentId!==current.executionSegmentId||fresh.contentEpoch!==current.contentEpoch||this.store.snapshot().projectContentPolicies[current.projectId]?.syncContent===false)return;
+      watch.lastDigest=digest;
+      await this.emitForThread(current,{type:final?"item.completed":"item.started",appServerEpoch:watch.epoch,nativeThreadId:id,nativeTurnId:watch.turnId!,nativeItemId:`workspace-${watch.turnId}`,
+        payload:{item:{id:`workspace-${watch.turnId}`,type:"fileChange",status:final?"completed":"running",source:"workspace_snapshot",limited:result.limited,supported:watch.before.supported&&after.supported,changes:result.changes}}});
+    };
+    watch.lane=watch.lane.then(sample).catch(()=>undefined);
+    await watch.lane;
+    if(final&&this.workspaceWatches.get(id)===watch)this.discardWorkspaceWatch(id);
+  }
   private hostCodexRefresh: Promise<void> | undefined;
   private hostCodexLastAttempt = Date.now();
   private readonly exitedAppServerEpochs = new Set<string>();
@@ -768,6 +802,7 @@ export class AgentRuntime {
   async setProjectContentPolicy(projectId: string, syncContent: boolean, retentionDays: number): Promise<void> {
     if (![1, 3, 7, 14, 30].includes(retentionDays)) throw new AgentError("PROJECT_POLICY_INVALID", "retentionDays is invalid");
     await this.store.setProjectContentPolicy(projectId, syncContent, retentionDays);
+    if(!syncContent)for(const [id,watch] of this.workspaceWatches)if(watch.thread.projectId===projectId)this.discardWorkspaceWatch(id);
   }
 
   heartbeatPayload(): Record<string, unknown> {
@@ -1020,6 +1055,7 @@ export class AgentRuntime {
 
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
+    for(const id of this.workspaceWatches.keys())this.discardWorkspaceWatch(id);
     await this.panelVoice?.close();
     this.catalogSync.close();
     this.catalogWatcher?.close();
@@ -1769,9 +1805,12 @@ export class AgentRuntime {
         const referenced = referenceInputs(prompt, materialized);
         const materializedSkills = nativeAction ? [] : await materializePluginSkills(project, command.commandId, pluginSkills, server);
         const materializedPlugins = nativeAction ? [] : await materializePlugins(project, command.commandId, plugins, server);
-        const result = nativeAction
+        await this.beginWorkspaceWatch(thread, project.root, server.appServerEpoch);
+        const result = await (async()=>{try {return nativeAction
           ? await server.startNativeTurn!(thread, nativeAction, nativeAction === "review" ? parseReviewTarget(command.payload.target) : undefined)
           : await server.startTurn(thread, project, referenced.prompt, clientUserMessageId, turnSettings, images, { attachments: referenced.attachments, referenceFiles: referenced.referenceFiles, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(outputSchema ? { outputSchema } : {}), ...(goal ? { goal } : {}) });
+        } catch(error){this.discardWorkspaceWatch(thread.nativeThreadId);throw error;}})();
+        const watch=this.workspaceWatches.get(thread.nativeThreadId);if(watch)watch.turnId=result.nativeTurnId;
         let completedBeforeResponse = false;
         const updated = await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => {
           delete candidate.activeTurnSettings;
@@ -1788,6 +1827,7 @@ export class AgentRuntime {
           candidate.lastTurnId = result.nativeTurnId;
           candidate.lastTurnStatus = result.status;
         });
+        if (completedBeforeResponse) await this.sampleWorkspaceWatch(thread.nativeThreadId,true);
         if (!completedBeforeResponse) {
           await this.emitForThread(updated, {
             type: "turn.started",
@@ -2021,6 +2061,9 @@ export class AgentRuntime {
     if(event.type==="turn.started" && thread.realtimeSessionId && event.nativeTurnId && event.payload.voiceSessionId===thread.realtimeSessionId) {
       await this.store.updateManagedThread(thread.nativeThreadId,t=>{ t.activeTurnId=event.nativeTurnId!; t.activeTurnSettings={nativeTurnId:event.nativeTurnId!,changedAt:nowIso(),source:"native_voice",...(t.realtimeSettings ? {model:t.realtimeSettings.model,effort:t.realtimeSettings.effort} : {})}; });
     }
+    const watch=this.workspaceWatches.get(thread.nativeThreadId);
+    if(watch&&event.type==='turn.started'&&event.nativeTurnId)watch.turnId=event.nativeTurnId;
+    if(watch&&event.nativeTurnId===watch.turnId&&['turn.completed','turn.failed','turn.interrupted'].includes(event.type))await this.sampleWorkspaceWatch(thread.nativeThreadId,true);
     let mappedEvent = event;
     if (event.type === "turn.completed" && event.nativeTurnId !== undefined) {
       const completedTurnId = event.nativeTurnId;
@@ -2142,6 +2185,7 @@ export class AgentRuntime {
   }
 
   private async handleThreadExit(id: string, epoch: string, detail: string): Promise<void> {
+    if(this.workspaceWatches.get(id)?.epoch===epoch)this.discardWorkspaceWatch(id);
     const thread = this.store.snapshot().managedThreads[id];
     if (!thread || thread.appServerEpoch !== epoch || this.appServer?.appServerEpoch !== epoch || this.shuttingDown) return;
     if(thread.realtimeSessionId) {
@@ -2161,6 +2205,7 @@ export class AgentRuntime {
   }
 
   private async handleAppExit(epoch: string, detail: string): Promise<void> {
+    for(const [id,watch] of this.workspaceWatches)if(watch.epoch===epoch)this.discardWorkspaceWatch(id);
     const isCurrent = this.appServer?.appServerEpoch === epoch;
     const isStarting = this.startingAppServer?.appServerEpoch === epoch;
     if ((!isCurrent && !isStarting) || this.exitedAppServerEpochs.has(epoch) || this.shuttingDown) return;

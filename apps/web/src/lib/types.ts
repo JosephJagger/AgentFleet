@@ -207,6 +207,7 @@ export interface CommandReceipt {
 
 export interface TimelineEvent {
   itemType?: string;
+  changeSource?:string; changeLimited?:boolean; changeSupported?:boolean;
   fileChanges?: Array<{path:string;diff:string}>;
   historyOrder?: Array<{itemId:string;index:number;occurredAt?:string}>;
   nativeThreadId?: string;
@@ -284,7 +285,7 @@ export interface SessionProgress {
   sessionId:string; nativeTurnId:string|null; state:string; source:string;
   freshness:'live'|'stale'|'unavailable'; updatedAt:string|null; contentAvailable:boolean;
   waitingForApproval:boolean; limited:boolean;
-  items:Array<{id:string;kind:string;status:string;title:string;output?:string;updatedAt:string}>;
+  items:Array<{source?:string;limited?:boolean;supported?:boolean;id:string;kind:string;status:string;title:string;output?:string;updatedAt:string}>;
 }
 
 export interface SessionDetail {

@@ -3246,5 +3246,10 @@
   "向左查看更多主机": "Scroll hosts left",
   "向右查看更多主机": "Scroll hosts right",
   "正在执行，过程见终端": "Running · follow progress in Terminal",
-  "等待新的对话消息": "Waiting for the next conversation message"
+  "等待新的对话消息": "Waiting for the next conversation message",
+  "工作区变化（本轮期间）": "Workspace changes during this turn",
+  "对比任务开始前的工作区；可能包含其他程序同期写入的变化": "Compared with the workspace before this turn; may include concurrent edits by other programs",
+  "部分文件或差异未采集（大小、数量或读取限制）": "Partial capture: file size, count or read limits apply",
+  "此工作区暂无法采集：需要 Git 工作区和可用的 Git": "Capture unavailable: requires a Git workspace and Git installation",
+  "截至本次采样，未发现相对任务开始前的文件变化": "No changes from the pre-turn workspace at this sample"
 }
