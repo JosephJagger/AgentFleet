@@ -190,3 +190,14 @@
   :root[data-theme="buzhoushan"] .buzhou-empty-select:hover { color:#3794ff; }
   :root[data-theme="buzhoushan"] .buzhou-empty-select:focus-visible { outline:2px solid #3794ff; outline-offset:3px; }
 }
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .buzhou-session-providers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-provider { min-width:0; }
+  :root[data-theme="buzhoushan"] .buzhou-session-provider + .buzhou-session-provider { border-left:1px solid #383838; padding-left:12px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-provider > header { display:flex; align-items:center; gap:10px; padding:4px 6px 8px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-provider h3 { font-size:12px; margin:0; color:#ddd; }
+  :root[data-theme="buzhoushan"] .buzhou-session-provider > header small { font-size:10px; color:#999; }
+  :root[data-theme="buzhoushan"] .buzhou-session-provider .buzhou-session-row { min-height:94px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-provider .buzhou-session-row__label { flex-basis:92px; gap:5px; white-space:nowrap; }
+}

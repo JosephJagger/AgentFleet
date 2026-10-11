@@ -3277,5 +3277,6 @@
   "当前主机会话切换": "Sessions on this host",
   "推理中": "Reasoning",
   "切换会话": "Switch session",
-  "收起会话选择": "Hide session picker"
+  "收起会话选择": "Hide session picker",
+  "安装状态未上报": "Installation status not reported"
 }

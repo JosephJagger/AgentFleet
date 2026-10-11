@@ -58,7 +58,10 @@ export function BuzhoushanSessions({enabled,machine,sessions,selectedId,detail,o
   return <div className="buzhou-editor">
     {selectedId && <div className="buzhou-session-toggle"><button type="button" aria-controls="buzhou-session-picker" aria-expanded={showSwitcher} onClick={()=>setExpandedFor(showSwitcher?undefined:scope)}><Layers3 size={13}/>{showSwitcher?t('收起会话选择'):t('切换会话')}</button></div>}
     {showSwitcher && <div id="buzhou-session-picker" className="buzhou-session-switcher" aria-label={t('当前主机会话切换')}>
-      {(['running','managed'] as const).map(kind=><SessionRow key={`${machine?.id}:${kind}`} kind={kind} sessions={groups[kind]} selectedId={picked?.machineId===machine?.id && picked?.id===selectedId ? selectedId : undefined} online={machine?.reachability==='live'} detail={detail} onSelect={select}/>)}
+      <div className="buzhou-session-providers">{(['codex','claude'] as const).map(provider=><section className="buzhou-session-provider" key={provider} aria-label={provider==='claude'?'Claude Code':'Codex'}>
+        <header><h3>{provider==='claude'?'Claude Code':'Codex'}</h3>{provider==='claude' && <small>{machine?.agentRuntimes?.claude?.installed===false?t('未安装'):machine?.agentRuntimes?.claude?.installed===true?'':t('安装状态未上报')}</small>}</header>
+        {(['running','managed'] as const).map(kind=><SessionRow key={`${machine?.id}:${kind}`} kind={kind} sessions={groups[kind].filter(session=>(session.provider??'codex')===provider)} selectedId={picked?.machineId===machine?.id && picked?.id===selectedId ? selectedId : undefined} online={machine?.reachability==='live'} detail={detail} onSelect={select}/>)}
+      </section>)}</div>
       {!groups.running.length&&!groups.managed.length&&<div className="buzhou-session-empty-actions"><button type="button" onClick={onBrowse}>{t('展开项目与会话')}</button><button type="button" onClick={onCreate} disabled={!machine||machine.reachability!=='live'}>{t('新会话')}</button></div>}
     </div>}
     {children}

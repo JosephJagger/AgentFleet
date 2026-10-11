@@ -36,16 +36,16 @@ it('renders two compact rows, masks names and moves completed sessions without n
  const onSelect=vi.fn(),a=session('a',true);a.title='CUPSHE work';a.projectAlias='gongqiankun';
  const props={enabled:true,machine,sessions:[a,session('idle')],onSelect,onBrowse:vi.fn(),onCreate:vi.fn(),children:<div>Selected conversation</div>};
  const view=render(<BuzhoushanSessions {...props}/>);
- expect(within(screen.getByRole('region',{name:'正在运行'})).getByText('c****e work',{exact:false})).toBeTruthy();
+ expect(within(within(screen.getByRole('region',{name:'Codex'})).getByRole('region',{name:'正在运行'})).getByText('c****e work',{exact:false})).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:/c\*\*\*\*e work/}));expect(onSelect).toHaveBeenCalledWith('a');onSelect.mockClear();
  view.rerender(<BuzhoushanSessions {...props} sessions={[{...a,activeTurnId:undefined,state:{...a.state,currentTurn:'completed'}},session('idle')]}/>);
- expect(screen.getByText('暂无运行会话')).toBeTruthy();expect(within(screen.getByRole('region',{name:'已接管'})).getByText('c****e work')).toBeTruthy();expect(onSelect).not.toHaveBeenCalled();
+ expect(screen.getAllByText('暂无运行会话')[0]).toBeTruthy();expect(within(within(screen.getByRole('region',{name:'Codex'})).getByRole('region',{name:'已接管'})).getByText('c****e work')).toBeTruthy();expect(onSelect).not.toHaveBeenCalled();
  expect(screen.getByText('Selected conversation')).toBeTruthy();expect(screen.queryByText('gongqiankun')).toBeNull();
 });
 it('shows explicit empty states and browse/create actions; other themes retain only children',()=>{
  vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});const browse=vi.fn(),create=vi.fn();
  const props={enabled:true,machine,sessions:[],onSelect:vi.fn(),onBrowse:browse,onCreate:create,children:<div>Conversation</div>};const view=render(<BuzhoushanSessions {...props}/>);
- expect(screen.getByText('暂无运行会话')).toBeTruthy();expect(screen.getByText('暂无已接管会话')).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'展开项目与会话'}));expect(browse).toHaveBeenCalledOnce();fireEvent.click(screen.getByRole('button',{name:'新会话'}));expect(create).toHaveBeenCalledOnce();
+ expect(screen.getAllByText('暂无运行会话')[0]).toBeTruthy();expect(screen.getAllByText('暂无已接管会话')[0]).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'展开项目与会话'}));expect(browse).toHaveBeenCalledOnce();fireEvent.click(screen.getByRole('button',{name:'新会话'}));expect(create).toHaveBeenCalledOnce();
  view.rerender(<BuzhoushanSessions {...props} enabled={false}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();expect(screen.getByText('Conversation')).toBeTruthy();
 });
 
@@ -78,4 +78,16 @@ it('clears manual card highlighting after host changes and remount, not dashboar
  view.rerender(<BuzhoushanSessions {...props}/>);open();expect(card().getAttribute('aria-pressed')).toBe('false');
  fireEvent.click(card());view.unmount();render(<BuzhoushanSessions {...props}/>);open();expect(card().getAttribute('aria-pressed')).toBe('false');
  fireEvent.click(card());open();expect(card().getAttribute('aria-pressed')).toBe('true');
+});
+
+it('always separates Codex and Claude Code, including hosts with no Claude installation',()=>{
+ vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
+ const codex=session('codex-running',true),claude={...session('claude-idle'),provider:'claude' as const};
+ const props={enabled:true,machine:{...machine,agentRuntimes:{claude:{installed:false,version:null}}},sessions:[codex,claude],onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<div/>};
+ const view=render(<BuzhoushanSessions {...props}/>);
+ const codexGroup=within(screen.getByRole('region',{name:'Codex'})),claudeGroup=within(screen.getByRole('region',{name:'Claude Code'}));
+ expect(codexGroup.getByText('codex-running')).toBeTruthy();expect(codexGroup.queryByText('claude-idle')).toBeNull();
+ expect(claudeGroup.getByText('claude-idle')).toBeTruthy();expect(claudeGroup.queryByText('codex-running')).toBeNull();expect(claudeGroup.getByText('未安装')).toBeTruthy();
+ view.rerender(<BuzhoushanSessions {...props} sessions={[codex]}/>);
+ expect(claudeGroup.getByText('暂无运行会话')).toBeTruthy();expect(claudeGroup.getByText('暂无已接管会话')).toBeTruthy();
 });
