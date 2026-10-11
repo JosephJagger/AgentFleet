@@ -884,7 +884,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const rawEvents = rawView ? detail.events.filter(event => event.payloadState !== "deleted" && event.body && (!buzhouDesktop || isConversationEvent(event))) : [];
   const projectedEvents = timelineItems(detail.events);
   const visibleEvents = buzhouDesktop ? projectedEvents.filter(isBuzhoushanChatEvent) : projectedEvents;
-  const heartbeatOnly = buzhouDesktop && isBuzhoushanTurnActive(detail) && session.state.reachability === "live" && !session.state.unknownFreeze && detail.hostOnline !== false;
+  const heartbeatOnly = buzhouDesktop && isBuzhoushanTurnActive(detail);
   const conversationEvents = projectedEvents.filter(isConversationEvent);
   const lease = session.controlLease;
   const managed = session.state.ownership === "agentfleet_owned";

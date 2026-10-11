@@ -130,7 +130,7 @@
   :root[data-theme="buzhoushan"] .buzhou-quota-card:focus-visible { outline:2px solid #007acc; outline-offset:2px; }
 }
 @media (min-width:1101px) {
-  :root[data-theme="buzhoushan"] .buzhou-heartbeat { height:240px; display:grid; color:#89d185; padding:24px; box-sizing:border-box; }
+  :root[data-theme="buzhoushan"] .buzhou-heartbeat { width:100%; height:240px; display:grid; color:#89d185; padding:24px; box-sizing:border-box; }
   :root[data-theme="buzhoushan"] .buzhou-heartbeat__layer { grid-area:1/1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; min-width:0; transition:opacity 160ms var(--ease-out,cubic-bezier(0.23,1,0.32,1)); }
   :root[data-theme="buzhoushan"] .buzhou-heartbeat__layer[aria-hidden="true"] { opacity:0; pointer-events:none; }
   :root[data-theme="buzhoushan"] .buzhou-heartbeat:not([data-mode="heartbeat"]) .buzhou-heartbeat__visual svg { animation-play-state:paused; }
@@ -276,4 +276,9 @@
 
 @media (min-width:1101px) {
   :root[data-theme="buzhoushan"] .timeline-scroll > div:has(> .buzhou-heartbeat:only-child) { min-height:100%; display:grid; place-items:center; }
+}
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-live="false"] .buzhou-heartbeat__visual svg { animation-play-state:paused; }
+  :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-live="false"] { color:#d7ba7d; }
 }

@@ -1,6 +1,6 @@
 import {preserveBuzhoushanStream} from "./lib/buzhoushan-stream";
 import {BuzhoushanHeartbeat} from "./components/BuzhoushanHeartbeat";
-import {isConversationEvent,isBuzhoushanChatEvent} from "./lib/buzhoushan-events";
+import {isConversationEvent,isBuzhoushanChatEvent,isBuzhoushanTurnActive} from "./lib/buzhoushan-events";
 // @vitest-environment jsdom
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 import {afterEach, expect, it, vi} from 'vitest';
@@ -121,15 +121,15 @@ it('reply completion and subsequent replies never pause heartbeat',()=>{
  d.events.push({...delta,id:'second-complete',type:'item.completed',sessionSeq:4},{...delta,id:'late',sessionSeq:5});
  view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
 });
-it('stops immediately on terminal events, offline, frozen state and turn change without stale timers',()=>{
+it('stops on turn outcome but retains a checking view during offline and frozen states',()=>{
  vi.useFakeTimers();
  for(const type of ['turn.completed','turn.failed','turn.interrupted','turn.cancelled']){
  const d=detail();const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
  d.events=[{id:'end',sessionSeq:1,type,nativeTurnId:'turn-a',occurredAt:'2026-01-01'}];view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();view.unmount();
  }
  const d=detail();const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
- d.hostOnline=false;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
- d.hostOnline=true;d.session.state.unknownFreeze=true;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
+ d.hostOnline=false;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.getByRole('status').getAttribute('data-live')).toBe('false');
+ d.hostOnline=true;d.session.state.unknownFreeze=true;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.getByRole('status').getAttribute('data-live')).toBe('false');
  d.session.state.unknownFreeze=false;d.session.activeTurnId='next';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
  d.session.activeTurnId=undefined;d.session.state.currentTurn='none';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
 });
@@ -239,4 +239,14 @@ it('does not pause heartbeat on a new reply after turn or content boundaries',()
   view.rerender(<BuzhoushanHeartbeat detail={d} messages={d.events}/>);
   expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');view.unmount();
  }
+});
+
+it('uses explicit completion despite stale active ID and ignores other turns or earlier endings',()=>{
+ const d=detail();d.session.state.currentTurn='completed';expect(isBuzhoushanTurnActive(d)).toBe(false);
+ d.session.state.currentTurn='in_progress';
+ d.events=[{id:'old',nativeTurnId:'older',sessionSeq:1,type:'turn.completed',occurredAt:'2026-01-01'}];
+ expect(isBuzhoushanTurnActive(d)).toBe(true);
+ d.events.push({...d.events[0],id:'end',nativeTurnId:'turn-a',sessionSeq:2});expect(isBuzhoushanTurnActive(d)).toBe(false);
+ d.events.push({...d.events[0],id:'resume',nativeTurnId:'turn-a',sessionSeq:3,type:'turn.started'});expect(isBuzhoushanTurnActive(d)).toBe(true);
+ d.session.state.reachability='reconciling';expect(isBuzhoushanTurnActive(d)).toBe(true);
 });
