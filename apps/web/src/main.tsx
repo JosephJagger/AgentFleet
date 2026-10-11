@@ -15,6 +15,7 @@ import "./chinese-themes.css";
 import "./settings-layout.css";
 import "./display-scale.css";
 import "./official-theme.css";
+import "./host-sessions.css";
 import "./buzhoushan-theme.css";
 import "./interaction-stability.css";
 

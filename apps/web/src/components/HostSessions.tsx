@@ -33,8 +33,8 @@ function SessionRow({kind,sessions,selectedId,online,detail,onSelect}:{kind:'run
   useEffect(()=>{
     const node=track.current;if(!node)return;
     const update=()=>setEdges({start:node.scrollLeft<=1,end:node.scrollLeft+node.clientWidth>=node.scrollWidth-1});
-    const observer=new ResizeObserver(update);observer.observe(node);for(const child of node.children)observer.observe(child);
-    node.addEventListener('scroll',update,{passive:true});update();return()=>{observer.disconnect();node.removeEventListener('scroll',update);};
+    const observer=typeof ResizeObserver==='undefined'?undefined:new ResizeObserver(update);observer?.observe(node);for(const child of node.children)observer?.observe(child);
+    window.addEventListener('resize',update);node.addEventListener('scroll',update,{passive:true});update();return()=>{observer?.disconnect();window.removeEventListener('resize',update);node.removeEventListener('scroll',update);};
   },[ids]);
   useEffect(()=>{const node=track.current;const selected=node?.querySelector<HTMLElement>('[aria-pressed="true"]');if(node&&selected){const a=node.getBoundingClientRect(),b=selected.getBoundingClientRect();if(b.left<a.left)node.scrollLeft+=b.left-a.left;else if(b.right>a.right)node.scrollLeft+=b.right-a.right;}},[selectedId,ids]);
   const label=kind==='running'?t('正在运行'):t('已接管');
@@ -46,16 +46,15 @@ function SessionRow({kind,sessions,selectedId,online,detail,onSelect}:{kind:'run
     <button className="buzhou-session-arrow" type="button" disabled={edges.end} aria-label={t('向右查看更多会话')} onClick={()=>scroll(1)}><ChevronRight size={15}/></button>
   </section>;
 }
-export function BuzhoushanSessions({enabled,machine,sessions,selectedId,detail,onSelect,onBrowse,onCreate,children}:{enabled:boolean;machine?:Machine;sessions:FleetSession[];selectedId?:string;detail?:SessionDetail;onSelect:(id:string)=>void;onBrowse:()=>void;onCreate:()=>void;children:ReactNode}) {
+export function HostSessions({machine,sessions,selectedId,detail,onSelect,onBrowse,onCreate,children}:{machine?:Machine;sessions:FleetSession[];selectedId?:string;detail?:SessionDetail;onSelect:(id:string)=>void;onBrowse:()=>void;onCreate:()=>void;children:ReactNode}) {
   const [expandedFor,setExpandedFor]=useState<string>();
   const [picked,setPicked]=useState<{machineId?:string;id:string}>();
   useEffect(()=>{setPicked(undefined);setExpandedFor(undefined);},[machine?.id]);
   const scope=JSON.stringify([machine?.id,selectedId]);
-  if(!enabled)return <>{children}</>;
   const groups=hostSessionGroups(sessions,machine);
   const showSwitcher=!selectedId || expandedFor===scope;
   const select=(id:string)=>{setPicked({machineId:machine?.id,id});setExpandedFor(undefined);onSelect(id);};
-  return <div className="buzhou-editor">
+  return <div className="host-session-editor buzhou-editor">
     {selectedId && <div className="buzhou-session-toggle"><button type="button" aria-controls="buzhou-session-picker" aria-expanded={showSwitcher} onClick={()=>setExpandedFor(showSwitcher?undefined:scope)}><Layers3 size={13}/>{showSwitcher?t('收起会话选择'):t('切换会话')}</button></div>}
     {showSwitcher && <div id="buzhou-session-picker" className="buzhou-session-switcher" aria-label={t('当前主机会话切换')}>
       <div className="buzhou-session-providers">{(['codex','claude'] as const).map(provider=><section className="buzhou-session-provider" key={provider} aria-label={provider==='claude'?'Claude Code':'Codex'}>

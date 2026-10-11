@@ -3,8 +3,8 @@ import {useEffect} from 'react';
 import {cleanup,fireEvent,render,screen,within} from '@testing-library/react';
 import {afterEach,expect,it,vi} from 'vitest';
 import {hostSessionGroups,preferredHostSession,rememberHostSession,rememberedHostSession} from './lib/host-session-selection';
-import {BuzhoushanSessions} from './components/BuzhoushanSessions';
-import {setTheme} from './lib/theme';
+import {HostSessions} from './components/HostSessions';
+import {setTheme,type Theme} from './lib/theme';
 import type {FleetSession,Machine} from './lib/types';
 vi.mock('./lib/api',()=>({api:{sessionProgress:vi.fn()}}));
 const machine={id:'host',reachability:'live'} as Machine;
@@ -34,60 +34,61 @@ it('keeps per-host browser memory isolated by owner and rejects invalid storage'
 it('renders two compact rows, masks names and moves completed sessions without navigating',()=>{
  setTheme('buzhoushan');vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
  const onSelect=vi.fn(),a=session('a',true);a.title='CUPSHE work';a.projectAlias='gongqiankun';
- const props={enabled:true,machine,sessions:[a,session('idle')],onSelect,onBrowse:vi.fn(),onCreate:vi.fn(),children:<div>Selected conversation</div>};
- const view=render(<BuzhoushanSessions {...props}/>);
+ const props={machine,sessions:[a,session('idle')],onSelect,onBrowse:vi.fn(),onCreate:vi.fn(),children:<div>Selected conversation</div>};
+ const view=render(<HostSessions {...props}/>);
  expect(within(within(screen.getByRole('region',{name:'Codex'})).getByRole('region',{name:'正在运行'})).getByText('c****e work',{exact:false})).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:/c\*\*\*\*e work/}));expect(onSelect).toHaveBeenCalledWith('a');onSelect.mockClear();
- view.rerender(<BuzhoushanSessions {...props} sessions={[{...a,activeTurnId:undefined,state:{...a.state,currentTurn:'completed'}},session('idle')]}/>);
+ view.rerender(<HostSessions {...props} sessions={[{...a,activeTurnId:undefined,state:{...a.state,currentTurn:'completed'}},session('idle')]}/>);
  expect(screen.getAllByText('暂无运行会话')[0]).toBeTruthy();expect(within(within(screen.getByRole('region',{name:'Codex'})).getByRole('region',{name:'已接管'})).getByText('c****e work')).toBeTruthy();expect(onSelect).not.toHaveBeenCalled();
  expect(screen.getByText('Selected conversation')).toBeTruthy();expect(screen.queryByText('gongqiankun')).toBeNull();
 });
-it('shows explicit empty states and browse/create actions; other themes retain only children',()=>{
+it('shows explicit empty states and browse/create actions',()=>{
  vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});const browse=vi.fn(),create=vi.fn();
- const props={enabled:true,machine,sessions:[],onSelect:vi.fn(),onBrowse:browse,onCreate:create,children:<div>Conversation</div>};const view=render(<BuzhoushanSessions {...props}/>);
+ const props={machine,sessions:[],onSelect:vi.fn(),onBrowse:browse,onCreate:create,children:<div>Conversation</div>};render(<HostSessions {...props}/>);
  expect(screen.getAllByText('暂无运行会话')[0]).toBeTruthy();expect(screen.getAllByText('暂无已接管会话')[0]).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'展开项目与会话'}));expect(browse).toHaveBeenCalledOnce();fireEvent.click(screen.getByRole('button',{name:'新会话'}));expect(create).toHaveBeenCalledOnce();
- view.rerender(<BuzhoushanSessions {...props} enabled={false}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();expect(screen.getByText('Conversation')).toBeTruthy();
+
 });
 
 it('hides the switcher for a sole running session without remounting the conversation',()=>{
  vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
  const mounted=vi.fn(),unmounted=vi.fn();function Conversation(){useEffect(()=>{mounted();return unmounted;},[]);return <div>Stable conversation</div>;}
- const a=session('a',true);const props={enabled:true,machine,sessions:[a],selectedId:'a',onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<Conversation/>};
- const view=render(<BuzhoushanSessions {...props}/>);
+ const a=session('a',true);const props={machine,sessions:[a],selectedId:'a',onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<Conversation/>};
+ const view=render(<HostSessions {...props}/>);
  expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();expect(screen.getByText('Stable conversation')).toBeTruthy();
  for(const sessions of [[a,session('b',true)],[a,session('idle')]]) {
-  view.rerender(<BuzhoushanSessions {...props} sessions={sessions}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
+  view.rerender(<HostSessions {...props} sessions={sessions}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
   fireEvent.click(screen.getByRole('button',{name:'切换会话'}));expect(screen.getByLabelText('当前主机会话切换')).toBeTruthy();
   expect(props.onBrowse).not.toHaveBeenCalled();
   fireEvent.click(document.querySelector<HTMLButtonElement>('.buzhou-session-window')!);expect(props.onSelect).toHaveBeenCalledWith('a');
-  view.rerender(<BuzhoushanSessions {...props}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
+  view.rerender(<HostSessions {...props}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
  }
  expect(mounted).toHaveBeenCalledOnce();expect(unmounted).not.toHaveBeenCalled();
 });
 
-it('clears manual card highlighting after host changes and remount, not dashboard refreshes',()=>{
+it.each<Theme>(['official','cyber','daylight','midnight','forest','eyecare','matrix','frozen','wizard','starwars','spirited','rivendell','mario','wukong','nezha','whitesnake','qingming','jiangshan','buzhoushan'])('clears manual selection independently of session data in %s',theme=>{
+ setTheme(theme);
  vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
- const idle=session('idle');const props={enabled:true,machine,sessions:[idle],selectedId:'idle',onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<div>Conversation</div>};
- const view=render(<BuzhoushanSessions {...props}/>);
+ const idle=session('idle');const props={machine,sessions:[idle],selectedId:'idle',onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<div>Conversation</div>};
+ const view=render(<HostSessions {...props}/>);
  const open=()=>fireEvent.click(screen.getByRole('button',{name:'切换会话'}));
  const card=()=>document.querySelector<HTMLButtonElement>('.buzhou-session-window')!;
  open();expect(card().getAttribute('aria-pressed')).toBe('false');
  fireEvent.click(card());open();expect(card().getAttribute('aria-pressed')).toBe('true');
- view.rerender(<BuzhoushanSessions {...props} sessions={[{...idle,lastActivityAt:'2026-02-01'}]}/>);expect(card().getAttribute('aria-pressed')).toBe('true');
- view.rerender(<BuzhoushanSessions {...props} machine={{...machine,id:'other'}}/>);
- view.rerender(<BuzhoushanSessions {...props}/>);open();expect(card().getAttribute('aria-pressed')).toBe('false');
- fireEvent.click(card());view.unmount();render(<BuzhoushanSessions {...props}/>);open();expect(card().getAttribute('aria-pressed')).toBe('false');
+ view.rerender(<HostSessions {...props} sessions={[{...idle,lastActivityAt:'2026-02-01'}]}/>);expect(card().getAttribute('aria-pressed')).toBe('true');
+ view.rerender(<HostSessions {...props} machine={{...machine,id:'other'}}/>);
+ view.rerender(<HostSessions {...props}/>);open();expect(card().getAttribute('aria-pressed')).toBe('false');
+ fireEvent.click(card());view.unmount();render(<HostSessions {...props}/>);open();expect(card().getAttribute('aria-pressed')).toBe('false');
  fireEvent.click(card());open();expect(card().getAttribute('aria-pressed')).toBe('true');
 });
 
 it('always separates Codex and Claude Code, including hosts with no Claude installation',()=>{
  vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
  const codex=session('codex-running',true),claude={...session('claude-idle'),provider:'claude' as const};
- const props={enabled:true,machine:{...machine,agentRuntimes:{claude:{installed:false,version:null}}},sessions:[codex,claude],onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<div/>};
- const view=render(<BuzhoushanSessions {...props}/>);
+ const props={machine:{...machine,agentRuntimes:{claude:{installed:false,version:null}}},sessions:[codex,claude],onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<div/>};
+ const view=render(<HostSessions {...props}/>);
  const codexGroup=within(screen.getByRole('region',{name:'Codex'})),claudeGroup=within(screen.getByRole('region',{name:'Claude Code'}));
  expect(codexGroup.getByText('codex-running')).toBeTruthy();expect(codexGroup.queryByText('claude-idle')).toBeNull();
  expect(claudeGroup.getByText('claude-idle')).toBeTruthy();expect(claudeGroup.queryByText('codex-running')).toBeNull();expect(claudeGroup.getByText('未安装')).toBeTruthy();
- view.rerender(<BuzhoushanSessions {...props} sessions={[codex]}/>);
+ view.rerender(<HostSessions {...props} sessions={[codex]}/>);
  expect(claudeGroup.getByText('暂无运行会话')).toBeTruthy();expect(claudeGroup.getByText('暂无已接管会话')).toBeTruthy();
 });

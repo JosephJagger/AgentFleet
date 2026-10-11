@@ -1015,11 +1015,11 @@ it("idle voice send reaches the API with text and images, preserving draft on re
   }
 });
 
-it("不周山切主机优先选择运行会话，返回不自动恢复空闲接管会话", async()=>{
+it.each(["buzhoushan","daylight","official","midnight"] as const)("%s 切主机优先选择运行会话，返回不自动恢复空闲接管会话", async(theme)=>{
  const original=window.matchMedia;
  vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){} unobserve(){}});
  window.matchMedia=vi.fn().mockReturnValue({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()});
- setTheme('buzhoushan');
+ setTheme(theme);
  try {
   const running={...session('outside-recent','2'),activeTurnId:'active',state:{...session('x','2').state,currentTurn:'in_progress' as const}};
   const data={...dashboard(),activitySessions:[...sessions,running]};
