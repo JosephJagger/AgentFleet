@@ -47,8 +47,20 @@ function updateDocument() {
 
 export const theme = () => current;
 
+let themeFrame: number | undefined;
 export function setTheme(value: Theme) {
   if (!isTheme(value) || value === current) return;
+  // Apply the palette as one update rather than animating every surface independently.
+  if (typeof requestAnimationFrame === "function") {
+    if (themeFrame !== undefined) cancelAnimationFrame(themeFrame);
+    document.documentElement.classList.add("theme-switching");
+    themeFrame = requestAnimationFrame(() => {
+      themeFrame = requestAnimationFrame(() => {
+        document.documentElement.classList.remove("theme-switching");
+        themeFrame = undefined;
+      });
+    });
+  }
   current = value;
   try { localStorage.setItem(STORAGE_KEY, value); } catch { /* Switching still works for this page. */ }
   updateDocument();

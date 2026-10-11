@@ -70,7 +70,6 @@ export function ThemeSettings({ paginated = false }: { paginated?: boolean }) {
   const options = paginated ? themeOptions.slice(page * 6, page * 6 + 6) : themeOptions;
   return (
     <>
-    {illustrated(selected) && <div className={`theme-scene theme-scene--${selected}`} aria-hidden="true"><img src={`/themes/${sceneAsset(selected)}.svg`} alt="" /></div>}
     <div className="theme-options" role="radiogroup" aria-label={t("界面主题")}>
       {options.map(option => (
         <button
@@ -88,6 +87,7 @@ export function ThemeSettings({ paginated = false }: { paginated?: boolean }) {
       ))}
     </div>
     {paginated && <SettingsPagination page={page} pages={Math.ceil(themeOptions.length / 6)} onChange={setPage} label={t("主题分页")} />}
+    {illustrated(selected) && <div className={`theme-scene theme-scene--${selected}`} aria-hidden="true"><img src={`/themes/${sceneAsset(selected)}.svg`} alt="" /></div>}
     </>
   );
 }

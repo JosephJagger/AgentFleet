@@ -15,6 +15,7 @@ import "./chinese-themes.css";
 import "./settings-layout.css";
 import "./display-scale.css";
 import "./official-theme.css";
+import "./interaction-stability.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

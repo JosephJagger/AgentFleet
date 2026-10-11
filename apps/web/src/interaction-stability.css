@@ -1,0 +1,39 @@
+/* Shared behavior across palettes: stable controls, immediate theme changes. */
+html.theme-switching *, html.theme-switching *::before, html.theme-switching *::after {
+  transition: none !important;
+}
+:root .button:not(:disabled):active,
+:root .theme-option:hover,
+:root .host-card:hover,
+:root .usage-trigger--machine-rich:hover {
+  transform: none;
+}
+:root :is(.button,.icon-button,.theme-option,.host-card,.usage-trigger--machine-rich) {
+  transition-property: background-color, border-color, color, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(.2,.8,.2,1);
+}
+/* Reserve the scrollbar's space before a list becomes long enough to scroll. */
+:root :is(.settings-view,.machine-rail,.activity-list,.usage-body,.session-config-body) {
+  scrollbar-gutter: stable;
+}
+:root :is(.world-clock time,.stat-value,.host-quota-metric strong,.runtime-release-times time) {
+  font-variant-numeric: tabular-nums;
+}
+:root .theme-options { align-items: stretch; }
+:root .theme-option__copy strong { line-height: 1.5; }
+/* Scenes remain decorative, below the controls, and never intercept gestures. */
+:root .theme-scene { pointer-events: none; }
+@media (hover: none) {
+  :root :is(.host-card,.usage-trigger--machine-rich):hover { box-shadow: var(--surface-shadow); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root *, :root *::before, :root *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* Theme decoration must not change the picker geometry while choosing a palette. */
+:root[data-theme] .settings-block.theme-settings-block { border-width: 1px; }
+:root[data-theme] .theme-option { font-family: "Noto Sans SC Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
