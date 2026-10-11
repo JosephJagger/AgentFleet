@@ -8,7 +8,7 @@ export function BuzhoushanHeartbeat({detail}:{detail:SessionDetail;messages:Time
   const running=isBuzhoushanTurnActive(detail);
   const live=session.state.reachability==='live' && !session.state.unknownFreeze && detail.hostOnline!==false;
   if(!running)return null;
-  const label=!live?t('正在核验运行状态，对话消息在人机对话查看'):session.state.waitReason==='approval'?t('等待确认'):session.state.waitReason==='user_input'?t('等待回答'):t('对话消息在人机对话查看');
+  const label=!live?t('正在核验运行状态'):session.state.waitReason==='approval'?t('等待确认'):session.state.waitReason==='user_input'?t('等待回答'):t('对话消息在人机对话查看');
   return <div className="buzhou-heartbeat" data-mode="heartbeat" data-live={live} role="status" aria-label={label}>
     <div className="buzhou-heartbeat__layer buzhou-heartbeat__pulse" aria-hidden={false}>
       <div className="buzhou-heartbeat__visual" aria-hidden="true">
