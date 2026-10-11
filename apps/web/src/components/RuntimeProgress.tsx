@@ -19,7 +19,7 @@ export function ProgressView({progress,unavailable=false}:{progress:SessionProgr
   </section>;
 }
 
-export function RuntimeProgress({sessionId,active,initial}:{sessionId:string;active:boolean;initial?:SessionProgress}) {
+export function useSessionProgress(sessionId:string, active:boolean, initial?:SessionProgress) {
   const [progress,setProgress]=useState(initial);
   const [unavailable,setUnavailable]=useState(false);
   useEffect(()=>{setProgress(initial);},[initial]);
@@ -35,6 +35,11 @@ export function RuntimeProgress({sessionId,active,initial}:{sessionId:string;act
     };
     void poll();return ()=>{controller.abort();clearTimeout(timer);};
   },[sessionId,active]);
-  if(!active||!progress||progress.sessionId!==sessionId)return null;
+  return {progress:progress?.sessionId===sessionId?progress:undefined,unavailable};
+}
+
+export function RuntimeProgress({sessionId,active,initial}:{sessionId:string;active:boolean;initial?:SessionProgress}) {
+  const {progress,unavailable}=useSessionProgress(sessionId,active,initial);
+  if(!active||!progress)return null;
   return <ProgressView progress={progress} unavailable={unavailable}/>;
 }

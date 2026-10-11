@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from "react";
 
-export type Theme = "official" | "cyber" | "daylight" | "midnight" | "forest" | "eyecare" | "matrix" | "frozen" | "wizard" | "starwars" | "spirited" | "rivendell" | "mario" | "wukong" | "nezha" | "whitesnake" | "qingming" | "jiangshan";
+export type Theme = "buzhoushan" | "official" | "cyber" | "daylight" | "midnight" | "forest" | "eyecare" | "matrix" | "frozen" | "wizard" | "starwars" | "spirited" | "rivendell" | "mario" | "wukong" | "nezha" | "whitesnake" | "qingming" | "jiangshan";
 
 const STORAGE_KEY = "agentfleet.theme";
-const themes: Theme[] = ["official", "cyber", "daylight", "midnight", "forest", "eyecare", "matrix", "frozen", "wizard", "starwars", "spirited", "rivendell", "mario", "wukong", "nezha", "whitesnake", "qingming", "jiangshan"];
+const themes: Theme[] = ["official", "cyber", "daylight", "midnight", "forest", "eyecare", "matrix", "frozen", "wizard", "starwars", "spirited", "rivendell", "mario", "wukong", "nezha", "whitesnake", "qingming", "jiangshan", "buzhoushan"];
 const listeners = new Set<() => void>();
 
 function isTheme(value: string | null): value is Theme {
@@ -24,6 +24,7 @@ function updateDocument() {
   if (typeof document === "undefined") return;
   document.documentElement.dataset.theme = current;
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", {
+    buzhoushan: "#1e1e1e",
     official: "#ffffff",
     cyber: "#14171c",
     daylight: "#edf5fa",

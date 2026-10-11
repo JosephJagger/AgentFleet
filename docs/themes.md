@@ -6,6 +6,8 @@ Real application screenshots of 17 themes with fictional demo data. Hosts, proje
 
 Desktop captures are 1920 × 1080; mobile captures are 390 × 1000. Click an image for full resolution. Castle in the Sky is the default for new browsers; existing preferences are retained. The screenshots show the Chinese interface.
 
+New: **Buzhoushan (不周山)** is available in Settings → Theme. Above 1100 CSS pixels it uses a classic editor workbench with an activity rail, explorer, conversation and lower-right activity dock. Stream focus and dock resizing are supported; other theme layouts are unchanged. Activity comes from the selected session’s actual progress or available history. Stream focus does not redact content. Narrow windows keep the existing layout.
+
 ## Cyberpunk
 
 [![Cyberpunk desktop demo](assets/themes/cyber-desktop.jpg)](assets/themes/cyber-desktop.jpg)

@@ -1,4 +1,4 @@
-import { Box, Check, Radio, Snowflake, SunMoon, Wand2, Orbit, Flower2, Leaf, Gamepad2, Zap, Cloud, Shield, TreePine, Heart } from "lucide-react";
+import { Mountain, Box, Check, Radio, Snowflake, SunMoon, Wand2, Orbit, Flower2, Leaf, Gamepad2, Zap, Cloud, Shield, TreePine, Heart } from "lucide-react";
 import { t } from "../i18n";
 import { setTheme, useTheme, type Theme } from "../lib/theme";
 import { useEffect, useState } from "react";
@@ -6,7 +6,7 @@ import { SettingsPagination } from "./SettingsPagination";
 
 export function ThemeEmblem() {
   const selected = useTheme();
-  const Icon = ({ official: Box, daylight: Cloud, midnight: Shield, forest: TreePine, eyecare: Heart, wukong: SunMoon, nezha: Flower2, whitesnake: Leaf, qingming: Cloud, jiangshan: TreePine, frozen: Snowflake, wizard: Wand2, starwars: Orbit, spirited: Flower2, rivendell: Leaf, mario: Gamepad2, cyber: Zap } as Partial<Record<Theme, typeof Radio>>)[selected] ?? Radio;
+  const Icon = ({ buzhoushan: Mountain, official: Box, daylight: Cloud, midnight: Shield, forest: TreePine, eyecare: Heart, wukong: SunMoon, nezha: Flower2, whitesnake: Leaf, qingming: Cloud, jiangshan: TreePine, frozen: Snowflake, wizard: Wand2, starwars: Orbit, spirited: Flower2, rivendell: Leaf, mario: Gamepad2, cyber: Zap } as Partial<Record<Theme, typeof Radio>>)[selected] ?? Radio;
   return <Icon size={18} aria-hidden="true" />;
 }
 
@@ -34,6 +34,7 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
         <option value="whitesnake">{t("白蛇传说")}</option>
         <option value="qingming">{t("清明上河")}</option>
         <option value="jiangshan">{t("千里江山")}</option>
+        <option value="buzhoushan">{t("不周山")}</option>
       </select>
     </label>
   );
@@ -58,8 +59,9 @@ const themeOptions: { value: Theme; label: string; description: string }[] = [
   { value: "whitesnake", label: "白蛇传说", description: "断桥烟雨、青白瓷色与水波细线" },
   { value: "qingming", label: "清明上河", description: "汴京舟桥、绢本淡墨与宋画暖褐" },
   { value: "jiangshan", label: "千里江山", description: "青绿山水、石青石绿与绢本金边" },
+  { value: "buzhoushan", label: "不周山", description: "桌面专属 · 经典编辑器布局与直播工作台" },
 ];
-const illustrated = (value: Theme) => value !== "matrix" && value !== "official";
+const illustrated = (value: Theme) => value !== "matrix" && value !== "official" && value !== "buzhoushan";
 const sceneAsset = (value: Theme) => value === "eyecare" ? "rabbit" : value;
 
 export function ThemeSettings({ paginated = false }: { paginated?: boolean }) {

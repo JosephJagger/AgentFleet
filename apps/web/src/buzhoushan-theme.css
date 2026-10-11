@@ -1,0 +1,108 @@
+/* 不周山 is an opt-in desktop workbench. No existing theme selectors are changed. */
+.theme-option--buzhoushan { --sample-canvas:#1e1e1e; --sample-paper:#252526; --sample-line:#454545; --sample-accent:#007acc; }
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] {
+    color-scheme:dark; zoom:1;
+    --canvas:#1e1e1e; --paper:#1e1e1e; --paper-solid:#252526; --terminal:#181818;
+    --ink:#d4d4d4; --muted:#aaa; --faint:#9a9a9a; --line:#383838; --line-strong:#646464; --component-line:#383838;
+    --cobalt:#3794ff; --cobalt-deep:#007acc; --cobalt-soft:#163a53;
+    --teal:#89d185; --teal-soft:#213b29; --amber:#d7ba7d; --amber-soft:#3d3526;
+    --red:#f48771; --red-soft:#432a29; --magenta:#c586c0; --magenta-soft:#3d2b3e;
+    --radius-sm:3px; --radius-md:4px; --radius-lg:5px; --surface-shadow:none; --control-shadow:none; --shadow:0 6px 24px #0006;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC Variable",sans-serif;
+  }
+  :root[data-theme="buzhoushan"] body { background:#1e1e1e; background-image:none; }
+  :root[data-theme="buzhoushan"] .app-shell { min-height:100dvh; padding-left:48px; }
+  :root[data-theme="buzhoushan"] .topbar { height:46px; min-height:46px; backdrop-filter:none; transform:none; padding:0 14px; gap:12px; background:#323233; border-bottom:1px solid #181818; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .brand-lockup { font-size:14px; gap:8px; }
+  :root[data-theme="buzhoushan"] .brand-glyph { border:0; background:none; box-shadow:none; width:24px; height:24px; }
+  :root[data-theme="buzhoushan"] .topbar .world-clocks { display:none; }
+  :root[data-theme="buzhoushan"] .topbar-actions { margin-left:auto; }
+  :root[data-theme="buzhoushan"] .primary-nav { position:fixed; left:0; right:auto; top:0; bottom:0; margin:0; transform:none; width:48px; height:auto; display:flex; flex-direction:column; justify-content:flex-start; padding:46px 0 24px; gap:4px; background:#333; border:0; border-radius:0; z-index:20; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .primary-nav button { width:48px; min-width:48px; height:48px; padding:0; justify-content:center; border:0; border-left:2px solid transparent; border-radius:0; color:#aaa; position:relative; }
+  :root[data-theme="buzhoushan"] .primary-nav button > span:not(.nav-count) { display:none; }
+  :root[data-theme="buzhoushan"] .primary-nav button:is(:hover,:focus-visible)::after { content:attr(aria-label); position:absolute; left:52px; top:10px; padding:6px 10px; color:#ddd; background:#252526; border:1px solid #555; font-size:12px; white-space:nowrap; pointer-events:none; }
+  :root[data-theme="buzhoushan"] .primary-nav button svg { width:22px; height:22px; }
+  :root[data-theme="buzhoushan"] .primary-nav button.active { color:#fff; background:transparent; border-left-color:#fff; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .fleet-layout { display:grid; grid-template-columns:280px minmax(0,1fr); grid-template-rows:64px minmax(0,1fr) 24px; grid-template-areas:"hosts hosts" "explorer editor" "status status"; height:calc(100dvh - 46px); gap:0; min-height:0; }
+  :root[data-theme="buzhoushan"] .fleet-layout--catalog-collapsed { grid-template-columns:48px minmax(0,1fr); }
+  :root[data-theme="buzhoushan"] .machine-rail { grid-area:hosts; display:flex; flex-direction:row; align-items:center; padding:0 12px; gap:16px; overflow:hidden; border:0; border-bottom:1px solid #383838; background:#252526; }
+  :root[data-theme="buzhoushan"] .rail-heading { flex:none; padding:0; margin:0; gap:8px; }
+  :root[data-theme="buzhoushan"] .rail-heading h2 { font-size:12px; margin:0; }
+  :root[data-theme="buzhoushan"] .rail-heading .eyebrow { display:none; }
+  :root[data-theme="buzhoushan"] .rail-track { display:flex; flex-direction:row; flex:1; gap:4px; overflow:auto; padding:0; min-width:0; }
+  :root[data-theme="buzhoushan"] .machine-link { flex:0 0 auto; width:auto; min-width:150px; padding:6px 12px; min-height:44px; margin:0; border:1px solid transparent; border-radius:3px; background:transparent; }
+  :root[data-theme="buzhoushan"] .machine-link--active { background:#37373d; border-color:#454545; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .machine-link strong { font-size:12px; }
+  :root[data-theme="buzhoushan"] .machine-link small { font-size:10px; }
+  :root[data-theme="buzhoushan"] .rail-node { width:22px; height:22px; border:0; box-shadow:none; background:transparent; }
+  :root[data-theme="buzhoushan"] .machine-rail .rail-footer { display:none; }
+  :root[data-theme="buzhoushan"] .fleet-main { grid-area:explorer; min-width:0; padding:0; overflow:auto; background:#252526; border-right:1px solid #383838; }
+  :root[data-theme="buzhoushan"] .catalog-toggle-bar { padding:4px 10px; border-bottom:1px solid #383838; }
+  :root[data-theme="buzhoushan"] .fleet-catalog-content { padding:10px; }
+  :root[data-theme="buzhoushan"] .fleet-main .machine-summary { padding:8px 0; }
+  :root[data-theme="buzhoushan"] .fleet-main :is(.quota-card,.host-quota,.discovery-status) { font-size:11px; }
+  :root[data-theme="buzhoushan"] .fleet-main h1 { font-size:18px; }
+  :root[data-theme="buzhoushan"] :is(.project-card,.session-card,.session-list-item,.catalog-project) { border-radius:3px; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .workspace-catalog { border:0; border-radius:0; background:transparent; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .workspace-catalog .section-heading { display:flex; flex-direction:column; align-items:stretch; gap:10px; padding:12px 0; }
+  :root[data-theme="buzhoushan"] .workspace-catalog h2 { font-size:12px; margin:0; }
+  :root[data-theme="buzhoushan"] .catalog-heading-actions { flex-direction:row; }
+  :root[data-theme="buzhoushan"] .catalog-heading-actions .button { font-size:11px; min-height:28px; padding:4px 8px; }
+  :root[data-theme="buzhoushan"] .catalog-search { padding:4px 0 10px; }
+  :root[data-theme="buzhoushan"] .catalog-search :is(label,select) { border-radius:3px; font-size:11px; }
+  :root[data-theme="buzhoushan"] .project-session-group__heading { padding:8px 4px; font-size:12px; }
+  :root[data-theme="buzhoushan"] .project-session-group__children { padding:4px; }
+  :root[data-theme="buzhoushan"] .session-row { border-radius:3px; padding:8px; }
+  :root[data-theme="buzhoushan"] .session-row--active { border-color:#007acc; background:#094771; }
+  :root[data-theme="buzhoushan"] .composer { padding:6px 16px 10px; }
+  :root[data-theme="buzhoushan"] .composer textarea { min-height:44px; font-size:14px; }
+  :root[data-theme="buzhoushan"] .lease-strip { min-height:32px; }
+  :root[data-theme="buzhoushan"] .inspector { grid-area:editor; border:0; background:#1e1e1e; min-height:0; overflow-y:auto; }
+  :root[data-theme="buzhoushan"] .inspector-head { padding:10px 18px; background:#252526; }
+  :root[data-theme="buzhoushan"] .inspector-title-row > h2 { font-size:16px; margin-bottom:6px; }
+  :root[data-theme="buzhoushan"] .inspector-context { font-size:11px; }
+  :root[data-theme="buzhoushan"] .inspector-head__actions { top:10px; }
+  :root[data-theme="buzhoushan"] .lease-strip { padding-block:5px; }
+  :root[data-theme="buzhoushan"] .conversation-viewport { min-height:80px; }
+  :root[data-theme="buzhoushan"] :is(.button,.composer-input,.session-config-trigger) { border-radius:3px; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .button--primary { background:#007acc; color:#fff; border-color:transparent; }
+  :root[data-theme="buzhoushan"] .composer-input { background:#252526; border:1px solid #454545; }
+  :root[data-theme="buzhoushan"] .buzhou-status { grid-area:status; display:flex; align-items:center; gap:18px; min-width:0; padding:0 12px; font-size:11px; color:#fff; background:#007acc; white-space:nowrap; overflow:hidden; }
+  :root[data-theme="buzhoushan"] .buzhou-status .rail-status { display:flex; gap:12px; padding:0; margin:0; border:0; }
+  :root[data-theme="buzhoushan"] .buzhou-status .fleet-shortcut { display:flex; align-items:center; gap:5px; padding:0; border:0; height:24px; min-height:24px; background:transparent; color:#fff; border-radius:0; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .buzhou-status .fleet-shortcut :is(strong,span) { font-size:11px; color:#fff; }
+  :root[data-theme="buzhoushan"] .buzhou-status .fleet-shortcut svg { display:none; }
+  :root[data-theme="buzhoushan"] .buzhou-status .relay-state { font-size:11px; color:#fff; margin:0; }
+  :root[data-theme="buzhoushan"] .buzhou-status__right { margin-left:auto; }
+  :root[data-theme="buzhoushan"] .buzhou-focus-toggle { border:1px solid #666; background:transparent; color:#ddd; padding:5px 10px; border-radius:3px; font-size:12px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus-toggle[aria-pressed="true"] { border-color:#3794ff; background:#163a53; }
+  :root[data-theme="buzhoushan"] .buzhou-focus { padding-left:0; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .primary-nav,
+  :root[data-theme="buzhoushan"] .buzhou-focus .account-label,
+  :root[data-theme="buzhoushan"] .buzhou-focus .machine-rail,
+  :root[data-theme="buzhoushan"] .buzhou-focus .fleet-main { display:none; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .fleet-layout { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) 24px; grid-template-areas:"editor" "status"; }
+  :root[data-theme="buzhoushan"] .buzhou-dock { order:100; flex:0 1 auto; min-height:130px; max-height:36dvh; background:#181818; border-top:1px solid #454545; position:relative; display:flex; flex-direction:column; overflow:visible; font-size:12px; }
+  :root[data-theme="buzhoushan"] .buzhou-dock--collapsed { min-height:38px; }
+  :root[data-theme="buzhoushan"] .buzhou-resizer { position:absolute; top:-4px; height:7px; width:100%; cursor:ns-resize; touch-action:none; z-index:5; }
+  :root[data-theme="buzhoushan"] .buzhou-resizer:focus-visible { background:#007acc; outline:0; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__head { height:38px; flex:none; display:flex; align-items:center; gap:10px; padding:0 12px; border-bottom:1px solid #333; }
+  :root[data-theme="buzhoushan"] .buzhou-dock button { border:0; border-radius:0; background:transparent; color:#aaa; padding:5px 8px; cursor:pointer; }
+  :root[data-theme="buzhoushan"] .buzhou-dock button:focus-visible { outline:1px solid #3794ff; outline-offset:-1px; }
+  :root[data-theme="buzhoushan"] .buzhou-dock button[aria-pressed="true"] { color:#fff; background:#2a2d2e; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__tabs { display:flex; align-self:stretch; gap:8px; margin-right:auto; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__tabs button[aria-pressed="true"] { border-bottom:1px solid #3794ff; background:transparent; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__body { display:grid; grid-template-columns:minmax(160px,28%) minmax(0,1fr); min-height:0; flex:1; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__list { overflow:auto; border-right:1px solid #333; scrollbar-gutter:stable; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__list button { display:flex; width:100%; gap:8px; text-align:left; padding:8px 12px; align-items:flex-start; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__list svg { flex:none; color:#75beff; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__list span { min-width:0; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__list strong { display:block; font-size:11px; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__list small { display:block; color:#9a9a9a; font-size:10px; margin-top:3px; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__output { display:flex; flex-direction:column; min-height:0; min-width:0; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__caption { display:flex; align-items:center; justify-content:space-between; padding:3px 12px; font-size:10px; color:#aaa; flex:none; }
+  :root[data-theme="buzhoushan"] .buzhou-dock pre { flex:1; min-height:0; overflow:auto; margin:0; padding:8px 14px; border:0; border-radius:0; background:transparent; color:#ce9178; font:12px/1.6 Consolas,"SFMono-Regular",monospace; white-space:pre-wrap; overflow-wrap:anywhere; scrollbar-gutter:stable; }
+  :root[data-theme="buzhoushan"] .buzhou-dock p { padding:8px 14px; color:#aaa; font-size:12px; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__limit { padding:3px 12px; font-size:10px; color:#888; border-top:1px solid #292929; }
+}
