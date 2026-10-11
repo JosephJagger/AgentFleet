@@ -57,8 +57,9 @@ it('hides the switcher for a sole running session without remounting the convers
  expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();expect(screen.getByText('Stable conversation')).toBeTruthy();
  for(const sessions of [[a,session('b',true)],[a,session('idle')]]) {
   view.rerender(<BuzhoushanSessions {...props} sessions={sessions}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
-  fireEvent.click(screen.getByRole('button',{name:'切换会话'}));expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
-  expect(props.onBrowse).toHaveBeenCalled();expect(props.onSelect).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'切换会话'}));expect(screen.getByLabelText('当前主机会话切换')).toBeTruthy();
+  expect(props.onBrowse).not.toHaveBeenCalled();
+  fireEvent.click(document.querySelector<HTMLButtonElement>('.buzhou-session-window')!);expect(props.onSelect).toHaveBeenCalledWith('a');
   view.rerender(<BuzhoushanSessions {...props}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
  }
  expect(mounted).toHaveBeenCalledOnce();expect(unmounted).not.toHaveBeenCalled();
