@@ -52,9 +52,9 @@ it('activates only for the new theme on desktop',()=>{
  act(()=>{desktop=true;changed();});expect(screen.getByText('workbench')).toBeTruthy();
  act(()=>{setTheme('official');});expect(screen.getByText('existing')).toBeTruthy();
 });
-it('merges durable file changes with command progress and restores idle activity with a single read',async()=>{
+it('omits file changes and restores idle terminal activity with a single read',async()=>{
  const d=detail();d.events=[{id:'file-event',nativeItemId:'file',nativeTurnId:'turn-a',sessionSeq:1,type:'item.completed',occurredAt:'2026-01-01',fileChanges:[{path:'src/demo.ts',diff:'+ real change'}]}];
- expect(workbenchItems(d,progress).map(item=>item.kind)).toEqual(['fileChange','commandExecution']);
+ expect(workbenchItems(d,progress).map(item=>item.kind)).toEqual(['commandExecution']);
  d.session.activeTurnId=undefined;d.session.state.currentTurn='none';d.events=[];
  vi.mocked(api.sessionProgress).mockResolvedValue({...progress,state:'completed',freshness:'stale',items:progress.items.map(item=>({...item,status:'completed'}))});
  render(<BuzhoushanActivity detail={d}/>);await act(async()=>{});
@@ -65,16 +65,20 @@ it('merges durable file changes with command progress and restores idle activity
  expect(vi.mocked(api.sessionProgress).mock.calls[0][2]).toBe(true);
 });
 
-it('keeps terminal commands and file edits in distinct tabs without a duplicate aggregate',async()=>{
+it('replaces file changes with conversation while leaving terminal output separate',async()=>{
  vi.mocked(api.sessionProgress).mockResolvedValue({...progress,items:[...progress.items,{id:'edit',kind:'fileChange',status:'completed',title:'src/example.ts',output:'+ changed',updatedAt:progress.updatedAt!}]});
- render(<BuzhoushanActivity detail={detail()}/>);await act(async()=>{});
- fireEvent.click(screen.getByRole('button',{name:'展开代码活动'}));
- expect(screen.queryByRole('button',{name:'代码活动'})).toBeNull();
+ const view=render(<BuzhoushanActivity detail={detail()} conversation={<div>Interim reply</div>}/>);await act(async()=>{});
+ fireEvent.click(screen.getByRole('button',{name:'终端'}));
  expect(screen.getByText(/partial check output/)).toBeTruthy();
+ expect(screen.queryByRole('button',{name:'文件修改'})).toBeNull();
  expect(screen.queryByText(/changed/)).toBeNull();
- fireEvent.click(screen.getByRole('button',{name:'文件修改'}));
- expect(screen.getByText(/changed/)).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'人机对话'}));
+ expect(screen.getByText('Interim reply')).toBeTruthy();
  expect(screen.queryByText(/partial check output/)).toBeNull();
+ const ended=detail();ended.session.activeTurnId=undefined;ended.session.state.currentTurn='completed';
+ view.rerender(<BuzhoushanActivity detail={ended} conversation={<div>Full reply</div>}/>);
+ expect(screen.getByText('Full reply')).toBeTruthy();
+ expect(screen.getByRole('button',{name:'收起代码活动'})).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:'重置活动布局'}));
  expect(screen.getByRole('button',{name:'终端'}).getAttribute('aria-pressed')).toBe('true');
 });
@@ -86,36 +90,36 @@ it('keeps reasoning and command output in the terminal and conversation text in 
  expect(workbenchItems(d).map(e=>e.id)).toEqual(['reason','cmd']);
  expect(workbenchItems(d)[0].output).toBe('public reasoning summary');
 });
-it('holds streaming replies through pauses and interleaved reasoning, then waits one second after completion',()=>{
+it('keeps heartbeat through streaming replies, reasoning, and reply completion',()=>{
  vi.useFakeTimers();const d=detail();
  const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
  const mode=()=>screen.getByRole('status').getAttribute('data-mode');
  expect(mode()).toBe('heartbeat');
  const delta={id:'delta',nativeItemId:'reply',sessionSeq:1,type:'agent_message.delta',actor:'agent' as const,nativeTurnId:'turn-a',body:'Writing',occurredAt:'2026-01-01'};
- d.events=[delta];view.rerender(<BuzhoushanHeartbeat detail={d} messages={[delta]}/>);expect(mode()).toBe('reply');
+ d.events=[delta];view.rerender(<BuzhoushanHeartbeat detail={d} messages={[delta]}/>);expect(mode()).toBe('heartbeat');
  const process={id:'reason',sessionSeq:2,type:'item.started',itemType:'reasoning',nativeTurnId:'turn-a',occurredAt:'2026-01-01'};
  d.events.push(process);view.rerender(<BuzhoushanHeartbeat detail={d} messages={[delta]}/>);
- act(()=>vi.advanceTimersByTime(60_000));expect(mode()).toBe('reply');expect(screen.getByRole('status').getAttribute('aria-label')).toBe('正在回复');
+ act(()=>vi.advanceTimersByTime(60_000));expect(mode()).toBe('heartbeat');expect(screen.getByRole('status').getAttribute('aria-label')).toBe('对话消息在人机对话查看');
  const complete={...delta,id:'complete',sessionSeq:3,type:'item.completed',itemType:'agentMessage',body:'Writing reply finished'};
  d.events.push(complete,{...process,id:'tool',sessionSeq:4,itemType:'commandExecution'});
- view.rerender(<BuzhoushanHeartbeat detail={d} messages={[complete]}/>);expect(mode()).toBe('settling');
- act(()=>vi.advanceTimersByTime(999));expect(mode()).toBe('settling');
+ view.rerender(<BuzhoushanHeartbeat detail={d} messages={[complete]}/>);expect(mode()).toBe('heartbeat');
+ act(()=>vi.advanceTimersByTime(999));expect(mode()).toBe('heartbeat');
  act(()=>vi.advanceTimersByTime(1));expect(mode()).toBe('heartbeat');
  d.session.state.waitReason='approval';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[complete]}/>);expect(screen.getByRole('status').getAttribute('aria-label')).toBe('等待确认');
 });
-it('completed replies restore heartbeat after one second without another process event',()=>{
+it('reply completion and subsequent replies never pause heartbeat',()=>{
  vi.useFakeTimers();const d=detail();
  const complete={id:'complete',nativeItemId:'reply',sessionSeq:1,type:'item.completed',itemType:'agentMessage',nativeTurnId:'turn-a',body:'Reply',occurredAt:'2026-01-01'};
  d.events=[complete];const view=render(<BuzhoushanHeartbeat detail={d} messages={[complete]}/>);
- act(()=>vi.advanceTimersByTime(999));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('settling');
+ act(()=>vi.advanceTimersByTime(999));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
  act(()=>vi.advanceTimersByTime(1));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
  const delta={...complete,id:'delta',nativeItemId:'second',type:'agent_message.delta',sessionSeq:3};
  d.events.push({...complete,id:'process',itemType:'reasoning',sessionSeq:2},delta);
  view.rerender(<BuzhoushanHeartbeat detail={d} messages={[complete,delta]}/>);
- act(()=>vi.advanceTimersByTime(10_000));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');
+ act(()=>vi.advanceTimersByTime(10_000));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
  // Out-of-order duplicate deltas cannot reopen a completed native message.
  d.events.push({...delta,id:'second-complete',type:'item.completed',sessionSeq:4},{...delta,id:'late',sessionSeq:5});
- view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.getByRole('status').getAttribute('data-mode')).toBe('settling');
+ view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
 });
 it('stops immediately on terminal events, offline, frozen state and turn change without stale timers',()=>{
  vi.useFakeTimers();
@@ -140,13 +144,6 @@ it('preserves unfinished native text through snapshots, but not completion, dele
  expect(preserveBuzhoushanStream(d,{...snapshot,progress:{...progress,contentAvailable:false}}).events).toEqual([]);
  expect(preserveBuzhoushanStream(d,{...snapshot,events:[{...delta,id:'end',type:'turn.completed'}]}).events).toHaveLength(1);
 });
-it('shows workspace snapshot provenance and explicit unsupported state in file changes',async()=>{
- vi.mocked(api.sessionProgress).mockResolvedValue({...progress,items:[{id:'workspace',kind:'fileChange',source:'workspace_snapshot',supported:false,limited:true,status:'completed',title:'',updatedAt:progress.updatedAt!}]});
- render(<BuzhoushanActivity detail={detail()}/>);await act(async()=>{});
- fireEvent.click(screen.getByRole('button',{name:'文件修改'}));
- expect(screen.getByText(/此工作区暂无法采集/)).toBeTruthy();
- expect(screen.getByText(/可能包含其他程序同期写入/)).toBeTruthy();
-});
 
 it('keeps dock closed across turn start and completion until the user opens it',async()=>{
  vi.mocked(api.sessionProgress).mockResolvedValue(progress);
@@ -162,7 +159,7 @@ it('keeps dock closed across turn start and completion until the user opens it',
  fireEvent.click(screen.getByText('最后已知进度'));expect(screen.getByRole('separator')).toBeTruthy();
 });
 
-it('cancels the one-second completion timer when another message starts',()=>{
+it('keeps heartbeat when another message starts without completion timers',()=>{
  vi.useFakeTimers();const d=detail();
  const done={id:'done',nativeItemId:'one',nativeTurnId:'turn-a',sessionSeq:1,type:'item.completed',itemType:'agentMessage',body:'First',occurredAt:'2026-01-01'};
  d.events=[done,{...done,id:'tool',nativeItemId:'tool',itemType:'commandExecution',sessionSeq:2}];
@@ -170,7 +167,7 @@ it('cancels the one-second completion timer when another message starts',()=>{
  act(()=>vi.advanceTimersByTime(500));
  const next={...done,id:'next',nativeItemId:'two',type:'agent_message.delta',sessionSeq:3,body:'Second'};
  d.events.push(next);view.rerender(<BuzhoushanHeartbeat detail={d} messages={[done,next]}/>);
- act(()=>vi.advanceTimersByTime(1000));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');
+ act(()=>vi.advanceTimersByTime(1000));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
  view.unmount();expect(vi.getTimerCount()).toBe(0);
 });
 
@@ -227,10 +224,10 @@ it('does not replay the same reply after four incomplete snapshots or late delta
  expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
  d.events=[{...done,id:'new',nativeItemId:'new-reply',type:'agent_message.delta',sessionSeq:11}];
  view.rerender(<BuzhoushanHeartbeat detail={d} messages={d.events}/>);
- expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');
+ expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
 });
 
-it('does not reuse completed-message memory across turn or content boundaries',()=>{
+it('does not pause heartbeat on a new reply after turn or content boundaries',()=>{
  vi.useFakeTimers();
  for(const boundary of ['turn','content','thread']) {
   const d=detail();const done={id:'done',nativeItemId:'same',nativeTurnId:'turn-a',sessionSeq:1,type:'item.completed',itemType:'agentMessage',body:'Complete',occurredAt:'2026-01-01'};
@@ -240,6 +237,6 @@ it('does not reuse completed-message memory across turn or content boundaries',(
   if(boundary==='thread')d.session.nativeThreadId='next-thread';
   d.events=[{...done,id:'new',type:'agent_message.delta',nativeTurnId:d.session.activeTurnId??undefined}];
   view.rerender(<BuzhoushanHeartbeat detail={d} messages={d.events}/>);
-  expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');view.unmount();
+  expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');view.unmount();
  }
 });

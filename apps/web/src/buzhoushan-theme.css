@@ -266,3 +266,14 @@
   :root[data-theme="buzhoushan"] .topbar-actions > .icon-button { min-width:30px; width:30px; min-height:30px; height:30px; padding:6px; }
   :root[data-theme="buzhoushan"] .topbar-actions > .icon-button svg { width:15px; height:15px; }
 }
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .buzhou-dock__chat { display:flex; flex:1; min-height:0; overflow:hidden; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__chat .conversation-viewport { flex:1; min-width:0; min-height:0; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__chat .timeline-event { padding-block:10px; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__chat .timeline-event p { padding:0; color:inherit; font-size:var(--buzhou-conversation-font-size); }
+}
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .timeline-scroll > div:has(> .buzhou-heartbeat:only-child) { min-height:100%; display:grid; place-items:center; }
+}

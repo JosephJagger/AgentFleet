@@ -1,7 +1,7 @@
 import { BuzhoushanSessions } from "./components/BuzhoushanSessions";
 import { hostSessionGroups, preferredHostSession, rememberedHostSession, rememberHostSession } from "./lib/host-session-selection";
 import { preserveBuzhoushanStream } from "./lib/buzhoushan-stream";
-import { isConversationEvent, isBuzhoushanChatEvent } from "./lib/buzhoushan-events";
+import { isConversationEvent, isBuzhoushanChatEvent, isBuzhoushanTurnActive } from "./lib/buzhoushan-events";
 import { BuzhoushanHeartbeat } from "./components/BuzhoushanHeartbeat";
 import { displayName } from "./lib/display-name";
 import { useBuzhoushanDesktop } from "./lib/buzhoushan";
@@ -877,13 +877,15 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
     });
   }
 
-  if (loading) return <aside className="inspector inspector--loading"><IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton><LoaderCircle className="spin" size={22} /><span>{t("正在读取会话")}</span></aside>;
+  if (loading && (!buzhouDesktop || !detail)) return <aside className="inspector inspector--loading"><IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton><LoaderCircle className="spin" size={22} /><span>{t("正在读取会话")}</span></aside>;
   if (!detail) return <aside className="inspector inspector--empty"><MonitorDot size={27} /><h2>{buzhouDesktop && onBrowseSessions ? <button type="button" className="buzhou-empty-select" aria-expanded={catalogExpanded} aria-controls="workbench-catalog" onClick={onBrowseSessions}>{t("选择一个会话")}</button> : t("选择一个会话")}</h2><p>{t("打开已有会话，或新建会话开始。")}</p></aside>;
 
   const { session, approval } = detail;
   const rawEvents = rawView ? detail.events.filter(event => event.payloadState !== "deleted" && event.body && (!buzhouDesktop || isConversationEvent(event))) : [];
   const projectedEvents = timelineItems(detail.events);
   const visibleEvents = buzhouDesktop ? projectedEvents.filter(isBuzhoushanChatEvent) : projectedEvents;
+  const heartbeatOnly = buzhouDesktop && isBuzhoushanTurnActive(detail) && session.state.reachability === "live" && !session.state.unknownFreeze && detail.hostOnline !== false;
+  const conversationEvents = projectedEvents.filter(isConversationEvent);
   const lease = session.controlLease;
   const managed = session.state.ownership === "agentfleet_owned";
   const pendingCommand = (detail.commands ?? []).some(commandPending);
@@ -1057,11 +1059,11 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div>
       )}
       {session.state.unknownFreeze && <div className="freeze-banner"><AlertTriangle size={17} /><div><strong>{t("结果不确定，写入已冻结")}</strong><span>{t("可以点击解除冻结核验主机结果；系统不会自动重发原命令。")}</span><SessionRecovery key={`${draftOwner}:${session.id}`} machineId={session.machineId} sessionId={session.id} online={detail.hostOnline === true} supported={detail.recoverySupported === true} onChanged={onRefresh} /></div></div>}
-      <ConversationViewport key={`${draftOwner}:${session.id}`} wholeMessagesDuringHeartbeat={buzhouDesktop && !rawView} events={rawView ? rawEvents : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}{buzhouDesktop && <BuzhoushanHeartbeat key={session.id} detail={detail} messages={visibleEvents}/>}</ConversationViewport>
+      <ConversationViewport key={`${draftOwner}:${session.id}`} events={heartbeatOnly ? [] : rawView ? rawEvents : visibleEvents}>{!heartbeatOnly && detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{heartbeatOnly ? null : rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}{buzhouDesktop && <BuzhoushanHeartbeat key={session.id} detail={detail} messages={visibleEvents}/>}</ConversationViewport>
       {approval?.status === "pending" && (approval.type === "user_input"
         ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} onChanged={onRefresh} />
         : <ApprovalCard approval={approval} provider={session.provider} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
-      {buzhouDesktop ? <BuzhoushanActivity key={`activity:${draftOwner}:${session.id}:${session.activeTurnId??"none"}`} detail={detail}/> : session.provider!=="claude" && <RuntimeProgress key={`progress:${session.id}:${session.activeTurnId??"none"}`} sessionId={session.id} active={Boolean(session.activeTurnId)||session.state.currentTurn==="in_progress"||session.state.unknownFreeze} initial={detail.progress}/>}
+      {buzhouDesktop ? <BuzhoushanActivity key={`activity:${draftOwner}:${session.id}`} detail={detail} conversation={<ConversationViewport events={conversationEvents}><Timeline events={conversationEvents} sessionId={session.id} provider={session.provider}/></ConversationViewport>}/> : session.provider!=="claude" && <RuntimeProgress key={`progress:${session.id}:${session.activeTurnId??"none"}`} sessionId={session.id} active={Boolean(session.activeTurnId)||session.state.currentTurn==="in_progress"||session.state.unknownFreeze} initial={detail.progress}/>}
       <OperationReceipts commands={detail.commands ?? []} mode="outstanding" />
       {(detail.session.state.unknownFreeze || (detail.commands ?? []).some(command => command.state === "unknown")) && <CommandRecovery key={`recovery:${draftOwner}:${session.machineId}`} machineId={session.machineId} online={session.state.reachability === "live"} supported={detail.commandRecoverySupported === true} onChanged={onRefresh} />}
       {detail.queue.some((item) => item.state === "queued" || item.state === "dispatching" || item.state === "unknown") && (
