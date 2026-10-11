@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ConversationViewport } from "./components/ConversationViewport";
 import { CommandExecution } from "./components/CommandExecution";
@@ -94,4 +94,60 @@ it("命令日志独立跟随末尾，向上看旧输出时不被新输出打断"
   expect(log.scrollTop).toBe(100);
   fireEvent.click(screen.getByRole("button", { name: "新输出 ↓" }));
   expect(log.scrollTop).toBe(log.scrollHeight - log.clientHeight);
+});
+
+function HeartbeatHistory({ events = initial, enabled = true, mode = 'heartbeat' }: { events?: TimelineEvent[]; enabled?: boolean; mode?: string }) {
+  return <ConversationViewport events={events} wholeMessagesDuringHeartbeat={enabled}>
+    {events.map(item => <article className="timeline-event" key={item.id} data-scroll-anchor={item.id}>{item.body}</article>)}
+    {mode !== 'ended' && <div className="buzhou-heartbeat" data-mode={mode}/>}
+  </ConversationViewport>;
+}
+it("心跳跟随时完整显示能放下的消息，裁切消息只隐藏展示且不改变滚动高度", () => {
+  viewportHeight = 150;
+  render(<HeartbeatHistory/>);
+  const view = screen.getByRole('region', { name: '会话记录' });
+  expect(screen.getByText('d').getAttribute('data-heartbeat-clipped')).toBe('true');
+  expect(screen.getByText('e').hasAttribute('data-heartbeat-clipped')).toBe(false);
+  expect(view.scrollHeight).toBe(500);
+  expect(view.scrollTop).toBe(350);
+  fireEvent.wheel(view, { deltaY: -10 });
+  expect(screen.getByText('d').hasAttribute('aria-hidden')).toBe(false);
+  expect(screen.getByText('d').inert).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: '回到最新' }));
+  expect(screen.getByText('d').getAttribute('aria-hidden')).toBe('true');
+});
+it("追加消息、窗口变小也不露半条；回复和本轮结束立即恢复正文", () => {
+  viewportHeight = 80;
+  const { rerender } = render(<HeartbeatHistory/>);
+  expect(screen.getByText('e').getAttribute('aria-hidden')).toBe('true');
+  const appended = [...initial, event('supplement', '追加本轮内容')];
+  rerender(<HeartbeatHistory events={appended}/>);
+  expect(screen.getByText('追加本轮内容').getAttribute('aria-hidden')).toBe('true');
+  expect(screen.getByText('追加本轮内容').textContent).toBe('追加本轮内容');
+  viewportHeight = 150; fireEvent.resize(window);
+  expect(screen.getByText('追加本轮内容').hasAttribute('aria-hidden')).toBe(false);
+  viewportHeight = 80; fireEvent.resize(window);
+  expect(screen.getByText('追加本轮内容').getAttribute('aria-hidden')).toBe('true');
+  rerender(<HeartbeatHistory events={appended} mode="reply"/>);
+  expect(screen.getByText('追加本轮内容').hasAttribute('aria-hidden')).toBe(false);
+  rerender(<HeartbeatHistory events={appended} mode="heartbeat"/>);
+  expect(screen.getByText('追加本轮内容').getAttribute('aria-hidden')).toBe('true');
+  rerender(<HeartbeatHistory events={appended} mode="ended"/>);
+  expect(screen.getByText('追加本轮内容').hasAttribute('aria-hidden')).toBe(false);
+});
+it("非不周山桌面视图不启用整条隐藏规则", () => {
+  viewportHeight = 80;
+  render(<HeartbeatHistory enabled={false}/>);
+  expect(screen.getByText('e').hasAttribute('aria-hidden')).toBe(false);
+});
+
+it("心跳子组件独立切换为回复时恢复消息，无需父组件刷新", async () => {
+  viewportHeight = 80;
+  const { container } = render(<HeartbeatHistory/>);
+  const message = screen.getByText('e');
+  expect(message.getAttribute('aria-hidden')).toBe('true');
+  container.querySelector('.buzhou-heartbeat')!.setAttribute('data-mode', 'reply');
+  await waitFor(() => expect(message.hasAttribute('aria-hidden')).toBe(false));
+  container.querySelector('.buzhou-heartbeat')!.setAttribute('data-mode', 'heartbeat');
+  await waitFor(() => expect(message.getAttribute('aria-hidden')).toBe('true'));
 });

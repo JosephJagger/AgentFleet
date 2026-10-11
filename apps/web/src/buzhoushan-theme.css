@@ -251,3 +251,7 @@
   :root[data-theme="buzhoushan"] .buzhou-focus .session-call-actions { margin:0; }
   :root[data-theme="buzhoushan"] .buzhou-focus .session-facts > [role="status"] { max-width:180px; font-size:11px; }
 }
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .timeline-event[data-heartbeat-clipped="true"] { visibility:hidden; pointer-events:none; }
+}
