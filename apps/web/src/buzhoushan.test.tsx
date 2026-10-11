@@ -1,3 +1,4 @@
+import {preserveBuzhoushanStream} from "./lib/buzhoushan-stream";
 import {BuzhoushanHeartbeat} from "./components/BuzhoushanHeartbeat";
 import {isConversationEvent} from "./lib/buzhoushan-events";
 // @vitest-environment jsdom
@@ -85,19 +86,58 @@ it('keeps reasoning and command output in the terminal and conversation text in 
  expect(workbenchItems(d).map(e=>e.id)).toEqual(['reason','cmd']);
  expect(workbenchItems(d)[0].output).toBe('public reasoning summary');
 });
-it('keeps heartbeat through reasoning without a timer and hides for replies, offline and completion',()=>{
+it('holds streaming replies through pauses and interleaved reasoning, then waits one second after completion',()=>{
  vi.useFakeTimers();const d=detail();
  const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
- expect(screen.getByRole('status')).toBeTruthy();
- const messages=[{id:'reply',sessionSeq:1,type:'agent_message.delta',actor:'agent' as const,nativeTurnId:'turn-a',body:'Writing reply',occurredAt:'2026-01-01'}];
- view.rerender(<BuzhoushanHeartbeat detail={d} messages={messages}/>);
- expect(screen.queryByRole('status')).toBeNull();
- act(()=>vi.advanceTimersByTime(60_000));expect(screen.queryByRole('status')).toBeNull();
- d.events=[{id:'reason',sessionSeq:2,type:'item.started',itemType:'reasoning',nativeTurnId:'turn-a',occurredAt:'2026-01-01'}];view.rerender(<BuzhoushanHeartbeat detail={d} messages={messages}/>);expect(screen.getByRole('status')).toBeTruthy();
- act(()=>vi.advanceTimersByTime(60_000));expect(screen.getByRole('status')).toBeTruthy();
- d.session.state.waitReason='approval';view.rerender(<BuzhoushanHeartbeat detail={d} messages={messages}/>);expect(screen.getByRole('status').textContent).toContain('等待确认');
- d.session.state.waitReason='none';d.hostOnline=false;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
- d.hostOnline=true;d.session.activeTurnId=undefined;d.session.state.currentTurn='none';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
+ const mode=()=>screen.getByRole('status').getAttribute('data-mode');
+ expect(mode()).toBe('heartbeat');
+ const delta={id:'delta',nativeItemId:'reply',sessionSeq:1,type:'agent_message.delta',actor:'agent' as const,nativeTurnId:'turn-a',body:'Writing',occurredAt:'2026-01-01'};
+ d.events=[delta];view.rerender(<BuzhoushanHeartbeat detail={d} messages={[delta]}/>);expect(mode()).toBe('reply');
+ const process={id:'reason',sessionSeq:2,type:'item.started',itemType:'reasoning',nativeTurnId:'turn-a',occurredAt:'2026-01-01'};
+ d.events.push(process);view.rerender(<BuzhoushanHeartbeat detail={d} messages={[delta]}/>);
+ act(()=>vi.advanceTimersByTime(60_000));expect(mode()).toBe('reply');expect(screen.getByRole('status').getAttribute('aria-label')).toBe('正在回复');
+ const complete={...delta,id:'complete',sessionSeq:3,type:'item.completed',itemType:'agentMessage',body:'Writing reply finished'};
+ d.events.push(complete,{...process,id:'tool',sessionSeq:4,itemType:'commandExecution'});
+ view.rerender(<BuzhoushanHeartbeat detail={d} messages={[complete]}/>);expect(mode()).toBe('settling');
+ act(()=>vi.advanceTimersByTime(999));expect(mode()).toBe('settling');
+ act(()=>vi.advanceTimersByTime(1));expect(mode()).toBe('heartbeat');
+ d.session.state.waitReason='approval';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[complete]}/>);expect(screen.getByRole('status').getAttribute('aria-label')).toBe('等待确认');
+});
+it('new replies cancel pending heartbeat and completed replies alone never restart it',()=>{
+ vi.useFakeTimers();const d=detail();
+ const complete={id:'complete',nativeItemId:'reply',sessionSeq:1,type:'item.completed',itemType:'agentMessage',nativeTurnId:'turn-a',body:'Reply',occurredAt:'2026-01-01'};
+ d.events=[complete];const view=render(<BuzhoushanHeartbeat detail={d} messages={[complete]}/>);
+ act(()=>vi.advanceTimersByTime(10_000));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('settling');
+ const delta={...complete,id:'delta',nativeItemId:'second',type:'agent_message.delta',sessionSeq:3};
+ d.events.push({...complete,id:'process',itemType:'reasoning',sessionSeq:2},delta);
+ view.rerender(<BuzhoushanHeartbeat detail={d} messages={[complete,delta]}/>);
+ act(()=>vi.advanceTimersByTime(10_000));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');
+ // Out-of-order duplicate deltas cannot reopen a completed native message.
+ d.events.push({...delta,id:'second-complete',type:'item.completed',sessionSeq:4},{...delta,id:'late',sessionSeq:5});
+ view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.getByRole('status').getAttribute('data-mode')).toBe('settling');
+});
+it('stops immediately on terminal events, offline, frozen state and turn change without stale timers',()=>{
+ vi.useFakeTimers();
+ for(const type of ['turn.completed','turn.failed','turn.interrupted','turn.cancelled']){
+ const d=detail();const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+ d.events=[{id:'end',sessionSeq:1,type,nativeTurnId:'turn-a',occurredAt:'2026-01-01'}];view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();view.unmount();
+ }
+ const d=detail();const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+ d.hostOnline=false;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
+ d.hostOnline=true;d.session.state.unknownFreeze=true;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
+ d.session.state.unknownFreeze=false;d.session.activeTurnId='next';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
+ d.session.activeTurnId=undefined;d.session.state.currentTurn='none';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
+});
+it('preserves unfinished native text through snapshots, but not completion, deletion or scope changes',()=>{
+ const d=detail();const delta={id:'delta',nativeItemId:'reply',nativeTurnId:'turn-a',sessionSeq:2,type:'agent_message.delta',body:'partial',occurredAt:'2026-01-01'};d.events=[delta];
+ const snapshot=detail();expect(preserveBuzhoushanStream(d,snapshot).events).toEqual([delta]);
+ expect(preserveBuzhoushanStream(d,{...snapshot,events:[{...delta,id:'done',type:'item.completed'}]}).events).toHaveLength(1);
+ expect(preserveBuzhoushanStream(d,{...snapshot,events:[{...delta,id:'delete',payloadState:'deleted'}]}).events).toHaveLength(1);
+ for(const patch of [{id:'other'},{activeTurnId:'other'},{nativeThreadId:'other'},{contentEpoch:2},{projectionEpoch:2},{cloudImageRevision:10}]){
+ expect(preserveBuzhoushanStream(d,{...snapshot,session:{...snapshot.session,...patch}}).events).toEqual([]);
+ }
+ expect(preserveBuzhoushanStream(d,{...snapshot,progress:{...progress,contentAvailable:false}}).events).toEqual([]);
+ expect(preserveBuzhoushanStream(d,{...snapshot,events:[{...delta,id:'end',type:'turn.completed'}]}).events).toHaveLength(1);
 });
 it('shows workspace snapshot provenance and explicit unsupported state in file changes',async()=>{
  vi.mocked(api.sessionProgress).mockResolvedValue({...progress,items:[{id:'workspace',kind:'fileChange',source:'workspace_snapshot',supported:false,limited:true,status:'completed',title:'',updatedAt:progress.updatedAt!}]});
@@ -119,4 +159,16 @@ it('keeps dock closed across turn start and completion until the user opens it',
  fireEvent.click(screen.getByRole('button',{name:'终端'}));expect(screen.getByRole('separator')).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:'收起代码活动'}));
  fireEvent.click(screen.getByText('最后已知进度'));expect(screen.getByRole('separator')).toBeTruthy();
+});
+
+it('cancels the one-second completion timer when another message starts',()=>{
+ vi.useFakeTimers();const d=detail();
+ const done={id:'done',nativeItemId:'one',nativeTurnId:'turn-a',sessionSeq:1,type:'item.completed',itemType:'agentMessage',body:'First',occurredAt:'2026-01-01'};
+ d.events=[done,{...done,id:'tool',nativeItemId:'tool',itemType:'commandExecution',sessionSeq:2}];
+ const view=render(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);
+ act(()=>vi.advanceTimersByTime(500));
+ const next={...done,id:'next',nativeItemId:'two',type:'agent_message.delta',sessionSeq:3,body:'Second'};
+ d.events.push(next);view.rerender(<BuzhoushanHeartbeat detail={d} messages={[done,next]}/>);
+ act(()=>vi.advanceTimersByTime(1000));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');
+ view.unmount();expect(vi.getTimerCount()).toBe(0);
 });

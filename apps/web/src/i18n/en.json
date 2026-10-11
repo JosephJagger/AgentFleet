@@ -3266,5 +3266,7 @@
   "主机返回版本": "Version returned by host",
   "上次升级记录": "Previous update record",
   "上次健康核验": "Last health verification",
-  "检查完成，未执行升级": "Check complete; no upgrade performed"
+  "检查完成，未执行升级": "Check complete; no upgrade performed",
+  "正在回复": "Replying",
+  "回复已完成，等待后续进度": "Reply complete; waiting for further progress"
 }

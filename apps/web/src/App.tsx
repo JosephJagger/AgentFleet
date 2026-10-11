@@ -1,3 +1,4 @@
+import { preserveBuzhoushanStream } from "./lib/buzhoushan-stream";
 import { isConversationEvent } from "./lib/buzhoushan-events";
 import { BuzhoushanHeartbeat } from "./components/BuzhoushanHeartbeat";
 import { displayName } from "./lib/display-name";
@@ -1417,6 +1418,8 @@ function CreateProjectDialog({ open, machines, selectedMachineId, onClose, onCre
 function App() {
   useLocale();
   const buzhouDesktop = useBuzhoushanDesktop();
+  const buzhouDesktopRef = useRef(buzhouDesktop);
+  buzhouDesktopRef.current = buzhouDesktop;
   const [streamFocus,setStreamFocus] = useState(() => { try { return localStorage.getItem("agentfleet.buzhoushan.focus") === "true"; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem("agentfleet.buzhoushan.focus", String(streamFocus)); } catch { /* Optional local layout preference. */ } }, [streamFocus]);
   const [catalogCollapsed, setCatalogCollapsed] = useState(() => {
@@ -1548,8 +1551,9 @@ function App() {
         if (generation === detailRequest.current.generation && id === selectedSessionRef.current) {
           setSelectedMachineId(incoming.session.machineId);
           setDetail((current) => {
+            const snapshot = buzhouDesktopRef.current ? preserveBuzhoushanStream(current, incoming) : incoming;
             const next = current?.session.id === incoming.session.id
-              ? { ...incoming, commands: mergeCommandReceipts(current.commands ?? [], incoming.commands ?? []) } : incoming;
+              ? { ...snapshot, commands: mergeCommandReceipts(current.commands ?? [], incoming.commands ?? []) } : snapshot;
             if (current?.session.cloudImageRevision !== next.session.cloudImageRevision) return next;
             if (!current || current.session.id !== next.session.id || current.session.contentEpoch !== next.session.contentEpoch || current.session.projectionEpoch !== next.session.projectionEpoch || !current.events.length || !next.events.length) return next;
             const firstNew = next.events[0].sessionSeq;
@@ -1585,6 +1589,8 @@ function App() {
         sessionSeq: current.session.sessionSeq + 1,
         type: update.eventType,
         nativeTurnId: update.nativeTurnId,
+        nativeItemId: update.nativeItemId ?? undefined,
+        nativeThreadId: current.session.nativeThreadId ?? undefined,
         occurredAt: existing?.occurredAt ?? new Date().toISOString(),
         actor: update.eventType === "agent_message.delta" ? "agent" : "system",
         title: update.eventType === "agent_message.delta" ? `${agentName(detail?.session.provider)} · ${t("实时")}` : update.eventType === "command_output.delta" ? t("命令输出 · 实时") : t("变更预览 · 实时"),
