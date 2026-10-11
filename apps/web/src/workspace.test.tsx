@@ -548,7 +548,12 @@ describe("会话工作区", () => {
     expect(screen.queryByText("P0b")).toBeNull();
     expect(screen.queryByText("remote-restricted-v1")).toBeNull();
     expect(screen.queryByText("项目内写入 · 网络关闭")).toBeNull();
-    expect(Array.from(status.children).map(row => row.textContent)).toEqual(["2在线主机", "0运行中", "2已接管", "赛博朋克天空之城黑暗骑士龙猫森林彼得兔园骇客帝国冰雪奇缘哈利波特星球大战千与千寻指环王超级马里奥大闹天宫哪吒闹海白蛇传说清明上河千里江山", "正在重新连接"]);
+    const rows = Array.from(status.children);
+    expect(rows.slice(0, 3).map(row => row.textContent)).toEqual(["2在线主机", "0运行中", "2已接管"]);
+    const themePicker = within(rows[3] as HTMLElement).getByRole("combobox", { name: "界面主题" });
+    expect(within(themePicker).getByRole("option", { name: "澄蓝" })).toBeTruthy();
+    expect(within(themePicker).getByRole("option", { name: "赛博朋克" })).toBeTruthy();
+    expect(rows.at(-1)?.textContent).toBe("正在重新连接");
     await waitFor(() => expect(subscribeToFleet).toHaveBeenCalled());
     const onConnected = vi.mocked(subscribeToFleet).mock.calls[0][2];
     act(() => onConnected(true));
