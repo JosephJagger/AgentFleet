@@ -3275,5 +3275,7 @@
   "向左查看更多会话": "Show more sessions to the left",
   "向右查看更多会话": "Show more sessions to the right",
   "当前主机会话切换": "Sessions on this host",
-  "推理中": "Reasoning"
+  "推理中": "Reasoning",
+  "切换会话": "Switch session",
+  "收起会话选择": "Hide session picker"
 }

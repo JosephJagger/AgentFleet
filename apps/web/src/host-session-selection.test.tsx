@@ -34,7 +34,7 @@ it('keeps per-host browser memory isolated by owner and rejects invalid storage'
 it('renders two compact rows, masks names and moves completed sessions without navigating',()=>{
  setTheme('buzhoushan');vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
  const onSelect=vi.fn(),a=session('a',true);a.title='CUPSHE work';a.projectAlias='gongqiankun';
- const props={enabled:true,machine,sessions:[a,session('idle')],selectedId:'a',onSelect,onBrowse:vi.fn(),onCreate:vi.fn(),children:<div>Selected conversation</div>};
+ const props={enabled:true,machine,sessions:[a,session('idle')],onSelect,onBrowse:vi.fn(),onCreate:vi.fn(),children:<div>Selected conversation</div>};
  const view=render(<BuzhoushanSessions {...props}/>);
  expect(within(screen.getByRole('region',{name:'正在运行'})).getByText('c****e work',{exact:false})).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:/c\*\*\*\*e work/}));expect(onSelect).toHaveBeenCalledWith('a');onSelect.mockClear();
@@ -56,7 +56,9 @@ it('hides the switcher for a sole running session without remounting the convers
  const view=render(<BuzhoushanSessions {...props}/>);
  expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();expect(screen.getByText('Stable conversation')).toBeTruthy();
  for(const sessions of [[a,session('b',true)],[a,session('idle')]]) {
-  view.rerender(<BuzhoushanSessions {...props} sessions={sessions}/>);expect(screen.getByLabelText('当前主机会话切换')).toBeTruthy();
+  view.rerender(<BuzhoushanSessions {...props} sessions={sessions}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'切换会话'}));expect(screen.getByLabelText('当前主机会话切换')).toBeTruthy();
+  fireEvent.click(document.querySelector<HTMLButtonElement>('.buzhou-session-window')!);
   view.rerender(<BuzhoushanSessions {...props}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
  }
  expect(mounted).toHaveBeenCalledOnce();expect(unmounted).not.toHaveBeenCalled();

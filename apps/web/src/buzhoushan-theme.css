@@ -173,3 +173,14 @@
   :root[data-theme="buzhoushan"] .buzhou-session-empty-actions button { padding:4px; border:0; background:none; color:#3794ff; font-size:11px; }
 }
 @media (min-width:1101px) and (hover:hover) { :root[data-theme="buzhoushan"] .buzhou-session-window:hover { border-color:#888; } }
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .buzhou-session-window { min-height:94px; padding:10px 12px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-window__title strong { font-size:13px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-window__project { margin-top:7px; font-size:11px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-window__preview { margin-top:7px; padding-top:6px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-track > p { padding-block:14px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-toggle { flex:none; display:flex; justify-content:flex-end; background:#252526; padding:2px 12px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-toggle button { display:flex; align-items:center; gap:5px; color:#aaa; background:transparent; border:0; padding:3px 6px; font-size:11px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-toggle button:focus-visible { outline:1px solid #3794ff; }
+}
