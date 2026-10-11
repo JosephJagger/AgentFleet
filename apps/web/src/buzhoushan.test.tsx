@@ -22,6 +22,7 @@ it('filters suppressed payloads, foreign turns, wrong sessions and content-disab
 it('uses one progress poller, shows ongoing output, marks failure stale, and aborts on session change',async()=>{
  vi.useFakeTimers();vi.mocked(api.sessionProgress).mockResolvedValue(progress);
  const view=render(<BuzhoushanActivity key="a" detail={detail()}/>);await act(async()=>{});
+ fireEvent.click(screen.getByRole("button",{name:"展开代码活动"}));
  expect(screen.getByText(/partial check output/)).toBeTruthy();expect(screen.getByText('实时更新')).toBeTruthy();
  expect(api.sessionProgress).toHaveBeenCalledTimes(1);
  vi.mocked(api.sessionProgress).mockRejectedValueOnce(new Error('offline'));
@@ -33,6 +34,7 @@ it('uses one progress poller, shows ongoing output, marks failure stale, and abo
 it('supports idle history with one read, selection without stealing focus, collapse and keyboard resizing',()=>{
  const d=detail();d.session.activeTurnId=undefined;d.session.state.currentTurn='none';d.events=[{id:'one',sessionSeq:1,type:'item.completed',occurredAt:'2026-01-01',command:'npm test',output:'test output',status:'completed'}];
  const view=render(<BuzhoushanActivity detail={d}/>);
+ fireEvent.click(screen.getByRole("button",{name:"展开代码活动"}));
  expect(api.sessionProgress).toHaveBeenCalledTimes(1);expect(screen.queryByText('实时更新')).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:/npm test 已完成/}));
  view.rerender(<BuzhoushanActivity detail={{...d,events:[...d.events,{...d.events[0],id:'two',command:'npm run build',output:'build output'}]}}/>);
@@ -55,6 +57,7 @@ it('merges durable file changes with command progress and restores idle activity
  d.session.activeTurnId=undefined;d.session.state.currentTurn='none';d.events=[];
  vi.mocked(api.sessionProgress).mockResolvedValue({...progress,state:'completed',freshness:'stale',items:progress.items.map(item=>({...item,status:'completed'}))});
  render(<BuzhoushanActivity detail={d}/>);await act(async()=>{});
+ fireEvent.click(screen.getByRole("button",{name:"展开代码活动"}));
  expect(screen.getByText(/partial check output/)).toBeTruthy();
  expect(screen.getByText('最后已知进度')).toBeTruthy();
  expect(api.sessionProgress).toHaveBeenCalledTimes(1);
@@ -64,6 +67,7 @@ it('merges durable file changes with command progress and restores idle activity
 it('keeps terminal commands and file edits in distinct tabs without a duplicate aggregate',async()=>{
  vi.mocked(api.sessionProgress).mockResolvedValue({...progress,items:[...progress.items,{id:'edit',kind:'fileChange',status:'completed',title:'src/example.ts',output:'+ changed',updatedAt:progress.updatedAt!}]});
  render(<BuzhoushanActivity detail={detail()}/>);await act(async()=>{});
+ fireEvent.click(screen.getByRole('button',{name:'展开代码活动'}));
  expect(screen.queryByRole('button',{name:'代码活动'})).toBeNull();
  expect(screen.getByText(/partial check output/)).toBeTruthy();
  expect(screen.queryByText(/changed/)).toBeNull();
@@ -101,4 +105,18 @@ it('shows workspace snapshot provenance and explicit unsupported state in file c
  fireEvent.click(screen.getByRole('button',{name:'文件修改'}));
  expect(screen.getByText(/此工作区暂无法采集/)).toBeTruthy();
  expect(screen.getByText(/可能包含其他程序同期写入/)).toBeTruthy();
+});
+
+it('keeps dock closed across turn start and completion until the user opens it',async()=>{
+ vi.mocked(api.sessionProgress).mockResolvedValue(progress);
+ const d=detail();const view=render(<BuzhoushanActivity detail={d}/>);await act(async()=>{});
+ expect(screen.queryByRole('separator')).toBeNull();
+ d.session.activeTurnId=undefined;d.session.state.currentTurn='none';view.rerender(<BuzhoushanActivity detail={d}/>);
+ expect(screen.queryByRole('separator')).toBeNull();
+ d.session.activeTurnId='next';d.session.state.currentTurn='in_progress';view.rerender(<BuzhoushanActivity detail={d}/>);
+ expect(screen.queryByRole('separator')).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'重置活动布局'}));expect(screen.queryByRole('separator')).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'终端'}));expect(screen.getByRole('separator')).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'收起代码活动'}));
+ fireEvent.click(screen.getByText('最后已知进度'));expect(screen.getByRole('separator')).toBeTruthy();
 });

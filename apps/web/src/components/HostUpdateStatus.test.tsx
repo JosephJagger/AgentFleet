@@ -17,3 +17,13 @@ describe("host update truthfulness", () => {
     expect(screen.getByText("主机离线，以上为最后上报状态，尚未确认当前版本。")).toBeTruthy();
   });
 });
+
+it("does not present old upgrade success or duplicate versions as this check's upgrade", () => {
+ render(<HostUpdateStatus machine={{agentVersion:"1.2.3",reachability:"live",codexProfile:{agentInstalledVersion:"1.2.3",agentUpdateTarget:"1.2.3",agentUpdateState:"succeeded",agentUpdateCheckedAt:"2026-01-01T00:00:00Z",agentUpdateVerifiedAt:"2026-01-01T00:00:00Z"}}} operations={[{id:"check",type:"agent.update",state:"succeeded",createdAt:"2026-01-02T00:00:00Z",updatedAt:"2026-01-02T00:00:00Z",result:{phase:"current",version:"1.2.3"}}]} release={{status:"mismatch",expectedVersion:"1.2.4",publicVersion:"1.2.3",checkedAt:"2026-01-02T00:00:00Z"}}/>);
+ expect(screen.queryByText("已安装版本")).toBeNull();
+ expect(screen.queryByText("本次更新目标")).toBeNull();
+ expect(screen.queryByText("升级完成，健康检查通过")).toBeNull();
+ expect(screen.getByText("更新源不一致，暂无法确认最新版本")).toBeTruthy();
+ expect(screen.getByText("检查完成，更新源未提供更高版本")).toBeTruthy();
+ expect(screen.getByText("上次升级记录")).toBeTruthy();
+});

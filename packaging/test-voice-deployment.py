@@ -62,12 +62,18 @@ class DeploymentFenceTests(unittest.TestCase):
             self.db.commit()
         self.assertTrue(deploy.wait_idle(self.db, 'owner', 10, sleep=user_hangs_up))
 
-    def invoke(self, fail=False):
+    def invoke(self, fail=False, public_fail=False):
         commands = []
         def runner(*args):
             commands.append(args)
             if args[:3] == ('docker', 'image', 'inspect'):
                 return json.dumps([{'Id':'sha256:fixture', 'Config':{'Env':['AGENTFLEET_BUILD_SHA=fixture-build']}}])
+            if args[:2] == ('docker', 'inspect'):
+                return json.dumps([{'Config':{'Env':['PUBLIC_ORIGIN=https://example.test']}}])
+            if args[:2] == ('docker', 'run'):
+                return '1.2.3'
+            if args[0] == 'node' and public_fail:
+                raise RuntimeError('public release mismatch')
             if args[:2] == ('docker', 'compose') and fail:
                 raise RuntimeError('synthetic switch failure')
             return ''
@@ -87,10 +93,15 @@ class DeploymentFenceTests(unittest.TestCase):
     def test_success_switches_only_after_empty_calls_and_health_releases_fence(self):
         result, commands = self.invoke()
         self.assertEqual(result, 0)
-        self.assertEqual(commands[1], ('docker','tag','sha256:fixture','agentfleet:local'))
-        self.assertEqual(commands[2][-4:], ('-d','--no-deps','--no-build','control-plane'))
+        self.assertEqual(commands[3], ('docker','tag','sha256:fixture','agentfleet:local'))
+        self.assertEqual(commands[4][-4:], ('-d','--no-deps','--no-build','control-plane'))
         self.assertEqual(self.db.execute('SELECT count(*) FROM voice_deployment_guard').fetchone()[0], 0)
         self.assertEqual(len(list(self.path.parent.glob('*.predeploy-*.sqlite'))), 1)
+
+    def test_public_failure_does_not_claim_publication_or_lock_healthy_calls(self):
+        with self.assertRaisesRegex(RuntimeError, 'public release mismatch'):
+            self.invoke(public_fail=True)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM voice_deployment_guard').fetchone()[0], 0)
 
     def test_failed_switch_retains_fence_for_explicit_recovery(self):
         with self.assertRaisesRegex(RuntimeError, 'synthetic switch failure'):

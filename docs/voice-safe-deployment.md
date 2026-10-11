@@ -65,3 +65,27 @@ capture through OS sleep, mobile app suspension, process eviction, page refresh
 or closure. A resumed page whose call actually ended requires an explicit new
 call. New frontend code takes effect on a later page load; never force-refresh
 an existing call to apply this update. Publication still waits for all calls.
+
+### Public release verification
+
+The guarded publisher now reads the expected Agent version from the prepared
+image and verifies the running service's `PUBLIC_ORIGIN` (or `--public-origin`)
+after readiness. It compares installer bytes, manifest version, and all four
+artifact sizes/SHA-256 values. A public verification failure is a failed release
+gate, even if the panel is already healthy; it does not force rollback or keep
+healthy voice admission fenced. Correct the download route and re-run the
+read-only `packaging/verify-published-installers.mjs` check before reporting success.
+
+Reverse proxies must forward mutable `/downloads/manifest.json`, `/install`,
+`/install-macos`, and `/install.ps1` to the control plane rather than pinning
+these paths to a past release directory. Preserve immutable versioned artifact
+routes. Validate proxy configuration before a graceful reload, under the same
+voice admission fence with both call counts zero; otherwise defer.
+
+The authenticated `/api/agent-release-status` endpoint compares the public
+manifest with the panel release metadata (30-second shared cache, five-second
+fetch timeout). Host settings display source mismatches/unavailability separately
+from host operation success. An `agent.update` result of `phase: current` means
+only that the check offered no newer release; it is not a completed installation.
+Previous health verification stays in dated update history. Equal installed and
+running versions are shown once, and update targets only during active updates.

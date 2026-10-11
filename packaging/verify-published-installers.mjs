@@ -23,7 +23,9 @@ for (const platform of ["linux-x64","darwin-arm64","darwin-x64","win32-x64"]) {
   const artifact = manifest.artifacts?.[platform];
   if (!artifact || artifact.file !== `agentfleet-${platform}-${expected}.tar.gz` || !/^[a-f0-9]{64}$/.test(artifact.sha256)) throw new Error(`Invalid artifact for ${platform}`);
   const checksum = (await get(`/downloads/${artifact.file}.sha256`)).toString("utf8").trim().split(/\s+/);
-  if (checksum[0] !== artifact.sha256 || checksum[1] !== artifact.file) throw new Error(`Published checksum mismatch for ${platform}`);
-  console.log(`PASS ${platform}: immutable checksum route matches manifest`);
+  if (checksum[0] !== artifact.sha256 || checksum[1]?.split(/[\\/]/).at(-1) !== artifact.file) throw new Error(`Published checksum mismatch for ${platform}`);
+  const bytes = await get(`/downloads/${artifact.file}`);
+  if (bytes.length !== artifact.size || digest(bytes) !== artifact.sha256) throw new Error(`Published artifact bytes mismatch for ${platform}`);
+  console.log(`PASS ${platform}: public artifact size and SHA-256 match manifest`);
 }
 console.log(`PASS public release ${expected}`);

@@ -68,6 +68,7 @@ def main():
     parser.add_argument('--image', help='Already built immutable image tag or digest')
     parser.add_argument('--wait-seconds', type=int, default=0, help='On timeout keep old service, reopen admission, exit 75')
     parser.add_argument('--ready-url', default='http://127.0.0.1:3215/ready')
+    parser.add_argument('--public-origin', help='Public panel origin; defaults to running service PUBLIC_ORIGIN')
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--release', action='store_true', help='Explicitly release an abandoned fence after checking service health')
     args = parser.parse_args()
@@ -103,6 +104,13 @@ def main():
                 if not wait_idle(db, token, args.wait_seconds):
                     print('Deferred: active or uncertain calls remain. Old service unchanged; new calls reopened.')
                     return 75
+                # Verify the actual public update channel after switching, not only image files.
+                runtime = json.loads(run('docker', 'inspect', 'agentfleet-control-plane'))[0]
+                public_origin = args.public_origin or next((v.split('=', 1)[1] for v in runtime['Config'].get('Env', []) if v.startswith('PUBLIC_ORIGIN=')), None)
+                if not public_origin:
+                    raise RuntimeError('Public origin is required for release verification')
+                expected_version = run('docker', 'run', '--rm', '--entrypoint', 'node', image_id,
+                                       '-e', "console.log(JSON.parse(require('node:fs').readFileSync('/app/web/downloads/manifest.json','utf8')).version)")
                 backup_path = str(path) + '.predeploy-' + token + '.sqlite'
                 fd = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
                 os.close(fd)
@@ -119,6 +127,10 @@ def main():
                         if status.get('status') == 'ok' and status.get('build') == build and status.get('voiceDeploymentGuard') == 1:
                             release(db, token)
                             acquired = False
+                            try:
+                                run('node', str(ROOT / 'packaging/verify-published-installers.mjs'), public_origin, expected_version)
+                            except Exception as error:
+                                raise RuntimeError(f'Panel is healthy, but public release verification failed: {error}. No rollback performed; verify public routes before reporting publication.') from error
                             print(json.dumps({'phase': 'published', 'build': build, 'schema': status.get('schemaVersion'), 'backup': backup_path}))
                             return 0
                     except (OSError, ValueError):

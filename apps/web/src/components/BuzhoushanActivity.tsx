@@ -35,7 +35,7 @@ export function BuzhoushanActivity({detail}: {detail: SessionDetail}) {
   const [tab,setTab] = useState<"commandExecution"|"fileChange">("commandExecution");
   const [following,setFollowing] = useState(true);
   const [selected,setSelected] = useState<string>();
-  const [collapsed,setCollapsed] = useState(false);
+  const [collapsed,setCollapsed] = useState(true);
   const [height,setHeight] = useState(() => {try { const n=Number(localStorage.getItem(HEIGHT_KEY));return clamp(n>0?n:220); } catch {return clamp(220);} });
   const output = useRef<HTMLPreElement>(null);
   const drag = useRef<{y:number;height:number} | undefined>(undefined);
@@ -47,7 +47,7 @@ export function BuzhoushanActivity({detail}: {detail: SessionDetail}) {
   const status = unavailable ? t("进度暂时无法更新") : isLive ? t("实时更新") : t("最后已知进度");
   useEffect(()=>{const resize=()=>setHeight(h=>clamp(h));window.addEventListener("resize",resize);return()=>window.removeEventListener("resize",resize);},[]);
   useEffect(()=>{try{localStorage.setItem(HEIGHT_KEY,String(height));}catch{/* Local preference is optional. */}},[height]);
-  const reset=()=>{setHeight(clamp(220));setCollapsed(false);setFollowing(true);setTab("commandExecution");};
+  const reset=()=>{setHeight(clamp(220));setFollowing(true);setTab("commandExecution");};
   const stateLabel=(value:string)=>({completed:t("已完成"),failed:t("失败"),declined:t("已拒绝"),running:t("执行中"),in_progress:t("执行中")}[value] || t("状态待确认"));
   return <section className={`buzhou-dock${collapsed?" buzhou-dock--collapsed":""}`} aria-label={t("代码活动")} style={{height:collapsed?38:height}}>
     {!collapsed && <div className="buzhou-resizer" role="separator" aria-label={t("调整代码活动高度")} aria-orientation="horizontal" aria-valuemin={130} aria-valuemax={Math.floor(Math.min(360,window.innerHeight*.36))} aria-valuenow={Math.round(height)} tabIndex={0}
@@ -55,9 +55,9 @@ export function BuzhoushanActivity({detail}: {detail: SessionDetail}) {
       onPointerMove={event=>{if(drag.current)setHeight(clamp(drag.current.height+drag.current.y-event.clientY));}}
       onPointerUp={()=>{drag.current=undefined;}} onPointerCancel={()=>{drag.current=undefined;}} onLostPointerCapture={()=>{drag.current=undefined;}}
       onKeyDown={event=>{if(event.key==="ArrowUp"||event.key==="ArrowDown"){event.preventDefault();setHeight(h=>clamp(h+(event.key==="ArrowUp"?20:-20)));}}}/>} 
-    <header className="buzhou-dock__head">
+    <header className="buzhou-dock__head" onClick={event=>{if (!(event.target as HTMLElement).closest("button")) setCollapsed(false);}}>
       <div className="buzhou-dock__tabs" role="group" aria-label={t("活动筛选")}>
-        {([["commandExecution","终端"],["fileChange","文件修改"]] as const).map(([value,label])=><button type="button" aria-pressed={tab===value} key={value} onClick={()=>{setTab(value);setFollowing(true);}}>{t(label)}</button>)}
+        {([["commandExecution","终端"],["fileChange","文件修改"]] as const).map(([value,label])=><button type="button" aria-pressed={tab===value} key={value} onClick={()=>{setTab(value);setFollowing(true);setCollapsed(false);}}>{t(label)}</button>)}
       </div>
       <small>{status}</small>
       <button type="button" onClick={reset} title={t("重置活动布局")} aria-label={t("重置活动布局")}><RotateCcw size={14}/></button>

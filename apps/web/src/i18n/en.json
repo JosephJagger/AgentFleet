@@ -3251,5 +3251,20 @@
   "对比任务开始前的工作区；可能包含其他程序同期写入的变化": "Compared with the workspace before this turn; may include concurrent edits by other programs",
   "部分文件或差异未采集（大小、数量或读取限制）": "Partial capture: file size, count or read limits apply",
   "此工作区暂无法采集：需要 Git 工作区和可用的 Git": "Capture unavailable: requires a Git workspace and Git installation",
-  "截至本次采样，未发现相对任务开始前的文件变化": "No changes from the pre-turn workspace at this sample"
+  "截至本次采样，未发现相对任务开始前的文件变化": "No changes from the pre-turn workspace at this sample",
+  "正在检查更新": "Checking for updates",
+  "检查完成": "Check complete",
+  "检查完成，更新源未提供更高版本": "Check complete; the update source offered no newer version",
+  "更新源不一致，暂无法确认最新版本": "Update sources disagree; latest version cannot be confirmed",
+  "暂无法确认最新版本": "Latest version cannot be confirmed",
+  "当前运行版本与发布版本一致": "Running version matches the published release",
+  "运行版本与发布版本不同，请检查更新": "Running and published versions differ; check for updates",
+  "公网可用版本": "Public release version",
+  "等待核验": "Awaiting verification",
+  "面板发布目标": "Panel release target",
+  "最近检查": "Last check",
+  "主机返回版本": "Version returned by host",
+  "上次升级记录": "Previous update record",
+  "上次健康核验": "Last health verification",
+  "检查完成，未执行升级": "Check complete; no upgrade performed"
 }

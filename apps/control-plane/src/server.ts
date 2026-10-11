@@ -1,3 +1,4 @@
+import { createAgentReleaseStatus } from "./agent-release-status.js";
 import { deliveryPlan, deliveredPath } from './file-delivery.js';
 import {LongTermPreferences,supportsVoicePreferences} from './long-term-preferences.js';
 import { panelVoiceBindingMatches, type PanelTransportBinding } from './panel-voice-binding.js';
@@ -667,6 +668,8 @@ export async function buildControlPlane(
   }
     return { agentManifestVersion, manifestStatus };
   };
+  const agentReleaseStatus = createAgentReleaseStatus(readPublishedAgent, config.publicOrigin);
+  app.get("/api/agent-release-status", {preHandler:authenticate}, async () => agentReleaseStatus());
   const authenticateAdmin = async (request: FastifyRequest) => { await authenticate(request); auth.requirePlatformAdmin(request.principal!); };
   const mutateAdmin = async (request: FastifyRequest) => { await mutate(request); auth.requirePlatformAdmin(request.principal!); };
   const administration = new AdministrationService(db, auth);
