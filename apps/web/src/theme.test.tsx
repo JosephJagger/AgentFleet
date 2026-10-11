@@ -14,7 +14,7 @@ describe("theme switching", () => {
   it("paginates settings themes and starts on the saved theme page", () => {
     setTheme("jiangshan");
     render(<ThemeSettings paginated />);
-    expect(screen.getAllByRole("radio")).toHaveLength(5);
+    expect(screen.getAllByRole("radio")).toHaveLength(6);
     expect(screen.getByRole("radio", { name: /千里江山/ }).getAttribute("aria-checked")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "上一页" }));
     expect(screen.getAllByRole("radio")).toHaveLength(6);
@@ -68,7 +68,7 @@ describe("theme switching", () => {
     setTheme("cyber");
     render(<ThemeSettings />);
     const eyecare = screen.getByRole("radio", { name: /彼得兔园/ });
-    expect(screen.getAllByRole("radio")).toHaveLength(17);
+    expect(screen.getAllByRole("radio")).toHaveLength(18);
     fireEvent.click(eyecare);
     expect(eyecare.getAttribute("aria-checked")).toBe("true");
     expect(document.documentElement.dataset.theme).toBe("eyecare");
@@ -77,3 +77,11 @@ describe("theme switching", () => {
     expect(localStorage.getItem("agentfleet.theme")).toBe("matrix");
   });
 });
+
+ it("selects Clear Blue without illustrated scenery and persists its browser palette",()=>{
+   const meta=document.createElement("meta");meta.name="theme-color";document.head.append(meta);
+   render(<ThemeSettings/>);fireEvent.click(screen.getByRole("radio",{name:/澄蓝/}));
+   expect(localStorage.getItem("agentfleet.theme")).toBe("official");
+   expect(meta.content).toBe("#ffffff");
+   expect(document.querySelector(".theme-scene")).toBeNull();meta.remove();
+ });

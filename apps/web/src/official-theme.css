@@ -1,0 +1,51 @@
+/* Official website palette; workspace density and functional status colors remain intact. */
+:root[data-theme="official"] {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC Variable", sans-serif;
+  --canvas: #fff;
+  --paper: #fff;
+  --paper-solid: #f5f5f7;
+  --terminal: #f5f5f7;
+  --ink: #1d1d1f;
+  --muted: #65656b;
+  --faint: #6b6b73;
+  --line: #d9d9df;
+  --line-strong: #a5a5af;
+  --component-line: #d9d9df;
+  --cobalt: #0066cc;
+  --cobalt-deep: #0054aa;
+  --cobalt-soft: #eaf3ff;
+  --teal: #087d70;
+  --teal-soft: #e3f3ed;
+  --amber: #955000;
+  --amber-soft: #fff2df;
+  --red: #bc2940;
+  --red-soft: #fff0f2;
+  --magenta: #7737aa;
+  --magenta-soft: #f3ecfa;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --surface-shadow: 0 2px 10px rgb(29 29 31 / .035);
+  --control-shadow: none;
+  --shadow: 0 16px 60px rgb(29 29 31 / .12);
+}
+:root[data-theme="official"] body { background: var(--canvas); background-image: none; }
+:root[data-theme="official"] :is(h1,h2,h3) { font-weight: 650; letter-spacing: -.025em; }
+:root[data-theme="official"] :is(.app-header,.app-rail) { background: var(--paper); }
+:root[data-theme="official"] :is(.settings-block,.host-card,.runtime-release-panel) {
+  background: var(--paper); border: 1px solid var(--line); box-shadow: none;
+}
+:root[data-theme="official"] .primary-nav { background: var(--paper-solid); border-color: transparent; }
+:root[data-theme="official"] .primary-nav button.active { color: var(--cobalt); background: var(--paper); box-shadow: 0 1px 4px rgb(0 0 0 / .06); }
+:root[data-theme="official"] .button { border-radius: 999px; }
+:root[data-theme="official"] .button--primary { color: #fff; background: var(--cobalt); border-color: transparent; }
+:root[data-theme="official"] .button--primary:hover:not(:disabled) { background: var(--cobalt-deep); }
+:root[data-theme="official"] .composer-input { background: var(--paper-solid); border: 1px solid var(--line); box-shadow: none; border-radius: 20px; }
+:root[data-theme="official"] .composer-input:focus-within { border-color: var(--cobalt); box-shadow: 0 0 0 3px var(--cobalt-soft); }
+:root[data-theme="official"] :is(.modal,.activity-panel,.session-config-dialog) { background: var(--paper); border-radius: 22px; box-shadow: var(--shadow); }
+:root[data-theme="official"] ::selection { background: #c9e3ff; color: #1d1d1f; }
+.theme-option--official { --sample-canvas: #fff; --sample-paper: #f5f5f7; --sample-line: #d9d9df; --sample-accent: #0066cc; }
+@media (prefers-contrast: more) {
+  :root[data-theme="official"] { --line: #65656b; --component-line: #65656b; }
+}

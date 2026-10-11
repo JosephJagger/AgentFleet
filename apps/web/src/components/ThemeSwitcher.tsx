@@ -1,4 +1,4 @@
-import { Check, Radio, Snowflake, SunMoon, Wand2, Orbit, Flower2, Leaf, Gamepad2, Zap, Cloud, Shield, TreePine, Heart } from "lucide-react";
+import { Box, Check, Radio, Snowflake, SunMoon, Wand2, Orbit, Flower2, Leaf, Gamepad2, Zap, Cloud, Shield, TreePine, Heart } from "lucide-react";
 import { t } from "../i18n";
 import { setTheme, useTheme, type Theme } from "../lib/theme";
 import { useEffect, useState } from "react";
@@ -6,7 +6,7 @@ import { SettingsPagination } from "./SettingsPagination";
 
 export function ThemeEmblem() {
   const selected = useTheme();
-  const Icon = ({ daylight: Cloud, midnight: Shield, forest: TreePine, eyecare: Heart, wukong: SunMoon, nezha: Flower2, whitesnake: Leaf, qingming: Cloud, jiangshan: TreePine, frozen: Snowflake, wizard: Wand2, starwars: Orbit, spirited: Flower2, rivendell: Leaf, mario: Gamepad2, cyber: Zap } as Partial<Record<Theme, typeof Radio>>)[selected] ?? Radio;
+  const Icon = ({ official: Box, daylight: Cloud, midnight: Shield, forest: TreePine, eyecare: Heart, wukong: SunMoon, nezha: Flower2, whitesnake: Leaf, qingming: Cloud, jiangshan: TreePine, frozen: Snowflake, wizard: Wand2, starwars: Orbit, spirited: Flower2, rivendell: Leaf, mario: Gamepad2, cyber: Zap } as Partial<Record<Theme, typeof Radio>>)[selected] ?? Radio;
   return <Icon size={18} aria-hidden="true" />;
 }
 
@@ -16,6 +16,7 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
     <label className="theme-switcher">
       <SunMoon size={15} aria-hidden="true" />
       <select aria-label={t("界面主题")} value={selected} onChange={event => { setTheme(event.target.value as Theme); onChange?.(); }}>
+        <option value="official">{t("澄蓝")}</option>
         <option value="cyber">{t("赛博朋克")}</option>
         <option value="daylight">{t("天空之城")}</option>
         <option value="midnight">{t("黑暗骑士")}</option>
@@ -39,6 +40,7 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
 }
 
 const themeOptions: { value: Theme; label: string; description: string }[] = [
+  { value: "official", label: "澄蓝", description: "官网同款纯白、石墨文字与经典蓝" },
   { value: "cyber", label: "赛博朋克", description: "夜之城剪影、警示黄与工业切角" },
   { value: "daylight", label: "天空之城", description: "云海浮岛、飞行石与轻盈白蓝" },
   { value: "midnight", label: "黑暗骑士", description: "哥谭夜幕、蝙蝠探照灯与装甲边框" },
@@ -57,7 +59,7 @@ const themeOptions: { value: Theme; label: string; description: string }[] = [
   { value: "qingming", label: "清明上河", description: "汴京舟桥、绢本淡墨与宋画暖褐" },
   { value: "jiangshan", label: "千里江山", description: "青绿山水、石青石绿与绢本金边" },
 ];
-const illustrated = (value: Theme) => value !== "matrix";
+const illustrated = (value: Theme) => value !== "matrix" && value !== "official";
 const sceneAsset = (value: Theme) => value === "eyecare" ? "rabbit" : value;
 
 export function ThemeSettings({ paginated = false }: { paginated?: boolean }) {
