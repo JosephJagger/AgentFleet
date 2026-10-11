@@ -1,5 +1,5 @@
 import { preserveBuzhoushanStream } from "./lib/buzhoushan-stream";
-import { isConversationEvent } from "./lib/buzhoushan-events";
+import { isConversationEvent, isBuzhoushanChatEvent } from "./lib/buzhoushan-events";
 import { BuzhoushanHeartbeat } from "./components/BuzhoushanHeartbeat";
 import { displayName } from "./lib/display-name";
 import { useBuzhoushanDesktop } from "./lib/buzhoushan";
@@ -879,7 +879,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   const { session, approval } = detail;
   const rawEvents = rawView ? detail.events.filter(event => event.payloadState !== "deleted" && event.body && (!buzhouDesktop || isConversationEvent(event))) : [];
   const projectedEvents = timelineItems(detail.events);
-  const visibleEvents = buzhouDesktop ? projectedEvents.filter(isConversationEvent) : projectedEvents;
+  const visibleEvents = buzhouDesktop ? projectedEvents.filter(isBuzhoushanChatEvent) : projectedEvents;
   const lease = session.controlLease;
   const managed = session.state.ownership === "agentfleet_owned";
   const pendingCommand = (detail.commands ?? []).some(commandPending);

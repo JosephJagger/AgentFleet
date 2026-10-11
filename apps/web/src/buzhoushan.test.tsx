@@ -1,6 +1,6 @@
 import {preserveBuzhoushanStream} from "./lib/buzhoushan-stream";
 import {BuzhoushanHeartbeat} from "./components/BuzhoushanHeartbeat";
-import {isConversationEvent} from "./lib/buzhoushan-events";
+import {isConversationEvent,isBuzhoushanChatEvent} from "./lib/buzhoushan-events";
 // @vitest-environment jsdom
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 import {afterEach, expect, it, vi} from 'vitest';
@@ -103,11 +103,12 @@ it('holds streaming replies through pauses and interleaved reasoning, then waits
  act(()=>vi.advanceTimersByTime(1));expect(mode()).toBe('heartbeat');
  d.session.state.waitReason='approval';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[complete]}/>);expect(screen.getByRole('status').getAttribute('aria-label')).toBe('等待确认');
 });
-it('new replies cancel pending heartbeat and completed replies alone never restart it',()=>{
+it('completed replies restore heartbeat after one second without another process event',()=>{
  vi.useFakeTimers();const d=detail();
  const complete={id:'complete',nativeItemId:'reply',sessionSeq:1,type:'item.completed',itemType:'agentMessage',nativeTurnId:'turn-a',body:'Reply',occurredAt:'2026-01-01'};
  d.events=[complete];const view=render(<BuzhoushanHeartbeat detail={d} messages={[complete]}/>);
- act(()=>vi.advanceTimersByTime(10_000));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('settling');
+ act(()=>vi.advanceTimersByTime(999));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('settling');
+ act(()=>vi.advanceTimersByTime(1));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
  const delta={...complete,id:'delta',nativeItemId:'second',type:'agent_message.delta',sessionSeq:3};
  d.events.push({...complete,id:'process',itemType:'reasoning',sessionSeq:2},delta);
  view.rerender(<BuzhoushanHeartbeat detail={d} messages={[complete,delta]}/>);
@@ -171,4 +172,11 @@ it('cancels the one-second completion timer when another message starts',()=>{
  d.events.push(next);view.rerender(<BuzhoushanHeartbeat detail={d} messages={[done,next]}/>);
  act(()=>vi.advanceTimersByTime(1000));expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');
  view.unmount();expect(vi.getTimerCount()).toBe(0);
+});
+
+it('shows turn outcomes in workbench chat while reasoning and commands remain in terminal',()=>{
+ const base={id:'event',sessionSeq:1,occurredAt:'2026-01-01'};
+ for(const type of ['turn.completed','turn.failed','turn.interrupted','turn.cancelled']) expect(isBuzhoushanChatEvent({...base,type})).toBe(true);
+ for(const itemType of ['reasoning','commandExecution','fileChange']) expect(isBuzhoushanChatEvent({...base,type:'item.completed',itemType})).toBe(false);
+ expect(isBuzhoushanChatEvent({...base,type:'item.completed',itemType:'agentMessage'})).toBe(true);
 });

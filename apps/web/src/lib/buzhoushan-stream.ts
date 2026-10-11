@@ -22,6 +22,5 @@ export function buzhoushanReplyState(detail:SessionDetail,messages:TimelineEvent
   const last=replies.filter(e=>e.type!=='agent_message.delta'||!completed.has(identity(e))).at(-1);
   const finished=last && (last.type==='item.completed'||last.type==='message');
   const completionKey=finished ? JSON.stringify([detail.session.id,detail.session.nativeThreadId,detail.session.contentEpoch,detail.session.projectionEpoch,turn,identity(last),last.sessionSeq]) : undefined;
-  const processAfter=finished && events.some(e=>e.sessionSeq>last.sessionSeq&&(e.type==='command_output.delta'||['reasoning','commandExecution','fileChange','plan'].includes(e.itemType??'')));
-  return {ended,open,hasReply:replies.length>0,completionKey,processAfter};
+  return {ended,open,hasReply:replies.length>0,completionKey};
 }

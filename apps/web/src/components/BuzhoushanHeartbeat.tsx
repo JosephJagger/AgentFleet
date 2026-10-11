@@ -16,7 +16,7 @@ export function BuzhoushanHeartbeat({detail, messages}:{detail:SessionDetail;mes
   },[running,reply.completionKey,reply.open]);
   if(!running)return null;
   // A pause or an interleaved tool event never completes a streaming message.
-  const heartbeat=!reply.open && (!reply.hasReply || Boolean(reply.processAfter && settled===reply.completionKey));
+  const heartbeat=!reply.open && (!reply.hasReply || Boolean(reply.completionKey && settled===reply.completionKey));
   const label=session.state.waitReason==='approval'?t('等待确认'):session.state.waitReason==='user_input'?t('等待回答'):t('正在执行，过程见终端');
   const quietLabel=reply.open?t('正在回复'):t('回复已完成，等待后续进度');
   return <div className="buzhou-heartbeat" data-mode={heartbeat?'heartbeat':reply.open?'reply':'settling'} role="status" aria-label={heartbeat?label:quietLabel}>
