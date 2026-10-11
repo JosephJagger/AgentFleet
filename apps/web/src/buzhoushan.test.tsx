@@ -238,7 +238,7 @@ it('does not reuse completed-message memory across turn or content boundaries',(
   if(boundary==='turn')d.session.activeTurnId='next';
   if(boundary==='content')d.session.contentEpoch++;
   if(boundary==='thread')d.session.nativeThreadId='next-thread';
-  d.events=[{...done,id:'new',type:'agent_message.delta',nativeTurnId:d.session.activeTurnId}];
+  d.events=[{...done,id:'new',type:'agent_message.delta',nativeTurnId:d.session.activeTurnId??undefined}];
   view.rerender(<BuzhoushanHeartbeat detail={d} messages={d.events}/>);
   expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');view.unmount();
  }
