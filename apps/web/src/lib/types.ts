@@ -206,6 +206,7 @@ export interface CommandReceipt {
 }
 
 export interface TimelineEvent {
+  fileChanges?: Array<{path:string;diff:string}>;
   historyOrder?: Array<{itemId:string;index:number;occurredAt?:string}>;
   nativeThreadId?: string;
   nativeTurnId?: string;

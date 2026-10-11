@@ -3241,5 +3241,8 @@
   "面板连接中断": "Panel disconnected",
   "主机在线": "Host online",
   "主机未就绪": "Host not ready",
-  "真实执行记录": "Actual execution activity"
+  "真实执行记录": "Actual execution activity",
+  "本轮未收到原生文件变更事件，脚本操作请查看终端": "No native file-change events for this turn. Check Terminal for script operations.",
+  "向左查看更多主机": "Scroll hosts left",
+  "向右查看更多主机": "Scroll hosts right"
 }

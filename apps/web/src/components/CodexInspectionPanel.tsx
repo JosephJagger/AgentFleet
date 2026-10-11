@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { t, locale, localized, systemText } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
@@ -26,7 +27,7 @@ export function CodexInspectionPanel({ session, commands, request, onChanged }: 
     {!session.actions?.inspect?.allowed && <p>{session.actions?.inspect?.message ?? t("此主机尚未报告查询能力，请更新连接服务。")}</p>}
     {snapshot && <p>{t("读取于")}{locale() === "en" ? " " : ""}{new Date(snapshot.observedAt).toLocaleString(locale())} · {snapshot.cwd}</p>}
     {data ? !data.available ? <p>{t("此项读取失败或当前 Codex 不支持（")}{locale() === "en" ? " " : ""}{data.errorCode}{locale() === "en" ? " " : ""}{t("）。不会将读取失败显示为“未安装”。")}</p> : <>
-      {data.rows.length ? <dl>{data.rows.map((row, i) => <div key={i}><dt>{row.name}<small>{systemText(row.status)}</small></dt><dd>{row.detail}</dd></div>)}</dl> : <p>{t("本次查询没有返回条目。")}</p>}
+      {data.rows.length ? <dl>{data.rows.map((row, i) => <div key={i}><dt>{displayName(row.name)}<small>{systemText(row.status)}</small></dt><dd>{row.detail}</dd></div>)}</dl> : <p>{t("本次查询没有返回条目。")}</p>}
       {data.truncated && <p>{t("结果较多，仅显示部分条目，不代表完整清单。")}</p>}
     </> : <p>{t("尚无这类环境快照，请读取宿主机。")}</p>}
     {section === "config" && <p>{t("这是目录配置来源，不是某一历史轮次的实际模型；面板的会话覆盖单独保存在运行配置中。")}</p>}

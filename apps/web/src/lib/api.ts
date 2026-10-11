@@ -441,6 +441,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     command: itemType === "commandExecution" ? string(item.command) || null : null,
     output: itemType === "commandExecution" ? string(item.aggregatedOutput) || null : null,
     diff: diffSummary(diffText),
+    fileChanges: itemType === "fileChange" ? list(item.changes).map(record).map(change=>({path:string(change.path),diff:string(change.diff)})) : undefined,
     nativeUsage,
   };
 }
@@ -809,8 +810,8 @@ export const api = {
       commands: commands.map(mapCommandReceipt),
     };
   },
-  async sessionProgress(id:string,signal?:AbortSignal):Promise<SessionProgress> {
-    return request<SessionProgress>(`/api/sessions/${encodeURIComponent(id)}/progress`,{signal});
+  async sessionProgress(id:string,signal?:AbortSignal,activity=false):Promise<SessionProgress> {
+    return request<SessionProgress>(`/api/sessions/${encodeURIComponent(id)}/progress${activity?"?activity=1":""}`,{signal});
   },
   async createSession(machineId: string, projectId: string, title: string) {
     const raw = await request<JsonObject>("/api/sessions", {

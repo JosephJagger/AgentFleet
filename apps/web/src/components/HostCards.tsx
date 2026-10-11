@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { count, t, locale } from "../i18n";
 import { Check, CircleDot, LoaderCircle, Server, Unplug } from "lucide-react";
 import type { Machine } from "../lib/types";
@@ -24,9 +25,9 @@ export function HostCards({ machines, selectedId, onSelect }: { machines: Machin
         const state = hostCardState(machine);
         const selected = machine.id === selectedId;
         return <button type="button" key={machine.id} className={`host-card host-card--${state.tone}${selected ? " host-card--selected" : ""}`}
-          aria-pressed={selected} aria-label={`${machine.name}，${state.connection}，${state.activity}`} title={machine.name} onClick={() => onSelect(machine.id)}>
+          aria-pressed={selected} aria-label={displayName(`${machine.name}，${state.connection}，${state.activity}`)} title={displayName(machine.name)} onClick={() => onSelect(machine.id)}>
           <span className="host-card__top"><span className="host-card__device" aria-hidden="true">{state.tone === "offline" ? <Unplug size={21} /> : <Server size={21} />}</span><span className="host-card__connection"><i aria-hidden="true" />{state.connection}</span></span>
-          <span className="host-card__identity"><strong>{machine.name}</strong><small>{machine.os} · {machine.arch}</small></span>
+          <span className="host-card__identity"><strong>{displayName(machine.name)}</strong><small>{machine.os} · {machine.arch}</small></span>
           <span className="host-card__activity"><span className="host-card__signal" aria-hidden="true">{state.tone === "running" ? <span className="host-card__bars">{[0, 1, 2, 3, 4].map(i => <i key={i} />)}</span> : state.tone === "connecting" ? <LoaderCircle size={17} /> : <CircleDot size={17} />}</span><span>{state.activity}</span></span>
           <span className="host-card__selection">{selected ? <><Check size={13} aria-hidden="true" />{t("当前主机")}</> : t("查看配置 →")}</span>
         </button>;

@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { t, locale, localized } from "../i18n";
 import {
   AlertTriangle,
@@ -356,7 +357,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
               ))}
             </div>
             {enrollment?.machineReady ? (
-              <section className="pair-complete"><CircleCheck size={28} /><h3>{enrollment.machineName} {locale() === "en" ? " " : ""}{t("已连接")}</h3><DiscoveryStatus discovery={enrollment.discovery} /><form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!enrollment.machineId) return; setBusy(true); try { if (alias.trim() !== enrollment.machineName) await api.updateMachineAlias(enrollment.machineId, alias.trim() || null); onPaired(enrollment.machineId); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机显示名称")}</span><input aria-label={t("新主机显示名称")} value={alias} maxLength={80} onChange={(event) => setAlias(event.target.value)} /></label><button type="submit" className="button button--primary" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <ArrowRight size={16} />}{locale() === "en" ? " " : ""}{t("查看项目")}</button></form></section>
+              <section className="pair-complete"><CircleCheck size={28} /><h3>{displayName(enrollment.machineName)} {locale() === "en" ? " " : ""}{t("已连接")}</h3><DiscoveryStatus discovery={enrollment.discovery} /><form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!enrollment.machineId) return; setBusy(true); try { if (alias.trim() !== enrollment.machineName) await api.updateMachineAlias(enrollment.machineId, alias.trim() || null); onPaired(enrollment.machineId); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机显示名称")}</span><input aria-label={t("新主机显示名称")} value={alias} maxLength={80} onChange={(event) => setAlias(event.target.value)} /></label><button type="submit" className="button button--primary" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <ArrowRight size={16} />}{locale() === "en" ? " " : ""}{t("查看项目")}</button></form></section>
             ) : creating ? (
               <div className="pair-loading" aria-live="polite"><LoaderCircle className="spin" size={19} /><div><strong>{t("正在签发一次性票据")}</strong><span>{t("票据只保存在当前窗口，有效期很短。")}</span></div></div>
             ) : createError ? (
@@ -400,7 +401,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
                     </div>
                     <div className={`receipt-line ${claimed ? "receipt-line--done" : "receipt-line--idle"}`}>
                       {claimed ? <Check size={13} /> : <span className="receipt-node" />}
-                      <span>{t("Codex 主机")}</span><strong>{claimed ? enrollment.machineName ?? t("已识别主机") : t("自动识别运行账号与 Codex 环境")}</strong>
+                      <span>{t("Codex 主机")}</span><strong>{displayName(claimed ? enrollment.machineName ?? t("已识别主机") : t("自动识别运行账号与 Codex 环境"))}</strong>
                     </div>
                   </div>
                 </section>
@@ -428,7 +429,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
                   <section className="pair-verification" aria-labelledby="verify-title">
                     <div className="pair-machine">
                       <span className="pair-machine__icon"><Server size={21} /></span>
-                      <div><span>{t("已识别 Codex 主机")}</span><strong>{enrollment.machineName}</strong><small>{enrollment.os} · {enrollment.arch}</small></div>
+                      <div><span>{t("已识别 Codex 主机")}</span><strong>{displayName(enrollment.machineName)}</strong><small>{enrollment.os} · {enrollment.arch}</small></div>
                     </div>
                     <div className="verify-block">
                       <span id="verify-title">{t("主机身份已验证，正在自动完成连接")}</span>

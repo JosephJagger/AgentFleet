@@ -69,3 +69,8 @@ it("原生进度更新同一卡片，旧事件和另一轮任务不能覆盖完�
   const deleted = { ...completed, payloadState: "deleted" as const, body: null };
   expect(timelineItems([deleted, running])[0]).toMatchObject({ payloadState: "deleted", body: null });
 });
+
+it('preserves native file changes for the workbench history fallback',()=>{
+ const event=mapEvent({eventId:'file-edit',sessionSeq:1,type:'item.completed',nativeTurnId:'turn',payload:{item:{id:'edit',type:'fileChange',status:'completed',changes:[{path:'src/demo.ts',diff:'+ actual edit'}]}}});
+ expect(event.fileChanges).toEqual([{path:'src/demo.ts',diff:'+ actual edit'}]);
+});

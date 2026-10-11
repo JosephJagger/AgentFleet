@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { NativeConfigPanel } from "./NativeConfigPanel";
 import { SettingsSections } from "./SettingsSections";
 import { SlidersHorizontal, Headphones, ShieldCheck } from "lucide-react";
@@ -38,7 +39,7 @@ function HostConfiguration({ machine }: { machine: Machine }) {
   }
   return <div className="codex-config-target">
     <label>{t("搜索项目")}<input type="search" value={query} onChange={e => { setQuery(e.target.value); setProjectId(""); }} /></label>
-    <label>{t("项目")}<select value={projectId} onChange={e => { setProjectId(e.target.value); }}><option value="">{t("主机默认（所有项目继承）")}</option>{projects.map(p => <option key={p.id} value={p.id}>{p.alias} · {p.pathHint}</option>)}</select></label>
+    <label>{t("项目")}<select value={projectId} onChange={e => { setProjectId(e.target.value); }}><option value="">{t("主机默认（所有项目继承）")}</option>{projects.map(p => <option key={p.id} value={p.id}>{displayName(p.alias)} · {displayName(p.pathHint)}</option>)}</select></label>
     {cursor && <button className="button button--quiet" type="button" disabled={loading} onClick={() => void more()}>{t("加载更多项目")}</button>}
     {error && <p role="alert">{systemText(error)} <button type="button" onClick={() => setRetry(n => n + 1)}>{t("重试")}</button></p>}
     <CodexSettingsPanel key={`model:${projectId}`} {...(projectId ? { projectId } : { machineId: machine.id })} /><PermissionPanel key={`permission:${projectId}`} {...(projectId ? { projectId } : { machineId: machine.id })} />
@@ -65,7 +66,7 @@ export function CodexConfiguration({ machines, initialMachineId }: { machines: M
         <div hidden={defaultsSection !== "permissions"} className="config-subpanel"><PermissionPanel workspace /></div>
       </> : <>
         <label>{t("搜索主机")}<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
-        <label>{t("主机")}<select value={machineId} onChange={e => setMachineId(e.target.value)}><option value="">{t("选择主机")}</option>{hosts.filter(m => m.id === machineId || `${m.name} ${m.hostname}`.toLowerCase().includes(query.toLowerCase())).map(m => <option key={m.id} value={m.id}>{m.name} · {t(m.reachability === "live" ? "在线" : "离线")}</option>)}</select></label>
+        <label>{t("主机")}<select value={machineId} onChange={e => setMachineId(e.target.value)}><option value="">{t("选择主机")}</option>{hosts.filter(m => m.id === machineId || `${m.name} ${m.hostname}`.toLowerCase().includes(query.toLowerCase())).map(m => <option key={m.id} value={m.id}>{displayName(m.name)} · {t(m.reachability === "live" ? "在线" : "离线")}</option>)}</select></label>
         {selected && (tab === "native" ? <NativeConfigPanel key={selected.id} machine={selected}/> : <HostConfiguration key={selected.id} machine={selected} />)}
       </>}
   </section>;

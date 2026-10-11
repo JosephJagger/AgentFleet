@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { count, t, locale, systemText } from "../i18n";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
@@ -68,7 +69,7 @@ export function SessionImageStorage({ machineId }: { machineId: string }) {
         const operation = operations[row.logicalSessionId]; const result = operation?.result;
         const usage = result?.tokenUsage as {last_token_usage?: {input_tokens?: number; output_tokens?: number; cached_input_tokens?: number}} | undefined;
         return <article key={row.logicalSessionId}>
-          <label><input type="checkbox" aria-label={t("选择 {0}", row.title)} checked={selected.includes(row.logicalSessionId)} disabled={busy} onChange={e => { setSelected(ids => e.target.checked ? [...ids, row.logicalSessionId] : ids.filter(id => id !== row.logicalSessionId)); setConfirm(false); }} /><span><strong>{row.title}</strong><small>{row.project}</small></span></label>
+          <label><input type="checkbox" aria-label={displayName(t("选择 {0}", row.title))} checked={selected.includes(row.logicalSessionId)} disabled={busy} onChange={e => { setSelected(ids => e.target.checked ? [...ids, row.logicalSessionId] : ids.filter(id => id !== row.logicalSessionId)); setConfirm(false); }} /><span><strong>{displayName(row.title)}</strong><small>{row.project}</small></span></label>
           <div className="session-image-storage__metrics"><span>{row.imageCount} {locale() === "en" ? " " : ""}{t("张图片 · 云端引用")}{locale() === "en" ? " " : ""}{imageSpace(row.cloudBytes)}</span><span>{row.fileCount??0} {locale() === "en" ? " " : ""}{t("个文件 · 主机暂存")}{locale() === "en" ? " " : ""}{imageSpace(row.fileBytes??0)}</span>
             {!!row.fileTypes?.length && <span className="attachment-type-summary">{row.fileTypes.map(item => <small key={item.type}><b>{item.type}</b> {item.count} · {imageSpace(item.bytes)}</small>)}</span>}
             <span>{t("历史文件：")}{locale() === "en" ? " " : ""}{typeof result?.rolloutBytes === "number" ? imageSpace(result.rolloutBytes) : t("预览后核验")}</span>

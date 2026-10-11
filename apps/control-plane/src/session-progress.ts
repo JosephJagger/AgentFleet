@@ -40,11 +40,11 @@ export class SessionProgressService {
     this.streams.set(key,{sessionId,segmentId,contentEpoch:row.content_epoch,turnId,itemId:itemId??'diff',type,text:combined.slice(-4000),at:this.now(),truncated:truncated||combined.length>4000||Boolean(previous?.truncated)});
     this.prune();
   }
-  read(principal: Principal, sessionId: string, requestedTurn?: string | null): SessionProgress {
+  read(principal: Principal, sessionId: string, requestedTurn?: string | null, activity = false): SessionProgress {
     const session=this.registry.getSession(principal,sessionId); // enforce workspace access before any content reads
     const machine=this.registry.getMachine(principal,session.machineId);
     const policy=this.db.get<{sync_content:number}>("SELECT sync_content FROM projects WHERE project_id=?",session.projectId);
-    const turnId=requestedTurn===undefined?session.activeTurnId:requestedTurn;
+    const turnId=requestedTurn===undefined?(session.activeTurnId ?? (activity ? this.db.get<{native_turn_id:string}>("SELECT native_turn_id FROM durable_events WHERE logical_session_id=? AND native_turn_id IS NOT NULL ORDER BY session_seq DESC LIMIT 1",sessionId)?.native_turn_id ?? null : null)):requestedTurn;
     const online=machine.reachability==='online' && session.reachability==='live' && Boolean(machine.lastHeartbeatAt && this.now()-Date.parse(machine.lastHeartbeatAt)<90_000);
     this.prune();
     if (!policy?.sync_content) for (const [key,value] of this.streams) if(value.sessionId===sessionId)this.streams.delete(key);
@@ -89,7 +89,8 @@ export class SessionProgressService {
       limited ||= stream.truncated;
     }
     const waitingForApproval=Boolean(turnId && turnId===session.activeTurnId && this.db.get("SELECT 1 FROM approvals WHERE logical_session_id=? AND state='pending' LIMIT 1",sessionId));
-    const all=[...items.values()];
-    return {sessionId,nativeTurnId:turnId,state,source:session.provider==='claude'?'claude_events':'codex_app_server_events',freshness:!turnId?'unavailable':online&&!end?'live':'stale',updatedAt,contentAvailable:Boolean(policy?.sync_content),waitingForApproval,items:all.slice(-8),limited:limited||all.length>8};
+    const all=[...items.values()].filter(item=>!activity || item.kind==='commandExecution' || item.kind==='fileChange');
+    const limit=activity?60:8;
+    return {sessionId,nativeTurnId:turnId,state,source:session.provider==='claude'?'claude_events':'codex_app_server_events',freshness:!turnId?'unavailable':online&&!end&&turnId===session.activeTurnId?'live':'stale',updatedAt,contentAvailable:Boolean(policy?.sync_content),waitingForApproval,items:all.slice(-limit),limited:limited||all.length>limit};
   }
 }

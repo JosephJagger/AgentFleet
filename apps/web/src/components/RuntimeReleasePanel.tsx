@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { t, locale, localized, systemText } from "../i18n";
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
@@ -40,7 +41,7 @@ export function RuntimeReleasePanel({ machine }: { machine?: Machine }) {
       <p className="runtime-release-message" role="status">{systemText(data.message)}</p>
       <div className="runtime-release-times"><span>{t("上次检查：")}{locale() === "en" ? " " : ""}{date(data.lastCheckedAt)}</span><span>{t("下次检查：")}{locale() === "en" ? " " : ""}{!data.workerOnline ? t("检查服务离线，等待恢复") : data.paused ? t("恢复晋升后继续") : date(data.nextCheckAt)}</span></div>
       <ul className="runtime-release-checks">{data.checks.map((check, index) => <li key={`${systemText(check.name)}:${index}`} data-state={check.state}><CheckCircle2 size={16} aria-hidden="true" /><div><strong>{systemText(check.name)}</strong><p>{systemText(check.detail)}</p></div></li>)}</ul>
-      {machine && <p className="runtime-release-host"><strong>{machine.name}</strong> · {rollout}</p>}
+      {machine && <p className="runtime-release-host"><strong>{displayName(machine.name)}</strong> · {rollout}</p>}
       <p className="host-help">{t("约每 6 小时检查官方版本；支持自动更新的连接服务约每 15 分钟检查托管目标。Linux 中心验证通过后，各平台主机还会校验版本、SHA-256、schema 与启动健康。不兼容的协议需要开发适配，不会强制晋升。")}</p>
       {data.canControl === false && <p className="host-help">{t("全站升级设置由平台管理员管理。")}</p>}
       {data.canControl === true && <div className="host-operation-buttons">

@@ -28,10 +28,10 @@ it('uses one progress poller, shows ongoing output, marks failure stale, and abo
  view.rerender(<BuzhoushanActivity key="b" detail={detail('b')}/>);await act(async()=>{});
  expect(oldSignal.aborted).toBe(true);expect(screen.queryByText(/partial check output/)).toBeNull();
 });
-it('supports idle history without polling, selection without stealing focus, collapse and keyboard resizing',()=>{
+it('supports idle history with one read, selection without stealing focus, collapse and keyboard resizing',()=>{
  const d=detail();d.session.activeTurnId=undefined;d.session.state.currentTurn='none';d.events=[{id:'one',sessionSeq:1,type:'item.completed',occurredAt:'2026-01-01',command:'npm test',output:'test output',status:'completed'}];
  const view=render(<BuzhoushanActivity detail={d}/>);
- expect(api.sessionProgress).not.toHaveBeenCalled();expect(screen.queryByText('实时更新')).toBeNull();
+ expect(api.sessionProgress).toHaveBeenCalledTimes(1);expect(screen.queryByText('实时更新')).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:/npm test 已完成/}));
  view.rerender(<BuzhoushanActivity detail={{...d,events:[...d.events,{...d.events[0],id:'two',command:'npm run build',output:'build output'}]}}/>);
  expect(screen.getByText(/test output/)).toBeTruthy();expect(screen.queryByText(/build output/)).toBeNull();
@@ -46,4 +46,28 @@ it('activates only for the new theme on desktop',()=>{
  setTheme('buzhoushan');render(<Probe/>);expect(screen.getByText('existing')).toBeTruthy();
  act(()=>{desktop=true;changed();});expect(screen.getByText('workbench')).toBeTruthy();
  act(()=>{setTheme('official');});expect(screen.getByText('existing')).toBeTruthy();
+});
+it('merges durable file changes with command progress and restores idle activity with a single read',async()=>{
+ const d=detail();d.events=[{id:'file-event',nativeItemId:'file',nativeTurnId:'turn-a',sessionSeq:1,type:'item.completed',occurredAt:'2026-01-01',fileChanges:[{path:'src/demo.ts',diff:'+ real change'}]}];
+ expect(workbenchItems(d,progress).map(item=>item.kind)).toEqual(['fileChange','commandExecution']);
+ d.session.activeTurnId=undefined;d.session.state.currentTurn='none';d.events=[];
+ vi.mocked(api.sessionProgress).mockResolvedValue({...progress,state:'completed',freshness:'stale',items:progress.items.map(item=>({...item,status:'completed'}))});
+ render(<BuzhoushanActivity detail={d}/>);await act(async()=>{});
+ expect(screen.getByText(/partial check output/)).toBeTruthy();
+ expect(screen.getByText('最后已知进度')).toBeTruthy();
+ expect(api.sessionProgress).toHaveBeenCalledTimes(1);
+ expect(vi.mocked(api.sessionProgress).mock.calls[0][2]).toBe(true);
+});
+
+it('keeps terminal commands and file edits in distinct tabs without a duplicate aggregate',async()=>{
+ vi.mocked(api.sessionProgress).mockResolvedValue({...progress,items:[...progress.items,{id:'edit',kind:'fileChange',status:'completed',title:'src/example.ts',output:'+ changed',updatedAt:progress.updatedAt!}]});
+ render(<BuzhoushanActivity detail={detail()}/>);await act(async()=>{});
+ expect(screen.queryByRole('button',{name:'代码活动'})).toBeNull();
+ expect(screen.getByText(/partial check output/)).toBeTruthy();
+ expect(screen.queryByText(/changed/)).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'文件修改'}));
+ expect(screen.getByText(/changed/)).toBeTruthy();
+ expect(screen.queryByText(/partial check output/)).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'重置活动布局'}));
+ expect(screen.getByRole('button',{name:'终端'}).getAttribute('aria-pressed')).toBe('true');
 });

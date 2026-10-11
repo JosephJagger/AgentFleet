@@ -26,3 +26,9 @@ AgentFleets launches `codex app-server --stdio` and exchanges newline-delimited 
 - Authorization, content sync, deletion/expiry, content epochs, session/segment/turn isolation still apply. Turning off content sync hides content. Disconnected hosts show last-known progress, not a claim that the task stopped or completed.
 - `turn.failed` and `turn.interrupted` are terminal alongside `turn.completed`; coordinator status must not keep waiting for a successful completion event. Progress is not proof of successful completion, and command submission is not proof a native turn started.
 - Existing Agents already emit the required events. This patch changes control-plane/web code only, requires no Agent release or forced host restart, and does not add a database migration.
+
+### Desktop activity viewer
+
+`GET /api/sessions/:id/progress?activity=1` is a read-only, authenticated projection for the desktop workbench. It uses the active native turn, or the latest recorded turn when idle, and returns up to 60 command/file-change items from the bounded durable-event window. Ordinary progress and coordinator status retain their active-turn-only semantics. An idle view fetches once; active views reuse the existing progress polling cadence. Durable `fileChange.changes` history is also mapped into the viewer and merged by native item ID with current progress. Deleted/suppressed content, disabled content sync, session and turn boundaries remain enforced.
+
+A shell command may edit files without emitting a native `fileChange`. Such commands remain in Terminal; the viewer does not infer a file diff from command text. Empty file activity is labeled accordingly. This is not a filesystem watcher and cannot recover expired or never-synchronized event content.

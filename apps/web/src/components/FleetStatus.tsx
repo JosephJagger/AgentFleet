@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { agentName } from "../lib/agent-provider";
 import { t, localized } from "../i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -82,18 +83,18 @@ export function FleetStatus({ machines, sessions, connected, onSession, onMachin
     </div>
     {selected && createPortal(<div className="activity-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}>
       <section className="activity-panel" role="dialog" aria-modal="true" aria-labelledby="activity-title" ref={dialog}>
-        <header className="activity-panel__head"><div><span className="eyebrow">{t("快捷访问")}</span><h2 id="activity-title">{selected.title}<span>{counts[selected.id]}</span></h2></div><button className="icon-button" type="button" aria-label={t("关闭快捷列表")} onClick={close}><X size={19} /></button></header>
+        <header className="activity-panel__head"><div><span className="eyebrow">{t("快捷访问")}</span><h2 id="activity-title">{displayName(selected.title)}<span>{counts[selected.id]}</span></h2></div><button className="icon-button" type="button" aria-label={t("关闭快捷列表")} onClick={close}><X size={19} /></button></header>
         <div className="activity-tabs" role="group" aria-label={t("快捷列表分类")}>{categories.map(({id,label}) => <button type="button" key={id} aria-pressed={category === id} onClick={() => setCategory(id)}>{label}<span>{counts[id]}</span></button>)}</div>
         <div className="activity-list">
           {category === "hosts" ? online.map(machine => {
             const state = hostCardState(machine);
             return <button className="activity-item" type="button" key={machine.id} onClick={() => { close(); onMachine(machine.id); }}>
               <span className={`activity-item__icon${state.tone === "running" ? " activity-item__icon--running" : ""}`}><Server size={20} /></span>
-              <span className="activity-item__copy"><strong>{machine.name}</strong><small>{machine.os} · {machine.arch}</small><em>{state.activity}</em></span><ArrowUpRight size={17} aria-hidden="true" />
+              <span className="activity-item__copy"><strong>{displayName(machine.name)}</strong><small>{machine.os} · {machine.arch}</small><em>{state.activity}</em></span><ArrowUpRight size={17} aria-hidden="true" />
             </button>;
           }) : visible.map(session => <button className="activity-item" type="button" key={session.id} onClick={() => { close(); onSession(session.id); }}>
             <span className={`activity-item__icon${session.state.currentTurn === "in_progress" && session.state.reachability === "live" ? " activity-item__icon--running" : ""}`}><Activity size={20} /></span>
-            <span className="activity-item__copy"><strong>{session.title}</strong><small>{session.machineName} · {agentName(session.provider)} · {session.projectAlias}</small><em>{sessionActivity(session, machines)}</em></span><ArrowUpRight size={17} aria-hidden="true" />
+            <span className="activity-item__copy"><strong>{displayName(session.title)}</strong><small>{displayName(session.machineName)} · {agentName(session.provider)} · {displayName(session.projectAlias)}</small><em>{sessionActivity(session, machines)}</em></span><ArrowUpRight size={17} aria-hidden="true" />
           </button>)}
           {counts[selected.id] === 0 && <div className="activity-empty"><selected.icon size={30} /><h3>{category === "hosts" ? t("暂无在线主机") : category === "running" ? t("暂无运行中的会话") : t("暂无已接管的会话")}</h3><p>{category === "hosts" ? t("主机连接后会显示在这里。") : category === "running" ? t("开始任务后，可从这里快速回到会话。") : t("在会话中点击接管，即可在这里集中访问。")}</p></div>}
         </div>

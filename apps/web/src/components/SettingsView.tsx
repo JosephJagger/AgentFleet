@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import {LongTermPreferencesPanel} from './LongTermPreferencesPanel';
 import { SettingsSections } from "./SettingsSections";
 import { Settings2, MessageSquare, Palette, Database } from "lucide-react";
@@ -117,8 +118,8 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
       </div><div className="settings-category" hidden={category !== "history"}>
       <section className="settings-block"><h2>{t("云端历史")}</h2><p className="subtle">{t("按项目设置保存内容和时长。宿主机上的原始会话不受影响。")}</p>
         {machines.length === 0 ? <p className="subtle">{t("添加主机并发现项目后，可以设置历史保存方式。")}</p> : <>
-          <label className="settings-field"><span>{t("主机")}</span><select aria-label={t("历史设置主机")} value={machineId} onChange={event => setSelectedMachineId(event.target.value)}>{machines.map(machine => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label>
-          <label className="settings-field"><span>{t("项目")}</span><select aria-label={t("历史设置项目")} value={selected?.id ?? ""} disabled={loadingProjects || !projects.length} onChange={event => setProjectId(event.target.value)}>{!selected && <option value="">{loadingProjects ? t("正在读取项目…") : t("暂无项目")}</option>}{projects.filter(project => project.machineId === machineId).map(project => <option key={project.id} value={project.id}>{project.alias} · {project.pathHint}</option>)}</select></label>
+          <label className="settings-field"><span>{t("主机")}</span><select aria-label={t("历史设置主机")} value={machineId} onChange={event => setSelectedMachineId(event.target.value)}>{machines.map(machine => <option key={machine.id} value={machine.id}>{displayName(machine.name)}</option>)}</select></label>
+          <label className="settings-field"><span>{t("项目")}</span><select aria-label={t("历史设置项目")} value={selected?.id ?? ""} disabled={loadingProjects || !projects.length} onChange={event => setProjectId(event.target.value)}>{!selected && <option value="">{loadingProjects ? t("正在读取项目…") : t("暂无项目")}</option>}{projects.filter(project => project.machineId === machineId).map(project => <option key={project.id} value={project.id}>{displayName(project.alias)} · {displayName(project.pathHint)}</option>)}</select></label>
           {projectError && <p className="catalog-error" role="alert">{projectError} <button type="button" className="button button--quiet" onClick={() => setReloadProjects(value => value + 1)}>{t("重试")}</button></p>}
           {selected && <HistoryPolicy key={selected.id} project={selected} onToast={onToast} onSaved={project => { setProjects(items => items.map(item => item.id === project.id ? project : item)); void onUpdated().catch(() => undefined); }} />}
         </>}

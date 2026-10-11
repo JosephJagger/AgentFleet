@@ -1,3 +1,4 @@
+import { displayName } from "./lib/display-name";
 import { useBuzhoushanDesktop } from "./lib/buzhoushan";
 import { BuzhoushanActivity } from "./components/BuzhoushanActivity";
 import { RuntimeProgress } from "./components/RuntimeProgress";
@@ -256,20 +257,48 @@ function Login({ onLogin }: { onLogin: (dashboard: Dashboard) => void }) {
   );
 }
 
-function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPair, onSession, onHost }: { machines: Machine[]; sessions: FleetSession[]; connected: boolean; selectedId?: string; onSelect: (id: string) => void; onPair: () => void; onSession: (id: string) => void; onHost: (id: string) => void }) {
+export function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPair, onSession, onHost }: { machines: Machine[]; sessions: FleetSession[]; connected: boolean; selectedId?: string; onSelect: (id: string) => void; onPair: () => void; onSession: (id: string) => void; onHost: (id: string) => void }) {
   const track = useRef<HTMLDivElement>(null);
+  const desktop = useBuzhoushanDesktop();
+  const [edges, setEdges] = useState({overflow:false, start:true, end:true});
+  const hostOrder = onlineFirst(machines).map(machine=>machine.id).join(",");
   useEffect(() => {
+    const list = track.current;
+    if (!list || !desktop) return;
+    const measure = () => setEdges(previous => {
+      const next = {overflow:list.scrollWidth > list.clientWidth + 1, start:list.scrollLeft <= 1, end:list.scrollLeft + list.clientWidth >= list.scrollWidth - 1};
+      return JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
+    });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    for (const child of list.children) observer.observe(child);
+    list.addEventListener("scroll", measure, {passive:true});
+    return () => {observer.disconnect();list.removeEventListener("scroll", measure);};
+  }, [desktop, hostOrder]);
+  useEffect(() => {
+    const list = track.current;
+    const active = list?.querySelector<HTMLElement>(".machine-link--active");
+    if (!desktop || !list || !active) return;
+    const bounds = list.getBoundingClientRect(), item = active.getBoundingClientRect();
+    if (item.left < bounds.left) list.scrollLeft += item.left - bounds.left;
+    else if (item.right > bounds.right) list.scrollLeft += item.right - bounds.right;
+  }, [selectedId, desktop, hostOrder]);
+  useEffect(() => {
+    if (desktop) return;
     const reveal = () => {
       const list = track.current;
       const active = list?.querySelector<HTMLElement>(".machine-link--active");
-      if (list && active && list.scrollWidth > list.clientWidth) {
-        list.scrollLeft = active.offsetLeft - list.clientWidth / 2 + active.clientWidth / 2;
-      }
+      if (list && active && list.scrollWidth > list.clientWidth) list.scrollLeft = active.offsetLeft - list.clientWidth / 2 + active.clientWidth / 2;
     };
     reveal();
     window.addEventListener("resize", reveal);
     return () => window.removeEventListener("resize", reveal);
-  }, [selectedId]);
+  }, [selectedId, desktop]);
+  const scrollHosts = (direction:number) => {
+    const list = track.current;
+    list?.scrollBy({left:direction * list.clientWidth * .8, behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+  };
   return (
     <aside className="machine-rail">
       <div className="rail-heading">
@@ -279,6 +308,7 @@ function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPa
         </div>
         <IconButton label={t("配对新主机")} onClick={onPair}><Plus size={17} /></IconButton>
       </div>
+      {desktop && edges.overflow && <button className="buzhou-host-scroll" type="button" aria-label={t("向左查看更多主机")} disabled={edges.start} onClick={()=>scrollHosts(-1)}>‹</button>}
       <div ref={track} className="rail-track" aria-label={t("已配对主机")}>
         {machines.length === 0 ? (
           <button className="rail-empty" onClick={onPair} type="button">
@@ -300,7 +330,7 @@ function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPa
             >
               <span className={`rail-node${transportConnected ? " rail-node--live" : ""}${live && (machine.capacity === "busy" || machine.capacity === "saturated") ? " rail-node--running" : ""}`}><Server size={15} /></span>
               <span className="machine-link__copy">
-                <strong>{machine.name}</strong>
+                <strong>{displayName(machine.name)}</strong>
                 <small>{live ? machine.maintenance ? t("维护中 · 等待安全重启") : machine.capacity === "busy" || machine.capacity === "saturated" ? t("正在执行") : t("在线可用") : machine.reachability === "reconciling" ? t("正在同步") : machine.reachability === "reconnecting" ? t("正在重连") : t("不可达 · {0}", timeAgo(machine.lastSeenAt))}</small>
               </span>
               {warning ? <AlertTriangle className="machine-warning" size={15} /> : <StatusDot tone={transportConnected ? "live" : "muted"} pulse={live && (machine.capacity === "busy" || machine.capacity === "saturated")} />}
@@ -308,6 +338,7 @@ function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPa
           );
         })}
       </div>
+      {desktop && edges.overflow && <button className="buzhou-host-scroll" type="button" aria-label={t("向右查看更多主机")} disabled={edges.end} onClick={()=>scrollHosts(1)}>›</button>}
       <div className="rail-footer">
         <FleetStatus machines={machines} sessions={sessions} connected={connected} onSession={onSession} onMachine={onHost} utility={<ThemeSwitcher />} />
       </div>
@@ -409,18 +440,18 @@ export function MachineSummaryHeader({ machine, onAliasChange, provider = "codex
         <span className="machine-os">{machine.os} · {machine.arch}</span>
         {editing ? (
           <form className="machine-alias-form" onSubmit={(event) => void saveAlias(event)}>
-            <input aria-label={t("主机显示名称")} value={draft} maxLength={80} onChange={(event) => setDraft(event.target.value)} placeholder={machine.hostname} autoFocus />
+            <input aria-label={t("主机显示名称")} value={draft} maxLength={80} onChange={(event) => setDraft(event.target.value)} placeholder={displayName(machine.hostname)} autoFocus />
             <IconButton label={t("保存主机名称")} type="submit" disabled={busy}><Check size={15} /></IconButton>
             <IconButton label={t("取消修改")} disabled={busy} onClick={() => { setDraft(machine.displayAlias ?? ""); setEditing(false); }}><X size={15} /></IconButton>
           </form>
         ) : (
           <div className="machine-name-line">
-            <h1>{machine.name}</h1>
+            <h1>{displayName(machine.name)}</h1>
             <IconButton label={t("修改主机显示名称")} onClick={() => setEditing(true)}><Pencil size={14} /></IconButton>
             {onProviderChange && <AgentPicker value={provider} claudeInstalled={machine.agentRuntimes?.claude?.installed === true} onChange={onProviderChange} />}
           </div>
         )}
-        {machine.displayAlias && <span className="machine-hostname">hostname · {machine.hostname}</span>}
+        {machine.displayAlias && <span className="machine-hostname">hostname · {displayName(machine.hostname)}</span>}
       </div>
       <div className="machine-summary__actions">
         <UsageButton scope="machine" id={machine.id} provider={provider}/>
@@ -521,7 +552,7 @@ export function SessionList({ sessions, projects, selectedId, machineId, onSelec
                   })}
                 >
                   <span className="project-session-group__icon"><FolderGit2 size={16} /></span>
-                  <span className="project-session-group__copy"><strong>{group.project?.alias ?? group.sessions[0]?.projectAlias ?? t("未知项目")}</strong><span>{group.project?.pathHint ?? t("项目路径未上报")}</span></span>
+                  <span className="project-session-group__copy"><strong>{displayName(group.project?.alias ?? group.sessions[0]?.projectAlias ?? t("未知项目"))}</strong><span>{displayName(group.project?.pathHint ?? t("项目路径未上报"))}</span></span>
                   {group.project?.gitBranch && <span className="project-branch"><GitBranch size={11} />{group.project.gitBranch}</span>}
                   <span className="project-session-count">{count(group.sessions.length, "个会话")} </span>
                   <ChevronRight className="project-session-toggle" size={17} aria-hidden="true" />
@@ -530,10 +561,10 @@ export function SessionList({ sessions, projects, selectedId, machineId, onSelec
                   {group.sessions.map((session) => (
                     <button type="button" key={session.id} className={`session-row${selectedId === session.id ? " session-row--active" : ""}`} onClick={() => onSelect(session.id)}>
                       <div className="session-row__top">
-                        <strong>{session.title}</strong>
+                        <strong>{displayName(session.title)}</strong>
                         <span className="session-time">{timeAgo(session.lastActivityAt)}</span>
                       </div>
-                      <div className="session-row__meta"><span>{session.machineName}</span><span>·</span><span className="mono">{shortId(session.nativeThreadId)}</span></div>
+                      <div className="session-row__meta"><span>{displayName(session.machineName)}</span><span>·</span><span className="mono">{shortId(session.nativeThreadId)}</span></div>
                       <div className="session-row__bottom"><StatePill session={session} /><span className={`history-mark history-mark--${session.state.history}`}>{session.state.history.replace("_", " ")}</span></div>
                       <ChevronRight className="row-chevron" size={17} />
                     </button>
@@ -578,7 +609,7 @@ function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; se
         <article className={`timeline-event timeline-event--${event.actor ?? "system"}`} key={event.id} data-scroll-anchor={event.id}>
           <span className="timeline-event__node"><EventIcon event={event} /></span>
           <div className="timeline-event__head">
-            <strong>{(event.title === "Codex" ? agentName(provider) : systemText(event.title?.replace(provider === "claude" ? /^Codex/ : /$^/, "Claude Code"))) || (event.actor === "user" ? t("你") : event.actor === "agent" ? agentName(provider) : event.type)}{event.type === "turn.completed" && <span className="timeline-event__turn-tokens"> · {event.turnTokens == null ? t("本轮 token 未记录") : t("本轮消耗 {0} tokens", new Intl.NumberFormat(locale()).format(event.turnTokens))} · {event.turnCacheHitRate == null ? t("缓存命中率未记录") : t("缓存命中率 {0}%", new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(event.turnCacheHitRate))}</span>}</strong>
+            <strong>{displayName((event.title === "Codex" ? agentName(provider) : systemText(event.title?.replace(provider === "claude" ? /^Codex/ : /$^/, "Claude Code"))) || (event.actor === "user" ? t("你") : event.actor === "agent" ? agentName(provider) : event.type))}{event.type === "turn.completed" && <span className="timeline-event__turn-tokens"> · {event.turnTokens == null ? t("本轮 token 未记录") : t("本轮消耗 {0} tokens", new Intl.NumberFormat(locale()).format(event.turnTokens))} · {event.turnCacheHitRate == null ? t("缓存命中率未记录") : t("缓存命中率 {0}%", new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(event.turnCacheHitRate))}</span>}</strong>
             <time>{new Date(event.occurredAt).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</time>
           </div>
           {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} sessionId={sessionId} /> : event.actor === "user" ? <UserMessage body={event.body} /> : <p>{event.body}</p> : null}
@@ -600,7 +631,7 @@ function ApprovalCard({ approval, provider, onDecide, busy }: { approval: Approv
         <span className={`risk-label risk-label--${approval.risk}`}>{approval.risk === "high" ? t("高风险") : approval.risk === "medium" ? t("需确认") : t("低风险")}</span>
       </div>
       <dl className="approval-context">
-        <div><dt>{t("主机 / 项目")}</dt><dd>{approval.machineName} / {approval.projectAlias}</dd></div>
+        <div><dt>{t("主机 / 项目")}</dt><dd>{displayName(approval.machineName)} / {displayName(approval.projectAlias)}</dd></div>
         <div><dt>{t("工作目录")}</dt><dd title={approval.cwd}>{approval.cwd}</dd></div>
         <div><dt>{t("操作范围")}</dt><dd>{approval.grantScope === "turn" ? t("授权持续到本轮任务结束") : t("本次请求所列操作")}{locale() === "en" ? " " : ""}{t("，不更改主机默认权限")}</dd></div>
         {approval.networkTarget && <div><dt>{t("联网目标")}</dt><dd>{approval.networkTarget}</dd></div>}
@@ -965,9 +996,9 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
     <aside className="inspector">
       <header className="inspector-head">
         <IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton>
-        <div className="eyebrow inspector-context" title={`${session.machineName} · ${agentName(session.provider)} · ${session.projectAlias}`}>{session.machineName} · {agentName(session.provider)} · {session.projectAlias}</div>
+        <div className="eyebrow inspector-context" title={displayName(`${session.machineName} · ${agentName(session.provider)} · ${session.projectAlias}`)}>{displayName(session.machineName)} · {agentName(session.provider)} · {displayName(session.projectAlias)}</div>
         <div className="inspector-title-row">
-          <h2 title={session.title}>{session.title}</h2>
+          <h2 title={displayName(session.title)}>{displayName(session.title)}</h2>
           <div className="session-facts">
             <StatePill session={session} />
             <span className={`history-mark history-mark--${session.state.history}`}>{{ complete: t("完整历史"), partial: t("部分历史"), summary_only: t("历史摘要"), metadata_only: t("仅会话信息"), unavailable: t("历史暂不可用") }[session.state.history]}</span>
@@ -1044,7 +1075,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         </section>
       )}
 
-      <SessionConfiguration key={`config:${draftOwner}:${session.id}`} request={configuration} title={session.title} onClose={() => setConfiguration(undefined)}>
+      <SessionConfiguration key={`config:${draftOwner}:${session.id}`} request={configuration} title={displayName(session.title)} onClose={() => setConfiguration(undefined)}>
         {configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
         {session.provider !== "claude" && <CodexSettingsPanel key={`${draftOwner}:${session.id}:${modeSettingsRevision}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />}
@@ -1059,7 +1090,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         <details className="session-sync-details session-config-section"><summary><span>{t("同步详情")}<small>{t("查看会话同步状态的排查信息")}</small></span></summary><p className="mono">seq {session.sessionSeq} · epoch {session.contentEpoch}</p></details>
       </SessionConfiguration>
       <form className="composer" onSubmit={event => { void submit(event); }}>
-        {session.provider !== "claude" && prompt.trimStart().startsWith("/") && <div className="codex-command-menu" role="group" aria-label={t("Codex 命令")}><p>{t("面板命令 · 点击待接入项可查看原因，不会发送给模型")}</p>{codexCommands.filter((item) => item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map((item) => <button type="button" key={item.name} onClick={() => void runSlash(item.name, slashCommand?.args)}><code>/{item.name}</code><span>{item.label} · {coverageLabels[item.coverage]}</span></button>)}</div>}
+        {session.provider !== "claude" && prompt.trimStart().startsWith("/") && <div className="codex-command-menu" role="group" aria-label={t("Codex 命令")}><p>{t("面板命令 · 点击待接入项可查看原因，不会发送给模型")}</p>{codexCommands.filter((item) => item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map((item) => <button type="button" key={item.name} onClick={() => void runSlash(item.name, slashCommand?.args)}><code>/{displayName(item.name)}</code><span>{item.label} · {coverageLabels[item.coverage]}</span></button>)}</div>}
         {!configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
         {voiceActive && <p className="composer-mode" role="status">{t("通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。")}</p>}
@@ -1069,8 +1100,8 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         {session.provider !== "claude" && <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>}
         {referenceCards.length > 0 && <div className="session-reference-cards" aria-label={t("复用的会话")}>
           {referenceCards.map(card => { const source = card.identity; const candidate = referenceCandidates.find(item => item.id === card.sourceId); const failed = Boolean(card.error); return <article className="session-reference-card" key={card.key}>
-            <div className="session-reference-card__head"><strong>{source?.title ?? candidate?.title ?? card.sourceId}</strong><button type="button" aria-label={t("删除引用卡片")} onClick={() => removeReference(card.key)}><X size={15} /></button></div>
-            <small>{source ? `${source.host} · ${source.project}` : candidate ? `${candidate.machineName} · ${candidate.projectAlias}` : t("正在读取会话")}</small>
+            <div className="session-reference-card__head"><strong>{displayName(source?.title ?? candidate?.title ?? card.sourceId)}</strong><button type="button" aria-label={t("删除引用卡片")} onClick={() => removeReference(card.key)}><X size={15} /></button></div>
+            <small>{displayName(source ? `${source.host} · ${source.project}` : candidate ? `${candidate.machineName} · ${candidate.projectAlias}` : t("正在读取会话"))}</small>
             <small>{t(session.provider === "claude" ? "发送后由 Claude Code 按任务查阅可读历史；不预先生成摘要" : "发送后由 Codex 按任务查阅可读历史；不预先生成摘要")}</small>
             {failed ? <p role="alert">{card.error}</p> : source ? <span role="status">{t("引用已就绪")}{source.incomplete ? ` · ${t("部分历史未同步")}` : ""}</span> : <span role="status">{t("正在核验会话")}</span>}
             {failed && <button type="button" className="button button--secondary" onClick={() => retryReference(card.key)}>{t("重试")}</button>}
@@ -1079,7 +1110,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         {referencePicker && <div ref={referencePickerRef} className="session-reference-picker" role="dialog" aria-label={t("复用会话")}>
           <div className="session-reference-picker__head"><div><strong>{t("复用会话")}</strong><small>{t("选择会话或粘贴链接，添加引用卡片")}</small></div><button type="button" aria-label={t("关闭")} onClick={() => setReferencePicker(false)}><X size={18}/></button></div>
           <div className="session-reference-picker__search"><label htmlFor="reference-session-search">{t("浏览会话")}</label><input id="reference-session-search" aria-label={t("搜索会话")} value={referenceSearch} onChange={event => { setReferenceSearch(event.target.value); setReferencePage(1); setReferenceCursors([null]); referenceListRef.current && (referenceListRef.current.scrollTop = 0); }} placeholder={t("搜索主机、项目或会话")}/></div>
-          <div ref={referenceListRef} className="session-reference-picker__list" role="group" aria-label={t("会话列表")}>{referenceLoading ? <p role="status">{t("正在加载会话")}</p> : referenceError ? <p role="alert">{referenceError}</p> : referenceItems.length ? referenceItems.map(item => <button type="button" key={item.id} onClick={() => { setReferencePicker(false); void addReference(item.id); }}><b title={item.title}>{item.title}</b><small>{item.machineName} · {agentName(item.provider)} · {item.projectAlias}</small></button>) : <p>{t("没有匹配的会话")}</p>}</div>
+          <div ref={referenceListRef} className="session-reference-picker__list" role="group" aria-label={t("会话列表")}>{referenceLoading ? <p role="status">{t("正在加载会话")}</p> : referenceError ? <p role="alert">{referenceError}</p> : referenceItems.length ? referenceItems.map(item => <button type="button" key={item.id} onClick={() => { setReferencePicker(false); void addReference(item.id); }}><b title={displayName(item.title)}>{displayName(item.title)}</b><small>{displayName(item.machineName)} · {agentName(item.provider)} · {displayName(item.projectAlias)}</small></button>) : <p>{t("没有匹配的会话")}</p>}</div>
           <div className="session-reference-picker__footer"><span>{t("共 {0} 个会话", referenceTotal)}{referencePages > 1 && <> · {t("第 {0} / {1} 页", referencePage, referencePages)}</>}</span>{referencePages > 1 && <div><button type="button" aria-label={t("上一页")} disabled={referenceLoading || referencePage === 1} onClick={() => changeReferencePage(referencePage - 1)}><ChevronLeft size={17}/></button><button type="button" aria-label={t("下一页")} disabled={referenceLoading || !referenceNextCursor} onClick={() => changeReferencePage(referencePage + 1)}><ChevronRight size={17}/></button></div>}</div>
           <div className="session-reference-picker__link"><label htmlFor="reference-session-link">{t("粘贴会话链接")}</label><div><input id="reference-session-link" value={referenceLink} onChange={event => { setReferenceLink(event.target.value); setReferenceLinkError(""); }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addReferenceLink(); } }} placeholder={`${window.location.origin}/sessions/…`} aria-invalid={Boolean(referenceLinkError)} aria-describedby={referenceLinkError ? "reference-session-link-error" : undefined}/><button type="button" disabled={!referenceLink.trim()} onClick={() => addReferenceLink()}>{t("添加引用")}</button></div>{referenceLinkError && <small id="reference-session-link-error" role="alert">{referenceLinkError}</small>}</div>
         </div>}
@@ -1217,7 +1248,7 @@ export function ApprovalsView({ approvals, onOpen, onBack }: { approvals: Approv
       <div className="wide-view__heading"><div><h1>{t("待处理")}</h1><p>{t("查看需要确认的操作和问题。")}</p></div><KeyRound size={31} /></div>
       <div className="request-explainer"><div><strong>{t("确认操作")}</strong><p>{t("需要你允许的命令或文件修改。你可以只允许这一次，也可以拒绝。")}</p></div><div><strong>{t("回答问题")}</strong><p>{t("Codex 需要了解你的选择或补充要求，例如计划模式中的提问。")}</p></div></div>
       {approvals.length === 0 ? <div className="wide-empty request-empty"><Check size={30} /><h2>{t("暂无待处理事项")}</h2><p>{t("有新的确认请求或问题时，会在这里提醒你。")}</p><button type="button" className="button button--primary" onClick={onBack}>{t("返回工作台")}</button></div> : (
-        <div className="approval-grid">{approvals.map((approval) => <button type="button" key={approval.id} className="approval-preview" onClick={() => onOpen(approval.logicalSessionId)}><span className={`risk-stripe risk-stripe--${approval.risk}`} /><div><span className="request-kind">{approval.type === "user_input" ? t("需要回答") : t("需要确认")}</span><div className="eyebrow">{approval.machineName} · {approval.projectAlias}</div><h3>{approval.summary}</h3><p>{approval.command || approval.paths?.join(", ")}</p><span className="request-open">{t("打开会话处理 →")}</span></div><ChevronRight size={18} /></button>)}</div>
+        <div className="approval-grid">{approvals.map((approval) => <button type="button" key={approval.id} className="approval-preview" onClick={() => onOpen(approval.logicalSessionId)}><span className={`risk-stripe risk-stripe--${approval.risk}`} /><div><span className="request-kind">{approval.type === "user_input" ? t("需要回答") : t("需要确认")}</span><div className="eyebrow">{displayName(approval.machineName)} · {displayName(approval.projectAlias)}</div><h3>{approval.summary}</h3><p>{approval.command || approval.paths?.join(", ")}</p><span className="request-open">{t("打开会话处理 →")}</span></div><ChevronRight size={18} /></button>)}</div>
       )}
     </section>
   );
@@ -1269,14 +1300,14 @@ export function RemoveMachineDialog({ machine, onClose, onRemoved, onToast }: {
         </div>
         {removed ? (
           <>
-            <div className="remove-machine-result"><Check size={18} /><div><strong>{machine.name} {locale() === "en" ? " " : ""}{t("已断开并隐藏")}</strong><span>{t("在该主机执行下面命令，可停止服务并删除 AgentFleets 程序、身份和连接数据。Codex 会话与项目文件不会被删除。")}</span></div></div>
+            <div className="remove-machine-result"><Check size={18} /><div><strong>{displayName(machine.name)} {locale() === "en" ? " " : ""}{t("已断开并隐藏")}</strong><span>{t("在该主机执行下面命令，可停止服务并删除 AgentFleets 程序、身份和连接数据。Codex 会话与项目文件不会被删除。")}</span></div></div>
             <div className="uninstall-command"><code>{uninstallCommand}</code><button className="button button--quiet" type="button" onClick={async () => { try { await copyText(uninstallCommand); setCopied(true); } catch (error) { onToast("danger", errorMessage(error)); } }}><Copy size={15} />{copied ? t("已复制") : t("复制卸载命令")}</button></div>
             <div className="modal-actions"><button className="button button--primary" type="button" onClick={onClose}>{t("完成")}</button></div>
           </>
         ) : (
           <>
-            <div className="remove-machine-warning"><AlertTriangle size={19} /><div><strong>{t("将立即吊销")}{locale() === "en" ? " " : ""}{machine.name}</strong><span>{t("Agent 会断开，相关项目、会话和待审批项将从活动面板隐藏。云端审计记录仍会保留。")}</span></div></div>
-            <div className="remove-machine-facts"><span>{t("主机")}</span><strong>{machine.name}</strong><span>{t("系统")}</span><strong>{machine.os} · {machine.arch}</strong><span>{t("项目")}</span><strong>{machine.projects.length} {locale() === "en" ? " " : ""}{t("个")}</strong></div>
+            <div className="remove-machine-warning"><AlertTriangle size={19} /><div><strong>{t("将立即吊销")}{locale() === "en" ? " " : ""}{displayName(machine.name)}</strong><span>{t("Agent 会断开，相关项目、会话和待审批项将从活动面板隐藏。云端审计记录仍会保留。")}</span></div></div>
+            <div className="remove-machine-facts"><span>{t("主机")}</span><strong>{displayName(machine.name)}</strong><span>{t("系统")}</span><strong>{machine.os} · {machine.arch}</strong><span>{t("项目")}</span><strong>{machine.projects.length} {locale() === "en" ? " " : ""}{t("个")}</strong></div>
             <div className="modal-actions"><button className="button button--quiet" type="button" onClick={onClose} disabled={busy}>{t("取消")}</button><button className="button button--danger" type="button" onClick={() => void remove()} disabled={busy}>{busy ? <LoaderCircle className="spin" size={15} /> : <Trash2 size={15} />}{busy ? t("正在移除") : t("确认移除主机")}</button></div>
           </>
         )}
@@ -1317,7 +1348,7 @@ function CreateSessionDialog({ open, machines, selectedMachineId, initialProject
     return () => controller.abort();
   }, [open, machineId, initialProject?.id]);
   if (!open) return null;
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-session-title"><div className="modal-head"><div><div className="eyebrow">New conversation</div><h2 id="new-session-title">{t("创建会话")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有可用主机")}</h3><p>{t("连接在线主机并完成项目发现后，可以创建会话。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !projectId || !title.trim()) return; setBusy(true); try { await onCreate(machineId, projectId, title.trim()); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { setMachineId(event.target.value); setProjectId(""); setProjectOptions([]); }}>{writableMachines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label><span>{t("项目")}</span><select value={projectId} title={projectOptions.find((project) => project.id === projectId)?.pathHint} onChange={(event) => setProjectId(event.target.value)} required>{projectOptions.map((project) => <option key={project.id} value={project.id}>{project.alias} · {project.pathHint}</option>)}</select></label><label><span>{t("会话名称")}</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("例如：修复结算页测试")} required autoFocus /></label><p className="subtle">{t("会话在所选主机和项目中执行。")}</p><button className="button button--primary button--full" disabled={busy || !projectId}>{busy ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}{locale() === "en" ? " " : ""}{t("创建会话")}</button></form>}</section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-session-title"><div className="modal-head"><div><div className="eyebrow">New conversation</div><h2 id="new-session-title">{t("创建会话")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有可用主机")}</h3><p>{t("连接在线主机并完成项目发现后，可以创建会话。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !projectId || !title.trim()) return; setBusy(true); try { await onCreate(machineId, projectId, title.trim()); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { setMachineId(event.target.value); setProjectId(""); setProjectOptions([]); }}>{writableMachines.map((item) => <option key={item.id} value={item.id}>{displayName(item.name)}</option>)}</select></label><label><span>{t("项目")}</span><select value={projectId} title={projectOptions.find((project) => project.id === projectId)?.pathHint} onChange={(event) => setProjectId(event.target.value)} required>{projectOptions.map((project) => <option key={project.id} value={project.id}>{displayName(project.alias)} · {displayName(project.pathHint)}</option>)}</select></label><label><span>{t("会话名称")}</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("例如：修复结算页测试")} required autoFocus /></label><p className="subtle">{t("会话在所选主机和项目中执行。")}</p><button className="button button--primary button--full" disabled={busy || !projectId}>{busy ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}{locale() === "en" ? " " : ""}{t("创建会话")}</button></form>}</section></div>;
 }
 
 function projectAliasFromPath(path: string): string {
@@ -1376,7 +1407,7 @@ function CreateProjectDialog({ open, machines, selectedMachineId, onClose, onCre
     setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true);
   }, [open, selectedMachineId]);
   if (!open) return null;
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><div className="modal-head"><div><div className="eyebrow">New project</div><h2 id="new-project-title">{t("创建项目")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有支持创建项目的在线主机")}</h3><p>{t("请先更新并连接主机上的 Agent。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !effectivePath || !alias.trim()) return; setBusy(true); try { await onCreate(machineId, effectivePath, alias.trim(), location === CUSTOM_PROJECT_LOCATION ? createDirectory : true); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { const nextMachine = writableMachines.find((machine) => machine.id === event.target.value); setMachineId(event.target.value); setLocation(projectLocationOptions(nextMachine)[0]?.path ?? CUSTOM_PROJECT_LOCATION); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{writableMachines.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}</select></label><label><span>{t("创建位置")}</span><select value={location} title={location === CUSTOM_PROJECT_LOCATION ? t("自定义完整路径") : location} onChange={(event) => { setLocation(event.target.value); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{locations.map((choice) => <option key={choice.path} value={choice.path}>{t("{0}（与{1}同级）", choice.path, choice.projects.length === 1 ? choice.projects[0] : count(choice.projects.length, "个项目"))}</option>)}<option value={CUSTOM_PROJECT_LOCATION}>{t("自定义完整路径")}</option></select></label>{location === CUSTOM_PROJECT_LOCATION ? <label><span>{t("项目路径")}</span><input value={path} onChange={(event) => { const next = event.target.value; setPath(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} placeholder={t("例如：/home/me/projects/my-app")} required autoFocus /></label> : <><label><span>{t("新项目文件夹")}</span><input value={folderName} onChange={(event) => { const next = event.target.value; setFolderName(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,63}" placeholder="my-app" required autoFocus /></label><div className="project-path-preview" aria-live="polite"><span>{t("将创建在")}</span><code>{effectivePath || projectPathAt(location, "my-app")}</code></div></>}<label><span>{t("项目名称")}</span><input value={alias} onChange={(event) => { setAlias(event.target.value); setAliasEdited(true); }} pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,63}" placeholder="my-app" required /></label>{location === CUSTOM_PROJECT_LOCATION && <label className="checkbox-row"><input type="checkbox" checked={createDirectory} onChange={(event) => setCreateDirectory(event.target.checked)} /><span>{t("路径不存在时创建目录")}</span></label>}<p className="subtle">{location === CUSTOM_PROJECT_LOCATION ? t("路径必须是主机上的绝对路径；只会创建最后一级目录。") : t("新项目会创建在所选目录中，与现有项目位于同一层级。")}</p><button className="button button--primary button--full" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <FolderGit2 size={16} />}{busy ? t("正在创建") : t("创建项目")}</button></form>}</section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><div className="modal-head"><div><div className="eyebrow">New project</div><h2 id="new-project-title">{t("创建项目")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有支持创建项目的在线主机")}</h3><p>{t("请先更新并连接主机上的 Agent。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !effectivePath || !alias.trim()) return; setBusy(true); try { await onCreate(machineId, effectivePath, alias.trim(), location === CUSTOM_PROJECT_LOCATION ? createDirectory : true); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { const nextMachine = writableMachines.find((machine) => machine.id === event.target.value); setMachineId(event.target.value); setLocation(projectLocationOptions(nextMachine)[0]?.path ?? CUSTOM_PROJECT_LOCATION); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{writableMachines.map((machine) => <option key={machine.id} value={machine.id}>{displayName(machine.name)}</option>)}</select></label><label><span>{t("创建位置")}</span><select value={location} title={location === CUSTOM_PROJECT_LOCATION ? t("自定义完整路径") : location} onChange={(event) => { setLocation(event.target.value); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{locations.map((choice) => <option key={choice.path} value={choice.path}>{t("{0}（与{1}同级）", choice.path, choice.projects.length === 1 ? choice.projects[0] : count(choice.projects.length, "个项目"))}</option>)}<option value={CUSTOM_PROJECT_LOCATION}>{t("自定义完整路径")}</option></select></label>{location === CUSTOM_PROJECT_LOCATION ? <label><span>{t("项目路径")}</span><input value={path} onChange={(event) => { const next = event.target.value; setPath(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} placeholder={t("例如：/home/me/projects/my-app")} required autoFocus /></label> : <><label><span>{t("新项目文件夹")}</span><input value={folderName} onChange={(event) => { const next = event.target.value; setFolderName(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,63}" placeholder="my-app" required autoFocus /></label><div className="project-path-preview" aria-live="polite"><span>{t("将创建在")}</span><code>{effectivePath || projectPathAt(location, "my-app")}</code></div></>}<label><span>{t("项目名称")}</span><input value={alias} onChange={(event) => { setAlias(event.target.value); setAliasEdited(true); }} pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,63}" placeholder="my-app" required /></label>{location === CUSTOM_PROJECT_LOCATION && <label className="checkbox-row"><input type="checkbox" checked={createDirectory} onChange={(event) => setCreateDirectory(event.target.checked)} /><span>{t("路径不存在时创建目录")}</span></label>}<p className="subtle">{location === CUSTOM_PROJECT_LOCATION ? t("路径必须是主机上的绝对路径；只会创建最后一级目录。") : t("新项目会创建在所选目录中，与现有项目位于同一层级。")}</p><button className="button button--primary button--full" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <FolderGit2 size={16} />}{busy ? t("正在创建") : t("创建项目")}</button></form>}</section></div>;
 }
 
 function App() {
@@ -1751,7 +1782,7 @@ function App() {
           {dashboard.user.platformAdmin === true && <button aria-current={view === "admin" ? "page" : undefined} aria-label={t("管理")} className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><ShieldCheck size={16} /><NavText full="管理" compact="管理" /></button>}
         </nav>
         <WorldClocks side="right" />
-        <div className="topbar-actions">{buzhouDesktop && view === "fleet" && <button type="button" className="buzhou-focus-toggle" aria-pressed={streamFocus} title={t("聚焦任务与过程；不会隐藏对话和输出中的敏感内容")} onClick={()=>setStreamFocus(!streamFocus)}>{streamFocus?t("退出直播聚焦"):t("直播聚焦")}</button>}<PanelVoiceControl machines={dashboard.machines} onOpenSession={id=>{setView("fleet");selectSession(id);}}/><LanguageSwitcher compact /><span className="account-label">{dashboard.user.displayName}</span><IconButton label={t("退出登录")} onClick={async () => { window.dispatchEvent(new Event("agentfleet:logout")); await api.logout(); setDashboard(undefined); setConnected(false); }}><LogOut size={16} /></IconButton></div>
+        <div className="topbar-actions">{buzhouDesktop && view === "fleet" && <button type="button" className="buzhou-focus-toggle" aria-pressed={streamFocus} title={t("聚焦任务与过程；不会隐藏对话和输出中的敏感内容")} onClick={()=>setStreamFocus(!streamFocus)}>{streamFocus?t("退出直播聚焦"):t("直播聚焦")}</button>}<PanelVoiceControl machines={dashboard.machines} onOpenSession={id=>{setView("fleet");selectSession(id);}}/><LanguageSwitcher compact /><span className="account-label">{displayName(dashboard.user.displayName)}</span><IconButton label={t("退出登录")} onClick={async () => { window.dispatchEvent(new Event("agentfleet:logout")); await api.logout(); setDashboard(undefined); setConnected(false); }}><LogOut size={16} /></IconButton></div>
       </header>
       {view === "fleet" ? <div className={`fleet-layout${catalogCollapsed ? " fleet-layout--catalog-collapsed" : ""}`}>
         <MachineRail machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} selectedId={selectedMachineId} onSession={selectSession} onHost={id => navigate({ view: "hosts", machineId: id })} onSelect={selectMachine} onPair={() => setPairOpen(true)} />
@@ -1763,7 +1794,7 @@ function App() {
           </div>
         </main>
         <SessionInspector referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
-        {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong><FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayedSession?.projectAlias}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}
+        {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong><FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayName(displayedSession?.projectAlias)}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}
       </div> : view === "hosts" ? <HostsView onConfigure={id => { setSettingsMachineId(id); setView("security"); }} machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView initialMachineId={settingsMachineId} dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />

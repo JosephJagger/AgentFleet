@@ -76,3 +76,19 @@ test('session status can expose native work without a coordinator job and never 
  assert.equal(f.progress.read(f.principal,f.session.logicalSessionId,null).items.length,0);
  assert.equal(f.progress.read(f.principal,f.session.logicalSessionId,'other-turn').items.length,0);
 });
+
+test('activity projection restores idle last turn and retains file edits beyond eight messages without changing coordinator semantics',t=>{
+ const f=fixture();t.after(()=>f.db.close());f.running();
+ f.event('item.completed',{item:{id:'patch',type:'fileChange',changes:[{path:'src/demo.ts',diff:'+ fixed'}]}});
+ for(let n=0;n<12;n++)f.event('item.completed',{item:{id:'message-'+n,type:'agentMessage',text:'Progress'}});
+ f.event('item.completed',{item:{id:'cmd',type:'commandExecution',command:'npm test',aggregatedOutput:'passed'}});
+ f.event('turn.completed',{turn:{id:'turn-current',status:'completed'}});
+ f.db.run("UPDATE logical_sessions SET execution_state='idle',active_turn_id=NULL");
+ assert.equal(f.read().items.length,0);
+ const restored=f.progress.read(f.principal,f.session.logicalSessionId,undefined,true);
+ assert.equal(restored.nativeTurnId,'turn-current');assert.equal(restored.freshness,'stale');assert.equal(restored.state,'completed');
+ assert.deepEqual(restored.items.map(item=>item.id),['patch','cmd']);
+ assert.equal(restored.items[0]?.output,'+ fixed');
+ assert.throws(()=>f.progress.read({...f.principal,workspaceId:'other'},f.session.logicalSessionId,undefined,true));
+ f.db.run('UPDATE projects SET sync_content=0');assert.equal(f.progress.read(f.principal,f.session.logicalSessionId,undefined,true).items.length,0);
+});

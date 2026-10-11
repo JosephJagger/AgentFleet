@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { Import } from "lucide-react";
 import { ConfigDisclosureSummary } from "./ConfigDisclosureSummary";
 import { useEffect, useRef, useState } from "react";
@@ -15,7 +16,7 @@ export function NativeImportPanel(props: { machine: Machine; hostOperations: Hos
     <div className="workspace-actions"><button type="button" disabled={op.pending || !op.allowed} onClick={() => void op.run("migration.detect")}>{t("预览可导入内容")}</button><button type="button" disabled={op.pending || !op.allowed} onClick={() => void op.run("migration.history")}>{t("查看导入记录")}</button></div>
     {items.length > 0 && <><div className="workspace-file-list">{items.map(r => <label className="checkbox-row" key={r.name}><input type="checkbox" checked={selected.includes(r.name)} onChange={e => {setSelected(e.target.checked ? [...selected,r.name] : selected.filter(id=>id!==r.name));setConfirmed(false);}}/><span>{r.detail}<small>{r.status}</small></span></label>)}</div><label className="checkbox-row"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>{t("确认将勾选内容导入此主机 Codex")}</label><button type="button" disabled={!confirmed || !selected.length || op.pending || !op.allowed} onClick={()=>void op.run("migration.import",{itemIds:selected,confirmed:true})}>{t("导入所选内容")}</button></>}
     {op.result?.operation === "migration.detect" && !items.length && <p>{t("未检测到可导入内容")}</p>}
-    {op.result && op.result.operation !== "migration.detect" && <ul>{op.result.rows.map((r,i)=><li key={i}>{r.name} · {r.detail} · {r.status}</li>)}</ul>}
+    {op.result && op.result.operation !== "migration.detect" && <ul>{op.result.rows.map((r,i)=><li key={i}>{displayName(r.name)} · {r.detail} · {r.status}</li>)}</ul>}
     {op.error && <p role="alert">{systemText(op.error)}</p>}
   </div></details>;
 }

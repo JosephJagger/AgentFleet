@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { useEffect, useRef, useState } from "react";
 import { Archive, RefreshCw, Trash2, LoaderCircle } from "lucide-react";
 import { api } from "../lib/api";
@@ -42,7 +43,7 @@ export function HostVersionStorage({ machine }: { machine: Machine }) {
       {pending&&<p className="version-storage-status" role="status"><LoaderCircle size={16} className="spin"/>{operation?.state==="unknown"?t("结果待核验，请勿重复清理"):t("正在核查主机版本文件…")}</p>}
       {operation?.state==="succeeded"&&operation.type==="versions.clean"&&report&&<p role="status">{t("已清理 {0}，删除 {1} 个旧版本目录。",imageSpace(report.deletedBytes),report.deletedCount)}</p>}
       {operation?.state==="expired"&&<p role="status">{t("操作已过期，请重新检查版本。")}</p>}
-      {report&&<><p className="subtle">{t("上次检查：{0}",new Date(report.checkedAt).toLocaleString(locale()))}</p><details><summary>{t("查看保留和清理明细")}</summary><ul className="version-storage-list">{report.entries.map(e=><li key={`${e.kind}:${e.name}`}><div><strong>{kind(e.kind)}</strong><span>{e.name}</span></div><div><span>{imageSpace(e.bytes)}</span><small>{reason(e.reason)}</small></div></li>)}</ul>{report.entryCount>report.entries.length&&<p className="subtle">{t("仅展示前 {0} 项，总占用已包含全部目录。",report.entries.length)}</p>}</details></>}
+      {report&&<><p className="subtle">{t("上次检查：{0}",new Date(report.checkedAt).toLocaleString(locale()))}</p><details><summary>{t("查看保留和清理明细")}</summary><ul className="version-storage-list">{report.entries.map(e=><li key={`${e.kind}:${e.name}`}><div><strong>{kind(e.kind)}</strong><span>{displayName(e.name)}</span></div><div><span>{imageSpace(e.bytes)}</span><small>{reason(e.reason)}</small></div></li>)}</ul>{report.entryCount>report.entries.length&&<p className="subtle">{t("仅展示前 {0} 项，总占用已包含全部目录。",report.entries.length)}</p>}</details></>}
     </>}
     {error&&<p className="catalog-error" role="alert">{systemText(error)}</p>}
   </HostDisclosure>;

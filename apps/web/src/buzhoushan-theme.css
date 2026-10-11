@@ -109,3 +109,9 @@
   :root[data-theme="buzhoushan"] .buzhou-dock p { padding:8px 14px; color:#aaa; font-size:12px; }
   :root[data-theme="buzhoushan"] .buzhou-dock__limit { padding:3px 12px; font-size:10px; color:#888; border-top:1px solid #292929; }
 }
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .buzhou-host-scroll { flex:0 0 28px; width:28px; height:40px; padding:0; border:1px solid #454545; border-radius:3px; background:#2d2d30; color:#ddd; font-size:24px; line-height:1; }
+  :root[data-theme="buzhoushan"] .buzhou-host-scroll:disabled { opacity:.35; cursor:default; }
+  :root[data-theme="buzhoushan"] .buzhou-host-scroll:focus-visible { outline:2px solid #007acc; outline-offset:2px; }
+}

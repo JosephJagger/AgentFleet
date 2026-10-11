@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { agentName } from "../lib/agent-provider";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Check, ChevronRight, LoaderCircle, Pause, Play, Plus, Trash2 } from "lucide-react";
@@ -140,12 +141,12 @@ export function ScheduledTasksView({ machines, initialProjectId, initialSessionI
         {sidebarTab === "tasks" && loading && <p className="subtle">{t("读取中…")}</p>}
         {sidebarTab === "tasks" && !loading && tasks.length === 0 && <p className="subtle">{t("还没有定时任务。选择项目或会话后创建第一个任务。")}</p>}
         {sidebarTab === "tasks" && tasks.map(task => <button type="button" key={task.id} className={`scheduled-list__item${task.id === selectedId ? " active" : ""}`} onClick={() => void selectTask(task)}>
-          <strong>{task.title}</strong><span>{projects.find(project => project.id === task.projectId)?.alias ?? task.projectId} · {kindLabel(task.schedule)}</span>
+          <strong>{displayName(task.title)}</strong><span>{projects.find(project => project.id === task.projectId)?.alias ?? task.projectId} · {kindLabel(task.schedule)}</span>
           <small>{task.enabled ? t("下次：{0}", dateTime(task.nextAt,task.timezone)) : t("已暂停")}</small><ChevronRight size={16}/>
         </button>)}
         {sidebarTab === "history" && <section className="scheduled-history"><div className="scheduled-list__heading"><strong>{t("历史记录")}</strong><button type="button" className="button button--quiet" onClick={() => void refresh().catch(reason => setError((reason as Error).message))}>{t("刷新")}</button></div>
           {history.length === 0 && <p className="subtle">{t("尚无执行记录")}</p>}
-          <div className="scheduled-history__list">{history.map(run => <div className="scheduled-history__item" key={run.run_id}><strong>{run.title}</strong><span>{t(runLabel[run.status])} · {dateTime(run.scheduled_at)}</span>{run.detail && <small>{systemText(run.detail)}</small>}{run.session_id && <button type="button" onClick={() => onSession(run.session_id!)}>{t("打开会话")}</button>}</div>)}</div>
+          <div className="scheduled-history__list">{history.map(run => <div className="scheduled-history__item" key={run.run_id}><strong>{displayName(run.title)}</strong><span>{t(runLabel[run.status])} · {dateTime(run.scheduled_at)}</span>{run.detail && <small>{systemText(run.detail)}</small>}{run.session_id && <button type="button" onClick={() => onSession(run.session_id!)}>{t("打开会话")}</button>}</div>)}</div>
         </section>}
       </aside>
       <div className="scheduled-editor">
@@ -154,18 +155,18 @@ export function ScheduledTasksView({ machines, initialProjectId, initialSessionI
           <div className="scheduled-choice"><span>{t("会话")}</span><label><input type="radio" checked={destination === "new"} onChange={() => { setDestination("new"); setSessionId(""); if (!selected) setProjectId(""); }}/>{t("每次新建会话")}</label><label><input type="radio" checked={destination === "existing"} onChange={() => { setDestination("existing"); setSessionId(""); if (!selected) setProjectId(""); }}/>{t("使用项目里的已有会话")}</label></div>
           {destination === "new" ? <div className="scheduled-project-picker">
             <label><span>{t("项目")}</span><input type="search" aria-label={t("搜索项目")} placeholder={t("搜索主机、项目或路径")} value={projectQuery} disabled={Boolean(selected)} onChange={event => setProjectQuery(event.target.value)}/></label>
-            {chosenProject && <div className="scheduled-session-selected"><Check size={16}/><span>{t("已选项目")} · {chosenProject.machineName} / {chosenProject.alias}</span></div>}
+            {chosenProject && <div className="scheduled-session-selected"><Check size={16}/><span>{t("已选项目")} · {displayName(chosenProject.machineName)} / {displayName(chosenProject.alias)}</span></div>}
             {!selected && <div className="scheduled-session-results" role="listbox" aria-label={t("选择项目")}>
               {matchingProjects.length === 0 && <p className="subtle">{t("没有匹配的项目")}</p>}
-              {matchingProjects.map(project => <button type="button" role="option" aria-selected={project.id === projectId} className={project.id === projectId ? "active" : ""} key={project.id} onClick={() => setProjectId(project.id)}><strong>{project.alias}</strong><small>{project.machineName} · {project.pathHint}</small></button>)}
+              {matchingProjects.map(project => <button type="button" role="option" aria-selected={project.id === projectId} className={project.id === projectId ? "active" : ""} key={project.id} onClick={() => setProjectId(project.id)}><strong>{displayName(project.alias)}</strong><small>{displayName(project.machineName)} · {displayName(project.pathHint)}</small></button>)}
             </div>}
           </div> : <div className="scheduled-session-picker">
             <label><span>{t("搜索已接管会话")}</span><input placeholder={t("搜索主机、项目或会话")} value={sessionQuery} onChange={event => setSessionQuery(event.target.value)}/></label>
-            {sessionId && <div className="scheduled-session-selected"><Check size={16}/><span>{sessions.find(session => session.id === sessionId)?.title ?? t("已选会话")} · {chosenProject?.machineName ?? ""} / {chosenProject?.alias ?? projectId}</span></div>}
+            {sessionId && <div className="scheduled-session-selected"><Check size={16}/><span>{sessions.find(session => session.id === sessionId)?.title ?? t("已选会话")} · {displayName(chosenProject?.machineName ?? "")} / {displayName(chosenProject?.alias ?? projectId)}</span></div>}
             <div className="scheduled-session-results" role="listbox" aria-label={t("选择已接管的会话")}>
               {sessionLoading && <p className="subtle">{t("正在加载会话")}</p>}
               {!sessionLoading && sessions.length === 0 && <p className="subtle">{t("没有匹配的已接管会话")}</p>}
-              {sessions.map(session => <button type="button" role="option" aria-selected={session.id === sessionId} className={session.id === sessionId ? "active" : ""} key={session.id} onClick={() => { setSessionId(session.id); setProjectId(session.projectId); }}><strong>{session.title}</strong><small>{session.machineName} · {agentName(session.provider)} · {session.projectAlias}</small></button>)}
+              {sessions.map(session => <button type="button" role="option" aria-selected={session.id === sessionId} className={session.id === sessionId ? "active" : ""} key={session.id} onClick={() => { setSessionId(session.id); setProjectId(session.projectId); }}><strong>{displayName(session.title)}</strong><small>{displayName(session.machineName)} · {agentName(session.provider)} · {displayName(session.projectAlias)}</small></button>)}
             </div>
             {nextCursor && <button type="button" className="button button--quiet" onClick={async () => { setSessionLoading(true); try { const page = await api.sessions({ managed: true, projectId: lockedProjectId, q: sessionQuery.trim() || undefined, cursor: nextCursor, limit: 50 }); setSessions(current => [...current,...page.items]); setNextCursor(page.nextCursor); } catch (reason) { setError((reason as Error).message); } finally { setSessionLoading(false); } }}>{t("加载更多会话")}</button>}
             <small>{t("未接管的会话请先在工作台接管。")}</small>
@@ -181,7 +182,7 @@ export function ScheduledTasksView({ machines, initialProjectId, initialSessionI
           {kind === "weekly" && <fieldset className="scheduled-weekdays"><legend>{t("星期几")}</legend>{[0,1,2,3,4,5,6].map(day => <label key={day}><input type="checkbox" checked={weekdays.includes(day)} onChange={event => setWeekdays(current => event.target.checked ? [...current,day] : current.filter(value => value !== day))}/>{[t("周日"),t("周一"),t("周二"),t("周三"),t("周四"),t("周五"),t("周六")][day]}</label>)}</fieldset>}
           <label><span>{t("时区")}</span><input required value={timezone} onChange={event => setTimezone(event.target.value)} placeholder="Asia/Shanghai"/></label>
           </fieldset>
-          {chosenProject && <p className="subtle">{t("将在 {0} 的原项目目录中执行；同项目任务会顺序等待。离线超过 24 小时不补跑。", chosenProject.machineName)}</p>}
+          {chosenProject && <p className="subtle">{displayName(t("将在 {0} 的原项目目录中执行；同项目任务会顺序等待。离线超过 24 小时不补跑。", chosenProject.machineName))}</p>}
           {error && <p className="catalog-error" role="alert">{systemText(error)}</p>}
           <div className="scheduled-editor__actions"><button type="submit" className="button button--primary" disabled={busy || !targetReady}>{busy ? <LoaderCircle className="spin" size={16}/> : <Check size={16}/ >}{selected ? t("保存任务") : t("创建任务")}</button>
             {selected && <><button type="button" className="button button--quiet" disabled={busy} onClick={async () => { setBusy(true); try { await api.setScheduledTaskEnabled(selected.id,!selected.enabled); await refresh(); } catch (reason) { setError((reason as Error).message); } finally { setBusy(false); } }}>{selected.enabled ? <Pause size={16}/> : <Play size={16}/ >}{selected.enabled ? t("暂停") : t("启用")}</button><button type="button" className="button button--quiet" disabled={busy} onClick={async () => { if (!window.confirm(t("删除此定时任务及其运行记录？已创建的 Codex 会话会保留。"))) return; setBusy(true); try { await api.deleteScheduledTask(selected.id); reset(); await refresh(); } catch (reason) { setError((reason as Error).message); } finally { setBusy(false); } }}><Trash2 size={16}/>{t("删除")}</button></>}

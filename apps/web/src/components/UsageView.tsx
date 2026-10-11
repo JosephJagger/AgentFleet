@@ -1,3 +1,4 @@
+import { displayName } from "../lib/display-name";
 import { useEffect, useState } from "react";
 import { BarChart3, RefreshCw } from "lucide-react";
 import { api } from "../lib/api";
@@ -32,7 +33,7 @@ export function UsageView({machines,selectedId,onSelect,onSession}:{machines:Mac
     const safePage=Math.min(page,totalPages);
     const visible=entries?.slice((safePage-1)*pageSize,safePage*pageSize);
     return <>
-      <div className="usage-table-wrap"><table className="usage-table"><thead><tr><th>{session?t("会话"):t("项目")}</th><th>{t("总消耗")}</th><th>{t("本周消耗")}</th><th>{t("周命中率")}</th></tr></thead><tbody>{visible?.length?visible.map(entry=><tr key={entry.id}><td>{session?<button className="usage-table__name" title={entry.title} type="button" onClick={()=>onSession(entry.id)}>{entry.title}</button>:<span className="usage-table__name" title={entry.title}>{entry.title}</span>}</td><td data-label={t("总消耗")}>{number(entry.totalTokens)} <small>tokens</small></td><td data-label={t("本周消耗")}>{number(entry.weeklyTokens)} <small>tokens</small></td><td data-label={t("周命中率")}>{percent(cacheRate(entry.weeklyInputTokens,entry.weeklyCachedInputTokens))}</td></tr>):<tr><td colSpan={4} className="usage-table-empty">{loading?t("正在读取用量…"):t("尚无已记录用量")}</td></tr>}</tbody></table></div>
+      <div className="usage-table-wrap"><table className="usage-table"><thead><tr><th>{session?t("会话"):t("项目")}</th><th>{t("总消耗")}</th><th>{t("本周消耗")}</th><th>{t("周命中率")}</th></tr></thead><tbody>{visible?.length?visible.map(entry=><tr key={entry.id}><td>{session?<button className="usage-table__name" title={displayName(entry.title)} type="button" onClick={()=>onSession(entry.id)}>{displayName(entry.title)}</button>:<span className="usage-table__name" title={displayName(entry.title)}>{displayName(entry.title)}</span>}</td><td data-label={t("总消耗")}>{number(entry.totalTokens)} <small>tokens</small></td><td data-label={t("本周消耗")}>{number(entry.weeklyTokens)} <small>tokens</small></td><td data-label={t("周命中率")}>{percent(cacheRate(entry.weeklyInputTokens,entry.weeklyCachedInputTokens))}</td></tr>):<tr><td colSpan={4} className="usage-table-empty">{loading?t("正在读取用量…"):t("尚无已记录用量")}</td></tr>}</tbody></table></div>
       {totalPages>1&&<nav className="usage-pagination" aria-label={session?t("会话分页"):t("项目分页")}>
         <button type="button" disabled={safePage===1} onClick={()=>setPage(safePage-1)}>{t("上一页")}</button>
         {pageItems(safePage,totalPages).map((item,index)=>item==="ellipsis"?<span key={`ellipsis-${index}`} aria-hidden="true">…</span>:<button key={item} type="button" aria-current={item===safePage?"page":undefined} aria-label={t("第 {0} 页",item)} onClick={()=>setPage(item)}>{item}</button>)}
@@ -43,7 +44,7 @@ export function UsageView({machines,selectedId,onSelect,onSession}:{machines:Mac
   return <section className="wide-view usage-view">
     <div className="wide-view__heading"><div><h1>{t("消耗")}</h1><p>{t("查看本周额度、项目与会话的 token 消耗和缓存效率。")}</p></div><BarChart3 size={30}/></div>
     {!machine?<div className="usage-empty"><h2>{t("暂无主机")}</h2><p>{t("连接主机后，用量会在这里按项目和会话汇总。")}</p></div>:<>
-      <div className="usage-toolbar"><label><span>{t("主机")}</span><select value={machine.id} onChange={event=>onSelect(event.target.value)}>{machines.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button className="button button--quiet" type="button" disabled={refreshing||loading} onClick={()=>void refresh()}><RefreshCw className={refreshing?"spin":undefined} size={15}/>{t("刷新消耗")}</button></div>
+      <div className="usage-toolbar"><label><span>{t("主机")}</span><select value={machine.id} onChange={event=>onSelect(event.target.value)}>{machines.map(item=><option key={item.id} value={item.id}>{displayName(item.name)}</option>)}</select></label><button className="button button--quiet" type="button" disabled={refreshing||loading} onClick={()=>void refresh()}><RefreshCw className={refreshing?"spin":undefined} size={15}/>{t("刷新消耗")}</button></div>
       {failed&&<p className="usage-error" role="status">{t("用量读取失败，请稍后重试。")}</p>}
       <div className="usage-overview-cards">
         <article><span>{t("官方周额度剩余")}</span><strong>{weekly.length===1?t("{0}%",weekly[0].window.remainingPercent):"—"}</strong><small>{weekly.length===1&&weekly[0].window.resetsAt?t("重置于 {0}",date(new Date(weekly[0].window.resetsAt*1000).toISOString())):t("等待额度上报")}</small></article>

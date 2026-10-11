@@ -1245,7 +1245,7 @@ export async function buildControlPlane(
   });
   app.get("/api/sessions/:id/progress", { preHandler: authenticate }, async (request,reply) => {
     reply.header("cache-control","no-store");
-    return sessionProgress.read(request.principal as Principal,routeId(request));
+    return sessionProgress.read(request.principal as Principal,routeId(request),undefined,(request.query as Record<string,unknown>).activity === "1");
   });
   app.get("/api/sessions/:id", { preHandler: authenticate }, async (request) => {
     const principal = request.principal as Principal;
