@@ -432,6 +432,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     type,
     occurredAt: string(raw.occurredAt, new Date().toISOString()),
     actor,
+    itemType: itemType || undefined,
     title: eventTitle(type, item),
     ...(type === "thread.history.order" ? {historyOrder:list(payload.items).map(record).filter(x=>typeof x.itemId === "string" && Number.isSafeInteger(x.index)).map(x=>({itemId:String(x.itemId),index:Number(x.index),...(typeof x.occurredAt === "string" ? {occurredAt:x.occurredAt} : {})}))} : {}),
     images: list(item.content).map(record).filter(entry => entry.type === "image" && isInlineImage(entry.url)).slice(0, 4).map(entry => entry.url as string),

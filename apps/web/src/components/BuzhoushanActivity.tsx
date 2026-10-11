@@ -1,3 +1,5 @@
+import { isConversationEvent } from "../lib/buzhoushan-events";
+import { timelineItems } from "../lib/timeline-items";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, FileCode2, Terminal, RotateCcw } from "lucide-react";
 import { useSessionProgress } from "./RuntimeProgress";
@@ -14,12 +16,12 @@ export function workbenchItems(detail: SessionDetail, progress?: SessionProgress
   const turn = detail.session.activeTurnId || matching?.nativeTurnId || [...detail.events].reverse().find(event=>event.nativeTurnId)?.nativeTurnId;
   const hidden = new Set(detail.events.filter(event=>event.payloadState === "deleted" || event.payloadState === "suppressed").map(event=>event.nativeItemId || event.id));
   const items = new Map<string,ActivityItem>();
-  for (const event of detail.events) {
+  for (const event of timelineItems(detail.events)) {
     const id = event.nativeItemId || event.id;
-    if (hidden.has(id) || (turn && event.nativeTurnId !== turn) || !(event.command || event.diff || event.fileChanges?.length)) continue;
-    items.set(id,{id,kind:event.command?"commandExecution":"fileChange",status:event.status || (event.type==="item.completed"?"completed":"unknown"),
-      title:event.command || event.fileChanges?.map(change=>change.path).join(", ") || event.title || t("修改文件"),
-      output:event.output || event.fileChanges?.map(change=>change.diff).join("\n") || undefined,updatedAt:event.occurredAt});
+    if (hidden.has(id) || (turn && event.nativeTurnId && event.nativeTurnId !== turn) || isConversationEvent(event)) continue;
+    items.set(id,{id,kind:event.diff || event.fileChanges?.length?"fileChange":event.command?"commandExecution":event.itemType || "process",status:event.status || (event.type==="item.completed"?"completed":"unknown"),
+      title:event.command || event.fileChanges?.map(change=>change.path).join(", ") || event.title || event.type,
+      output:event.output || event.body || event.fileChanges?.map(change=>change.diff).join("\n") || undefined,updatedAt:event.occurredAt});
   }
   for (const item of matching?.items ?? []) if (!hidden.has(item.id) && (item.kind === "commandExecution" || item.kind === "fileChange")) items.set(item.id,item);
   return [...items.values()].slice(-60);
@@ -37,7 +39,7 @@ export function BuzhoushanActivity({detail}: {detail: SessionDetail}) {
   const [height,setHeight] = useState(() => {try { const n=Number(localStorage.getItem(HEIGHT_KEY));return clamp(n>0?n:220); } catch {return clamp(220);} });
   const output = useRef<HTMLPreElement>(null);
   const drag = useRef<{y:number;height:number} | undefined>(undefined);
-  const visible = items.filter(item => item.kind === tab);
+  const visible = items.filter(item => tab === "fileChange" ? item.kind === "fileChange" : item.kind !== "fileChange");
   const current = following ? visible.at(-1) : visible.find(item=>item.id===selected);
   useEffect(() => { if (following && output.current) output.current.scrollTop = output.current.scrollHeight; }, [following,current?.id,current?.output,collapsed]);
   const isLive = active && scoped?.freshness === "live" && !unavailable && detail.hostOnline !== false;

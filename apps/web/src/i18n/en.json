@@ -3244,5 +3244,7 @@
   "真实执行记录": "Actual execution activity",
   "本轮未收到原生文件变更事件，脚本操作请查看终端": "No native file-change events for this turn. Check Terminal for script operations.",
   "向左查看更多主机": "Scroll hosts left",
-  "向右查看更多主机": "Scroll hosts right"
+  "向右查看更多主机": "Scroll hosts right",
+  "正在执行，过程见终端": "Running · follow progress in Terminal",
+  "等待新的对话消息": "Waiting for the next conversation message"
 }

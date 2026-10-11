@@ -1,3 +1,5 @@
+import { isConversationEvent } from "./lib/buzhoushan-events";
+import { BuzhoushanHeartbeat } from "./components/BuzhoushanHeartbeat";
 import { displayName } from "./lib/display-name";
 import { useBuzhoushanDesktop } from "./lib/buzhoushan";
 import { BuzhoushanActivity } from "./components/BuzhoushanActivity";
@@ -874,8 +876,9 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
   if (!detail) return <aside className="inspector inspector--empty"><MonitorDot size={27} /><h2>{t("选择一个会话")}</h2><p>{t("打开已有会话，或新建会话开始。")}</p></aside>;
 
   const { session, approval } = detail;
-  const rawEvents = rawView ? detail.events.filter(event => event.payloadState !== "deleted" && event.body) : [];
-  const visibleEvents = timelineItems(detail.events);
+  const rawEvents = rawView ? detail.events.filter(event => event.payloadState !== "deleted" && event.body && (!buzhouDesktop || isConversationEvent(event))) : [];
+  const projectedEvents = timelineItems(detail.events);
+  const visibleEvents = buzhouDesktop ? projectedEvents.filter(isConversationEvent) : projectedEvents;
   const lease = session.controlLease;
   const managed = session.state.ownership === "agentfleet_owned";
   const pendingCommand = (detail.commands ?? []).some(commandPending);
@@ -1049,7 +1052,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
         </div>
       )}
       {session.state.unknownFreeze && <div className="freeze-banner"><AlertTriangle size={17} /><div><strong>{t("结果不确定，写入已冻结")}</strong><span>{t("可以点击解除冻结核验主机结果；系统不会自动重发原命令。")}</span><SessionRecovery key={`${draftOwner}:${session.id}`} machineId={session.machineId} sessionId={session.id} online={detail.hostOnline === true} supported={detail.recoverySupported === true} onChanged={onRefresh} /></div></div>}
-      <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? detail.events : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}</ConversationViewport>
+      <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? rawEvents : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}{buzhouDesktop && <BuzhoushanHeartbeat key={session.id} detail={detail} messages={visibleEvents}/>}</ConversationViewport>
       {approval?.status === "pending" && (approval.type === "user_input"
         ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} onChanged={onRefresh} />
         : <ApprovalCard approval={approval} provider={session.provider} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
@@ -1581,6 +1584,7 @@ function App() {
         id,
         sessionSeq: current.session.sessionSeq + 1,
         type: update.eventType,
+        nativeTurnId: update.nativeTurnId,
         occurredAt: existing?.occurredAt ?? new Date().toISOString(),
         actor: update.eventType === "agent_message.delta" ? "agent" : "system",
         title: update.eventType === "agent_message.delta" ? `${agentName(detail?.session.provider)} · ${t("实时")}` : update.eventType === "command_output.delta" ? t("命令输出 · 实时") : t("变更预览 · 实时"),

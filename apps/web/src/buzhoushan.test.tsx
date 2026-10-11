@@ -1,3 +1,5 @@
+import {BuzhoushanHeartbeat} from "./components/BuzhoushanHeartbeat";
+import {isConversationEvent} from "./lib/buzhoushan-events";
 // @vitest-environment jsdom
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 import {afterEach, expect, it, vi} from 'vitest';
@@ -70,4 +72,24 @@ it('keeps terminal commands and file edits in distinct tabs without a duplicate 
  expect(screen.queryByText(/partial check output/)).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'重置活动布局'}));
  expect(screen.getByRole('button',{name:'终端'}).getAttribute('aria-pressed')).toBe('true');
+});
+
+it('keeps reasoning and command output in the terminal and conversation text in chat',()=>{
+ const d=detail();const base={sessionSeq:1,occurredAt:'2026-01-01',nativeTurnId:'turn-a',type:'item.completed'};
+ d.events=[{...base,id:'reason',actor:'agent',itemType:'reasoning',body:'public reasoning summary'}, {...base,id:'reply',actor:'agent',itemType:'agentMessage',body:'Reply'}, {...base,id:'user',actor:'user',itemType:'userMessage',body:'Request'}, {...base,id:'cmd',itemType:'commandExecution',command:'npm test',output:'checks'}];
+ expect(d.events.filter(isConversationEvent).map(e=>e.id)).toEqual(['reply','user']);
+ expect(workbenchItems(d).map(e=>e.id)).toEqual(['reason','cmd']);
+ expect(workbenchItems(d)[0].output).toBe('public reasoning summary');
+});
+it('shows a quiet-running heartbeat but stops for replies, approvals, offline and completion',()=>{
+ vi.useFakeTimers();const d=detail();
+ const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+ expect(screen.getByRole('status')).toBeTruthy();
+ const messages=[{id:'reply',sessionSeq:1,type:'agent_message.delta',actor:'agent' as const,nativeTurnId:'turn-a',body:'Writing reply',occurredAt:'2026-01-01'}];
+ view.rerender(<BuzhoushanHeartbeat detail={d} messages={messages}/>);
+ expect(screen.queryByRole('status')).toBeNull();
+ act(()=>vi.advanceTimersByTime(10_000));expect(screen.getByRole('status')).toBeTruthy();
+ d.session.state.waitReason='approval';view.rerender(<BuzhoushanHeartbeat detail={d} messages={messages}/>);expect(screen.queryByRole('status')).toBeNull();
+ d.session.state.waitReason='none';d.hostOnline=false;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
+ d.hostOnline=true;d.session.activeTurnId=undefined;d.session.state.currentTurn='none';view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);expect(screen.queryByRole('status')).toBeNull();
 });
