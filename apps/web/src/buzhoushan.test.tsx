@@ -210,3 +210,36 @@ it('a replayed started item cannot reopen an already completed reply',()=>{
  d.events.push({...done,id:'late-start',sessionSeq:3,type:'item.started'});view.rerender(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);
  expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
 });
+
+it('does not replay the same reply after four incomplete snapshots or late deltas',()=>{
+ vi.useFakeTimers();const d=detail();
+ const done={id:'done',nativeItemId:'reply',nativeTurnId:'turn-a',sessionSeq:5,type:'item.completed',itemType:'agentMessage',actor:'agent' as const,body:'Already displayed reply',occurredAt:'2026-01-01'};
+ d.events=[done];const view=render(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);
+ act(()=>vi.advanceTimersByTime(1000));
+ for(let i=0;i<4;i++){
+  d.events=[{...done,id:'tool'+i,nativeItemId:'tool'+i,itemType:'reasoning',sessionSeq:6+i}];
+  view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+  d.events=[done];view.rerender(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);
+  expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
+ }
+ d.events=[{...done,id:'late',type:'agent_message.delta',sessionSeq:10}];
+ view.rerender(<BuzhoushanHeartbeat detail={d} messages={d.events}/>);
+ expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
+ d.events=[{...done,id:'new',nativeItemId:'new-reply',type:'agent_message.delta',sessionSeq:11}];
+ view.rerender(<BuzhoushanHeartbeat detail={d} messages={d.events}/>);
+ expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');
+});
+
+it('does not reuse completed-message memory across turn or content boundaries',()=>{
+ vi.useFakeTimers();
+ for(const boundary of ['turn','content','thread']) {
+  const d=detail();const done={id:'done',nativeItemId:'same',nativeTurnId:'turn-a',sessionSeq:1,type:'item.completed',itemType:'agentMessage',body:'Complete',occurredAt:'2026-01-01'};
+  d.events=[done];const view=render(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);act(()=>vi.advanceTimersByTime(1000));
+  if(boundary==='turn')d.session.activeTurnId='next';
+  if(boundary==='content')d.session.contentEpoch++;
+  if(boundary==='thread')d.session.nativeThreadId='next-thread';
+  d.events=[{...done,id:'new',type:'agent_message.delta',nativeTurnId:d.session.activeTurnId}];
+  view.rerender(<BuzhoushanHeartbeat detail={d} messages={d.events}/>);
+  expect(screen.getByRole('status').getAttribute('data-mode')).toBe('reply');view.unmount();
+ }
+});

@@ -13,15 +13,15 @@ export function preserveBuzhoushanStream(previous:SessionDetail|undefined, next:
   return pending.length ? {...next,events:[...next.events,...pending]} : next;
 }
 
-export function buzhoushanReplyState(detail:SessionDetail,messages:TimelineEvent[]) {
+export function buzhoushanReplyState(detail:SessionDetail,messages:TimelineEvent[], knownCompleted:ReadonlySet<string>=new Set()) {
   const turn=detail.session.activeTurnId;
   const events=[...detail.events,...messages].filter(e=>Boolean(turn)&&e.nativeTurnId===turn).sort((a,b)=>a.sessionSeq-b.sessionSeq);
   const ended=events.some(e=>terminal.has(e.type));
-  const completed=new Set(events.filter(e=>e.type==='item.completed' && reply(e)).map(identity));
-  const replies=events.filter(e=>readable(e)&&reply(e)&&Boolean(e.body?.trim()));
+  const completed=new Set([...knownCompleted,...events.filter(e=>e.type==='item.completed' && reply(e)).map(identity)]);
+  const replies=events.filter(e=>readable(e)&&reply(e)&&Boolean(e.body?.trim()) && (!['agent_message.delta','item.started'].includes(e.type)||!completed.has(identity(e))));
   const open=replies.some(e=>['agent_message.delta','item.started'].includes(e.type)&&!completed.has(identity(e)));
   const last=replies.filter(e=>!['agent_message.delta','item.started'].includes(e.type)||!completed.has(identity(e))).at(-1);
   const finished=last && (last.type==='item.completed'||last.type==='message');
   const completionKey=finished ? JSON.stringify([detail.session.id,detail.session.nativeThreadId,detail.session.contentEpoch,detail.session.projectionEpoch,turn,identity(last)]) : undefined;
-  return {ended,open,hasReply:replies.length>0,completionKey};
+  return {ended,open,hasReply:replies.length>0,completionKey,completed};
 }
