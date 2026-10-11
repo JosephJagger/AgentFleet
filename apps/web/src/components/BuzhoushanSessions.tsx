@@ -49,11 +49,12 @@ function SessionRow({kind,sessions,selectedId,online,detail,onSelect}:{kind:'run
 export function BuzhoushanSessions({enabled,machine,sessions,selectedId,detail,onSelect,onBrowse,onCreate,children}:{enabled:boolean;machine?:Machine;sessions:FleetSession[];selectedId?:string;detail?:SessionDetail;onSelect:(id:string)=>void;onBrowse:()=>void;onCreate:()=>void;children:ReactNode}) {
   if(!enabled)return <>{children}</>;
   const groups=hostSessionGroups(sessions,machine);
+  const showSwitcher=groups.running.length!==1 || groups.managed.length>0;
   return <div className="buzhou-editor">
-    <div className="buzhou-session-switcher" aria-label={t('当前主机会话切换')}>
+    {showSwitcher && <div className="buzhou-session-switcher" aria-label={t('当前主机会话切换')}>
       {(['running','managed'] as const).map(kind=><SessionRow key={`${machine?.id}:${kind}`} kind={kind} sessions={groups[kind]} selectedId={selectedId} online={machine?.reachability==='live'} detail={detail} onSelect={onSelect}/>)}
       {!groups.running.length&&!groups.managed.length&&<div className="buzhou-session-empty-actions"><button type="button" onClick={onBrowse}>{t('展开项目与会话')}</button><button type="button" onClick={onCreate} disabled={!machine||machine.reachability!=='live'}>{t('新会话')}</button></div>}
-    </div>
+    </div>}
     {children}
   </div>;
 }

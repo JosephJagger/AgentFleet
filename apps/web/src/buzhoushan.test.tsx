@@ -195,3 +195,18 @@ it('reasoning lifecycle and duplicate completion receipts never restart a settle
  view.rerender(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);
  expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
 });
+
+it('empty reply lifecycle cannot pause heartbeat without visible reply text',()=>{
+ vi.useFakeTimers();const d=detail();const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+ for(const type of ['item.started','item.completed']) {
+  d.events.push({id:type,nativeItemId:'empty',sessionSeq:d.events.length+1,type,itemType:'agentMessage',actor:'agent',nativeTurnId:'turn-a',body:'   ',occurredAt:'2026-01-01'});
+  view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
+  expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
+ }
+});
+it('a replayed started item cannot reopen an already completed reply',()=>{
+ vi.useFakeTimers();const d=detail();const done={id:'done',nativeItemId:'reply',sessionSeq:1,type:'item.completed',itemType:'agentMessage',actor:'agent' as const,nativeTurnId:'turn-a',body:'Complete',occurredAt:'2026-01-01'};
+ d.events=[done];const view=render(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);act(()=>vi.advanceTimersByTime(1000));
+ d.events.push({...done,id:'late-start',sessionSeq:3,type:'item.started'});view.rerender(<BuzhoushanHeartbeat detail={d} messages={[done]}/>);
+ expect(screen.getByRole('status').getAttribute('data-mode')).toBe('heartbeat');
+});

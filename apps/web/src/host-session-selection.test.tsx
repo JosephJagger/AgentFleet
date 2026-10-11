@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import {useEffect} from 'react';
 import {cleanup,fireEvent,render,screen,within} from '@testing-library/react';
 import {afterEach,expect,it,vi} from 'vitest';
 import {hostSessionGroups,preferredHostSession,rememberHostSession,rememberedHostSession} from './lib/host-session-selection';
@@ -46,4 +47,17 @@ it('shows explicit empty states and browse/create actions; other themes retain o
  const props={enabled:true,machine,sessions:[],onSelect:vi.fn(),onBrowse:browse,onCreate:create,children:<div>Conversation</div>};const view=render(<BuzhoushanSessions {...props}/>);
  expect(screen.getByText('暂无运行会话')).toBeTruthy();expect(screen.getByText('暂无已接管会话')).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'展开项目与会话'}));expect(browse).toHaveBeenCalledOnce();fireEvent.click(screen.getByRole('button',{name:'新会话'}));expect(create).toHaveBeenCalledOnce();
  view.rerender(<BuzhoushanSessions {...props} enabled={false}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();expect(screen.getByText('Conversation')).toBeTruthy();
+});
+
+it('hides the switcher for a sole running session without remounting the conversation',()=>{
+ vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
+ const mounted=vi.fn(),unmounted=vi.fn();function Conversation(){useEffect(()=>{mounted();return unmounted;},[]);return <div>Stable conversation</div>;}
+ const a=session('a',true);const props={enabled:true,machine,sessions:[a],selectedId:'a',onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<Conversation/>};
+ const view=render(<BuzhoushanSessions {...props}/>);
+ expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();expect(screen.getByText('Stable conversation')).toBeTruthy();
+ for(const sessions of [[a,session('b',true)],[a,session('idle')]]) {
+  view.rerender(<BuzhoushanSessions {...props} sessions={sessions}/>);expect(screen.getByLabelText('当前主机会话切换')).toBeTruthy();
+  view.rerender(<BuzhoushanSessions {...props}/>);expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
+ }
+ expect(mounted).toHaveBeenCalledOnce();expect(unmounted).not.toHaveBeenCalled();
 });
