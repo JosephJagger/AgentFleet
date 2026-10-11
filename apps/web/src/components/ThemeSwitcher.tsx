@@ -34,7 +34,7 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
         <option value="whitesnake">{t("白蛇传说")}</option>
         <option value="qingming">{t("清明上河")}</option>
         <option value="jiangshan">{t("千里江山")}</option>
-        <option value="buzhoushan">{t("不周山")}</option>
+        <option value="buzhoushan">{t("不周山")} · {t("仅限桌面直播")}</option>
       </select>
     </label>
   );
@@ -59,7 +59,7 @@ const themeOptions: { value: Theme; label: string; description: string }[] = [
   { value: "whitesnake", label: "白蛇传说", description: "断桥烟雨、青白瓷色与水波细线" },
   { value: "qingming", label: "清明上河", description: "汴京舟桥、绢本淡墨与宋画暖褐" },
   { value: "jiangshan", label: "千里江山", description: "青绿山水、石青石绿与绢本金边" },
-  { value: "buzhoushan", label: "不周山", description: "桌面专属 · 经典编辑器布局与直播工作台" },
+  { value: "buzhoushan", label: "不周山", description: "仅限桌面直播" },
 ];
 const illustrated = (value: Theme) => value !== "matrix" && value !== "official" && value !== "buzhoushan";
 const sceneAsset = (value: Theme) => value === "eyecare" ? "rabbit" : value;
