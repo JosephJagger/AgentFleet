@@ -1018,7 +1018,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           </div>
         <div className="inspector-head__actions">
       {session.provider !== "claude" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
-          <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span>{t("会话配置")}</span></button>
+          <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
           <SessionActions>
             <button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(new URL(sessionPath(session.id), window.location.origin).href); setCommandMessage(t("已复制会话链接")); } catch { setCommandMessage(t("浏览器未允许复制会话链接")); } }}><Copy size={16} />{t("复制会话链接")}</button>
             {onSchedule && <button type="button" className="button button--quiet" onClick={onSchedule}><Clock3 size={16}/>{t("定时执行")}</button>}

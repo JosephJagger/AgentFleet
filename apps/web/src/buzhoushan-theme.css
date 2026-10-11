@@ -237,3 +237,17 @@
   :root[data-theme="buzhoushan"] .buzhou-focus .rail-track { margin:0; scrollbar-width:none; }
   :root[data-theme="buzhoushan"] .buzhou-focus .session-call-actions .native-voice__trigger { width:26px; min-width:26px; height:26px; min-height:26px; padding:3px; }
 }
+
+.buzhou-focus-label { display:none; }
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-full-label { display:none; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-focus-label { display:inline; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-head { grid-template-columns:minmax(160px,1fr) auto auto; gap:8px; min-height:38px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-context { display:none; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-title-row > h2 { grid-column:1; grid-row:1; min-width:0; line-height:26px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-facts { grid-column:2; grid-row:1; flex-wrap:nowrap; gap:6px; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-quota-card--forecast strong { display:none; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .usage-trigger-text small { display:none; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-call-actions { margin:0; }
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-facts > [role="status"] { max-width:180px; font-size:11px; }
+}

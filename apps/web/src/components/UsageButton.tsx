@@ -71,7 +71,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
         <small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>
       </button>
       {!claude&&<button type="button" className="buzhou-quota-card buzhou-quota-card--forecast" onClick={()=>{setRadarOpen(true);refreshUsage.current();}} aria-haspopup="dialog">
-        <span><small>{t("临时重置预测")}</small><strong>{failed?t("更新暂时延迟"):radarLabel}</strong></span>
+        <span><small className="buzhou-full-label">{t("临时重置预测")}</small><small className="buzhou-focus-label">{t("重置预测")}</small><strong>{failed?t("更新暂时延迟"):radarLabel}</strong></span>
         <small>{t("公告仅供参考，额度与日期以原生最新数据为准")}</small>
       </button>}
     </div> : <button type="button" className={`button button--quiet usage-trigger${richMachineSummary?" usage-trigger--machine-rich":""}`} onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>

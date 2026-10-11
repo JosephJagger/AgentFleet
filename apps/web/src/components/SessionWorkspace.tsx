@@ -16,7 +16,7 @@ export function SessionWorkspace(props: { session: FleetSession; commands: Comma
   const [tab, setTab] = useState<"files" | "terminal" | "history" | "tools">("files");
   const [open, setOpen] = useState(false);
   const [opened, setOpened] = useState(false);
-  return <><button type="button" className="button button--quiet session-config-trigger" aria-label={t("项目工具")} title={t("项目工具")} aria-haspopup="dialog" onClick={() => { setOpened(true); setOpen(true); }}><FolderOpen size={18}/><span>{t("项目工具")}</span></button>
+  return <><button type="button" className="button button--quiet session-config-trigger" aria-label={t("项目工具")} title={t("项目工具")} aria-haspopup="dialog" onClick={() => { setOpened(true); setOpen(true); }}><FolderOpen size={18}/><span className="buzhou-full-label">{t("项目工具")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("工具")}</span></button>
     {opened && createPortal(<SessionConfiguration request={open ? {section:"all",nonce:0} : undefined} heading={t("项目工具")} closeLabel={t("关闭项目工具")} title={displayName(`${props.session.projectAlias ?? ""} · ${props.session.machineName ?? ""}`)} onClose={() => setOpen(false)}>
     <p className="project-tools-description">{t("手动查看项目文件、执行命令，或查看会话历史与子代理。日常对话直接使用消息框即可。")}</p><div className="project-tools-panel">
     <SettingsSections label={t("项目工作区分类")} value={tab} onChange={setTab} items={[
