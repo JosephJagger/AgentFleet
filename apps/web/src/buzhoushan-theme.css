@@ -69,11 +69,14 @@
   :root[data-theme="buzhoushan"] .button--primary { background:#007acc; color:#fff; border-color:transparent; }
   :root[data-theme="buzhoushan"] .composer-input { background:#252526; border:1px solid #454545; }
   :root[data-theme="buzhoushan"] .buzhou-status { grid-area:status; display:flex; align-items:center; gap:18px; min-width:0; padding:0 12px; font-size:11px; color:#fff; background:#007acc; white-space:nowrap; overflow:hidden; }
-  :root[data-theme="buzhoushan"] .buzhou-status .rail-status { display:flex; gap:12px; padding:0; margin:0; border:0; }
-  :root[data-theme="buzhoushan"] .buzhou-status .fleet-shortcut { display:flex; align-items:center; gap:5px; padding:0; border:0; height:24px; min-height:24px; background:transparent; color:#fff; border-radius:0; box-shadow:none; }
-  :root[data-theme="buzhoushan"] .buzhou-status .fleet-shortcut :is(strong,span) { font-size:11px; color:#fff; }
+  :root[data-theme="buzhoushan"] .buzhou-status .rail-status { display:flex; align-items:center; flex:none; height:24px; gap:16px; padding:0; margin:0; border:0; }
+  :root[data-theme="buzhoushan"] .buzhou-status .fleet-shortcut { display:flex; align-items:center; gap:5px; width:auto; flex:none; line-height:24px; padding:0; border:0; height:24px; min-height:24px; background:transparent; color:#fff; border-radius:0; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .buzhou-status .fleet-shortcut :is(strong,span) { font-size:11px; line-height:24px; color:#fff; }
   :root[data-theme="buzhoushan"] .buzhou-status .fleet-shortcut svg { display:none; }
-  :root[data-theme="buzhoushan"] .buzhou-status .relay-state { font-size:11px; color:#fff; margin:0; }
+  :root[data-theme="buzhoushan"] .buzhou-status .relay-state { display:flex; align-items:center; flex:none; height:24px; min-height:0; gap:6px; padding:0; border:0; margin:0; font-size:11px; line-height:24px; color:#fff; }
+  :root[data-theme="buzhoushan"] .buzhou-status .relay-state > span:last-child { font-size:11px; line-height:24px; color:inherit; }
+  :root[data-theme="buzhoushan"] .buzhou-status .relay-state > .status-dot { flex:none; margin:0; }
+  :root[data-theme="buzhoushan"] .buzhou-status .stat-value { min-width:0; }
   :root[data-theme="buzhoushan"] .buzhou-status__right { margin-left:auto; }
   :root[data-theme="buzhoushan"] .buzhou-focus-toggle { border:1px solid #666; background:transparent; color:#ddd; padding:5px 10px; border-radius:3px; font-size:12px; }
   :root[data-theme="buzhoushan"] .buzhou-focus-toggle[aria-pressed="true"] { border-color:#3794ff; background:#163a53; }
