@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
+import boot from "../public/theme-init.js?raw";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ThemeSettings, ThemeSwitcher } from "./components/ThemeSwitcher";
@@ -90,7 +90,6 @@ describe("theme switching", () => {
 it("initial paint restores every selectable theme before React loads",()=>{
  render(<ThemeSwitcher/>);
  const values=Array.from(screen.getByRole("combobox").querySelectorAll("option")).map(o=>o.value);
- const boot=readFileSync("public/theme-init.js","utf8");
  for(const value of values){
    localStorage.setItem("agentfleet.theme",value);
    new Function("document","localStorage",boot)(document,localStorage);
