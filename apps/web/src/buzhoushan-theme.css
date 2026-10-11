@@ -255,3 +255,14 @@
 @media (min-width:1101px) {
   :root[data-theme="buzhoushan"] .timeline-event[data-heartbeat-clipped="true"] { visibility:hidden; pointer-events:none; }
 }
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .topbar-actions { gap:8px; }
+  :root[data-theme="buzhoushan"] .topbar-actions > .panel-voice-control > .button:not(.panel-voice-control__floating) { min-height:30px; height:30px; padding:4px 8px; gap:6px; font-size:12px; font-weight:500; }
+  :root[data-theme="buzhoushan"] .topbar-actions > .panel-voice-control > .button:not(.panel-voice-control__floating) svg { width:15px; height:15px; }
+  :root[data-theme="buzhoushan"] .topbar-actions > .language-switcher { gap:4px; margin:0; font-size:12px; }
+  :root[data-theme="buzhoushan"] .topbar-actions > .language-switcher select { min-height:30px; height:30px; font-size:12px; padding:3px 6px; border-radius:3px; }
+  :root[data-theme="buzhoushan"] .topbar-actions > .language-switcher svg { width:14px; height:14px; }
+  :root[data-theme="buzhoushan"] .topbar-actions > .icon-button { min-width:30px; width:30px; min-height:30px; height:30px; padding:6px; }
+  :root[data-theme="buzhoushan"] .topbar-actions > .icon-button svg { width:15px; height:15px; }
+}
