@@ -47,16 +47,13 @@ function SessionRow({kind,sessions,selectedId,online,detail,onSelect}:{kind:'run
   </section>;
 }
 export function BuzhoushanSessions({enabled,machine,sessions,selectedId,detail,onSelect,onBrowse,onCreate,children}:{enabled:boolean;machine?:Machine;sessions:FleetSession[];selectedId?:string;detail?:SessionDetail;onSelect:(id:string)=>void;onBrowse:()=>void;onCreate:()=>void;children:ReactNode}) {
-  const [expandedFor,setExpandedFor]=useState<string>();
-  const scope=JSON.stringify([machine?.id,selectedId]);
   if(!enabled)return <>{children}</>;
   const groups=hostSessionGroups(sessions,machine);
-  const showSwitcher=!selectedId || expandedFor===scope;
-  const select=(id:string)=>{setExpandedFor(undefined);onSelect(id);};
+  const showSwitcher=!selectedId;
   return <div className="buzhou-editor">
-    {selectedId && <div className="buzhou-session-toggle"><button type="button" aria-expanded={showSwitcher} onClick={()=>setExpandedFor(showSwitcher?undefined:scope)}><Layers3 size={13}/>{showSwitcher?t('收起会话选择'):t('切换会话')}</button></div>}
+    {selectedId && <div className="buzhou-session-toggle"><button type="button" aria-controls="workbench-catalog" title={t('展开项目与会话')} onClick={onBrowse}><Layers3 size={13}/>{t('切换会话')}</button></div>}
     {showSwitcher && <div className="buzhou-session-switcher" aria-label={t('当前主机会话切换')}>
-      {(['running','managed'] as const).map(kind=><SessionRow key={`${machine?.id}:${kind}`} kind={kind} sessions={groups[kind]} selectedId={selectedId} online={machine?.reachability==='live'} detail={detail} onSelect={select}/>)}
+      {(['running','managed'] as const).map(kind=><SessionRow key={`${machine?.id}:${kind}`} kind={kind} sessions={groups[kind]} selectedId={selectedId} online={machine?.reachability==='live'} detail={detail} onSelect={onSelect}/>)}
       {!groups.running.length&&!groups.managed.length&&<div className="buzhou-session-empty-actions"><button type="button" onClick={onBrowse}>{t('展开项目与会话')}</button><button type="button" onClick={onCreate} disabled={!machine||machine.reachability!=='live'}>{t('新会话')}</button></div>}
     </div>}
     {children}
