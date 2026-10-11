@@ -3,6 +3,7 @@
 @media (min-width:1101px) {
   :root[data-theme="buzhoushan"] {
     color-scheme:dark; zoom:1;
+    --buzhou-conversation-font-size:14px;
     --canvas:#1e1e1e; --paper:#1e1e1e; --paper-solid:#252526; --terminal:#181818;
     --ink:#d4d4d4; --muted:#aaa; --faint:#9a9a9a; --line:#383838; --line-strong:#646464; --component-line:#383838;
     --cobalt:#3794ff; --cobalt-deep:#007acc; --cobalt-soft:#163a53;
@@ -56,7 +57,8 @@
   :root[data-theme="buzhoushan"] .session-row { border-radius:3px; padding:8px; }
   :root[data-theme="buzhoushan"] .session-row--active { border-color:#007acc; background:#094771; }
   :root[data-theme="buzhoushan"] .composer { padding:6px 16px 10px; }
-  :root[data-theme="buzhoushan"] .composer textarea { min-height:44px; font-size:14px; }
+  :root[data-theme="buzhoushan"] .composer textarea { min-height:44px; font-size:var(--buzhou-conversation-font-size); }
+  :root[data-theme="buzhoushan"] :is(.timeline-event--user > p,.timeline-event--agent .message-markdown,.voice-request__preview,.voice-request__content p) { font-size:var(--buzhou-conversation-font-size); }
   :root[data-theme="buzhoushan"] .lease-strip { min-height:32px; }
   :root[data-theme="buzhoushan"] .inspector { grid-area:editor; border:0; background:#1e1e1e; min-height:0; overflow-y:auto; }
   :root[data-theme="buzhoushan"] .inspector-head { padding:10px 18px; background:#252526; }
