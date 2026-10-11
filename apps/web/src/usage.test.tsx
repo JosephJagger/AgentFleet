@@ -202,3 +202,15 @@ it("shows delayed refresh while retaining the last analyzed timeline",async()=>{
  expect(within(dialog).getByText(/更新于/)).toBeTruthy();
  expect(screen.queryByText("信号检查失败")).toBeNull();
 });
+it("compact session-header quota uses its host and opens the independent reset timeline",async()=>{
+ vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine"});
+ const view=render(<UsageButton scope="machine" id="host-a" compactQuota/>);
+ expect(await screen.findByText("38%")).toBeTruthy();
+ expect(api.usage).toHaveBeenCalledWith("machine","host-a",expect.any(AbortSignal),"codex");
+ fireEvent.click(screen.getByRole("button",{name:/临时重置预测/}));
+ expect(screen.getByRole("dialog",{name:"重置消息时间轴"})).toBeTruthy();
+ view.rerender(<UsageButton scope="machine" id="host-b" provider="claude" compactQuota/>);
+ await waitFor(()=>expect(api.usage).toHaveBeenCalledWith("machine","host-b",expect.any(AbortSignal),"claude"));
+ expect(screen.queryByRole("button",{name:/临时重置预测/})).toBeNull();
+ expect(screen.queryByText("38%")).toBeNull();
+});

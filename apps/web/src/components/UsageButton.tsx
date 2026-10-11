@@ -7,7 +7,7 @@ import { api } from "../lib/api";
 import type { UsageSummary } from "../lib/usage";
 import { locale, t } from "../i18n";
 const cacheRate=(input:number|null|undefined,cached:number|null|undefined)=>input&&cached!=null?cached/input*100:null;
-export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"codex"|"claude";scope:"session"|"project"|"machine";id:string;onSession?:(id:string)=>void}) {
+export function UsageButton({scope,id,onSession,provider="codex",compactQuota=false}:{compactQuota?:boolean;provider?:"codex"|"claude";scope:"session"|"project"|"machine";id:string;onSession?:(id:string)=>void}) {
   const [data,setData]=useState<UsageSummary>();const [failed,setFailed]=useState(false);const [open,setOpen]=useState(false);
   const [refreshing,setRefreshing]=useState(false);const [refreshNotice,setRefreshNotice]=useState("");
   const dialog=useRef<HTMLDialogElement>(null);
@@ -64,7 +64,17 @@ export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"co
   const weeklyCacheRate=cacheRate(data?.quotaCycle?.inputTokens,data?.quotaCycle?.cachedInputTokens);
   const rate=(value:number|null)=>value==null?t("未记录"):t("{0}%",new Intl.NumberFormat(locale(),{maximumFractionDigits:1}).format(value));
   return <>
-    <button type="button" className={`button button--quiet usage-trigger${richMachineSummary?" usage-trigger--machine-rich":""}`} onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>
+    {compactQuota ? <div className="buzhou-session-quota">
+      <button type="button" className="buzhou-quota-card" onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>
+        <span><small>{t("周额度")}</small><strong>{failed?t("用量暂不可用"):weekly.length===1?`${weekly[0].w.remainingPercent}%`:t("用量未上报")}</strong></span>
+        {weekly.length===1&&!failed&&<span className="host-quota-meter" aria-hidden="true"><i style={{width:`${Math.max(0,Math.min(100,weekly[0].w.remainingPercent))}%`}}/></span>}
+        <small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>
+      </button>
+      {!claude&&<button type="button" className="buzhou-quota-card buzhou-quota-card--forecast" onClick={()=>{setRadarOpen(true);refreshUsage.current();}} aria-haspopup="dialog">
+        <span><small>{t("临时重置预测")}</small><strong>{failed?t("更新暂时延迟"):radarLabel}</strong></span>
+        <small>{t("公告仅供参考，额度与日期以原生最新数据为准")}</small>
+      </button>}
+    </div> : <button type="button" className={`button button--quiet usage-trigger${richMachineSummary?" usage-trigger--machine-rich":""}`} onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>
       {richMachineSummary?<>
         <span className="host-quota-icon" aria-hidden="true"><BarChart3 size={18}/></span>
         <span className="host-quota-summary">
@@ -77,7 +87,7 @@ export function UsageButton({scope,id,onSession,provider="codex"}:{provider?:"co
           {updatedAt&&<span className="host-quota-updated"><i aria-hidden="true"/>{t("更新于 {0}",date(updatedAt))}<b aria-hidden="true">→</b></span>}
         </span>
       </>:<><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&!claude&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope!=="machine"&&!failed&&!claude&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",fiveHour[0].remainingPercent)}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
-    </button>
+    </button>}
     {scope==="machine"&&createPortal(<dialog ref={radarDialog} className="modal usage-dialog radar-dialog" aria-label={t("重置消息时间轴")} onClick={event=>{if(event.target===event.currentTarget){const r=event.currentTarget.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)setRadarOpen(false);}}} onCancel={()=>setRadarOpen(false)} onClose={()=>setRadarOpen(false)}>
       <header className="modal-head"><div><h2>{t("重置消息时间轴")}</h2><p>{t("最近 7 天 · 最新在上")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setRadarOpen(false)}><X size={18}/></button></header>
       <div className="usage-body"><p>{t("公告仅供参考，额度与日期以原生最新数据为准")}</p>

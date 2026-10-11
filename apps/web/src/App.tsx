@@ -1003,6 +1003,7 @@ export function SessionInspector({ detail, loading, draftOwner, referenceCandida
             <StatePill session={session} />
             <span className={`history-mark history-mark--${session.state.history}`}>{{ complete: t("完整历史"), partial: t("部分历史"), summary_only: t("历史摘要"), metadata_only: t("仅会话信息"), unavailable: t("历史暂不可用") }[session.state.history]}</span>
             {session.actions?.start?.reasonCode === "MACHINE_DRAINING" && <span role="status">{t("主机正在维护，等待安全重启；当前任务可继续，暂不接受新任务")}</span>}
+            {buzhouDesktop && <UsageButton key={`header-quota:${session.machineId}:${session.provider}`} scope="machine" id={session.machineId} provider={session.provider} compactQuota/>}
             <div className="session-call-actions"><UsageButton scope="session" id={session.id} provider={session.provider}/>
       {session.provider !== "claude" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
             </div>

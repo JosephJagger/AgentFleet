@@ -115,3 +115,16 @@
   :root[data-theme="buzhoushan"] .buzhou-host-scroll:disabled { opacity:.35; cursor:default; }
   :root[data-theme="buzhoushan"] .buzhou-host-scroll:focus-visible { outline:2px solid #007acc; outline-offset:2px; }
 }
+
+@media (min-width:1101px) {
+  :root[data-theme="buzhoushan"] .session-facts { flex-wrap:wrap; gap:10px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-quota { display:flex; flex:1 1 320px; gap:10px; min-width:0; max-width:660px; margin-inline:auto; }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:5px; padding:8px 12px; border:1px solid #3b3b3b; border-left:2px solid #89d185; border-radius:3px; background:#202020; color:#ccc; text-align:left; cursor:pointer; }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card--forecast { border-left-color:#3794ff; }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card > span:first-child { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:4px 12px; }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card strong { font-size:14px; font-variant-numeric:tabular-nums; }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card small { font-size:11px; line-height:1.4; color:#aaa; overflow-wrap:anywhere; }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card .host-quota-meter { height:3px; width:100%; }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card:hover { border-color:#666; }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card:focus-visible { outline:2px solid #007acc; outline-offset:2px; }
+}
