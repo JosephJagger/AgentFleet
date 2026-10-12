@@ -6,7 +6,7 @@ import {AuthService} from '../src/auth.js';
 import {RegistryService} from '../src/registry.js';
 import {CoordinationService} from '../src/coordination.js';
 import {sessionActions} from '../src/capabilities.js';
-import {directoryProjectIds} from '../src/directory-turn-lock.js';
+import {directoryProjectIds, directoryTurnConflict} from '../src/directory-turn-lock.js';
 
 function fixture() {
   const config={...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'lock@example.test',ADMIN_PASSWORD:'directory-test-password',PUBLIC_ORIGIN:'http://lock.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:'};
@@ -65,6 +65,38 @@ test('queue promotion rechecks the cross-provider reservation before creating an
   f.db.run("DELETE FROM project_turn_reservations WHERE project_id='codex'");
   assert.ok(f.coordination.activateNextQueued(f.claude.logicalSessionId));
   assert.equal(f.db.get<{state:string}>('SELECT state FROM turn_queue')?.state,'dispatching');
+});
+
+test('missing unmanaged history without an active turn does not lock its directory',t=>{
+  const f=fixture();t.after(()=>f.db.close());
+  // Registry reconciliation marks disappeared external history exactly this way.
+  f.db.run("UPDATE logical_sessions SET managed=0,execution_state='unknown',reachability='unreachable' WHERE logical_session_id=?",f.claude.logicalSessionId);
+  assert.equal(sessionActions(f.db,f.codex.logicalSessionId,f.principal.clientSessionId).start.allowed,true);
+  f.start(f.codex,'start-with-missing-history');
+});
+
+test('reclaim availability and command acceptance ignore missing external history',t=>{
+  const f=fixture();t.after(()=>f.db.close());
+  f.db.run("UPDATE machines SET command_types_json='[\"thread.claim\",\"turn.start\"]'");
+  f.db.run("UPDATE logical_sessions SET managed=0,execution_state='unknown',reachability='unreachable' WHERE logical_session_id=?",f.claude.logicalSessionId);
+  // State after a successful release: native identity retained, management off.
+  f.db.run('UPDATE logical_sessions SET managed=0 WHERE logical_session_id=?',f.codex.logicalSessionId);
+  f.db.run("UPDATE execution_segments SET native_thread_id='original-native',history_mode='legacy' WHERE logical_session_id=?",f.codex.logicalSessionId);
+  assert.equal(sessionActions(f.db,f.codex.logicalSessionId,f.principal.clientSessionId).claim.allowed,true);
+  const lease=f.coordination.acquireLease(f.principal,f.codex.logicalSessionId);
+  assert.doesNotThrow(()=>f.coordination.createCommand(f.principal,f.codex.logicalSessionId,{
+    type:'thread.claim',clientMutationId:'reclaim-with-missing-history',controlLeaseId:lease.leaseId,payload:{},
+    precondition:{nativeThreadId:'original-native',threadControlVersion:f.codex.threadControlVersion,
+      projectLeaseVersion:f.codex.projectLeaseVersion,expectedActiveTurnId:null},
+  }));
+});
+
+test('unreachable sessions still block when active or managed uncertainty remains',t=>{
+  const f=fixture();t.after(()=>f.db.close());
+  for(const [managed,state,turn] of [[0,'unknown','active'],[1,'unknown',null],[0,'running',null],[0,'awaiting_approval',null]] as const) {
+    f.db.run("UPDATE logical_sessions SET managed=?,execution_state=?,active_turn_id=?,reachability='unreachable' WHERE logical_session_id=?",managed,state,turn,f.claude.logicalSessionId);
+    assert.ok(directoryTurnConflict(f.db,'codex',f.codex.logicalSessionId));
+  }
 });
 
 test('Windows drive/UNC aliases compare equally without merging sibling paths or Linux case',t=>{

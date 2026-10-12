@@ -24,11 +24,15 @@ export function directoryTurnConflict(db: ControlPlaneDatabase, projectId: strin
   const reservation = db.get<{ project_id: string; logical_session_id: string; state: string; [key: string]: unknown }>(
     `SELECT * FROM project_turn_reservations WHERE project_id IN (${placeholders}) LIMIT 1`, ...ids);
   if (reservation) return reservation;
-  // External native work may have no panel reservation. Never take over its directory.
+  // External native work may have no panel reservation. Missing discovery entries
+  // are also marked unknown, but an unreachable, unmanaged history entry without
+  // an active turn is not evidence of a directory writer. Keep managed uncertainty
+  // and every active turn protected; reservations above remain authoritative.
   const running = db.get<{ project_id: string; logical_session_id: string; state: string }>(
     `SELECT project_id,logical_session_id,execution_state AS state FROM logical_sessions
      WHERE project_id IN (${placeholders}) AND logical_session_id<>?
-       AND (active_turn_id IS NOT NULL OR execution_state IN ('running','awaiting_approval','unknown')) LIMIT 1`, ...ids, sessionId);
+       AND (active_turn_id IS NOT NULL OR execution_state IN ('running','awaiting_approval')
+         OR (execution_state='unknown' AND (managed=1 OR reachability<>'unreachable'))) LIMIT 1`, ...ids, sessionId);
   if (running) return running;
   return db.get<{ project_id: string; logical_session_id: string; state: string }>(
     `SELECT project_id,logical_session_id,state FROM voice_sessions WHERE project_id IN (${placeholders}) AND state<>'closed'
