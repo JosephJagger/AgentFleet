@@ -78,3 +78,18 @@ it('preserves failure/timeout notices and ignores callbacks from a previous sock
  fireEvent.click(screen.getByRole('button',{name:'重试连接'}));act(()=>vi.advanceTimersByTime(30000));expect(screen.getByRole('alert').textContent).toContain('连接超时');
  fireEvent.click(screen.getByRole('button',{name:'重试连接'}));act(()=>{Socket.all[2]!.open();f.ws.onerror?.();f.ws.close();});expect(screen.getByText('本机采集已连接')).toBeTruthy();expect(screen.queryByRole('alert')).toBeNull();
 });
+
+it('allows enabling while native activity is unknown without sending or replaying unverified entries',()=>{
+ const f=ui();f.status.mockReturnValue('unknown');act(()=>vi.advanceTimersByTime(500));
+ const toggle=screen.getByRole('checkbox',{name:'入场自动欢迎'});expect(toggle).toHaveProperty('disabled',false);
+ fireEvent.click(toggle);expect(toggle).toHaveProperty('checked',true);
+ act(()=>{f.ws.receive(frame());vi.advanceTimersByTime(1000);});expect(f.send).not.toHaveBeenCalled();expect(toggle).toHaveProperty('checked',true);
+ expect(screen.getByText('已开启，等待语音状态就绪')).toBeTruthy();
+ f.status.mockReturnValue('ready');act(()=>vi.advanceTimersByTime(500));expect(f.send).not.toHaveBeenCalled();
+ act(()=>{f.ws.receive(frame(3,{MsgId:'fresh'}));vi.advanceTimersByTime(500);});expect(f.send).toHaveBeenCalledTimes(1);
+ f.status.mockReturnValue('unavailable');act(()=>vi.advanceTimersByTime(500));expect(toggle).toHaveProperty('checked',false);
+});
+it('discards a pending greeting if native activity becomes unknown',()=>{
+ const f=ui();fireEvent.click(screen.getByRole('checkbox'));f.status.mockReturnValue('busy');act(()=>f.ws.receive(frame()));
+ f.status.mockReturnValue('unknown');act(()=>vi.advanceTimersByTime(500));f.status.mockReturnValue('ready');act(()=>vi.advanceTimersByTime(500));expect(f.send).not.toHaveBeenCalled();
+});

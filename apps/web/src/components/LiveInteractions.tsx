@@ -32,7 +32,9 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
       const receipt=bridge?.receipt;
       if(receipt&&`${receipt.requestId}:${receipt.status}`!==lastReceipt.current){lastReceipt.current=`${receipt.requestId}:${receipt.status}`;setWelcomeState(receipt.status==='accepted'?'已送达总控，未确认实际播音':receipt.status==='requested'?'已请求欢迎，等待回执':receipt.status==='skipped'?'总控繁忙，本次已跳过':'送达未确认，不重试');}
       if(!welcoming.current)return;
-      if(status==='unavailable'||status==='unknown'){resetWelcome();return;}
+      if(status==='unavailable'){resetWelcome();return;}
+      if(status==='unknown'){pending.current=null;setWelcomeState('已开启，等待语音状态就绪');return;}
+      if(!pending.current)setWelcomeState(previous=>previous==='已开启，等待语音状态就绪'?'等待新的入场事件':previous);
       const entry=pending.current;if(!entry)return;
       if(Date.now()-entry.receivedAt>20000){pending.current=null;setWelcomeState('等待超时，已跳过');return;}
       if(status!=='ready')return;
@@ -59,7 +61,7 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
         setLastAt(event.receivedAt);
         if(!ledger.current.accept(event))return;
         setEvents(previous=>[...previous.slice(-99),event]);
-        if(welcoming.current&&Date.now()>=cooldown.current&&!pending.current&&ledger.current.welcome(event)){pending.current=event;setWelcomeState('等待总控空闲，连续入场合并欢迎');}
+        if(welcoming.current&&voice.current?.status()!=='unknown'&&Date.now()>=cooldown.current&&!pending.current&&ledger.current.welcome(event)){pending.current=event;setWelcomeState('等待总控空闲，连续入场合并欢迎');}
       };
       ws.onerror=()=>{if(socket.current===ws){clearTimeout(timeout);failure();}};
       ws.onclose=()=>{clearTimeout(timeout);if(socket.current===ws){socket.current=null;setEvents([]);resetWelcome();if(!opened||failed){if(!failed)failure();}else{setConnection('off');setNotice('本机采集连接已断开，请手动重连；自动欢迎已关闭');}}};
@@ -88,9 +90,9 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
           {(diagnostics.reasons.room||diagnostics.reasons.message)&&<p>{t('消息缺少房间编号、消息编号或聊天文字，无法可靠接收')}</p>}
         </details>}
       </div>}
-      {connection==='open'&&<><label><input type="checkbox" checked={enabled} disabled={!enabled&&(voiceStatus==='unavailable'||voiceStatus==='unknown')} onChange={e=>{welcoming.current=e.target.checked;setEnabled(e.target.checked);pending.current=null;setWelcomeState(e.target.checked?'等待新的入场事件':'未开启');}}/>{t('入场自动欢迎')}</label><p>{t('固定欢迎语：嗨，你好，欢迎光临')}</p><p role="status">{t(welcomeState)}</p></>}
+      {connection==='open'&&<><label><input type="checkbox" checked={enabled} disabled={!enabled&&voiceStatus==='unavailable'} onChange={e=>{welcoming.current=e.target.checked;setEnabled(e.target.checked);pending.current=null;setWelcomeState(e.target.checked?(voiceStatus==='unknown'?'已开启，等待语音状态就绪':'等待新的入场事件'):'未开启');}}/>{t('入场自动欢迎')}</label><p>{t('固定欢迎语：嗨，你好，欢迎光临')}</p><p role="status">{t(welcomeState)}</p></>}
       {!supported&&<p role="status">{t('自动欢迎需要语音主机连接服务 0.30.100 或更新版本，请在通话结束后更新')}</p>}
-      <p className="live-interactions__hint">{t(voiceStatus==='unavailable'?'请在本页连接语音总控；恢复或断线时自动关闭欢迎':voiceStatus==='unknown'?'语音忙闲状态未就绪，自动欢迎暂停；收到入场不等于已播音':voiceStatus==='busy'?'用户对话或任务优先，等待语音总控空闲':'语音总控已就绪')}</p>
+      <p className="live-interactions__hint">{t(voiceStatus==='unavailable'?'请在本页连接语音总控；恢复或断线时自动关闭欢迎':voiceStatus==='unknown'?'尚未取得原生语音忙闲信号；可开启等待，状态就绪前不会播报。请先与总控对话并等播放结束；若仍未就绪，当前通话暂不支持安全自动欢迎。':voiceStatus==='busy'?'用户对话或任务优先，等待语音总控空闲':'语音总控已就绪')}</p>
       <p className="live-interactions__hint">{t('同一观众十分钟内不重复欢迎；全局至少间隔三十秒，连续入场合并，等待超过二十秒跳过。')}</p>
       <div ref={messages} onScroll={e=>{const area=e.currentTarget;setFollow(area.scrollHeight-area.scrollTop-area.clientHeight<30);}} className="live-interactions__messages" aria-label={t('收到的互动消息')}>{!events.length?<p>{t('等待新服务推送聊天或独立入场事件')}</p>:events.map(event=><article key={`${event.roomId}:${event.type}:${event.id}`}><span>{t(event.type==='chat'?'聊天':'入场')}</span><strong>{displayName(event.name)||t('匿名观众')}</strong><time>{new Date(event.receivedAt).toLocaleTimeString()}</time><p>{event.type==='chat'?displayName(event.content):t('进入直播间')}</p></article>)}</div>
       {!follow&&<button type="button" className="button button--secondary" onClick={()=>setFollow(true)}>{t('跟随最新')}</button>}

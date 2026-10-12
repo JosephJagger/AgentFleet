@@ -38,7 +38,10 @@ masking and text escaping. Closing the popup keeps reception; Stop, logout, page
 exit and leaving the supported desktop theme stop reception. Reconnect clears the
 message view and disables welcomes. No previous entries are replayed on enable.
 
-Separately connect the global voice coordinator and enable “入场自动欢迎”. Native
+Separately connect the global voice coordinator and enable “入场自动欢迎”. The
+switch records user intent even while activity signals are unknown; a waiting
+status distinguishes this from readiness to speak. Entries received or pending
+while activity is unknown are discarded rather than replayed later. Native
 WebRTC input and output activity evidence plus five seconds of quiet are required.
 Unknown activity, recovery, blocked playback or unavailable voice prevents welcomes.
 A model response completion alone is not proof of audio-playback completion. If the

@@ -3454,5 +3454,7 @@
   "语音忙闲状态未就绪，自动欢迎暂停；收到入场不等于已播音": "Voice activity status is not ready; automatic welcomes are paused. Receiving an entry does not confirm audio playback.",
   "等待新服务推送聊天或独立入场事件": "Waiting for new chat or independent entry events from the collector.",
   "新服务默认端口 18888。此面板不会启动、重启或修改采集服务。": "The new collector uses port 18888 by default. This panel does not start, restart, or modify it.",
-  "这是本机非官方采集接入，不是抖音账号认证。新服务不限制房间；仅处理独立原生入场，不用聊天推断入场。": "This is an unofficial local collector connection, not Douyin account authentication. The new service does not filter rooms. Only independent native entry events qualify; chat never implies entry."
+  "这是本机非官方采集接入，不是抖音账号认证。新服务不限制房间；仅处理独立原生入场，不用聊天推断入场。": "This is an unofficial local collector connection, not Douyin account authentication. The new service does not filter rooms. Only independent native entry events qualify; chat never implies entry.",
+  "已开启，等待语音状态就绪": "Enabled; waiting for voice activity status.",
+  "尚未取得原生语音忙闲信号；可开启等待，状态就绪前不会播报。请先与总控对话并等播放结束；若仍未就绪，当前通话暂不支持安全自动欢迎。": "Native voice activity signals are not available yet. You can enable and wait; no greeting plays until ready. Speak to the coordinator and wait for playback to finish. If still unavailable, this call cannot safely provide automatic welcomes."
 }
