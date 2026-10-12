@@ -21,7 +21,10 @@ const manifest = JSON.parse((await get("/downloads/manifest.json")).toString("ut
 if (manifest.schemaVersion !== 1 || manifest.version !== expected) throw new Error("Published manifest version differs from expected release");
 for (const platform of ["linux-x64","darwin-arm64","darwin-x64","win32-x64"]) {
   const artifact = manifest.artifacts?.[platform];
-  if (!artifact || artifact.file !== `agentfleet-${platform}-${expected}.tar.gz` || !/^[a-f0-9]{64}$/.test(artifact.sha256)) throw new Error(`Invalid artifact for ${platform}`);
+  const sea = platform === "linux-x64" && artifact?.format === "sea";
+  const portable = ["portable", "tar.gz"].includes(artifact?.format);
+  const filename = `agentfleet-${platform}-${expected}${sea ? "" : ".tar.gz"}`;
+  if (!artifact || (!sea && !portable) || artifact.file !== filename || !Number.isSafeInteger(artifact.size) || artifact.size <= 0 || !/^[a-f0-9]{64}$/.test(artifact.sha256)) throw new Error(`Invalid artifact for ${platform}`);
   const checksum = (await get(`/downloads/${artifact.file}.sha256`)).toString("utf8").trim().split(/\s+/);
   if (checksum[0] !== artifact.sha256 || checksum[1]?.split(/[\\/]/).at(-1) !== artifact.file) throw new Error(`Published checksum mismatch for ${platform}`);
   const bytes = await get(`/downloads/${artifact.file}`);

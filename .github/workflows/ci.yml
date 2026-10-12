@@ -81,6 +81,7 @@ jobs:
       - run: npm ci --prefix apps/local-agent --no-audit --no-fund
       - run: npm ci --prefix apps/web --no-audit --no-fund
       - run: npm run check
+      - run: node --test packaging/test-public-release-verifier.mjs
       - run: npm test
       - run: npm run build
       - name: Build and verify self-contained Local Agent release
