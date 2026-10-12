@@ -147,7 +147,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       socket.onmessage = event => {
         if (!current()) return;
         void (async () => {
-          const value = JSON.parse(String(event.data)) as { requestId?:string;transcriptSeq?:number;snapshot?:boolean;status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
+          const value = JSON.parse(String(event.data)) as { reason?:string;requestId?:string;transcriptSeq?:number;snapshot?:boolean;status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
           if (value.type === "ready" && !offerSent) {
             offerSent = true;
             socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",skipPreferences,machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", skipPreferences, logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
@@ -169,7 +169,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
             });
           }
           else if (!globalMachineId && value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
-          else if(value.type==='live_welcome'&&typeof value.requestId==='string'&&value.requestId===welcomeReceipt.current?.requestId){welcomeReceipt.current={requestId:value.requestId,status:value.status??'unknown'};}
+          else if(value.type==='live_welcome'&&typeof value.requestId==='string'&&value.requestId===welcomeReceipt.current?.requestId){welcomeReceipt.current={requestId:value.requestId,status:value.status??'unknown',reason:value.reason};}
           else if(value.type==='report_unavailable')setMessage(t('结果播报未确认，请在待办与结果记录中查看；通话继续'));
           else if(value.type==="task_status_unavailable") setTaskPhase("unknown");
           else if(value.type==="panel_task") { const tasks=Array.isArray(value.tasks)?value.tasks:value.task?[value.task]:[]; onPanelTasks?.(tasks); onPanelTask?.(value.task); if(!value.task){setTaskPhase("idle");return;} setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }

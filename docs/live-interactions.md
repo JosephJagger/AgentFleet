@@ -53,7 +53,10 @@ server priority/rate checks → thread/realtime/appendText → existing voice ca
 
 The fixed instruction requests “嗨，你好，欢迎光临”. The transcript UI displays
 conversation; it is not an input integration point. No new call, project task,
-external TTS, chat text or viewer nickname is sent to the model. Native acceptance
+external TTS, chat text or viewer nickname is sent to the model. Rejection receipts identify protocol/time, duplicate/cooldown, task, recovery or
+transport reasons instead of labeling every rejection as busy. Both collector and
+browser timestamps allow up to five seconds of positive clock skew; the twenty
+second expiry remains. Native acceptance
 is not confirmed audible playback or a prerecorded exact-audio guarantee.
 
 A viewer is welcomed at most once per ten minutes per room, with at least thirty

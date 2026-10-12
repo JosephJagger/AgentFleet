@@ -3458,5 +3458,21 @@
   "已开启，等待语音状态就绪": "Enabled; waiting for voice activity status.",
   "尚未取得原生语音忙闲信号；可开启等待，状态就绪前不会播报。请先与总控对话并等播放结束；若仍未就绪，当前通话暂不支持安全自动欢迎。": "Native voice activity signals are not available yet. You can enable and wait; no greeting plays until ready. Speak to the coordinator and wait for playback to finish. If still unavailable, this call cannot safely provide automatic welcomes.",
   "总控状态暂不可用，等待恢复后接收新的入场事件": "Coordinator status is unavailable. Waiting for recovery and new entry events.",
-  "任务结果优先或欢迎间隔中，请稍候": "Task results take priority, or the greeting cooldown is active. Please wait."
+  "任务结果优先或欢迎间隔中，请稍候": "Task results take priority, or the greeting cooldown is active. Please wait.",
+  "事件时间超出允许范围，请校准直播电脑时间": "Event time is outside the allowed window. Synchronize the broadcast computer clock.",
+  "欢迎请求协议不匹配，请在通话结束后刷新页面": "Welcome protocol mismatch. Refresh after ending the call.",
+  "入场标识不完整，本次未播报": "Entry identifiers are incomplete; greeting skipped.",
+  "任务或结果播报优先，本次已跳过": "Task or result reporting takes priority; greeting skipped.",
+  "总控正在处理工具调用，本次已跳过": "Coordinator tool call in progress; greeting skipped.",
+  "重复入场事件，本次不重复欢迎": "Duplicate entry; greeting will not repeat.",
+  "该观众十分钟内已处理，本次不重复欢迎": "This viewer was already processed within ten minutes; greeting will not repeat.",
+  "欢迎间隔未到，本次已跳过": "Greeting cooldown is active; skipped.",
+  "本次通话欢迎记录已达上限": "Welcome records for this call reached their limit.",
+  "语音主机版本不支持欢迎": "Voice host version does not support welcomes.",
+  "语音通话未就绪，本次已跳过": "Voice call is not ready; greeting skipped.",
+  "语音连接恢复中，本次已跳过": "Voice connection is recovering; greeting skipped.",
+  "任务状态暂不可用，本次已跳过": "Task status is unavailable; greeting skipped.",
+  "欢迎未能发送到语音主机，不重试": "Welcome could not be sent to the voice host; no retry.",
+  "欢迎请求处理失败或过于频繁，本次已跳过": "Welcome request failed or was too frequent; skipped.",
+  "欢迎请求被拒绝，原因未返回": "Welcome request rejected without a reason."
 }

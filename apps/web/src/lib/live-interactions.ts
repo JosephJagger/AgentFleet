@@ -74,5 +74,5 @@ export class LiveEventLedger {
 export interface WelcomeBridge {
   status:()=> 'unavailable'|'unknown'|'busy'|'ready';
   send:(event:LiveEvent)=>boolean;
-  receipt?:{requestId:string;status:string};
+  receipt?:{requestId:string;status:string;reason?:string};
 }

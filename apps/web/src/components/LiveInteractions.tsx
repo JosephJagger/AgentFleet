@@ -6,6 +6,24 @@ import {displayName} from '../lib/display-name';
 import {useDraggablePanel} from '../lib/use-draggable-panel';
 import {LiveEventLedger,LiveCollectorStream,emptyCollectorDiagnostics,localCollectorUrl,type LiveEvent,type WelcomeBridge} from '../lib/live-interactions';
 
+const skippedReason=(reason?:string)=>({
+  event_time:'事件时间超出允许范围，请校准直播电脑时间',
+  protocol:'欢迎请求协议不匹配，请在通话结束后刷新页面',
+  identifiers:'入场标识不完整，本次未播报',
+  task_priority:'任务或结果播报优先，本次已跳过',
+  tool_active:'总控正在处理工具调用，本次已跳过',
+  duplicate_event:'重复入场事件，本次不重复欢迎',
+  repeat_viewer:'该观众十分钟内已处理，本次不重复欢迎',
+  cooldown:'欢迎间隔未到，本次已跳过',
+  capacity:'本次通话欢迎记录已达上限',
+  agent_version:'语音主机版本不支持欢迎',
+  call_inactive:'语音通话未就绪，本次已跳过',
+  recovering:'语音连接恢复中，本次已跳过',
+  task_status:'任务状态暂不可用，本次已跳过',
+  transport:'欢迎未能发送到语音主机，不重试',
+  request_failed:'欢迎请求处理失败或过于频繁，本次已跳过',
+} as Record<string,string>)[reason??'']??'欢迎请求被拒绝，原因未返回';
+
 export function LiveInteractions({voice,supported=true}:{voice:RefObject<WelcomeBridge|null>;supported?:boolean}) {
   const [open,setOpen]=useState(false),[port,setPort]=useState('18888');
 
@@ -30,7 +48,7 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
     const timer=setInterval(()=>{
       const bridge=voice.current,status=!supported?'unavailable':bridge?.status()??'unavailable';setVoiceStatus(status);
       const receipt=bridge?.receipt;
-      if(receipt&&`${receipt.requestId}:${receipt.status}`!==lastReceipt.current){lastReceipt.current=`${receipt.requestId}:${receipt.status}`;setWelcomeState(receipt.status==='accepted'?'已送达总控，未确认实际播音':receipt.status==='requested'?'已请求欢迎，等待回执':receipt.status==='skipped'?'总控繁忙，本次已跳过':'送达未确认，不重试');}
+      if(receipt&&`${receipt.requestId}:${receipt.status}`!==lastReceipt.current){lastReceipt.current=`${receipt.requestId}:${receipt.status}`;setWelcomeState(receipt.status==='accepted'?'已送达总控，未确认实际播音':receipt.status==='requested'?'已请求欢迎，等待回执':receipt.status==='skipped'?skippedReason(receipt.reason):'送达未确认，不重试');}
       if(!welcoming.current)return;
       if(status==='unavailable'){resetWelcome();return;}
       if(status==='unknown'){pending.current=null;setWelcomeState('已开启，等待语音状态就绪');return;}

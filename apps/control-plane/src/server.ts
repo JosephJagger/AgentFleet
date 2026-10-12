@@ -1615,10 +1615,12 @@ export async function buildControlPlane(
               const capable=(version[0]??0)>0||(version[1]??0)>30||version[1]===30&&(version[2]??0)>=100;
               const unreported=db.get("SELECT 1 FROM panel_voice_jobs WHERE voice_id=? AND reported_call_id IS NULL LIMIT 1",voiceId);
               const status=panelVoice.poll(principal,voiceId,panelFailedReports.get(voiceId));
-              const busy=!capable||Boolean(unreported)||call?.state!=='active'||panelRecovery.has(voiceId)||Boolean(status.unavailable||status.report||panelReports.has(voiceId)||panelFailedReports.get(voiceId)?.size)||status.tasks.some(task=>!['completed','failed','interrupted'].includes(task.state));
-              const accepted=gate?.accept(value,busy)&&sendPanel(voiceId,'report',{reportId:`welcome:${value.requestId}`,text:LIVE_WELCOME_TEXT});
-              sendJson(socket,{type:'live_welcome',requestId:value.requestId,status:accepted?'requested':'skipped'});
-            }catch{sendJson(socket,{type:'live_welcome',requestId:value.requestId,status:'skipped'});}
+              const blocked=!capable?'agent_version':call?.state!=='active'?'call_inactive':panelRecovery.has(voiceId)?'recovering':status.unavailable?'task_status':Boolean(unreported||status.report||panelReports.has(voiceId)||panelFailedReports.get(voiceId)?.size)||status.tasks.some(task=>!['completed','failed','interrupted'].includes(task.state))?'task_priority':undefined;
+              const eligible=gate?.accept(value,Boolean(blocked));
+              const accepted=eligible&&sendPanel(voiceId,'report',{reportId:`welcome:${value.requestId}`,text:LIVE_WELCOME_TEXT});
+              const reason=accepted?undefined:blocked??(eligible?'transport':gate?.rejectionReason||'call_inactive');
+              sendJson(socket,{type:'live_welcome',requestId:value.requestId,status:accepted?'requested':'skipped',reason});
+            }catch{sendJson(socket,{type:'live_welcome',requestId:value.requestId,status:'skipped',reason:'request_failed'});}
           }
           else throw new AppError(400,'VOICE_INVALID','Invalid global voice action');
         } else if(value.type==="start") {

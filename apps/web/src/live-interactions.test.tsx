@@ -87,3 +87,8 @@ it('discards a pending greeting if native activity becomes unknown',()=>{
  const f=ui();fireEvent.click(screen.getByRole('checkbox'));f.status.mockReturnValue('busy');act(()=>f.ws.receive(frame()));
  f.status.mockReturnValue('unknown');act(()=>vi.advanceTimersByTime(500));f.status.mockReturnValue('ready');act(()=>vi.advanceTimersByTime(500));expect(f.send).not.toHaveBeenCalled();
 });
+
+it('shows the server rejection reason instead of falsely claiming the coordinator is busy',()=>{
+ const f=ui();f.voice.current!.receipt={requestId:'rejected',status:'skipped',reason:'event_time'};
+ act(()=>vi.advanceTimersByTime(500));expect(screen.getByText('事件时间超出允许范围，请校准直播电脑时间')).toBeTruthy();expect(screen.queryByText('总控繁忙，本次已跳过')).toBeNull();
+});

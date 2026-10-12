@@ -137,7 +137,7 @@ test('optional live welcome uses native report once, keeps failures nonfatal and
  assert.equal(report.reportId,'welcome:fixture-request');assert.match(String(report.text),/嗨，你好，欢迎光临/);assert.ok(!String(report.text).includes('fixture-viewer'));
  assert.equal((await f.browser.next('live_welcome')).status,'requested');
  f.first.send(f.event({event:'reported',requestId:report.reportId}));assert.equal((await f.browser.next('live_welcome')).status,'accepted');
- f.browser.send(entry);assert.equal((await f.browser.next('live_welcome')).status,'skipped');
+ f.browser.send(entry);const rejected=await f.browser.next('live_welcome');assert.equal(rejected.status,'skipped');assert.equal(rejected.reason,'duplicate_event');
  f.first.send(f.event({event:'report_unavailable',requestId:report.reportId}));assert.equal((await f.browser.next('live_welcome')).status,'unknown');
  assert.equal(f.row().state,'active');assert.equal(f.db.all('SELECT * FROM commands').length,0);
  f.browser.send({...entry,requestId:'bad',kind:'chat'});assert.equal((await f.browser.next('live_welcome')).status,'skipped');assert.equal(f.row().state,'active');
