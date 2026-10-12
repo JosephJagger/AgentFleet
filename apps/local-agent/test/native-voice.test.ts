@@ -73,7 +73,9 @@ test("selected voice reaches the native realtime request and invalid voices neve
 });
 
 import { supportsNativeVoice } from "../src/voice-options.js";
-test("reviewed 0.160.1 retains native voice while unknown versions remain gated",()=>{
+test("reviewed releases retain native voice while unknown versions remain gated",()=>{
+ assert.equal(supportsNativeVoice("0.162.1"),true);
+ assert.equal(supportsNativeVoice("0.162.2"),false);
  assert.equal(supportsNativeVoice("0.160.1"),true);
  assert.equal(supportsNativeVoice("0.159.2"),true);
  assert.equal(supportsNativeVoice("0.159.0"),false);

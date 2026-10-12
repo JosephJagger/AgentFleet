@@ -39,3 +39,17 @@ The Linux musl archive passed its official SHA-256 (`9226581be592d18f7e7f740a352
 Agent 0.30.75 adds the reviewed release and explicitly keeps native session/panel voice available on 0.160.1. Unknown versions remain gated. This verifies protocol compatibility, not a live microphone call. The central validator must still verify all platform binaries and helpers plus Code Mode execution before publishing the managed target. Hosts apply only after idle-time local validation and health acknowledgement; the previous runtime remains available for rollback. Version-specific destructive history adapters are unchanged.
 
 0.160.1 已通过 Linux 隔离验证，与 0.159.2 的 App Server v2 协议完全一致；连接服务 0.30.75 同时适配语音能力判断。托管验证器完成四平台文件及执行依赖校验后才晋升，主机继续按空闲、本地验证、健康确认的流程升级。
+
+## Codex 0.162.1 review (2026-10-12)
+
+Official release: https://github.com/openai/codex/releases/tag/rust-v0.162.1
+
+The release is neither draft nor prerelease. The Linux musl archive matches the official SHA-256 `86f268d81b898f3e144c5ecff2ad2fda2c5802e042d6195b72538fe0fa125057`; the generated v2 schema is `0bf5254bede109d4ae03ce2e81372e4c93a30b359c0749ec7dce7a9382a7f857`.
+
+Compared with 0.160.1, there are no removed request methods or schema definitions. Changes include optional attachment-owner/prediction interfaces, task provenance fields, browser extension requirements, MCP OAuth login identifiers, and the `partial_answer` message phase. `namespaceTools` is removed from provider capabilities; the existing adapter already reports omitted flags as unavailable rather than assuming support. Skill paths remain strings. All 22 realtime definitions are unchanged. Unknown versions remain blocked; no destructive history adapter is broadened.
+
+Isolated Linux probes passed version/schema/initialize/configuration/history checks, legacy and paginated writer exclusion, same-ID release/resume, policy verification, archive/restore, subtree deletion protection and unrelated-history retention. Image delivery and stored history passed against a local Responses fixture. Native browser MCP discovery passed. Code Mode executed the no-tool arithmetic probe successfully. No user credentials, real model requests, microphone calls or existing sessions were used. A regression covers partial answers remaining dialogue without declaring an active turn complete.
+
+The native writer test previously captured a deletion preview before another writer resumed a descendant. Native metadata can change on resume, so the stale-preview guard sometimes rejected the request before the expected writer-ownership check. The test now previews after acquisition to reach the intended check; production deletion protections are unchanged. All five opt-in native checks then passed together.
+
+Agent 0.30.95 carries the reviewed hash and unchanged realtime capability gate. The central validator must still verify all four platform binaries, execution helpers and sandbox helper before publishing the target. macOS/Windows artifacts are verified by digest; physical-device operation and live voice are not certified by these Linux tests. Hosts apply only when idle, repeat local validation and retain rollback health acknowledgement.

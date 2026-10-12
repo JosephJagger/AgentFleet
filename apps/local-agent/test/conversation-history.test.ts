@@ -61,3 +61,13 @@ test('latest pair includes final reply even when context has more than one page'
  const rpc=async()=>({thread:{id:'t',cwd:'/project',turns:[{id:'turn',status:'completed',items:[user,...comments,final]}]}});
  const page=await readConversation(rpc,'t',null);assert.equal(page.items.length,20);assert.deepEqual(page.latestMessages?.map(i=>i.text),['Question','Answer']);assert.ok(page.nextCursor);
 });
+
+test('0.162.1 partial answers remain dialogue but do not declare an active turn complete',async()=>{
+ const partial={id:'partial',type:'agentMessage',phase:'partial_answer',text:'First part'};
+ const rpc=async()=>({thread:{id:'t',cwd:'/project',turns:[{id:'turn',status:'inProgress',items:[user,partial]}]}});
+ const page=await readConversation(rpc,'t',null);
+ assert.equal(page.turnStatus,'inProgress');
+ assert.equal(page.items.find(i=>i.id==='partial')?.phase,'partial_answer');
+ assert.ok(page.latestMessages);
+ assert.equal(page.latestMessages.some(i=>i.role==='assistant'),false);
+});

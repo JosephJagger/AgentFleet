@@ -89,7 +89,10 @@ for (const historyMode of ["legacy", "paginated"] as const) test(`native ${histo
       const external = new CodexAppServer(callbacks,undefined,environment);
       try {
         await external.start();await external.resumeThread(childId,project);
-        await assert.rejects(panel.deleteThread(archiveTarget,project,plan),/active writer/);
+        // Resume may update native metadata; preview after acquisition so this
+        // assertion reaches writer exclusion instead of the stale-preview guard.
+        const busyPlan = await panel.previewDeletion(archiveTarget,project);
+        await assert.rejects(panel.deleteThread(archiveTarget,project,busyPlan),/active writer/);
         assert.equal((await deletion.readThread(id)).nativeThreadId,id,"Busy descendant prevents deletion of the parent");
       } finally {await external.stop();}
       const currentPlan=await panel.previewDeletion(archiveTarget,project);

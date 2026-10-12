@@ -76,6 +76,8 @@ test("unknown releases wait for adapter review before downloading and retain the
   assert.equal(state.phase, "blocked");
   assert.match(state.message, /尚未进入已验证兼容清单/);
   assert.deepEqual(state.target, initial);
+  assert.equal(validatedCodexSchemaHash("0.162.1"), "0bf5254bede109d4ae03ce2e81372e4c93a30b359c0749ec7dce7a9382a7f857");
+  assert.equal(validatedCodexSchemaHash("0.162.2"), "unreviewed");
   assert.equal(validatedCodexSchemaHash("0.157.0"), "unreviewed");
   assert.equal(validatedCodexSchemaHash("0.156.0"), "995fc3b8f8c469f6787e8fc5be4038c4f31359025edd8480b862e83355f3bf3b");
   assert.equal(validatedCodexSchemaHash("0.159.2"), "81a88c04ae4984b16d73080f4109d0477682bc76c8adbe483e371175ce54c054");

@@ -9,6 +9,8 @@ test("reviewed schemas match the control plane; unknown versions fail closed", a
   assert.equal(expectedCodexSchemaHash("0.159.2"), "81a88c04ae4984b16d73080f4109d0477682bc76c8adbe483e371175ce54c054");
   assert.equal(expectedCodexSchemaHash("0.159.0"), "81a88c04ae4984b16d73080f4109d0477682bc76c8adbe483e371175ce54c054");
   assert.equal(expectedCodexSchemaHash("0.158.0"), "5742a9a7dd41a8b44dca3138f506e013620d4a93573c792b1e5881c053f169a7");
+  assert.equal(expectedCodexSchemaHash("0.162.1"), "0bf5254bede109d4ae03ce2e81372e4c93a30b359c0749ec7dce7a9382a7f857");
+  assert.equal(expectedCodexSchemaHash("0.162.2"), "unreviewed");
   assert.equal(expectedCodexSchemaHash("0.157.0"), "unreviewed");
   assert.equal(await readFile(new URL("../../src/reviewed-codex-schemas.ts", import.meta.url), "utf8"), await readFile(new URL("../../../control-plane/src/reviewed-codex-schemas.ts", import.meta.url), "utf8"));
 });
