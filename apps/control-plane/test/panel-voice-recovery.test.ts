@@ -5,7 +5,7 @@ import {loadConfig} from '../src/config.js';
 import {sha256} from '../src/crypto.js';
 import {WebSocket} from 'ws';
 
-async function fixture(t: import('node:test').TestContext) {
+async function fixture(t: import('node:test').TestContext,resumeAck=false) {
   const config={...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'voice@example.test',ADMIN_PASSWORD:'voice-test-password',PUBLIC_ORIGIN:'http://voice.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:'};
   const h=await buildControlPlane(config);const {app,db}=h;const address=await app.listen({host:"127.0.0.1",port:0});
   const sockets:WebSocket[]=[];
@@ -39,7 +39,7 @@ async function fixture(t: import('node:test').TestContext) {
   browser.send({type:'panel.start',machineId:'m',sdp:'v=0\r\nm=audio 9\r\n'});
   const start=await first.next('voice.control','start');const voiceId=String(start.voiceId),instanceId='fixture-original-instance';
   const event=(extra:Record<string,unknown>)=>({type:'voice.event',voiceId,producerEpoch:'producer',appServerEpoch:'native',...extra});
-  first.send(event({event:'sdp',sdp:'v=0\r\nm=audio 9\r\n',instanceId}));await browser.next('answer');
+  first.send(event({event:'sdp',sdp:'v=0\r\nm=audio 9\r\n',instanceId,resumeAck}));await browser.next('answer');
   return {...h,first,browser,host,event,voiceId,instanceId,row:()=>db.get<{state:string;binding_json:string}>('SELECT state,binding_json FROM panel_voice_calls WHERE voice_id=?',voiceId)!};
 }
 
@@ -99,4 +99,32 @@ test('changed coordinator epoch cannot restore even matching instance; confirmed
   await f.browser.next('error');await next.next('voice.control','stop');assert.equal(f.row().state,'closing');
   assert.ok(!next.frames.some(v=>v.action==='start'||v.action==='resume'));
   next.send(f.event({producerEpoch:'new-producer',event:'stopped'}));await new Promise(r=>setTimeout(r,10));assert.equal(f.row().state,'closed');
+});
+
+test('new host resume must be acknowledged before recovery UI clears; old nonce and hangup stay fenced',async t=>{
+ const f=await fixture(t,true);f.first.socket.close();await f.browser.next('recovering');
+ const next=await f.host(2);const probe=await next.next('voice.control','probe');
+ next.send(f.event({event:'recovery',requestId:probe.requestId,recoveryState:'present',instanceId:f.instanceId}));
+ const resume=await next.next('voice.control','resume');
+ assert.ok(!f.browser.frames.some(x=>x.type==='recovered'));
+ next.send(f.event({event:'resumed',requestId:'stale',instanceId:f.instanceId}));assert.equal((await next.next('error')).code,'VOICE_FENCED');
+ next.send(f.event({event:'resumed',requestId:resume.requestId,instanceId:f.instanceId}));await f.browser.next('recovered');
+ next.send(f.event({event:'resumed',requestId:resume.requestId,instanceId:f.instanceId}));assert.equal((await next.next('error')).code,'VOICE_FENCED');
+ assert.equal(f.db.all('SELECT * FROM commands').length,0);
+});
+
+test('hangup between continuity proof and resume ack cannot revive the original call',async t=>{
+ const f=await fixture(t,true);f.first.socket.close();await f.browser.next('recovering');
+ const next=await f.host(2);const probe=await next.next('voice.control','probe');
+ next.send(f.event({event:'recovery',requestId:probe.requestId,recoveryState:'present',instanceId:f.instanceId}));const resume=await next.next('voice.control','resume');
+ f.browser.send({type:'stop',reason:'USER_HANGUP'});await next.next('voice.control','stop');
+ next.send(f.event({event:'resumed',requestId:resume.requestId,instanceId:f.instanceId}));assert.equal((await next.next('error')).code,'VOICE_FENCED');
+ assert.equal(f.row().state,'closing');assert.ok(!f.browser.frames.some(x=>x.type==='recovered'));
+ next.send(f.event({event:'stopped'}));await new Promise(r=>setTimeout(r,10));assert.equal(f.row().state,'closed');
+});
+
+test('failed report delivery warns browser without ending call or altering tasks',async t=>{
+ const f=await fixture(t);f.first.send(f.event({event:'report_unavailable',requestId:'job'}));
+ await f.browser.next('report_unavailable');assert.equal(f.row().state,'active');assert.equal(f.browser.socket.readyState,WebSocket.OPEN);
+ assert.ok(!f.first.frames.some(v=>v.action==='stop'||v.action==='start'));
 });

@@ -475,3 +475,16 @@ test("file requests stream exact project bytes without entering the command queu
   assert.equal(runtime.commandCalls.length, 0);
   assert.equal(socket.closeCode, undefined);
 });
+
+test('an uncertain result report emits a nonfatal receipt instead of closing voice',async()=>{
+ const {store,runtime,socket,access}=await setup();
+ try{
+  (runtime as unknown as {handlePanelVoice:()=>Promise<void>}).handlePanelVoice=async()=>{throw Error('untrusted secret error');};
+  access.reconciliationReady=true;
+  access.enqueueInbound(frame({type:'voice.control',kind:'panel',action:'report',voiceId:'pvoice_test',reportId:'job'}),socket as unknown as WebSocket);
+  await access.inboundTail;await wait(5);
+  assert.ok(socket.sent.some(event=>event.event==='report_unavailable'&&event.requestId==='job'));
+  assert.ok(!socket.sent.some(event=>event.event==='error'));assert.equal(socket.readyState,WebSocket.OPEN);
+  assert.ok(!JSON.stringify(socket.sent).includes('secret'));
+ }finally{store.close();}
+});

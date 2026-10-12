@@ -626,6 +626,8 @@ export interface RuntimeReleaseStatus {
 }
 
 export const api = {
+  voiceTranscriptTails:()=>request<{items:import('../components/VoiceTranscriptDrafts').VoiceTranscriptDraft[]}>('/api/voice-transcript-tails'),
+  resolveVoiceTranscriptTail:(id:string,input:{revision:number;action:'save'|'discard';confirmed:boolean;text:string})=>request(`/api/voice-transcript-tails/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(input)}),
   agentReleaseStatus: (signal?: AbortSignal) => request<{status:string;expectedVersion:string|null;publicVersion:string|null;checkedAt:string}>("/api/agent-release-status", {signal}),
   async voiceTasks(view='recover',cursor?:string,signal?:AbortSignal):Promise<import('./types').VoiceTaskPage> {
     const query=new URLSearchParams({view,...(cursor?{cursor}:{})});return request(`/api/voice-tasks?${query}`,{signal});

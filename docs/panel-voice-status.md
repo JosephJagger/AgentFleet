@@ -60,3 +60,34 @@ The coordinator exposes `steer` separately from `dispatch`. It must query the ex
 The response includes `commandId`; `status` with that commandId reads its durable host receipt (`commandState`, `outcome`, `error`) rather than claiming that submission means application. Keys are scoped by workspace/user and remain deduplicated across calls; changed content or targets cannot reuse a key. An ended/changed turn requires a new user decision, never fallback dispatch. Host maintenance, target capability and normal session permissions remain enforced. Search now distinguishes `available` for starting from `canAppend` for steering. Pending approvals or unsupported providers may prevent appending.
 
 The voice host needs 0.30.88 and a fresh call to load the new tool schema/instructions. Target hosts only need their existing negotiated `turn.steer` capability. Existing recovered todos are not automatically dispatched or converted into supplements.
+
+### Final-result accuracy and delivery (0.30.100)
+
+The global web panel ignores the coordinator's own internal turn events as
+project status. Jobs remain bound to their command, session and native turn;
+a late native terminal event can repair an earlier terminal projection. Native
+`turn.completed` carries a status which may itself be failed or interrupted;
+progress now honors that status. Another active turn is not proof this job is
+still running.
+
+Final replies exclude explicit commentary and partial_answer phases. Legacy
+phase-less agent messages remain supported after a terminal event. A completed
+job whose final payload is not available waits up to 90 seconds after the end
+event before reporting only its verified state and missing output; other jobs
+continue through the report queue. Later text is still available through an
+explicit status query. No inferred reply is substituted.
+
+Retries use the stable job report ID and the surviving native runtime retains
+its append promise across relay recovery, including when the acknowledgement
+was lost. Thus automatic retry does not append the same result twice to that
+call. A new call does not auto-replay old results; pending/unacknowledged results
+remain in server memory. Native acceptance is delivery, not proof the audio
+played or the user heard it; explicit user acknowledgement remains independent.
+This is delivery deduplication, not an exactly-once audible playback guarantee
+from the upstream voice model. User-requested repetition is permitted.
+
+An uncertain/failed native result append is a reporting failure, not a call
+failure. It leaves the result unacknowledged, shows a separate warning and stops
+automatic retry of that report in this call; other jobs may still report. It
+never terminates audio or changes the project outcome. An explicit status query
+can retrieve the stored result without re-dispatching work.

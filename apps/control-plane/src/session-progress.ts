@@ -55,7 +55,7 @@ export class SessionProgressService {
       WHERE e.logical_session_id=? AND e.native_turn_id=? ORDER BY e.session_seq DESC LIMIT 120`,sessionId,turnId):[];
     const end=rows.find(row=>terminalTypes.includes(row.type));
     let state=requestedTurn===null?'awaiting_turn':session.executionState;
-    if(end)state=end.type==='turn.failed'?'failed':end.type==='turn.interrupted'?'interrupted':'completed';
+    if(end){const status=JSON.parse(end.body_json??'{}').turn?.status;state=['completed','failed','interrupted'].includes(status)?status:end.type==='turn.failed'?'failed':end.type==='turn.interrupted'?'interrupted':'completed';}
     else if (requestedTurn && requestedTurn!==session.activeTurnId) state='unknown';
     const items=new Map<string,ProgressItem>();
     const completed=new Set<string>();

@@ -1,3 +1,4 @@
+import {VoiceTranscriptTail} from '../src/voice-transcript-tail.js';
 import test from 'node:test';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -246,7 +247,7 @@ test('schema 49 migration preserves work and enables another host project after 
  let db=new ControlPlaneDatabase(path);
  db.sqlite.exec("DROP INDEX IF EXISTS panel_voice_one_session_job; CREATE UNIQUE INDEX panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown'); PRAGMA user_version=49");db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,56);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,57);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_jobs')?.job_id,original.jobId);
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
  const registry=new RegistryService(db,config);const service=new PanelVoiceService(db,registry,new CoordinationService(db,config));
@@ -329,7 +330,7 @@ test('schema 50 backfills existing jobs without execution and recovery paginates
  f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
  let db=new ControlPlaneDatabase(path);db.sqlite.exec('DROP TABLE panel_voice_todo_resolutions; DROP TABLE panel_voice_task_records; DROP TABLE panel_voice_todos; PRAGMA user_version=50');db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,56);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,57);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_task_records')?.job_id,old.jobId);
  assert.equal(db.get<{original_intent:string}>('SELECT original_intent FROM panel_voice_task_records')?.original_intent,'Read project status');
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
@@ -597,4 +598,47 @@ test('Claude target exposes queue but never mid-turn steering',t=>{
  assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'steer',{action:'steer',sessionId:f.session.logicalSessionId,nativeTurnId:'claude-turn',prompt:'Add something'}),/Claude Code/);
  const queued=f.service.tool(f.principal,f.call.voice_id,'queue',{action:'dispatch',mode:'queue',sessionId:f.session.logicalSessionId,prompt:'Next task'}) as {state:string;provider:string};
  assert.equal(queued.state,'queued');assert.equal(queued.provider,'claude');
+});
+
+test('partial/commentary output cannot be spoken as final; late exact-turn final evidence repairs stale terminal projection',t=>{
+ const f=fixture();t.after(()=>f.db.close());const dispatched=f.dispatch() as {jobId:string};
+ f.db.run("UPDATE panel_voice_jobs SET native_turn_id='exact',state='interrupted' WHERE job_id=?",dispatched.jobId);
+ const event=(seq:number,type:string,body:unknown,turn='exact')=>{
+  const ref=`strict-${seq}`,at=new Date().toISOString();
+  f.db.run("INSERT INTO content_blobs VALUES(?,?,?,?,?,?,NULL)",ref,f.principal.workspaceId,JSON.stringify(body),'hash',at,'9999-12-31T00:00:00Z');
+  f.db.run(`INSERT INTO durable_events(event_id,payload_hash,source_kind,workspace_id,logical_session_id,execution_segment_id,machine_id,project_id,session_seq,projection_epoch,native_thread_id,native_turn_id,type,schema_version,occurred_at,received_at,payload_ref,payload_state) VALUES(?,'hash','agent',?,?,?,'m','p',?,1,'native',?,?,'1',?,?,?,'present')`,ref,f.principal.workspaceId,f.session.logicalSessionId,f.session.executionSegmentId,seq,turn,type,at,at,ref);
+ };
+ event(1,'item.completed',{item:{type:'agentMessage',phase:'partial_answer',text:'I will check'}});
+ event(2,'turn.completed',{turn:{id:'exact',status:'completed'}});
+ assert.equal(f.service.current(f.principal)?.state,'completed');
+ assert.equal(f.service.report(f.principal,f.call.voice_id),null);
+ event(3,'item.completed',{item:{type:'agentMessage',phase:'final_answer',text:'Other task result'}},'other');
+ assert.equal(f.service.report(f.principal,f.call.voice_id),null);
+ event(4,'item.completed',{item:{type:'agentMessage',phase:'final_answer',text:'Exact task result'}});
+ event(5,'item.completed',{item:{type:'agentMessage',phase:'commentary',text:'Later process message'}});
+ assert.equal(f.service.report(f.principal,f.call.voice_id)?.result.result,'Exact task result');
+ const recovered=f.service.recover(f.principal);assert.equal(recovered.items[0]?.job?.result,'Exact task result');
+ f.service.acknowledgeReport(f.call.voice_id,dispatched.jobId);
+ assert.equal(f.service.report(f.principal,f.call.voice_id),null);
+ assert.equal(f.service.recover(f.principal).items[0]?.job?.acknowledgedAt,null);
+});
+
+test('transcript tails require owner confirmation, preserve receipts and never dispatch work',t=>{
+ const f=fixture();t.after(()=>f.db.close());const tails=new VoiceTranscriptTail(f.db,f.service.memory),id=f.call.voice_id;
+ tails.record(f.call,{text:'unfinished request',transcriptSnapshot:true,transcriptSeq:1});assert.deepEqual(tails.list(f.principal),[]);
+ tails.review(id);assert.equal(tails.list(f.principal)[0]?.complete,false);
+ tails.record(f.call,{text:'Complete request',final:true,transcriptSnapshot:true,transcriptSeq:2});
+ tails.record(f.call,{text:'stale',final:true,transcriptSnapshot:true,transcriptSeq:1});
+ const row=tails.list(f.principal)[0]!;assert.equal(row.text,'Complete request');
+ assert.throws(()=>tails.resolve(f.principal,row.id,{action:'save',revision:row.revision,text:row.text}),/明确确认/);
+ const other={...f.principal,userId:'foreign'};assert.deepEqual(tails.list(other),[]);assert.throws(()=>tails.resolve(other,row.id,{action:'discard',revision:row.revision}),/没有/);
+ tails.record(f.call,{text:'new utterance',final:true,transcriptSnapshot:true,transcriptSeq:3});
+ assert.equal(tails.list(f.principal)[0]?.text,'Complete request','new speech must not overwrite unconfirmed draft');
+ const saved=tails.resolve(f.principal,row.id,{action:'save',revision:row.revision,text:'Reviewed request',confirmed:true});
+ assert.equal(saved.dispatched,false);assert.ok(saved.todoId);assert.equal(f.db.all('SELECT * FROM commands').length,0);
+ assert.throws(()=>tails.resolve(f.principal,row.id,{action:'save',revision:row.revision,text:'Again',confirmed:true}),/变化/);
+ tails.record(f.call,{text:'already sent',final:true,transcriptSnapshot:true,transcriptSeq:4});tails.review(id);
+ tails.receipt(id,4,{jobId:'job',commandId:'command'});const receipt=tails.list(f.principal)[0]!;
+ assert.throws(()=>tails.resolve(f.principal,receipt.id,{action:'save',revision:receipt.revision,text:receipt.text,confirmed:true}),/回执/);
+ assert.equal(f.db.all('SELECT * FROM commands').length,0);
 });

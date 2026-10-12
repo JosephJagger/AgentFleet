@@ -1,3 +1,4 @@
+import {VoiceTranscriptTail} from './voice-transcript-tail.js';
 import { NativeSubagentsBroker } from "./native-subagents-broker.js";
 import { createAgentReleaseStatus } from "./agent-release-status.js";
 import { deliveryPlan, deliveredPath } from './file-delivery.js';
@@ -255,6 +256,8 @@ export async function buildControlPlane(
   const sessionHistory=new SessionHistoryService(db,registry,(binding,cursor)=>historyBroker.read(binding,cursor));
   app.addHook('onClose',async()=>historyBroker.close());
   const panelVoice = new PanelVoiceService(db,registry,coordination,sessionProgress,sessionHistory);
+  const voiceTails=new VoiceTranscriptTail(db,panelVoice.memory);
+  for(const call of panelVoice.pending())voiceTails.review(call.voice_id);
   panelVoice.closeOrphans();
   const panelOwners=new Map<string,{socket:WebSocket;token:string;lastSeen:number;lastPing:number}>();
   const sendPanel=(voiceId:string,action:string,extra:Record<string,unknown>={})=>{
@@ -298,13 +301,15 @@ export async function buildControlPlane(
     }catch{sendJson(socket,{type:'preferences',status:'unavailable'});}
   }
   const panelReports=new Map<string,number>();
+  const panelFailedReports=new Map<string,Set<string>>();
   // Nonces belong to one live transport; reconnecting again invalidates its proof.
-  const panelRecovery=new Map<string,{deadline:number;requestId?:string;generation?:number;lastProbe:number}>();
+  const panelRecovery=new Map<string,{deadline:number;requestId?:string;generation?:number;lastProbe:number;resumeRequestId?:string}>();
   const recoverPanel=(id:string)=>{
     const call=panelVoice.get(id);if(!call||call.state==='closed')return false;
     const binding=JSON.parse(call.binding_json);
     if(typeof binding.instanceId!=='string')return false; // Legacy agents cannot prove continuity.
     const newlyRecovering=!panelRecovery.has(id);
+    if(newlyRecovering)voiceTails.review(id);
     if(newlyRecovering)panelRecovery.set(id,{deadline:Date.now()+60000,lastProbe:0});
     if(call.state==='active'&&newlyRecovering){
       const owner=panelOwners.get(id);if(owner)sendJson(owner.socket,{type:'recovering'});
@@ -318,19 +323,22 @@ export async function buildControlPlane(
     const agent=agents.get(call.machine_id);
     if(!agent?.reconciliationReady||!agent.producerEpoch||!agent.appServerEpoch)return;
     if(recovery.generation===agent.identity.transportGeneration&&Date.now()-recovery.lastProbe<5000)return;
+    delete recovery.resumeRequestId;
     recovery.generation=agent.identity.transportGeneration;recovery.requestId=newId('vprobe');recovery.lastProbe=Date.now();
     sendJson(agent.socket,{type:'voice.control',kind:'panel',action:'probe',voiceId:id,requestId:recovery.requestId,
       transportGeneration:agent.identity.transportGeneration,producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch});
   };
   const stopPanel=(id:string)=>{
+    voiceTails.review(id);
     const call=panelVoice.get(id);if(!call||call.state==='closed')return;
     const sent=sendPanel(id,'stop');
     // A missing socket is not evidence that the retained native writer exited.
     panelVoice.state(id,sent||JSON.parse(call.binding_json).instanceId?'closing':'closed');
     if(!sent&&recoverPanel(id))probePanel(id);
-    panelOwners.delete(id);panelReports.delete(id);preferenceCalls.delete(id);
+    panelOwners.delete(id);panelReports.delete(id);panelFailedReports.delete(id);preferenceCalls.delete(id);
   };
   const sweepPanel=()=>{
+    voiceTails.prune();
     for(const call of panelVoice.pending()) {
       const owner=panelOwners.get(call.voice_id);
       let closeReason="SERVER_ERROR";
@@ -351,7 +359,7 @@ export async function buildControlPlane(
         }
         if(Date.now()-owner.lastPing>=15000){owner.lastPing=Date.now();owner.socket.ping();if(!sendPanel(call.voice_id,'heartbeat')){if(recoverPanel(call.voice_id))continue;closeReason='HOST_DISCONNECTED';throw new Error('Host disconnected');}}
         if(call.state==='active') {
-          const status=panelVoice.poll(principal,call.voice_id);
+          const status=panelVoice.poll(principal,call.voice_id,panelFailedReports.get(call.voice_id));
           if(status.unavailable)sendJson(owner.socket,{type:'task_status_unavailable'});
           if(!status.unavailable)sendJson(owner.socket,{type:'panel_task',task:status.task,tasks:status.tasks});
           const report=status.report;
@@ -1145,6 +1153,8 @@ export async function buildControlPlane(
   app.post('/api/long-term-preferences',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body)));
   app.patch('/api/long-term-preferences/:id',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body),routeId(request)));
   app.delete('/api/long-term-preferences/:id',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body),routeId(request),true));
+  app.get("/api/voice-transcript-tails",{preHandler:authenticate},async(request,reply)=>{reply.header('cache-control','no-store');return {items:voiceTails.list(request.principal as Principal)};});
+  app.patch("/api/voice-transcript-tails/:id",{preHandler:mutate},async request=>voiceTails.resolve(request.principal as Principal,routeId(request),record(request.body)));
   app.get("/api/voice-tasks", {preHandler:authenticate}, async (request,reply)=>{
     reply.header('cache-control','no-store');return panelVoice.recover(request.principal as Principal,request.query as {cursor?:unknown;view?:unknown});
   });
@@ -1892,6 +1902,14 @@ export async function buildControlPlane(
               const call=panelVoice.get(message.voiceId);
               invariant(call&&call.machine_id===identity.machineId,403,"VOICE_TARGET_CHANGED","Wrong panel voice host");
               const binding=JSON.parse(call.binding_json);
+              if(message.event==='resumed') {
+                const recovery=panelRecovery.get(call.voice_id),owner=panelOwners.get(call.voice_id);
+                invariant(recovery&&recovery.resumeRequestId===message.requestId&&typeof message.requestId==='string'&&Date.now()<recovery.deadline
+                  &&call.state==='active'&&owner&&Date.now()-owner.lastSeen<=120000&&state.reconciliationReady&&binding.instanceId===message.instanceId
+                  &&binding.transportGeneration===identity.transportGeneration&&binding.producerEpoch===message.producerEpoch&&binding.appServerEpoch===message.appServerEpoch,409,'VOICE_FENCED','Stale resume acknowledgement');
+                const principal=auth.authenticateToken(owner.token);invariant(principal.clientSessionId===call.owner_id,403,'PANEL_VOICE_OWNER','Owner changed');registry.getMachine(principal,call.machine_id);
+                panelRecovery.delete(call.voice_id);sendJson(owner.socket,{type:'recovered'});app.log.info({voiceId:call.voice_id,machineId:identity.machineId},'Panel voice resume acknowledged');return;
+              }
               if(message.event==='recovery') {
                 const recovery=panelRecovery.get(call.voice_id);
                 invariant(recovery&&typeof recovery.requestId==='string'&&state.reconciliationReady&&recovery.generation===identity.transportGeneration
@@ -1915,9 +1933,10 @@ export async function buildControlPlane(
                 panelVoice.binding(call.voice_id,{transportGeneration:identity.transportGeneration,producerEpoch:state.producerEpoch,appServerEpoch:state.appServerEpoch});
                 if(call.state==='active'&&sameEpoch&&authorized&&Date.now()<recovery.deadline) {
                   panelVoice.state(call.voice_id,'active');
-                  if(sendPanel(call.voice_id,'resume',{instanceId:binding.instanceId})) {
-                    panelRecovery.delete(call.voice_id);sendJson(owner!.socket,{type:'recovered'});
-                    app.log.info({voiceId:call.voice_id,machineId:identity.machineId,transportGeneration:identity.transportGeneration},'Panel voice original process restored');
+                  const resumeRequestId=newId('vresume');recovery.resumeRequestId=resumeRequestId;
+                  if(sendPanel(call.voice_id,'resume',{instanceId:binding.instanceId,requestId:resumeRequestId})) {
+                    if(!binding.resumeAck){panelRecovery.delete(call.voice_id);sendJson(owner!.socket,{type:'recovered'});}
+                    app.log.info({voiceId:call.voice_id,machineId:identity.machineId,transportGeneration:identity.transportGeneration},'Panel voice resume requested after continuity proof');
                   }else recoverPanel(call.voice_id);
                 }else {
                   panelVoice.recordCloseReason(call.voice_id,sameEpoch?'HOST_RECOVERY_TIMEOUT':'VOICE_PROCESS_CHANGED');
@@ -1934,11 +1953,16 @@ export async function buildControlPlane(
               if(message.event==='closed'){panelVoice.recordCloseReason(call.voice_id,'NATIVE_CLOSED');if(owner)sendJson(owner.socket,{type:'closed'});stopPanel(call.voice_id);return;}
               if(!owner){stopPanel(call.voice_id);return;}
               const principal=auth.authenticateToken(owner.token);
-              if(message.event==='sdp'){invariant(call.state==='starting'&&validVoiceOffer(message.sdp),400,"VOICE_INVALID","Invalid voice answer");if(typeof message.instanceId==='string'&&/^[a-zA-Z0-9_-]{16,80}$/.test(message.instanceId))panelVoice.binding(call.voice_id,{instanceId:message.instanceId});panelVoice.state(call.voice_id,'active');sendJson(owner.socket,{type:'answer',sdp:message.sdp});}
-              else if(message.event==='reported'){if(message.requestId?.startsWith('pref:')){const state=preferenceCalls.get(call.voice_id);if(state&&state.pending===message.requestId)state.received=message.requestId;preferenceStatus(call.voice_id,owner.socket);}else if(typeof message.requestId==='string')panelVoice.acknowledgeReport(call.voice_id,message.requestId);}
+              if(message.event==='sdp'){invariant(call.state==='starting'&&validVoiceOffer(message.sdp),400,"VOICE_INVALID","Invalid voice answer");if(typeof message.instanceId==='string'&&/^[a-zA-Z0-9_-]{16,80}$/.test(message.instanceId))panelVoice.binding(call.voice_id,{instanceId:message.instanceId,resumeAck:message.resumeAck===true});panelVoice.state(call.voice_id,'active');sendJson(owner.socket,{type:'answer',sdp:message.sdp});}
+              else if(message.event==='reported'){if(message.requestId?.startsWith('pref:')){const state=preferenceCalls.get(call.voice_id);if(state&&state.pending===message.requestId)state.received=message.requestId;preferenceStatus(call.voice_id,owner.socket);}else if(typeof message.requestId==='string'){panelVoice.acknowledgeReport(call.voice_id,message.requestId);panelReports.delete(call.voice_id);}}
+              else if(message.event==='report_unavailable'&&typeof message.requestId==='string'){
+                const failed=panelFailedReports.get(call.voice_id)??new Set<string>();failed.add(message.requestId);panelFailedReports.set(call.voice_id,failed);panelReports.delete(call.voice_id);
+                sendJson(owner.socket,{type:'report_unavailable'});
+              }
               else if(message.event==='panel_tool'){
                 invariant(!panelRecovery.has(call.voice_id)&&(call.state==='active'||call.state==='starting'),409,'VOICE_FENCED','Voice recovery is pending');
                 const requestId=requiredString(message.requestId,'requestId',80);
+                const transcriptSequence=voiceTails.sequence(call.voice_id);
                 void (async()=>{let result:unknown;
                 try {
                   result=(message.args as {action?:unknown})?.action==='history'?await panelVoice.history(principal,call.voice_id,record(message.args)):panelVoice.tool(principal,call.voice_id,requestId,message.args);
@@ -1948,9 +1972,10 @@ export async function buildControlPlane(
                     if(task.sessionId){const target=registry.getSession(principal,task.sessionId);dispatchPendingCommands(target.machineId,principal.workspaceId);broadcastSession(target.logicalSessionId,{type:"session.changed",logicalSessionId:target.logicalSessionId});}
                   }
                 }catch(error){result={error:error instanceof AppError?error.message:'请求未完成，请查询任务状态后再试',errorCode:error instanceof AppError?error.code:'PANEL_REQUEST_FAILED',...(error instanceof AppError?{details:error.details}:{}),executionStarted:error instanceof AppError&&error.code==='MACHINE_DRAINING'?false:null};}
+                if(result&&typeof result==='object'&&['dispatch','steer','todo.save'].includes(String((message.args as {action?:unknown})?.action)))voiceTails.receipt(call.voice_id,transcriptSequence,result as Record<string,unknown>);
                 sendPanel(call.voice_id,'tool.result',{requestId,result});})();
               }
-              else if(message.event==='transcript'){if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role)))sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final)});}
+              else if(message.event==='transcript'){if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role))){if(message.role==='user')voiceTails.record(call,{...message,text:message.text});sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final),snapshot:message.transcriptSnapshot===true,transcriptSeq:message.transcriptSeq});}}
               else if(message.event==='error'){const code=panelVoice.recordFailure(call.voice_id,message.message);app.log.warn({voiceId:call.voice_id,machineId:identity.machineId,code},'Panel voice failed');sendJson(owner.socket,{type:'error',message:`总控语音连接失败（${code}），请重新连接`});stopPanel(call.voice_id);}
               return;
             }

@@ -107,7 +107,7 @@ export class VoiceTaskStore {
     CASE WHEN e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at>? AND e.content_epoch=? THEN b.body_json END body_json
     FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=?
     AND e.type IN ('item.completed','turn.completed','turn.failed','turn.interrupted') ORDER BY e.session_seq DESC LIMIT 120`,nowIso(),policy.stored_epoch,job.session_id,job.native_turn_id):[];
-  const output=rows.find(row=>{const p=JSON.parse(row.body_json??'{}');return row.type==='item.completed'&&p.item?.type==='agentMessage'&&typeof p.item.text==='string';});
+  const output=rows.find(row=>{const p=JSON.parse(row.body_json??'{}');return row.type==='item.completed'&&p.item?.type==='agentMessage'&&(p.item.phase===undefined||p.item.phase===null||p.item.phase==='final_answer')&&typeof p.item.text==='string'&&p.item.text.trim()&&!p.item.truncated;});
   const failure=this.db.get<{detail_json:string}>('SELECT detail_json FROM command_lifecycle WHERE command_id=? AND (json_extract(detail_json,\'$.error\') IS NOT NULL OR json_extract(detail_json,\'$.code\') IS NOT NULL) ORDER BY lifecycle_id DESC LIMIT 1',job.command_id);
   const detail=JSON.parse(failure?.detail_json??'{}');
   const native=rows.find(row=>row.type!=='item.completed');

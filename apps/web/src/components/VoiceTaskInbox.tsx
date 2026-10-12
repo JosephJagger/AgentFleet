@@ -1,3 +1,4 @@
+import {VoiceTranscriptDrafts} from './VoiceTranscriptDrafts';
 import { displayName } from "../lib/display-name";
 import {useEffect,useState} from 'react';
 import {api} from '../lib/api';
@@ -22,6 +23,7 @@ export function VoiceTaskInbox({onOpenSession}:{onOpenSession:(id:string)=>void}
   catch{setError(t('记录已变化或操作失败，请刷新后重试'));}finally{setBusy(null);}
  };
  return <section className="voice-task-inbox">
+  <VoiceTranscriptDrafts/>
   <button className="button button--secondary" type="button" aria-expanded={expanded} onClick={()=>setExpanded(value=>!value)}>{t('待办与结果记录')}</button>
   {expanded&&<>
    <p>{t('记录保存在服务端，挂断后仍保留。恢复只读取记录，不会自动执行。')}</p>

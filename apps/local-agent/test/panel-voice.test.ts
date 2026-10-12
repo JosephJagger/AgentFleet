@@ -123,3 +123,16 @@ test('repeated reconnect does not extend suspension; unknown process is never re
   assert.throws(()=>runtime.resume('pvoice_live',id),/no longer resumable/);
   await runtime.stop();state={voiceId:'pvoice_unknown',pid:777};runtime.probe('pvoice_unknown','two');assert.equal(events.at(-1)!.recoveryState,'unknown');
 });
+
+test('resume acknowledgement and transcript replay preserve call identity; report lost ack never re-appends',async t=>{
+ let state:unknown;let cb!:AppServerCallbacks;let reports=0;const events:Record<string,unknown>[]=[];
+ const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(v:unknown)=>{state=v;}} as unknown as StateStore;
+ const runtime=new PanelVoiceRuntime(store,e=>events.push(e),callbacks=>{cb=callbacks;return {start:async()=>undefined,stop:async()=>undefined,getProcessId:()=>123,startPanelVoice:async()=>'thread',updateVoicePreferences:async()=>undefined,reportPanelVoice:async()=>{reports++;},stopVoice:async()=>undefined};});
+ t.after(()=>runtime.close());await runtime.start('pvoice_live','sdp');runtime.probe('pvoice_live','one');const instance=events.at(-1)!.instanceId;
+ cb.onVolatile({type:'voice.event',payload:{event:'transcript',role:'user',text:'hello',final:false}} as never,'epoch');
+ await runtime.report('pvoice_live','final result','job');runtime.suspend();
+ await assert.rejects(runtime.report('pvoice_live','final result','job'),/Call ended/);
+ runtime.resume('pvoice_live',instance,'resume-nonce');assert.equal(events.at(-2)?.event,'resumed');assert.equal(events.at(-2)?.requestId,'resume-nonce');
+ assert.equal(events.at(-1)?.text,'hello');assert.equal(events.at(-1)?.transcriptSeq,1);
+ await runtime.report('pvoice_live','final result','job');assert.equal(reports,1);
+});

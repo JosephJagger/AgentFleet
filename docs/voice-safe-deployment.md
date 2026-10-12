@@ -128,3 +128,41 @@ Diagnostic logs record transport generation, numeric WebSocket close code and
 whether the server superseded the connection; host logs additionally record the
 WebSocket clean-close flag. They deliberately omit tickets and free-form native
 error text. A reconnect alone does not identify a network fault.
+
+## Voice reliability follow-up (Agent 0.30.100, schema 57)
+
+New hosts advertise resume acknowledgement on the original SDP event. After a
+same-process proof, the panel stays recovering until the exact resume nonce is
+acknowledged on the new verified transport. The original 60-second deadline is
+not extended; changed epochs, late receipts and hangup remain fenced. Agent
+0.30.99 keeps its previous recovery protocol for compatibility. No replacement
+call or dispatch is created. Apply the new host update after calls/tasks drain.
+
+The host retains the last received user transcript snapshot while this native
+process remains alive and repeats that snapshot, with a monotonic sequence,
+after recovery. The server deduplicates it and stores only the latest user
+utterance per call and freezes interrupted tails as drafts for seven days. New
+speech after recovery cannot overwrite an unconfirmed draft. Disconnect/hangup
+makes it available under
+“待确认转写”. This is potentially incomplete, already-handled text, not an
+executable instruction. An explicit review saves a pending todo only; execution
+still requires a new explicit instruction and normal target/admission checks.
+Associated dispatch/steer/save receipts block creating another pending copy.
+Discard clears the text. No audio is recorded. Speech never delivered by the
+native transcription service cannot be recovered. The optional Codex native
+`flushTranscriptTailOnSessionEnd` remains false to avoid implicit handoff.
+
+Web audio settings refer to the computer opening the panel, not the voice host.
+Microphone selection applies to the next call; output selection uses browser
+`setSinkId` when supported. Unavailable devices/permissions are shown rather
+than silently selecting another microphone. A separate explicit local-only
+microphone test and an input-level meter do not create a native call. Device
+names may require microphone permission; unsupported output selection must use
+OS settings. Preferences are stored in that browser. OS sleep, browser loss,
+actual native process exit and audio disconnection are still outside host-relay
+recovery. No Windows/macOS hardware compatibility claim follows from Linux
+Chromium tests with synthetic audio.
+
+The new database schema requires the prepared compatible backend; rollback must
+follow the existing backup and voice-drain procedure, never replace a live
+post-migration database with an older copy containing lost user writes.

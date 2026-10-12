@@ -299,7 +299,7 @@ export interface AgentReconciliationStream {
 export type AgentToServerMessage =
   | {type:"subagents.result";requestId:string;result?:unknown;error?:{code?:string;message?:string}}
   | {type:"session.history.result";requestId:string;result?:unknown;error?:{code?:string;message?:string}}
-  | { type: "voice.event"; voiceId: string; producerEpoch: string; appServerEpoch: string; requestId?:string; args?:unknown; instanceId?:string; recoveryState?:"present"|"absent"|"unknown"; event: "recovery" | "panel_tool" | "reported" | "sdp" | "closed" | "stopped" | "error" | "transcript" | "task"; phase?: "delegated" | "running" | "completed" | "failed"; role?: string; text?: string; final?: boolean; throughHostSeq?: number; throughProducerEpoch?: string; previousWriterExitConfirmed?: boolean; sdp?: string; message?: string }
+  | { type: "voice.event"; voiceId: string; producerEpoch: string; appServerEpoch: string; requestId?:string; args?:unknown; instanceId?:string; recoveryState?:"present"|"absent"|"unknown"; resumeAck?:boolean; transcriptSeq?:number; transcriptSnapshot?:boolean; event: "report_unavailable" | "resumed" | "recovery" | "panel_tool" | "reported" | "sdp" | "closed" | "stopped" | "error" | "transcript" | "task"; phase?: "delegated" | "running" | "completed" | "failed"; role?: string; text?: string; final?: boolean; throughHostSeq?: number; throughProducerEpoch?: string; previousWriterExitConfirmed?: boolean; sdp?: string; message?: string }
   | {
       type: "hello";
       producerEpoch: string;

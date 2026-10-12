@@ -1,3 +1,4 @@
+import {VoiceAudioDevices,useVoiceDevicePreferences,voiceMicrophoneConstraints} from './VoiceAudioDevices';
 import type { SessionProgress } from "../lib/types";
 import { useDraggablePanel } from "../lib/use-draggable-panel";
 import { useEffect, useId, useRef, useState } from "react";
@@ -10,6 +11,9 @@ export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;pro
 type Phase = "idle" | "connecting" | "connected" | "recovering" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
 export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks }: { globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
+  const devices=useVoiceDevicePreferences();
+  const [meterStream,setMeterStream]=useState<MediaStream|null>(null);
+  const [deviceError,setDeviceError]=useState('');
   const [expanded, setExpanded] = useState(false);
   const control = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -36,6 +40,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   useEffect(()=>{if(transcriptArea.current) transcriptArea.current.scrollTop=transcriptArea.current.scrollHeight;},[transcript]);
   const [playBlocked, setPlayBlocked] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
+  const outputSupported=typeof HTMLMediaElement!=='undefined'&&'setSinkId' in HTMLMediaElement.prototype;
+  useEffect(()=>{let current=true;const element=audio.current as (HTMLAudioElement&{setSinkId?:(id:string)=>Promise<void>})|null;if(element?.setSinkId)void element.setSinkId(devices.speaker).then(()=>{if(current)setDeviceError('');}).catch(()=>{if(current)setDeviceError(t('扬声器切换失败，请检查权限或选择系统默认'));});return()=>{current=false;};},[devices.speaker]);
   const generation = useRef(0);
   const resources = useRef<{ recovering?: boolean; starting?: boolean; signalingReady?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
   const activeCallback = useRef(onActiveChange);
@@ -46,6 +52,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     generation.current++;
     const owned = resources.current;
     resources.current = {};
+    setMeterStream(null);
     clearInterval(owned.heartbeat); clearTimeout(owned.timeout); clearTimeout(owned.disconnectTimeout);
     owned.stream?.getTracks().forEach(track => track.stop());
     owned.peer?.close();
@@ -93,9 +100,9 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     resources.current.starting=true;
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || typeof RTCPeerConnection === "undefined") throw new Error(t("此浏览器不支持实时语音，请使用 HTTPS 下的现代浏览器"));
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+      const stream = await navigator.mediaDevices.getUserMedia(voiceMicrophoneConstraints(devices.microphone));
       if (!current()) { stream.getTracks().forEach(track => track.stop()); return; }
-      resources.current.stream = stream;
+      resources.current.stream = stream;setMeterStream(stream);
       const peer = new RTCPeerConnection();
       resources.current.peer = peer;
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -129,11 +136,11 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       if (!current()) return;
       const socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/voice`);
       resources.current.socket = socket;
-      let offerSent = false;
+      let offerSent = false;let userTranscriptSeq=0;
       socket.onmessage = event => {
         if (!current()) return;
         void (async () => {
-          const value = JSON.parse(String(event.data)) as { status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
+          const value = JSON.parse(String(event.data)) as { transcriptSeq?:number;snapshot?:boolean;status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
           if (value.type === "ready" && !offerSent) {
             offerSent = true;
             socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",skipPreferences,machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", skipPreferences, logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
@@ -146,14 +153,16 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
           else if(globalMachineId && value.type==="recovering") { resources.current.recovering=true; setPhase("recovering"); }
           else if(globalMachineId && value.type==="recovered") { resources.current.recovering=false; setPhase(peer.connectionState==="connected"?"connected":"connecting"); }
           else if(value.type==="transcript" && ["user","assistant"].includes(String(value.role)) && typeof value.text==="string") {
+            if(value.role==='user'&&typeof value.transcriptSeq==='number'){if(value.transcriptSeq<=userTranscriptSeq)return;userTranscriptSeq=value.transcriptSeq;}
             setTranscript(previous=>{
               const last=previous.at(-1);const role=value.role!;
               const text=value.text!.slice(0,6000);
-              if(last?.role===role && !last.done) return [...previous.slice(0,-1),{role,text:value.final ? text : (last.text+text).slice(-6000),done:Boolean(value.final)}];
+              if(last?.role===role && !last.done) return [...previous.slice(0,-1),{role,text:value.final || value.snapshot ? text : (last.text+text).slice(-6000),done:Boolean(value.final)}];
               return [...previous.slice(-5),{role,text,done:Boolean(value.final)}];
             });
           }
-          else if (value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
+          else if (!globalMachineId && value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
+          else if(value.type==='report_unavailable')setMessage(t('结果播报未确认，请在待办与结果记录中查看；通话继续'));
           else if(value.type==="task_status_unavailable") setTaskPhase("unknown");
           else if(value.type==="panel_task") { const tasks=Array.isArray(value.tasks)?value.tasks:value.task?[value.task]:[]; onPanelTasks?.(tasks); onPanelTask?.(value.task); if(!value.task){setTaskPhase("idle");return;} setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
           else if(value.type==="preferences")setPreferenceState(value.status??"unavailable");
@@ -176,6 +185,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     <p className="native-voice__status" role="status">{status}</p>
     {!active&&<label className="native-voice__status"><input type="checkbox" checked={skipPreferences} onChange={e=>setSkipPreferences(e.target.checked)}/>{t('本次通话不加载长期偏好')}</label>}
     {active&&preferenceState&&<p className="native-voice__status" role="status">{t(preferenceState==='disabled'?'本次通话不加载长期偏好':preferenceState==='loaded'?'长期偏好已加载':preferenceState==='reconnect_required'?'偏好已更新，请挂断重连以清除旧规则上下文':preferenceState==='pending'?'长期偏好同步中':'长期偏好暂未加载；通话仍保持连接')}</p>}
+    <details><summary>{t('音频设备与检测')}</summary><VoiceAudioDevices active={active} stream={meterStream} microphone={devices.microphone} speaker={devices.speaker} onMicrophone={devices.setMicrophone} onSpeaker={devices.setSpeaker} outputSupported={outputSupported}/>{deviceError&&<p role="status">{deviceError}</p>}</details>
+    {!active&&<button type="button" className="button button--primary" disabled={!canStart} onClick={()=>void start()}>{t('开始通话')}</button>}
     {message && <p className="native-voice__error" role="alert">{message}</p>}
     {active && <p className="native-voice__task" role="status">{t(activeTurnId || taskPhase === "running" ? "项目任务正在执行" : taskPhase === "delegated" ? "已派发，等待项目任务启动" : taskPhase === "completed" ? "项目任务已完成，结果见会话" : taskPhase === "failed" ? "项目任务未完成，请查看会话结果" : taskPhase === "unknown" ? "任务状态暂不可用，通话可继续" : "尚未派发项目任务")}</p>}
     {active && <div className="native-voice__actions">
@@ -191,6 +202,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       {globalMachineId && <span>{t(phase === "recovering" ? "恢复中…" : phase === "connecting" ? "正在连接…" : active ? "通话控制" : "开始通话")}</span>}
       {active && <i className="native-voice__indicator" aria-hidden="true" />}
     </button>
+    {!active&&<button type="button" className="button button--secondary" onClick={()=>setExpanded(value=>!value)}>{t('音频设备')}</button>}
     {portalHost ? createPortal(callPanel, portalHost) : callPanel}
     <audio ref={audio} autoPlay />
   </div>;

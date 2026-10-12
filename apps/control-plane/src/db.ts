@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 56) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 57) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1466,6 +1466,21 @@ export class ControlPlaneDatabase {
       DROP INDEX IF EXISTS panel_voice_one_session_job;
       CREATE INDEX IF NOT EXISTS panel_voice_session_jobs ON panel_voice_jobs(session_id,state);
       PRAGMA user_version=56`); });
+
+    if (version < 57) this.transaction(() => { this.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS panel_voice_tails (
+        voice_id TEXT PRIMARY KEY REFERENCES panel_voice_calls(voice_id),
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),user_id TEXT NOT NULL REFERENCES users(user_id),
+        text TEXT NOT NULL,final INTEGER NOT NULL,sequence INTEGER NOT NULL,segment INTEGER NOT NULL,revision INTEGER NOT NULL,
+        state TEXT NOT NULL,review INTEGER NOT NULL,receipt_json TEXT,updated_at TEXT NOT NULL
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS panel_voice_tail_drafts (
+        id TEXT PRIMARY KEY,voice_id TEXT NOT NULL REFERENCES panel_voice_calls(voice_id),
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),user_id TEXT NOT NULL REFERENCES users(user_id),
+        text TEXT NOT NULL,final INTEGER NOT NULL,sequence INTEGER NOT NULL,revision INTEGER NOT NULL,
+        state TEXT NOT NULL,receipt_json TEXT,updated_at TEXT NOT NULL
+      ) STRICT;
+      PRAGMA user_version=57`); });
 
   }
 

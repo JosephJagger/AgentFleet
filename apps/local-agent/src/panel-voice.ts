@@ -8,7 +8,7 @@ import { AgentError } from "./errors.js";
 import type { StateStore } from "./store.js";
 
 type PanelClient = Pick<CodexAppServer, 'start'|'stop'|'getProcessId'|'startPanelVoice'|'reportPanelVoice'|'stopVoice'|'updateVoicePreferences'>;
-interface Call { instanceId: string; pid?: number; suspendedUntil?: number; id: string; client: PanelClient; threadId?: string; directory?: string; lastSeen: number; cancelled: boolean; ready: Promise<void>; }
+interface Call { instanceId: string; pid?: number; suspendedUntil?: number; id: string; client: PanelClient; threadId?: string; directory?: string; lastSeen: number; cancelled: boolean; ready: Promise<void>; transcriptSeq?: number; tail?: {text:string;final:boolean}; }
 
 /** A dedicated ephemeral native writer, separate from all project sessions. */
 export class PanelVoiceRuntime {
@@ -32,7 +32,12 @@ export class PanelVoiceRuntime {
       findManagedThread: () => undefined, findProject: () => undefined, onEvent: async () => undefined,
       onVolatile: event => {
         if (event.type !== 'voice.event' || this.current?.id !== id || this.current.cancelled) return;
-        this.emit({ type: 'voice.event', voiceId: id, ...event.payload, instanceId: this.current.instanceId });
+        const call=this.current;
+        if(event.payload.event==='transcript'&&event.payload.role==='user'&&typeof event.payload.text==='string'){
+          call.tail={text:(event.payload.final?event.payload.text:(call.tail?.final?'':call.tail?.text??'')+event.payload.text).slice(-8000),final:Boolean(event.payload.final)};
+          call.transcriptSeq=(call.transcriptSeq??0)+1;
+          this.emit({type:'voice.event',voiceId:id,event:'transcript',role:'user',...call.tail,transcriptSnapshot:true,transcriptSeq:call.transcriptSeq,instanceId:call.instanceId});
+        }else this.emit({ type: 'voice.event', voiceId: id, ...event.payload, resumeAck:true, instanceId: call.instanceId });
         // Native audio closure does not dispose the dedicated app-server process.
         // Do not await here: stopVoice drains the notification currently being handled.
         if (event.payload.event === 'closed' || event.payload.event === 'error')
@@ -90,13 +95,15 @@ export class PanelVoiceRuntime {
       recoveryState:live?'present':this.store.snapshot().panelVoiceRuntime?.voiceId === id?'unknown':'absent',
       ...(live?{instanceId:call!.instanceId}: {})});
   }
-  resume(id: string, instanceId: unknown) {
+  resume(id: string, instanceId: unknown, requestId?:string) {
     const call = this.current;
     if (!call || call.id !== id || call.instanceId !== instanceId || call.cancelled || !call.threadId || (!call.pid || call.pid !== call.client.getProcessId())
       || call.suspendedUntil !== undefined && Date.now() >= call.suspendedUntil)
       throw new AgentError('VOICE_FENCED', 'Original voice process is no longer resumable');
     delete call.suspendedUntil;
     call.lastSeen = Date.now();
+    if(requestId)this.emit({type:'voice.event',voiceId:id,event:'resumed',instanceId:call.instanceId,requestId});
+    if(call.tail)this.emit({type:'voice.event',voiceId:id,event:'transcript',role:'user',...call.tail,transcriptSnapshot:true,transcriptSeq:call.transcriptSeq,instanceId:call.instanceId});
   }
   heartbeat(id: string) { if (this.current?.id === id) this.current.lastSeen = Date.now(); }
   result(id: string, requestId: string, result: unknown) {
@@ -106,7 +113,7 @@ export class PanelVoiceRuntime {
   }
   async report(id: string, text: string, reportId: string) {
     const call = this.current;
-    if (!call || call.id !== id || call.cancelled || !call.threadId) throw new AgentError('VOICE_FENCED', 'Call ended');
+    if (!call || call.id !== id || call.cancelled || call.suspendedUntil!==undefined || !call.threadId) throw new AgentError('VOICE_FENCED', 'Call ended');
     let sent = this.reports.get(reportId);
     if (!sent) { sent = call.client.reportPanelVoice(call.threadId, text); this.reports.set(reportId, sent); }
     await sent;

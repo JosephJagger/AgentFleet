@@ -76,7 +76,7 @@ export class PanelVoiceService {
     return call;
   }
   private refresh(job:PanelJob):PanelJob {
-    if(["completed","failed","interrupted"].includes(job.state)){this.memory.capture(job);return job;}
+    const alreadyTerminal=["completed","failed","interrupted"].includes(job.state);
     const command=this.db.get<{state:string}>("SELECT state FROM command_projection WHERE command_id=?",job.command_id);
     let state=job.state, turnId=job.native_turn_id;
     if(!turnId) turnId=this.db.get<{native_turn_id:string}>("SELECT native_turn_id FROM durable_events e JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.type='turn.started' AND json_extract(b.body_json,'$.commandId')=? ORDER BY session_seq LIMIT 1",job.session_id,job.command_id)?.native_turn_id??null;
@@ -85,9 +85,13 @@ export class PanelVoiceService {
     if(!turnId) turnId=this.db.get<{native_turn_id:string}>("SELECT COALESCE(json_extract(detail_json,'$.response.nativeTurnId'),json_extract(detail_json,'$.nativeTurnId')) AS native_turn_id FROM command_lifecycle WHERE command_id=? AND native_turn_id IS NOT NULL ORDER BY lifecycle_id DESC LIMIT 1",job.command_id)?.native_turn_id??null;
     if(turnId) {
       const end=this.db.get<{type:string;body_json:string|null}>("SELECT e.type,b.body_json FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type IN ('turn.completed','turn.failed','turn.interrupted') ORDER BY session_seq DESC LIMIT 1",job.session_id,turnId);
-      if(end) {const body=JSON.parse(end.body_json??'{}');state=['completed','failed','interrupted'].includes(body.turn?.status)?body.turn.status:end.type==='turn.failed'?'failed':end.type==='turn.interrupted'?'interrupted':'completed';}
-      else state='running';
-    } else if(command?.state==='invalidated' || command?.state==='expired' || command?.state==='cancelled' || command?.state==='rejected') state='failed';
+      if(end) {const body=JSON.parse(end.body_json??'{}');state=['completed','failed','interrupted'].includes(body.turn?.status)?body.turn.status:end.type==='turn.failed'?'failed':end.type==='turn.interrupted'?'interrupted':alreadyTerminal?job.state:'completed';}
+      else if(!alreadyTerminal) {
+        const active=this.db.get<{active_turn_id:string|null}>("SELECT active_turn_id FROM logical_sessions WHERE logical_session_id=?",job.session_id);
+        state=active?.active_turn_id&&active.active_turn_id!==turnId?'unknown':'running';
+      }
+    } else if(alreadyTerminal){this.memory.capture(job);return job;}
+    else if(command?.state==='invalidated' || command?.state==='expired' || command?.state==='cancelled' || command?.state==='rejected') state='failed';
     else if(command?.state==='unknown') state='unknown';
     else if(command?.state==='applied') {
       const failure=this.db.get("SELECT 1 FROM command_lifecycle WHERE command_id=? AND (json_extract(detail_json,'$.ok')=0 OR json_extract(detail_json,'$.error') IS NOT NULL OR json_extract(detail_json,'$.code') IS NOT NULL)",job.command_id);
@@ -131,10 +135,10 @@ export class PanelVoiceService {
     const executionStarted=job.native_turn_id?true:error?.code==='MACHINE_DRAINING'?false:null;
     const historyLimited=Boolean(job.native_turn_id&&terminal&&(!canReadContent||this.db.get(`SELECT 1 FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref)
       WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type IN ('item.completed','turn.completed')
-      AND (e.payload_state<>'present' OR b.payload_ref IS NULL OR b.deleted_at IS NOT NULL) LIMIT 1`,job.session_id,job.native_turn_id)));
+      AND (e.payload_state<>'present' OR b.payload_ref IS NULL OR b.deleted_at IS NOT NULL OR b.expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) LIMIT 1`,job.session_id,job.native_turn_id)));
     if(canReadContent && job.native_turn_id && ['completed','failed','interrupted'].includes(job.state)) {
       const rows=this.db.all<{body_json:string}>("SELECT b.body_json FROM durable_events e JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type='item.completed' AND e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY e.session_seq DESC LIMIT 30",job.session_id,job.native_turn_id);
-      for(const row of rows) {const p=JSON.parse(row.body_json);const item=p.item;if(item?.type==='agentMessage'&&typeof item.text==='string'){result=item.text.slice(-6000);resultTruncated=item.text.length>6000;break;}}
+      for(const row of rows) {const p=JSON.parse(row.body_json);const item=p.item;if(item?.type==='agentMessage'&&(item.phase===undefined||item.phase===null||item.phase==='final_answer')&&typeof item.text==='string'&&item.text.trim()&&!item.truncated){result=item.text.slice(-6000);resultTruncated=item.text.length>6000;break;}}
     }
     const resolution=stored?.todo_id?this.memory.resolution(principal,stored.todo_id):null;
     const queue=this.db.get<{state:string;position:number}>("SELECT state,position FROM turn_queue WHERE command_id=?",job.command_id);
@@ -314,26 +318,30 @@ export class PanelVoiceService {
   acknowledgeReport(voiceId:string,jobId:string) {
     this.db.run("UPDATE panel_voice_jobs SET reported_call_id=? WHERE job_id=? AND voice_id=? AND user_id=(SELECT user_id FROM panel_voice_calls WHERE voice_id=? AND state='active')",voiceId,jobId,voiceId,voiceId);
   }
-  poll(principal:Principal,voiceId:string) {
+  poll(principal:Principal,voiceId:string,skipReports?:ReadonlySet<string>) {
     this.own(principal,voiceId);
     try {
       const tasks=this.jobs(principal,{voiceId}).map(job=>this.describe(principal,job));
       const task=tasks.find(task=>!['completed','failed','interrupted'].includes(task.state))??tasks[0]??null;
-      const report=this.report(principal,voiceId);
+      const report=this.report(principal,voiceId,skipReports);
       return {task,tasks,report,unavailable:false};
     } catch {
       this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.taskStatusError','TASK_STATUS_UNAVAILABLE','$.taskStatusErrorAt',?) WHERE voice_id=?",nowIso(),voiceId);
       return {task:null,tasks:[],report:null,unavailable:true};
     }
   }
-  report(principal:Principal,voiceId:string) {
+  report(principal:Principal,voiceId:string,skipReports?:ReadonlySet<string>) {
     this.own(principal,voiceId);
     // Reports have their own queue: a running project must not starve completed projects.
-    const job=this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE user_id=? AND workspace_id=? AND voice_id=? AND reported_call_id IS NULL ORDER BY created_at,rowid",principal.userId,principal.workspaceId,voiceId)
-      .map(job=>this.refresh(job)).find(job=>this.shouldAutoReport(job,voiceId));
-    if(!job)return null;
-    const result=this.describe(principal,job);
-    if(this.shouldAutoReport(job,voiceId)) return {result,reportId:job.job_id};
+    const jobs=this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE user_id=? AND workspace_id=? AND voice_id=? AND reported_call_id IS NULL ORDER BY created_at,rowid",principal.userId,principal.workspaceId,voiceId)
+      .map(job=>this.refresh(job)).filter(job=>this.shouldAutoReport(job,voiceId)&&!skipReports?.has(job.job_id));
+    for(const job of jobs){
+      const result=this.describe(principal,job);
+      // Allow late final payloads to arrive without blocking other projects' reports.
+      const end=this.db.get<{received_at:string}>("SELECT received_at FROM durable_events WHERE logical_session_id=? AND native_turn_id=? AND type IN ('turn.completed','turn.failed','turn.interrupted') ORDER BY session_seq DESC LIMIT 1",job.session_id,job.native_turn_id);
+      if(job.state==='completed'&&!result.result&&!result.historyLimited&&end&&Date.now()-Date.parse(end.received_at)<90000)continue;
+      return {result,reportId:job.job_id};
+    }
     return null;
   }
 }
