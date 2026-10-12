@@ -229,7 +229,6 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       {globalMachineId && <span>{t(phase === "recovering" ? "恢复中…" : phase === "connecting" ? "正在连接…" : active ? "通话控制" : "开始通话")}</span>}
       {active && <i className="native-voice__indicator" aria-hidden="true" />}
     </button>
-    {!active&&<button type="button" className="button button--secondary" onClick={()=>setExpanded(value=>!value)}>{t('音频设备')}</button>}
     {portalHost ? createPortal(callPanel, portalHost) : callPanel}
     <audio ref={audio} autoPlay />
   </div>;
