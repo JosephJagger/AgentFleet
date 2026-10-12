@@ -1,4 +1,4 @@
-import {WelcomeAudioGate,type WelcomeBridge} from '../lib/live-interactions';
+import {WelcomeAudioGate,welcomeEligible,type WelcomeBridge} from '../lib/live-interactions';
 import {VoiceAudioDevices,useVoiceDevicePreferences,voiceMicrophoneConstraints} from './VoiceAudioDevices';
 import type { SessionProgress } from "../lib/types";
 import { useDraggablePanel } from "../lib/use-draggable-panel";
@@ -196,7 +196,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     status:()=>phase!=='connected'||resources.current.recovering||playBlocked?'unavailable':!welcomeGate.current.known?'unknown':welcomeGate.current.busy()||!['idle','completed','failed'].includes(taskPhase)?'busy':'ready',
     send:event=>{
       const socket=resources.current.socket;
-      if(event.type!=='enter'||!globalMachineId||welcomeRef.current?.status()!=='ready'||socket?.readyState!==WebSocket.OPEN)return false;
+      if(!welcomeEligible(event)||!globalMachineId||welcomeRef.current?.status()!=='ready'||socket?.readyState!==WebSocket.OPEN)return false;
       const requestId=crypto.randomUUID();
       welcomeReceipt.current={requestId,status:'requested'};welcomeSentAt.current=Date.now();
       socket.send(JSON.stringify({type:'live.welcome',kind:'enter',source:'douyin-barrage-grab:直播伴侣',confirmedOwnRoom:true,audioIdle:true,requestId,eventId:event.id,roomId:event.roomId,ownerId:event.ownerId,viewerId:event.userId,observedAt:event.receivedAt}));

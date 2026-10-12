@@ -1517,3 +1517,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .live-interactions article > span { margin-right:8px; color:var(--cobalt); }
 .live-interactions time { float:right; color:var(--muted); }
 .panel-voice-control--live { display:flex; gap:8px; }
+
+.live-interactions__diagnostics { padding:8px 10px; margin:10px 0; border-left:2px solid var(--cobalt); background:color-mix(in srgb,var(--cobalt) 5%,transparent); }
+.live-interactions__diagnostics p { margin:4px 0; }
+.live-interactions summary { font-size:13px; font-weight:400; cursor:pointer; }
+.live-interactions__rooms > div { flex-wrap:wrap; }
+.live-interactions__rooms > div > span { flex:1; min-width:180px; overflow-wrap:anywhere; }
+.live-interactions__rooms label { display:grid; gap:6px; margin-top:8px; }
+.live-interactions__rooms input { width:100%; min-width:0; padding:6px; font-size:12px; }
+.live-interactions__rooms button { font-size:12px; }

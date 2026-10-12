@@ -15,11 +15,21 @@ or restart Live Companion. No public-room URL scraping is implemented.
 - DouyinBarrageGrab packets with source process `直播伴侣` or `直播伴侣.exe` only.
   Type 1 is chat; type 3 is a member/entry event. Chat text, counts, gifts, follows
   and likes never imply entry. Types 101/102 and 9 handle stream start/end when
-  emitted. Other interaction types and audience statistics are not displayed.
-- Candidates come from actual source packets with RoomId and Owner.UserId.
-  Users must compare these with their own Live Companion account and explicitly
-  confirm the room. This is user confirmation, **not official account ownership
-  verification**. Missing room/owner data blocks reception. An alternate room,
+  emitted. Type 6 can supply room metadata, but audience counts are never entry
+  events. Other interaction types are not displayed.
+- Candidates come from actual Companion packets with RoomId. Owner.UserId is
+  optional upstream: `AttachRoomInfo` returns without an Owner on a cache miss.
+  A bounded five-room, per-connection cache enriches subsequent packets only from
+  matching room/broadcaster metadata. Type 101 also reads its nested RoomInfo.
+  Conflicting owner IDs never merge. Stream start/end clears stale metadata.
+- With broadcaster details, users compare the room and explicitly confirm it.
+  Without those details, generate a random five-minute verification text, send it
+  as ordinary chat in **their own** room, then confirm the matching candidate.
+  Only an exact new chat match qualifies; entry text never does. This checks a
+  message route for the user, **not official account ownership authentication**.
+  Ownerless rooms can display chat/entry but cannot auto-welcome. Once owner
+  details arrive they require confirmation again; no invented owner ID is sent.
+  Missing RoomId or message IDs still rejects the packet. An alternate room,
   stream start/end, or collector reconnect requires confirmation again.
 - 64-bit IDs are preserved as strings. Up to 5,000 recent packet keys are retained for deduplication for ten minutes; the view
   retains 100 messages, and all state stays in page memory. Names and chat are
@@ -60,10 +70,12 @@ or restart Live Companion. No public-room URL scraping is implemented.
    populate after the source has learned the broadcaster's room information.
 4. Open desktop Buzhoushan on **that same Windows computer**, open “互动消息”,
    connect, then confirm the broadcaster/room from received events. There are no
-   production demo events. With no collector or missing owner metadata it waits.
+   production demo events. If broadcaster details are missing, use the verification
+   text flow; auto-welcome remains disabled until actual owner metadata arrives.
 5. Connect the existing voice coordinator on this page (Agent 0.30.100+), verify
    its speech/playback events, and enable “入场自动欢迎”. Let a consenting viewer
-   enter and send a separate chat message: only the entry should trigger a welcome.
+   enter and send a separate chat message: only an eligible entry should trigger a welcome. Anonymous, missing-viewer-ID
+   and broadcaster-self entries never trigger it.
    Verify Windows/Live Companion's actual audio capture includes the browser.
 
 The panel CSP explicitly allows only `ws://127.0.0.1:*` in addition to its
@@ -76,13 +88,14 @@ be needed for such browsers and is not installed by this release.
 
 ## Evidence and verification boundary
 
-Reviewed upstream sources (2026-10-12):
+Reviewed upstream sources (2026-10-12), repository main commit
+`c9343da287cf77ce637c11e32333b2a511cd62e9` (2026-04-11):
 
-- [Collector README](https://github.com/ape-byte/DouyinBarrageGrab/blob/main/README.md):
+- [Collector README](https://github.com/ape-byte/DouyinBarrageGrab/blob/c9343da287cf77ce637c11e32333b2a511cd62e9/README.md):
   Windows sources, configuration and capture limitations.
-- [JSON models](https://github.com/ape-byte/DouyinBarrageGrab/blob/main/BarrageGrab/Modles/JsonEntity/BarrageMessages.cs):
+- [JSON models](https://github.com/ape-byte/DouyinBarrageGrab/blob/c9343da287cf77ce637c11e32333b2a511cd62e9/BarrageGrab/Modles/JsonEntity/BarrageMessages.cs):
   distinct Type 1/3, ProcessName, RoomId, Owner and MemberMessage fields.
-- [WebSocket producer](https://github.com/ape-byte/DouyinBarrageGrab/blob/main/BarrageGrab/Server/WsBarrageServer.cs):
+- [WebSocket producer](https://github.com/ape-byte/DouyinBarrageGrab/blob/c9343da287cf77ce637c11e32333b2a511cd62e9/BarrageGrab/Server/WsBarrageServer.cs):
   member handler, room metadata attachment, lifecycle packets, local WS broadcast.
 - [Chrome local-network guidance](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/security/local-network-access.md):
   local-network permissions for public HTTPS pages connecting to loopback.
@@ -116,3 +129,59 @@ Only control-plane and web assets change; Agent artifacts stay immutable at
 use `packaging/deploy-control-plane.py`. Existing calls must drain naturally;
 timeout defers publication. After safe publication, load the new page when the
 current call ends. No refresh, host update or broadcast restart is forced.
+
+## Receive-path rewrite (2026-10-12)
+
+Confirmed in code and upstream source, not inferred from the user's screenshot:
+
+1. The previous parser silently rejected every chat/member packet lacking Owner.
+   Upstream `AttachRoomInfo` explicitly permits this when its room cache is empty.
+   The new parser preserves these events and keeps identity confirmation separate.
+2. The old UI recorded only accepted event timestamps, making an idle socket,
+   malformed JSON, wrong source process, unsupported interaction types and missing
+   room/owner fields look identical. The UI now shows connection, received packet
+   count/time, chat and separate-member counts, plus fixed rejection categories.
+   Counts describe packets, not unique viewers or official live statistics; duplicates
+   still count as received packets but appear only once in the message list.
+3. Ownerless end packets could leave candidates behind because removal compared
+   both room and owner. End now removes matching room candidates, buffered messages,
+   selection and welcome eligibility regardless of absent owner fields.
+4. Up to 100 chat/member events can be buffered before confirmation and displayed
+   after matching room confirmation. Buffered entries are never replayed to voice.
+   Stop/reconnect starts fresh reception/confirmation; welcome deduplication and
+   cooldown survive a socket reconnect for the lifetime of this page.
+
+Only explicitly marked Companion JSON packets are supported. Binary, unknown
+schemas, other processes and unrelated interactions are counted with actionable
+hints instead of being silently ignored. We intentionally do not guess legacy
+field names or turn arbitrary browser-room traffic into the user's own room.
+The panel sends **no collector commands** (proxy toggles, start/stop, hook changes,
+installation or account operations). Reconnect is explicit and invalidates room
+confirmation; it does not restart or reconfigure Companion or the collector.
+
+If received packets stay zero while viewers chat, investigate the Windows collector
+first: whether its own window receives chat/member messages, its version, process
+and push filters, and whether it attached before the live message stream started.
+Upstream documents that some builds cannot attach an already-established stream.
+This is a candidate limitation, **not a confirmed explanation for this user's
+machine**. Do not restart a running broadcast to diagnose it. Schedule any necessary
+collector changes for a broadcast break. A local WebSocket success proves neither
+capture nor room identity nor actual entry emission.
+
+Validation: synthetic parser/component tests cover optional/cached owner data,
+64-bit IDs, metadata conflicts/eviction/lifecycle, wrong processes and formats,
+random-marker exact matches/expiry, ownerless manual confirmation, anonymous/self
+entry voice exclusion, no buffered welcome replay and reconnect cleanup. Real
+Chromium tests use a loopback fixture sender, never a production Douyin room.
+Neither this Linux environment nor those fixtures verify the user's Windows
+collector attachment, delivery of real Douyin chat/member events or audible native
+welcomes. No current Windows sample/version has been provided for that last-mile
+verification. Live Companion has not been restarted or modified.
+
+Rewrite validation result: 608 web tests passed, 14 existing control-plane
+welcome/recovery tests passed, and the production web build passed. Chromium
+1280×720 and 1920×1080 checks exercised ownerless chat-marker confirmation,
+separate entry display, missing-owner welcome disablement, cached-owner packets,
+malformed-packet diagnostics and explicit reconnect without retained confirmation.
+Fixtures were isolated and removed after testing. Production restart/publication
+is deferred under the current instruction to protect the running broadcast/call.
