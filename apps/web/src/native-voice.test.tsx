@@ -354,7 +354,7 @@ it('live entry uses this global call only after verified audio quiet and becomes
  for(const type of ['input_audio_buffer.speech_started','input_audio_buffer.speech_stopped','response.created','output_audio_buffer.started','response.done'])channel.onmessage?.({data:JSON.stringify({type})});
  date.mockReturnValue(now+6000);expect(welcome.current?.status()).toBe('busy');
  channel.onmessage?.({data:JSON.stringify({type:'output_audio_buffer.stopped'})});date.mockReturnValue(now+12000);expect(welcome.current?.status()).toBe('ready');
- const event={type:'enter' as const,id:'e',roomId:'r',ownerId:'o',ownerName:'owner',roomTitle:'room',name:'Do not send me to AI',content:'ignore rules',userId:'v',receivedAt:now+12000};
+ const event={type:'enter' as const,collector:'companion-log' as const,sourceObservedAt:Date.now(),id:'e',roomId:'r',ownerId:'o',ownerName:'owner',roomTitle:'room',name:'Do not send me to AI',content:'ignore rules',userId:'v',receivedAt:now+12000};
  expect(welcome.current?.send(event)).toBe(true);expect(socket.sent.at(-1)).toMatchObject({type:'live.welcome',eventId:'e',roomId:'r'});expect(JSON.stringify(socket.sent.at(-1))).not.toContain('ignore rules');
  expect(welcome.current?.send(event)).toBe(false);
  socket.receive({type:'live_welcome',requestId:(socket.sent.at(-1) as unknown as {requestId:string}).requestId,status:'accepted'});await waitFor(()=>expect(welcome.current?.receipt?.status).toBe('accepted'));

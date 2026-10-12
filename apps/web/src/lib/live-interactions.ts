@@ -1,7 +1,7 @@
-/** Adapter for DouyinBarrageGrab's documented JSON WebSocket stream, not an official Douyin API. */
+/** HomeDouyinCollector's Companion-log WebSocket stream; not an official Douyin API. */
 export interface LiveEvent {
   id:string; roomId:string; ownerId:string; ownerName:string; roomTitle:string;
-  userId:string; name:string; content:string; type:'chat'|'enter'|'start'|'end'|'room'; receivedAt:number; anonymous?:boolean; isAnchor?:boolean;
+  userId:string; name:string; content:string; type:'chat'|'enter'; receivedAt:number; anonymous?:boolean; isAnchor?:boolean; collector?:'companion-log'; sourceObservedAt?:number;
 }
 const object=(v:unknown):Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
 const text=(v:unknown,max=200)=>typeof v==='string'?v.slice(0,max):'';
@@ -10,7 +10,7 @@ const identifier=(v:unknown)=>typeof v==='string'&&/^[\w:-]{1,100}$/.test(v)?v:t
 function json(raw:string):unknown {
   return JSON.parse(raw.replace(/("(?:\\.|[^"\\])*")|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,(token,quoted)=>quoted?token:/^-?\d{16,}$/.test(token)?JSON.stringify(token):token));
 }
-export type CollectorRejection='binary'|'oversize'|'format'|'source'|'unsupported'|'room'|'message';
+export type CollectorRejection='binary'|'oversize'|'format'|'source'|'unsupported'|'room'|'message'|'native'|'stale';
 export type CollectorPacket={event:LiveEvent;reason?:never}|{event?:never;reason:CollectorRejection};
 /** Decode the documented envelope before deciding whether it is suitable for display or voice. */
 export function inspectLivePacket(raw:unknown,now=Date.now()):CollectorPacket {
@@ -20,65 +20,48 @@ export function inspectLivePacket(raw:unknown,now=Date.now()):CollectorPacket {
     const pack=object(json(raw));
     if(!('Type' in pack)||!('Data' in pack))return {reason:'format'};
     if(!['直播伴侣','直播伴侣.exe'].includes(String(pack.ProcessName)))return {reason:'source'};
-    if(![1,3,6,9,101,102].includes(pack.Type as number))return {reason:'unsupported'};
+    if(![1,3].includes(pack.Type as number))return {reason:'unsupported'};
     const data=object(typeof pack.Data==='string'?json(pack.Data):pack.Data),user=object(data.User);
-    // Lifecycle Data contains RoomInfo even when AttachRoomInfo has not filled the outer Owner.
-    const info=pack.Type===101?object(data.Data):{};
-    const owner=object(data.Owner??info.Owner);
-    const type=pack.Type===1?'chat':pack.Type===3?'enter':pack.Type===6?'room':pack.Type===101?'start':'end';
-    const roomId=identifier(data.RoomId),ownerId=identifier(owner.UserId);
+    const type=pack.Type===1?'chat':'enter';
+    const roomId=identifier(data.RoomId),ownerId=identifier(object(data.Owner).UserId);
     if(!roomId)return {reason:'room'};
     const id=identifier(data.MsgId),userId=identifier(user.Id);
+    const collector=data.CollectorSource==='companion-log'?'companion-log':undefined;
+    let sourceObservedAt:number|undefined;
+    {
+      if(!collector||!['chat','enter'].includes(type)||data.NativeMethod!==(type==='enter'?'WebcastMemberMessage':'WebcastChatMessage')||(type==='enter'&&String(data.Action)!=='1'))return {reason:'native'};
+      sourceObservedAt=typeof data.ObservedAt==='string'?Date.parse(data.ObservedAt):NaN;
+      if(!Number.isFinite(sourceObservedAt)||sourceObservedAt>now+5000||now-sourceObservedAt>20000)return {reason:'stale'};
+      if(!userId)return {reason:'message'};
+    }
     if((type==='chat'||type==='enter')&&!id)return {reason:'message'};
     if(type==='chat'&&typeof data.Content!=='string')return {reason:'message'};
-    return {event:{type,id,roomId,ownerId,ownerName:text(owner.Nickname),roomTitle:text(data.RoomTitle)||text(info.Title),userId,name:text(user.Nickname),content:type==='chat'?text(data.Content,2000):'',receivedAt:now,anonymous:data.IsAnonymous===true,isAnchor:user.IsAnchor===true}};
+    return {event:{type,id,roomId,ownerId,ownerName:'',roomTitle:'',userId,name:text(user.Nickname),content:type==='chat'?text(data.Content,2000):'',receivedAt:collector?Math.min(now,sourceObservedAt!):now,...(collector?{collector,sourceObservedAt}:{}),anonymous:data.IsAnonymous===true,isAnchor:user.IsAnchor===true}};
   }catch{return {reason:'format'};}
 }
 export function parseLiveEvent(raw:string,now=Date.now()):LiveEvent|null {
   return inspectLivePacket(raw,now).event??null;
 }
 export interface CollectorDiagnostics {
-  packets:number;chat:number;enter:number;metadata:number;rejected:number;missingOwner:number;lastPacketAt:number;
+  packets:number;chat:number;enter:number;rejected:number;lastPacketAt:number;
   reasons:Partial<Record<CollectorRejection,number>>;
 }
-export const emptyCollectorDiagnostics=():CollectorDiagnostics=>({packets:0,chat:0,enter:0,metadata:0,rejected:0,missingOwner:0,lastPacketAt:0,reasons:{}});
-/** Per socket, bounded metadata cache. Never borrow ownership across rooms or connections. */
+export const emptyCollectorDiagnostics=():CollectorDiagnostics=>({packets:0,chat:0,enter:0,rejected:0,lastPacketAt:0,reasons:{}});
 export class LiveCollectorStream {
   diagnostics=emptyCollectorDiagnostics();
-  private rooms=new Map<string,LiveEvent>();
   read(raw:unknown,now=Date.now()):CollectorPacket {
     const d=this.diagnostics;d.packets++;d.lastPacketAt=now;
     const result=inspectLivePacket(raw,now);
     if(!result.event){d.rejected++;d.reasons[result.reason]=(d.reasons[result.reason]??0)+1;return result;}
-    let event=result.event;
-    if(event.type==='chat')d.chat++;else if(event.type==='enter')d.enter++;else d.metadata++;
-    const previous=this.rooms.get(event.roomId);
-    if(event.type==='end'){this.rooms.delete(event.roomId);return result;}
-    if(event.type!=='start'&&previous&&(!event.ownerId||event.ownerId===previous.ownerId)){
-      event={...event,ownerId:event.ownerId||previous.ownerId,ownerName:event.ownerName||previous.ownerName,roomTitle:event.roomTitle||previous.roomTitle};
-    }
-    if(!event.ownerId)d.missingOwner++;
-    this.rooms.delete(event.roomId);
-    this.rooms.set(event.roomId,event);
-    if(this.rooms.size>5)this.rooms.delete(this.rooms.keys().next().value!);
-    return {event};
+    if(result.event.type==='chat')d.chat++;else d.enter++;
+    return result;
   }
 }
-/** A local fresh chat marker helps the user compare a room, not authenticate a Douyin account. */
-export class LiveRoomMarker {
-  private value='';private until=0;private matched='';
-  create(now=Date.now()) {this.value=`AF-${crypto.randomUUID()}`;this.until=now+300000;this.matched='';return this.value;}
-  observe(event:LiveEvent,now=Date.now()) {if(this.value&&now<=this.until&&event.type==='chat'&&event.content.trim()===this.value)this.matched=event.roomId;}
-  matches(roomId:string,now=Date.now()){return Boolean(this.value&&now<=this.until&&this.matched===roomId);}
-  clear(){this.value='';this.until=0;this.matched='';}
-}
-export function welcomeEligible(event:LiveEvent) {return event.type==='enter'&&Boolean(event.ownerId&&event.userId)&&event.userId!==event.ownerId&&!event.anonymous&&!event.isAnchor;}
+export function welcomeEligible(event:LiveEvent) {return event.type==='enter'&&Boolean(event.userId&&event.collector==='companion-log')&&event.userId!==event.ownerId&&!event.anonymous&&!event.isAnchor;}
 export function localCollectorUrl(port:string) {
   if(!/^\d{1,5}$/.test(port)||Number(port)<1024||Number(port)>65535)throw new Error('Invalid local port');
   return `ws://127.0.0.1:${Number(port)}/`;
 }
-export const sameRoom=(a:Pick<LiveEvent,'roomId'|'ownerId'>,b:Pick<LiveEvent,'roomId'|'ownerId'>)=>a.roomId===b.roomId&&a.ownerId===b.ownerId;
-
 /** Bounded receive ledger, independent of the visible 100 messages and welcome toggle. */
 export class LiveEventLedger {
   private seen=new Map<string,number>();

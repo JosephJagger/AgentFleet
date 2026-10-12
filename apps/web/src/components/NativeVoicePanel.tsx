@@ -199,7 +199,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       if(!welcomeEligible(event)||!globalMachineId||welcomeRef.current?.status()!=='ready'||socket?.readyState!==WebSocket.OPEN)return false;
       const requestId=crypto.randomUUID();
       welcomeReceipt.current={requestId,status:'requested'};welcomeSentAt.current=Date.now();
-      socket.send(JSON.stringify({type:'live.welcome',kind:'enter',source:'douyin-barrage-grab:直播伴侣',confirmedOwnRoom:true,audioIdle:true,requestId,eventId:event.id,roomId:event.roomId,ownerId:event.ownerId,viewerId:event.userId,observedAt:event.receivedAt}));
+      socket.send(JSON.stringify({type:'live.welcome',kind:'enter',source:'home-douyin-collector:companion-log',streamEnabled:true,nativeMethod:'WebcastMemberMessage',entryAction:'1',sourceObservedAt:event.sourceObservedAt,audioIdle:true,requestId,eventId:event.id,roomId:event.roomId,ownerId:event.ownerId,viewerId:event.userId,observedAt:event.receivedAt}));
       welcomeGate.current.quietSince=Date.now()+25000;
       return true;
     },

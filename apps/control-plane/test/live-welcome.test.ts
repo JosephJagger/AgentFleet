@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {LiveWelcomeGate,LIVE_WELCOME_TEXT} from '../src/live-welcome.js';
-const entry=(now:number,patch:Record<string,unknown>={})=>({kind:'enter',source:'douyin-barrage-grab:直播伴侣',confirmedOwnRoom:true,audioIdle:true,roomId:'room',ownerId:'owner',eventId:'entry',viewerId:'viewer',requestId:'request',observedAt:now,...patch});
-test('welcome accepts only explicit recent member events from a confirmed room; busy work wins',()=>{
+const entry=(now:number,patch:Record<string,unknown>={})=>({kind:'enter',source:'home-douyin-collector:companion-log',streamEnabled:true,nativeMethod:'WebcastMemberMessage',entryAction:'1',sourceObservedAt:now,audioIdle:true,roomId:'room',eventId:'entry',viewerId:'viewer',requestId:'request',observedAt:now,...patch});
+test('welcome accepts only explicit recent member events from the new local collector; busy work wins',()=>{
  const gate=new LiveWelcomeGate();gate.quietAt=0;const now=10000;
- for(const patch of [{kind:'chat'},{source:'chrome'},{confirmedOwnRoom:false},{audioIdle:false},{eventId:''},{observedAt:now-21000},{observedAt:now+1}])assert.equal(gate.accept(entry(now,patch),false,now),false);
+ for(const patch of [{kind:'chat'},{source:'chrome'},{streamEnabled:false},{entryAction:'2'},{nativeMethod:'WebcastChatMessage'},{sourceObservedAt:now-21000},{sourceObservedAt:now+5001},{audioIdle:false},{eventId:''},{observedAt:now-21000},{observedAt:now+1}])assert.equal(gate.accept(entry(now,patch),false,now),false);
  assert.equal(gate.accept(entry(now),true,now),false);
  assert.equal(gate.accept(entry(now),false,now),true);
  assert.ok(LIVE_WELCOME_TEXT.includes('嗨，你好，欢迎光临'));assert.ok(!LIVE_WELCOME_TEXT.includes('viewerId'));
