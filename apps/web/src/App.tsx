@@ -1,4 +1,3 @@
-import { NativeSubagents, NativeSubagentsTrigger, useNativeSubagents } from "./components/NativeSubagents";
 import { matchesRuntimeTarget, runtimeRollout } from "./lib/runtime-rollout";
 import { HostSessions } from "./components/HostSessions";
 import { hostSessionGroups, preferredHostSession, rememberedHostSession, rememberHostSession } from "./lib/host-session-selection";
@@ -660,7 +659,6 @@ function ApprovalCard({ approval, provider, onDecide, busy }: { approval: Approv
 }
 
 type TurnAdditions = {
-  nativeCollaboration?: boolean;
   outputSchema?: Record<string, unknown>;
   attachments?: Array<{ name: string; relativePath: string; mimeType: string; data: string }>;
   references?: Array<{ id: string; version: string }>;
@@ -692,10 +690,6 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   onNewSession?: () => void;
 }) {
   const buzhouDesktop = useBuzhoushanDesktop();
-  const [subagentsOpen, setSubagentsOpen] = useState(false);
-  const nativeCollaboration = buzhouDesktop && detail?.session.state.ownership === "agentfleet_owned";
-  const subagents = useNativeSubagents(detail?.session.id, nativeCollaboration, subagentsOpen);
-  useEffect(() => setSubagentsOpen(false), [detail?.session.id, detail?.session.state.ownership, buzhouDesktop]);
   const [voiceActive, setVoiceActive] = useState(false);
   const [prompt, setPrompt] = useSessionDraft(draftOwner ?? "preview", detail?.session.id);
   const writingSettings = useCompletionPreferences(draftOwner ?? "preview", detail?.session.id);
@@ -911,7 +905,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   let outputSchema: Record<string, unknown> | undefined;
   let outputSchemaError = false;
   if (session.provider !== "claude" && outputSchemaDraft.trim()) { try { outputSchema = parseOutputSchema(JSON.parse(outputSchemaDraft)); } catch { outputSchemaError = true; } }
-  const additions: TurnAdditions | undefined = nativeCollaboration || fileDraft.files.length || selectedPlugins.length || goal.trim() || referenceCards.length || outputSchema ? { ...(nativeCollaboration ? { nativeCollaboration: true } : {}), ...(outputSchema ? { outputSchema } : {}), ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(referenceCards.length ? { references: referenceCards.filter(card => card.identity).map(card => ({ id: card.sourceId, version: card.identity!.version })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
+  const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() || referenceCards.length || outputSchema ? { ...(outputSchema ? { outputSchema } : {}), ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(referenceCards.length ? { references: referenceCards.filter(card => card.identity).map(card => ({ id: card.sourceId, version: card.identity!.version })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
   const referencesBlocked = referenceCards.some(card => card.error || !card.identity) || (referenceCards.length > 0 && !prompt.trim());
   const sendText = () => prompt.trim();
   const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length);
@@ -1014,7 +1008,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           }}>{aiBusy ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}<span className="composer-action-label composer-action-label--full" aria-hidden="true">{aiBusy ? t("正在优化…") : t("优化表达")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{aiBusy ? t("优化中") : t("优化")}</span></button>;
 
   return (
-    <aside className={`inspector${nativeCollaboration && subagentsOpen ? " inspector--subagents" : ""}`}>
+    <aside className="inspector">
       <header className="inspector-head">
         <IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton>
         <div className="eyebrow inspector-context" title={displayName(`${session.machineName} · ${agentName(session.provider)} · ${session.projectAlias}`)}>{displayName(session.machineName)} · {agentName(session.provider)} · {displayName(session.projectAlias)}</div>
@@ -1030,7 +1024,6 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
             </div>
           </div>
         <div className="inspector-head__actions">
-      {nativeCollaboration && <NativeSubagentsTrigger state={subagents} open={subagentsOpen} onClick={() => setSubagentsOpen(open => !open)}/>}
       {session.provider !== "claude" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
           <SessionActions>
@@ -1042,7 +1035,6 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div>
         </div>
       </header>
-      <div className="native-subagents-conversation">
       {managed ? (
         <div className={`lease-strip${lease?.isMine ? " lease-strip--mine" : ""}${(!lease || lease.isMine) && detail.releaseManagementSupported && !releaseConfirming ? " lease-strip--ready" : ""}`}>
           <span className="lease-strip__icon"><UserRoundCheck size={16} /></span>
@@ -1262,8 +1254,6 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div>
         </div>
       </form>
-      </div>
-      {nativeCollaboration && subagentsOpen && <NativeSubagents session={session} state={subagents} onClose={() => setSubagentsOpen(false)}/>}
     </aside>
   );
 }

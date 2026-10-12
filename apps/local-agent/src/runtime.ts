@@ -1834,7 +1834,7 @@ export class AgentRuntime {
         await this.beginWorkspaceWatch(thread, project.root, server.appServerEpoch);
         const result = await (async()=>{try {return nativeAction
           ? await server.startNativeTurn!(thread, nativeAction, nativeAction === "review" ? parseReviewTarget(command.payload.target) : undefined)
-          : await server.startTurn(thread, project, referenced.prompt, clientUserMessageId, turnSettings, images, { attachments: referenced.attachments, referenceFiles: referenced.referenceFiles, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(command.payload.nativeCollaboration === true ? { nativeCollaboration: true } : {}), ...(outputSchema ? { outputSchema } : {}), ...(goal ? { goal } : {}) });
+          : await server.startTurn(thread, project, referenced.prompt, clientUserMessageId, turnSettings, images, { attachments: referenced.attachments, referenceFiles: referenced.referenceFiles, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(outputSchema ? { outputSchema } : {}), ...(goal ? { goal } : {}) });
         } catch(error){this.discardWorkspaceWatch(thread.nativeThreadId);throw error;}})();
         const watch=this.workspaceWatches.get(thread.nativeThreadId);if(watch)watch.turnId=result.nativeTurnId;
         let completedBeforeResponse = false;
@@ -1923,7 +1923,7 @@ export class AgentRuntime {
         const referenced = referenceInputs(prompt, materialized);
         const materializedSkills = await materializePluginSkills(project, command.commandId, pluginSkills, server);
         const materializedPlugins = await materializePlugins(project, command.commandId, plugins, server);
-        const result = await server.steerTurn(thread, turnId, referenced.prompt, clientUserMessageId, images, { attachments: referenced.attachments, referenceFiles: referenced.referenceFiles, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(command.payload.nativeCollaboration === true ? { nativeCollaboration: true } : {}), ...(goal ? { goal } : {}) });
+        const result = await server.steerTurn(thread, turnId, referenced.prompt, clientUserMessageId, images, { attachments: referenced.attachments, referenceFiles: referenced.referenceFiles, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(goal ? { goal } : {}) });
         await this.emitForThread(thread, {
           type: "turn.steered",
           nativeThreadId: thread.nativeThreadId,

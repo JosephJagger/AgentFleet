@@ -9,10 +9,24 @@ vi.mock('./components/NativeVoicePanel',()=>({NativeVoicePanel:({canStart,onPane
  <button disabled={!canStart}>Test call</button>
  <button onClick={()=>onPanelTask({jobId:'job',sessionId:'session',title:'Book',project:'Demo',host:'Host',state:'failed',result:'',link:'/sessions/session',executionStarted:false,historyLimited:false,error:{code:'MACHINE_DRAINING',message:'waiting for maintenance'}})}>Fail task</button>
  <button onClick={()=>onPanelTask({jobId:'job-two',sessionId:'session-two',title:'Other project',project:'Other',host:'Host',state:'running',result:'',link:'/sessions/session-two'})}>Second task</button>
+ <button onClick={()=>onPanelTask({jobId:'job-queue',sessionId:'session-claude',title:'Review changes',project:'App',host:'Mac',provider:'claude',managed:true,state:'queued',result:'',link:'/sessions/session-claude'})}>Queue Claude task</button>
+ <button onClick={()=>onPanelTask({jobId:'job-queue',sessionId:'session-claude',title:'Review changes',project:'App',host:'Mac',provider:'claude',managed:true,state:'running',result:'',link:'/sessions/session-claude'})}>Start queued task</button>
  <button onClick={()=>onPanelTask(undefined)}>New call</button>
 </>}));
 afterEach(cleanup);
 const machine={id:'host',name:'Host',agentVersion:'0.30.86',reachability:'live'} as Machine;
+it('shows queued Claude work separately from running work and keeps the same target after promotion',()=>{
+ const open=vi.fn();render(<PanelVoiceControl machines={[{...machine,agentVersion:'0.30.98'}]} onOpenSession={open}/>);
+ fireEvent.click(screen.getByRole('button',{name:'面板语音总控'}));fireEvent.click(screen.getByText('Queue Claude task'));
+ fireEvent.click(screen.getByRole('button',{name:'0 运行中'}));
+ const card=screen.getByText('Review changes').closest('.panel-voice-control__task') as HTMLElement;
+ expect(within(card).getByText('排队中')).toBeTruthy();expect(within(card).getByText('已接管')).toBeTruthy();
+ expect(within(card).getByText('等待当前轮次结束后执行')).toBeTruthy();
+ fireEvent.click(within(card).getByRole('button',{name:'Review changes Mac · App · Claude Code'}));expect(open).toHaveBeenLastCalledWith('session-claude');
+ fireEvent.click(screen.getByText('Start queued task'));
+ expect(screen.getByRole('button',{name:'1 运行中'})).toBeTruthy();expect(screen.getAllByText('Review changes')).toHaveLength(1);
+ expect(within(card).getByText('执行中')).toBeTruthy();expect(within(card).queryByText('排队中')).toBeNull();
+});
 it('maintenance explains why a connected host cannot start voice and recovers on a fresh report',()=>{
  const props={machines:[{...machine,maintenance:{operationId:'upgrade',startedAt:'2026-01-01T00:00:00Z'}}],onOpenSession:vi.fn()};
  const view=render(<PanelVoiceControl {...props}/>);fireEvent.click(screen.getByRole('button',{name:'面板语音总控'}));

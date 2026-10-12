@@ -51,6 +51,23 @@ test('runtime checks exact binding, cwd, permissions and connection before and a
 });
 
 import {serializePanelToolResult} from '../src/panel-voice-tools.js';
+
+test('oversized dispatch receipts retain committed identifiers and queued state without inviting a retry',()=>{
+ const value={jobId:'job-queued',commandId:'cmd-queued',sessionId:'session',projectId:'project',machineId:'host',state:'queued',commandState:'queued',nativeTurnId:null,queueState:'queued',executionStarted:false,duplicate:true,originalIntent:'large prompt '.repeat(3000),result:''};
+ const encoded=serializePanelToolResult(value);
+ const receipt=JSON.parse(encoded);
+ assert.ok(encoded.length<24000);
+ for(const key of ['jobId','commandId','sessionId','projectId','machineId','state','commandState','nativeTurnId','queueState','executionStarted','duplicate'] as const)assert.equal(receipt[key],value[key]);
+ assert.equal(receipt.detailsOmitted,true);assert.equal(receipt.truncated,true);
+ assert.equal(receipt.error,undefined);assert.equal(receipt.originalIntent,undefined);
+ assert.match(receipt.message,/不要重复派发/);
+});
+
+test('oversized completed results preserve turn attribution and explicitly mark omitted output',()=>{
+ const receipt=JSON.parse(serializePanelToolResult({jobId:'job-completed',nativeTurnId:'its-own-turn',state:'completed',resultStatus:'available',result:'x'.repeat(30000)}));
+ assert.equal(receipt.nativeTurnId,'its-own-turn');assert.equal(receipt.state,'completed');
+ assert.equal(receipt.resultTruncated,true);assert.equal(receipt.result,undefined);
+});
 test('voice tool preserves long history JSON and continuation cursors without slicing',()=>{
  const page={items:[{text:'x'.repeat(63000)}],nextCursor:'next-page'};
  assert.deepEqual(JSON.parse(serializePanelToolResult(page,true)),page);

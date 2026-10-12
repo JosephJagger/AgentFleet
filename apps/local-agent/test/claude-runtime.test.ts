@@ -4,7 +4,6 @@ import { ClaudeRuntime } from "../src/claude-runtime.js";
 import type { AppServerCallbacks } from "../src/app-server.js";
 import type { ManagedThread, ProjectRecord } from "../src/types.js";
 import type { Options, Query } from "@anthropic-ai/claude-agent-sdk";
-import { NATIVE_COLLABORATION_INSTRUCTIONS } from "../src/native-subagents.js";
 
 const project = { id: "claude-project", root: "/tmp", provider: "claude" } as ProjectRecord;
 test("Claude starts the first streaming prompt, resumes the original identity and reports completion", async () => {
@@ -240,8 +239,8 @@ test("Claude child stream and result cannot become parent reply or complete pare
       } } as unknown as Query;
     },
   });
-  await runtime.start(); await runtime.startTurn(thread, project, "Main task", undefined, undefined, undefined, { nativeCollaboration: true }); await completed;
-  assert.deepEqual(options.systemPrompt, { type: "preset", preset: "claude_code", append: NATIVE_COLLABORATION_INSTRUCTIONS });
+  await runtime.start(); await runtime.startTurn(thread, project, "Main task", undefined, undefined, undefined, { attachments: [], ...{ nativeCollaboration: true } }); await completed;
+  assert.deepEqual(options.systemPrompt, { type: "preset", preset: "claude_code" });
   assert.equal(events.filter(event => event.type === "turn.completed").length, 1);
   assert.equal(events.find(event => event.type === "agent_message.delta")?.nativeItemId, "parent-reply:text");
   assert.equal(JSON.stringify(events).includes("Child"), false);

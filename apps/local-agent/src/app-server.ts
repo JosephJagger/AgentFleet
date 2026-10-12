@@ -1066,7 +1066,7 @@ export class CodexAppServer implements AppServerClient {
         // before selecting this disposable writer. A writer-local model/list can
         // be temporarily unavailable even though turn/start accepts that model.
         ...turnSettingsParams(settings),
-        ...nativeCollaborationContext(extras?.nativeCollaboration),
+        ...nativeCollaborationContext(),
         threadId: thread.nativeThreadId,
         ...(clientUserMessageId === undefined ? {} : { clientUserMessageId }),
         input: this.imageInputs(prompt, images, settings?.model ?? thread.observedSettings?.model, extras),
@@ -1103,7 +1103,7 @@ export class CodexAppServer implements AppServerClient {
       await this.request("turn/steer", {
         threadId: thread.nativeThreadId,
         expectedTurnId: turnId,
-        ...nativeCollaborationContext(extras?.nativeCollaboration),
+        ...nativeCollaborationContext(),
         input: this.imageInputs(prompt, images, thread.acceptedSettings?.model ?? thread.observedSettings?.model, extras),
         clientUserMessageId: clientUserMessageId ?? null,
       }),

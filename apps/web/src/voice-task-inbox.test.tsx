@@ -9,6 +9,13 @@ afterEach(()=>{cleanup();vi.resetAllMocks();});
 const pending:VoiceTaskRecord={todoId:'todo',intent:'Develop this later',intentUnavailable:false,state:'pending',revision:2,sourceVoiceId:'old-call',createdAt:'2026-01-01',updatedAt:'2026-01-01',target:null,targetUnavailable:false,job:null};
 const finished:VoiceTaskRecord={...pending,todoId:'done',intent:'Original completed task',state:'dispatched',target:{machineId:'m',projectId:'p',sessionId:'s',host:'Host',project:'Project',title:'Session'},job:{jobId:'job',nativeTurnId:'turn',state:'completed',result:'Stored result',deliveredToVoice:true,acknowledgedAt:null}};
 const page=(items:VoiceTaskRecord[]):VoiceTaskPage=>({items,total:items.length,nextCursor:null,instruction:'Read-only recovery'});
+it('restored queued work shows its provider and management state without implying it has started',async()=>{
+ vi.mocked(api.voiceTasks).mockResolvedValue(page([{...finished,target:{...finished.target!,provider:'claude',managed:true},job:{...finished.job!,nativeTurnId:null,state:'queued',result:'',deliveredToVoice:false}}]));
+ render(<VoiceTaskInbox onOpenSession={()=>undefined}/>);fireEvent.click(screen.getByText('待办与结果记录'));
+ expect(await screen.findByText('排队中')).toBeTruthy();expect(screen.getByText('Host · Project · Session · Claude Code · 已接管')).toBeTruthy();
+ expect(screen.queryByText('执行中')).toBeNull();expect(screen.queryByText('标记已知悉')).toBeNull();
+ expect(api.cancelVoiceTodo).not.toHaveBeenCalled();expect(api.acknowledgeVoiceTodo).not.toHaveBeenCalled();
+});
 it('opening/restoring memory is read-only; cancels and acknowledgement require explicit clicks',async()=>{
  vi.mocked(api.voiceTasks).mockResolvedValue(page([pending,finished]));
  vi.mocked(api.cancelVoiceTodo).mockResolvedValue({...pending,state:'cancelled'});vi.mocked(api.acknowledgeVoiceTodo).mockResolvedValue(finished);

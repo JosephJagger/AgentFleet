@@ -1,3 +1,4 @@
+import { directoryTurnConflict } from "./directory-turn-lock.js";
 import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
@@ -26,13 +27,13 @@ const blocked = (reasonCode: string, message: string): ActionAvailability => ({ 
 
 export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clientSessionId: string): SessionActions {
   const row = db.get<{
-    managed: number; execution_state: string; active_turn_id: string | null; reachability: string;
+    project_id: string; sync_content: number; managed: number; execution_state: string; active_turn_id: string | null; reachability: string;
     native_thread_id: string | null; history_mode: string | null; machine_reachability: string;
     identity_state: string; security_state: string; compatibility: string; runtime_read_only: number;
     command_types_json: string | null; holder: string | null; pending_approvals: number; queued: number; frozen: number;
     runtime_settings_json: string | null; maintenance_json: string | null;
     paginated_history: number; provider: string; discovery_json: string | null;
-  }>(`SELECT s.*,p.provider,m.discovery_json,e.native_thread_id,e.history_mode,m.reachability AS machine_reachability,
+  }>(`SELECT s.*,p.provider,p.sync_content,m.discovery_json,e.native_thread_id,e.history_mode,m.reachability AS machine_reachability,
       m.identity_state,m.security_state,m.compatibility,m.runtime_read_only,m.maintenance_json,m.command_types_json,m.paginated_history,
       (SELECT holder_client_session_id FROM control_leases WHERE logical_session_id=s.logical_session_id
         AND state='active' AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY acquired_at DESC LIMIT 1) AS holder,
@@ -57,6 +58,8 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     JOIN projects p ON p.project_id=s.project_id
     JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL
     WHERE s.logical_session_id=? ORDER BY e.created_at DESC LIMIT 1`, sessionId);
+  const startConflict = row && directoryTurnConflict(db, row.project_id, sessionId, true);
+  const directoryConflict = row && directoryTurnConflict(db, row.project_id, sessionId);
   const actions = {} as SessionActions;
   const heldElsewhere = row?.holder && !sameLeaseAccount(db, row.holder, clientSessionId);
   actions.read = allowed;
@@ -81,10 +84,13 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     else if ((action === "claim" || action === "release") && !row.native_thread_id) availability = blocked("THREAD_NOT_AVAILABLE", "宿主机会话尚未建立");
     else if (["deletePreview", "delete", "claim", "release", "start", "rename", "archive", "unarchive", "fork", "compact", "review"].includes(action) &&
       (row.active_turn_id !== null || !["idle", "completed", "failed", "interrupted"].includes(row.execution_state))) availability = blocked("THREAD_BUSY", "等待当前任务完成");
+    else if (action === "queue" && row.sync_content !== 1) availability = blocked("QUEUE_REQUIRES_CONTENT_SYNC", "项目未开启内容同步，暂不能排队");
+    else if (action === "queue" && row.active_turn_id === null) availability = blocked("QUEUE_NOT_NEEDED", "当前没有运行中的任务，请直接发送");
     else if (["cancel", "steer"].includes(action) && !row.active_turn_id) availability = blocked("NO_ACTIVE_TURN", "当前没有运行中的任务");
     else if (["deletePreview", "delete", "release", "rename", "archive", "unarchive", "fork"].includes(action) && (row.pending_approvals || row.queued)) availability = blocked("SESSION_HAS_PENDING_WORK", "请先处理待审批与排队任务");
     else if (["deletePreview", "delete", "rename", "archive", "unarchive", "fork", "compact", "review", "stop"].includes(action) && !row.native_thread_id) availability = blocked("THREAD_NOT_AVAILABLE", "先发送一条消息建立宿主机会话");
     else if (["claim", "start", "queue", "release", "archive", "fork", "compact", "review"].includes(action) && row.runtime_settings_json && JSON.parse(row.runtime_settings_json)?.archived === true) availability = blocked("THREAD_ARCHIVED", row.managed ? "先恢复宿主机归档会话" : "请先在宿主机恢复归档，再接管原会话");
+    else if (["claim", "start", "compact", "review"].includes(action) && (action === "start" ? startConflict : directoryConflict)) availability = blocked("PROJECT_TURN_RESERVED", "此目录已有执行中或待核验任务，请等待完成；Codex 与 Claude Code 共用目录时不能并行执行");
     else if (action === "approve" && !row.pending_approvals) availability = blocked("NO_PENDING_APPROVAL", "当前没有待审批操作");
     actions[action] = availability;
   }

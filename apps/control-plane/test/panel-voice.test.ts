@@ -82,6 +82,11 @@ test('completion follows the exact native turn; deleted content is never spoken 
   assert.equal(report.result.result,'Verified deployment result');
   assert.equal(report.result.executionStarted,true);
   assert.equal(report.result.historyLimited,false);
+  f.db.run("UPDATE content_blobs SET body_json=? WHERE payload_ref='payload-3'",JSON.stringify({item:{type:'agentMessage',text:'x'.repeat(7000)}}));
+  const truncated=f.service.report(f.principal,f.call.voice_id)!.result;
+  assert.equal(truncated.result.length,6000);assert.equal(truncated.resultTruncated,true);assert.equal(truncated.historyLimited,true);
+  const stored=f.service.recover(f.principal) as {items:Array<{job:{resultTruncated?:boolean;historyLimited?:boolean}|null}>};
+  assert.equal(stored.items[0]?.job?.resultTruncated,true);assert.equal(stored.items[0]?.job?.historyLimited,true);
   f.service.acknowledgeReport(f.call.voice_id,report.reportId);
   assert.equal(f.service.report(f.principal,f.call.voice_id),null);
   f.db.run("UPDATE content_blobs SET deleted_at='now' WHERE payload_ref='payload-3'");
@@ -239,9 +244,9 @@ test('schema 49 migration preserves work and enables another host project after 
  const dir=mkdtempSync(join(tmpdir(),'panel-parallel-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'test.sqlite');
  f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
  let db=new ControlPlaneDatabase(path);
- db.sqlite.exec("DROP INDEX panel_voice_one_session_job; CREATE UNIQUE INDEX panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown'); PRAGMA user_version=49");db.close();
+ db.sqlite.exec("DROP INDEX IF EXISTS panel_voice_one_session_job; CREATE UNIQUE INDEX panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown'); PRAGMA user_version=49");db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,55);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,56);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_jobs')?.job_id,original.jobId);
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
  const registry=new RegistryService(db,config);const service=new PanelVoiceService(db,registry,new CoordinationService(db,config));
@@ -324,7 +329,7 @@ test('schema 50 backfills existing jobs without execution and recovery paginates
  f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
  let db=new ControlPlaneDatabase(path);db.sqlite.exec('DROP TABLE panel_voice_todo_resolutions; DROP TABLE panel_voice_task_records; DROP TABLE panel_voice_todos; PRAGMA user_version=50');db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,55);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,56);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_task_records')?.job_id,old.jobId);
  assert.equal(db.get<{original_intent:string}>('SELECT original_intent FROM panel_voice_task_records')?.original_intent,'Read project status');
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
@@ -478,4 +483,118 @@ test('completion evidence must be current, final, native and accessible; expiry 
 for (const reason of ['PAGE_LEFT','USER_LOGOUT','OTHER_CALL_STARTED','AUDIO_DISCONNECTED','CONNECT_TIMEOUT']) test(`panel voice keeps precise ${reason} diagnostic`,t=>{
  const f=fixture();t.after(()=>f.db.close());f.service.recordCloseReason(f.call.voice_id,reason);f.service.recordCloseReason(f.call.voice_id,'SIGNAL_CLOSED');
  assert.equal(JSON.parse(f.service.get(f.call.voice_id)!.binding_json).closeReason,reason);
+});
+
+function makeExternal(f:ReturnType<typeof fixture>) {
+ f.db.run("UPDATE machines SET command_types_json='[\"thread.claim\",\"turn.start\",\"turn.queue\",\"turn.steer\"]'");
+ f.db.run("UPDATE logical_sessions SET managed=0,execution_state='idle',active_turn_id=NULL WHERE logical_session_id=?",f.session.logicalSessionId);
+ f.db.run("UPDATE execution_segments SET native_thread_id='external-native',history_mode='legacy' WHERE logical_session_id=?",f.session.logicalSessionId);
+}
+
+test('voice search discovers unmanaged targets and reports exact claim, queue and provider capabilities',t=>{
+ const f=fixture();t.after(()=>f.db.close());makeExternal(f);
+ const search=()=>f.service.tool(f.principal,f.call.voice_id,'search',{action:'search',query:'Test'}) as {sessions:Array<{managed:boolean;provider:string;canClaim:boolean;canQueue:boolean;available:boolean;claimUnavailableReason:{code:string}|null}>};
+ const target=search().sessions[0]!;
+ assert.equal(target.managed,false);assert.equal(target.provider,'codex');assert.equal(target.canClaim,true);assert.equal(target.available,false);assert.equal(target.canQueue,false);
+ f.db.run("UPDATE logical_sessions SET execution_state='running',active_turn_id='external-turn'");
+ assert.equal(search().sessions[0]!.canClaim,false);assert.equal(search().sessions[0]!.claimUnavailableReason?.code,'THREAD_BUSY');
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
+});
+
+test('voice claim requires current authorization and native success evidence, and reconnect never repeats it',t=>{
+ const f=fixture();t.after(()=>f.db.close());makeExternal(f);
+ const args={action:'claim',sessionId:f.session.logicalSessionId,idempotencyKey:'claim-once',confirmed:true};
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'deny',{...args,confirmed:false}),/本次用户授权/);
+ const first=f.service.tool(f.principal,f.call.voice_id,'claim',args) as {commandId:string;state:string};
+ assert.equal(first.state,'claiming');
+ assert.equal(f.registry.getSession(f.principal,f.session.logicalSessionId).managed,false);
+ assert.throws(()=>f.dispatch(),/先连接/);
+ const status=()=>f.service.tool(f.principal,f.call.voice_id,'status',{action:'status',commandId:first.commandId}) as {state:string;claimed:boolean};
+ f.db.run("UPDATE command_projection SET state='applied' WHERE command_id=?",first.commandId);
+ assert.equal(status().claimed,false,'applied without claimed evidence is not native success');
+ f.db.run("INSERT INTO command_lifecycle(command_id,state,detail_json,created_at) VALUES(?,'applied',?,?)",first.commandId,JSON.stringify({ok:true,response:{claimed:true,nativeThreadId:'external-native'}}),new Date().toISOString());
+ assert.equal(status().claimed,false,'native response must also match live management projection');
+ f.db.run('UPDATE logical_sessions SET managed=1');
+ assert.equal(status().claimed,true);
+ f.service.closeOrphans();const next=f.service.start(f.principal,'m',{});f.service.state(next.voice_id,'active');
+ const duplicate=f.service.tool(f.principal,next.voice_id,'new-call',args) as {commandId:string;duplicate:boolean};
+ assert.equal(duplicate.commandId,first.commandId);assert.equal(duplicate.duplicate,true);
+ const recovery=f.service.recover(f.principal) as {claims:Array<{commandId:string}>};
+ assert.equal(recovery.claims[0]?.commandId,first.commandId);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,1);
+ assert.throws(()=>f.service['describeClaim']({...f.principal,userId:'other'},first.commandId),/没有此/);
+});
+
+test('voice does not take over an external running session or replay an unknown claim',t=>{
+ const f=fixture();t.after(()=>f.db.close());makeExternal(f);
+ const args={action:'claim',sessionId:f.session.logicalSessionId,idempotencyKey:'once',confirmed:true};
+ f.db.run("UPDATE logical_sessions SET active_turn_id='external',execution_state='running'");
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'running',args),/等待当前任务/);
+ f.db.run("UPDATE logical_sessions SET active_turn_id=NULL,execution_state='idle'");
+ const first=f.service.tool(f.principal,f.call.voice_id,'first',args) as {commandId:string};
+ f.db.run("UPDATE command_projection SET state='unknown' WHERE command_id=?",first.commandId);
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'second',{...args,idempotencyKey:'different'}),/已有接管操作/);
+ assert.equal((f.service.tool(f.principal,f.call.voice_id,'retry',args) as {state:string}).state,'unknown');
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,1);
+});
+
+test('voice queues separate tasks without stealing the running turn, and recovers the same job across calls',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const running=f.dispatch() as {jobId:string};
+ f.db.run("UPDATE machines SET command_types_json='[\"turn.start\",\"turn.queue\"]'");
+ f.db.run("UPDATE logical_sessions SET active_turn_id='first-turn',execution_state='running'");
+ f.db.run("UPDATE panel_voice_jobs SET native_turn_id='first-turn',state='running' WHERE job_id=?",running.jobId);
+ const args={action:'dispatch',mode:'queue',sessionId:f.session.logicalSessionId,prompt:'Second independent task',idempotencyKey:'second-task'};
+ const queued=f.service.tool(f.principal,f.call.voice_id,'queue',args) as {jobId:string;commandId:string;state:string;nativeTurnId:string|null;progress:{nativeTurnId:string|null;items:unknown[]}};
+ assert.equal(queued.state,'queued');assert.equal(queued.nativeTurnId,null);assert.equal(queued.progress.nativeTurnId,null);assert.deepEqual(queued.progress.items,[]);
+ assert.equal(f.db.get<{type:string}>('SELECT type FROM commands WHERE command_id=?',queued.commandId)?.type,'turn.queue');
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM panel_voice_jobs')?.n,2);
+ const recovered=f.service.recover(f.principal) as {items:Array<{job:{jobId:string;state:string}|null}>};
+ assert.equal(recovered.items.find(x=>x.job?.jobId===queued.jobId)?.job?.state,'queued');
+ f.service.closeOrphans();const next=f.service.start(f.principal,'m',{});f.service.state(next.voice_id,'active');
+ const duplicate=f.service.tool(f.principal,next.voice_id,'new-request',args) as {jobId:string};
+ assert.equal(duplicate.jobId,queued.jobId);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,2);
+ assert.throws(()=>f.service.tool(f.principal,next.voice_id,'changed',{...args,mode:undefined}),/不同操作/);
+ f.db.run("UPDATE command_projection SET state='cancelled' WHERE command_id=?",queued.commandId);
+ f.db.run("UPDATE turn_queue SET state='cancelled' WHERE command_id=?",queued.commandId);
+ assert.equal((f.service.tool(f.principal,next.voice_id,'status',{action:'status',jobId:queued.jobId}) as {state:string}).state,'failed');
+});
+
+test('queue request does not silently become immediate dispatch when current turn finishes',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.db.run("UPDATE machines SET command_types_json='[\"turn.start\",\"turn.queue\"]'");
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'queue',{action:'dispatch',mode:'queue',sessionId:f.session.logicalSessionId,prompt:'Do next'}),/当前任务已结束|当前没有运行中的任务/);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
+});
+
+test('queued job follows only its own promoted command receipt and completion',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.db.run("UPDATE machines SET command_types_json='[\"turn.start\",\"turn.queue\"]'");
+ f.db.run("UPDATE logical_sessions SET active_turn_id='previous-turn',execution_state='running'");
+ const job=f.service.tool(f.principal,f.call.voice_id,'queue',{action:'dispatch',mode:'queue',sessionId:f.session.logicalSessionId,prompt:'Next task'}) as {jobId:string;commandId:string};
+ const status=()=>f.service.tool(f.principal,f.call.voice_id,'status',{action:'status',jobId:job.jobId}) as {state:string;nativeTurnId:string|null};
+ assert.equal(status().state,'queued');assert.equal(status().nativeTurnId,null);
+ f.db.run("UPDATE logical_sessions SET active_turn_id=NULL,execution_state='idle'");
+ const promoted=f.coordination.activateNextQueued(f.session.logicalSessionId);
+ assert.equal(promoted?.commandId,job.commandId);
+ assert.equal(status().state,'submitted');assert.equal(status().nativeTurnId,null);
+ f.db.run("INSERT INTO command_lifecycle(command_id,state,detail_json,created_at) VALUES(?,'applied',?,?)",job.commandId,JSON.stringify({ok:true,response:{nativeTurnId:'next-turn'}}),new Date().toISOString());
+ f.db.run("UPDATE command_projection SET state='applied' WHERE command_id=?",job.commandId);
+ assert.equal(status().state,'running');assert.equal(status().nativeTurnId,'next-turn');
+ const at=new Date().toISOString();
+ f.db.run(`INSERT INTO durable_events(event_id,payload_hash,source_kind,workspace_id,logical_session_id,execution_segment_id,machine_id,project_id,session_seq,projection_epoch,native_thread_id,native_turn_id,type,schema_version,occurred_at,received_at,payload_state) VALUES('queue-end','hash','agent',?,?,?,'m','p',1,1,'native','next-turn','turn.completed','1',?,?,'suppressed')`,f.principal.workspaceId,f.session.logicalSessionId,f.session.executionSegmentId,at,at);
+ assert.equal(status().state,'completed');assert.equal(status().nativeTurnId,'next-turn');
+});
+
+test('Claude target exposes queue but never mid-turn steering',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.db.run("UPDATE machines SET command_types_json='[\"turn.start\",\"turn.queue\",\"turn.steer\"]',discovery_json=?",JSON.stringify({agentRuntimes:{claude:{installed:true}}}));
+ f.db.run("UPDATE projects SET provider='claude'");
+ f.db.run("UPDATE logical_sessions SET active_turn_id='claude-turn',execution_state='running'");
+ const search=f.service.tool(f.principal,f.call.voice_id,'search',{action:'search',query:'Test'}) as {sessions:Array<{provider:string;canAppend:boolean;canQueue:boolean}>};
+ assert.equal(search.sessions[0]?.provider,'claude');assert.equal(search.sessions[0]?.canAppend,false);assert.equal(search.sessions[0]?.canQueue,true);
+ assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'steer',{action:'steer',sessionId:f.session.logicalSessionId,nativeTurnId:'claude-turn',prompt:'Add something'}),/Claude Code/);
+ const queued=f.service.tool(f.principal,f.call.voice_id,'queue',{action:'dispatch',mode:'queue',sessionId:f.session.logicalSessionId,prompt:'Next task'}) as {state:string;provider:string};
+ assert.equal(queued.state,'queued');assert.equal(queued.provider,'claude');
 });

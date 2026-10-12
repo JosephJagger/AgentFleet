@@ -626,7 +626,6 @@ export interface RuntimeReleaseStatus {
 }
 
 export const api = {
-  nativeSubagents: (sessionId: string, input: { childId?: string; cursor?: string } = {}, signal?: AbortSignal) => request<import("./native-subagents").NativeSubagentSnapshot>(`/api/sessions/${encodeURIComponent(sessionId)}/subagents`, { method: "POST", body: JSON.stringify(input), signal: timeoutSignal(signal, 30000) }),
   agentReleaseStatus: (signal?: AbortSignal) => request<{status:string;expectedVersion:string|null;publicVersion:string|null;checkedAt:string}>("/api/agent-release-status", {signal}),
   async voiceTasks(view='recover',cursor?:string,signal?:AbortSignal):Promise<import('./types').VoiceTaskPage> {
     const query=new URLSearchParams({view,...(cursor?{cursor}:{})});return request(`/api/voice-tasks?${query}`,{signal});

@@ -88,6 +88,8 @@ test('stop of a rejected start is acknowledged without stopping another call; un
 
  test('coordinator and realtime instructions allow cross-project concurrency with exact task queries',()=>{
   assert.ok('jobId' in PANEL_VOICE_TOOL.inputSchema.properties);
+  assert.ok(PANEL_VOICE_TOOL.inputSchema.properties.action.enum.includes('claim'));
+  assert.ok(PANEL_VOICE_TOOL.inputSchema.properties.mode.enum.includes('queue'));
   assert.match(PANEL_VOICE_INSTRUCTIONS,/Different projects may run concurrently/);
   assert.match(PANEL_VOICE_INSTRUCTIONS,/same project\/session/);
   assert.match(PANEL_VOICE_INSTRUCTIONS,/query jobId/);

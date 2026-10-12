@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readCodexSubagents, nativeCollaborationContext, NATIVE_COLLABORATION_INSTRUCTIONS } from "../src/native-subagents.js";
+import { readCodexSubagents, nativeCollaborationContext } from "../src/native-subagents.js";
 import { AgentRuntime } from "../src/runtime.js";
 import { SessionAppServer } from "../src/session-app-server.js";
 import type { AppServerCallbacks, AppServerClient } from "../src/app-server.js";
@@ -84,8 +84,8 @@ test("runtime refuses foreign bindings and discards reads when sharing or connec
   assert.deepEqual(activities, [true, false, true, false]);
 });
 
-test("native orchestration instructions are opt-in application context, never user input or global config", () => {
+test("retired native orchestration guidance is cleared even for legacy enabled requests", () => {
   assert.deepEqual(nativeCollaborationContext(), { additionalContext: {} });
   assert.deepEqual(nativeCollaborationContext(false), { additionalContext: {} });
-  assert.deepEqual(nativeCollaborationContext(true), { additionalContext: { agentfleet_native_collaboration: { kind: "application", value: NATIVE_COLLABORATION_INSTRUCTIONS } } });
+  assert.deepEqual(nativeCollaborationContext(true), { additionalContext: {} });
 });

@@ -4,11 +4,11 @@ import { sessionActions } from "../src/capabilities.js";
 import type { ControlPlaneDatabase } from "../src/db.js";
 
 test("paginated claims require an explicit agent capability, preserving busy and read-only gates", () => {
-  const row = { managed: 0, execution_state: "idle", active_turn_id: null, reachability: "live", native_thread_id: "original-id",
+  const row = { project_id: "project", managed: 0, execution_state: "idle", active_turn_id: null, reachability: "live", native_thread_id: "original-id",
     history_mode: "paginated", machine_reachability: "online", identity_state: "active", security_state: "normal",
     compatibility: "compatible", runtime_read_only: 0, command_types_json: JSON.stringify(["thread.claim"]), holder: null,
     pending_approvals: 0, queued: 0, frozen: 0, runtime_settings_json: null as string | null, paginated_history: 0 };
-  const db = { get: () => row } as unknown as ControlPlaneDatabase;
+  const db = { get: (sql: string) => sql.includes("FROM logical_sessions s JOIN machines m") ? row : undefined, all: () => [] } as unknown as ControlPlaneDatabase;
   assert.equal(sessionActions(db, "same-session", "browser").claim.reasonCode, "THREAD_HISTORY_UNSUPPORTED");
   row.paginated_history = 1;
   assert.equal(sessionActions(db, "same-session", "browser").claim.allowed, true);

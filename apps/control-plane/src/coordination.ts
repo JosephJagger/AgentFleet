@@ -1,3 +1,4 @@
+import { directoryTurnConflict } from "./directory-turn-lock.js";
 import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
 import { parseOutputSchema } from "./output-schema.js";
 import { parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, sanitizeCodexResult, parseReviewTarget, parseForkRange } from "./codex-operations.js";
@@ -652,6 +653,7 @@ export class CoordinationService {
 
       let executionSegmentId = session.execution_segment_id;
       if (input.type === "thread.claim") {
+        invariant(!directoryTurnConflict(this.db, session.project_id, logicalSessionId), 409, "PROJECT_TURN_RESERVED", "此目录已有执行中或待核验任务，请等待完成后接管");
         this.requireLease(principal, logicalSessionId, input.controlLeaseId);
         invariant(session.execution_state === "idle", 409, "THREAD_BUSY", "Host thread must be idle before it can be claimed");
         invariant(session.active_turn_id === null, 409, "THREAD_BUSY", "Host thread has an active turn");
@@ -887,10 +889,7 @@ export class CoordinationService {
       }
 
       if (["turn.start", "turn.compact", "turn.review"].includes(input.type)) {
-        const reservation = this.db.get<ProjectTurnReservationRow>(
-          "SELECT * FROM project_turn_reservations WHERE project_id=?",
-          session.project_id,
-        );
+        const reservation = directoryTurnConflict(this.db, session.project_id, logicalSessionId, input.type === "turn.start");
         invariant(
           !reservation,
           409,
@@ -1264,7 +1263,7 @@ export class CoordinationService {
       if (!session || session.active_turn_id !== null || !["idle", "completed", "interrupted", "failed"].includes(session.execution_state) || session.managed !== 1 || session.reachability !== "live" ||
           session.identity_state !== "active" || session.security_state !== "normal" || session.compatibility !== "compatible" ||
           session.machine_reachability !== "online" || session.runtime_read_only === 1 || blocksDuringMaintenance(session.maintenance_json,"turn.start")) return null;
-      if (this.db.get("SELECT 1 FROM project_turn_reservations WHERE project_id=?", session.project_id)) return null;
+      if (directoryTurnConflict(this.db, session.project_id, logicalSessionId)) return null;
       if (this.pendingCodexMutation(session.machine_id) || this.db.get("SELECT 1 FROM voice_sessions WHERE project_id=? AND state<>'closed'",session.project_id)) return null;
       if (this.db.get("SELECT 1 FROM turn_queue WHERE logical_session_id=? AND state='unknown'", logicalSessionId)) return null;
 

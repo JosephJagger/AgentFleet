@@ -8,7 +8,7 @@ import { access, readlink, readdir, readFile } from "node:fs/promises";
 import { delimiter, join, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { query, listSessions, getSessionInfo, getSessionMessages, listSubagents, getSubagentMessages, type Query, type SDKUserMessage, type PermissionResult, type Options } from "@anthropic-ai/claude-agent-sdk";
-import { NATIVE_COLLABORATION_INSTRUCTIONS, validateSubagentRequest, type NativeSubagent, type NativeSubagentMessage, type NativeSubagentsPage } from "./native-subagents.js";
+import { validateSubagentRequest, type NativeSubagent, type NativeSubagentMessage, type NativeSubagentsPage } from "./native-subagents.js";
 import type { AppServerClient, AppServerCallbacks, ThreadHistorySnapshot, ThreadHistoryPage } from "./app-server.js";
 import type { ManagedThread, ProjectRecord, ApprovalRecord } from "./types.js";
 import type { CodexSettings } from "./codex-settings.js";
@@ -284,7 +284,7 @@ export class ClaudeRuntime implements AppServerClient {
     const input = async function* () { while (!writer.closed) { const message = writer.input.shift(); if (message) yield message; else await new Promise<void>(resolve => { writer.wake = resolve; }); } };
     const options: Options = {
       cwd: thread.sessionCwd ?? project.root, pathToClaudeCodeExecutable: this.binary!,
-      settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code", ...(extras?.nativeCollaboration === true ? { append: NATIVE_COLLABORATION_INSTRUCTIONS } : {}) },
+      settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code" },
       includePartialMessages: true, permissionMode: settings?.mode === "plan" ? "plan" : (settings as ClaudeSettings|undefined)?.permissionMode ?? "default", permissionPrompts: "host",
       ...(writer.fresh ? { sessionId: nativeId(id), ...(thread.titleSource === "name" && thread.title ? { title: thread.title } : {}) } : { resume: nativeId(id) }),
       ...(settings?.model && settings.model !== "host" ? { model: settings.model } : {}),

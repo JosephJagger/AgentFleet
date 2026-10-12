@@ -32,9 +32,9 @@ export function VoiceTaskInbox({onOpenSession}:{onOpenSession:(id:string)=>void}
    {page?.items.length===0&&<p>{t('暂无语音任务记录')}</p>}
    <div className="voice-task-inbox__records">{page?.items.map(record=>{
     const finished=record.job&&['completed','failed','interrupted'].includes(record.job.state);
-    const state=record.state==='completed'?t('手动续办已完成'):record.state==='pending'?t('待确认，尚未派发'):record.state==='cancelled'?t('已取消'):record.job?.state==='completed'?t('已完成'):record.job?.state==='failed'?t('失败'):record.job?.state==='interrupted'?t('已停止'):record.job?.state==='submitted'?t('等待主机'):record.job?.state==='running'?t('执行中'):t('状态待确认');
+    const state=record.state==='completed'?t('手动续办已完成'):record.state==='pending'?t('待确认，尚未派发'):record.state==='cancelled'?t('已取消'):record.job?.state==='completed'?t('已完成'):record.job?.state==='failed'?t('失败'):record.job?.state==='interrupted'?t('已停止'):record.job?.state==='queued'?t('排队中'):record.job?.state==='submitted'?t('等待主机'):record.job?.state==='running'?t('执行中'):t('状态待确认');
     return <article key={record.todoId} className="panel-voice-control__task"><strong>{state}</strong><p>{record.intent||t('原始意图已不可用')}</p>
-     <small>{displayName(record.target?`${record.target.host} · ${record.target.project} · ${record.target.title}`:record.targetUnavailable?t('原目标暂不可访问'):t('尚未选择目标会话'))}</small>
+     <small>{displayName(record.target?`${record.target.host} · ${record.target.project} · ${record.target.title}`:record.targetUnavailable?t('原目标暂不可访问'):t('尚未选择目标会话'))}{record.target?.provider&&<> · {record.target.provider==='claude'?'Claude Code':'Codex'}</>}{record.target?.managed!==undefined&&<> · {record.target.managed?t('已接管'):t('未接管')}</>}</small>
      {record.resolution&&<><small>{t('完成轮次')} · {record.resolution.nativeTurnId}</small>{record.resolution.result&&<details><summary>{t('续办完成结果')}</summary><p>{record.resolution.result}</p></details>}{record.resolution.historyLimited&&<small>{t('部分任务历史不可用')}</small>}<small>{t('以下为原派发任务记录，保留原执行结果')}</small></>}
      {record.job&&<small>{record.job.jobId}</small>}{record.job?.statusFreshness==='last_known'&&!finished&&<small>{t('主机状态未确认，显示最后已知任务状态')}</small>}
      {record.job?.result&&<details><summary>{t('任务结果')}</summary><p>{record.job.result}</p></details>}

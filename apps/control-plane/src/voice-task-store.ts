@@ -113,8 +113,9 @@ export class VoiceTaskStore {
   const native=rows.find(row=>row.type!=='item.completed');
   const cause=JSON.parse(native?.body_json??'{}').turn?.error??detail.error??detail;
   const error=job.state==='failed'||job.state==='interrupted'?{code:typeof cause.code==='string'?cause.code:'TASK_FAILED',message:typeof cause.message==='string'?cause.message:'未提供失败详情'}:null;
-  const result=output?JSON.parse(output.body_json!).item.text.slice(-6000):'';
-  const snapshot={result,error,historyLimited:!available||rows.some(row=>!row.body_json),executionStarted:job.native_turn_id?true:error?.code==='MACHINE_DRAINING'?false:null};
+  const fullResult=output?JSON.parse(output.body_json!).item.text as string:'';
+  const result=fullResult.slice(-6000),resultTruncated=fullResult.length>6000;
+  const snapshot={result,resultTruncated,error,historyLimited:resultTruncated||!available||rows.some(row=>!row.body_json),executionStarted:job.native_turn_id?true:error?.code==='MACHINE_DRAINING'?false:null};
   this.db.run('UPDATE panel_voice_task_records SET result_json=?,result_payload_ref=?,result_expires_at=? WHERE job_id=?',JSON.stringify(snapshot),output?.payload_ref??native?.payload_ref??null,output?.expires_at??native?.expires_at??null,job.job_id);
  }
  purgeUnavailable() {
@@ -124,15 +125,16 @@ export class VoiceTaskStore {
    OR result_expires_at<=? OR (result_payload_ref IS NOT NULL AND NOT EXISTS (SELECT 1 FROM content_blobs b WHERE b.payload_ref=panel_voice_task_records.result_payload_ref AND b.deleted_at IS NULL)))`,nowIso());
  }
  describe(principal:Principal,todo:VoiceTodo) {
-  let target:null|{machineId:string;projectId:string;sessionId:string;host:string;project:string;title:string}=null;
+  let target:null|{machineId:string;projectId:string;sessionId:string;host:string;project:string;title:string;provider:string;managed:boolean}=null;
   let targetUnavailable=false,statusFreshness='last_known';
-  if(todo.session_id)try{const s=this.registry.getSession(principal,todo.session_id);statusFreshness=s.reachability==='live'&&this.registry.getMachine(principal,s.machineId).reachability==='online'?'live':'last_known';target={machineId:s.machineId,projectId:s.projectId,sessionId:s.logicalSessionId,host:this.registry.getMachine(principal,s.machineId).name,project:s.projectAlias,title:s.title};}catch{targetUnavailable=true;}
+  if(todo.session_id)try{const s=this.registry.getSession(principal,todo.session_id);statusFreshness=s.reachability==='live'&&this.registry.getMachine(principal,s.machineId).reachability==='online'?'live':'last_known';target={machineId:s.machineId,projectId:s.projectId,sessionId:s.logicalSessionId,host:this.registry.getMachine(principal,s.machineId).name,project:s.projectAlias,title:s.title,provider:s.provider??"codex",managed:s.managed};}catch{targetUnavailable=true;}
   this.purgeUnavailable();
   const row=this.db.get<{job_id:string;native_turn_id:string|null;state:string;result_json:string;acknowledged_at:string|null;reported_call_id:string|null}>(`SELECT r.*,j.reported_call_id FROM panel_voice_task_records r JOIN panel_voice_jobs j USING(job_id) WHERE r.todo_id=?`,todo.todo_id);
+  const queue=row?this.db.get<{state:string;position:number}>('SELECT q.state,q.position FROM turn_queue q JOIN panel_voice_jobs j ON j.command_id=q.command_id WHERE j.job_id=?',row.job_id):undefined;
   const resolution=targetUnavailable?null:this.resolution(principal,todo.todo_id);
   const resolved=Boolean(this.db.get('SELECT 1 FROM panel_voice_todo_resolutions WHERE todo_id=?',todo.todo_id));
   return {resolution,todoId:todo.todo_id,intent:todo.intent,intentUnavailable:!todo.intent,state:resolved?'completed':todo.state,dispatchState:todo.state,revision:todo.revision,sourceVoiceId:todo.source_voice_id,createdAt:todo.created_at,updatedAt:todo.updated_at,target,targetUnavailable,
-   job:row?{jobId:row.job_id,nativeTurnId:row.native_turn_id,state:row.state,statusFreshness,...(targetUnavailable?{result:'',historyLimited:true}:JSON.parse(row.result_json)),deliveredToVoice:Boolean(row.reported_call_id),acknowledgedAt:row.acknowledged_at}:null};
+   job:row?{jobId:row.job_id,nativeTurnId:row.native_turn_id,state:queue?.state==='queued'&&!terminal(row.state)?'queued':row.state,queueState:queue?.state??null,queuePosition:queue?.position??null,statusFreshness,...(targetUnavailable?{result:'',historyLimited:true}:JSON.parse(row.result_json)),deliveredToVoice:Boolean(row.reported_call_id),acknowledgedAt:row.acknowledged_at}:null};
  }
  list(principal:Principal,options:{cursor?:unknown;view?:unknown}={}) {
   invariant(options.view===undefined||options.view==='all'||options.view==='recover',400,'VOICE_TODO_VIEW','记录范围无效');
