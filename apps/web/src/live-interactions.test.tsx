@@ -2,7 +2,7 @@
 import {act,cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {afterEach,expect,it,vi} from 'vitest';
 import {LiveInteractions} from './components/LiveInteractions';
-import {parseLiveEvent,LiveCollectorStream,welcomeEligible,LiveEventLedger,WelcomeAudioGate,localCollectorUrl,type WelcomeBridge} from './lib/live-interactions';
+import {parseLiveEvent,LiveCollectorStream,welcomeEligible,LiveEventLedger,localCollectorUrl,type WelcomeBridge} from './lib/live-interactions';
 const frame=(type=3,patch:Record<string,unknown>={},now=Date.now(),process='直播伴侣')=>JSON.stringify({Type:type,ProcessName:process,Data:JSON.stringify({RoomId:'fixture-room',MsgId:'event',Owner:null,User:{Id:'viewer',Nickname:'Fixture viewer'},Content:'我来了 <script>alert(1)</script>',CollectorSource:'companion-log',NativeMethod:type===3?'WebcastMemberMessage':'WebcastChatMessage',Action:'1',ObservedAt:new Date(now).toISOString(),...patch})});
 afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.useRealTimers();});
 it('accepts the new collector envelope with null owner, never confuses chat with member actions',()=>{
@@ -37,12 +37,6 @@ it('deduplicates packet IDs and repeat viewers per room, anonymous or anchor ent
  expect(ledger.welcome({...e,roomId:'another-room'})).toBe(true);
  for(const patch of [{type:'chat' as const},{anonymous:true},{isAnchor:true},{userId:''},{ownerId:'viewer'}])expect(welcomeEligible({...e,...patch})).toBe(false);
  expect(ledger.welcome({...e,receivedAt:610001})).toBe(true);
-});
-it('audio gate fails closed until both native inputs are observed; response.done does not mean playback stopped',()=>{
- const gate=new WelcomeAudioGate();expect(gate.busy(9999999999999)).toBe(true);
- gate.event({type:'input_audio_buffer.speech_started'},100);gate.event({type:'input_audio_buffer.speech_stopped'},200);
- expect(gate.busy(6000)).toBe(true);gate.event({type:'response.created'},300);gate.event({type:'output_audio_buffer.started'},400);gate.event({type:'response.done'},500);
- expect(gate.busy(6000)).toBe(true);gate.event({type:'output_audio_buffer.stopped'},7000);expect(gate.busy(11999)).toBe(true);expect(gate.busy(12000)).toBe(false);
 });
 class Socket {
  static all:Socket[]=[];static CONNECTING=0;readyState=0;

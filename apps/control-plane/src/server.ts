@@ -1979,7 +1979,6 @@ export async function buildControlPlane(
                 sendJson(owner.socket,{type:'report_unavailable'});
               }
               else if(message.event==='panel_tool'){
-                liveWelcomes.get(call.voice_id)?.touch();
                 invariant(!panelRecovery.has(call.voice_id)&&(call.state==='active'||call.state==='starting'),409,'VOICE_FENCED','Voice recovery is pending');
                 const requestId=requiredString(message.requestId,'requestId',80);
                 const transcriptSequence=voiceTails.sequence(call.voice_id);
@@ -1996,7 +1995,7 @@ export async function buildControlPlane(
                 if(result&&typeof result==='object'&&['dispatch','steer','todo.save'].includes(String((message.args as {action?:unknown})?.action)))voiceTails.receipt(call.voice_id,transcriptSequence,result as Record<string,unknown>);
                 sendPanel(call.voice_id,'tool.result',{requestId,result});})().finally(()=>liveWelcomes.get(call.voice_id)?.endWork());
               }
-              else if(message.event==='transcript'){liveWelcomes.get(call.voice_id)?.touch();if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role))){if(message.role==='user')voiceTails.record(call,{...message,text:message.text});sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final),snapshot:message.transcriptSnapshot===true,transcriptSeq:message.transcriptSeq});}}
+              else if(message.event==='transcript'){if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role))){if(message.role==='user')voiceTails.record(call,{...message,text:message.text});sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final),snapshot:message.transcriptSnapshot===true,transcriptSeq:message.transcriptSeq});}}
               else if(message.event==='error'){const code=panelVoice.recordFailure(call.voice_id,message.message);app.log.warn({voiceId:call.voice_id,machineId:identity.machineId,code},'Panel voice failed');sendJson(owner.socket,{type:'error',message:`总控语音连接失败（${code}），请重新连接`});stopPanel(call.voice_id);}
               return;
             }

@@ -1,4 +1,4 @@
-import {WelcomeAudioGate,welcomeEligible,type WelcomeBridge} from '../lib/live-interactions';
+import {welcomeEligible,type WelcomeBridge} from '../lib/live-interactions';
 import {VoiceAudioDevices,useVoiceDevicePreferences,voiceMicrophoneConstraints} from './VoiceAudioDevices';
 import type { SessionProgress } from "../lib/types";
 import { useDraggablePanel } from "../lib/use-draggable-panel";
@@ -12,7 +12,7 @@ export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;pro
 type Phase = "idle" | "connecting" | "connected" | "recovering" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
 export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks, welcomeRef }: { welcomeRef?:RefObject<WelcomeBridge|null>; globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
-  const welcomeGate=useRef(new WelcomeAudioGate());
+  const welcomeNextAt=useRef(0);
   const welcomeSentAt=useRef(0);
   const welcomeReceipt=useRef<WelcomeBridge["receipt"]>(undefined);
   const devices=useVoiceDevicePreferences();
@@ -55,7 +55,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     setPreferenceState("");
     if(welcomeRef)welcomeRef.current=null;
     welcomeReceipt.current=undefined;
-    welcomeGate.current=new WelcomeAudioGate();
+    welcomeNextAt.current=0;
     generation.current++;
     const owned = resources.current;
     resources.current = {};
@@ -113,12 +113,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       const peer = new RTCPeerConnection();
       resources.current.peer = peer;
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
-      const channel=peer.createDataChannel("oai-events");
-      if(globalMachineId&&channel){
-        channel.onmessage=event=>{if(!current())return;try{welcomeGate.current.event(JSON.parse(String(event.data)));}catch{/* Unknown native event never grants idle permission. */}};
-        channel.onclose=()=>{if(current())welcomeGate.current.known=false;};
-        channel.onerror=()=>{if(current())welcomeGate.current.known=false;};
-      }
+      peer.createDataChannel("oai-events");
       peer.ontrack = event => {
         if (!current() || !audio.current) return;
         audio.current.srcObject = event.streams[0] ?? new MediaStream([event.track]);
@@ -162,11 +157,10 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
               socket.send(JSON.stringify({ type: "heartbeat" }));
             }, 15_000);
           } else if (value.type === "answer" && value.sdp) await peer.setRemoteDescription({ type: "answer", sdp: value.sdp });
-          else if(globalMachineId && value.type==="recovering") { resources.current.recovering=true; welcomeGate.current=new WelcomeAudioGate(); setPhase("recovering"); }
+          else if(globalMachineId && value.type==="recovering") { resources.current.recovering=true; welcomeNextAt.current=0; setPhase("recovering"); }
           else if(globalMachineId && value.type==="recovered") { resources.current.recovering=false; setPhase(peer.connectionState==="connected"?"connected":"connecting"); }
           else if(value.type==="transcript" && ["user","assistant"].includes(String(value.role)) && typeof value.text==="string") {
             if(value.role==='user'&&typeof value.transcriptSeq==='number'){if(value.transcriptSeq<=userTranscriptSeq)return;userTranscriptSeq=value.transcriptSeq;}
-            welcomeGate.current.quietSince=Date.now();
             setTranscript(previous=>{
               const last=previous.at(-1);const role=value.role!;
               const text=value.text!.slice(0,6000);
@@ -193,14 +187,14 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   }
   if(welcomeRef)welcomeRef.current={
     get receipt(){const receipt=welcomeReceipt.current;return receipt?.status==='requested'&&Date.now()-welcomeSentAt.current>10000?{...receipt,status:'unknown'}:receipt;},
-    status:()=>phase!=='connected'||resources.current.recovering||playBlocked?'unavailable':!welcomeGate.current.known?'unknown':welcomeGate.current.busy()||!['idle','completed','failed'].includes(taskPhase)?'busy':'ready',
+    status:()=>phase!=='connected'||resources.current.recovering||playBlocked?'unavailable':Date.now()<welcomeNextAt.current||!['idle','completed','failed'].includes(taskPhase)?'busy':'ready',
     send:event=>{
       const socket=resources.current.socket;
       if(!welcomeEligible(event)||!globalMachineId||welcomeRef.current?.status()!=='ready'||socket?.readyState!==WebSocket.OPEN)return false;
       const requestId=crypto.randomUUID();
       welcomeReceipt.current={requestId,status:'requested'};welcomeSentAt.current=Date.now();
-      socket.send(JSON.stringify({type:'live.welcome',kind:'enter',source:'home-douyin-collector:companion-log',streamEnabled:true,nativeMethod:'WebcastMemberMessage',entryAction:'1',sourceObservedAt:event.sourceObservedAt,audioIdle:true,requestId,eventId:event.id,roomId:event.roomId,ownerId:event.ownerId,viewerId:event.userId,observedAt:event.receivedAt}));
-      welcomeGate.current.quietSince=Date.now()+25000;
+      socket.send(JSON.stringify({type:'live.welcome',kind:'enter',source:'home-douyin-collector:companion-log',streamEnabled:true,nativeMethod:'WebcastMemberMessage',entryAction:'1',sourceObservedAt:event.sourceObservedAt,nativeInterruptible:true,requestId,eventId:event.id,roomId:event.roomId,ownerId:event.ownerId,viewerId:event.userId,observedAt:event.receivedAt}));
+      welcomeNextAt.current=Date.now()+30000;
       return true;
     },
   };

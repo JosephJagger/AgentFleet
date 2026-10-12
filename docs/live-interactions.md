@@ -38,15 +38,13 @@ masking and text escaping. Closing the popup keeps reception; Stop, logout, page
 exit and leaving the supported desktop theme stop reception. Reconnect clears the
 message view and disables welcomes. No previous entries are replayed on enable.
 
-Separately connect the global voice coordinator and enable “入场自动欢迎”. The
-switch records user intent even while activity signals are unknown; a waiting
-status distinguishes this from readiness to speak. Entries received or pending
-while activity is unknown are discarded rather than replayed later. Native
-WebRTC input and output activity evidence plus five seconds of quiet are required.
-Unknown activity, recovery, blocked playback or unavailable voice prevents welcomes.
-A model response completion alone is not proof of audio-playback completion. If the
-native version does not emit the required activity events, automatic welcomes stay
-paused; this release does not bypass that protection.
+Separately connect the global voice coordinator and enable “入场自动欢迎”.
+Welcomes use the existing native voice call and its interruption behavior. No
+WebRTC VAD/output-buffer events or fabricated audio-idle claim are required. A
+connected call with available playback can request a welcome without first
+speaking to the coordinator. Recovery or unavailable/blocked playback still
+prevents requests. Native interruption is not a guarantee against overlapping
+speech, and an interrupted welcome is never automatically restarted.
 
 A fresh eligible entry follows this path:
 
@@ -62,7 +60,7 @@ A viewer is welcomed at most once per ten minutes per room, with at least thirty
 seconds between welcomes. Bursts merge into one pending entry, expiring after
 twenty seconds. Deduplication and cooldown survive reconnect within the page.
 Delivery is reserved before sending and unknown outcomes are never retried.
-User speech, running/unknown tasks and pending/failed task reports take priority.
+Running/unknown tasks and pending/failed task reports take priority.
 The backend independently validates freshness, source/action, call ownership and
 priority. Recovery/disconnection disables welcomes; an already accepted welcome
 may still play. No audio cancellation or microphone interruption is performed.

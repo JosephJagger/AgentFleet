@@ -71,23 +71,6 @@ export class LiveEventLedger {
   welcome(event:LiveEvent){if(!welcomeEligible(event))return false;this.prune(this.viewers,event.receivedAt);const key=`${event.roomId}:${event.userId}`;if(this.viewers.has(key)||this.viewers.size>=5000)return false;this.viewers.set(key,event.receivedAt);return true;}
 }
 
-/** Observe only; never cancel audio or send messages on the native data channel. */
-export class WelcomeAudioGate {
-  known=false; private inputKnown=false; private outputKnown=false; user=false; response=false; output=false; quietSince=Date.now();
-  event(raw:unknown,now=Date.now()) {
-    const type=object(raw).type;
-    if(type==='input_audio_buffer.speech_started'){this.inputKnown=true;this.user=true;this.response=true;}
-    else if(type==='input_audio_buffer.speech_stopped'){this.inputKnown=true;this.user=false;}
-    else if(type==='response.created'){this.response=true;}
-    else if(type==='response.done'){this.response=false;}
-    else if(type==='output_audio_buffer.started'){this.outputKnown=true;this.output=true;}
-    else if(type==='output_audio_buffer.stopped'||type==='output_audio_buffer.cleared'){this.outputKnown=true;this.output=false;}
-    else return;
-    this.known=this.inputKnown&&this.outputKnown;
-    this.quietSince=now;
-  }
-  busy(now=Date.now()){return !this.known||this.user||this.response||this.output||now-this.quietSince<5000;}
-}
 export interface WelcomeBridge {
   status:()=> 'unavailable'|'unknown'|'busy'|'ready';
   send:(event:LiveEvent)=>boolean;
