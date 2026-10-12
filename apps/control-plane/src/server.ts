@@ -1,3 +1,4 @@
+import {LiveWelcomeGate,LIVE_WELCOME_TEXT} from './live-welcome.js';
 import {VoiceTranscriptTail} from './voice-transcript-tail.js';
 import { NativeSubagentsBroker } from "./native-subagents-broker.js";
 import { createAgentReleaseStatus } from "./agent-release-status.js";
@@ -259,6 +260,7 @@ export async function buildControlPlane(
   const voiceTails=new VoiceTranscriptTail(db,panelVoice.memory);
   for(const call of panelVoice.pending())voiceTails.review(call.voice_id);
   panelVoice.closeOrphans();
+  const liveWelcomes=new Map<string,LiveWelcomeGate>();
   const panelOwners=new Map<string,{socket:WebSocket;token:string;lastSeen:number;lastPing:number}>();
   const sendPanel=(voiceId:string,action:string,extra:Record<string,unknown>={})=>{
     const call=panelVoice.get(voiceId);if(!call||call.state==='closed'||panelRecovery.has(voiceId) && !['stop','resume'].includes(action))return false;
@@ -329,6 +331,7 @@ export async function buildControlPlane(
       transportGeneration:agent.identity.transportGeneration,producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch});
   };
   const stopPanel=(id:string)=>{
+    liveWelcomes.delete(id);
     voiceTails.review(id);
     const call=panelVoice.get(id);if(!call||call.state==='closed')return;
     const sent=sendPanel(id,'stop');
@@ -453,7 +456,7 @@ export async function buildControlPlane(
     reply.header("permissions-policy", "camera=(), microphone=(self), geolocation=()");
     reply.header(
       "content-security-policy",
-      `default-src 'self'; base-uri 'none'; connect-src 'self' ${[...config.allowedOrigins].map(origin => { const url = new URL(origin); url.protocol = url.protocol === "https:" ? "wss:" : "ws:"; return url.origin; }).join(" ")}; media-src 'self' blob:; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; object-src 'none'; script-src 'self'; style-src 'self'`,
+      `default-src 'self'; base-uri 'none'; connect-src 'self' ${[...config.allowedOrigins].map(origin => { const url = new URL(origin); url.protocol = url.protocol === "https:" ? "wss:" : "ws:"; return url.origin; }).join(" ")} ws://127.0.0.1:*; media-src 'self' blob:; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; object-src 'none'; script-src 'self'; style-src 'self'`,
     );
     if (
       request.url.startsWith("/api/") ||
@@ -1597,11 +1600,26 @@ export async function buildControlPlane(
           const preferenceSnapshot=preferenceStart(principal,String(machine.agentVersion),value.skipPreferences===true);
           const call=panelVoice.start(principal,machineId,{producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,transportGeneration:agent.identity.transportGeneration});
           voiceId=call.voice_id;panelOwners.set(voiceId,{socket,token,lastSeen:Date.now(),lastPing:Date.now()});
+          liveWelcomes.set(voiceId,new LiveWelcomeGate());
           invariant(sendPanel(voiceId,'start',{sdp:value.sdp,voice,...trackPreferences(voiceId,principal,preferenceSnapshot,String(machine.agentVersion),value.skipPreferences===true)}),409,"VOICE_OFFLINE","主机连接中断");
         } else if(voiceId?.startsWith('pvoice_')) {
           const owner=panelOwners.get(voiceId);invariant(owner?.socket===socket,403,"VOICE_NOT_OWNER","总控通话已结束");
           if(value.type==='heartbeat'){owner.lastSeen=Date.now();sendPanel(voiceId,'heartbeat');refreshPreferences(voiceId,principal,socket);sendJson(socket,{type:'heartbeat'});}
           else if(value.type==='stop'){panelVoice.recordCloseReason(voiceId,value.reason);stopPanel(voiceId);}
+          else if(value.type==='live.welcome'){
+            // Optional interaction failures must never terminate an otherwise healthy call.
+            try{
+              limiter.check(`live-welcome:${voiceId}`,6,60000);
+              const call=panelVoice.get(voiceId),gate=liveWelcomes.get(voiceId);
+              const version=String(registry.getMachine(principal,call!.machine_id).agentVersion).split('.').map(Number);
+              const capable=(version[0]??0)>0||(version[1]??0)>30||version[1]===30&&(version[2]??0)>=100;
+              const unreported=db.get("SELECT 1 FROM panel_voice_jobs WHERE voice_id=? AND reported_call_id IS NULL LIMIT 1",voiceId);
+              const status=panelVoice.poll(principal,voiceId,panelFailedReports.get(voiceId));
+              const busy=!capable||Boolean(unreported)||call?.state!=='active'||panelRecovery.has(voiceId)||Boolean(status.unavailable||status.report||panelReports.has(voiceId)||panelFailedReports.get(voiceId)?.size)||status.tasks.some(task=>!['completed','failed','interrupted'].includes(task.state));
+              const accepted=gate?.accept(value,busy)&&sendPanel(voiceId,'report',{reportId:`welcome:${value.requestId}`,text:LIVE_WELCOME_TEXT});
+              sendJson(socket,{type:'live_welcome',requestId:value.requestId,status:accepted?'requested':'skipped'});
+            }catch{sendJson(socket,{type:'live_welcome',requestId:value.requestId,status:'skipped'});}
+          }
           else throw new AppError(400,'VOICE_INVALID','Invalid global voice action');
         } else if(value.type==="start") {
           limiter.check(`voice:${principal.clientSessionId}`,6,60000);
@@ -1949,20 +1967,23 @@ export async function buildControlPlane(
               if(message.event==='error')panelVoice.recordFailure(call.voice_id,message.message);
               if(call.state==='closed')return;
               const owner=panelOwners.get(call.voice_id);
-              if(message.event==='stopped'){panelRecovery.delete(call.voice_id);panelVoice.state(call.voice_id,'closed');if(owner)sendJson(owner.socket,{type:'closed'});panelOwners.delete(call.voice_id);panelReports.delete(call.voice_id);return;}
+              if(message.event==='stopped'){liveWelcomes.delete(call.voice_id);panelRecovery.delete(call.voice_id);panelVoice.state(call.voice_id,'closed');if(owner)sendJson(owner.socket,{type:'closed'});panelOwners.delete(call.voice_id);panelReports.delete(call.voice_id);return;}
               if(message.event==='closed'){panelVoice.recordCloseReason(call.voice_id,'NATIVE_CLOSED');if(owner)sendJson(owner.socket,{type:'closed'});stopPanel(call.voice_id);return;}
               if(!owner){stopPanel(call.voice_id);return;}
               const principal=auth.authenticateToken(owner.token);
               if(message.event==='sdp'){invariant(call.state==='starting'&&validVoiceOffer(message.sdp),400,"VOICE_INVALID","Invalid voice answer");if(typeof message.instanceId==='string'&&/^[a-zA-Z0-9_-]{16,80}$/.test(message.instanceId))panelVoice.binding(call.voice_id,{instanceId:message.instanceId,resumeAck:message.resumeAck===true});panelVoice.state(call.voice_id,'active');sendJson(owner.socket,{type:'answer',sdp:message.sdp});}
-              else if(message.event==='reported'){if(message.requestId?.startsWith('pref:')){const state=preferenceCalls.get(call.voice_id);if(state&&state.pending===message.requestId)state.received=message.requestId;preferenceStatus(call.voice_id,owner.socket);}else if(typeof message.requestId==='string'){panelVoice.acknowledgeReport(call.voice_id,message.requestId);panelReports.delete(call.voice_id);}}
+              else if(message.event==='reported'){if(message.requestId?.startsWith('welcome:')){sendJson(owner.socket,{type:'live_welcome',requestId:message.requestId.slice(8),status:'accepted'});}else if(message.requestId?.startsWith('pref:')){const state=preferenceCalls.get(call.voice_id);if(state&&state.pending===message.requestId)state.received=message.requestId;preferenceStatus(call.voice_id,owner.socket);}else if(typeof message.requestId==='string'){panelVoice.acknowledgeReport(call.voice_id,message.requestId);panelReports.delete(call.voice_id);}}
               else if(message.event==='report_unavailable'&&typeof message.requestId==='string'){
+                if(message.requestId.startsWith('welcome:')){sendJson(owner.socket,{type:'live_welcome',requestId:message.requestId.slice(8),status:'unknown'});return;}
                 const failed=panelFailedReports.get(call.voice_id)??new Set<string>();failed.add(message.requestId);panelFailedReports.set(call.voice_id,failed);panelReports.delete(call.voice_id);
                 sendJson(owner.socket,{type:'report_unavailable'});
               }
               else if(message.event==='panel_tool'){
+                liveWelcomes.get(call.voice_id)?.touch();
                 invariant(!panelRecovery.has(call.voice_id)&&(call.state==='active'||call.state==='starting'),409,'VOICE_FENCED','Voice recovery is pending');
                 const requestId=requiredString(message.requestId,'requestId',80);
                 const transcriptSequence=voiceTails.sequence(call.voice_id);
+                liveWelcomes.get(call.voice_id)?.beginWork();
                 void (async()=>{let result:unknown;
                 try {
                   result=(message.args as {action?:unknown})?.action==='history'?await panelVoice.history(principal,call.voice_id,record(message.args)):panelVoice.tool(principal,call.voice_id,requestId,message.args);
@@ -1973,9 +1994,9 @@ export async function buildControlPlane(
                   }
                 }catch(error){result={error:error instanceof AppError?error.message:'请求未完成，请查询任务状态后再试',errorCode:error instanceof AppError?error.code:'PANEL_REQUEST_FAILED',...(error instanceof AppError?{details:error.details}:{}),executionStarted:error instanceof AppError&&error.code==='MACHINE_DRAINING'?false:null};}
                 if(result&&typeof result==='object'&&['dispatch','steer','todo.save'].includes(String((message.args as {action?:unknown})?.action)))voiceTails.receipt(call.voice_id,transcriptSequence,result as Record<string,unknown>);
-                sendPanel(call.voice_id,'tool.result',{requestId,result});})();
+                sendPanel(call.voice_id,'tool.result',{requestId,result});})().finally(()=>liveWelcomes.get(call.voice_id)?.endWork());
               }
-              else if(message.event==='transcript'){if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role))){if(message.role==='user')voiceTails.record(call,{...message,text:message.text});sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final),snapshot:message.transcriptSnapshot===true,transcriptSeq:message.transcriptSeq});}}
+              else if(message.event==='transcript'){liveWelcomes.get(call.voice_id)?.touch();if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role))){if(message.role==='user')voiceTails.record(call,{...message,text:message.text});sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final),snapshot:message.transcriptSnapshot===true,transcriptSeq:message.transcriptSeq});}}
               else if(message.event==='error'){const code=panelVoice.recordFailure(call.voice_id,message.message);app.log.warn({voiceId:call.voice_id,machineId:identity.machineId,code},'Panel voice failed');sendJson(owner.socket,{type:'error',message:`总控语音连接失败（${code}），请重新连接`});stopPanel(call.voice_id);}
               return;
             }

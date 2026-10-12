@@ -1,3 +1,5 @@
+import {LiveInteractions} from './LiveInteractions';
+import type {WelcomeBridge} from '../lib/live-interactions';
 import { displayName } from "../lib/display-name";
 import {VoiceTaskInbox} from "./VoiceTaskInbox";
 import { ProgressView } from "./RuntimeProgress";
@@ -9,7 +11,8 @@ import { NativeVoicePanel, type PanelVoiceTask } from "./NativeVoicePanel";
 import { t } from "../i18n";
 import type { Dashboard } from "../lib/types";
 
-export function PanelVoiceControl({ machines, onOpenSession }: { machines:Dashboard['machines'];onOpenSession:(id:string)=>void }) {
+export function PanelVoiceControl({ machines, onOpenSession, liveInteractions=false }: { liveInteractions?:boolean; machines:Dashboard['machines'];onOpenSession:(id:string)=>void }) {
+  const welcomeRef=useRef<WelcomeBridge|null>(null);
   const [expanded,setExpanded]=useState(false);
   const panel = useRef<HTMLElement>(null);
   const dragging = useDraggablePanel(panel, expanded);
@@ -25,10 +28,12 @@ export function PanelVoiceControl({ machines, onOpenSession }: { machines:Dashbo
   const eligible=machines.filter(m=>{const v=m.agentVersion.split('.').map(Number);return m.reachability==='live'&&(v[0]>0||v[1]>30||v[1]===30&&v[2]>=69);});
   const selected=host||eligible[0]?.id||'';
   const selectedVersion=eligible.find(machine=>machine.id===selected)?.agentVersion.split('.').map(Number);
+  const supportsLiveWelcomes=Boolean(selectedVersion&&(selectedVersion[0]>0||selectedVersion[1]>30||selectedVersion[1]===30&&selectedVersion[2]>=100));
   const supportsMemory=selectedVersion&&(selectedVersion[0]>0||selectedVersion[1]>30||selectedVersion[1]===30&&selectedVersion[2]>=87);
   const supportsDispatch=selectedVersion&&(selectedVersion[0]>0||selectedVersion[1]>30||selectedVersion[1]===30&&selectedVersion[2]>=98);
-  return <div className="panel-voice-control">
+  return <div className={`panel-voice-control${liveInteractions?' panel-voice-control--live':''}`}>
     <button className={`button button--secondary${active?' panel-voice-control--active':''}`} type="button" aria-label={t("面板语音总控")} aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}><Headset size={18}/><span>{t("语音总控")}</span>{active&&<i aria-hidden="true"/>}</button>
+    {liveInteractions&&<LiveInteractions voice={welcomeRef} supported={supportsLiveWelcomes}/>}
     {createPortal(<>
     {active&&<button type="button" className="button button--secondary panel-voice-control__floating" onClick={()=>setExpanded(true)} aria-label={t("面板语音总控")}><Headset size={16}/>{t("总控通话控制")}</button>}
     <section ref={panel} style={dragging.style} className="panel-voice-control__settings" hidden={!expanded} aria-label={t("面板语音总控")}>
@@ -38,7 +43,7 @@ export function PanelVoiceControl({ machines, onOpenSession }: { machines:Dashbo
       <p className="panel-voice-control__hint">{t("使用此主机的 Codex 账号通话，可指挥其他主机。")}</p>
       {eligible.find(m=>m.id===selected)?.maintenance && <p role="status">{t("主机正在维护，等待安全重启；当前任务可继续，暂不接受新任务")}</p>}
       {!supportsDispatch&&selected&&<p>{t("接管与排队需要语音主机连接服务 0.30.98 或更新版本；更新后请重新通话")}</p>}
-      <NativeVoicePanel sessionId={`panel:${selected}`} globalMachineId={selected||'unavailable'} canStart={Boolean(selected&&eligible.some(m=>m.id===selected&&!m.maintenance))} onActiveChange={value=>{if(value)setHost(selected);setActive(value);}} onPanelTasks={setTasks} onPanelTask={task=>{if(!task)setTasks([]);else setTasks(previous=>[task,...previous.filter(other=>other.jobId!==task.jobId)]);}}/>
+      <NativeVoicePanel welcomeRef={welcomeRef} sessionId={`panel:${selected}`} globalMachineId={selected||'unavailable'} canStart={Boolean(selected&&eligible.some(m=>m.id===selected&&!m.maintenance))} onActiveChange={value=>{if(value)setHost(selected);setActive(value);}} onPanelTasks={setTasks} onPanelTask={task=>{if(!task)setTasks([]);else setTasks(previous=>[task,...previous.filter(other=>other.jobId!==task.jobId)]);}}/>
       {!supportsMemory&&selected&&<p>{t("服务端待办恢复需要语音主机 0.30.87 或更新版本，更新后重新通话")}</p>}
       <button type="button" className="panel-voice-control__task-summary" aria-expanded={tasksExpanded} aria-controls={taskListId} onClick={()=>setTasksExpanded(value=>!value)}>
         <strong>{runningCount}</strong><span>{t("运行中")}</span><Activity size={18}/><ChevronDown size={16} className={tasksExpanded?'is-expanded':''}/>

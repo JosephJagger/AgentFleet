@@ -128,3 +128,18 @@ test('failed report delivery warns browser without ending call or altering tasks
  await f.browser.next('report_unavailable');assert.equal(f.row().state,'active');assert.equal(f.browser.socket.readyState,WebSocket.OPEN);
  assert.ok(!f.first.frames.some(v=>v.action==='stop'||v.action==='start'));
 });
+
+test('optional live welcome uses native report once, keeps failures nonfatal and never creates tasks',async t=>{
+ const f=await fixture(t,true);f.db.run("UPDATE machines SET agent_version='0.30.100' WHERE machine_id='m'");
+ const original=Date.now;const now=original()+6000;t.mock.method(Date,'now',()=>now);
+ const entry={type:'live.welcome',kind:'enter',source:'douyin-barrage-grab:直播伴侣',confirmedOwnRoom:true,audioIdle:true,roomId:'fixture-room',ownerId:'fixture-owner',viewerId:'fixture-viewer',eventId:'fixture-entry',requestId:'fixture-request',observedAt:now};
+ f.browser.send(entry);const report=await f.first.next('voice.control','report');
+ assert.equal(report.reportId,'welcome:fixture-request');assert.match(String(report.text),/嗨，你好，欢迎光临/);assert.ok(!String(report.text).includes('fixture-viewer'));
+ assert.equal((await f.browser.next('live_welcome')).status,'requested');
+ f.first.send(f.event({event:'reported',requestId:report.reportId}));assert.equal((await f.browser.next('live_welcome')).status,'accepted');
+ f.browser.send(entry);assert.equal((await f.browser.next('live_welcome')).status,'skipped');
+ f.first.send(f.event({event:'report_unavailable',requestId:report.reportId}));assert.equal((await f.browser.next('live_welcome')).status,'unknown');
+ assert.equal(f.row().state,'active');assert.equal(f.db.all('SELECT * FROM commands').length,0);
+ f.browser.send({...entry,requestId:'bad',kind:'chat'});assert.equal((await f.browser.next('live_welcome')).status,'skipped');assert.equal(f.row().state,'active');
+ f.first.socket.close();await f.browser.next('recovering');f.browser.send({...entry,requestId:'recovery'});assert.equal((await f.browser.next('live_welcome')).status,'skipped');assert.equal(f.row().state,'active');
+});

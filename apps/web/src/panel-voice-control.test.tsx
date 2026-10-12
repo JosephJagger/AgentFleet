@@ -76,3 +76,10 @@ it('keeps the overview compact and updates counts without confusing completed or
  expect(screen.getByRole('button',{name:'0 运行中'})).toBeTruthy();
  expect(screen.getByText('暂无本次通话派发的任务')).toBeTruthy();
 });
+
+it('live message entry is opt-in for the desktop broadcast theme',()=>{
+ const props={machines:[machine],onOpenSession:()=>undefined};const view=render(<PanelVoiceControl {...props}/>);
+ expect(screen.queryByRole('button',{name:'互动消息'})).toBeNull();
+ view.rerender(<PanelVoiceControl {...props} liveInteractions/>);expect(screen.getByRole('button',{name:'互动消息'})).toBeTruthy();
+ view.rerender(<PanelVoiceControl {...props}/>);expect(screen.queryByRole('button',{name:'互动消息'})).toBeNull();
+});

@@ -45,7 +45,7 @@ test("static hosting preserves SPA routes without masking missing assets", async
   const spaRoute = await app.inject({ method: "GET", url: "/sessions/session-1" });
   assert.equal(spaRoute.statusCode, 200);
   assert.equal(spaRoute.headers["permissions-policy"], "camera=(), microphone=(self), geolocation=()");
-  assert.match(spaRoute.headers["content-security-policy"] ?? "", /connect-src 'self' ws:\/\/control-plane\.test wss:\/\/panel\.example\.test;/);
+  assert.match(spaRoute.headers["content-security-policy"] ?? "", /connect-src 'self' ws:\/\/control-plane\.test wss:\/\/panel\.example\.test ws:\/\/127\.0\.0\.1:\*;/);
   assert.match(spaRoute.headers["content-security-policy"] ?? "", /media-src 'self' blob:/);
   assert.match(spaRoute.body, /AgentFleet test shell/);
   assert.match(spaRoute.headers["content-security-policy"] ?? "", /base-uri 'none'/);

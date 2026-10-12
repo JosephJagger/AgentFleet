@@ -1,7 +1,8 @@
+import {WelcomeAudioGate,type WelcomeBridge} from '../lib/live-interactions';
 import {VoiceAudioDevices,useVoiceDevicePreferences,voiceMicrophoneConstraints} from './VoiceAudioDevices';
 import type { SessionProgress } from "../lib/types";
 import { useDraggablePanel } from "../lib/use-draggable-panel";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { Mic, MicOff, Headset, Phone, PhoneOff, LoaderCircle, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api";
@@ -10,7 +11,10 @@ import { t } from "../i18n";
 export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;provider?:'codex'|'claude';managed?:boolean;queuePosition?:number|null;state:string;result:string;link:string;progress?:SessionProgress;historyLimited?:boolean;executionStarted?:boolean|null;error?:{code:string;message:string}|null; }
 type Phase = "idle" | "connecting" | "connected" | "recovering" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
-export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks }: { globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
+export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks, welcomeRef }: { welcomeRef?:RefObject<WelcomeBridge|null>; globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
+  const welcomeGate=useRef(new WelcomeAudioGate());
+  const welcomeSentAt=useRef(0);
+  const welcomeReceipt=useRef<WelcomeBridge["receipt"]>(undefined);
   const devices=useVoiceDevicePreferences();
   const [meterStream,setMeterStream]=useState<MediaStream|null>(null);
   const [deviceError,setDeviceError]=useState('');
@@ -49,6 +53,9 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const cleanup = useRef<(reason?: string) => void>(() => undefined);
   cleanup.current = (reason = "CLIENT_DISPOSED") => {
     setPreferenceState("");
+    if(welcomeRef)welcomeRef.current=null;
+    welcomeReceipt.current=undefined;
+    welcomeGate.current=new WelcomeAudioGate();
     generation.current++;
     const owned = resources.current;
     resources.current = {};
@@ -106,7 +113,12 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       const peer = new RTCPeerConnection();
       resources.current.peer = peer;
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
-      peer.createDataChannel("oai-events");
+      const channel=peer.createDataChannel("oai-events");
+      if(globalMachineId&&channel){
+        channel.onmessage=event=>{if(!current())return;try{welcomeGate.current.event(JSON.parse(String(event.data)));}catch{/* Unknown native event never grants idle permission. */}};
+        channel.onclose=()=>{if(current())welcomeGate.current.known=false;};
+        channel.onerror=()=>{if(current())welcomeGate.current.known=false;};
+      }
       peer.ontrack = event => {
         if (!current() || !audio.current) return;
         audio.current.srcObject = event.streams[0] ?? new MediaStream([event.track]);
@@ -140,7 +152,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       socket.onmessage = event => {
         if (!current()) return;
         void (async () => {
-          const value = JSON.parse(String(event.data)) as { transcriptSeq?:number;snapshot?:boolean;status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
+          const value = JSON.parse(String(event.data)) as { requestId?:string;transcriptSeq?:number;snapshot?:boolean;status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
           if (value.type === "ready" && !offerSent) {
             offerSent = true;
             socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",skipPreferences,machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", skipPreferences, logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
@@ -150,10 +162,11 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
               socket.send(JSON.stringify({ type: "heartbeat" }));
             }, 15_000);
           } else if (value.type === "answer" && value.sdp) await peer.setRemoteDescription({ type: "answer", sdp: value.sdp });
-          else if(globalMachineId && value.type==="recovering") { resources.current.recovering=true; setPhase("recovering"); }
+          else if(globalMachineId && value.type==="recovering") { resources.current.recovering=true; welcomeGate.current=new WelcomeAudioGate(); setPhase("recovering"); }
           else if(globalMachineId && value.type==="recovered") { resources.current.recovering=false; setPhase(peer.connectionState==="connected"?"connected":"connecting"); }
           else if(value.type==="transcript" && ["user","assistant"].includes(String(value.role)) && typeof value.text==="string") {
             if(value.role==='user'&&typeof value.transcriptSeq==='number'){if(value.transcriptSeq<=userTranscriptSeq)return;userTranscriptSeq=value.transcriptSeq;}
+            welcomeGate.current.quietSince=Date.now();
             setTranscript(previous=>{
               const last=previous.at(-1);const role=value.role!;
               const text=value.text!.slice(0,6000);
@@ -162,6 +175,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
             });
           }
           else if (!globalMachineId && value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
+          else if(value.type==='live_welcome'&&typeof value.requestId==='string'&&value.requestId===welcomeReceipt.current?.requestId){welcomeReceipt.current={requestId:value.requestId,status:value.status??'unknown'};}
           else if(value.type==='report_unavailable')setMessage(t('结果播报未确认，请在待办与结果记录中查看；通话继续'));
           else if(value.type==="task_status_unavailable") setTaskPhase("unknown");
           else if(value.type==="panel_task") { const tasks=Array.isArray(value.tasks)?value.tasks:value.task?[value.task]:[]; onPanelTasks?.(tasks); onPanelTask?.(value.task); if(!value.task){setTaskPhase("idle");return;} setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
@@ -177,6 +191,19 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       fail(denied ? t("请允许麦克风访问后重试") : error instanceof Error ? error.message : t("原生实时语音暂不可用"));
     }
   }
+  if(welcomeRef)welcomeRef.current={
+    get receipt(){const receipt=welcomeReceipt.current;return receipt?.status==='requested'&&Date.now()-welcomeSentAt.current>10000?{...receipt,status:'unknown'}:receipt;},
+    status:()=>phase!=='connected'||resources.current.recovering||playBlocked?'unavailable':!welcomeGate.current.known?'unknown':welcomeGate.current.busy()||!['idle','completed','failed'].includes(taskPhase)?'busy':'ready',
+    send:event=>{
+      const socket=resources.current.socket;
+      if(event.type!=='enter'||!globalMachineId||welcomeRef.current?.status()!=='ready'||socket?.readyState!==WebSocket.OPEN)return false;
+      const requestId=crypto.randomUUID();
+      welcomeReceipt.current={requestId,status:'requested'};welcomeSentAt.current=Date.now();
+      socket.send(JSON.stringify({type:'live.welcome',kind:'enter',source:'douyin-barrage-grab:直播伴侣',confirmedOwnRoom:true,audioIdle:true,requestId,eventId:event.id,roomId:event.roomId,ownerId:event.ownerId,viewerId:event.userId,observedAt:event.receivedAt}));
+      welcomeGate.current.quietSince=Date.now()+25000;
+      return true;
+    },
+  };
   const active = phase === "connecting" || phase === "connected" || phase === "recovering";
   const status = active ? t(phase === "recovering" ? "正在恢复主机连接，核验原通话中（最多 60 秒）" : phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
   const callPanel = expanded && <div ref={panel} style={dragging.style} id={popoverId} className={`native-voice__popover${globalMachineId ? " native-voice__popover--global" : ""}`} role="region" aria-label={t("原生实时语音")}>
