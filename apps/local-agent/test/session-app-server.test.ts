@@ -165,16 +165,3 @@ test("repair releases idle writers but retains an unproven writer and preserves 
   assert.equal(f.clients[0]!.stopped, 0);
   await f.server.stop();
 });
-
-test('optional browser setup does not release a writer with an active voice session',async t=>{
- const {sharedBrowsers}=await import('../src/shared-browser.js');t.mock.method(sharedBrowsers,'has',()=>true);
- const f=fixture();t.after(()=>f.server.stop());await f.server.resumeThread('voice',project);
- await assert.rejects(()=>f.server.startTurn({nativeThreadId:'voice',realtimeSessionId:'voice-call'} as ManagedThread,project,'test'),/自然结束/);
- assert.equal(f.clients[1]!.released,0);assert.equal(f.clients[1]!.stopped,0);assert.equal(f.clients.length,2);
-});
-test('optional browser setup rejects unverified replacement and never starts a turn',async t=>{
- const {sharedBrowsers}=await import('../src/shared-browser.js');t.mock.method(sharedBrowsers,'has',()=>true);
- const f=fixture();t.after(()=>f.server.stop());await f.server.resumeThread('a',project);
- await assert.rejects(()=>f.server.startTurn({nativeThreadId:'a'} as ManagedThread,project,'test'),/权限未通过验证/);
- assert.equal(f.clients[1]!.released,1);assert.equal(f.clients[2]!.released,1);
-});

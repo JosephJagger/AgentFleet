@@ -613,6 +613,7 @@ export class CoordinationService {
         invariant(this.db.get<{command_types_json:string|null}>("SELECT command_types_json FROM machines WHERE machine_id=?", session.machine_id)?.command_types_json?.includes('"codex.manage"'), 409, "AGENT_CAPABILITY_UNAVAILABLE", "请先更新主机连接服务，再使用结构化输出");
         try { payload.outputSchema = parseOutputSchema(payload.outputSchema); } catch { throw new AppError(400, "OUTPUT_SCHEMA_INVALID", "结构化输出的 JSON Schema 无效"); }
       }
+      if (payload.nativeCollaboration !== undefined) invariant(typeof payload.nativeCollaboration === "boolean" && ["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "SUBAGENTS_INPUT", "原生分工只能随会话消息启用");
       if (payload.goal !== undefined) invariant(typeof payload.goal === "string" && payload.goal.trim().length > 0 && payload.goal.length <= 2_000 && !payload.goal.includes("\0"), 400, "GOAL_INVALID", "目标需要为 1–2000 个字符");
       if (attachments.length && session.provider !== "claude") {
         const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);

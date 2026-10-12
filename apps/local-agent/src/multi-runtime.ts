@@ -8,7 +8,7 @@ import { isRecord } from "./util.js";
 export function createMultiRuntime(callbacks: AppServerCallbacks): AppServerClient {
   const codex = new SessionAppServer(callbacks);
   const claude = new ClaudeRuntime(callbacks, codex.appServerEpoch);
-  const routed = new Set(["createThread", "readThread", "readHistoryPage", "readTurnOutcome", "resumeThread", "unsubscribeThread", "startTurn", "steerTurn", "interruptTurn", "respondApproval", "respondInput", "threadAction", "startNativeTurn", "inspectEnvironment", "previewDeletion", "deleteThread", "stopBackgroundTerminals"]);
+  const routed = new Set(["createThread", "readThread", "readHistoryPage", "readNativeSubagents", "readTurnOutcome", "resumeThread", "unsubscribeThread", "startTurn", "steerTurn", "interruptTurn", "respondApproval", "respondInput", "threadAction", "startNativeTurn", "inspectEnvironment", "previewDeletion", "deleteThread", "stopBackgroundTerminals"]);
   let lastClaudeCatalog: Awaited<ReturnType<ClaudeRuntime["listThreads"]>> = [];
   const claudeCatalog = async () => { try { lastClaudeCatalog = await claude.listThreads(); delete claude.availability.error; } catch { claude.availability.error = "Claude 会话扫描失败，将自动重试"; } return lastClaudeCatalog; };
   const status = () => { void claude.refreshMetadata(); return { codex: { installed: true }, claude: claude.availability }; };

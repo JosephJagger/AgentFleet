@@ -12,7 +12,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { nativeSubagents: vi.fn().mockResolvedValue({provider:"codex",items:[]}), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -1037,21 +1037,39 @@ it.each(["buzhoushan","daylight","official","midnight"] as const)("%s 切主机�
  } finally {cleanup();setTheme('daylight');window.matchMedia=original;vi.unstubAllGlobals();}
 });
 
-it('collaboration entry points exist only in desktop Buzhoushan and collapse on theme change',async()=>{
+it('native subagents exist only in desktop Buzhoushan and collapse on theme change',async()=>{
  const original=window.matchMedia;
  window.matchMedia=(()=>({matches:true,addEventListener:()=>{},removeEventListener:()=>{}})) as unknown as typeof window.matchMedia;
  try {
    act(()=>setTheme('buzhoushan'));
    const view=render(<SessionInspector {...inspectorProps('A')}/>);
-   fireEvent.click(screen.getByRole('button',{name:'浏览器'}));
-   expect(screen.getByRole('region',{name:'协作工作区'})).toBeTruthy();
+   fireEvent.click(screen.getByRole('button',{name:'子 Agent'}));
+   expect(screen.getByRole('region',{name:'子 Agent 进度'})).toBeTruthy();
    act(()=>setTheme('daylight'));
-   expect(screen.queryByRole('region',{name:'协作工作区'})).toBeNull();
+   expect(screen.queryByRole('region',{name:'子 Agent 进度'})).toBeNull();
+   expect(screen.queryByRole('button',{name:'子 Agent'})).toBeNull();
    expect(screen.queryByRole('button',{name:'浏览器'})).toBeNull();
    expect(screen.queryByRole('button',{name:'分工'})).toBeNull();
-   act(()=>setTheme('buzhoushan'));expect(screen.queryByRole('region',{name:'协作工作区'})).toBeNull();
-   fireEvent.click(screen.getByRole('button',{name:'浏览器'}));
+   act(()=>setTheme('buzhoushan'));expect(screen.queryByRole('region',{name:'子 Agent 进度'})).toBeNull();
+   fireEvent.click(screen.getByRole('button',{name:'子 Agent'}));
    const props=inspectorProps('A');view.rerender(<SessionInspector {...props} detail={{...props.detail,session:{...props.detail.session,state:{...props.detail.session.state,ownership:'external_owned'}}}}/>);
-   expect(screen.queryByRole('region',{name:'协作工作区'})).toBeNull();view.unmount();
+   expect(screen.queryByRole('region',{name:'子 Agent 进度'})).toBeNull();view.unmount();
  } finally {window.matchMedia=original;act(()=>setTheme('daylight'));}
+});
+
+it.each([['buzhoushan', true], ['daylight', true], ['buzhoushan', false]] as const)('native delegation encouragement is scoped to theme %s desktop %s without altering user text', async (theme, desktop) => {
+ const original = window.matchMedia;
+ window.matchMedia = (() => ({matches: desktop, addEventListener: () => {}, removeEventListener: () => {}})) as unknown as typeof window.matchMedia;
+ try {
+   act(() => setTheme(theme));
+   const onSend = vi.fn().mockResolvedValue(undefined);
+   render(<SessionInspector {...inspectorProps('A')} onSend={onSend}/>);
+   fireEvent.change(screen.getByRole('textbox', {name: '发送给 Codex 的消息'}), {target: {value: '研究资料并验证结果'}});
+   fireEvent.click(screen.getByRole('button', {name: '发送'}));
+   await waitFor(() => expect(onSend).toHaveBeenCalledOnce());
+   expect(onSend.mock.calls[0][0]).toBe('研究资料并验证结果');
+   if (theme === 'buzhoushan' && desktop) expect(onSend.mock.calls[0][3]).toEqual({nativeCollaboration: true});
+   else expect(onSend.mock.calls[0][3]).toBeUndefined();
+   expect(Boolean(screen.queryByRole('button', {name: '子 Agent'}))).toBe(theme === 'buzhoushan' && desktop);
+ } finally {cleanup(); window.matchMedia = original; act(() => setTheme('daylight'));}
 });

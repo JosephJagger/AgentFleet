@@ -626,6 +626,7 @@ export interface RuntimeReleaseStatus {
 }
 
 export const api = {
+  nativeSubagents: (sessionId: string, input: { childId?: string; cursor?: string } = {}, signal?: AbortSignal) => request<import("./native-subagents").NativeSubagentSnapshot>(`/api/sessions/${encodeURIComponent(sessionId)}/subagents`, { method: "POST", body: JSON.stringify(input), signal: timeoutSignal(signal, 30000) }),
   agentReleaseStatus: (signal?: AbortSignal) => request<{status:string;expectedVersion:string|null;publicVersion:string|null;checkedAt:string}>("/api/agent-release-status", {signal}),
   async voiceTasks(view='recover',cursor?:string,signal?:AbortSignal):Promise<import('./types').VoiceTaskPage> {
     const query=new URLSearchParams({view,...(cursor?{cursor}:{})});return request(`/api/voice-tasks?${query}`,{signal});
@@ -1095,12 +1096,3 @@ export function subscribeToFleet(
 }
 
 export interface AdminUser { id: string; email: string; platformAdmin: boolean; disabled: boolean; createdAt: string; lastLoginAt: string | null; machineCount: number }
-
-export const collaborationApi = {
-  prepare: (input:{sessionId:string;title:string;candidates:string[];clientMutationId:string;confirmed:true}) => request<import("./collaboration").CollaborationPlan>("/api/collaboration/prepare",{method:"POST",body:JSON.stringify(input)}),
-  browserStatus: (sessionId:string,signal?:AbortSignal) => request<import('./collaboration').BrowserStatus>(`/api/sessions/${encodeURIComponent(sessionId)}/browser`,{method:'POST',body:JSON.stringify({action:'status'}),signal:timeoutSignal(signal,30000)}),
-  browser: (sessionId:string,input:Record<string,unknown>,signal?:AbortSignal) => request<import('./collaboration').BrowserFrame & {closed?:boolean}>(`/api/sessions/${encodeURIComponent(sessionId)}/browser`,{method:'POST',body:JSON.stringify(input),signal:timeoutSignal(signal,30000)}),
-  plans: (sessionId:string,signal?:AbortSignal) => request<{plans:import('./collaboration').CollaborationPlan[]}>(`/api/sessions/${encodeURIComponent(sessionId)}/collaboration`,{signal}),
-  create: (input:{sessionId:string;title:string;tasks:import('./collaboration').TaskDraft[];clientMutationId:string;confirmed:true}) => request<import('./collaboration').CollaborationPlan>('/api/collaboration',{method:'POST',body:JSON.stringify(input)}),
-  action: (id:string,action:string,index?:number) => request<import('./collaboration').CollaborationPlan>(`/api/collaboration/${encodeURIComponent(id)}/actions`,{method:'POST',body:JSON.stringify({action,index})}),
-};

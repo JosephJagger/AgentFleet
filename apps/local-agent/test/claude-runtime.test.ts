@@ -4,6 +4,7 @@ import { ClaudeRuntime } from "../src/claude-runtime.js";
 import type { AppServerCallbacks } from "../src/app-server.js";
 import type { ManagedThread, ProjectRecord } from "../src/types.js";
 import type { Options, Query } from "@anthropic-ai/claude-agent-sdk";
+import { NATIVE_COLLABORATION_INSTRUCTIONS } from "../src/native-subagents.js";
 
 const project = { id: "claude-project", root: "/tmp", provider: "claude" } as ProjectRecord;
 test("Claude starts the first streaming prompt, resumes the original identity and reports completion", async () => {
@@ -188,16 +189,101 @@ test("panel-created Claude titles reach the native session and survive AI title 
  assert.equal((await runtime.listThreads())[0]?.title,"Auto-generated summary");
 });
 
-test('browser MCP is opt-in for Claude and preserves existing permission settings',async t=>{
- const {sharedBrowsers}=await import('../src/shared-browser.js');let enabled=false;t.mock.method(sharedBrowsers,'has',()=>enabled);
- const id='claude_12345678-1234-1234-1234-123456789012',thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;
- const options:Options[]=[];
- const runtime=new ClaudeRuntime({findManagedThread:()=>thread,findProject:()=>project,onVolatile:()=>{},onEvent:async()=>{},onExit:async()=>{}} as unknown as AppServerCallbacks,'epoch',{
-   detectClaude:async()=>({installed:true,version:'test',path:'/bin/claude'}),nativeClaudeRunning:async()=>false,
-   query:input=>{options.push(input.options!);return {close(){},async *[Symbol.asyncIterator](){yield {type:'result',subtype:'success',is_error:false,result:'ok',usage:{input_tokens:0,output_tokens:0},modelUsage:{}};}} as unknown as Query;},
- });t.after(()=>runtime.stop());await runtime.start();
- await runtime.startTurn(thread,project,'fixture',undefined,{model:'host',mode:'plan'});await new Promise(resolve=>setImmediate(resolve));await runtime.unsubscribeThread(id);
- assert.equal(options[0]!.mcpServers,undefined);enabled=true;
- await runtime.startTurn(thread,project,'fixture',undefined,{model:'host',mode:'plan'});await new Promise(resolve=>setImmediate(resolve));
- const endpoint=options[1]!.mcpServers!.agentfleet_browser as {type:string;url:string};assert.equal(endpoint.type,'http');assert.match(endpoint.url,/^http:\/\/127\.0\.0\.1:\d+\/[a-f0-9]{64}$/);assert.equal(options[1]!.permissionMode,'plan');
+test("Claude native children are SDK-scoped to the verified parent project and long replies are complete", async () => {
+  const id = "claude_parent", requests: string[] = [], long = "x".repeat(61000);
+  let cwd = "/tmp";
+  const runtime = new ClaudeRuntime({} as AppServerCallbacks, "epoch", {
+    getSessionInfo: async (parent, options) => { assert.equal(parent, "parent"); assert.equal(options?.dir, "/tmp"); return { sessionId: "parent", cwd, summary: "", lastModified: 0 }; },
+    listSubagents: async (parent, options) => { assert.equal(parent, "parent"); assert.equal(options?.dir, "/tmp"); return ["child"]; },
+    getSubagentMessages: async (parent, child, options) => {
+      assert.equal(parent, "parent"); assert.equal(options?.dir, "/tmp"); requests.push(child);
+      return [{ type: "assistant", uuid: "a", session_id: "parent", parent_tool_use_id: "tool", parent_agent_id: null, message: { id: "answer", content: [{ type: "text", text: long }] } }];
+    },
+  });
+  cwd = "/other"; await assert.rejects(runtime.readNativeSubagents(id, project, "/tmp"), { code: "SUBAGENTS_TARGET_CHANGED" });
+  cwd = "/tmp"; await assert.rejects(runtime.readNativeSubagents(id, project, "/tmp", "foreign"), { code: "SUBAGENTS_TARGET_CHANGED" });
+  assert.deepEqual(requests, []);
+  const list = await runtime.readNativeSubagents(id, project, "/tmp");
+  assert.equal(list.items[0]?.id, "child"); assert.equal(list.items[0]?.status, "unknown", "persisted text does not prove completion");
+  let cursor: string | null = null, text = "", pages = 0;
+  do { const page = await runtime.readNativeSubagents(id, project, "/tmp", "child", cursor); text += page.messages!.map(message => message.text).join(""); cursor = page.nextCursor; assert.ok(++pages < 5); } while (cursor);
+  assert.equal(text, long);
+});
+
+test("Claude child stream and result cannot become parent reply or complete parent turn; native tasks stay visible", async () => {
+  const id = "claude_parent", thread = { nativeThreadId: id, projectId: project.id, sessionCwd: project.root } as ManagedThread;
+  const events: Array<{ type: string; payload: Record<string, unknown>; nativeItemId?: string }> = [];
+  let complete!: () => void; const completed = new Promise<void>(resolve => { complete = resolve; });
+  let options!: Options;
+  const runtime = new ClaudeRuntime({ findManagedThread: () => thread, findProject: () => project, onVolatile: event => { events.push(event); }, onEvent: async event => { events.push(event); if (event.type === "turn.completed") complete(); }, onExit: async () => {}, onApproval: async () => {}, onApprovalResolved: async () => {} } as AppServerCallbacks, "epoch", {
+    detectClaude: async () => ({ installed: true, version: "2.1.285", path: "/bin/claude" }), nativeClaudeRunning: async () => false,
+    inspectClaudeMetadata: async () => ({ models: [], quota: { available: false, observedAt: new Date().toISOString(), subscriptionType: null, windows: [] } }),
+    getSessionInfo: async () => ({ sessionId: "parent", cwd: "/tmp", summary: "", lastModified: 0 }), listSubagents: async () => ["child"],
+    query: input => {
+      options = input.options!;
+      return { close() {}, async *[Symbol.asyncIterator]() {
+        const sent = await (input.prompt as AsyncIterable<{ uuid: string; message: { content: Array<{ text: string }> } }>)[Symbol.asyncIterator]().next();
+        assert.equal(sent.value!.message.content[0]!.text, "Main task", "collaboration guidance must not be appended to visible user text");
+        const result = { type: "result", is_error: false, num_turns: 1, user_message_uuid: sent.value!.uuid, modelUsage: {}, usage: { input_tokens: 0, output_tokens: 0 } };
+        yield { type: "system", subtype: "task_started", session_id: "parent", task_id: "child", task_type: "local_agent", subagent_type: "Reviewer", description: "Review the change" };
+        yield { type: "system", subtype: "task_started", session_id: "parent", task_id: "shell", task_type: "local_bash", description: "Not a child agent" };
+        yield { type: "stream_event", parent_tool_use_id: null, event: { type: "message_start", message: { id: "parent-reply" } } };
+        yield { type: "stream_event", parent_tool_use_id: "child-tool", event: { type: "message_start", message: { id: "child-reply" } } };
+        yield { type: "stream_event", parent_tool_use_id: "child-tool", event: { type: "content_block_delta", delta: { type: "text_delta", text: "Child delta" } } };
+        yield { type: "assistant", parent_tool_use_id: "child-tool", message: { id: "child-reply", content: [{ type: "text", text: "Child answer" }] } };
+        yield { ...result, parent_tool_use_id: "child-tool" };
+        assert.equal(events.length, 0, "a child result must not finish or pollute the parent");
+        yield { type: "system", subtype: "task_notification", session_id: "parent", task_id: "child", status: "completed", summary: "Review done" };
+        yield { type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_delta", delta: { type: "text_delta", text: "Parent delta" } } };
+        yield { type: "assistant", parent_tool_use_id: null, message: { id: "parent-reply", content: [{ type: "text", text: "Parent synthesis" }] } };
+        yield result;
+      } } as unknown as Query;
+    },
+  });
+  await runtime.start(); await runtime.startTurn(thread, project, "Main task", undefined, undefined, undefined, { nativeCollaboration: true }); await completed;
+  assert.deepEqual(options.systemPrompt, { type: "preset", preset: "claude_code", append: NATIVE_COLLABORATION_INSTRUCTIONS });
+  assert.equal(events.filter(event => event.type === "turn.completed").length, 1);
+  assert.equal(events.find(event => event.type === "agent_message.delta")?.nativeItemId, "parent-reply:text");
+  assert.equal(JSON.stringify(events).includes("Child"), false);
+  const page = await runtime.readNativeSubagents(id, project, "/tmp");
+  assert.deepEqual(page.items, [{ id: "child", title: "Reviewer", status: "completed", description: "Review done" }]);
+  await runtime.stop();
+});
+
+for (const ending of ["parent-result", "stream-error", "release"] as const) test(`Claude ${ending} loses unconfirmed child running state and preserves reported terminal outcomes`, async () => {
+  const id = "claude_parent", thread = { nativeThreadId: id, projectId: project.id, sessionCwd: project.root } as ManagedThread;
+  let ready!: () => void, finish!: () => void, terminal!: () => void;
+  const started = new Promise<void>(resolve => { ready = resolve; }), released = new Promise<void>(resolve => { finish = resolve; }), ended = new Promise<void>(resolve => { terminal = resolve; });
+  const runtime = new ClaudeRuntime({ findManagedThread: () => thread, findProject: () => project, onVolatile: () => {}, onEvent: async event => { if (event.type === "turn.completed") terminal(); }, onExit: async () => {}, onApproval: async () => {}, onApprovalResolved: async () => {} } as AppServerCallbacks, "epoch", {
+    detectClaude: async () => ({ installed: true, version: "2.1.285", path: "/bin/claude" }), nativeClaudeRunning: async () => false,
+    inspectClaudeMetadata: async () => ({ models: [], quota: { available: false, observedAt: new Date().toISOString(), subscriptionType: null, windows: [] } }),
+    getSessionInfo: async () => ({ sessionId: "parent", cwd: "/tmp", summary: "", lastModified: 0 }), listSubagents: async () => [],
+    query: input => ({ close() { finish(); }, async *[Symbol.asyncIterator]() {
+      const sent = await (input.prompt as AsyncIterable<{ uuid: string }>)[Symbol.asyncIterator]().next();
+      for (const name of ["unconfirmed", "completed", "failed", "stopped", "killed"]) {
+        yield { type: "system", subtype: "task_started", session_id: "parent", task_id: name, task_type: "local_agent", description: name };
+        if (name !== "unconfirmed") yield name === "killed"
+          ? { type: "system", subtype: "task_updated", session_id: "parent", task_id: name, patch: { status: name } }
+          : { type: "system", subtype: "task_notification", session_id: "parent", task_id: name, status: name, summary: name };
+      }
+      for (const flags of [{ skip_transcript: true }, { ambient: true }]) {
+        yield { type: "system", subtype: "task_started", session_id: "parent", task_id: "internal", task_type: "local_agent", subagent_type: "internal worker", ...flags };
+        yield { type: "system", subtype: "task_progress", session_id: "parent", task_id: "internal", subagent_type: "internal worker", description: "flags omitted on progress" };
+        yield { type: "system", subtype: "task_notification", session_id: "parent", task_id: "internal", status: "completed" };
+      }
+      ready(); await released;
+      if (ending === "stream-error") throw Error("Disconnected native stream");
+      yield { type: "result", is_error: false, num_turns: 1, user_message_uuid: sent.value!.uuid, modelUsage: {}, usage: { input_tokens: 0, output_tokens: 0 } };
+    } } as unknown as Query),
+  });
+  await runtime.start(); await runtime.startTurn(thread, project, "Main task"); await started;
+  const before = await runtime.readNativeSubagents(id, project, "/tmp");
+  assert.equal(before.items.find(item => item.id === "unconfirmed")?.status, "running");
+  assert.equal(before.items.some(item => item.id === "internal"), false, "internal events and later progress cannot register a visible child");
+  if (ending === "release") await runtime.unsubscribeThread(id);
+  else { finish(); await ended; }
+  await new Promise(resolve => setImmediate(resolve));
+  const after = await runtime.readNativeSubagents(id, project, "/tmp");
+  assert.deepEqual(Object.fromEntries(after.items.map(item => [item.id, item.status])), { completed: "completed", failed: "failed", killed: "killed", stopped: "stopped", unconfirmed: "unknown" });
+  await runtime.stop();
 });

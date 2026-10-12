@@ -18,7 +18,7 @@ import "./official-theme.css";
 import "./host-sessions.css";
 import "./buzhoushan-theme.css";
 import "./interaction-stability.css";
-import "./collaboration.css";
+import "./native-subagents.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

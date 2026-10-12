@@ -1,5 +1,3 @@
-import { browserMcpUrl } from "./browser-mcp.js";
-import { sharedBrowsers } from "./shared-browser.js";
 import {preferenceInstructions} from './voice-preference-rules.js';
 import { serializePanelToolResult } from "./panel-voice-tools.js";
 import { readConversation, type ConversationPage } from "./conversation-history.js";
@@ -12,6 +10,7 @@ import { executeCodexWorkspaceOperation } from "./codex-workspace-operations.js"
 import { codexNotification } from "./codex-notifications.js";
 import { elicitationForm, elicitationContent, type ElicitationField } from "./mcp-elicitation.js";
 import { executeCodexOperation } from "./codex-operation-executor.js";
+import { readCodexSubagents, nativeCollaborationContext, type NativeSubagentsPage } from "./native-subagents.js";
 import { parseHostCodexOperation, parseCodexOperation, parseForkRange, type CodexOperationResult } from "./codex-operations.js";
 import { REFERENCE_TOOL, queryReference } from "./reference-tool.js";
 import { quotaSnapshot, tokenUsage } from "./usage.js";
@@ -219,6 +218,7 @@ export interface AppServerClient {
   listThreadPage?(cursor: string | null, options?: { useStateDbOnly: boolean }): Promise<ThreadListPage>;
   readThread(threadId: string, metadataOnly?: boolean): Promise<ThreadHistorySnapshot>;
   readConversation?(threadId:string,cursor:string|null):Promise<ConversationPage>;
+  readNativeSubagents?(threadId: string, project: ProjectRecord, cwd: string, childId?: string, cursor?: string | null): Promise<NativeSubagentsPage>;
   readHistoryPage?(threadId: string, cursor: string | null): Promise<ThreadHistoryPage>;
   readTurnOutcome?(threadId: string, turnId: string): Promise<{ cwd: string; status: string } | null>;
   resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile?: PermissionProfile, metadataOnly?: boolean, realtime?: boolean): Promise<ThreadResumeResult>;
@@ -880,6 +880,11 @@ export class CodexAppServer implements AppServerClient {
     }
   }
 
+  async readNativeSubagents(threadId: string, _project: ProjectRecord, cwd: string, childId?: string, cursor?: string | null): Promise<NativeSubagentsPage> {
+    this.assertInitialized();
+    return readCodexSubagents((method, params) => this.request(method, params), threadId, cwd, childId, cursor);
+  }
+
   async readHistoryPage(threadId: string, cursor: string | null): Promise<ThreadHistoryPage> {
     this.assertInitialized();
     const raw = resultObject(await this.request("thread/items/list", {threadId,cursor,limit:100,sortDirection:"asc"}),"thread/items/list");
@@ -964,7 +969,6 @@ export class CodexAppServer implements AppServerClient {
         excludeTurns: true,
         cwd,
         ...threadPermissionParams(project.root, profile),
-        ...(!metadataOnly && !realtime && sharedBrowsers.has(threadId) ? { config: { ...threadPermissionParams(project.root,profile).config, "mcp_servers.agentfleet_browser.url": await browserMcpUrl(threadId), "mcp_servers.agentfleet_browser.tool_timeout_sec": 75 } } : {}),
         ...(metadataOnly || realtime ? { config: { ...threadPermissionParams(project.root,profile).config, ...(metadataOnly ? { "features.goals": false } : {}), ...(realtime ? { "features.realtime_conversation": true } : {}) } } : {}),
       }),
       "thread/resume",
@@ -1062,6 +1066,7 @@ export class CodexAppServer implements AppServerClient {
         // before selecting this disposable writer. A writer-local model/list can
         // be temporarily unavailable even though turn/start accepts that model.
         ...turnSettingsParams(settings),
+        ...nativeCollaborationContext(extras?.nativeCollaboration),
         threadId: thread.nativeThreadId,
         ...(clientUserMessageId === undefined ? {} : { clientUserMessageId }),
         input: this.imageInputs(prompt, images, settings?.model ?? thread.observedSettings?.model, extras),
@@ -1098,6 +1103,7 @@ export class CodexAppServer implements AppServerClient {
       await this.request("turn/steer", {
         threadId: thread.nativeThreadId,
         expectedTurnId: turnId,
+        ...nativeCollaborationContext(extras?.nativeCollaboration),
         input: this.imageInputs(prompt, images, thread.acceptedSettings?.model ?? thread.observedSettings?.model, extras),
         clientUserMessageId: clientUserMessageId ?? null,
       }),

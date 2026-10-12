@@ -1,5 +1,3 @@
-import { browserMcpUrl } from "./browser-mcp.js";
-import { sharedBrowsers } from "./shared-browser.js";
 import { type ClaudeSettings } from "./claude-settings.js";
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
@@ -9,7 +7,8 @@ import { promisify } from "node:util";
 import { access, readlink, readdir, readFile } from "node:fs/promises";
 import { delimiter, join, isAbsolute } from "node:path";
 import { homedir } from "node:os";
-import { query, listSessions, getSessionInfo, getSessionMessages, type Query, type SDKUserMessage, type PermissionResult, type Options } from "@anthropic-ai/claude-agent-sdk";
+import { query, listSessions, getSessionInfo, getSessionMessages, listSubagents, getSubagentMessages, type Query, type SDKUserMessage, type PermissionResult, type Options } from "@anthropic-ai/claude-agent-sdk";
+import { NATIVE_COLLABORATION_INSTRUCTIONS, validateSubagentRequest, type NativeSubagent, type NativeSubagentMessage, type NativeSubagentsPage } from "./native-subagents.js";
 import type { AppServerClient, AppServerCallbacks, ThreadHistorySnapshot, ThreadHistoryPage } from "./app-server.js";
 import type { ManagedThread, ProjectRecord, ApprovalRecord } from "./types.js";
 import type { CodexSettings } from "./codex-settings.js";
@@ -102,7 +101,7 @@ function messageItems(value: unknown): Array<{ nativeTurnId: string; nativeItemI
 interface Writer { query: Query; input: SDKUserMessage[]; wake?: () => void; closed: boolean; child?: ChildProcess; turnId?: string; interrupted: boolean; fresh: boolean; promptIds: Set<string>; textItemId?: string; }
 interface Pending { writer: Writer; resolve: (result: PermissionResult) => void; input: Record<string, unknown>; }
 
-const defaults = { query, listSessions, getSessionInfo, getSessionMessages, detectClaude, nativeClaudeRunning, inspectClaudeMetadata };
+const defaults = { query, listSessions, getSessionInfo, getSessionMessages, listSubagents, getSubagentMessages, detectClaude, nativeClaudeRunning, inspectClaudeMetadata };
 
 export class ClaudeRuntime implements AppServerClient {
   availability: ClaudeAvailability = { installed: false, version: null };
@@ -111,6 +110,7 @@ export class ClaudeRuntime implements AppServerClient {
   private readonly fresh = new Set<string>();
   private readonly pending = new Map<string, Pending>();
   private readonly owned = new Set<number>();
+  private readonly nativeTasks = new Map<string, Map<string, NativeSubagent>>();
   private readonly sdk: typeof defaults;
   constructor(private readonly callbacks: AppServerCallbacks, readonly appServerEpoch: string, dependencies: Partial<typeof defaults> = {}) { this.sdk = { ...defaults, ...dependencies }; }
   private metadataAt = 0;
@@ -171,6 +171,81 @@ export class ClaudeRuntime implements AppServerClient {
     const cwd = info?.cwd ?? thread?.sessionCwd ?? this.callbacks.findProject(thread?.projectId ?? "")?.root ?? "";
     return { nativeThreadId: id, cwd, paged: true, historyMode: "paginated", executionState: this.writers.get(id)?.turnId || await this.sdk.nativeClaudeRunning(cwd, this.owned) ? "running" : "idle", updatedAt: info?.lastModified ?? null, items: [] };
   }
+  async readNativeSubagents(id: string, _project: ProjectRecord, cwd: string, childId?: string, cursor: string | null = null): Promise<NativeSubagentsPage> {
+    validateSubagentRequest(childId, cursor);
+    const info = await this.sdk.getSessionInfo(nativeId(id), { dir: cwd });
+    if (info?.sessionId !== nativeId(id) || info.cwd !== cwd) throw new AgentError("SUBAGENTS_TARGET_CHANGED", "主会话项目已变化，请重新读取");
+    const children = [...new Set(await this.sdk.listSubagents(nativeId(id), { dir: cwd }))].filter(child => /^[a-zA-Z0-9_-]{1,128}$/.test(child)).sort();
+    if (!childId) {
+      const offset = cursor === null ? 0 : /^list:[0-9]+$/.test(cursor) ? Number(cursor.slice(5)) : NaN;
+      if (!Number.isSafeInteger(offset) || offset < 0) throw new AgentError("SUBAGENTS_CURSOR_INVALID", "分工读取位置无效");
+      const active = this.nativeTasks.get(id);
+      // An event can arrive just before the SDK transcript is materialized.
+      const ids = [...new Set([...children, ...(active?.keys() ?? [])])].sort();
+      const selected = ids.slice(offset, offset + 25);
+      const items = await Promise.all(selected.map(async child => {
+        const task = active?.get(child);
+        if (task) return task;
+        const first = (await this.sdk.getSubagentMessages(nativeId(id), child, { dir: cwd, limit: 1, offset: 0 }))[0];
+        const description = first ? messageItems(first).filter(entry => entry.item.type === "userMessage").map(entry => (entry.item.content as Array<{text: string}>)[0]?.text ?? "").join("\n").slice(0, 2000) : "";
+        // Persisted text alone does not prove a child is still running or has completed.
+        return { id: child, title: `子 Agent ${child.slice(0, 12)}`, status: "unknown", ...(description ? { description } : {}) };
+      }));
+      return { provider: "claude", items, nextCursor: offset + selected.length < ids.length ? `list:${offset + selected.length}` : null };
+    }
+    if (!children.includes(childId)) throw new AgentError("SUBAGENTS_TARGET_CHANGED", "目标不属于当前主会话的子 Agent，或记录尚未写入");
+    let position: { offset: number; textOffset: number; messageId?: string } = { offset: 0, textOffset: 0 };
+    if (cursor) {
+      try { position = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")); } catch { throw new AgentError("SUBAGENTS_CURSOR_INVALID", "分工读取位置无效"); }
+      if (!isRecord(position) || !Number.isSafeInteger(position.offset) || position.offset < 0 || !Number.isSafeInteger(position.textOffset) || position.textOffset < 0 || (position.messageId !== undefined && typeof position.messageId !== "string")) throw new AgentError("SUBAGENTS_CURSOR_INVALID", "分工读取位置无效");
+    }
+    const raw = await this.sdk.getSubagentMessages(nativeId(id), childId, { dir: cwd, offset: position.offset, limit: 20 });
+    const messages: NativeSubagentMessage[] = [];
+    let consumed = 0, characters = 0, continuation: typeof position | null = null;
+    for (const message of raw) {
+      if (characters >= 80000) { continuation = { offset: position.offset + consumed, textOffset: 0 }; break; }
+      const entries = messageItems(message).filter(entry => ["userMessage", "agentMessage"].includes(String(entry.item.type)));
+      if (!entries.length) { consumed++; continue; }
+      const entry = entries[0]!;
+      const text = entry.item.type === "agentMessage" ? String(entry.item.text ?? "") : (entry.item.content as Array<{text: string}>).map(block => block.text).join("\n");
+      const start = consumed === 0 ? position.textOffset : 0;
+      if (start > text.length || (consumed === 0 && position.messageId && position.messageId !== entry.nativeItemId)) throw new AgentError("SUBAGENTS_CURSOR_INVALID", "原生对话已变化，请重新读取");
+      const part = text.slice(start, start + 20000);
+      messages.push({ id: entry.nativeItemId, role: entry.item.type === "userMessage" ? "user" : "assistant", text: part, textOffset: start, textLength: text.length, truncated: start > 0 || part.length < text.length, status: this.nativeTasks.get(id)?.get(childId)?.status ?? "unknown" });
+      characters += part.length;
+      if (start + part.length < text.length) { continuation = { offset: position.offset + consumed, textOffset: start + part.length, messageId: entry.nativeItemId }; break; }
+      consumed++;
+    }
+    continuation ??= consumed === 20 ? { offset: position.offset + consumed, textOffset: 0 } : null;
+    return { provider: "claude", items: [], childId, messages, nextCursor: continuation ? Buffer.from(JSON.stringify(continuation)).toString("base64url") : null };
+  }
+
+  private observeNativeTask(id: string, message: unknown): void {
+    if (!isRecord(message) || message.type !== "system" || message.session_id !== nativeId(id) || typeof message.task_id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(message.task_id)) return;
+    if (message.skip_transcript === true || message.ambient === true) {
+      this.nativeTasks.get(id)?.delete(message.task_id);
+      return;
+    }
+    const existing = this.nativeTasks.get(id)?.get(message.task_id);
+    // Only a visible start registers a task. Later progress may omit ambient
+    // flags, so it cannot reintroduce a filtered internal worker on its own.
+    const isAgent = message.subtype === "task_started" && (message.task_type === "local_agent" || typeof message.subagent_type === "string");
+    if (!existing && !isAgent) return; // Background Bash and MCP jobs are not child Agents.
+    const tasks = this.nativeTasks.get(id) ?? new Map<string, NativeSubagent>();
+    const patch = isRecord(message.patch) ? message.patch : {};
+    const status = message.subtype === "task_notification" ? message.status : message.subtype === "task_updated" ? patch.status : "running";
+    tasks.set(message.task_id, { id: message.task_id, title: String(message.subagent_type ?? existing?.title ?? `子 Agent ${message.task_id.slice(0, 12)}`).slice(0, 200), status: typeof status === "string" ? status.slice(0, 60) : existing?.status ?? "unknown", description: String(message.summary ?? message.description ?? patch.description ?? existing?.description ?? "").slice(0, 2000) });
+    while (tasks.size > 200) tasks.delete(tasks.keys().next().value!);
+    this.nativeTasks.set(id, tasks);
+    while (this.nativeTasks.size > 64) this.nativeTasks.delete(this.nativeTasks.keys().next().value!);
+  }
+  private loseNativeTaskObservation(id: string): void {
+    const tasks = this.nativeTasks.get(id);
+    if (!tasks) return;
+    for (const [taskId, task] of tasks) {
+      if (!["completed", "failed", "stopped", "killed"].includes(task.status)) tasks.set(taskId, { ...task, status: "unknown" });
+    }
+  }
   async readTurnOutcome(id: string, turnId: string): Promise<{cwd:string;status:string} | null> {
     const thread = this.callbacks.findManagedThread(id);
     const cwd = thread?.sessionCwd ?? this.callbacks.findProject(thread?.projectId ?? "")?.root;
@@ -191,6 +266,7 @@ export class ClaudeRuntime implements AppServerClient {
   async unsubscribeThread(id: string) {
     const writer = this.writers.get(id); if (!writer) return;
     writer.closed = true; writer.wake?.();
+    this.loseNativeTaskObservation(id);
     for (const [key, pending] of this.pending) if (pending.writer === writer) { pending.resolve({ behavior: "deny", message: "会话执行连接已释放" }); this.pending.delete(key); }
     const child = writer.child;
     const exited = child && child.exitCode === null && child.signalCode === null ? new Promise<void>(resolve => child.once("close", () => resolve())) : Promise.resolve();
@@ -206,11 +282,9 @@ export class ClaudeRuntime implements AppServerClient {
     const turnId = randomUUID();
     const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), promptIds: new Set<string>(), turnId } as unknown as Writer;
     const input = async function* () { while (!writer.closed) { const message = writer.input.shift(); if (message) yield message; else await new Promise<void>(resolve => { writer.wake = resolve; }); } };
-    const browserUrl = sharedBrowsers.has(id) ? await browserMcpUrl(id) : undefined;
     const options: Options = {
-      ...(browserUrl ? { mcpServers: { agentfleet_browser: { type: "http" as const, url: browserUrl } } } : {}),
       cwd: thread.sessionCwd ?? project.root, pathToClaudeCodeExecutable: this.binary!,
-      settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code" },
+      settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code", ...(extras?.nativeCollaboration === true ? { append: NATIVE_COLLABORATION_INSTRUCTIONS } : {}) },
       includePartialMessages: true, permissionMode: settings?.mode === "plan" ? "plan" : (settings as ClaudeSettings|undefined)?.permissionMode ?? "default", permissionPrompts: "host",
       ...(writer.fresh ? { sessionId: nativeId(id), ...(thread.titleSource === "name" && thread.title ? { title: thread.title } : {}) } : { resume: nativeId(id) }),
       ...(settings?.model && settings.model !== "host" ? { model: settings.model } : {}),
@@ -256,6 +330,11 @@ export class ClaudeRuntime implements AppServerClient {
     try {
       for await (const msg of writer.query) {
         if (this.writers.get(id) !== writer || writer.closed) break;
+        this.observeNativeTask(id, msg);
+        // A child's stream, assistant reply, or result belongs to its native
+        // transcript. It must never alter the parent's text id or finish its turn.
+        const rawMessage: unknown = msg;
+        if (isRecord(rawMessage) && (typeof rawMessage.parent_tool_use_id === "string" || typeof rawMessage.parent_agent_id === "string")) continue;
         if (msg.type === "system" && msg.subtype === "init") {
           if (CLAUDE_PREFIX + msg.session_id !== id) throw new AgentError("CLAUDE_RESUME_MISMATCH", "Claude 返回了不同会话，已停止执行");
           this.fresh.delete(id);
@@ -291,6 +370,11 @@ export class ClaudeRuntime implements AppServerClient {
       if (writer.turnId && !writer.closed) throw new Error("Claude 进程退出，未返回任务完成结果");
     } catch (error) {
       if (!writer.closed) { delete writer.turnId; await emit("turn.error", { message: error instanceof Error ? error.message : "Claude 执行失败" }); await emit("turn.completed", { turn: { id: turnId, status: "failed" } }); }
+    } finally {
+      // Parent result, interruption, stream failure, and release all end our
+      // observation. Do not pretend unreported child outcomes are still live.
+      // An old pump must not overwrite a replacement writer's fresh task state.
+      if (this.writers.get(id) === writer) this.loseNativeTaskObservation(id);
     }
   }
   async steerTurn(thread: ManagedThread, turnId: string, prompt: string, _clientUserMessageId?: string) {

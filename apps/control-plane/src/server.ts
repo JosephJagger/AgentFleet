@@ -1,5 +1,4 @@
-import { CollaborationService } from "./collaboration.js";
-import { BrowserBroker } from "./browser-broker.js";
+import { NativeSubagentsBroker } from "./native-subagents-broker.js";
 import { createAgentReleaseStatus } from "./agent-release-status.js";
 import { deliveryPlan, deliveredPath } from './file-delivery.js';
 import {LongTermPreferences,supportsVoicePreferences} from './long-term-preferences.js';
@@ -69,8 +68,7 @@ interface AgentSocketState {
   reconciliationReady: boolean;
   dispatchPaused?: boolean;
   projectFiles?: boolean;
-  sharedBrowser?: boolean;
-  sharedBrowserStatus?: boolean;
+  nativeSubagents?: boolean;
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
   verifiedVoiceBinding?: PanelTransportBinding;
@@ -525,31 +523,26 @@ export async function buildControlPlane(
     return attempt;
   };
 
-  const collaboration = new CollaborationService(db, registry, coordination, dispatchCommand);
-  const browserBroker = new BrowserBroker(machineId => {
-    const agent=agents.get(machineId);
-    if(!agent?.reconciliationReady || agent.dispatchPaused || !agent.producerEpoch || !agent.appServerEpoch || agent.socket.readyState!==WebSocket.OPEN)return undefined;
-    return {key:agent.socket,generation:agent.identity.transportGeneration,producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,supported:agent.sharedBrowser===true,statusSupported:agent.sharedBrowserStatus===true,send:value=>sendJson(agent.socket,value)};
+  const subagentsBroker = new NativeSubagentsBroker(machineId => {
+    const agent = agents.get(machineId);
+    if (!agent?.producerEpoch || !agent.appServerEpoch || agent.socket.readyState !== WebSocket.OPEN) return undefined;
+    return { key: agent.socket, generation: agent.identity.transportGeneration, producerEpoch: agent.producerEpoch, appServerEpoch: agent.appServerEpoch, ready: agent.reconciliationReady && !agent.dispatchPaused, supported: agent.nativeSubagents === true, send: value => sendJson(agent.socket, value) };
   });
-  app.addHook('onClose',async()=>browserBroker.close());
-  app.get('/api/sessions/:id/collaboration',{preHandler:authenticate},async request=>collaboration.list(request.principal!,routeId(request)));
-  app.post('/api/collaboration',{preHandler:mutate,bodyLimit:100000},async request=>collaboration.create(request.principal!,record(request.body)));
-  app.post('/api/collaboration/prepare',{preHandler:mutate,bodyLimit:16000},async request=>collaboration.prepare(request.principal!,record(request.body)));
-  app.post('/api/collaboration/:id/actions',{preHandler:mutate},async request=>{const body=record(request.body);return collaboration.action(request.principal!,routeId(request),body.action,body.index);});
-  app.post('/api/sessions/:id/browser',{preHandler:mutate,bodyLimit:16000},async(request,reply)=>{
-    reply.header('cache-control','no-store');
-    const principal=request.principal!,session=registry.getSession(principal,routeId(request)),input=record(request.body);
-    invariant(session.managed,409,'BROWSER_NOT_MANAGED','请先接管会话');
-    invariant(['status','open','snapshot','close','takeover','handoff','approve','deny','navigate','click','fill','key','scroll'].includes(String(input.action)),400,'BROWSER_INPUT','浏览器操作无效');
-    limiter.check(`browser:${principal.userId}:${session.logicalSessionId}`,180,60_000);
-    const binding=db.get<{external_id:string;native_thread_id:string;execution_segment_id:string;sync_content:number}>(`SELECT p.external_id,p.sync_content,e.native_thread_id,e.execution_segment_id FROM projects p JOIN logical_sessions s ON s.project_id=p.project_id JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL WHERE s.logical_session_id=?`,session.logicalSessionId);
-    invariant(binding?.native_thread_id,409,'BROWSER_TARGET_CHANGED','会话尚未连接原生运行环境');
-    invariant(binding.sync_content===1,403,'BROWSER_CONTENT_DISABLED','请先允许项目内容同步');
-    if(input.action==='open')invariant(!db.get("SELECT 1 FROM voice_sessions WHERE logical_session_id=? AND state<>'closed'",session.logicalSessionId),409,'BROWSER_VOICE_BUSY','请在当前会话语音结束后打开浏览器协作');
-    const result=await browserBroker.control({sessionId:session.logicalSessionId,machineId:session.machineId,projectId:session.projectId,projectExternalId:binding.external_id,nativeThreadId:binding.native_thread_id,executionSegmentId:binding.execution_segment_id,contentEpoch:session.contentEpoch},input);
-    // Access may have been revoked while waiting for the host.
-    const current=registry.getSession(principal,session.logicalSessionId);
-    invariant(current.managed && current.contentEpoch===session.contentEpoch && current.executionSegmentId===binding.execution_segment_id && db.get<{sync_content:number}>('SELECT sync_content FROM projects WHERE project_id=?',session.projectId)?.sync_content===1,409,'BROWSER_TARGET_CHANGED','浏览器访问权限已变化');
+  app.addHook("onClose", async () => subagentsBroker.close());
+  app.post("/api/sessions/:id/subagents", { preHandler: mutate, bodyLimit: 16000 }, async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    const principal = request.principal!, session = registry.getSession(principal, routeId(request)), input = record(request.body);
+    invariant(session.managed, 409, "SUBAGENTS_NOT_MANAGED", "请先接管会话");
+    invariant(Object.keys(input).every(key => ["childId", "cursor"].includes(key)) && (input.childId === undefined || typeof input.childId === "string" && input.childId.length > 0 && input.childId.length <= 256 && !/[\0\r\n]/.test(input.childId)) && (input.cursor === undefined || input.cursor === null || typeof input.cursor === "string" && input.cursor.length > 0 && input.cursor.length <= 12000), 400, "SUBAGENTS_INPUT", "子 Agent 读取参数无效");
+    limiter.check(`subagents:${principal.userId}:${session.logicalSessionId}`, 120, 60000);
+    const binding = db.get<{external_id: string; native_thread_id: string; execution_segment_id: string; sync_content: number}>(`SELECT p.external_id,p.sync_content,e.native_thread_id,e.execution_segment_id FROM projects p JOIN logical_sessions s ON s.project_id=p.project_id JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL WHERE s.logical_session_id=?`, session.logicalSessionId);
+    invariant(binding?.native_thread_id, 409, "SUBAGENTS_TARGET_CHANGED", "会话尚未连接原生运行环境");
+    invariant(binding.sync_content === 1, 403, "SUBAGENTS_CONTENT_DISABLED", "请先允许项目内容同步");
+    const result = await subagentsBroker.read({ sessionId: session.logicalSessionId, machineId: session.machineId, projectId: session.projectId, projectExternalId: binding.external_id, nativeThreadId: binding.native_thread_id, executionSegmentId: binding.execution_segment_id, contentEpoch: session.contentEpoch }, input as { childId?: string; cursor?: string | null });
+    const currentPrincipal = auth.authenticateRequest(request);
+    const current = registry.getSession(currentPrincipal, session.logicalSessionId);
+    invariant(current.managed && current.contentEpoch === session.contentEpoch && current.executionSegmentId === binding.execution_segment_id && db.get<{sync_content: number}>("SELECT sync_content FROM projects WHERE project_id=?", session.projectId)?.sync_content === 1, 409, "SUBAGENTS_TARGET_CHANGED", "读取期间会话或内容权限已变化");
+    invariant(result.provider === session.provider, 502, "SUBAGENTS_INVALID", "原生提供方与当前会话不匹配");
     return result;
   });
 
@@ -1693,13 +1686,12 @@ export async function buildControlPlane(
         try {
           const message = record(parseWsMessage(data), "WebSocket message must be an object") as unknown as AgentToServerMessage;
           incomingType=typeof message.type==='string'&&/^[a-zA-Z0-9_.]{1,48}$/.test(message.type)?message.type:undefined;
-          if(message.type === "browser.result"){browserBroker.receive(identity.machineId,socket,message);return;}
+          if(message.type === "subagents.result"){subagentsBroker.receive(identity.machineId,socket,message);return;}
           if(message.type === "session.history.result"){historyBroker.receive(identity.machineId,socket,message);return;}
           if (message.type === "hello") {
             state.reconciliationReady = false;
             state.projectFiles = message.capabilities?.projectFiles === true;
-            state.sharedBrowser = message.capabilities?.sharedBrowser === true;
-            state.sharedBrowserStatus = message.capabilities?.sharedBrowserStatus === true;
+            state.nativeSubagents = message.capabilities?.nativeSubagents === true;
             state.realtimeVoice = message.capabilities?.realtimeVoice === true;
             state.conversationHistory = message.capabilities?.conversationHistory === true;
             delete state.reconciliationId;
@@ -2004,7 +1996,7 @@ export async function buildControlPlane(
         }
       });
       socket.on("close", (_code: number, reason: Buffer) => {
-        historyBroker.disconnect(identity.machineId,socket);browserBroker.disconnect(identity.machineId,socket);
+        historyBroker.disconnect(identity.machineId,socket);subagentsBroker.disconnect(identity.machineId,socket);
         cancelMachineFiles(identity.machineId, identity.transportGeneration);
         if (agents.get(identity.machineId) === state) agents.delete(identity.machineId);
         if (closing) return;
@@ -2036,7 +2028,6 @@ export async function buildControlPlane(
     writingMemory.cleanup();
     const expiredAudit = coordination.purgeExpiredAudit();
     scheduledTasks.sweep();
-    collaboration.sweep();
     let inactiveTakeoversReleased = 0;
     if (Date.now() >= nextInactiveTakeoverSweepAt) {
       nextInactiveTakeoverSweepAt = Date.now() + 60 * 60 * 1_000;

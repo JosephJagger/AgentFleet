@@ -1,5 +1,3 @@
-import { sharedBrowsers } from "./shared-browser.js";
-import { closeBrowserMcp } from "./browser-mcp.js";
 import {snapshotWorkspace, workspaceChanges, type WorkspaceSnapshot} from "./workspace-changes.js";
 import {preferenceRules} from './voice-preference-rules.js';
 import { parseRealtimeVoice, supportsNativeVoice } from "./voice-options.js";
@@ -404,19 +402,6 @@ export class AgentRuntime {
   private readonly historySyncJobs = new Set<string>();
   private readonly imageMaintenanceSessions = new Set<string>();
 
-  async controlSharedBrowser(target:Record<string,unknown>):Promise<unknown> {
-    const id=String(target.nativeThreadId??'');
-    const check=()=>{
-      const state=this.store.snapshot(),binding=state.nativeThreadBindings[id];
-      if(!binding||binding.logicalSessionId!==target.logicalSessionId||binding.executionSegmentId!==target.executionSegmentId||binding.contentEpoch!==target.contentEpoch||binding.projectId!==target.projectExternalId||!state.managedThreads[id])throw new AgentError('BROWSER_TARGET_CHANGED','浏览器会话绑定已变化');
-      if(target.transportGeneration!==this.transportGeneration||target.producerEpoch!==this.producerEpoch||target.appServerEpoch!==this.getAppServerEpoch())throw new AgentError('BROWSER_TARGET_CHANGED','主机连接已变化');
-      if(state.projectContentPolicies[binding.projectId]?.syncContent===false)throw new AgentError('BROWSER_CONTENT_DISABLED','请先允许项目内容同步');
-    };
-    check();sharedBrowsers.setAccessGuard(id,check);
-    if(!isRecord(target.input))throw new AgentError('BROWSER_INPUT','浏览器请求无效');
-    return sharedBrowsers.control(id,target.input);
-  }
-
   async readSessionConversation(target:Record<string,unknown>):Promise<unknown> {
     const server=this.appServer,id=requireString(target.nativeThreadId,'nativeThreadId',{maxLength:256});
     const state=this.store.snapshot(),binding=state.nativeThreadBindings[id];
@@ -435,6 +420,31 @@ export class AgentRuntime {
       if(page.nativeThreadId!==id||page.cwd!==expected)throw new AgentError('HISTORY_TARGET_CHANGED','Native history project changed');
       return page;
     } finally {this.store.setAuxiliaryActivity(activity,false);}
+  }
+
+  async readNativeSubagents(target: Record<string, unknown>): Promise<unknown> {
+    const server = this.appServer, id = requireString(target.nativeThreadId, "nativeThreadId", { maxLength: 256 });
+    if (!this.canRead() || !server?.readNativeSubagents) throw new AgentError("SUBAGENTS_UNSUPPORTED", "请更新连接服务以查看原生分工");
+    const state = this.store.snapshot(), binding = state.nativeThreadBindings[id];
+    const check = () => {
+      const currentState = this.store.snapshot(), current = currentState.nativeThreadBindings[id];
+      if (!binding || !current || current.codexProfileId !== this.support.codexProfile?.id || current.logicalSessionId !== target.logicalSessionId || current.executionSegmentId !== target.executionSegmentId || current.contentEpoch !== target.contentEpoch || current.projectId !== target.projectExternalId || canonicalJson(current) !== canonicalJson(binding) || this.appServer !== server) throw new AgentError("SUBAGENTS_TARGET_CHANGED", "会话绑定已变化，请重新读取");
+      if (target.transportGeneration !== this.transportGeneration || target.producerEpoch !== this.producerEpoch || target.appServerEpoch !== this.getAppServerEpoch()) throw new AgentError("SUBAGENTS_TARGET_CHANGED", "主机连接已变化，请重新读取");
+      if (currentState.projectContentPolicies[current.projectId]?.syncContent === false) throw new AgentError("SUBAGENTS_CONTENT_DISABLED", "请先允许项目内容同步");
+    };
+    check();
+    const project = state.projects.find(project => project.id === binding!.projectId);
+    if (!project) throw new AgentError("SUBAGENTS_TARGET_CHANGED", "项目已变化，请重新读取");
+    if (target.childId !== undefined && (typeof target.childId !== "string" || !target.childId || target.childId.length > 256 || /[\0\r\n]/.test(target.childId))) throw new AgentError("SUBAGENTS_INPUT", "子 Agent 标识无效");
+    if (target.cursor !== undefined && target.cursor !== null && (typeof target.cursor !== "string" || !target.cursor || target.cursor.length > 12000)) throw new AgentError("SUBAGENTS_CURSOR_INVALID", "分工读取位置无效");
+    const cwd = state.managedThreads[id]?.sessionCwd ?? state.discoveredThreads[id]?.sessionCwd ?? project.root;
+    const activity = "subagents-" + String(target.requestId);
+    this.store.setAuxiliaryActivity(activity, true);
+    try {
+      const page = await server.readNativeSubagents(id, project, cwd, target.childId as string | undefined, target.cursor as string | null | undefined);
+      check();
+      return page;
+    } finally { this.store.setAuxiliaryActivity(activity, false); }
   }
 
   async manageSessionImages(target: Record<string, unknown>, clean: boolean): Promise<Record<string, unknown>> {
@@ -726,8 +736,7 @@ export class AgentRuntime {
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
         maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
         projectFiles: true,
-        sharedBrowser: true,
-        sharedBrowserStatus: true,
+        nativeSubagents: true,
         conversationHistory: this.canRead() && Boolean(this.appServer?.readConversation),
         realtimeVoice: this.isWritable() && supportsNativeVoice(this.support.codexVersion),
         queue: this.isWritable(),
@@ -1074,7 +1083,6 @@ export class AgentRuntime {
     this.shuttingDown = true;
     for(const id of this.workspaceWatches.keys())this.discardWorkspaceWatch(id);
     await this.panelVoice?.close();
-    await sharedBrowsers.stop();
     this.catalogSync.close();
     this.catalogWatcher?.close();
     this.claudeCatalogWatcher?.close();
@@ -1087,7 +1095,6 @@ export class AgentRuntime {
     this.appServer = undefined;
     this.startingAppServer = undefined;
     await Promise.all([...servers].map((server) => server.stop()));
-    await closeBrowserMcp();
     await this.restartLoop?.catch(() => undefined);
   }
 
@@ -1827,7 +1834,7 @@ export class AgentRuntime {
         await this.beginWorkspaceWatch(thread, project.root, server.appServerEpoch);
         const result = await (async()=>{try {return nativeAction
           ? await server.startNativeTurn!(thread, nativeAction, nativeAction === "review" ? parseReviewTarget(command.payload.target) : undefined)
-          : await server.startTurn(thread, project, referenced.prompt, clientUserMessageId, turnSettings, images, { attachments: referenced.attachments, referenceFiles: referenced.referenceFiles, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(outputSchema ? { outputSchema } : {}), ...(goal ? { goal } : {}) });
+          : await server.startTurn(thread, project, referenced.prompt, clientUserMessageId, turnSettings, images, { attachments: referenced.attachments, referenceFiles: referenced.referenceFiles, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(command.payload.nativeCollaboration === true ? { nativeCollaboration: true } : {}), ...(outputSchema ? { outputSchema } : {}), ...(goal ? { goal } : {}) });
         } catch(error){this.discardWorkspaceWatch(thread.nativeThreadId);throw error;}})();
         const watch=this.workspaceWatches.get(thread.nativeThreadId);if(watch)watch.turnId=result.nativeTurnId;
         let completedBeforeResponse = false;
@@ -1916,7 +1923,7 @@ export class AgentRuntime {
         const referenced = referenceInputs(prompt, materialized);
         const materializedSkills = await materializePluginSkills(project, command.commandId, pluginSkills, server);
         const materializedPlugins = await materializePlugins(project, command.commandId, plugins, server);
-        const result = await server.steerTurn(thread, turnId, referenced.prompt, clientUserMessageId, images, { attachments: referenced.attachments, referenceFiles: referenced.referenceFiles, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(goal ? { goal } : {}) });
+        const result = await server.steerTurn(thread, turnId, referenced.prompt, clientUserMessageId, images, { attachments: referenced.attachments, referenceFiles: referenced.referenceFiles, pluginSkills: [...materializedPlugins, ...materializedSkills], ...(command.payload.nativeCollaboration === true ? { nativeCollaboration: true } : {}), ...(goal ? { goal } : {}) });
         await this.emitForThread(thread, {
           type: "turn.steered",
           nativeThreadId: thread.nativeThreadId,

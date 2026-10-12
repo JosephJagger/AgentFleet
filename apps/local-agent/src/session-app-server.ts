@@ -1,4 +1,3 @@
-import { sharedBrowsers } from "./shared-browser.js";
 import { randomUUID } from "node:crypto";
 import { CodexAppServer, type AppServerCallbacks, type AppServerClient, type ThreadStartResult } from "./app-server.js";
 import { AgentError } from "./errors.js";
@@ -7,7 +6,7 @@ import type { CodexSettings } from "./codex-settings.js";
 import type { InputAnswers } from "./user-input.js";
 import type { TurnExtras } from "./attachments.js";
 
-type Writer = { client: AppServerClient; token: string; threadId?: string; live: boolean; verified?: boolean; browser?: boolean };
+type Writer = { client: AppServerClient; token: string; threadId?: string; live: boolean; verified?: boolean };
 type Factory = (callbacks: AppServerCallbacks, epoch: string) => AppServerClient;
 
 /** One read-only catalog connection and disposable, isolated session writers.
@@ -78,6 +77,13 @@ export class SessionAppServer implements AppServerClient {
     return this.catalog.readConversation(id,cursor);
   }
   readTurnOutcome(id: string, turnId: string) { return this.catalog.readTurnOutcome!(id, turnId); }
+  readNativeSubagents(id: string, project: ProjectRecord, cwd: string, childId?: string, cursor?: string | null) {
+    // Existing writers know their live children; otherwise the passive catalog
+    // reads saved records. Inspection never creates or resumes an execution writer.
+    const client = this.writers.get(id)?.client ?? this.catalog;
+    if (!client.readNativeSubagents) throw new AgentError("SUBAGENTS_UNSUPPORTED", "当前运行版本不支持读取原生分工");
+    return client.readNativeSubagents(id, project, cwd, childId, cursor);
+  }
   readThread(id: string, metadataOnly?: boolean) { return (this.writers.get(id)?.client ?? this.catalog).readThread(id, metadataOnly); }
   readHistoryPage(id: string, cursor: string | null) {
     const client = this.writers.get(id)?.client ?? this.catalog;
@@ -259,18 +265,7 @@ export class SessionAppServer implements AppServerClient {
     return this.serial(thread.nativeThreadId, async () => {
       const current = this.callbacks.findManagedThread(thread.nativeThreadId);
       if (current?.activeTurnId) throw new AgentError("THREAD_BUSY", "A native task started before the message could be sent; append to it or retry");
-      // Installing the optional browser tool requires a fresh idle writer. Never interrupt an active turn/voice.
-      let writer=this.writer(thread.nativeThreadId);
-      if(sharedBrowsers.has(thread.nativeThreadId) && !writer.browser) {
-        if(current?.realtimeSessionId || thread.realtimeSessionId)throw new AgentError("BROWSER_VOICE_BUSY","请先自然结束此会话的语音，再启用浏览器工具");
-        await this.release(writer);
-        writer=await this.newWriter(thread.nativeThreadId);
-        try {
-          const resumed=await writer.client.resumeThread(thread.nativeThreadId,project,thread.sessionCwd,thread.permissionProfile);
-          if(resumed.nativeThreadId!==thread.nativeThreadId || !resumed.policyVerified)throw new AgentError('POLICY_NOT_PROVEN','浏览器会话身份或执行权限未通过验证');
-          writer.browser=true;writer.verified=true;
-        } catch(error) { await this.release(writer); throw error; }
-      }
+      const writer = this.writer(thread.nativeThreadId);
       return writer.client.startTurn(thread, project, prompt, messageId, settings, images, extras);
     });
   }

@@ -44,8 +44,9 @@ export async function executeCodexOperation(value: unknown, threadId: string, mu
     return sanitizeCodexResult({ operation, status: "available", rows, nextCursor: raw.nextCursor })!;
   }
   if (operation === "subagents.read") {
-    raw = object(await rpc("thread/list", { limit: 100, sourceKinds: ["subAgent"], ...(cwd ? { cwd } : {}), ...(args.cursor ? { cursor: args.cursor } : {}) }));
-    const children = (Array.isArray(raw.data) ? raw.data : []).map(object).filter(child => child.parentThreadId === threadId);
+    if (!cwd) throw new AgentError("CODEX_CHILD_CHANGED", "当前项目会话不存在");
+    raw = object(await rpc("thread/list", { limit: 49, sourceKinds: ["subAgentThreadSpawn"], parentThreadId: threadId, cwd, ...(args.cursor ? { cursor: args.cursor } : {}) }));
+    const children = (Array.isArray(raw.data) ? raw.data : []).map(object).filter(child => child.parentThreadId === threadId && child.cwd === cwd);
     return sanitizeCodexResult({ operation, status: "available", rows: children.slice(0, 49).map(child => ({ name: String(child.id), detail: [child.agentNickname ?? child.name, child.preview].filter(Boolean).join(" · "), status: String(object(child.status).type ?? "未上报") })), nextCursor: raw.nextCursor })!;
   }
   if (operation === "windows.readiness") {
