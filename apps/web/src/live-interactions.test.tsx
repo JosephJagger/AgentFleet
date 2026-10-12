@@ -64,3 +64,29 @@ it('busy voice expires instead of playing late; disconnect/unmount stop the loca
  f.status.mockReturnValue('ready');act(()=>vi.advanceTimersByTime(1000));expect(f.send).not.toHaveBeenCalled();
  f.view.unmount();expect(f.ws.readyState).toBe(3);
 });
+it('preserves connection failures after close and allows a successful retry without stale socket interference',()=>{
+ vi.useFakeTimers();Socket.all=[];vi.stubGlobal('WebSocket',Socket);
+ render(<LiveInteractions voice={{current:null}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'互动消息'}));
+ fireEvent.click(screen.getByRole('button',{name:'连接采集器'}));
+ expect(screen.getByRole('button',{name:'正在连接…'})).toHaveProperty('disabled',true);
+ const first=Socket.all[0]!;act(()=>{first.onerror?.();first.close();});
+ expect(screen.getByText('采集连接失败')).toBeTruthy();
+ expect(screen.getByRole('alert').textContent).toContain('网页无法判断具体失败原因');
+ fireEvent.click(screen.getByRole('button',{name:'重试连接'}));
+ const next=Socket.all[1]!;act(()=>{next.open();first.onerror?.();first.close();});
+ expect(screen.getByText('本机采集已连接')).toBeTruthy();expect(screen.queryByRole('alert')).toBeNull();
+ act(()=>next.close());expect(screen.getByRole('alert').textContent).toContain('已断开');
+});
+it('keeps timeout evidence through close and validates ports before opening a socket',()=>{
+ vi.useFakeTimers();Socket.all=[];vi.stubGlobal('WebSocket',Socket);
+ render(<LiveInteractions voice={{current:null}}/>);fireEvent.click(screen.getByRole('button',{name:'互动消息'}));
+ fireEvent.change(screen.getByLabelText('本机采集端口'),{target:{value:'0'}});
+ fireEvent.click(screen.getByRole('button',{name:'连接采集器'}));
+ expect(Socket.all).toHaveLength(0);expect(screen.getByRole('alert').textContent).toContain('1024–65535');
+ fireEvent.change(screen.getByLabelText('本机采集端口'),{target:{value:'8888'}});
+ fireEvent.click(screen.getByRole('button',{name:'重试连接'}));act(()=>vi.advanceTimersByTime(30000));
+ expect(screen.getByText('采集连接失败')).toBeTruthy();expect(screen.getByRole('alert').textContent).toContain('连接超时');
+ expect(Socket.all[0]!.readyState).toBe(3);
+ fireEvent.click(screen.getByRole('button',{name:'停止接收'}));expect(screen.getByText('采集未连接')).toBeTruthy();
+});

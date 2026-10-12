@@ -19,7 +19,7 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
   const socket=useRef<WebSocket|null>(null),selected=useRef<LiveEvent|null>(null),welcoming=useRef(false);
   const pending=useRef<LiveEvent|null>(null),cooldown=useRef(0),ledger=useRef(new LiveEventLedger()),lastReceipt=useRef('');
   const resetWelcome=()=>{welcoming.current=false;pending.current=null;setEnabled(false);setWelcomeState('未开启');};
-  const stop=()=>{const previous=socket.current;socket.current=null;previous?.close();selected.current=null;setRoom(null);setRooms([]);resetWelcome();setConnection('off');};
+  const stop=()=>{const previous=socket.current;socket.current=null;previous?.close();selected.current=null;setRoom(null);setRooms([]);resetWelcome();setConnection('off');setNotice('');};
   useEffect(()=>{const logout=()=>stop();window.addEventListener('agentfleet:logout',logout);window.addEventListener('pagehide',logout);return()=>{window.removeEventListener('agentfleet:logout',logout);window.removeEventListener('pagehide',logout);const previous=socket.current;socket.current=null;previous?.close();pending.current=null;};},[]);
   useEffect(()=>{if(!open)return;const escape=(e:KeyboardEvent)=>{if(e.key==='Escape')setOpen(false);};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[open]);
   useEffect(()=>{
@@ -39,10 +39,14 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
   },[voice,supported]);
   function connect(){
     stop();setNotice('');setEvents([]);setLastAt(0);
+    let url:string;
+    try{url=localCollectorUrl(port);}catch{setConnection('error');setNotice('请输入 1024–65535 之间的本机采集端口');return;}
+    let opened=false,failed=false;
+    const failure=()=>{failed=true;setConnection('error');setNotice('未能连接本机采集器。请确认这台电脑已运行 DouyinBarrageGrab、WebSocket 端口一致，并允许浏览器访问本地网络。网页无法判断具体失败原因。');resetWelcome();};
     try{
-      const ws=new WebSocket(localCollectorUrl(port));socket.current=ws;setConnection('connecting');
-      const timeout=setTimeout(()=>{if(socket.current===ws&&ws.readyState===WebSocket.CONNECTING){ws.close();setConnection('error');setNotice('连接超时，请检查本机采集器与浏览器本地网络权限');}},30000);
-      ws.onopen=()=>{clearTimeout(timeout);if(socket.current===ws)setConnection('open');};
+      const ws=new WebSocket(url);socket.current=ws;setConnection('connecting');
+      const timeout=setTimeout(()=>{if(socket.current===ws&&ws.readyState===WebSocket.CONNECTING){failed=true;setConnection('error');setNotice('连接超时，请检查本机采集器与浏览器本地网络权限');ws.close();}},30000);
+      ws.onopen=()=>{clearTimeout(timeout);if(socket.current===ws){opened=true;setConnection('open');}};
       ws.onmessage=message=>{
         if(socket.current!==ws||typeof message.data!=='string')return;
         const event=parseLiveEvent(message.data);if(!event)return;
@@ -62,9 +66,9 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
         setEvents(previous=>[...previous.slice(-99),event]);
         if(welcoming.current&&event.type==='enter'&&Date.now()>=cooldown.current&&!pending.current&&ledger.current.welcome(event)){pending.current??=event;setWelcomeState('等待总控空闲，连续入场合并欢迎');}
       };
-      ws.onerror=()=>{if(socket.current===ws){setConnection('error');setNotice('无法连接本机采集器，请检查端口及浏览器本地网络权限；不要关闭浏览器安全保护');resetWelcome();}};
-      ws.onclose=()=>{clearTimeout(timeout);if(socket.current===ws){socket.current=null;setConnection('off');selected.current=null;setRoom(null);setRooms([]);resetWelcome();setNotice('本机采集连接已断开，请手动重连并确认房间');}};
-    }catch{setConnection('error');setNotice('无法连接本机采集器，请检查端口及浏览器本地网络权限；不要关闭浏览器安全保护');}
+      ws.onerror=()=>{if(socket.current===ws){clearTimeout(timeout);failure();}};
+      ws.onclose=()=>{clearTimeout(timeout);if(socket.current===ws){socket.current=null;selected.current=null;setRoom(null);setRooms([]);resetWelcome();if(!opened||failed){if(!failed)failure();}else{setConnection('off');setNotice('本机采集连接已断开，请手动重连并确认房间');}}};
+    }catch{failure();}
   }
   function confirm(candidate:LiveEvent){selected.current=candidate;setRoom(candidate);setEvents([]);resetWelcome();setFollow(true);setNotice('');}
   return <>
@@ -72,7 +76,8 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
     {createPortal(<section ref={panel} style={dragging.style} className="live-interactions" role="dialog" aria-label={t('直播互动消息')} hidden={!open}>
       <header className="voice-drag-handle" {...dragging.handle}><strong>{t('直播互动消息')}</strong><button type="button" className="icon-button" aria-label={t('收起互动消息')} onClick={()=>setOpen(false)}><X size={18}/></button></header>
       <p>{t('读取打开网页这台电脑的直播伴侣消息，不是远程主机。仅用于本人直播间。')}</p>
-      <div className="live-interactions__connection"><label>{t('本机采集端口')}<input inputMode="numeric" value={port} disabled={connection==='open'||connection==='connecting'} onChange={e=>setPort(e.target.value)}/></label><button type="button" className="button button--secondary" disabled={connection==='open'||connection==='connecting'} onClick={connect}>{t('连接采集器')}</button><button type="button" className="button button--secondary" disabled={connection==='off'} onClick={stop}>{t('停止接收')}</button></div>
+      <p>{t('请先在这台直播电脑运行 DouyinBarrageGrab 并开启 WebSocket 服务；此按钮只连接，不会安装或启动采集器。')}</p>
+      <div className="live-interactions__connection"><label>{t('本机采集端口')}<input inputMode="numeric" value={port} disabled={connection==='open'||connection==='connecting'} onChange={e=>setPort(e.target.value)}/></label><button type="button" className="button button--secondary" disabled={connection==='open'||connection==='connecting'} onClick={connect}>{t(connection==='connecting'?'正在连接…':connection==='error'?'重试连接':'连接采集器')}</button><button type="button" className="button button--secondary" disabled={connection==='off'} onClick={stop}>{t('停止接收')}</button></div>
       <p role="status">{t(connection==='open'?'本机采集已连接':connection==='connecting'?'连接本机采集中':connection==='error'?'采集连接失败':'采集未连接')}{lastAt>0&&<> · {t('最后收到事件')} {new Date(lastAt).toLocaleTimeString()}</>}</p>
       {notice&&<p role="alert">{t(notice)}</p>}
       {connection==='open'&&!room&&<div className="live-interactions__rooms"><strong>{t('确认本人直播间')}</strong><p>{t('来源标记不等于账号授权。请对照直播伴侣中的主播和房间，仅确认你自己的直播间。')}</p>{rooms.length===0?<p>{t('等待直播伴侣来源的聊天或入场事件，尚未识别房间')}</p>:rooms.map(candidate=><div key={`${candidate.ownerId}:${candidate.roomId}`}><span>{displayName(candidate.ownerName)||t('主播昵称未知')} · {displayName(candidate.roomTitle)}<small>{t('房间编号')} {candidate.roomId} · {t('主播编号')} {candidate.ownerId}</small></span><button type="button" className="button button--secondary" onClick={()=>confirm(candidate)}>{t('确认这是我的直播间')}</button></div>)}</div>}
