@@ -197,6 +197,7 @@ export interface AgentCapabilities {
   paginatedHistory?: boolean;
   permissionProfiles?: boolean;
   projectFiles?: boolean;
+  sharedBrowser?: boolean;
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
   commandTypes?: string[];
@@ -296,6 +297,7 @@ export interface AgentReconciliationStream {
 }
 
 export type AgentToServerMessage =
+  | {type:"browser.result";requestId:string;result?:unknown;error?:{code?:string;message?:string}}
   | {type:"session.history.result";requestId:string;result?:unknown;error?:{code?:string;message?:string}}
   | { type: "voice.event"; voiceId: string; producerEpoch: string; appServerEpoch: string; requestId?:string; args?:unknown; event: "panel_tool" | "reported" | "sdp" | "closed" | "stopped" | "error" | "transcript" | "task"; phase?: "delegated" | "running" | "completed" | "failed"; role?: string; text?: string; final?: boolean; throughHostSeq?: number; throughProducerEpoch?: string; previousWriterExitConfirmed?: boolean; sdp?: string; message?: string }
   | {

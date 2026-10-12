@@ -1,3 +1,5 @@
+import { browserMcpUrl } from "./browser-mcp.js";
+import { sharedBrowsers } from "./shared-browser.js";
 import {preferenceInstructions} from './voice-preference-rules.js';
 import { serializePanelToolResult } from "./panel-voice-tools.js";
 import { readConversation, type ConversationPage } from "./conversation-history.js";
@@ -962,6 +964,7 @@ export class CodexAppServer implements AppServerClient {
         excludeTurns: true,
         cwd,
         ...threadPermissionParams(project.root, profile),
+        ...(!metadataOnly && !realtime && sharedBrowsers.has(threadId) ? { config: { ...threadPermissionParams(project.root,profile).config, "mcp_servers.agentfleet_browser.url": await browserMcpUrl(threadId), "mcp_servers.agentfleet_browser.tool_timeout_sec": 75 } } : {}),
         ...(metadataOnly || realtime ? { config: { ...threadPermissionParams(project.root,profile).config, ...(metadataOnly ? { "features.goals": false } : {}), ...(realtime ? { "features.realtime_conversation": true } : {}) } } : {}),
       }),
       "thread/resume",

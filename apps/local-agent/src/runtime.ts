@@ -1,3 +1,5 @@
+import { sharedBrowsers } from "./shared-browser.js";
+import { closeBrowserMcp } from "./browser-mcp.js";
 import {snapshotWorkspace, workspaceChanges, type WorkspaceSnapshot} from "./workspace-changes.js";
 import {preferenceRules} from './voice-preference-rules.js';
 import { parseRealtimeVoice, supportsNativeVoice } from "./voice-options.js";
@@ -402,6 +404,19 @@ export class AgentRuntime {
   private readonly historySyncJobs = new Set<string>();
   private readonly imageMaintenanceSessions = new Set<string>();
 
+  async controlSharedBrowser(target:Record<string,unknown>):Promise<unknown> {
+    const id=String(target.nativeThreadId??'');
+    const check=()=>{
+      const state=this.store.snapshot(),binding=state.nativeThreadBindings[id];
+      if(!binding||binding.logicalSessionId!==target.logicalSessionId||binding.executionSegmentId!==target.executionSegmentId||binding.contentEpoch!==target.contentEpoch||binding.projectId!==target.projectExternalId||!state.managedThreads[id])throw new AgentError('BROWSER_TARGET_CHANGED','浏览器会话绑定已变化');
+      if(target.transportGeneration!==this.transportGeneration||target.producerEpoch!==this.producerEpoch||target.appServerEpoch!==this.getAppServerEpoch())throw new AgentError('BROWSER_TARGET_CHANGED','主机连接已变化');
+      if(state.projectContentPolicies[binding.projectId]?.syncContent===false)throw new AgentError('BROWSER_CONTENT_DISABLED','请先允许项目内容同步');
+    };
+    check();sharedBrowsers.setAccessGuard(id,check);
+    if(!isRecord(target.input))throw new AgentError('BROWSER_INPUT','浏览器请求无效');
+    return sharedBrowsers.control(id,target.input);
+  }
+
   async readSessionConversation(target:Record<string,unknown>):Promise<unknown> {
     const server=this.appServer,id=requireString(target.nativeThreadId,'nativeThreadId',{maxLength:256});
     const state=this.store.snapshot(),binding=state.nativeThreadBindings[id];
@@ -711,6 +726,7 @@ export class AgentRuntime {
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
         maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
         projectFiles: true,
+        sharedBrowser: true,
         conversationHistory: this.canRead() && Boolean(this.appServer?.readConversation),
         realtimeVoice: this.isWritable() && supportsNativeVoice(this.support.codexVersion),
         queue: this.isWritable(),
@@ -1057,6 +1073,7 @@ export class AgentRuntime {
     this.shuttingDown = true;
     for(const id of this.workspaceWatches.keys())this.discardWorkspaceWatch(id);
     await this.panelVoice?.close();
+    await sharedBrowsers.stop();
     this.catalogSync.close();
     this.catalogWatcher?.close();
     this.claudeCatalogWatcher?.close();
@@ -1069,6 +1086,7 @@ export class AgentRuntime {
     this.appServer = undefined;
     this.startingAppServer = undefined;
     await Promise.all([...servers].map((server) => server.stop()));
+    await closeBrowserMcp();
     await this.restartLoop?.catch(() => undefined);
   }
 

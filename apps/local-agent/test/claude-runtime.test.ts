@@ -187,3 +187,17 @@ test("panel-created Claude titles reach the native session and survive AI title 
  thread.origin="host_claimed";
  assert.equal((await runtime.listThreads())[0]?.title,"Auto-generated summary");
 });
+
+test('browser MCP is opt-in for Claude and preserves existing permission settings',async t=>{
+ const {sharedBrowsers}=await import('../src/shared-browser.js');let enabled=false;t.mock.method(sharedBrowsers,'has',()=>enabled);
+ const id='claude_12345678-1234-1234-1234-123456789012',thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;
+ const options:Options[]=[];
+ const runtime=new ClaudeRuntime({findManagedThread:()=>thread,findProject:()=>project,onVolatile:()=>{},onEvent:async()=>{},onExit:async()=>{}} as unknown as AppServerCallbacks,'epoch',{
+   detectClaude:async()=>({installed:true,version:'test',path:'/bin/claude'}),nativeClaudeRunning:async()=>false,
+   query:input=>{options.push(input.options!);return {close(){},async *[Symbol.asyncIterator](){yield {type:'result',subtype:'success',is_error:false,result:'ok',usage:{input_tokens:0,output_tokens:0},modelUsage:{}};}} as unknown as Query;},
+ });t.after(()=>runtime.stop());await runtime.start();
+ await runtime.startTurn(thread,project,'fixture',undefined,{model:'host',mode:'plan'});await new Promise(resolve=>setImmediate(resolve));await runtime.unsubscribeThread(id);
+ assert.equal(options[0]!.mcpServers,undefined);enabled=true;
+ await runtime.startTurn(thread,project,'fixture',undefined,{model:'host',mode:'plan'});await new Promise(resolve=>setImmediate(resolve));
+ const endpoint=options[1]!.mcpServers!.agentfleet_browser as {type:string;url:string};assert.equal(endpoint.type,'http');assert.match(endpoint.url,/^http:\/\/127\.0\.0\.1:\d+\/[a-f0-9]{64}$/);assert.equal(options[1]!.permissionMode,'plan');
+});

@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 54) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 55) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1450,6 +1450,17 @@ export class ControlPlaneDatabase {
        PRIMARY KEY(workspace_id,user_id,mutation_key)
       ) STRICT;
       PRAGMA user_version=54`); });
+
+    if (version < 55) this.transaction(() => { this.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS collaboration_plans (
+        id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        user_id TEXT NOT NULL REFERENCES users(user_id), client_id TEXT NOT NULL,
+        session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id),
+        mutation_key TEXT NOT NULL, fingerprint TEXT NOT NULL, title TEXT NOT NULL,
+        state TEXT NOT NULL, tasks_json TEXT NOT NULL, created_at TEXT NOT NULL,
+        UNIQUE(workspace_id,user_id,mutation_key)
+      ) STRICT;
+      PRAGMA user_version=55`); });
 
   }
 

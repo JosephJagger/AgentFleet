@@ -1,3 +1,5 @@
+import { browserMcpUrl } from "./browser-mcp.js";
+import { sharedBrowsers } from "./shared-browser.js";
 import { type ClaudeSettings } from "./claude-settings.js";
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
@@ -204,7 +206,9 @@ export class ClaudeRuntime implements AppServerClient {
     const turnId = randomUUID();
     const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), promptIds: new Set<string>(), turnId } as unknown as Writer;
     const input = async function* () { while (!writer.closed) { const message = writer.input.shift(); if (message) yield message; else await new Promise<void>(resolve => { writer.wake = resolve; }); } };
+    const browserUrl = sharedBrowsers.has(id) ? await browserMcpUrl(id) : undefined;
     const options: Options = {
+      ...(browserUrl ? { mcpServers: { agentfleet_browser: { type: "http" as const, url: browserUrl } } } : {}),
       cwd: thread.sessionCwd ?? project.root, pathToClaudeCodeExecutable: this.binary!,
       settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code" },
       includePartialMessages: true, permissionMode: settings?.mode === "plan" ? "plan" : (settings as ClaudeSettings|undefined)?.permissionMode ?? "default", permissionPrompts: "host",

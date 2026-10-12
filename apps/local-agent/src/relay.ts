@@ -1,3 +1,4 @@
+import { sharedBrowsers } from "./shared-browser.js";
 import { voiceErrorCode } from "./voice-errors.js";
 import { HEARTBEAT_INTERVAL_MS, MAX_WS_FRAME_BYTES } from "./constants.js";
 import { setImmediate as yieldToIO } from "node:timers/promises";
@@ -155,6 +156,7 @@ export class RelayConnection {
         this.logger.warn(`relay disconnected: ${errorMessage(error)}`);
         attempt += 1;
       } finally {
+        sharedBrowsers.disconnect();
         for (const transfer of this.fileTransfers.values()) transfer.abort();
         this.fileTransfers.clear();
         if (this.helloFollowupTimer) clearTimeout(this.helloFollowupTimer);
@@ -207,6 +209,7 @@ export class RelayConnection {
     try {
       await waitForClose(socket, signal);
     } finally {
+      sharedBrowsers.disconnect();
       clearInterval(heartbeat);
       await this.runtime.closeAllVoice();
     }
@@ -306,6 +309,12 @@ export class RelayConnection {
       return;
     }
     switch (value.type) {
+      case "browser.control": {
+        if(!this.reconciliationReady)return;
+        const source=this.socket;
+        void this.runtime.controlSharedBrowser(value).then(result=>{if(this.socket===source)this.send({type:'browser.result',requestId:value.requestId,result});}).catch(error=>{if(this.socket===source)this.send({type:'browser.result',requestId:value.requestId,error:{code:error instanceof AgentError?error.code:'BROWSER_FAILED',message:error instanceof AgentError?error.message:'浏览器未能完成操作，请检查主机浏览器安装与沙箱支持'}});});
+        return;
+      }
       case "session.history.read": {
         if(!this.reconciliationReady)return;
         const source=this.socket;

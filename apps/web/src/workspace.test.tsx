@@ -1036,3 +1036,22 @@ it.each(["buzhoushan","daylight","official","midnight"] as const)("%s 切主机�
   expect(api.command).not.toHaveBeenCalled();
  } finally {cleanup();setTheme('daylight');window.matchMedia=original;vi.unstubAllGlobals();}
 });
+
+it('collaboration entry points exist only in desktop Buzhoushan and collapse on theme change',async()=>{
+ const original=window.matchMedia;
+ window.matchMedia=(()=>({matches:true,addEventListener:()=>{},removeEventListener:()=>{}})) as unknown as typeof window.matchMedia;
+ try {
+   act(()=>setTheme('buzhoushan'));
+   const view=render(<SessionInspector {...inspectorProps('A')}/>);
+   fireEvent.click(screen.getByRole('button',{name:'浏览器'}));
+   expect(screen.getByRole('region',{name:'协作工作区'})).toBeTruthy();
+   act(()=>setTheme('daylight'));
+   expect(screen.queryByRole('region',{name:'协作工作区'})).toBeNull();
+   expect(screen.queryByRole('button',{name:'浏览器'})).toBeNull();
+   expect(screen.queryByRole('button',{name:'分工'})).toBeNull();
+   act(()=>setTheme('buzhoushan'));expect(screen.queryByRole('region',{name:'协作工作区'})).toBeNull();
+   fireEvent.click(screen.getByRole('button',{name:'浏览器'}));
+   const props=inspectorProps('A');view.rerender(<SessionInspector {...props} detail={{...props.detail,session:{...props.detail.session,state:{...props.detail.session.state,ownership:'external_owned'}}}}/>);
+   expect(screen.queryByRole('region',{name:'协作工作区'})).toBeNull();view.unmount();
+ } finally {window.matchMedia=original;act(()=>setTheme('daylight'));}
+});

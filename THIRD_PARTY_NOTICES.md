@@ -3,6 +3,7 @@
 The MIT license covers this project's original source code. Dependencies and downloaded or bundled runtimes keep their own licenses.
 
 - OpenAI Codex: Apache-2.0; see https://github.com/openai/codex.
+- Playwright Core: Apache-2.0; see https://github.com/microsoft/playwright. Portable agents retain its LICENSE and NOTICE files. Browser executables are installed separately and retain their own licenses.
 - Node.js: MIT and bundled third-party notices; see https://github.com/nodejs/node/blob/main/LICENSE.
 - Manrope and IBM Plex fonts: SIL Open Font License; retain the license files distributed with the font packages.
 - React, Vite, Fastify, Lucide, and other npm dependencies: consult each installed package's license and notices.

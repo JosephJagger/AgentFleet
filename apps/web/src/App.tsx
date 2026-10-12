@@ -1,3 +1,4 @@
+import { CollaborationWorkspace } from "./components/CollaborationWorkspace";
 import { HostSessions } from "./components/HostSessions";
 import { hostSessionGroups, preferredHostSession, rememberedHostSession, rememberHostSession } from "./lib/host-session-selection";
 import { preserveBuzhoushanStream } from "./lib/buzhoushan-stream";
@@ -685,6 +686,8 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   onNewSession?: () => void;
 }) {
   const buzhouDesktop = useBuzhoushanDesktop();
+  const [collaborationTab,setCollaborationTab]=useState<"browser"|"tasks"|null>(null);
+  useEffect(()=>setCollaborationTab(null),[detail?.session.id,detail?.session.state.ownership,buzhouDesktop]);
   const [voiceActive, setVoiceActive] = useState(false);
   const [prompt, setPrompt] = useSessionDraft(draftOwner ?? "preview", detail?.session.id);
   const writingSettings = useCompletionPreferences(draftOwner ?? "preview", detail?.session.id);
@@ -1003,7 +1006,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           }}>{aiBusy ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}<span className="composer-action-label composer-action-label--full" aria-hidden="true">{aiBusy ? t("正在优化…") : t("优化表达")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{aiBusy ? t("优化中") : t("优化")}</span></button>;
 
   return (
-    <aside className="inspector">
+    <aside className={`inspector${buzhouDesktop && collaborationTab ? " inspector--collaboration" : ""}`}>
       <header className="inspector-head">
         <IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton>
         <div className="eyebrow inspector-context" title={displayName(`${session.machineName} · ${agentName(session.provider)} · ${session.projectAlias}`)}>{displayName(session.machineName)} · {agentName(session.provider)} · {displayName(session.projectAlias)}</div>
@@ -1019,6 +1022,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
             </div>
           </div>
         <div className="inspector-head__actions">
+      {buzhouDesktop && managed && <><button type="button" className="button button--quiet" aria-pressed={collaborationTab==='browser'} onClick={()=>setCollaborationTab(tab=>tab==='browser'?null:'browser')}>{t('浏览器')}</button><button type="button" className="button button--quiet" aria-pressed={collaborationTab==='tasks'} onClick={()=>setCollaborationTab(tab=>tab==='tasks'?null:'tasks')}>{t('分工')}</button></>}
       {session.provider !== "claude" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
           <SessionActions>
@@ -1030,6 +1034,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div>
         </div>
       </header>
+      <div className="collaboration-conversation">
       {managed ? (
         <div className={`lease-strip${lease?.isMine ? " lease-strip--mine" : ""}${(!lease || lease.isMine) && detail.releaseManagementSupported && !releaseConfirming ? " lease-strip--ready" : ""}`}>
           <span className="lease-strip__icon"><UserRoundCheck size={16} /></span>
@@ -1249,6 +1254,8 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div>
         </div>
       </form>
+      </div>
+      {buzhouDesktop && collaborationTab && <CollaborationWorkspace key={session.id} session={session} tab={collaborationTab} onTab={setCollaborationTab} onClose={()=>setCollaborationTab(null)}/>}
     </aside>
   );
 }
