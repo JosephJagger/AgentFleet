@@ -674,7 +674,7 @@ export class AgentRuntime {
   }
 
   setTransportGeneration(generation: number | undefined): void {
-    if(this.transportGeneration!==generation)void this.panelVoice?.stop().catch(()=>undefined);
+    if(this.transportGeneration!==generation)this.panelVoice?.suspend();
     this.transportGeneration = generation;
   }
 
@@ -2005,6 +2005,8 @@ export class AgentRuntime {
     if(value.transportGeneration!==this.transportGeneration||value.producerEpoch!==this.producerEpoch||value.appServerEpoch!==this.getAppServerEpoch())throw new AgentError("VOICE_FENCED","Stale panel voice");
     const id=String(value.voiceId??"");if(!/^pvoice_[A-Za-z0-9_-]+$/.test(id))throw new AgentError("VOICE_INVALID","Invalid panel voice identity");
     this.panelVoice??=new PanelVoiceRuntime(this.store,event=>this.callbacks.onVolatile({...event,producerEpoch:this.producerEpoch,appServerEpoch:this.getAppServerEpoch()}));
+    if(value.action==='probe'){this.panelVoice.probe(id,String(value.requestId));return;}
+    if(value.action==='resume'){this.panelVoice.resume(id,value.instanceId);return;}
     if(value.action==='stop')return this.panelVoice.stop(id);
     if(value.action==='heartbeat'){this.panelVoice.heartbeat(id);return;}
     if(value.action==='tool.result'){this.panelVoice.result(id,String(value.requestId),value.result);return;}

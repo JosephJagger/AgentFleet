@@ -96,3 +96,30 @@ test('stop of a rejected start is acknowledged without stopping another call; un
   assert.match(PANEL_REALTIME_PROMPT,/Different projects may run concurrently/);
   assert.doesNotMatch(PANEL_VOICE_INSTRUCTIONS+PANEL_REALTIME_PROMPT,/One outstanding task at a time|Only one dispatched/);
  });
+
+test('transport recovery retains one native writer, blocks dispatch while suspended and requires exact instance',async t=>{
+  let state:unknown;let cb!:AppServerCallbacks;let starts=0;let stops=0;const events:Record<string,unknown>[]=[];
+  const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(v:unknown)=>{state=v;}} as unknown as StateStore;
+  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),callbacks=>{cb=callbacks;return {start:async()=>{starts++;},stop:async()=>{stops++;},getProcessId:()=>123,startPanelVoice:async()=>'thread',updateVoicePreferences:async()=>undefined,reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined};});
+  t.after(()=>runtime.close());await runtime.start('pvoice_live','sdp');
+  runtime.probe('pvoice_live','one');const instanceId=events.at(-1)!.instanceId;
+  assert.equal(events.at(-1)!.recoveryState,'present');
+  runtime.suspend();runtime.suspend();
+  const blocked=await cb.onPanelTool!({action:'dispatch'});assert.match(JSON.stringify(blocked),/no task was dispatched/);
+  assert.equal(events.filter(e=>e.event==='panel_tool').length,0);
+  assert.throws(()=>runtime.resume('pvoice_live','wrong'),/no longer resumable/);
+  runtime.probe('pvoice_live','two');assert.equal(events.at(-1)!.instanceId,instanceId);
+  runtime.resume('pvoice_live',instanceId);assert.equal(starts,1);assert.equal(stops,0);
+  await assert.rejects(runtime.start('pvoice_second','sdp'),/active/);
+  await runtime.stop('pvoice_live');runtime.probe('pvoice_live','three');assert.equal(events.at(-1)!.recoveryState,'absent');
+});
+
+test('repeated reconnect does not extend suspension; unknown process is never reported absent',async t=>{
+  let state:unknown;const events:Record<string,unknown>[]=[];
+  const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(v:unknown)=>{state=v;}} as unknown as StateStore;
+  const runtime=new PanelVoiceRuntime(store,e=>events.push(e),()=>({start:async()=>undefined,stop:async()=>undefined,getProcessId:()=>123,startPanelVoice:async()=>'thread',updateVoicePreferences:async()=>undefined,reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined}));
+  t.after(()=>runtime.close());await runtime.start('pvoice_live','sdp');runtime.probe('pvoice_live','one');const id=events.at(-1)!.instanceId;
+  runtime.suspend();t.mock.timers.enable({apis:['Date'],now:Date.now()+61000});runtime.suspend();
+  assert.throws(()=>runtime.resume('pvoice_live',id),/no longer resumable/);
+  await runtime.stop();state={voiceId:'pvoice_unknown',pid:777};runtime.probe('pvoice_unknown','two');assert.equal(events.at(-1)!.recoveryState,'unknown');
+});

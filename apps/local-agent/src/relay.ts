@@ -196,6 +196,10 @@ export class RelayConnection {
     this.runtime.setTransportGeneration(ticket.transportGeneration);
     socket.addEventListener("message", (event) => this.enqueueInbound(event, socket));
     socket.addEventListener("error", () => closeRelaySocket(socket, 4011, "relay transport error"));
+    socket.addEventListener("close", event => {
+      if(this.socket===socket)this.runtime.setTransportGeneration(undefined);
+      this.logger.info(`relay closed (generation ${ticket.transportGeneration}, code ${event.code}, clean ${event.wasClean})`);
+    });
     this.beginHelloCycle();
     const heartbeat = setInterval(() => {
       if (socket.readyState !== WebSocket.OPEN || !this.reconciliationReady) return;
@@ -636,7 +640,7 @@ export class RelayConnection {
   private sendVolatile(event: Record<string, unknown>): void {
     if(event.type==="voice.event") {
       if(this.reconciliationReady && this.socket?.readyState===WebSocket.OPEN) this.send(event);
-      else if(typeof event.voiceId==="string" && this.pendingVoiceEvents.size<48) this.pendingVoiceEvents.set(`${event.voiceId}:${String(event.event)}`,event);
+      else if(event.event!=="panel_tool" && typeof event.voiceId==="string" && this.pendingVoiceEvents.size<48) this.pendingVoiceEvents.set(`${event.voiceId}:${String(event.event)}`,event);
       return;
     }
     if (!this.reconciliationReady || this.socket?.readyState !== WebSocket.OPEN) return;

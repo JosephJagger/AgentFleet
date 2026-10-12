@@ -7,7 +7,7 @@ import { api } from "../lib/api";
 import { t } from "../i18n";
 
 export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;provider?:'codex'|'claude';managed?:boolean;queuePosition?:number|null;state:string;result:string;link:string;progress?:SessionProgress;historyLimited?:boolean;executionStarted?:boolean|null;error?:{code:string;message:string}|null; }
-type Phase = "idle" | "connecting" | "connected" | "error";
+type Phase = "idle" | "connecting" | "connected" | "recovering" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
 export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks }: { globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
   const [expanded, setExpanded] = useState(false);
@@ -37,7 +37,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const [playBlocked, setPlayBlocked] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
   const generation = useRef(0);
-  const resources = useRef<{ starting?: boolean; signalingReady?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
+  const resources = useRef<{ recovering?: boolean; starting?: boolean; signalingReady?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
   const activeCallback = useRef(onActiveChange);
   activeCallback.current = onActiveChange;
   const cleanup = useRef<(reason?: string) => void>(() => undefined);
@@ -107,7 +107,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       };
       peer.onconnectionstatechange = () => {
         if (!current()) return;
-        if (peer.connectionState === "connected") { clearTimeout(resources.current.timeout); clearTimeout(resources.current.disconnectTimeout); resources.current.disconnectTimeout = undefined; setPhase("connected"); }
+        if (peer.connectionState === "connected") { clearTimeout(resources.current.timeout); clearTimeout(resources.current.disconnectTimeout); resources.current.disconnectTimeout = undefined; setPhase(resources.current.recovering ? "recovering" : "connected"); }
         // Cellular transitions can briefly disconnect ICE without ending the call.
         if (peer.connectionState === "disconnected" && !resources.current.disconnectTimeout) {
           resources.current.disconnectTimeout = setTimeout(() => fail(t("语音音频连接中断，麦克风已关闭，请重新开始"), "AUDIO_DISCONNECTED"), 8_000);
@@ -143,6 +143,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
               socket.send(JSON.stringify({ type: "heartbeat" }));
             }, 15_000);
           } else if (value.type === "answer" && value.sdp) await peer.setRemoteDescription({ type: "answer", sdp: value.sdp });
+          else if(globalMachineId && value.type==="recovering") { resources.current.recovering=true; setPhase("recovering"); }
+          else if(globalMachineId && value.type==="recovered") { resources.current.recovering=false; setPhase(peer.connectionState==="connected"?"connected":"connecting"); }
           else if(value.type==="transcript" && ["user","assistant"].includes(String(value.role)) && typeof value.text==="string") {
             setTranscript(previous=>{
               const last=previous.at(-1);const role=value.role!;
@@ -166,8 +168,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       fail(denied ? t("请允许麦克风访问后重试") : error instanceof Error ? error.message : t("原生实时语音暂不可用"));
     }
   }
-  const active = phase === "connecting" || phase === "connected";
-  const status = active ? t(phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
+  const active = phase === "connecting" || phase === "connected" || phase === "recovering";
+  const status = active ? t(phase === "recovering" ? "正在恢复主机连接，核验原通话中（最多 60 秒）" : phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
   const callPanel = expanded && <div ref={panel} style={dragging.style} id={popoverId} className={`native-voice__popover${globalMachineId ? " native-voice__popover--global" : ""}`} role="region" aria-label={t("原生实时语音")}>
     <div className="native-voice__head voice-drag-handle" {...dragging.handle}><strong>{t(globalMachineId ? "面板语音总控" : "语音通话")}</strong><button type="button" className="native-voice__close" aria-label={t("收起语音控制")} onClick={() => { setExpanded(false); trigger.current?.focus(); }}><X size={16} /></button></div>
     <div className={`native-voice__orb${active && !muted ? " native-voice__orb--live" : ""}`} aria-hidden="true">{phase === "connecting" && <LoaderCircle className="spin" size={24} />}</div>

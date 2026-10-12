@@ -56,13 +56,16 @@ export class PanelVoiceService {
   get(id:string) {return this.db.get<PanelCall>("SELECT * FROM panel_voice_calls WHERE voice_id=?",id);}
   pending() {return this.db.all<PanelCall>("SELECT * FROM panel_voice_calls WHERE state<>'closed'");}
   state(id:string,state:string) {this.db.run("UPDATE panel_voice_calls SET state=? WHERE voice_id=?",state,id);}
+  binding(id:string,patch:Record<string,unknown>) {
+    const call=this.get(id);if(call)this.db.run("UPDATE panel_voice_calls SET binding_json=? WHERE voice_id=?",JSON.stringify({...JSON.parse(call.binding_json),...patch}),id);
+  }
   recordFailure(id:string,message:unknown) {
     const code=typeof message==='string'&&/^VOICE_(?:HTTP_(?:400|401|403|404|408|409|429|500|502|503|504)|AUTH|LIMIT|SDP|TIMEOUT|SIDEBAND|BUSY|FENCED|TARGET_CHANGED|UNAVAILABLE|POLICY_NOT_PROVEN|POLICY_UNVERIFIED|PROCESS_UNVERIFIED|CONFIG|NATIVE_ERROR)$/.test(message)?message:'VOICE_NATIVE_ERROR';
     this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.failureCode',?) WHERE voice_id=? AND json_extract(binding_json,'$.failureCode') IS NULL",code,id);
     return code;
   }
   recordCloseReason(id:string,reason:unknown) {
-    const code=typeof reason==='string'&&['USER_HANGUP','PAGE_HIDDEN','PAGE_LEFT','USER_LOGOUT','OTHER_CALL_STARTED','CLIENT_START_FAILED','AUDIO_DISCONNECTED','AUDIO_FAILED','CONNECT_TIMEOUT','SIGNAL_INVALID','SIGNAL_FAILED','CLIENT_DISPOSED','SIGNAL_CLOSED','NATIVE_CLOSED','HOST_DISCONNECTED','OWNER_EXPIRED','SERVER_ERROR'].includes(reason)?reason:'SERVER_ERROR';
+    const code=typeof reason==='string'&&['USER_HANGUP','PAGE_HIDDEN','PAGE_LEFT','USER_LOGOUT','OTHER_CALL_STARTED','CLIENT_START_FAILED','AUDIO_DISCONNECTED','AUDIO_FAILED','CONNECT_TIMEOUT','SIGNAL_INVALID','SIGNAL_FAILED','CLIENT_DISPOSED','SIGNAL_CLOSED','NATIVE_CLOSED','HOST_DISCONNECTED','HOST_RECOVERY_TIMEOUT','VOICE_PROCESS_CHANGED','OWNER_EXPIRED','SERVER_ERROR'].includes(reason)?reason:'SERVER_ERROR';
     this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.closeReason',?,'$.closeRequestedAt',?) WHERE voice_id=? AND json_extract(binding_json,'$.closeReason') IS NULL",code,nowIso(),id);
   }
   closeOrphans() {this.db.run("UPDATE panel_voice_calls SET state='closed' WHERE state<>'closed'");}

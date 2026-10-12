@@ -301,3 +301,18 @@ for(const action of ['logout','pagehide','unmount'] as const) it(`${action} rele
  expect(socket.sent.at(-1)).toMatchObject({type:'stop',reason:action==='logout'?'USER_LOGOUT':action==='pagehide'?'PAGE_LEFT':'CLIENT_DISPOSED'});
  view.unmount();expect(socket.sent.filter(x=>x.type==='stop')).toHaveLength(1);
 });
+
+it('global host recovery preserves microphone, peer and signaling without repeating start',async()=>{
+  const active=vi.fn();render(<NativeVoicePanel sessionId="panel" globalMachineId="host" canStart onActiveChange={active}/>);
+  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  const socket=Socket.all[0]!;act(()=>socket.receive({type:'ready'}));
+  await act(async()=>socket.receive({type:'answer',sdp:'v=0\r\n'}));
+  act(()=>socket.receive({type:'recovering'}));
+  expect(screen.getByText('正在恢复主机连接，核验原通话中（最多 60 秒）')).toBeTruthy();
+  expect(track.stop).not.toHaveBeenCalled();expect(Peer.all[0]!.closed).toBe(false);expect(socket.readyState).toBe(1);
+  act(()=>Peer.all[0]!.onconnectionstatechange?.());
+  expect(screen.getByText('正在恢复主机连接，核验原通话中（最多 60 秒）')).toBeTruthy();
+  act(()=>socket.receive({type:'recovered'}));expect(screen.getByText('语音已连接，直接与 Codex 对话')).toBeTruthy();
+  expect(socket.sent.filter(v=>v.type==='panel.start')).toHaveLength(1);expect(Peer.all).toHaveLength(1);expect(active).toHaveBeenLastCalledWith(true);
+  act(()=>socket.receive({type:'error',message:'语音恢复超时'}));expect(track.stop).toHaveBeenCalled();expect(active).toHaveBeenLastCalledWith(false);
+});

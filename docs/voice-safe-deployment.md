@@ -89,3 +89,42 @@ from host operation success. An `agent.update` result of `phase: current` means
 only that the check offered no newer release; it is not a completed installation.
 Previous health verification stays in dated update history. Equal installed and
 running versions are shown once, and update targets only during active updates.
+
+## Global voice host transport recovery (Agent 0.30.99)
+
+A temporary host relay replacement does not by itself prove the dedicated global
+voice process ended. Agent 0.30.99 suspends global tool admission and retains that
+exact native call for a 60-second recovery window. Repeated socket attempts do not
+extend the window. The existing native session voice behavior is unchanged.
+
+The panel displays “正在恢复主机连接，核验原通话中（最多 60 秒）”. It retains the
+browser microphone, WebRTC peer and authenticated signaling socket. After host
+reconciliation, the control plane issues a fresh challenge bound to the current
+transport generation. Recovery requires the original producer/app-server epochs,
+per-call random instance ID, a still-live dedicated process with its original PID
+and thread, and a still-authorized browser owner. Only then is the transport
+binding advanced. There is no new SDP/start request, lease takeover, or replay of
+voice task dispatches. Stale sockets and stale/duplicate challenge responses remain
+fenced. Tool results interrupted in flight are unknown, not a reason to retry work;
+query existing task status after recovery.
+
+Timeout closes browser resources; native cleanup is swept every five seconds.
+The panel checks its deadline on the ten-second maintenance sweep, so the error
+notice can arrive shortly after the 60-second recovery window. Hangup, revoked
+ownership, changed native epochs, or a confirmed absent process cannot resume.
+An unconfirmed native writer remains `closing` and continues to block publication
+until a live host confirms absence or acknowledges stop. Transport loss alone is
+never used to clear that protection for recovery-capable calls. Recovery state is
+held in memory while the durable call remains `active` (or `closing` for cleanup),
+so the existing deployment admission guard continues to count it.
+
+Both the new control plane and Agent 0.30.99 are required; old Agents cannot supply
+continuity proof. Apply the Agent update only after the current call naturally
+ends and start a new call from a refreshed panel. Browser signaling loss, browser
+refresh/exit, OS suspension, or actual native audio/process termination are outside
+this recovery boundary. Those still end the call and require an explicit new call.
+
+Diagnostic logs record transport generation, numeric WebSocket close code and
+whether the server superseded the connection; host logs additionally record the
+WebSocket clean-close flag. They deliberately omit tickets and free-form native
+error text. A reconnect alone does not identify a network fault.

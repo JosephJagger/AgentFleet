@@ -8,7 +8,7 @@ import { AgentError } from "./errors.js";
 import type { StateStore } from "./store.js";
 
 type PanelClient = Pick<CodexAppServer, 'start'|'stop'|'getProcessId'|'startPanelVoice'|'reportPanelVoice'|'stopVoice'|'updateVoicePreferences'>;
-interface Call { id: string; client: PanelClient; threadId?: string; directory?: string; lastSeen: number; cancelled: boolean; ready: Promise<void>; }
+interface Call { instanceId: string; pid?: number; suspendedUntil?: number; id: string; client: PanelClient; threadId?: string; directory?: string; lastSeen: number; cancelled: boolean; ready: Promise<void>; }
 
 /** A dedicated ephemeral native writer, separate from all project sessions. */
 export class PanelVoiceRuntime {
@@ -21,7 +21,7 @@ export class PanelVoiceRuntime {
   constructor(private store: StateStore, private emit: (event: Record<string, unknown>) => void,
     private factory: (callbacks: AppServerCallbacks) => PanelClient = callbacks => new CodexAppServer(callbacks)) {
     this.watchdog = setInterval(() => {
-      if (this.current && Date.now() - this.current.lastSeen > 120000) void this.stop().catch(() => undefined);
+      if (this.current && (Date.now() - this.current.lastSeen > 120000 || this.current.suspendedUntil !== undefined && Date.now() >= this.current.suspendedUntil)) void this.stop().catch(() => undefined);
     }, 5000);
     this.watchdog.unref();
   }
@@ -32,7 +32,7 @@ export class PanelVoiceRuntime {
       findManagedThread: () => undefined, findProject: () => undefined, onEvent: async () => undefined,
       onVolatile: event => {
         if (event.type !== 'voice.event' || this.current?.id !== id || this.current.cancelled) return;
-        this.emit({ type: 'voice.event', voiceId: id, ...event.payload });
+        this.emit({ type: 'voice.event', voiceId: id, ...event.payload, instanceId: this.current.instanceId });
         // Native audio closure does not dispose the dedicated app-server process.
         // Do not await here: stopVoice drains the notification currently being handled.
         if (event.payload.event === 'closed' || event.payload.event === 'error')
@@ -44,6 +44,7 @@ export class PanelVoiceRuntime {
       onExit: async () => { if (this.current?.id === id) void this.stop(id).catch(() => undefined); },
       onPanelTool: async args => {
         if (this.current?.id !== id || this.current.cancelled) throw new AgentError('VOICE_FENCED', 'Call ended');
+        if (this.current.suspendedUntil !== undefined) return { error: 'Voice control is recovering; no task was dispatched. Query status after recovery before retrying.' };
         const requestId = randomUUID();
         return new Promise(resolve => {
           const timer = setTimeout(() => { this.pending.delete(requestId); resolve({ error: 'Result unknown; query status before retrying dispatch.' }); }, typeof args==='object'&&args!==null&&'action' in args&&args.action==='recover'&&!this.current?.threadId?5000:30000);
@@ -52,13 +53,14 @@ export class PanelVoiceRuntime {
         });
       },
     });
-    const call: Call = { id, client, lastSeen: Date.now(), cancelled: false, ready: Promise.resolve() };
+    const call: Call = { instanceId: randomUUID(), id, client, lastSeen: Date.now(), cancelled: false, ready: Promise.resolve() };
     this.current = call;
     call.ready = (async () => {
       call.directory = await mkdtemp(join(tmpdir(), 'agentfleet-panel-voice-'));
       await this.store.setPanelVoiceRuntime({ voiceId: id });
       if (call.cancelled) return;
       await client.start();
+      const pid=client.getProcessId();if(pid)call.pid=pid;
       await this.store.setPanelVoiceRuntime({ voiceId: id, ...(client.getProcessId() ? { pid: client.getProcessId()! } : {}) });
       if (call.cancelled) return;
       call.threadId = await client.startPanelVoice(call.directory, id, sdp, voice, preferences);
@@ -70,6 +72,32 @@ export class PanelVoiceRuntime {
     }
   }
 
+  /** Retain this exact native call for a bounded transport interruption. Never start a replacement. */
+  suspend() {
+    const call = this.current;
+    if (!call || call.cancelled || call.suspendedUntil !== undefined) return;
+    call.suspendedUntil = Date.now() + 60000;
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      pending.resolve({ error: 'Connection changed; dispatch outcome may be unknown. Query task status after recovery; do not repeat dispatch.' });
+    }
+    this.pending.clear();
+  }
+  probe(id: string, requestId: string) {
+    const call = this.current;
+    const live = call?.id === id && !call.cancelled && !!call.threadId && !!call.pid && call.pid === call.client.getProcessId();
+    this.emit({type:'voice.event',voiceId:id,event:'recovery',requestId,
+      recoveryState:live?'present':this.store.snapshot().panelVoiceRuntime?.voiceId === id?'unknown':'absent',
+      ...(live?{instanceId:call!.instanceId}: {})});
+  }
+  resume(id: string, instanceId: unknown) {
+    const call = this.current;
+    if (!call || call.id !== id || call.instanceId !== instanceId || call.cancelled || !call.threadId || (!call.pid || call.pid !== call.client.getProcessId())
+      || call.suspendedUntil !== undefined && Date.now() >= call.suspendedUntil)
+      throw new AgentError('VOICE_FENCED', 'Original voice process is no longer resumable');
+    delete call.suspendedUntil;
+    call.lastSeen = Date.now();
+  }
   heartbeat(id: string) { if (this.current?.id === id) this.current.lastSeen = Date.now(); }
   result(id: string, requestId: string, result: unknown) {
     if (this.current?.id !== id || this.current.cancelled) return;
