@@ -620,7 +620,7 @@ export interface RuntimeReleaseStatus {
   canControl?: boolean;
   configured: boolean; paused: boolean; workerOnline: boolean; phase: string; message: string;
   latestVersion?: string; lastCheckedAt?: string; nextCheckAt?: string;
-  target?: { version: string }; previous?: { version: string };
+  target?: { version: string; schemaHash?: string }; previous?: { version: string };
   checks: { name: string; state: string; detail: string }[];
   history: { at: string; version: string; result: string; message: string }[];
 }

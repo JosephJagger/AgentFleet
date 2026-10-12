@@ -13,7 +13,24 @@ it("shows why a release was blocked instead of claiming the latest version is ru
   render(<RuntimeReleasePanel machine={machine} />);
   expect(await screen.findByText("需要适配：协议不兼容，原目标未改变")).toBeTruthy();
   expect(screen.getByText("0.153.4")).toBeTruthy(); expect(screen.getByText("0.153.2")).toBeTruthy();
-  expect(screen.getByText(/已运行当前托管目标/)).toBeTruthy();
+  expect(screen.getByText(/等待主机核验/)).toBeTruthy();
+  expect(screen.queryByText(/已运行当前托管目标/)).toBeNull();
+});
+it("confirms the managed target only after both the runtime protocol and backend compatibility match", async () => {
+  const schemaHash = "a".repeat(64);
+  vi.mocked(api.runtimeRelease).mockResolvedValue({ ...state, target: { version: machine.codexVersion, schemaHash } });
+  render(<RuntimeReleasePanel machine={{ ...machine, schemaHash: `sha256:${schemaHash}` }} />);
+
+  expect(await screen.findByText(/已运行当前托管目标/)).toBeTruthy();
+  expect(screen.queryByText(/等待主机核验/)).toBeNull();
+});
+it.each(["unknown", "incompatible"] as const)("does not claim a matching version and protocol are verified when compatibility is %s", async (compatibility) => {
+  const schemaHash = "a".repeat(64);
+  vi.mocked(api.runtimeRelease).mockResolvedValue({ ...state, target: { version: machine.codexVersion, schemaHash } });
+  render(<RuntimeReleasePanel machine={{ ...machine, compatibility, schemaHash: `sha256:${schemaHash}` }} />);
+
+  expect(await screen.findByText(/等待主机核验/)).toBeTruthy();
+  expect(screen.queryByText(/已运行当前托管目标/)).toBeNull();
 });
 it("rollback requires an in-page confirmation and invokes the rollback action only once", async () => {
   render(<RuntimeReleasePanel machine={machine} />); fireEvent.click(await screen.findByRole("button", { name: "回退托管目标" }));

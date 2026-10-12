@@ -1,4 +1,5 @@
 import { CollaborationWorkspace } from "./components/CollaborationWorkspace";
+import { matchesRuntimeTarget, runtimeRollout } from "./lib/runtime-rollout";
 import { HostSessions } from "./components/HostSessions";
 import { hostSessionGroups, preferredHostSession, rememberedHostSession, rememberHostSession } from "./lib/host-session-selection";
 import { preserveBuzhoushanStream } from "./lib/buzhoushan-stream";
@@ -160,11 +161,6 @@ function shortId(value?: string | null) {
 
 function normalizedSchemaHash(value?: string | null) {
   return value?.toLowerCase().replace(/^sha256:/, "") ?? "";
-}
-
-function shortSchemaHash(value?: string | null) {
-  const normalized = normalizedSchemaHash(value);
-  return normalized ? `${normalized.slice(0, 10)}…${normalized.slice(-8)}` : t("未上报");
 }
 
 function validationTime(value: string) {
@@ -353,17 +349,20 @@ export function MachineRail({ machines, sessions, connected, selectedId, onSelec
 }
 
 export function CompatibilityProfileCard({ machine, profile }: { machine: Machine; profile: CodexCompatibilityProfile }) {
-  const schemaMatches = normalizedSchemaHash(machine.schemaHash) !== "" &&
-    normalizedSchemaHash(machine.schemaHash) === normalizedSchemaHash(profile.schemaHash);
-  const compatible = machine.compatibility === "compatible" && schemaMatches && profile.validationStatus === "verified";
-  const pending = machine.compatibility === "unknown" || profile.validationStatus === "unknown";
-  const tone = compatible ? "verified" : pending ? "pending" : "blocked";
-  const title = compatible ? t("兼容档案已验证") : pending ? t("等待兼容验证") : t("未通过兼容验证");
+  const compatible = machine.compatibility === "compatible";
+  const pending = machine.compatibility === "unknown";
+  const readOnly = machine.compatibility === "degraded_read_only";
+  const tone = compatible ? "verified" : pending || readOnly ? "pending" : "blocked";
+  const title = compatible ? t("当前运行版本兼容") : pending ? t("等待兼容验证") : readOnly ? t("当前运行时只读") : t("未通过兼容验证");
   const summary = compatible
-    ? t("Agent 实际使用的运行时与控制面固定档案一致，远程写入已启用。")
-    : machine.compatibilityReason ?? t("Agent 运行时尚未与控制面兼容档案匹配。");
+    ? t("当前版本已通过对应协议验证，升级进度单独显示。")
+    : machine.compatibilityReason ? systemText(machine.compatibilityReason) : pending ? t("等待主机上报运行版本与协议验证结果。") : t("请查看当前运行版本的验证依据。");
+  const targetVerified = profile.validationStatus === "verified";
+  const atTarget = compatible && targetVerified && matchesRuntimeTarget(machine, profile.managedCodexVersion, profile.schemaHash);
+  const comparison = !targetVerified ? t("目标待验证") : atTarget ? t("已达目标") : machine.codexVersion === profile.managedCodexVersion ? t("协议待核验") : t("版本不同");
+  const rollout = runtimeRollout(machine, profile.managedCodexVersion, profile.schemaHash, targetVerified);
   const [evidenceOpen, setEvidenceOpen] = useState(!compatible);
-  useEffect(() => setEvidenceOpen(!compatible), [machine.id, compatible, profile.profileVersion]);
+  useEffect(() => setEvidenceOpen(!compatible), [machine.id, compatible]);
 
   return (
     <section className={`compatibility-card compatibility-card--${tone}`} aria-label={t("Codex 兼容档案")}>
@@ -372,42 +371,48 @@ export function CompatibilityProfileCard({ machine, profile }: { machine: Machin
           {compatible ? <ShieldCheck size={19} /> : <AlertTriangle size={18} />}
         </span>
         <div className="compatibility-card__copy">
-          <div className="compatibility-card__title"><strong>{title}</strong><span>{profile.profileVersion}</span></div>
+          <div className="compatibility-card__title"><strong>{title}</strong></div>
           <p>{summary}</p>
         </div>
         <div className="compatibility-card__stamp">
-          <span>{t("最后验证")}</span>
-          <strong>{validationTime(profile.lastValidatedAt)}</strong>
+          <span>{t("最近上报")}</span>
+          <strong>{machine.lastSeenAt ? validationTime(machine.lastSeenAt) : t("未上报")}</strong>
         </div>
       </div>
-      <div className="schema-trace" aria-label={schemaMatches ? t("Agent schema 与控制面档案一致") : t("Agent schema 与控制面档案不一致")}>
+      <div className="schema-trace" aria-label={t("当前运行与托管目标")}>
         <div className="schema-trace__endpoint">
           <span>{t("Agent 实际使用")}</span>
           <strong>Codex {machine.codexVersion}</strong>
-          <code title={machine.schemaHash ?? undefined}>{shortSchemaHash(machine.schemaHash)}</code>
         </div>
-        <div className={`schema-trace__link schema-trace__link--${schemaMatches ? "match" : "mismatch"}`}>
+        <div className={`schema-trace__link schema-trace__link--${atTarget && compatible ? "match" : "pending"}`}>
           <span />
-          {schemaMatches ? <Check size={14} /> : <AlertTriangle size={14} />}
+          {atTarget && compatible ? <Check size={14} /> : <ArrowRight size={14} />}
           <span />
-          <small>{schemaMatches ? t("SHA-256 一致") : t("SHA-256 不一致")}</small>
+          <small>{comparison}</small>
         </div>
         <div className="schema-trace__endpoint schema-trace__endpoint--target">
           <span>{t("托管目标")}</span>
           <strong>Codex {profile.managedCodexVersion}</strong>
-          <code title={profile.schemaHash}>{shortSchemaHash(profile.schemaHash)}</code>
         </div>
+      </div>
+      <div className={`compatibility-card__rollout${rollout.failed ? " compatibility-card__rollout--failed" : ""}`} aria-label={t("托管更新状态")}>
+        <strong>{rollout.label}</strong>
+        {rollout.error && <p>{systemText(rollout.error)}</p>}
+        {machine.reachability !== "live" && <p>{t("主机离线，以上为最后上报状态，尚未确认当前版本。")}</p>}
+        {machine.reachability === "live" && machine.codexProfile?.source !== "host" && !atTarget && <p>{t("可在主机设置中检查并更新；先更新连接服务，再在空闲时应用 Codex。")}</p>}
       </div>
       <p className="compatibility-card__runtime-note">
         {t("此处显示 AgentFleets 实际使用的 Codex。来源为宿主机时会直接使用本机程序；来源为托管时使用独立运行时，两者版本可以不同。")}</p>
       <details className="compatibility-evidence" open={evidenceOpen} onToggle={(event) => setEvidenceOpen(event.currentTarget.open)}>
         <summary>{t("查看验证依据")}<ChevronRight size={15} /></summary>
         <dl>
-          <div><dt>Agent App Server schema</dt><dd><code>{machine.schemaHash || t("未上报")}</code></dd></div>
-          <div><dt>{t("控制面期望 schema")}</dt><dd><code>sha256:{normalizedSchemaHash(profile.schemaHash) || t("未发布")}</code></dd></div>
-          <div><dt>{t("版本范围")}</dt><dd>Codex ≥ {profile.minimumCodexVersion}{locale() === "en" ? " " : ""}{t("，且 schema 必须完全一致")}</dd></div>
+          <div><dt>{t("当前运行协议摘要")}</dt><dd><code>{machine.schemaHash || t("未上报")}</code></dd></div>
+          <div><dt>{t("托管目标协议摘要")}</dt><dd><code>sha256:{normalizedSchemaHash(profile.schemaHash) || t("未发布")}</code></dd></div>
+          <div><dt>{t("兼容验证规则")}</dt><dd>{t("按当前运行版本对应的已验证协议核验；与新目标版本不同不代表不兼容。")}</dd></div>
+          <div><dt>{t("摘要说明")}</dt><dd>{t("这里是接口协议摘要，不是安装包文件校验结果。")}</dd></div>
+          <div><dt>{t("托管目标档案")}</dt><dd><code>{profile.profileVersion}</code></dd></div>
+          <div><dt>{t("托管目标验证时间")}</dt><dd>{targetVerified ? validationTime(profile.lastValidatedAt) : t("目标待验证")}</dd></div>
           <div><dt>{t("自动升级规则")}</dt><dd>{t("仅在新版本验证通过并晋升为托管目标后自动切换")}</dd></div>
-          <div><dt>{t("主机最近核验")}</dt><dd>{timeAgo(machine.lastSeenAt)}</dd></div>
         </dl>
       </details>
     </section>

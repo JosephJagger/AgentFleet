@@ -160,43 +160,176 @@ describe("SessionList", () => {
 });
 
 describe("CompatibilityProfileCard", () => {
-  it("shows the promoted profile and exact schema evidence", () => {
-    const schemaHash = "d3eace08be5dca386bfd1f1e8df650058b4113f1e10870a284d775d75517576a";
-    const machine: Machine = {
-      id: "machine-compatible",
-      name: "build-host",
-      hostname: "build-host",
-      os: "ubuntu 24.04",
-      arch: "x64",
-      identity: "paired",
-      reachability: "live",
-      compatibility: "compatible",
-      capacity: "idle",
-      credentialProtectionLevel: "software_protected",
-      agentVersion: "0.13.0",
-      codexVersion: "0.153.2",
-      schemaHash: `sha256:${schemaHash}`,
-      lastSeenAt: new Date().toISOString(),
-      projects: [],
-    };
-    const profile: CodexCompatibilityProfile = {
-      profileVersion: "codex-v2-2026.09.05",
-      validationStatus: "verified",
-      protocol: "codex-app-server-v2",
-      minimumCodexVersion: "0.153.2",
-      managedCodexVersion: "0.153.2",
-      schemaHash,
-      lastValidatedAt: "2026-09-05T02:30:00.000Z",
-      upgradePolicy: "when-promoted",
-    };
+  const previousSchema = "81a88c04" + "a".repeat(48) + "ce54c054";
+  const targetSchema = "0bf5254b" + "b".repeat(48) + "82a7f857";
+  const machine: Machine = {
+    id: "machine-compatible",
+    name: "build-host",
+    hostname: "build-host",
+    os: "ubuntu 24.04",
+    arch: "x64",
+    identity: "paired",
+    reachability: "live",
+    compatibility: "compatible",
+    capacity: "idle",
+    credentialProtectionLevel: "software_protected",
+    agentVersion: "0.30.94",
+    codexVersion: "0.160.1",
+    schemaHash: `sha256:${previousSchema}`,
+    codexProfile: { source: "managed" },
+    lastSeenAt: "2026-10-12T05:13:00.000Z",
+    projects: [],
+  };
+  const profile: CodexCompatibilityProfile = {
+    profileVersion: "codex-v2-2026.10.12",
+    validationStatus: "verified",
+    protocol: "codex-app-server-v2",
+    minimumCodexVersion: "0.160.1",
+    managedCodexVersion: "0.162.1",
+    schemaHash: targetSchema,
+    lastValidatedAt: "2026-10-12T05:06:00.000Z",
+    upgradePolicy: "when-promoted",
+  };
 
+  it("keeps an accepted previous runtime compatible after the managed target is promoted", () => {
     render(<CompatibilityProfileCard machine={machine} profile={profile} />);
-    expect(screen.getByText("兼容档案已验证")).toBeTruthy();
-    expect(screen.getByText("SHA-256 一致")).toBeTruthy();
-    expect(screen.getByText("codex-v2-2026.09.05")).toBeTruthy();
-    expect(screen.getAllByText(new RegExp(schemaHash)).length).toBe(2);
-    expect(screen.getByText(/晋升为托管目标后自动切换/)).toBeTruthy();
+
+    expect(screen.getByText("当前运行版本兼容")).toBeTruthy();
+    expect(screen.getByText("Codex 0.160.1")).toBeTruthy();
+    expect(screen.getByText("Codex 0.162.1")).toBeTruthy();
+    expect(screen.getByText("版本不同")).toBeTruthy();
+    expect(within(screen.getByLabelText("托管更新状态")).getByText("等待主机检查更新")).toBeTruthy();
+    expect(screen.queryByText("未通过兼容验证")).toBeNull();
+    expect(screen.queryByText("SHA-256 不一致")).toBeNull();
+    expect(screen.getByLabelText("Codex 兼容档案").classList.contains("compatibility-card--blocked")).toBe(false);
+  });
+
+  it("shows that the host reached the target with exact normalized protocol evidence", () => {
+    render(<CompatibilityProfileCard machine={{ ...machine, codexVersion: "0.162.1", schemaHash: `sha256:${targetSchema}` }} profile={profile} />);
+
+    expect(screen.getByText("当前运行版本兼容")).toBeTruthy();
+    expect(screen.getByText("已达目标")).toBeTruthy();
+    expect(screen.getByText(profile.profileVersion)).toBeTruthy();
+    expect(screen.getAllByText(new RegExp(targetSchema)).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/来源为宿主机时会直接使用本机程序/)).toBeTruthy();
+  });
+
+  it("preserves real backend incompatibility when the reported target version has the wrong schema", () => {
+    render(<CompatibilityProfileCard machine={{
+      ...machine, codexVersion: "0.162.1", compatibility: "incompatible",
+      compatibilityReason: "当前运行版本的协议摘要未被兼容档案接受",
+    }} profile={profile} />);
+
+    expect(screen.getByText("未通过兼容验证")).toBeTruthy();
+    expect(screen.getByText("当前运行版本的协议摘要未被兼容档案接受")).toBeTruthy();
+    expect(screen.getByText("协议待核验")).toBeTruthy();
+    expect(screen.queryByText("当前运行版本兼容")).toBeNull();
+    expect(screen.queryByText("已达目标")).toBeNull();
+  });
+
+  it("does not invent a validation result for a host whose compatibility is unknown", () => {
+    render(<CompatibilityProfileCard machine={{ ...machine, compatibility: "unknown", schemaHash: null }} profile={profile} />);
+
+    expect(screen.getByText("等待兼容验证")).toBeTruthy();
+    expect(screen.queryByText("当前运行版本兼容")).toBeNull();
+    expect(screen.queryByText("未通过兼容验证")).toBeNull();
+  });
+
+  it.each(["unknown", "incompatible"] as const)("does not claim the target is reached before the reported matching runtime is compatible (%s)", (compatibility) => {
+    render(<CompatibilityProfileCard machine={{ ...machine, compatibility, codexVersion: "0.162.1", schemaHash: `sha256:${targetSchema}` }} profile={profile} />);
+
+    expect(within(screen.getByLabelText("当前运行与托管目标")).getByText("协议待核验")).toBeTruthy();
+    expect(within(screen.getByLabelText("托管更新状态")).getByText("等待主机核验")).toBeTruthy();
+    expect(screen.queryByText("已达目标")).toBeNull();
+    expect(screen.queryByText("已运行当前托管目标")).toBeNull();
+  });
+
+  it("keeps current compatibility independent from an unverified managed target", () => {
+    render(<CompatibilityProfileCard machine={machine} profile={{ ...profile, validationStatus: "unknown" }} />);
+
+    expect(screen.getByText("当前运行版本兼容")).toBeTruthy();
+    expect(within(screen.getByLabelText("当前运行与托管目标")).getByText("目标待验证")).toBeTruthy();
+    expect(screen.queryByText("未通过兼容验证")).toBeNull();
+  });
+
+  it("does not describe a security-degraded runtime as writable or compatible", () => {
+    render(<CompatibilityProfileCard machine={{ ...machine, compatibility: "degraded_read_only", compatibilityReason: "凭据保护降级，仅允许读取" }} profile={profile} />);
+
+    expect(screen.getByText("当前运行时只读")).toBeTruthy();
+    expect(screen.getByText("凭据保护降级，仅允许读取")).toBeTruthy();
+    expect(screen.queryByText("当前运行版本兼容")).toBeNull();
+    expect(screen.queryByText(/远程写入已启用/)).toBeNull();
+  });
+
+  it("reports a pending Agent update separately from current runtime compatibility", () => {
+    render(<CompatibilityProfileCard machine={{ ...machine, codexProfile: {
+      source: "managed", agentUpdateTarget: "0.30.95", agentUpdateState: "downloading",
+    } }} profile={profile} />);
+
+    expect(screen.getByText("当前运行版本兼容")).toBeTruthy();
+    expect(within(screen.getByLabelText("托管更新状态")).getByText("先更新连接服务")).toBeTruthy();
+    expect(screen.queryByText("未通过兼容验证")).toBeNull();
+  });
+
+  it("reports a confirmed runtime idle wait without misclassifying its old protocol", () => {
+    render(<CompatibilityProfileCard machine={{ ...machine, codexProfile: {
+      source: "managed", runtimeUpdateTarget: "0.162.1", runtimeUpdateState: "waiting_for_idle",
+    } }} profile={profile} />);
+
+    expect(screen.getByText("当前运行版本兼容")).toBeTruthy();
+    expect(within(screen.getByLabelText("托管更新状态")).getByText("等待任务或通话结束")).toBeTruthy();
+  });
+
+  it("shows the current target's failed update while retaining accepted running compatibility", () => {
+    render(<CompatibilityProfileCard machine={{ ...machine, codexProfile: {
+      source: "managed", runtimeUpdateTarget: "0.162.1", runtimeUpdateState: "failed", runtimeUpdateError: "下载校验失败，已保留原运行时",
+    } }} profile={profile} />);
+
+    expect(screen.getByText("当前运行版本兼容")).toBeTruthy();
+    const update = within(screen.getByLabelText("托管更新状态"));
+    expect(update.getByText("本机更新未完成，原运行时保留")).toBeTruthy();
+    expect(update.getByText("下载校验失败，已保留原运行时")).toBeTruthy();
+    expect(screen.queryByText("未通过兼容验证")).toBeNull();
+  });
+
+  it("does not attribute a previous target's failed update to the newly promoted target", () => {
+    render(<CompatibilityProfileCard machine={{ ...machine, codexProfile: {
+      source: "managed", runtimeUpdateTarget: "0.160.1", runtimeUpdateState: "failed", runtimeUpdateError: "旧目标下载失败",
+    } }} profile={profile} />);
+
+    const update = within(screen.getByLabelText("托管更新状态"));
+    expect(update.getByText("等待主机检查更新")).toBeTruthy();
+    expect(update.queryByText("本机更新未完成，原运行时保留")).toBeNull();
+    expect(update.queryByText("旧目标下载失败")).toBeNull();
+  });
+
+  it.each(["waiting_for_idle", undefined])("ignores a failed Agent target older than the running Agent when runtime progress is %s", (runtimeUpdateState) => {
+    render(<CompatibilityProfileCard machine={{ ...machine, agentVersion: "0.30.95", codexProfile: {
+      source: "managed", agentUpdateTarget: "0.30.94", agentUpdateState: "failed", agentUpdateError: "旧版连接服务安装失败",
+      ...(runtimeUpdateState ? { runtimeUpdateTarget: "0.162.1", runtimeUpdateState } : {}),
+    } }} profile={profile} />);
+
+    const update = within(screen.getByLabelText("托管更新状态"));
+    expect(update.getByText(runtimeUpdateState ? "等待任务或通话结束" : "等待主机检查更新")).toBeTruthy();
+    expect(update.queryByText("连接服务更新未完成")).toBeNull();
+    expect(update.queryByText("旧版连接服务安装失败")).toBeNull();
+    expect(screen.getByText("当前运行版本兼容")).toBeTruthy();
+  });
+
+  it("distinguishes self-installed runtimes from managed update candidates", () => {
+    render(<CompatibilityProfileCard machine={{ ...machine, codexProfile: { source: "host" } }} profile={profile} />);
+
+    const update = within(screen.getByLabelText("托管更新状态"));
+    expect(update.getByText("使用自装 Codex，不参与托管切换")).toBeTruthy();
+    expect(update.queryByText("等待主机检查更新")).toBeNull();
+    expect(screen.getByText("当前运行版本兼容")).toBeTruthy();
+  });
+
+  it("describes an offline host as awaiting connection rather than a failed upgrade", () => {
+    render(<CompatibilityProfileCard machine={{ ...machine, reachability: "unreachable" }} profile={profile} />);
+
+    expect(within(screen.getByLabelText("托管更新状态")).getByText("等待主机连接")).toBeTruthy();
+    expect(screen.queryByText("未通过兼容验证")).toBeNull();
   });
 });
 

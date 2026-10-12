@@ -636,6 +636,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .schema-trace__link > span { background: currentColor; height: 1px; opacity: .45; width: 100%; }
 .schema-trace__link small { font-family: var(--mono); font-size: var(--text-caption); grid-column: 1 / -1; white-space: nowrap; }
 .schema-trace__link--match { color: var(--teal); }
+.schema-trace__link--pending { color: var(--muted); }
+.compatibility-card__rollout { padding: 10px 17px; border-bottom: 1px solid var(--line); font-size: var(--text-caption); line-height: 1.5; }
+.compatibility-card__rollout strong { font-weight: 500; }
+.compatibility-card__rollout p { margin: 4px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.compatibility-card__rollout--failed strong { color: var(--red); }
 .compatibility-card__runtime-note { background: var(--paper); border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--text-caption); line-height: 1.55; margin: 0; padding: 8px 17px; }
 .compatibility-evidence summary { align-items: center; color: var(--muted); cursor: pointer; display: flex; font-size: var(--text-caption); gap: 5px; justify-content: flex-end; list-style: none; padding: 10px 17px; }
 .compatibility-evidence summary::-webkit-details-marker { display: none; }
