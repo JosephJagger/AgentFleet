@@ -1,9 +1,11 @@
+import { SharedBrowser } from "./SharedBrowser";
+export { SharedBrowser } from "./SharedBrowser";
 import { sessionPath } from "../lib/session-workspace";
 import { useEffect, useRef, useState } from 'react';
-import { Globe, Users, X, Hand, Play, RefreshCw, Plus, ArrowUpRight } from 'lucide-react';
+import { Globe, Users, X, Plus, ArrowUpRight } from 'lucide-react';
 import { api, collaborationApi } from '../lib/api';
 import type { FleetSession } from '../lib/types';
-import type { BrowserFrame, CollaborationPlan, TaskDraft } from '../lib/collaboration';
+import type { CollaborationPlan, TaskDraft } from '../lib/collaboration';
 import { taskState, readPlanDraft } from '../lib/collaboration';
 import { displayName } from '../lib/display-name';
 import { t } from '../i18n';
@@ -14,42 +16,6 @@ export function CollaborationWorkspace({session,tab,onTab,onClose}:{session:Flee
     <div className="collaboration-location">{t('当前会话')} · {displayName(session.title)}</div>
     {tab==='browser'?<SharedBrowser key={session.id} session={session}/>:<TaskBoard key={session.id} session={session}/>}
   </section>;
-}
-export function SharedBrowser({session}:{session:FleetSession}) {
-  const [frame,setFrame]=useState<BrowserFrame|null>(null),[opened,setOpened]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[url,setUrl]=useState('https://'),[input,setInput]=useState('');
-  const sequence=useRef(0),alive=useRef(true),operation=useRef(false);
-  useEffect(()=>{alive.current=true;return()=>{alive.current=false;sequence.current++;};},[]);
-  async function refresh(signal?:AbortSignal){const n=++sequence.current;const value=await collaborationApi.browser(session.id,{action:'snapshot'},signal);if(alive.current&&n===sequence.current&&!signal?.aborted)setFrame(value);}
-  useEffect(()=>{
-    if(!opened)return;
-    const controller=new AbortController();let timer:ReturnType<typeof setTimeout>;
-    const poll=async()=>{try{if(!operation.current)await refresh(controller.signal);}catch(e){if(!controller.signal.aborted)setError((e as Error).message);}finally{if(!controller.signal.aborted)timer=setTimeout(poll,2000);}};
-    void poll();return()=>{controller.abort();clearTimeout(timer);};
-  },[opened,session.id]);
-  async function act(action:string,extra:Record<string,unknown>={}){
-    if(operation.current)return;operation.current=true;setBusy(true);setError('');sequence.current++;
-    try{
-      const value=await collaborationApi.browser(session.id,{action,key:crypto.randomUUID(),revision:frame?.revision,...extra});
-      if(!alive.current)return;
-      if(action==='close'){setFrame(null);setOpened(false);return;}
-      if(action==='open'){setOpened(true);setFrame(value);}
-      else await refresh();
-      return true;
-    }catch(e){if(alive.current)setError((e as Error).message);}finally{operation.current=false;if(alive.current)setBusy(false);}
-  }
-  return <div className="collaboration-browser">
-    <p className="collaboration-location">{t('浏览器位于')}：<strong>{displayName(session.machineName??'')}</strong></p>
-    {!opened?<div className="collaboration-welcome"><Globe size={34}/><h3>{t('一起看网页，一起把事情做完')}</h3><p>{t('打开独立浏览器，页面会显示在这里。它不读取你现有的浏览器登录状态。登录时由你接手，AI 操作前会等待你确认。')}</p><button type="button" className="button button--primary" disabled={busy||session.state.ownership!=='agentfleet_owned'} onClick={()=>void act('open')}>{busy?t('正在打开…'):t('打开浏览器协作')}</button><small>{t('需要主机安装新版连接服务及 Chrome、Edge 或 Chromium。打开后，从下一轮对话开始使用。')}</small></div>:<>
-      <form className="collaboration-address" onSubmit={e=>{e.preventDefault();void act('navigate',{url});}}><label className="sr-only" htmlFor="collaboration-url">{t('网页地址')}</label><input id="collaboration-url" type="url" required value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://example.com" disabled={busy||frame?.mode!=='human'}/><button type="submit" disabled={busy||frame?.mode!=='human'}>{t('打开')}</button></form>
-      <div className="collaboration-browser-controls"><span>{frame?.mode==='agent'?t('AI 可查看 · 操作需确认'):t('由你操作')}</span><button type="button" disabled={busy} onClick={()=>void act(frame?.mode==='agent'?'takeover':'handoff')}>{frame?.mode==='agent'?<Hand size={15}/>:<Play size={15}/>} {frame?.mode==='agent'?t('我来操作'):t('交给 AI')}</button><button type="button" disabled={busy} aria-label={t('刷新网页预览')} onClick={()=>void refresh().catch(e=>setError(e.message))}><RefreshCw size={15}/></button><button type="button" disabled={busy} onClick={()=>void act('close')}>{t('关闭浏览器')}</button></div>
-      {frame?.pending&&<div className="collaboration-approval" role="status"><strong>{t('AI 想执行这一步，请你确认')}</strong><p>{({navigate:t('打开网页'),click:t('点击页面'),fill:t('填写内容'),key:t('按键操作'),scroll:t('滚动页面')} as Record<string,string>)[frame.pending.action.action]}</p><code>{displayName(frame.pending.action.url??frame.pending.action.selector??(frame.pending.action.x!==undefined?`(${frame.pending.action.x}, ${frame.pending.action.y})`:''))}</code>{frame.pending.action.text&&<pre>{frame.pending.action.text}</pre>}<div><button type="button" disabled={busy} onClick={()=>void act('approve',{pendingId:frame.pending!.id})}>{t('允许这一步')}</button><button type="button" disabled={busy} onClick={()=>void act('deny',{pendingId:frame.pending!.id})}>{t('拒绝')}</button></div></div>}
-      {frame&&<><p className="collaboration-page-title" title={frame.url}>{frame.title||frame.url}</p><button type="button" className="collaboration-preview" aria-label={t('网页预览，点击页面位置操作')} disabled={busy||frame.mode!=='human'} onClick={e=>{const r=e.currentTarget.getBoundingClientRect();void act('click',{x:Math.round((e.clientX-r.left)/r.width*frame.width),y:Math.round((e.clientY-r.top)/r.height*frame.height)});}}><img src={frame.image} alt={t('所选主机上的实时网页预览')} draggable={false}/></button></>}
-      <form className="collaboration-address" onSubmit={e=>{e.preventDefault();void act('fill',{text:input}).then(ok=>{if(ok)setInput('');});}}><input type="password" autoComplete="off" aria-label={t('输入到网页当前选中位置')} placeholder={t('先点击网页输入框，再在这里输入')} value={input} onChange={e=>setInput(e.target.value)} disabled={busy||frame?.mode!=='human'}/><button disabled={busy||frame?.mode!=='human'||!input} type="submit">{t('输入')}</button></form>
-      <div className="collaboration-browser-controls">{['Tab','Enter','Backspace'].map(key=><button type="button" key={key} disabled={busy||frame?.mode!=='human'} onClick={()=>void act('key',{text:key})}>{key}</button>)}<button type="button" disabled={busy||frame?.mode!=='human'} onClick={()=>void act('scroll',{delta:-600})}>{t('向上')}</button><button type="button" disabled={busy||frame?.mode!=='human'} onClick={()=>void act('scroll',{delta:600})}>{t('向下')}</button></div>
-      <small>{t('页面预览约每两秒更新。面板超过三十秒未连接时暂停 AI 网页操作；浏览器闲置十分钟关闭。')}</small>
-    </>}
-    {error&&<p role="alert" className="collaboration-error">{error}</p>}
-  </div>;
 }
 
 export function TaskBoard({session}:{session:FleetSession}) {

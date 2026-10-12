@@ -3391,5 +3391,16 @@
   "摘要说明": "About these hashes",
   "这里是接口协议摘要，不是安装包文件校验结果。": "These are API protocol hashes, not installer file integrity results.",
   "托管目标档案": "Managed target profile",
-  "托管目标验证时间": "Managed target validation time"
+  "托管目标验证时间": "Managed target validation time",
+  "浏览器状态暂未确认": "Browser state is unconfirmed",
+  "浏览器返回了无效预览，请重新检查": "The browser returned an invalid preview. Check again.",
+  "启动结果仍未确认，请重新检查；不会自动再次启动。": "Startup is still unconfirmed. Check again; the browser will not be started again automatically.",
+  "浏览器启动失败，请检查主机浏览器后重试。": "Browser startup failed. Check the browser on the host before trying again.",
+  "主机尚不支持浏览器状态恢复，请检查并更新连接服务。": "This host does not support browser state recovery yet. Check for a connection service update.",
+  "正在启动共享浏览器": "Starting the shared browser",
+  "正在检查浏览器状态": "Checking browser state",
+  "保留上次预览，连接恢复前暂停网页操作。": "Showing the last preview. Page controls are paused until the connection recovers.",
+  "这里只显示当前会话的共享浏览器，不会同步其他浏览器窗口。": "Only this session’s shared browser appears here. Other browser windows are not mirrored.",
+  "重新检查": "Check again",
+  "先打开共享浏览器，再点击“交给 AI”。从下一轮对话开始，让助手使用共享浏览器，操作前会等待你确认。": "Open the shared browser, then choose “Hand to AI”. From the next turn, ask the assistant to use the shared browser. Actions wait for your confirmation."
 }

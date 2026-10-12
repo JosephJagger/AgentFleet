@@ -70,6 +70,7 @@ interface AgentSocketState {
   dispatchPaused?: boolean;
   projectFiles?: boolean;
   sharedBrowser?: boolean;
+  sharedBrowserStatus?: boolean;
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
   verifiedVoiceBinding?: PanelTransportBinding;
@@ -528,7 +529,7 @@ export async function buildControlPlane(
   const browserBroker = new BrowserBroker(machineId => {
     const agent=agents.get(machineId);
     if(!agent?.reconciliationReady || agent.dispatchPaused || !agent.producerEpoch || !agent.appServerEpoch || agent.socket.readyState!==WebSocket.OPEN)return undefined;
-    return {key:agent.socket,generation:agent.identity.transportGeneration,producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,supported:agent.sharedBrowser===true,send:value=>sendJson(agent.socket,value)};
+    return {key:agent.socket,generation:agent.identity.transportGeneration,producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,supported:agent.sharedBrowser===true,statusSupported:agent.sharedBrowserStatus===true,send:value=>sendJson(agent.socket,value)};
   });
   app.addHook('onClose',async()=>browserBroker.close());
   app.get('/api/sessions/:id/collaboration',{preHandler:authenticate},async request=>collaboration.list(request.principal!,routeId(request)));
@@ -539,7 +540,7 @@ export async function buildControlPlane(
     reply.header('cache-control','no-store');
     const principal=request.principal!,session=registry.getSession(principal,routeId(request)),input=record(request.body);
     invariant(session.managed,409,'BROWSER_NOT_MANAGED','请先接管会话');
-    invariant(['open','snapshot','close','takeover','handoff','approve','deny','navigate','click','fill','key','scroll'].includes(String(input.action)),400,'BROWSER_INPUT','浏览器操作无效');
+    invariant(['status','open','snapshot','close','takeover','handoff','approve','deny','navigate','click','fill','key','scroll'].includes(String(input.action)),400,'BROWSER_INPUT','浏览器操作无效');
     limiter.check(`browser:${principal.userId}:${session.logicalSessionId}`,180,60_000);
     const binding=db.get<{external_id:string;native_thread_id:string;execution_segment_id:string;sync_content:number}>(`SELECT p.external_id,p.sync_content,e.native_thread_id,e.execution_segment_id FROM projects p JOIN logical_sessions s ON s.project_id=p.project_id JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL WHERE s.logical_session_id=?`,session.logicalSessionId);
     invariant(binding?.native_thread_id,409,'BROWSER_TARGET_CHANGED','会话尚未连接原生运行环境');
@@ -1698,6 +1699,7 @@ export async function buildControlPlane(
             state.reconciliationReady = false;
             state.projectFiles = message.capabilities?.projectFiles === true;
             state.sharedBrowser = message.capabilities?.sharedBrowser === true;
+            state.sharedBrowserStatus = message.capabilities?.sharedBrowserStatus === true;
             state.realtimeVoice = message.capabilities?.realtimeVoice === true;
             state.conversationHistory = message.capabilities?.conversationHistory === true;
             delete state.reconciliationId;

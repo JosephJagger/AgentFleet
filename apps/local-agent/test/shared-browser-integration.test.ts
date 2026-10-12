@@ -9,10 +9,15 @@ test('isolated Chromium: shared page, human input, approved AI action and takeov
  await new Promise<void>(resolve=>site.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise<void>((resolve,reject)=>site.close(e=>e?reject(e):resolve())));
  // This test visits only a synthetic local page. Production always enables Chromium sandboxing.
  const browsers=new SharedBrowsers(()=>chromium.launch({headless:true,executablePath:process.env.AGENTFLEET_TEST_CHROMIUM??chromium.executablePath(),chromiumSandbox:process.getuid?.()!==0}));t.after(()=>browsers.stop());
+ assert.deepEqual(await browsers.control('fixture',{action:'status'}),{state:'closed'});
  await browsers.control('fixture',{action:'open'});
+ assert.deepEqual(await browsers.control('fixture',{action:'status'}),{state:'open'});
  let frame=await browsers.snapshot('fixture');
  await browsers.control('fixture',{action:'navigate',url:`http://127.0.0.1:${(site.address() as {port:number}).port}`,key:'navigate',revision:frame.revision});
  frame=await browsers.snapshot('fixture');assert.equal(frame.title,'Collaboration fixture');assert.ok(frame.image.startsWith('data:image/jpeg;base64,'));
+ assert.ok(Buffer.byteLength(JSON.stringify({type:'browser.result',requestId:'fixture',result:frame}))<1_000_000);
+ // A re-open only reattaches to this thread's existing page, preserving its state.
+ const recovered=await browsers.control('fixture',{action:'open'});assert.equal((recovered as {url:string}).url,frame.url);
  await browsers.control('fixture',{action:'click',selector:'#name',key:'focus',revision:frame.revision});frame=await browsers.snapshot('fixture');
  await browsers.control('fixture',{action:'fill',text:'Verified draft',key:'fill',revision:frame.revision});frame=await browsers.snapshot('fixture');
  await browsers.control('fixture',{action:'handoff',key:'handoff',revision:frame.revision});
@@ -23,4 +28,5 @@ test('isolated Chromium: shared page, human input, approved AI action and takeov
  assert.match(JSON.stringify(await browsers.tool('fixture',{action:'read'})),/Verified draft/);
  frame=await browsers.snapshot('fixture');await browsers.control('fixture',{action:'takeover',key:'takeover',revision:frame.revision});
  await assert.rejects(()=>browsers.tool('fixture',{action:'read'}),/用户正在操作/);
+ await browsers.control('fixture',{action:'close'});assert.deepEqual(await browsers.control('fixture',{action:'status'}),{state:'closed'});
 });

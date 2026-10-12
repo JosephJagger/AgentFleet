@@ -1,3 +1,6 @@
+export interface BrowserStatus {
+  state:'closed'|'opening'|'open'|'failed'; error?:string; code?:string;
+}
 export interface BrowserFrame {
   mode:'human'|'agent'; revision:number; url:string; title:string; image:string;
   width:number; height:number; busy:boolean;

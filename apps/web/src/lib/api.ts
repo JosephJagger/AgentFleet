@@ -1098,7 +1098,8 @@ export interface AdminUser { id: string; email: string; platformAdmin: boolean; 
 
 export const collaborationApi = {
   prepare: (input:{sessionId:string;title:string;candidates:string[];clientMutationId:string;confirmed:true}) => request<import("./collaboration").CollaborationPlan>("/api/collaboration/prepare",{method:"POST",body:JSON.stringify(input)}),
-  browser: (sessionId:string,input:Record<string,unknown>,signal?:AbortSignal) => request<import('./collaboration').BrowserFrame & {closed?:boolean}>(`/api/sessions/${encodeURIComponent(sessionId)}/browser`,{method:'POST',body:JSON.stringify(input),signal}),
+  browserStatus: (sessionId:string,signal?:AbortSignal) => request<import('./collaboration').BrowserStatus>(`/api/sessions/${encodeURIComponent(sessionId)}/browser`,{method:'POST',body:JSON.stringify({action:'status'}),signal:timeoutSignal(signal,30000)}),
+  browser: (sessionId:string,input:Record<string,unknown>,signal?:AbortSignal) => request<import('./collaboration').BrowserFrame & {closed?:boolean}>(`/api/sessions/${encodeURIComponent(sessionId)}/browser`,{method:'POST',body:JSON.stringify(input),signal:timeoutSignal(signal,30000)}),
   plans: (sessionId:string,signal?:AbortSignal) => request<{plans:import('./collaboration').CollaborationPlan[]}>(`/api/sessions/${encodeURIComponent(sessionId)}/collaboration`,{signal}),
   create: (input:{sessionId:string;title:string;tasks:import('./collaboration').TaskDraft[];clientMutationId:string;confirmed:true}) => request<import('./collaboration').CollaborationPlan>('/api/collaboration',{method:'POST',body:JSON.stringify(input)}),
   action: (id:string,action:string,index?:number) => request<import('./collaboration').CollaborationPlan>(`/api/collaboration/${encodeURIComponent(id)}/actions`,{method:'POST',body:JSON.stringify({action,index})}),

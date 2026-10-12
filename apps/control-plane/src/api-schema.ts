@@ -198,6 +198,7 @@ export interface AgentCapabilities {
   permissionProfiles?: boolean;
   projectFiles?: boolean;
   sharedBrowser?: boolean;
+  sharedBrowserStatus?: boolean;
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
   commandTypes?: string[];

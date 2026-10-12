@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {AppError,invariant} from './errors.js';
 import type {HistoryBinding} from './session-history.js';
-export interface BrowserEndpoint {key:object;generation:number;producerEpoch:string;appServerEpoch:string;supported:boolean;send:(value:Record<string,unknown>)=>boolean;}
+export interface BrowserEndpoint {key:object;generation:number;producerEpoch:string;appServerEpoch:string;supported:boolean;statusSupported?:boolean;send:(value:Record<string,unknown>)=>boolean;}
 /** Ephemeral browser RPCs, bound to an authenticated host generation. Actions are never replayed. */
 export class BrowserBroker {
  private pending=new Map<string,{machineId:string;endpoint:BrowserEndpoint;finish:(error:AppError|null,result?:Record<string,unknown>)=>void}>();
@@ -10,6 +10,7 @@ export class BrowserBroker {
   const endpoint=this.endpoint(binding.machineId);
   invariant(endpoint,409,'BROWSER_HOST_OFFLINE','主机连接尚未就绪，暂不能读取原生浏览器');
   invariant(endpoint.supported,409,'BROWSER_UNSUPPORTED','此主机连接服务尚不支持浏览器，请更新后重试');
+  if(input.action==='status')invariant(endpoint.statusSupported,409,'BROWSER_UPDATE_REQUIRED','请检查并更新连接服务，以恢复共享浏览器状态');
   invariant([...this.pending.values()].filter(p=>p.machineId===binding.machineId).length<2,429,'BROWSER_BUSY','浏览器读取繁忙，请稍后再试');
   return new Promise((resolve,reject)=>{
    const requestId=randomUUID();
