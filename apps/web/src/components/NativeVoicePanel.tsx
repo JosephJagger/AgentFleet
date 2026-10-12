@@ -172,14 +172,14 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const status = active ? t(phase === "recovering" ? "正在恢复主机连接，核验原通话中（最多 60 秒）" : phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
   const callPanel = expanded && <div ref={panel} style={dragging.style} id={popoverId} className={`native-voice__popover${globalMachineId ? " native-voice__popover--global" : ""}`} role="region" aria-label={t("原生实时语音")}>
     <div className="native-voice__head voice-drag-handle" {...dragging.handle}><strong>{t(globalMachineId ? "面板语音总控" : "语音通话")}</strong><button type="button" className="native-voice__close" aria-label={t("收起语音控制")} onClick={() => { setExpanded(false); trigger.current?.focus(); }}><X size={16} /></button></div>
-    <div className={`native-voice__orb${active && !muted ? " native-voice__orb--live" : ""}`} aria-hidden="true">{phase === "connecting" && <LoaderCircle className="spin" size={24} />}</div>
+    <div className={`native-voice__orb${active && !muted ? " native-voice__orb--live" : ""}`} aria-hidden="true">{(phase === "connecting" || phase === "recovering") && <LoaderCircle className="spin" size={24} />}</div>
     <p className="native-voice__status" role="status">{status}</p>
     {!active&&<label className="native-voice__status"><input type="checkbox" checked={skipPreferences} onChange={e=>setSkipPreferences(e.target.checked)}/>{t('本次通话不加载长期偏好')}</label>}
     {active&&preferenceState&&<p className="native-voice__status" role="status">{t(preferenceState==='disabled'?'本次通话不加载长期偏好':preferenceState==='loaded'?'长期偏好已加载':preferenceState==='reconnect_required'?'偏好已更新，请挂断重连以清除旧规则上下文':preferenceState==='pending'?'长期偏好同步中':'长期偏好暂未加载；通话仍保持连接')}</p>}
     {message && <p className="native-voice__error" role="alert">{message}</p>}
     {active && <p className="native-voice__task" role="status">{t(activeTurnId || taskPhase === "running" ? "项目任务正在执行" : taskPhase === "delegated" ? "已派发，等待项目任务启动" : taskPhase === "completed" ? "项目任务已完成，结果见会话" : taskPhase === "failed" ? "项目任务未完成，请查看会话结果" : taskPhase === "unknown" ? "任务状态暂不可用，通话可继续" : "尚未派发项目任务")}</p>}
     {active && <div className="native-voice__actions">
-      <button type="button" className="button button--secondary" disabled={phase !== "connected"} aria-pressed={muted} onClick={() => { const next = !muted; resources.current.stream?.getAudioTracks().forEach(track => { track.enabled = !next; }); setMuted(next); }}>{muted ? <MicOff size={18} /> : <Mic size={18} />}{t(muted ? "取消静音" : "静音")}</button>
+      <button type="button" className="button button--secondary" disabled={phase !== "connected" && phase !== "recovering"} aria-pressed={muted} onClick={() => { const next = !muted; resources.current.stream?.getAudioTracks().forEach(track => { track.enabled = !next; }); setMuted(next); }}>{muted ? <MicOff size={18} /> : <Mic size={18} />}{t(muted ? "取消静音" : "静音")}</button>
       <button type="button" className="button button--stop" onClick={() => { cleanup.current("USER_HANGUP"); setPhase("idle"); setExpanded(false); }}><PhoneOff size={18} />{t("挂断")}</button>
     </div>}
     {playBlocked && active && <button type="button" className="button button--secondary" onClick={() => { void audio.current?.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true)); }}>{t("播放 Codex 语音")}</button>}
@@ -187,8 +187,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   </div>;
   return <div ref={control} className={`native-voice${globalMachineId ? " native-voice--panel" : ""}${active ? " native-voice--active" : ""}`}>
     <button ref={trigger} type="button" className={`button ${globalMachineId ? "button--primary" : "button--secondary"} native-voice__trigger`} disabled={!active && !canStart} aria-label={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} title={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} aria-expanded={expanded} aria-controls={expanded ? popoverId : undefined} onClick={() => { if (active) setExpanded(value => !value); else void start(); }}>
-      {phase === "connecting" ? <LoaderCircle className="spin" size={19} /> : globalMachineId ? <Headset size={20} /> : <Phone size={19} />}
-      {globalMachineId && <span>{t(phase === "connecting" ? "正在连接…" : active ? "通话控制" : "开始通话")}</span>}
+      {phase === "connecting" || phase === "recovering" ? <LoaderCircle className="spin" size={19} /> : globalMachineId ? <Headset size={20} /> : <Phone size={19} />}
+      {globalMachineId && <span>{t(phase === "recovering" ? "恢复中…" : phase === "connecting" ? "正在连接…" : active ? "通话控制" : "开始通话")}</span>}
       {active && <i className="native-voice__indicator" aria-hidden="true" />}
     </button>
     {portalHost ? createPortal(callPanel, portalHost) : callPanel}

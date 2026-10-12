@@ -310,6 +310,8 @@ it('global host recovery preserves microphone, peer and signaling without repeat
   act(()=>socket.receive({type:'recovering'}));
   expect(screen.getByText('正在恢复主机连接，核验原通话中（最多 60 秒）')).toBeTruthy();
   expect(track.stop).not.toHaveBeenCalled();expect(Peer.all[0]!.closed).toBe(false);expect(socket.readyState).toBe(1);
+  fireEvent.click(screen.getByRole('button',{name:'静音'}));expect(track.enabled).toBe(false);
+  fireEvent.click(screen.getByRole('button',{name:'取消静音'}));expect(track.enabled).toBe(true);
   act(()=>Peer.all[0]!.onconnectionstatechange?.());
   expect(screen.getByText('正在恢复主机连接，核验原通话中（最多 60 秒）')).toBeTruthy();
   act(()=>socket.receive({type:'recovered'}));expect(screen.getByText('语音已连接，直接与 Codex 对话')).toBeTruthy();
