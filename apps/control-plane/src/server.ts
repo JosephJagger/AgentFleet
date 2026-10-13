@@ -1,3 +1,4 @@
+import {LiveChatStore} from './live-chat.js';
 import {LiveWelcomeGate,liveWelcomePrompt} from './live-welcome.js';
 import {VoiceTranscriptTail} from './voice-transcript-tail.js';
 import { NativeSubagentsBroker } from "./native-subagents-broker.js";
@@ -261,6 +262,7 @@ export async function buildControlPlane(
   for(const call of panelVoice.pending())voiceTails.review(call.voice_id);
   panelVoice.closeOrphans();
   const liveWelcomes=new Map<string,LiveWelcomeGate>();
+  const liveChatReadOnly=new Map<string,number>();
   const panelOwners=new Map<string,{socket:WebSocket;token:string;lastSeen:number;lastPing:number}>();
   const sendPanel=(voiceId:string,action:string,extra:Record<string,unknown>={})=>{
     const call=panelVoice.get(voiceId);if(!call||call.state==='closed'||panelRecovery.has(voiceId) && !['stop','resume'].includes(action))return false;
@@ -331,7 +333,7 @@ export async function buildControlPlane(
       transportGeneration:agent.identity.transportGeneration,producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch});
   };
   const stopPanel=(id:string)=>{
-    liveWelcomes.delete(id);
+    liveWelcomes.delete(id);liveChatReadOnly.delete(id);
     voiceTails.review(id);
     const call=panelVoice.get(id);if(!call||call.state==='closed')return;
     const sent=sendPanel(id,'stop');
@@ -1149,6 +1151,11 @@ export async function buildControlPlane(
       return {...page,sessions:page.items};
     }
     return {sessions:registry.listSessions(request.principal as Principal)};
+  });
+  app.post('/api/live-chat',{preHandler:mutate},async request=>{
+    const principal=request.principal as Principal;
+    limiter.check(`live-chat:${principal.workspaceId}:${principal.userId}`,240,60000);
+    return new LiveChatStore(db).ingest(principal,record(request.body).messages);
   });
   app.get('/api/long-term-preferences',{preHandler:authenticate},async(request,reply)=>{
     reply.header('cache-control','no-store');return longTermPreferences.list(request.principal as Principal);
@@ -1969,7 +1976,7 @@ export async function buildControlPlane(
               if(message.event==='error')panelVoice.recordFailure(call.voice_id,message.message);
               if(call.state==='closed')return;
               const owner=panelOwners.get(call.voice_id);
-              if(message.event==='stopped'){liveWelcomes.delete(call.voice_id);panelRecovery.delete(call.voice_id);panelVoice.state(call.voice_id,'closed');if(owner)sendJson(owner.socket,{type:'closed'});panelOwners.delete(call.voice_id);panelReports.delete(call.voice_id);return;}
+              if(message.event==='stopped'){liveWelcomes.delete(call.voice_id);liveChatReadOnly.delete(call.voice_id);panelRecovery.delete(call.voice_id);panelVoice.state(call.voice_id,'closed');if(owner)sendJson(owner.socket,{type:'closed'});panelOwners.delete(call.voice_id);panelReports.delete(call.voice_id);return;}
               if(message.event==='closed'){panelVoice.recordCloseReason(call.voice_id,'NATIVE_CLOSED');if(owner)sendJson(owner.socket,{type:'closed'});stopPanel(call.voice_id);return;}
               if(!owner){stopPanel(call.voice_id);return;}
               const principal=auth.authenticateToken(owner.token);
@@ -1987,6 +1994,10 @@ export async function buildControlPlane(
                 liveWelcomes.get(call.voice_id)?.beginWork();
                 void (async()=>{let result:unknown;
                 try {
+                  const action=String((message.args as {action?:unknown})?.action);
+                  const segment=db.get<{segment:number}>('SELECT segment FROM panel_voice_tails WHERE voice_id=?',call.voice_id)?.segment??0;
+                  if(action==='live.chat.search')liveChatReadOnly.set(call.voice_id,segment);
+                  invariant(liveChatReadOnly.get(call.voice_id)!==segment||['live.chat.search','search','status','history','recover','preference.list'].includes(action),409,'LIVE_CHAT_READ_ONLY','观众问答只能查询和回答；执行操作需要主播新的明确指令');
                   result=(message.args as {action?:unknown})?.action==='history'?await panelVoice.history(principal,call.voice_id,record(message.args)):panelVoice.tool(principal,call.voice_id,requestId,message.args);
                   // A status/search request must never trigger command dispatch as a side effect.
                   if (['dispatch','steer'].includes(String((message.args as {action?:unknown})?.action))) {

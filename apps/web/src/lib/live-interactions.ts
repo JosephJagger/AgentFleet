@@ -2,7 +2,7 @@
 export type LiveCollectorSource='companion-log'|'companion-memory-bridge'|'douyin-browser-network';
 export interface LiveEvent {
   id:string; roomId:string; ownerId:string; ownerName:string; roomTitle:string;
-  userId:string; name:string; content:string; type:'chat'|'enter'|'interaction'; interaction?:'like'|'follow'|'gift'|'fansclub'|'share'; count?:number; giftName?:string; receivedAt:number; anonymous?:boolean; isAnchor?:boolean; collector?:LiveCollectorSource; collectorTransport?:string; sourceObservedAt?:number;
+  userId:string; name:string; content:string; contentTruncated?:boolean; type:'chat'|'enter'|'interaction'; interaction?:'like'|'follow'|'gift'|'fansclub'|'share'; count?:number; giftName?:string; receivedAt:number; anonymous?:boolean; isAnchor?:boolean; collector?:LiveCollectorSource; collectorTransport?:string; sourceObservedAt?:number;
 }
 export const DEFAULT_LIVE_WELCOME='嗨，你好，欢迎光临';
 export const LIVE_WELCOME_STORAGE_KEY='agentfleet.live-interactions.welcome-text';
@@ -58,7 +58,7 @@ export function inspectLivePacket(raw:unknown,now=Date.now()):CollectorPacket {
     }
     if(!id)return {reason:'message'};
     if(type==='chat'&&typeof data.Content!=='string')return {reason:'message'};
-    return {event:{type,id,roomId,ownerId,ownerName:'',roomTitle:'',userId,name:text(user.Nickname),content:type==='enter'?'':text(data.Content,2000),...(interaction?{interaction,count:Math.min(1000000,Math.max(1,Number(data.Count??data.GiftCount??data.RepeatCount)||1)),giftName:text(data.GiftName,100)}:{}),receivedAt:collector?Math.min(now,sourceObservedAt!):now,...(collector?{collector,sourceObservedAt,collectorTransport}:{}),anonymous:data.IsAnonymous===true,isAnchor:user.IsAnchor===true}};
+    return {event:{type,id,roomId,ownerId,ownerName:'',roomTitle:'',userId,name:text(user.Nickname),content:type==='enter'?'':text(data.Content,2000),contentTruncated:typeof data.Content==='string'&&data.Content.length>2000,...(interaction?{interaction,count:Math.min(1000000,Math.max(1,Number(data.Count??data.GiftCount??data.RepeatCount)||1)),giftName:text(data.GiftName,100)}:{}),receivedAt:collector?Math.min(now,sourceObservedAt!):now,...(collector?{collector,sourceObservedAt,collectorTransport}:{}),anonymous:data.IsAnonymous===true,isAnchor:user.IsAnchor===true}};
   }catch{return {reason:'format'};}
 }
 export function parseLiveEvent(raw:string,now=Date.now()):LiveEvent|null {

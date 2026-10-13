@@ -3,6 +3,7 @@ import {act,cleanup,fireEvent,render,screen,within} from '@testing-library/react
 import {afterEach,expect,it,vi} from 'vitest';
 import {LiveInteractions} from './components/LiveInteractions';
 import {parseLiveEvent,LiveCollectorStream,welcomeEligible,LiveEventLedger,localCollectorUrl,type WelcomeBridge} from './lib/live-interactions';
+vi.mock('./lib/api',()=>({api:{storeLiveChat:vi.fn().mockResolvedValue({stored:1})}}));
 const frame=(type=3,patch:Record<string,unknown>={},now=Date.now(),process='直播伴侣')=>JSON.stringify({Type:type,ProcessName:process,Data:JSON.stringify({RoomId:'fixture-room',MsgId:'event',Owner:null,User:{Id:'viewer',Nickname:'Fixture viewer'},Content:'我来了 <script>alert(1)</script>',CollectorSource:'companion-log',NativeMethod:type===3?'WebcastMemberMessage':'WebcastChatMessage',Action:'1',ObservedAt:new Date(now).toISOString(),...patch})});
 afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.useRealTimers();});
 it('accepts the new collector envelope with null owner, never confuses chat with member actions',()=>{
@@ -229,4 +230,10 @@ it('inserts username at the caret or selection and saves only the template, not 
  fireEvent.click(screen.getByRole('checkbox',{name:'入场自动欢迎'}));act(()=>{f.ws.receive(frame(3,{User:{Id:'fixture-viewer',Nickname:'合成访客'}}));vi.advanceTimersByTime(500);});
  expect(f.send.mock.calls[0][0].name).toBe('合成访客');expect(f.send.mock.calls[0][1]).toBe('{用户名}{用户名}来到直播间');expect(localStorage.getItem(key)).not.toContain('合成访客');
  f.view.unmount();localStorage.removeItem(key);
+});
+
+it('accepted chat reaches storage without a voice call, entry/duplicate packets do not upload or trigger speech',async()=>{
+ const {api}=await import('./lib/api');vi.mocked(api.storeLiveChat).mockClear();const f=ui();
+ await act(async()=>{f.ws.receive(frame(1,{MsgId:'store-1'}));f.ws.receive(frame(1,{MsgId:'store-2'}));f.ws.receive(frame(1,{MsgId:'store-3'}));f.ws.receive(frame(1,{MsgId:'store-3'}));f.ws.receive(frame(3,{MsgId:'store-entry'}));vi.advanceTimersByTime(1000);});
+ expect(api.storeLiveChat).toHaveBeenCalledTimes(1);expect(vi.mocked(api.storeLiveChat).mock.calls[0][0].map(e=>e.id)).toEqual(['store-1','store-2','store-3']);expect(f.send).not.toHaveBeenCalled();f.view.unmount();
 });

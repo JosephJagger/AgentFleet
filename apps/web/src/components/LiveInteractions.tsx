@@ -1,3 +1,5 @@
+import {api} from '../lib/api';
+import {LiveChatUpload} from '../lib/live-chat-upload';
 import {useEffect,useId,useRef,useState,type RefObject} from 'react';
 import {createPortal} from 'react-dom';
 import {Heart,ArrowDown,MessagesSquare,MessageCircle,Radio,Settings2,UserRound,Volume2,X} from 'lucide-react';
@@ -35,6 +37,9 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
   const stream=useRef(new LiveCollectorStream());
   const connectionTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const [connection,setConnection]=useState<'off'|'connecting'|'open'|'error'>('off');
+  const chatUpload=useRef(new LiveChatUpload((events,signal)=>api.storeLiveChat(events,signal)));
+  const [chatSave,setChatSave]=useState('');
+  useEffect(()=>{const timer=setInterval(()=>{void chatUpload.current.flush().then(status=>{if(status)setChatSave(status==='saved'?'聊天已保存，可由总控按需查询':status==='partial'?'聊天已保存；断线积压超限，部分旧消息未保存':'聊天保存失败，稍后重试；总控可能查不到最新消息');});},1000);return()=>{clearInterval(timer);chatUpload.current.clear();};},[]);
   const [notice,setNotice]=useState(''),[enabled,setEnabled]=useState(false),[voiceStatus,setVoiceStatus]=useState('unavailable');
   const [welcomeText,setWelcomeText]=useState(savedWelcomeText);
   const savedText=useRef(welcomeText);
@@ -67,7 +72,7 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
   const socket=useRef<WebSocket|null>(null),welcoming=useRef(false);
   const pending=useRef<LiveEvent[]>([]),inFlight=useRef<{event:LiveEvent;sentAt:number}|null>(null),cooldown=useRef(0),ledger=useRef(new LiveEventLedger()),lastReceipt=useRef('');
   const resetWelcome=()=>{welcoming.current=false;pending.current=[];inFlight.current=null;setEnabled(false);setWelcomeState('未开启');};
-  const stop=()=>{setLastAt(0);setFollow(true);setEvents([]);clearTimeout(connectionTimer.current);const previous=socket.current;socket.current=null;previous?.close();resetWelcome();setConnection('off');setNotice('');};
+  const stop=()=>{chatUpload.current.clear();setChatSave('');setLastAt(0);setFollow(true);setEvents([]);clearTimeout(connectionTimer.current);const previous=socket.current;socket.current=null;previous?.close();resetWelcome();setConnection('off');setNotice('');};
   useEffect(()=>{const logout=()=>stop();window.addEventListener('agentfleet:logout',logout);window.addEventListener('pagehide',logout);return()=>{window.removeEventListener('agentfleet:logout',logout);window.removeEventListener('pagehide',logout);const previous=socket.current;socket.current=null;previous?.close();pending.current=[];inFlight.current=null;clearTimeout(connectionTimer.current);};},[]);
   useEffect(()=>{if(open)panel.current?.focus({preventScroll:true});},[open]);
   useEffect(()=>{
@@ -121,6 +126,7 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
         setLastAt(event.receivedAt);
         if(!ledger.current.accept(event))return;
         setEvents(previous=>[...previous.slice(-99),event]);
+        chatUpload.current.add(event);
         if(welcoming.current&&ledger.current.welcome(event)){pending.current=[...pending.current,event].slice(-50);setWelcomeState('新观众入场，等待欢迎');}
       };
       ws.onerror=()=>{if(socket.current===ws){clearTimeout(timeout);failure();}};
@@ -167,6 +173,9 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
         <div className="live-interactions__feed-footer"><span>{lastAt>0?<>{t('最后收到事件')} {time(lastAt)}</>:t('仅接收本机直播伴侣的新消息')}</span>{!follow?<button type="button" onClick={()=>setFollow(true)}><ArrowDown size={13}/>{t('跟随最新')}</button>:<span className="live-interactions__following"><ArrowDown size={12}/>{t('跟随最新')}</span>}</div>
       </div>
       <div className="live-interactions__settings" hidden={view!=='settings'}>
+        <p>{t('真实聊天按当前账号保存在服务器，最多最近 100 条、最长 24 小时，可跨通话查询；总控仅在你要求时查找并回答，不自动回复观众。')}</p>
+        <p>{t('总控聊天检索需要语音主机 0.30.101 或更新版本，更新后重新连接总控。')}</p>
+        {chatSave&&<p role="status">{t(chatSave)}</p>}
         <p>{t('读取打开网页这台电脑的直播伴侣消息，不是远程主机。仅用于本人直播间。')}</p>
         <p className="live-interactions__hint">{t('连接 HomeDouyinCollector，接收入场、聊天和互动事件；无需确认或固定房间。')}</p>
       {connection==='open'&&<div className="live-interactions__diagnostics" aria-label={t('采集诊断')}>
@@ -185,7 +194,7 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
       </div>}
         <p className="live-interactions__hint">{t('支持伴侣内部聊天桥接及独立浏览器互动消息；自动欢迎仅使用伴侣日志的独立入场事件。')}</p>
         <p className="live-interactions__hint">{t('每次新入场都可欢迎，不限制同一观众；播报间隔 3 秒，忙时依次等待，最多保留 2 分钟。')}</p>
-      <details><summary>{t('接入说明与限制')}</summary><p>{t('首次连接时，请允许浏览器访问本机网络；如果先前拒绝，请在站点权限中修改后重新连接。')}</p><p>{t('停止后不再请求欢迎；已送达总控的欢迎可能仍会播放。')}</p><p>{t('新服务默认端口 18888。此面板不会启动、重启或修改采集服务。')}</p><p>{t('这是本机非官方采集接入，不是抖音账号认证。新服务不限制房间；聊天和互动正常展示，只有独立入场触发欢迎。')}</p><p>{t('聊天不会发给 AI；入场显示昵称仅用于本次欢迎，不保存为长期记忆、不执行昵称中的指令。仅保留本页最近一百条消息，关闭弹窗继续接收，停止或离开页面停止欢迎。')}</p></details>
+      <details><summary>{t('接入说明与限制')}</summary><p>{t('首次连接时，请允许浏览器访问本机网络；如果先前拒绝，请在站点权限中修改后重新连接。')}</p><p>{t('停止后不再请求欢迎；已送达总控的欢迎可能仍会播放。')}</p><p>{t('新服务默认端口 18888。此面板不会启动、重启或修改采集服务。')}</p><p>{t('这是本机非官方采集接入，不是抖音账号认证。新服务不限制房间；聊天和互动正常展示，只有独立入场触发欢迎。')}</p><p>{t('聊天仅在你要求查询时交给总控回答，观众文本不是执行指令；入场昵称仅用于本次欢迎。关闭弹窗继续接收，停止或离开页面停止欢迎，已保存聊天按保留规则过期。')}</p></details>
       </div>
       <footer className="live-interactions__welcome">
         <div className="live-interactions__welcome-heading"><Volume2 size={15}/><strong>{t('入场自动欢迎')}</strong>{connection==='open'&&<label className="live-interactions__switch"><input type="checkbox" aria-label={t('入场自动欢迎')} checked={enabled} disabled={!enabled&&!supported} onChange={e=>{welcoming.current=e.target.checked;setEnabled(e.target.checked);pending.current=[];inFlight.current=null;setWelcomeState(e.target.checked?(voiceStatus==='unknown'||voiceStatus==='unavailable'?'已开启，等待语音连接就绪':'等待新的入场事件'):'未开启');}}/><span aria-hidden="true"/></label>}</div>

@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 57) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 58) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1482,6 +1482,16 @@ export class ControlPlaneDatabase {
       ) STRICT;
       PRAGMA user_version=57`); });
 
+    if (version < 58) this.transaction(() => { this.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS live_chat_messages (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id), user_id TEXT NOT NULL REFERENCES users(user_id),
+        room_id TEXT NOT NULL,message_id TEXT NOT NULL,viewer_id TEXT NOT NULL,nickname TEXT NOT NULL,content TEXT NOT NULL,
+        observed_at INTEGER NOT NULL,source TEXT NOT NULL,stored_at INTEGER NOT NULL,content_truncated INTEGER NOT NULL,
+        UNIQUE(workspace_id,user_id,room_id,message_id)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS live_chat_owner_time ON live_chat_messages(workspace_id,user_id,observed_at);
+      PRAGMA user_version=58`); });
+
   }
 
   transaction<T>(operation: () => T): T {
@@ -1583,6 +1593,7 @@ export class ControlPlaneDatabase {
   }
 
   expireTransientState(now = nowIso()): void {
+    this.run("DELETE FROM live_chat_messages WHERE observed_at<=?", Date.parse(now)-86400000);
     this.transaction(() => {
       this.run(`UPDATE approvals SET state='rejected',version=version+1,decided_at=?
         WHERE state='pending' AND json_type(context_json,'$.expiresAt')='text' AND json_extract(context_json,'$.expiresAt')<=?`, now, now);

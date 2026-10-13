@@ -136,3 +136,16 @@ test('resume acknowledgement and transcript replay preserve call identity; repor
  assert.equal(events.at(-1)?.text,'hello');assert.equal(events.at(-1)?.transcriptSeq,1);
  await runtime.report('pvoice_live','final result','job');assert.equal(reports,1);
 });
+
+test('live chat is a coordinator-local read-only query, not a project worker task',async()=>{
+ assert.ok(PANEL_VOICE_TOOL.inputSchema.properties.action.enum.includes('live.chat.search'));
+ assert.match(PANEL_VOICE_INSTRUCTIONS,/never todo.save, dispatch, claim, steer/);
+ assert.match(PANEL_REALTIME_PROMPT,/YOU answer aloud in this same realtime call/);
+ const calls:string[]=[];const replies:Record<string,unknown>[]=[];
+ const server=new CodexAppServer({findManagedThread:()=>undefined,findProject:()=>undefined,onEvent:async()=>undefined,onVolatile:()=>undefined,onPanelTool:async(args:Record<string,unknown>)=>{calls.push(String(args.action));return {untrusted:true,items:[{content:'合成问题'}]};}} as unknown as AppServerCallbacks);
+ const internal=server as unknown as {request(method:string,params:Record<string,unknown>):Promise<unknown>;handleLine(line:string):Promise<void>;writeLine(value:Record<string,unknown>):Promise<void>};
+ internal.request=async method=>method==='thread/start'?{thread:{id:'coordinator'}}:{};internal.writeLine=async value=>{replies.push(value);};
+ await server.startPanelVoice('/tmp','pvoice_chat','v=0\r\nm=audio 9\r\n','shimmer');calls.length=0;
+ await internal.handleLine(JSON.stringify({method:'item/tool/call',id:10,params:{threadId:'coordinator',tool:'agentfleets_panel',arguments:{action:'live.chat.search',nickname:'合成观众'}}}));
+ assert.deepEqual(calls,['live.chat.search']);assert.match(JSON.stringify(replies),/合成问题/);
+});

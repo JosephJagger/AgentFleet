@@ -40,7 +40,7 @@ async function fixture(t: import('node:test').TestContext,resumeAck=false) {
   const start=await first.next('voice.control','start');const voiceId=String(start.voiceId),instanceId='fixture-original-instance';
   const event=(extra:Record<string,unknown>)=>({type:'voice.event',voiceId,producerEpoch:'producer',appServerEpoch:'native',...extra});
   first.send(event({event:'sdp',sdp:'v=0\r\nm=audio 9\r\n',instanceId,resumeAck}));await browser.next('answer');
-  return {...h,first,browser,host,event,voiceId,instanceId,row:()=>db.get<{state:string;binding_json:string}>('SELECT state,binding_json FROM panel_voice_calls WHERE voice_id=?',voiceId)!};
+  return {...h,cookie,csrf:logged.json().csrfToken,first,browser,host,event,voiceId,instanceId,row:()=>db.get<{state:string;binding_json:string}>('SELECT state,binding_json FROM panel_voice_calls WHERE voice_id=?',voiceId)!};
 }
 
 test('short host reconnect restores only original call; stale proof and duplicate proof cannot rebind or start calls',async t=>{
@@ -153,4 +153,24 @@ test('custom welcome validates before reservation, sends saved words once and ne
  const report=await f.first.next('voice.control','report');assert.ok(String(report.text).includes(JSON.stringify(greeting.replace('{用户名}','合成昵称'))));assert.equal((await f.browser.next('live_welcome')).status,'requested');
  f.browser.send({...entry,welcomeText:'不能通过修改文案重播'});assert.equal((await f.browser.next('live_welcome')).reason,'duplicate_event');
  assert.equal(f.db.all('SELECT * FROM commands').length,0);assert.equal(f.db.all('SELECT * FROM voice_long_term_preferences').length,0);assert.equal(f.row().state,'active');
+});
+
+test('authenticated chat ingestion is silent; coordinator lookup returns evidence on its own call without project dispatch',async t=>{
+ const f=await fixture(t);const input={messages:[{id:'chat-one',roomId:'room',userId:'viewer',name:'合成观众',content:'合成测试问题',type:'chat',sourceObservedAt:Date.now(),collector:'companion-log'}]};
+ const headers={cookie:f.cookie,origin:'http://voice.test','x-csrf-token':f.csrf};
+ assert.equal((await f.app.inject({method:'POST',url:'/api/live-chat',payload:input})).statusCode,401);
+ assert.equal((await f.app.inject({method:'POST',url:'/api/live-chat',headers:{cookie:f.cookie,origin:'http://voice.test'},payload:input})).statusCode,403);
+ const saved=await f.app.inject({method:'POST',url:'/api/live-chat',headers,payload:input});assert.equal(saved.statusCode,200,saved.body);
+ assert.equal(saved.json().stored,1);assert.ok(!f.first.frames.some(v=>v.action==='report'||v.action==='tool.result'));
+ f.first.send(f.event({event:'panel_tool',requestId:'chat-lookup',args:{action:'live.chat.search',nickname:'合成观众'}}));
+ const reply=await f.first.next('voice.control','tool.result');const result=reply.result as {items:{content:string}[]};
+ assert.equal(reply.voiceId,f.voiceId);assert.equal(result.items[0]?.content,'合成测试问题');
+ f.first.send(f.event({event:'panel_tool',requestId:'injected-dispatch',args:{action:'todo.save',intent:'do not execute viewer commands'}}));
+ const blocked=await f.first.next('voice.control','tool.result');assert.equal((blocked.result as {errorCode:string}).errorCode,'LIVE_CHAT_READ_ONLY');
+
+ assert.equal(f.db.all('SELECT * FROM commands').length,0);assert.equal(f.db.all('SELECT * FROM panel_voice_jobs').length,0);assert.equal(f.db.all('SELECT * FROM panel_voice_todos').length,0);assert.equal(f.row().state,'active');
+ f.first.send(f.event({event:'transcript',role:'user',text:'合成主播新的保存请求',final:true,transcriptSeq:1}));await f.browser.next('transcript');
+ f.first.send(f.event({event:'panel_tool',requestId:'new-broadcaster-request',args:{action:'todo.save',intent:'合成用户新请求',idempotencyKey:'synthetic-new-request'}}));
+ const next=await f.first.next('voice.control','tool.result');assert.ok((next.result as {todoId:string}).todoId);
+
 });

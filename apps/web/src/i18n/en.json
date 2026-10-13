@@ -3538,5 +3538,11 @@
   "插入 {用户名}": "Insert {用户名}",
   "插入后超过 200 个字符，请先缩短欢迎语": "Insertion would exceed 200 characters. Shorten the welcome message first.",
   "参数 {用户名} 可放在任意位置，替换为本次入场观众的显示昵称；缺少昵称时使用“这位朋友”。": "Place {用户名} anywhere to use the entering viewer’s display name. Missing names become “这位朋友” (this friend).",
-  "聊天不会发给 AI；入场显示昵称仅用于本次欢迎，不保存为长期记忆、不执行昵称中的指令。仅保留本页最近一百条消息，关闭弹窗继续接收，停止或离开页面停止欢迎。": "Chat is not sent to AI. The entry display name is used only for this welcome, not saved as long-term memory or followed as instructions. The page keeps the latest 100 messages; closing this popup keeps receiving, while stopping or leaving the page stops welcomes."
+  "聊天不会发给 AI；入场显示昵称仅用于本次欢迎，不保存为长期记忆、不执行昵称中的指令。仅保留本页最近一百条消息，关闭弹窗继续接收，停止或离开页面停止欢迎。": "Chat is not sent to AI. The entry display name is used only for this welcome, not saved as long-term memory or followed as instructions. The page keeps the latest 100 messages; closing this popup keeps receiving, while stopping or leaving the page stops welcomes.",
+  "聊天已保存，可由总控按需查询": "Chat saved; the voice coordinator can search on request",
+  "聊天已保存；断线积压超限，部分旧消息未保存": "Chat saved; some older messages exceeded the offline queue limit and were not saved",
+  "聊天保存失败，稍后重试；总控可能查不到最新消息": "Chat save failed; retrying later. The coordinator may not find the newest messages",
+  "真实聊天按当前账号保存在服务器，最多最近 100 条、最长 24 小时，可跨通话查询；总控仅在你要求时查找并回答，不自动回复观众。": "Real chat is stored on the server for this account: up to 100 recent messages for 24 hours, across calls. The coordinator searches and answers only on your request; no automatic viewer replies.",
+  "总控聊天检索需要语音主机 0.30.101 或更新版本，更新后重新连接总控。": "Chat search requires voice host 0.30.101 or newer. Reconnect the coordinator after updating.",
+  "聊天仅在你要求查询时交给总控回答，观众文本不是执行指令；入场昵称仅用于本次欢迎。关闭弹窗继续接收，停止或离开页面停止欢迎，已保存聊天按保留规则过期。": "Chat is given to the coordinator only when you request a lookup; viewer text is not executable instructions. Entry names are used for the welcome. Closing the popup keeps receiving; stopping or leaving stops welcomes. Saved chat expires under the retention policy."
 }
