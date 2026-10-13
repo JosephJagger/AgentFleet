@@ -1,3 +1,4 @@
+import {readReloadConnection,saveReloadConnection,clearReloadConnection} from '../lib/reload-connections';
 import {api} from '../lib/api';
 import {LiveChatUpload} from '../lib/live-chat-upload';
 import {useEffect,useId,useRef,useState,type RefObject} from 'react';
@@ -28,7 +29,9 @@ const skippedReason=(reason?:string)=>({
 } as Record<string,string>)[reason??'']??'欢迎请求被拒绝，原因未返回';
 
 export function LiveInteractions({voice,supported=true}:{voice:RefObject<WelcomeBridge|null>;supported?:boolean}) {
-  const [open,setOpen]=useState(false),[port,setPort]=useState('18888');
+  const [reloadPort]=useState(()=>readReloadConnection('collector'));
+  const [open,setOpen]=useState(false),[port,setPort]=useState(reloadPort||'18888');
+  const connectedPort=useRef('');
   const [view,setView]=useState<'messages'|'settings'>('messages');
   const [filter,setFilter]=useState<'all'|'chat'|'enter'|'interaction'>('all');
   const trigger=useRef<HTMLButtonElement>(null),panelId=useId();
@@ -72,8 +75,8 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
   const socket=useRef<WebSocket|null>(null),welcoming=useRef(false);
   const pending=useRef<LiveEvent[]>([]),inFlight=useRef<{event:LiveEvent;sentAt:number}|null>(null),cooldown=useRef(0),ledger=useRef(new LiveEventLedger()),lastReceipt=useRef('');
   const resetWelcome=()=>{welcoming.current=false;pending.current=[];inFlight.current=null;setEnabled(false);setWelcomeState('未开启');};
-  const stop=()=>{chatUpload.current.clear();setChatSave('');setLastAt(0);setFollow(true);setEvents([]);clearTimeout(connectionTimer.current);const previous=socket.current;socket.current=null;previous?.close();resetWelcome();setConnection('off');setNotice('');};
-  useEffect(()=>{const logout=()=>stop();window.addEventListener('agentfleet:logout',logout);window.addEventListener('pagehide',logout);return()=>{window.removeEventListener('agentfleet:logout',logout);window.removeEventListener('pagehide',logout);const previous=socket.current;socket.current=null;previous?.close();pending.current=[];inFlight.current=null;clearTimeout(connectionTimer.current);};},[]);
+  const stop=()=>{clearReloadConnection('collector');connectedPort.current='';chatUpload.current.clear();setChatSave('');setLastAt(0);setFollow(true);setEvents([]);clearTimeout(connectionTimer.current);const previous=socket.current;socket.current=null;previous?.close();resetWelcome();setConnection('off');setNotice('');};
+  useEffect(()=>{const logout=()=>stop();const leave=()=>{const resume=socket.current?.readyState===1?connectedPort.current:'';stop();if(resume)saveReloadConnection('collector',resume);};window.addEventListener('agentfleet:logout',logout);window.addEventListener('pagehide',leave);return()=>{window.removeEventListener('agentfleet:logout',logout);window.removeEventListener('pagehide',leave);const previous=socket.current;socket.current=null;previous?.close();pending.current=[];inFlight.current=null;clearTimeout(connectionTimer.current);};},[]);
   useEffect(()=>{if(open)panel.current?.focus({preventScroll:true});},[open]);
   useEffect(()=>{
     const timer=setInterval(()=>{
@@ -117,7 +120,7 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
     try{
       const ws=new WebSocket(url);socket.current=ws;setConnection('connecting');
       const timeout=connectionTimer.current=setTimeout(()=>{if(socket.current===ws&&ws.readyState===WebSocket.CONNECTING){failed=true;setConnection('error');setNotice('连接超时，请检查本机采集器与浏览器本地网络权限');ws.close();}},30000);
-      ws.onopen=()=>{clearTimeout(timeout);if(socket.current===ws){opened=true;setConnection('open');}};
+      ws.onopen=()=>{clearTimeout(timeout);if(socket.current===ws){connectedPort.current=port;opened=true;setConnection('open');}};
       ws.onmessage=message=>{
         if(socket.current!==ws)return;
         const packet=stream.current.read(message.data);
@@ -133,6 +136,7 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
       ws.onclose=()=>{clearTimeout(timeout);if(socket.current===ws){socket.current=null;setEvents([]);resetWelcome();if(!opened||failed){if(!failed)failure();}else{setConnection('off');setNotice('本机采集连接已断开，请手动重连；自动欢迎已关闭');}}};
     }catch{failure();}
   }
+  useEffect(()=>{if(!reloadPort){clearReloadConnection('collector');return;}const timer=setTimeout(()=>{clearReloadConnection('collector');connect();},0);return()=>clearTimeout(timer);},[]);
   const visibleEvents=events.filter(event=>filter==='all'||event.type===filter);
   const close=()=>{setOpen(false);trigger.current?.focus({preventScroll:true});};
   const connectionLabel=connection==='open'?'本机采集已连接':connection==='connecting'?'连接本机采集中':connection==='error'?'采集连接失败':'采集未连接';

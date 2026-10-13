@@ -1,10 +1,11 @@
+import {readReloadConnection,clearReloadConnection} from '../lib/reload-connections';
 import {LiveInteractions} from './LiveInteractions';
 import type {WelcomeBridge} from '../lib/live-interactions';
 import { displayName } from "../lib/display-name";
 import {VoiceTaskInbox} from "./VoiceTaskInbox";
 import { ProgressView } from "./RuntimeProgress";
 import { useDraggablePanel } from "../lib/use-draggable-panel";
-import { useState, useRef, useId } from "react";
+import { useState, useRef, useId, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Headset, X, ExternalLink, Activity, ChevronDown } from "lucide-react";
 import { NativeVoicePanel, type PanelVoiceTask } from "./NativeVoicePanel";
@@ -13,10 +14,12 @@ import type { Dashboard } from "../lib/types";
 
 export function PanelVoiceControl({ machines, onOpenSession, liveInteractions=false }: { liveInteractions?:boolean; machines:Dashboard['machines'];onOpenSession:(id:string)=>void }) {
   const welcomeRef=useRef<WelcomeBridge|null>(null);
-  const [expanded,setExpanded]=useState(false);
+  const [reloadHost,setReloadHost]=useState(()=>readReloadConnection('voice'));
+  useEffect(()=>clearReloadConnection('voice'),[]);
+  const [expanded,setExpanded]=useState(Boolean(reloadHost));
   const panel = useRef<HTMLElement>(null);
   const dragging = useDraggablePanel(panel, expanded);
-  const [host,setHost]=useState('');
+  const [host,setHost]=useState(reloadHost);
   const [active,setActive]=useState(false);
   const [tasks,setTasks]=useState<PanelVoiceTask[]>([]);
   const [tasksExpanded,setTasksExpanded]=useState(false);
@@ -39,11 +42,12 @@ export function PanelVoiceControl({ machines, onOpenSession, liveInteractions=fa
     <section ref={panel} style={dragging.style} className="panel-voice-control__settings" hidden={!expanded} aria-label={t("面板语音总控")}>
       <header className="voice-drag-handle" {...dragging.handle}><strong className="panel-voice-control__title"><Headset size={22}/>{t("语音总控")}</strong><button className="icon-button" aria-label={t("关闭")} onClick={()=>setExpanded(false)}><X size={17}/></button></header>
       <p>{t("说出主机、项目和任务，不同项目可并行派发。")}</p>
-      <label>{t("语音主机")}<select value={selected} disabled={active||!eligible.length} onChange={e=>setHost(e.target.value)}>{!eligible.length&&<option value="">{t("等待支持总控的主机上线")}</option>}{eligible.map(m=><option key={m.id} value={m.id}>{displayName(m.name)}</option>)}</select></label>
+      {reloadHost&&!active&&<p role="status">{t('页面已刷新，点击恢复语音重新建立通话；不会重发任务或补播欢迎。')}</p>}
+      <label>{t("语音主机")}<select value={selected} disabled={active||!eligible.length} onChange={e=>{setHost(e.target.value);setReloadHost('');}}>{host&&!eligible.some(m=>m.id===host)&&<option value={host}>{t("原语音主机暂不可用")}</option>}{!eligible.length&&!host&&<option value="">{t("等待支持总控的主机上线")}</option>}{eligible.map(m=><option key={m.id} value={m.id}>{displayName(m.name)}</option>)}</select></label>
       <p className="panel-voice-control__hint">{t("使用此主机的 Codex 账号通话，可指挥其他主机。")}</p>
       {eligible.find(m=>m.id===selected)?.maintenance && <p role="status">{t("主机正在维护，等待安全重启；当前任务可继续，暂不接受新任务")}</p>}
       {!supportsDispatch&&selected&&<p>{t("接管与排队需要语音主机连接服务 0.30.98 或更新版本；更新后请重新通话")}</p>}
-      <NativeVoicePanel welcomeRef={welcomeRef} sessionId={`panel:${selected}`} globalMachineId={selected||'unavailable'} canStart={Boolean(selected&&eligible.some(m=>m.id===selected&&!m.maintenance))} onActiveChange={value=>{if(value)setHost(selected);setActive(value);}} onPanelTasks={setTasks} onPanelTask={task=>{if(!task)setTasks([]);else setTasks(previous=>[task,...previous.filter(other=>other.jobId!==task.jobId)]);}}/>
+      <NativeVoicePanel reloadRecovery={Boolean(reloadHost)} welcomeRef={welcomeRef} sessionId={`panel:${selected}`} globalMachineId={selected||'unavailable'} canStart={Boolean(selected&&eligible.some(m=>m.id===selected&&!m.maintenance))} onActiveChange={value=>{if(value){setHost(selected);setReloadHost('');}setActive(value);}} onPanelTasks={setTasks} onPanelTask={task=>{if(!task)setTasks([]);else setTasks(previous=>[task,...previous.filter(other=>other.jobId!==task.jobId)]);}}/>
       {!supportsMemory&&selected&&<p>{t("服务端待办恢复需要语音主机 0.30.87 或更新版本，更新后重新通话")}</p>}
       <button type="button" className="panel-voice-control__task-summary" aria-expanded={tasksExpanded} aria-controls={taskListId} onClick={()=>setTasksExpanded(value=>!value)}>
         <strong>{runningCount}</strong><span>{t("运行中")}</span><Activity size={18}/><ChevronDown size={16} className={tasksExpanded?'is-expanded':''}/>

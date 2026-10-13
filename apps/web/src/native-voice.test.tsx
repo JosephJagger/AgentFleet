@@ -45,7 +45,7 @@ beforeEach(() => {
   getUserMedia.mockResolvedValue(stream);
   vi.mocked(api.acquireLease).mockResolvedValue({ lease: { id: "lease", version: 1 } } as Awaited<ReturnType<typeof api.acquireLease>>);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup();sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("microphone opens only on explicit start; native answer connects, mute works, and ending closes all media", async () => {
   const active = vi.fn();
@@ -300,6 +300,7 @@ for(const action of ['logout','pagehide','unmount'] as const) it(`${action} rele
  expect(track.stop).toHaveBeenCalledTimes(1);expect(Peer.all[0]!.closed).toBe(true);
  expect(socket.sent.at(-1)).toMatchObject({type:'stop',reason:action==='logout'?'USER_LOGOUT':action==='pagehide'?'PAGE_LEFT':'CLIENT_DISPOSED'});
  view.unmount();expect(socket.sent.filter(x=>x.type==='stop')).toHaveLength(1);
+ expect(Boolean(sessionStorage.getItem('agentfleet.reload-connection.voice'))).toBe(action==='pagehide');
 });
 
 it('global host recovery preserves microphone, peer and signaling without repeating start',async()=>{
@@ -360,4 +361,12 @@ it('live entry uses native interruption without VAD events; background tasks do 
  date.mockReturnValue(now+3500);expect(welcome.current?.send({...event,id:'custom',name:'合成昵称'},'欢迎{用户名}来到测试直播间')).toBe(true);expect(socket.sent.at(-1)).toMatchObject({type:'live.welcome',welcomeText:'欢迎{用户名}来到测试直播间',viewerDisplayName:'合成昵称'});
  socket.receive({type:'recovering'});await waitFor(()=>expect(welcome.current?.status()).toBe('unknown'));expect(welcome.current?.send(event)).toBe(false);
  date.mockRestore();
+});
+it('offers reload recovery without opening the microphone until the explicit click',async()=>{
+ render(<NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart reloadRecovery onActiveChange={()=>undefined}/>);
+ expect(Peer.all).toHaveLength(0);expect(Socket.all).toHaveLength(0);
+ fireEvent.click(screen.getByRole('button',{name:'恢复语音'}));
+ await waitFor(()=>expect(Socket.all).toHaveLength(1));
+ await act(async()=>Socket.all[0].receive({type:'ready'}));
+ expect(Socket.all[0].sent.filter(x=>x.type==='panel.start')).toHaveLength(1);
 });

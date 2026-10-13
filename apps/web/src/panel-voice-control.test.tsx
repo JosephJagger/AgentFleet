@@ -83,3 +83,14 @@ it('live message entry is opt-in for the desktop broadcast theme',()=>{
  view.rerender(<PanelVoiceControl {...props} liveInteractions/>);expect(screen.getByRole('button',{name:'互动消息'})).toBeTruthy();
  view.rerender(<PanelVoiceControl {...props}/>);expect(screen.queryByRole('button',{name:'互动消息'})).toBeNull();
 });
+it('restores the previous voice host after reload without silently selecting a different host',()=>{
+ vi.stubGlobal('performance',{getEntriesByType:()=>[{type:'reload'}]});
+ sessionStorage.setItem('agentfleet.reload-connection.voice',JSON.stringify({target:'previous-host',at:Date.now()}));
+ try {
+  render(<PanelVoiceControl machines={[machine]} onOpenSession={()=>{}}/>);
+  expect(screen.getByRole('button',{name:'面板语音总控'}).getAttribute('aria-expanded')).toBe('true');
+  expect((screen.getByLabelText('语音主机') as HTMLSelectElement).value).toBe('previous-host');
+  expect((screen.getByRole('button',{name:'Test call'}) as HTMLButtonElement).disabled).toBe(true);
+  expect(sessionStorage.getItem('agentfleet.reload-connection.voice')).toBeNull();
+ }finally{cleanup();sessionStorage.clear();vi.unstubAllGlobals();}
+});

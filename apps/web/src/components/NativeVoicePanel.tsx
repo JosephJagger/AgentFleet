@@ -1,3 +1,4 @@
+import {saveReloadConnection,clearReloadConnection} from '../lib/reload-connections';
 import {displayName} from '../lib/display-name';
 import {DEFAULT_LIVE_WELCOME,normalizeWelcomeText,LIVE_WELCOME_INTERVAL_MS,welcomeEligible,type WelcomeBridge} from '../lib/live-interactions';
 import {VoiceAudioDevices,useVoiceDevicePreferences,voiceMicrophoneConstraints} from './VoiceAudioDevices';
@@ -12,7 +13,7 @@ import { t } from "../i18n";
 export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;provider?:'codex'|'claude';managed?:boolean;queuePosition?:number|null;state:string;result:string;link:string;progress?:SessionProgress;historyLimited?:boolean;executionStarted?:boolean|null;error?:{code:string;message:string}|null; }
 type Phase = "idle" | "connecting" | "connected" | "recovering" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
-export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks, welcomeRef }: { welcomeRef?:RefObject<WelcomeBridge|null>; globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
+export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks, welcomeRef, reloadRecovery=false }: { reloadRecovery?:boolean; welcomeRef?:RefObject<WelcomeBridge|null>; globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
   const welcomeNextAt=useRef(0);
   const welcomeSentAt=useRef(0);
   const welcomeReceipt=useRef<WelcomeBridge["receipt"]>(undefined);
@@ -70,8 +71,8 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     activeCallback.current(false);
   };
   useEffect(() => {
-    const leavePage = () => { if (resources.current.starting || resources.current.peer || resources.current.stream) { cleanup.current("PAGE_LEFT"); setPhase("idle"); } };
-    const logout = () => { cleanup.current("USER_LOGOUT"); setPhase("idle"); };
+    const leavePage = () => { if (resources.current.starting || resources.current.peer || resources.current.stream) { const resume=globalMachineId&&resources.current.signalingReady?globalMachineId:undefined;cleanup.current("PAGE_LEFT");if(resume)saveReloadConnection('voice',resume);setPhase("idle"); } };
+    const logout = () => { clearReloadConnection('voice');cleanup.current("USER_LOGOUT"); setPhase("idle"); };
     const otherCall = (event:Event) => {if((event as CustomEvent).detail!==popoverId&&(resources.current.starting||resources.current.peer)){cleanup.current("OTHER_CALL_STARTED");setPhase("idle");}};
     // Hidden is not destroyed: keep microphone, playback, WebRTC and signaling.
     // The server's protocol ping/pong already tolerates throttled UI timers.
@@ -98,6 +99,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   }, [sessionId]);
 
   async function start() {
+    if(globalMachineId)clearReloadConnection('voice');
     window.dispatchEvent(new CustomEvent("agentfleet:voice-start",{detail:popoverId}));
     cleanup.current();
     const attempt = generation.current;
@@ -209,7 +211,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     {!active&&<label className="native-voice__status"><input type="checkbox" checked={skipPreferences} onChange={e=>setSkipPreferences(e.target.checked)}/>{t('本次通话不加载长期偏好')}</label>}
     {active&&preferenceState&&<p className="native-voice__status" role="status">{t(preferenceState==='disabled'?'本次通话不加载长期偏好':preferenceState==='loaded'?'长期偏好已加载':preferenceState==='reconnect_required'?'偏好已更新，请挂断重连以清除旧规则上下文':preferenceState==='pending'?'长期偏好同步中':'长期偏好暂未加载；通话仍保持连接')}</p>}
     <details className="native-voice__device-settings"><summary>{t('音频设备与检测')}</summary><VoiceAudioDevices active={active} stream={meterStream} microphone={devices.microphone} speaker={devices.speaker} onMicrophone={devices.setMicrophone} onSpeaker={devices.setSpeaker} outputSupported={outputSupported}/>{deviceError&&<p role="status">{deviceError}</p>}</details>
-    {!active&&<button type="button" className="button button--primary" disabled={!canStart} onClick={()=>void start()}>{t('开始通话')}</button>}
+    {!active&&<button type="button" className="button button--primary" disabled={!canStart} onClick={()=>void start()}>{t(reloadRecovery?'恢复语音':'开始通话')}</button>}
     {message && <p className="native-voice__error" role="alert">{message}</p>}
     {active && <p className="native-voice__task" role="status">{t(activeTurnId || taskPhase === "running" ? "项目任务正在执行" : taskPhase === "delegated" ? "已派发，等待项目任务启动" : taskPhase === "completed" ? "项目任务已完成，结果见会话" : taskPhase === "failed" ? "项目任务未完成，请查看会话结果" : taskPhase === "unknown" ? "任务状态暂不可用，通话可继续" : "尚未派发项目任务")}</p>}
     {active && <div className="native-voice__actions">
@@ -220,9 +222,9 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     {transcript.length > 0 && <details className="native-voice__transcript-details"><summary>{t("本次语音转写")}</summary><div className="native-voice__transcript" ref={transcriptArea} tabIndex={0}>{transcript.map((entry,index) => <p key={index}><strong>{entry.role === "user" ? t("你") : "Codex"}</strong><span>{entry.text}</span></p>)}</div></details>}
   </div>;
   return <div ref={control} className={`native-voice${globalMachineId ? " native-voice--panel" : ""}${active ? " native-voice--active" : ""}`}>
-    <button ref={trigger} type="button" className={`button ${globalMachineId ? "button--primary" : "button--secondary"} native-voice__trigger`} disabled={!active && !canStart} aria-label={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} title={t(globalMachineId ? active ? "总控通话控制" : "开始总控通话" : active ? "语音控制" : "开始语音")} aria-expanded={expanded} aria-controls={expanded ? popoverId : undefined} onClick={() => { if (active) setExpanded(value => !value); else void start(); }}>
+    <button ref={trigger} type="button" className={`button ${globalMachineId ? "button--primary" : "button--secondary"} native-voice__trigger`} disabled={!active && !canStart} aria-label={t(globalMachineId ? active ? "总控通话控制" : reloadRecovery ? "恢复语音" : "开始总控通话" : active ? "语音控制" : "开始语音")} title={t(globalMachineId ? active ? "总控通话控制" : reloadRecovery ? "恢复语音" : "开始总控通话" : active ? "语音控制" : "开始语音")} aria-expanded={expanded} aria-controls={expanded ? popoverId : undefined} onClick={() => { if (active) setExpanded(value => !value); else void start(); }}>
       {phase === "connecting" || phase === "recovering" ? <LoaderCircle className="spin" size={19} /> : globalMachineId ? <Headset size={20} /> : <Phone size={19} />}
-      {globalMachineId && <span>{t(phase === "recovering" ? "恢复中…" : phase === "connecting" ? "正在连接…" : active ? "通话控制" : "开始通话")}</span>}
+      {globalMachineId && <span>{t(phase === "recovering" ? "恢复中…" : phase === "connecting" ? "正在连接…" : active ? "通话控制" : reloadRecovery ? "恢复语音" : "开始通话")}</span>}
       {active && <i className="native-voice__indicator" aria-hidden="true" />}
     </button>
     {portalHost ? createPortal(callPanel, portalHost) : callPanel}

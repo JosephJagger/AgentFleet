@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import {StrictMode} from 'react';
 import {act,cleanup,fireEvent,render,screen,within} from '@testing-library/react';
 import {afterEach,expect,it,vi} from 'vitest';
 import {LiveInteractions} from './components/LiveInteractions';
@@ -236,4 +237,24 @@ it('accepted chat reaches storage without a voice call, entry/duplicate packets 
  const {api}=await import('./lib/api');vi.mocked(api.storeLiveChat).mockClear();const f=ui();
  await act(async()=>{f.ws.receive(frame(1,{MsgId:'store-1'}));f.ws.receive(frame(1,{MsgId:'store-2'}));f.ws.receive(frame(1,{MsgId:'store-3'}));f.ws.receive(frame(1,{MsgId:'store-3'}));f.ws.receive(frame(3,{MsgId:'store-entry'}));vi.advanceTimersByTime(1000);});
  expect(api.storeLiveChat).toHaveBeenCalledTimes(1);expect(vi.mocked(api.storeLiveChat).mock.calls[0][0].map(e=>e.id)).toEqual(['store-1','store-2','store-3']);expect(f.send).not.toHaveBeenCalled();f.view.unmount();
+});
+it('reconnects the collector once after reload but leaves welcomes off and respects Stop',()=>{
+ vi.useFakeTimers();Socket.all=[];sessionStorage.clear();
+ vi.stubGlobal('WebSocket',Socket);
+ vi.stubGlobal('performance',{getEntriesByType:()=>[{type:'reload'}]});
+ sessionStorage.setItem('agentfleet.reload-connection.collector',JSON.stringify({target:'18889',at:Date.now()}));
+ const voice={current:null};const view=render(<StrictMode><LiveInteractions voice={voice}/></StrictMode>);
+ act(()=>vi.advanceTimersByTime(1));
+ expect(Socket.all).toHaveLength(1);expect(Socket.all[0].url).toBe('ws://127.0.0.1:18889/');
+ act(()=>Socket.all[0].open());
+ expect((screen.getByRole('checkbox',{name:'入场自动欢迎',hidden:true}) as HTMLInputElement).checked).toBe(false);
+ act(()=>window.dispatchEvent(new Event('pagehide')));
+ expect(JSON.parse(sessionStorage.getItem('agentfleet.reload-connection.collector')!).target).toBe('18889');
+ view.unmount();const second=render(<LiveInteractions voice={voice}/>);act(()=>vi.advanceTimersByTime(1));
+ expect(Socket.all).toHaveLength(2);act(()=>Socket.all[1].open());
+ fireEvent.click(screen.getByRole('button',{name:'互动消息'}));
+ fireEvent.click(screen.getByRole('button',{name:'停止接收'}));
+ act(()=>window.dispatchEvent(new Event('pagehide')));second.unmount();
+ render(<LiveInteractions voice={voice}/>);act(()=>vi.advanceTimersByTime(1));
+ expect(Socket.all).toHaveLength(2);sessionStorage.clear();
 });

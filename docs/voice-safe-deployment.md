@@ -166,3 +166,20 @@ Chromium tests with synthetic audio.
 The new database schema requires the prepared compatible backend; rollback must
 follow the existing backup and voice-drain procedure, never replace a live
 post-migration database with an older copy containing lost user writes.
+
+### Refresh recovery hints
+
+A refresh still destroys the old WebRTC call. On `pagehide`, a ready global call
+writes only its host ID and timestamp to tab-local session storage. A reload
+within five minutes offers **恢复语音** on the same host; it does not open the
+microphone, replay tasks, or transfer the old call. The user starts a new call.
+If that host is unavailable, no alternative is silently selected. Hints are
+consumed once; ordinary navigation/back-forward and expired hints do not restore.
+
+A connected local collector similarly saves its port on page exit. A reload
+within five minutes attempts one loopback reconnection without opening an overlapping interaction
+panel. Manual Stop/logout clears this intent. Failure uses the existing timeout
+and manual retry; there is no reconnect loop. Automatic welcomes remain off and
+pending events are not replayed. This does not preserve unsaved in-memory chat
+or replay events that arrived while the webpage was absent. Browser microphone,
+local-network, and audio-playback permissions still apply.

@@ -3561,5 +3561,8 @@
   "窗口未打开，请允许本站弹出窗口后重试。": "The window did not open. Allow popups for this site and retry.",
   "新窗口不会转移当前通话；请勿关闭正在通话的原窗口。窗口尺寸可能受系统限制，以底部画布尺寸为准。": "Calls remain in their original window; keep it open during a call. System window limits may apply; check the canvas dimensions in the status bar.",
   "仅保存在本浏览器；画布较小时自动隐藏介绍，优先保证工作区。": "Saved only in this browser. Small canvases hide introductions to prioritize the workspace.",
-  "完整画布 {0} × {1}（含介绍）；网页左右裁去各 {2}px，上下裁去各 {3}px，再等比适配。标题栏需另外裁掉。": "Full canvas {0} × {1}, including introductions. Crop {2}px from each horizontal side and {3}px from top and bottom, then fit proportionally. Crop the title bar separately."
+  "完整画布 {0} × {1}（含介绍）；网页左右裁去各 {2}px，上下裁去各 {3}px，再等比适配。标题栏需另外裁掉。": "Full canvas {0} × {1}, including introductions. Crop {2}px from each horizontal side and {3}px from top and bottom, then fit proportionally. Crop the title bar separately.",
+  "恢复语音": "Reconnect voice",
+  "页面已刷新，点击恢复语音重新建立通话；不会重发任务或补播欢迎。": "The page was refreshed. Reconnect voice to start a new call; tasks and welcomes will not be replayed.",
+  "原语音主机暂不可用": "The previous voice host is unavailable"
 }
