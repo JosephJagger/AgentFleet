@@ -1,7 +1,7 @@
-/** HomeDouyinCollector's Companion-log WebSocket stream; not an official Douyin API. */
+/** HomeDouyinCollector's local Companion WebSocket stream; not an official Douyin API. */
 export interface LiveEvent {
   id:string; roomId:string; ownerId:string; ownerName:string; roomTitle:string;
-  userId:string; name:string; content:string; type:'chat'|'enter'; receivedAt:number; anonymous?:boolean; isAnchor?:boolean; collector?:'companion-log'; sourceObservedAt?:number;
+  userId:string; name:string; content:string; type:'chat'|'enter'; receivedAt:number; anonymous?:boolean; isAnchor?:boolean; collector?:'companion-log'|'companion-memory-bridge'; collectorTransport?:'native-publish-message'; sourceObservedAt?:number;
 }
 const object=(v:unknown):Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
 const text=(v:unknown,max=200)=>typeof v==='string'?v.slice(0,max):'';
@@ -26,7 +26,7 @@ export function inspectLivePacket(raw:unknown,now=Date.now()):CollectorPacket {
     const roomId=identifier(data.RoomId),ownerId=identifier(object(data.Owner).UserId);
     if(!roomId)return {reason:'room'};
     const id=identifier(data.MsgId),userId=identifier(user.Id);
-    const collector=data.CollectorSource==='companion-log'?'companion-log':undefined;
+    const collector=data.CollectorSource==='companion-log'?'companion-log':data.CollectorSource==='companion-memory-bridge'&&type==='chat'&&data.CollectorTransport==='native-publish-message'?'companion-memory-bridge':undefined;
     let sourceObservedAt:number|undefined;
     {
       if(!collector||!['chat','enter'].includes(type)||data.NativeMethod!==(type==='enter'?'WebcastMemberMessage':'WebcastChatMessage')||(type==='enter'&&String(data.Action)!=='1'))return {reason:'native'};
@@ -36,7 +36,7 @@ export function inspectLivePacket(raw:unknown,now=Date.now()):CollectorPacket {
     }
     if((type==='chat'||type==='enter')&&!id)return {reason:'message'};
     if(type==='chat'&&typeof data.Content!=='string')return {reason:'message'};
-    return {event:{type,id,roomId,ownerId,ownerName:'',roomTitle:'',userId,name:text(user.Nickname),content:type==='chat'?text(data.Content,2000):'',receivedAt:collector?Math.min(now,sourceObservedAt!):now,...(collector?{collector,sourceObservedAt}:{}),anonymous:data.IsAnonymous===true,isAnchor:user.IsAnchor===true}};
+    return {event:{type,id,roomId,ownerId,ownerName:'',roomTitle:'',userId,name:text(user.Nickname),content:type==='chat'?text(data.Content,2000):'',receivedAt:collector?Math.min(now,sourceObservedAt!):now,...(collector?{collector,sourceObservedAt}:{}),...(collector==='companion-memory-bridge'?{collectorTransport:'native-publish-message' as const}:{}),anonymous:data.IsAnonymous===true,isAnchor:user.IsAnchor===true}};
   }catch{return {reason:'format'};}
 }
 export function parseLiveEvent(raw:string,now=Date.now()):LiveEvent|null {
