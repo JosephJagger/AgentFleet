@@ -26,3 +26,26 @@ it('recovers from malformed saved preferences',()=>{
  render(<BuzhoushanBroadcastControl enabled onChange={()=>{}}/>);
  expect(screen.getByText((_,element)=>element?.tagName==='P'&&element.textContent==='Codex · Claude Code')).toBeTruthy();
 });
+it('opens a separate capture window without reusing the current call window and reports popup blocking',()=>{
+ const open=vi.spyOn(window,'open').mockReturnValue(null);
+ render(<BuzhoushanBroadcastControl enabled onChange={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'直播采集设置'}));
+ const button=screen.getByRole('button',{name:'打开 16:9 直播窗口'});
+ fireEvent.click(button);fireEvent.click(button);
+ expect(screen.getByRole('status').textContent).toContain('窗口未打开');
+ expect(open.mock.calls[0][0]).toBe('/workbench?broadcast=1');
+ expect(open.mock.calls[0][1]).not.toBe(open.mock.calls[1][1]);
+ open.mockRestore();
+});
+it('never resizes the original window and fits only the dedicated popup once',()=>{
+ const resize=vi.spyOn(window,'resizeTo').mockImplementation(()=>{});
+ const originalName=window.name;
+ const view=render(<BuzhoushanBroadcastControl enabled onChange={()=>{}}/>);
+ expect(resize).not.toHaveBeenCalled();view.unmount();
+ window.name='agentfleet-broadcast-canvas-test';
+ const popup=render(<BuzhoushanBroadcastControl enabled onChange={()=>{}}/>);
+ expect(resize).toHaveBeenCalledTimes(1);
+ popup.rerender(<BuzhoushanBroadcastControl enabled={false} onChange={()=>{}}/>);
+ expect(resize).toHaveBeenCalledTimes(1);
+ window.name=originalName;resize.mockRestore();
+});

@@ -2,7 +2,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Download,MonitorUp,Ratio,X} from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {t} from '../i18n';
-import {downloadBroadcastLauncher} from '../lib/broadcast-launcher';
+import {downloadBroadcastLauncher,openBroadcastWindow,fitBroadcastWindow} from '../lib/broadcast-launcher';
 
 type BroadcastIntro = {leftTitle:string;leftSubtitle:string;rightTitle:string;rightSubtitle:string};
 const introKey='agentfleet:buzhoushan-broadcast-intro';
@@ -15,7 +15,7 @@ function IntroWords({text}:{text:string}) {
   return <>{text.split(/(\s+|｜)/u).filter(Boolean).map((part,index)=>/^(\s+|｜)$/u.test(part)?<span key={index} className="buzhou-broadcast-rail__separator">{part}</span>:<span key={index} className="buzhou-broadcast-rail__word">{part}</span>)}</>;
 }
 
-/** Sits outside the unchanged 16:9 work area; CSS hides rails without enough room. */
+/** Introductions are part of the same 16:9 composition as the reflowing workspace. */
 export function BuzhoushanBroadcastIntro({intro=defaultIntro}:{intro?:BroadcastIntro}) {
   return <div className="buzhou-broadcast-intro" aria-label={t('直播间介绍')}>
     <aside className="buzhou-broadcast-rail buzhou-broadcast-rail--left"><div className="buzhou-broadcast-rail__content">
@@ -33,17 +33,22 @@ export function BuzhoushanBroadcastIntro({intro=defaultIntro}:{intro?:BroadcastI
 
 export function BuzhoushanBroadcastControl({enabled,onChange}:{enabled:boolean;onChange:(enabled:boolean)=>void}) {
   const [intro,setIntro]=useState(readIntro);
+  const [windowBlocked,setWindowBlocked]=useState(false);
+  useEffect(()=>{fitBroadcastWindow();},[]);
   const [open,setOpen]=useState(false),root=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
   useEffect(()=>{if(!open)return;const outside=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node))setOpen(false);};document.addEventListener('pointerdown',outside);return()=>document.removeEventListener('pointerdown',outside);},[open]);
   return <div ref={root} className="buzhou-broadcast-controls" onKeyDown={event=>{if(event.key==='Escape'&&open){event.stopPropagation();setOpen(false);trigger.current?.focus();}}}>
-    <button type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" aria-pressed={enabled} title={t('固定 16:9 工作区域，宽屏两侧展示直播介绍')} onClick={()=>onChange(!enabled)}><Ratio size={14}/>{t(enabled?'退出 16:9':'16:9 画布')}</button>
+    <button type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" aria-pressed={enabled} title={t('工作区与两侧介绍共同组成 16:9 画布')} onClick={()=>onChange(!enabled)}><Ratio size={14}/>{t(enabled?'退出 16:9':'16:9 画布')}</button>
     <button ref={trigger} type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" aria-label={t('直播采集设置')} aria-expanded={open} onClick={()=>setOpen(v=>!v)}><MonitorUp size={14}/></button>
     {open&&<section className="buzhou-broadcast-help" aria-label={t('直播采集设置')}>
       <header><strong>{t('直播采集设置')}</strong><button type="button" className="icon-button" aria-label={t('关闭')} onClick={()=>{setOpen(false);trigger.current?.focus();}}><X size={15}/></button></header>
-      <p>{t('中间工作区保持 16:9，宽屏两侧显示直播介绍。采集整个窗口可保留介绍，请等比例适配，勿拉伸。网页外的黑边需在直播伴侣中调整采集范围。')}</p>
+      <p>{t('工作区与介绍都在 16:9 画布内。建议打开独立直播窗口，采集时裁掉标题栏和画布外黑边，再等比适配；不要拉伸铺满。')}</p>
+      <button type="button" className="button" onClick={()=>setWindowBlocked(!openBroadcastWindow())}><MonitorUp size={14}/>{t('打开 16:9 直播窗口')}</button>
+      {windowBlocked&&<p role="status">{t('窗口未打开，请允许本站弹出窗口后重试。')}</p>}
+      <small>{t('新窗口不会转移当前通话；请勿关闭正在通话的原窗口。窗口尺寸可能受系统限制，以底部画布尺寸为准。')}</small>
       <details className="buzhou-broadcast-editor"><summary>{t('编辑直播介绍')}</summary>
         {(Object.keys(defaultIntro) as (keyof BroadcastIntro)[]).map((key,index)=><label key={key}>{t(['左侧标题','左侧副标题','右侧标题','右侧副标题'][index])}<input maxLength={40} value={intro[key]} onChange={event=>{const next={...intro,[key]:event.target.value};setIntro(next);try{localStorage.setItem(introKey,JSON.stringify(next));}catch{/* The current page still updates when storage is unavailable. */}}}/></label>)}
-        <small>{t('仅保存在本浏览器；留白较窄时自动隐藏介绍。')}</small>
+        <small>{t('仅保存在本浏览器；画布较小时自动隐藏介绍，优先保证工作区。')}</small>
       </details>
       <p>{t('遮挡后动画停住？下载 Windows 直播启动器，双击打开独立的 Edge / Chrome 窗口，再让直播伴侣采集这个窗口。')}</p>
       <button type="button" className="button button--primary" onClick={downloadBroadcastLauncher}><Download size={14}/>{t('下载 Windows 直播启动器')}</button>
@@ -58,9 +63,9 @@ export function BuzhoushanBroadcastStatus() {
   const [size,setSize]=useState({width:0,height:0,x:0,y:0});
   useLayoutEffect(()=>{
     const stage=ref.current?.closest('.app-shell');if(!stage)return;
-    const measure=()=>{const r=stage.getBoundingClientRect();setSize({width:Math.round(r.width),height:Math.round(r.height),x:Math.round(r.left),y:Math.round(r.top)});};
+    const measure=()=>{const r=stage.getBoundingClientRect();const left=document.querySelector('.buzhou-broadcast-rail--left')?.getBoundingClientRect();const right=document.querySelector('.buzhou-broadcast-rail--right')?.getBoundingClientRect();const hasCanvas=left&&right&&left.height>0;const x=hasCanvas?left.left:r.left;const width=hasCanvas?right.right-x:r.width;setSize({width:Math.round(width),height:Math.round(r.height),x:Math.round(x),y:Math.round(r.top)});};
     measure();const observer=typeof ResizeObserver==='undefined'?undefined:new ResizeObserver(measure);observer?.observe(stage);
     window.addEventListener('resize',measure);return()=>{observer?.disconnect();window.removeEventListener('resize',measure);};
   },[]);
-  return <output ref={ref} className="buzhou-broadcast-size" aria-label={t('直播画布尺寸')} title={t('画布 {0} × {1}；网页左右留边各 {2}px，上下留边各 {3}px。保留介绍请采集整个窗口并等比例适配；仅采集工作区时裁到画布边界。',size.width,size.height,size.x,size.y)}>16:9 · {size.width} × {size.height}</output>;
+  return <output ref={ref} className="buzhou-broadcast-size" aria-label={t('直播画布尺寸')} title={t('完整画布 {0} × {1}（含介绍）；网页左右裁去各 {2}px，上下裁去各 {3}px，再等比适配。标题栏需另外裁掉。',size.width,size.height,size.x,size.y)}>16:9 · {size.width} × {size.height}</output>;
 }

@@ -143,13 +143,16 @@
   .live-interactions__retention { display:none; }
 }
 
-/* A true 16:9 content rectangle. No unequal X/Y scaling, including ultrawide screens. */
+/* The entire composition (introductions + workspace) is 16:9; layout reflows without scaling. */
 @media (min-width:901px) {
   :root[data-theme="buzhoushan"]:has(.buzhou-broadcast) {
-    --buzhou-stage-width:min(100vw,calc(100dvh * 16 / 9));
+    --buzhou-canvas-width:min(100vw,calc(100dvh * 16 / 9));
+    --buzhou-canvas-side:calc((100vw - var(--buzhou-canvas-width)) / 2);
+    --buzhou-rail-width:0px;
+    --buzhou-stage-width:calc(var(--buzhou-canvas-width) - 2 * var(--buzhou-rail-width));
     --buzhou-stage-height:min(100dvh,calc(100vw * 9 / 16));
     --buzhou-stage-top:calc((100dvh - var(--buzhou-stage-height)) / 2);
-    --buzhou-stage-side:calc((100vw - var(--buzhou-stage-width)) / 2);
+    --buzhou-stage-side:calc(var(--buzhou-canvas-side) + var(--buzhou-rail-width));
   }
   :root[data-theme="buzhoushan"] body:has(.buzhou-broadcast) { background:#101012; }
   :root[data-theme="buzhoushan"] .app-shell.buzhou-broadcast { position:relative; contain:layout; width:var(--buzhou-stage-width); height:var(--buzhou-stage-height); min-height:0; margin:var(--buzhou-stage-top) auto; overflow:hidden; outline:1px solid #454545; background:var(--canvas); }
@@ -190,9 +193,9 @@
 .buzhou-broadcast-intro { display:none; }
 @media (min-width:901px) {
   :root[data-theme="buzhoushan"]:has(.buzhou-broadcast) .buzhou-broadcast-intro { display:block; }
-  .buzhou-broadcast-rail { position:fixed; top:var(--buzhou-stage-top); bottom:var(--buzhou-stage-top); width:var(--buzhou-stage-side); container-type:inline-size; pointer-events:none; overflow:hidden; background:linear-gradient(180deg,#101012,#14191f 55%,#101012); color:#70b9f4; }
-  .buzhou-broadcast-rail--left { left:0; }
-  .buzhou-broadcast-rail--right { right:0; }
+  .buzhou-broadcast-rail { position:fixed; top:var(--buzhou-stage-top); bottom:var(--buzhou-stage-top); width:var(--buzhou-rail-width); container-type:inline-size; pointer-events:none; overflow:hidden; background:linear-gradient(180deg,#101012,#14191f 55%,#101012); color:#70b9f4; }
+  .buzhou-broadcast-rail--left { left:var(--buzhou-canvas-side); }
+  .buzhou-broadcast-rail--right { right:var(--buzhou-canvas-side); }
   .buzhou-broadcast-rail__content { display:none; height:100%; box-sizing:border-box; }
   @container (min-width:140px) {
     .buzhou-broadcast-rail__content { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px clamp(12px,9cqw,40px); text-align:center; gap:20px; }
@@ -211,3 +214,8 @@
 
 .buzhou-broadcast-rail__word { display:inline-block; max-width:100%; overflow-wrap:anywhere; vertical-align:top; }
 .buzhou-broadcast-rail__separator { display:inline; }
+
+/* Reserve introductions inside the canvas only when the workspace remains usable. */
+@media (min-width:1200px) and (min-height:675px) {
+  :root[data-theme="buzhoushan"]:has(.buzhou-broadcast) { --buzhou-rail-width:clamp(140px,calc(var(--buzhou-canvas-width) * .12),240px); }
+}

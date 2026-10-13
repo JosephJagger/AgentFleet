@@ -25,3 +25,18 @@ export function downloadBroadcastLauncher() {
   const link=document.createElement('a');link.href=url;link.download='AgentFleets-Broadcast.cmd';document.body.append(link);link.click();link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+
+const broadcastWindowName='agentfleet-broadcast-canvas';
+/** New user-requested window only; never resize or navigate a live call's window. */
+export function openBroadcastWindow():boolean {
+  const height=Math.floor(Math.min(900,Math.max(1,window.screen.availHeight-100),Math.max(1,window.screen.availWidth-40)*9/16));
+  return Boolean(window.open('/workbench?broadcast=1',`${broadcastWindowName}-${crypto.randomUUID()}`,`popup=yes,width=${Math.floor(height*16/9)},height=${height}`));
+}
+/** Correct browser chrome once after this dedicated popup mounts, without a resize loop. */
+export function fitBroadcastWindow() {
+  if(!window.name.startsWith(broadcastWindowName+'-'))return;
+  const chromeWidth=Math.max(0,window.outerWidth-window.innerWidth);
+  const chromeHeight=Math.max(0,window.outerHeight-window.innerHeight);
+  const height=Math.floor(Math.min(900,Math.max(1,window.screen.availHeight-chromeHeight-40),Math.max(1,window.screen.availWidth-chromeWidth-40)*9/16));
+  try {window.resizeTo(Math.floor(height*16/9)+chromeWidth,height+chromeHeight);}catch{/* Browsers may keep their chosen size; the canvas still fits proportionally. */}
+}

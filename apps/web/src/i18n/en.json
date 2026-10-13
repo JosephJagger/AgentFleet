@@ -3554,5 +3554,12 @@
   "右侧标题": "Right title",
   "右侧副标题": "Right subtitle",
   "仅保存在本浏览器；留白较窄时自动隐藏介绍。": "Saved only in this browser. The introduction hides when the gutters are too narrow.",
-  "画布 {0} × {1}；网页左右留边各 {2}px，上下留边各 {3}px。保留介绍请采集整个窗口并等比例适配；仅采集工作区时裁到画布边界。": "Canvas {0} × {1}; side gutters {2}px each, top and bottom {3}px each. Capture the full window and fit proportionally to include the introduction; crop to the canvas for the workspace alone."
+  "画布 {0} × {1}；网页左右留边各 {2}px，上下留边各 {3}px。保留介绍请采集整个窗口并等比例适配；仅采集工作区时裁到画布边界。": "Canvas {0} × {1}; side gutters {2}px each, top and bottom {3}px each. Capture the full window and fit proportionally to include the introduction; crop to the canvas for the workspace alone.",
+  "工作区与两侧介绍共同组成 16:9 画布": "The workspace and introductions form one 16:9 canvas",
+  "工作区与介绍都在 16:9 画布内。建议打开独立直播窗口，采集时裁掉标题栏和画布外黑边，再等比适配；不要拉伸铺满。": "The workspace and introductions share one 16:9 canvas. Open a dedicated broadcast window, crop its title bar and margins outside the canvas, then fit proportionally without stretching.",
+  "打开 16:9 直播窗口": "Open 16:9 broadcast window",
+  "窗口未打开，请允许本站弹出窗口后重试。": "The window did not open. Allow popups for this site and retry.",
+  "新窗口不会转移当前通话；请勿关闭正在通话的原窗口。窗口尺寸可能受系统限制，以底部画布尺寸为准。": "Calls remain in their original window; keep it open during a call. System window limits may apply; check the canvas dimensions in the status bar.",
+  "仅保存在本浏览器；画布较小时自动隐藏介绍，优先保证工作区。": "Saved only in this browser. Small canvases hide introductions to prioritize the workspace.",
+  "完整画布 {0} × {1}（含介绍）；网页左右裁去各 {2}px，上下裁去各 {3}px，再等比适配。标题栏需另外裁掉。": "Full canvas {0} × {1}, including introductions. Crop {2}px from each horizontal side and {3}px from top and bottom, then fit proportionally. Crop the title bar separately."
 }

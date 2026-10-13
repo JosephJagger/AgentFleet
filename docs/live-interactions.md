@@ -106,23 +106,25 @@ not constitute real Douyin capture or audible live verification.
 
 ## 16:9 capture and background rendering
 
-The toolbar's “16:9 画布” fits an actual 16:9 rectangle inside the viewport without
-nonuniform scaling. The status bar shows its current CSS pixel dimensions; hover
-for canvas boundaries. In desktop Buzhoushan, browser-owned side gutters at least
-140 CSS pixels wide show static live-room introductions: mountain line art and
-AI programming on the left, connected computers and collaboration on the right.
-The center remains unchanged at 16:9; narrow gutters and other themes hide the
-introductions. No new animation, remote asset or voice task is involved.
+The toolbar's “16:9 画布” fits the **entire composition**, including both
+introductions, into one 16:9 rectangle. The workspace reflows inside it; nothing
+is stretched or scaled. At canvas sizes of at least 1200×675, introductions use
+12% on each side (140–240 CSS pixels); smaller canvases hide them to prioritize
+usable workspace width. Other themes are unaffected.
 
-Under “直播采集设置 → 编辑直播介绍”, four plain-text fields update immediately
-and persist only in this browser. Titles wrap by short phrase, with long custom
-text allowed to wrap within the gutter. Exit 16:9 removes the introductions.
-Capture the entire window to retain both introductions, preserving its aspect
-ratio; capture only the center for a strict 1920×1080 work-area source. Capturing
-the entire ultrawide window and stretching it still distorts the image. Outer
-letterboxing added by Live Companion is outside the page and remains a capture
-setting. This feature fills browser gutters; it does not eliminate every black
-border in a 16:9 broadcast output.
+“直播采集设置 → 编辑直播介绍” edits four plain-text fields saved locally.
+“打开 16:9 直播窗口” opens a new same-origin popup with a 16:9 content-size
+request and a one-time correction for browser chrome. It never reuses/navigates
+an existing window, transfers a call, starts voice, or resizes the original window.
+Browser/OS sizing restrictions may prevent the requested dimensions. A popup
+blocker shows a retry instruction. Keep an original window open if it owns a call.
+
+The status bar measures the full canvas including introductions; hover for its
+CSS pixel crop bounds. Crop title bars and margins **outside** that canvas, then
+fit proportionally to the broadcast output. Capturing an entire ultrawide window
+still produces letterboxing: website code cannot change Live Companion source
+bounds. These CSS pixel values are not necessarily physical capture pixels under
+Windows DPI scaling. Real Windows/Companion capture remains a manual check.
 Voice/message panels are positioned and drag-clamped inside the canvas.
 
 “直播采集设置” downloads an inspectable `AgentFleets-Broadcast.cmd` launcher.
