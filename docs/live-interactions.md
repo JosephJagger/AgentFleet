@@ -9,10 +9,16 @@ or Live Companion. Use this on the user's own broadcasting computer.
 ## Protocol and evidence
 
 The new collector's source and stored implementation evidence were reviewed. It
-reads appended Live Companion logs and emits JSON with `Type`, `ProcessName`, and
-JSON-string `Data`. Accepted sources are `直播伴侣` / `直播伴侣.exe`, with
+reads appended Live Companion logs and, optionally, the native Companion message
+callback, and emits JSON with `Type`, `ProcessName`, and JSON-string `Data`.
+Accepted process names are `直播伴侣` / `直播伴侣.exe`. Log events use
 `Data.CollectorSource = companion-log`. Type 1 requires `WebcastChatMessage`;
-Type 3 requires `WebcastMemberMessage` and `Action = 1`. Other member actions,
+Type 3 requires `WebcastMemberMessage` and `Action = 1`. Native callback chat is
+also accepted only with Type 1, `CollectorSource = companion-memory-bridge`,
+`CollectorTransport = native-publish-message`, and `NativeMethod = WebcastChatMessage`.
+The panel retains this source and transport instead of labeling it as a log event.
+Memory-bridge entry events are rejected; only the existing log source can supply
+welcome-eligible independent entries. Other member actions,
 chat text, counts, gifts and likes never imply entry. `Owner` may be null.
 
 Required fields include RoomId, MsgId, User.Id and an ISO ObservedAt timestamp.
@@ -20,14 +26,16 @@ Required fields include RoomId, MsgId, User.Id and an ISO ObservedAt timestamp.
 or more than 5 seconds ahead are rejected. New service packets from all rooms are
 accepted; room IDs namespace deduplication rather than select/filter a room.
 Source labels are not authentication or proof of account ownership. This is an
-unofficial local log collector, not an official Douyin authorization API.
+unofficial local collector, not an official Douyin authorization API.
 
 The referenced Windows investigation reported genuine independent entry delivery
 from Companion logs to its socket client. That historical evidence does not prove
-current end-to-end panel receipt or audible welcomes. Ordinary chat extraction was
-not established in that investigation: accepting the chat schema in the panel does
-not make the collector produce missing chat events. No real Windows capture or
-live audible welcome has been tested from this Linux deployment environment.
+current end-to-end panel receipt or audible welcomes. A later Windows capture
+confirmed a native `WebcastChatMessage` reached the collector's socket client,
+while the old panel rejected its `companion-memory-bridge` source. The parser now
+accepts that exact chat contract. Automated fixtures verify parsing and display,
+not delivery to a deployed webpage or audible welcomes. No chat event requests a
+welcome or sends chat content to the voice coordinator.
 
 ## Reception and welcome flow
 
@@ -77,7 +85,8 @@ accepted events. The service must bind to loopback. No browser security bypass o
 remote collector URL is provided. Verify browser sound is included in the actual
 Windows/Companion broadcast audio separately.
 
-Automated fixtures cover ownerless new-service parsing, source/action/freshness
+Automated fixtures cover ownerless new-service parsing, native callback chat with
+preserved provenance, rejected bridge entry or mismatched transport, source/action/freshness
 checks, large IDs, duplicate/multi-room events, independent entry versus chat,
 connection failures/reconnect, welcome expiry and voice/task priority. Fixtures do
 not constitute real Douyin capture or audible live verification.

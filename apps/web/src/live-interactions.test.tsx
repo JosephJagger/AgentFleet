@@ -19,6 +19,23 @@ it('rejects stale/replayed and invalid timestamps; uses source time for queue ex
  expect(parseLiveEvent(frame(3,{},10000),20000)?.receivedAt).toBe(10000);
  expect(parseLiveEvent(frame(3,{},21000),20000)?.receivedAt).toBe(20000);
 });
+it('accepts native memory-bridge chat with its source intact and never makes it welcome eligible',()=>{
+ const now=30000,stream=new LiveCollectorStream();
+ const result=stream.read(frame(1,{CollectorSource:'companion-memory-bridge',CollectorTransport:'native-publish-message',Content:'Fixture native chat'},now),now);
+ expect(result.event).toMatchObject({type:'chat',collector:'companion-memory-bridge',collectorTransport:'native-publish-message',content:'Fixture native chat',sourceObservedAt:now});
+ expect(welcomeEligible(result.event!)).toBe(false);
+ expect(welcomeEligible({...result.event!,type:'enter'})).toBe(false);
+ expect(stream.diagnostics).toMatchObject({packets:1,chat:1,enter:0,rejected:0});
+ expect(parseLiveEvent(frame(3,{},now),now)?.collector).toBe('companion-log');
+});
+it('rejects mismatched native memory-bridge provenance, entry actions and stale chat',()=>{
+ const now=30000,source={CollectorSource:'companion-memory-bridge',CollectorTransport:'native-publish-message'};
+ for(const patch of [{CollectorSource:'unknown'},{CollectorTransport:undefined},{CollectorTransport:'websocket'},{NativeMethod:'WebcastMemberMessage'},{NativeMethod:undefined}]){
+  expect(new LiveCollectorStream().read(frame(1,{...source,...patch},now),now)).toEqual({reason:'native'});
+ }
+ expect(new LiveCollectorStream().read(frame(3,source,now),now)).toEqual({reason:'native'});
+ expect(new LiveCollectorStream().read(frame(1,source,0),now)).toEqual({reason:'stale'});
+});
 it('preserves 64-bit IDs in string or object envelopes without rounding',()=>{
  const data=JSON.parse(JSON.parse(frame()).Data);data.MsgId='9223372036854775801';data.User.Id='9223372036854775802';
  const raw=JSON.stringify(data).replace('"9223372036854775801"','9223372036854775801').replace('"9223372036854775802"','9223372036854775802');
@@ -50,6 +67,14 @@ function ui(openSocket=true){
  const view=render(<LiveInteractions voice={voice}/>);fireEvent.click(screen.getByRole('button',{name:'互动消息'}));fireEvent.click(screen.getByRole('button',{name:'连接采集器'}));
  const ws=Socket.all[0]!;if(openSocket)act(()=>{ws.open();vi.advanceTimersByTime(500);});return {ws,send,status,voice,view};
 }
+it('displays native memory-bridge chat without sending a welcome or executing chat markup',()=>{
+ const f=ui();fireEvent.click(screen.getByRole('checkbox',{name:'入场自动欢迎'}));
+ act(()=>{f.ws.receive(frame(1,{CollectorSource:'companion-memory-bridge',CollectorTransport:'native-publish-message',Content:'Native chat <script>alert(1)</script>'}));vi.advanceTimersByTime(500);});
+ expect(screen.getByText('Native chat <script>alert(1)</script>')).toBeTruthy();
+ expect(screen.getByLabelText('采集诊断').textContent).toContain('聊天事件 1');
+ expect(screen.queryByText('不是受支持的原生聊天或入场动作，已拒收')).toBeNull();
+ expect(document.querySelector('script')).toBeNull();expect(f.send).not.toHaveBeenCalled();
+});
 it('shows ownerless entries immediately, with no old collector or room confirmation, and welcomes only new enabled entries',()=>{
  const f=ui();expect(f.ws.url).toBe('ws://127.0.0.1:18888/');expect(screen.queryByText(/DouyinBarrageGrab/)).toBeNull();
  act(()=>f.ws.receive(frame()));expect(screen.getByText('进入直播间')).toBeTruthy();expect(screen.queryByRole('button',{name:'确认这是我的直播间'})).toBeNull();expect(f.send).not.toHaveBeenCalled();
