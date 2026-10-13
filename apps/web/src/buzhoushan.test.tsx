@@ -270,3 +270,11 @@ it('identifies animated routine synchronization separately from uncertainty and 
  d.session.state.reachability='live';d.hostOnline=true;view.rerender(<BuzhoushanHeartbeat detail={d} messages={[]}/>);
  expect(screen.getByRole('status').getAttribute('data-live')).toBe('true');
 });
+
+it('keeps activity updates at two seconds while the broadcast window is hidden',async()=>{
+ vi.useFakeTimers();const visibility=vi.spyOn(document,'visibilityState','get').mockReturnValue('hidden');
+ vi.mocked(api.sessionProgress).mockResolvedValue(progress);
+ const view=render(<BuzhoushanActivity detail={detail()}/>);await act(async()=>{});
+ await act(async()=>{await vi.advanceTimersByTimeAsync(2000);});expect(api.sessionProgress).toHaveBeenCalledTimes(2);
+ view.unmount();await act(async()=>{await vi.advanceTimersByTimeAsync(10000);});expect(api.sessionProgress).toHaveBeenCalledTimes(2);visibility.mockRestore();
+});

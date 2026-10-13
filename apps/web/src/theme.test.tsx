@@ -96,3 +96,14 @@ it("initial paint restores every selectable theme before React loads",()=>{
    expect(document.documentElement.dataset.theme).toBe(value);
  }
 });
+
+it('broadcast launch initializes the theme and capture preferences before first paint',()=>{
+ const path=location.href;
+ try{
+  history.replaceState(null,'','/workbench?broadcast=1');
+  new Function(boot)();
+  expect(document.documentElement.dataset.theme).toBe('buzhoushan');
+  expect(localStorage.getItem('agentfleet.buzhoushan.broadcast-canvas')).toBe('true');
+  expect(localStorage.getItem('agentfleet.buzhoushan.focus')).toBe('true');
+ }finally{history.replaceState(null,'',path);}
+});

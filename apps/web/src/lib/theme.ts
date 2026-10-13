@@ -11,6 +11,7 @@ function isTheme(value: string | null): value is Theme {
 }
 
 function initialTheme(): Theme {
+  if (typeof location !== "undefined" && new URLSearchParams(location.search).get("broadcast") === "1") return "buzhoushan";
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (isTheme(saved)) return saved;

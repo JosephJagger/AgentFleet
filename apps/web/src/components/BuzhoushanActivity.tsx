@@ -59,14 +59,14 @@ export function BuzhoushanActivity({detail, conversation}: {detail: SessionDetai
       <div className="buzhou-dock__tabs" role="group" aria-label={t("活动筛选")}>
         {([["commandExecution","执行过程"],["conversation","人机对话"]] as const).map(([value,label])=><button type="button" aria-pressed={tab===value} key={value} onClick={()=>{setTab(value);setFollowing(true);setCollapsed(false);}}>{t(label)}</button>)}
       </div>
-      <small>{status}</small>
+      <small data-live={isLive}>{status}</small>
       <button type="button" onClick={reset} title={t("重置活动布局")} aria-label={t("重置活动布局")}><RotateCcw size={14}/></button>
       <button type="button" onClick={()=>setCollapsed(!collapsed)} aria-expanded={!collapsed} aria-label={collapsed?t("展开代码活动"):t("收起代码活动")}>{collapsed?<ChevronUp size={16}/>:<ChevronDown size={16}/>}</button>
     </header>
     {!collapsed && tab === "conversation" && <div className="buzhou-dock__chat">{conversation ?? <p>{t("暂无对话消息")}</p>}</div>}
     {!collapsed && tab === "commandExecution" && <div className="buzhou-dock__body">
       <div className="buzhou-dock__list" aria-label={t("最近活动")}>
-        {[...visible].reverse().map(item=><button type="button" key={item.id} aria-pressed={current?.id===item.id} onClick={()=>{setSelected(item.id);setFollowing(false);}}>
+        {[...visible].reverse().map(item=><button type="button" key={item.id} data-state={item.status} aria-pressed={current?.id===item.id} onClick={()=>{setSelected(item.id);setFollowing(false);}}>
           <Terminal size={15}/><span><strong>{itemTitle(item).slice(0,240)}</strong><small>{stateLabel(item.status)}</small></span>
         </button>)}
         {!visible.length&&<p>{scoped?.contentAvailable===false?t("未开启内容同步，仅显示运行状态"):t("尚无可展示的代码活动")}</p>}

@@ -143,3 +143,14 @@ test('optional live welcome uses native report once, keeps failures nonfatal and
  f.browser.send({...entry,requestId:'bad',kind:'chat'});assert.equal((await f.browser.next('live_welcome')).status,'skipped');assert.equal(f.row().state,'active');
  f.first.socket.close();await f.browser.next('recovering');f.browser.send({...entry,requestId:'recovery'});assert.equal((await f.browser.next('live_welcome')).status,'skipped');assert.equal(f.row().state,'active');
 });
+
+test('custom welcome validates before reservation, sends saved words once and never dispatches a task',async t=>{
+ const f=await fixture(t,true);f.db.run("UPDATE machines SET agent_version='0.30.100' WHERE machine_id='m'");
+ const now=Date.now()+6000;t.mock.method(Date,'now',()=>now);
+ const entry={type:'live.welcome',kind:'enter',source:'home-douyin-collector:companion-log',streamEnabled:true,nativeMethod:'WebcastMemberMessage',entryAction:'1',sourceObservedAt:now,nativeInterruptible:true,roomId:'fixture-room',viewerId:'fixture-viewer',eventId:'custom-entry',requestId:'custom-request',observedAt:now};
+ f.browser.send({...entry,welcomeText:' '});assert.equal((await f.browser.next('live_welcome')).reason,'welcome_text');
+ const greeting='欢迎{用户名}来到合成测试直播间';f.browser.send({...entry,welcomeText:greeting,viewerDisplayName:'合成昵称'});
+ const report=await f.first.next('voice.control','report');assert.ok(String(report.text).includes(JSON.stringify(greeting.replace('{用户名}','合成昵称'))));assert.equal((await f.browser.next('live_welcome')).status,'requested');
+ f.browser.send({...entry,welcomeText:'不能通过修改文案重播'});assert.equal((await f.browser.next('live_welcome')).reason,'duplicate_event');
+ assert.equal(f.db.all('SELECT * FROM commands').length,0);assert.equal(f.db.all('SELECT * FROM voice_long_term_preferences').length,0);assert.equal(f.row().state,'active');
+});

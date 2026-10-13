@@ -1,4 +1,4 @@
-import {LiveWelcomeGate,LIVE_WELCOME_TEXT} from './live-welcome.js';
+import {LiveWelcomeGate,liveWelcomePrompt} from './live-welcome.js';
 import {VoiceTranscriptTail} from './voice-transcript-tail.js';
 import { NativeSubagentsBroker } from "./native-subagents-broker.js";
 import { createAgentReleaseStatus } from "./agent-release-status.js";
@@ -1609,15 +1609,15 @@ export async function buildControlPlane(
           else if(value.type==='live.welcome'){
             // Optional interaction failures must never terminate an otherwise healthy call.
             try{
-              limiter.check(`live-welcome:${voiceId}`,6,60000);
+              limiter.check(`live-welcome:${voiceId}`,60,60000);
+              const welcomePrompt=liveWelcomePrompt(value.welcomeText,value.viewerDisplayName);
+              if(!welcomePrompt){sendJson(socket,{type:'live_welcome',requestId:value.requestId,status:'skipped',reason:'welcome_text'});return;}
               const call=panelVoice.get(voiceId),gate=liveWelcomes.get(voiceId);
               const version=String(registry.getMachine(principal,call!.machine_id).agentVersion).split('.').map(Number);
               const capable=(version[0]??0)>0||(version[1]??0)>30||version[1]===30&&(version[2]??0)>=100;
-              const unreported=db.get("SELECT 1 FROM panel_voice_jobs WHERE voice_id=? AND reported_call_id IS NULL LIMIT 1",voiceId);
-              const status=panelVoice.poll(principal,voiceId,panelFailedReports.get(voiceId));
-              const blocked=!capable?'agent_version':call?.state!=='active'?'call_inactive':panelRecovery.has(voiceId)?'recovering':status.unavailable?'task_status':Boolean(unreported||status.report||panelReports.has(voiceId)||panelFailedReports.get(voiceId)?.size)||status.tasks.some(task=>!['completed','failed','interrupted'].includes(task.state))?'task_priority':undefined;
+              const blocked=!capable?'agent_version':call?.state!=='active'?'call_inactive':panelRecovery.has(voiceId)?'recovering':panelReports.has(voiceId)?'task_priority':undefined;
               const eligible=gate?.accept(value,Boolean(blocked));
-              const accepted=eligible&&sendPanel(voiceId,'report',{reportId:`welcome:${value.requestId}`,text:LIVE_WELCOME_TEXT});
+              const accepted=eligible&&sendPanel(voiceId,'report',{reportId:`welcome:${value.requestId}`,text:welcomePrompt});
               const reason=accepted?undefined:blocked??(eligible?'transport':gate?.rejectionReason||'call_inactive');
               sendJson(socket,{type:'live_welcome',requestId:value.requestId,status:accepted?'requested':'skipped',reason});
             }catch{sendJson(socket,{type:'live_welcome',requestId:value.requestId,status:'skipped',reason:'request_failed'});}

@@ -32,7 +32,7 @@ export function useSessionProgress(sessionId:string, active:boolean, initial?:Se
         const value=await api.sessionProgress(sessionId,controller.signal,activity);
         if(!controller.signal.aborted&&value.sessionId===sessionId){setProgress(value);setUnavailable(false);}
       } catch {if(!controller.signal.aborted)setUnavailable(true);}
-      if(!controller.signal.aborted && active)timer=setTimeout(poll,document.visibilityState==='hidden'?10000:2000);
+      if(!controller.signal.aborted && active)timer=setTimeout(poll,document.visibilityState==='hidden'&&!activity?10000:2000);
     };
     void poll();return ()=>{controller.abort();clearTimeout(timer);};
   },[sessionId,active,activity]);

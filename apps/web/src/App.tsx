@@ -3,9 +3,11 @@ import { HostSessions } from "./components/HostSessions";
 import { hostSessionGroups, preferredHostSession, rememberedHostSession, rememberHostSession } from "./lib/host-session-selection";
 import { preserveBuzhoushanStream } from "./lib/buzhoushan-stream";
 import { isConversationEvent, isBuzhoushanChatEvent, isBuzhoushanTurnActive } from "./lib/buzhoushan-events";
+import { BuzhoushanBroadcastControl, BuzhoushanBroadcastStatus } from "./components/BuzhoushanBroadcast";
 import { BuzhoushanHeartbeat } from "./components/BuzhoushanHeartbeat";
 import { displayName } from "./lib/display-name";
 import { useBuzhoushanDesktop } from "./lib/buzhoushan";
+import { useTheme } from "./lib/theme";
 import { BuzhoushanActivity } from "./components/BuzhoushanActivity";
 import { RuntimeProgress } from "./components/RuntimeProgress";
 import { QueuedPromptEditor } from "./components/QueuedPromptEditor";
@@ -1428,10 +1430,13 @@ function CreateProjectDialog({ open, machines, selectedMachineId, onClose, onCre
 
 function App() {
   useLocale();
+  const liveTheme = useTheme() === "buzhoushan";
   const buzhouDesktop = useBuzhoushanDesktop();
+  const [broadcastCanvas,setBroadcastCanvas]=useState(()=>{if(new URLSearchParams(location.search).get("broadcast")==="1")return true;try{return localStorage.getItem("agentfleet.buzhoushan.broadcast-canvas")==="true";}catch{return false;}});
+  useEffect(()=>{try{localStorage.setItem("agentfleet.buzhoushan.broadcast-canvas",String(broadcastCanvas));}catch{/* Optional layout preference. */}},[broadcastCanvas]);
   const buzhouDesktopRef = useRef(buzhouDesktop);
   buzhouDesktopRef.current = buzhouDesktop;
-  const [streamFocus,setStreamFocus] = useState(() => { try { return localStorage.getItem("agentfleet.buzhoushan.focus") === "true"; } catch { return false; } });
+  const [streamFocus,setStreamFocus] = useState(() => { if(new URLSearchParams(location.search).get("broadcast")==="1")return true;try { return localStorage.getItem("agentfleet.buzhoushan.focus") === "true"; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem("agentfleet.buzhoushan.focus", String(streamFocus)); } catch { /* Optional local layout preference. */ } }, [streamFocus]);
   const [catalogCollapsed, setCatalogCollapsed] = useState(() => {
     try { return localStorage.getItem(CATALOG_COLLAPSED_KEY) === "true"; } catch { return false; }
@@ -1799,7 +1804,7 @@ function App() {
   }
 
   return (
-    <div className={`app-shell${buzhouDesktop && view === "fleet" && streamFocus ? " buzhou-focus" : ""}${view === "fleet" && (displayedSession || detailLoading) ? " app-shell--conversation" : ""}`}>
+    <div className={`app-shell${buzhouDesktop && view === "fleet" && broadcastCanvas ? " buzhou-broadcast" : ""}${buzhouDesktop && view === "fleet" && streamFocus ? " buzhou-focus" : ""}${view === "fleet" && (displayedSession || detailLoading) ? " app-shell--conversation" : ""}`}>
       <header className="topbar">
         <div className="brand-lockup"><span className="brand-glyph"><ThemeEmblem /></span><span>AgentFleets</span></div>
         <WorldClocks side="left" />
@@ -1813,7 +1818,7 @@ function App() {
           {dashboard.user.platformAdmin === true && <button aria-current={view === "admin" ? "page" : undefined} aria-label={t("管理")} className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><ShieldCheck size={16} /><NavText full="管理" compact="管理" /></button>}
         </nav>
         <WorldClocks side="right" />
-        <div className="topbar-actions">{buzhouDesktop && view === "fleet" && <button type="button" className="buzhou-focus-toggle" aria-pressed={streamFocus} title={t("聚焦任务与过程；不会隐藏对话和输出中的敏感内容")} onClick={()=>setStreamFocus(!streamFocus)}>{streamFocus?t("退出直播聚焦"):t("直播聚焦")}</button>}<PanelVoiceControl liveInteractions={buzhouDesktop} machines={dashboard.machines} onOpenSession={id=>{setView("fleet");selectSession(id);}}/><LanguageSwitcher compact /><span className="account-label">{displayName(dashboard.user.displayName)}</span><IconButton label={t("退出登录")} onClick={async () => { window.dispatchEvent(new Event("agentfleet:logout")); await api.logout(); setDashboard(undefined); setConnected(false); }}><LogOut size={16} /></IconButton></div>
+        <div className="topbar-actions">{buzhouDesktop && view === "fleet" && <BuzhoushanBroadcastControl enabled={broadcastCanvas} onChange={setBroadcastCanvas}/>} {buzhouDesktop && view === "fleet" && <button type="button" className="buzhou-focus-toggle" aria-pressed={streamFocus} title={t("聚焦任务与过程；不会隐藏对话和输出中的敏感内容")} onClick={()=>setStreamFocus(!streamFocus)}>{streamFocus?t("退出直播聚焦"):t("直播聚焦")}</button>}<PanelVoiceControl liveInteractions={liveTheme} machines={dashboard.machines} onOpenSession={id=>{setView("fleet");selectSession(id);}}/><LanguageSwitcher compact /><span className="account-label">{displayName(dashboard.user.displayName)}</span><IconButton label={t("退出登录")} onClick={async () => { window.dispatchEvent(new Event("agentfleet:logout")); await api.logout(); setDashboard(undefined); setConnected(false); }}><LogOut size={16} /></IconButton></div>
       </header>
       {view === "fleet" ? <div className={`fleet-layout${catalogCollapsed ? " fleet-layout--catalog-collapsed" : ""}`}>
         <MachineRail machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} selectedId={selectedMachineId} onSession={selectSession} onHost={id => navigate({ view: "hosts", machineId: id })} onSelect={selectMachine} onPair={() => setPairOpen(true)} />
@@ -1827,7 +1832,7 @@ function App() {
         <HostSessions key={`${dashboard.user.id}:${dashboard.user.clientSessionId}`} machine={selectedMachine} sessions={dashboard.activitySessions ?? dashboard.sessions} selectedId={selectedSessionId} detail={detail} onSelect={selectSession} onBrowse={()=>{setStreamFocus(false);setCatalogCollapsed(false);}} onCreate={()=>openCreate()}>
         <SessionInspector catalogExpanded={!streamFocus && !catalogCollapsed} onBrowseSessions={()=>{if(streamFocus){setStreamFocus(false);setCatalogCollapsed(false);}else setCatalogCollapsed(value=>!value);}} referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
         </HostSessions>
-        {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong><FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayName(displayedSession?.projectAlias)}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}
+        {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong>{broadcastCanvas&&<BuzhoushanBroadcastStatus/>}<FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayName(displayedSession?.projectAlias)}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}
       </div> : view === "hosts" ? <HostsView onConfigure={id => { setSettingsMachineId(id); setView("security"); }} machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView initialMachineId={settingsMachineId} dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />

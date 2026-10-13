@@ -1,6 +1,6 @@
 /* 不周山 is an opt-in desktop workbench. No existing theme selectors are changed. */
 .theme-option--buzhoushan { --sample-canvas:#1e1e1e; --sample-paper:#252526; --sample-line:#454545; --sample-accent:#007acc; }
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] {
     color-scheme:dark; zoom:1;
     --buzhou-conversation-font-size:14px;
@@ -14,7 +14,7 @@
   }
   :root[data-theme="buzhoushan"] body { background:#1e1e1e; background-image:none; }
   :root[data-theme="buzhoushan"] .app-shell { min-height:100dvh; padding-left:48px; }
-  :root[data-theme="buzhoushan"] .topbar { height:46px; min-height:46px; backdrop-filter:none; transform:none; padding:0 14px; gap:12px; background:#323233; border-bottom:1px solid #181818; box-shadow:none; }
+  :root[data-theme="buzhoushan"] .topbar { display:flex; height:46px; min-height:46px; backdrop-filter:none; transform:none; padding:0 14px; gap:12px; background:#323233; border-bottom:1px solid #181818; box-shadow:none; }
   :root[data-theme="buzhoushan"] .brand-lockup { font-size:14px; gap:8px; }
   :root[data-theme="buzhoushan"] .brand-glyph { border:0; background:none; box-shadow:none; width:24px; height:24px; }
   :root[data-theme="buzhoushan"] .topbar .world-clocks { display:none; }
@@ -111,13 +111,13 @@
   :root[data-theme="buzhoushan"] .buzhou-dock__limit { padding:3px 12px; font-size:10px; color:#888; border-top:1px solid #292929; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-host-scroll { flex:0 0 28px; width:28px; height:40px; padding:0; border:1px solid #454545; border-radius:3px; background:#2d2d30; color:#ddd; font-size:24px; line-height:1; }
   :root[data-theme="buzhoushan"] .buzhou-host-scroll:disabled { opacity:.35; cursor:default; }
   :root[data-theme="buzhoushan"] .buzhou-host-scroll:focus-visible { outline:2px solid #007acc; outline-offset:2px; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .session-facts { flex-wrap:wrap; gap:10px; }
   :root[data-theme="buzhoushan"] .buzhou-session-quota { display:flex; flex:1 1 320px; gap:10px; min-width:0; max-width:660px; margin-inline:auto; }
   :root[data-theme="buzhoushan"] .buzhou-quota-card { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:5px; padding:8px 12px; border:1px solid #3b3b3b; border-left:2px solid #89d185; border-radius:3px; background:#202020; color:#ccc; text-align:left; cursor:pointer; }
@@ -129,7 +129,7 @@
   :root[data-theme="buzhoushan"] .buzhou-quota-card:hover { border-color:#666; }
   :root[data-theme="buzhoushan"] .buzhou-quota-card:focus-visible { outline:2px solid #007acc; outline-offset:2px; }
 }
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-heartbeat { width:100%; height:240px; display:grid; color:#89d185; padding:24px; box-sizing:border-box; }
   :root[data-theme="buzhoushan"] .buzhou-heartbeat__layer { grid-area:1/1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; min-width:0; transition:opacity 160ms var(--ease-out,cubic-bezier(0.23,1,0.32,1)); }
   :root[data-theme="buzhoushan"] .buzhou-heartbeat__layer[aria-hidden="true"] { opacity:0; pointer-events:none; }
@@ -145,7 +145,7 @@
 
 @media (prefers-reduced-motion:reduce) { :root[data-theme="buzhoushan"] .buzhou-heartbeat__layer { transition:none; } }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-editor { grid-area:editor; display:flex; flex-direction:column; min-height:0; min-width:0; overflow:hidden; }
   :root[data-theme="buzhoushan"] .buzhou-editor > .inspector { flex:1; min-height:0; width:100%; }
   :root[data-theme="buzhoushan"] .buzhou-session-switcher { flex:none; background:#202020; border-bottom:1px solid #454545; padding:6px 8px; }
@@ -171,9 +171,9 @@
   :root[data-theme="buzhoushan"] .buzhou-session-empty-actions { display:flex; justify-content:flex-end; gap:12px; }
   :root[data-theme="buzhoushan"] .buzhou-session-empty-actions button { padding:4px; border:0; background:none; color:#3794ff; font-size:11px; }
 }
-@media (min-width:1101px) and (hover:hover) { :root[data-theme="buzhoushan"] .buzhou-session-window:hover { border-color:#888; } }
+@media (min-width:901px) and (hover:hover) { :root[data-theme="buzhoushan"] .buzhou-session-window:hover { border-color:#888; } }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-session-window { min-height:94px; padding:10px 12px; }
   :root[data-theme="buzhoushan"] .buzhou-session-window__title strong { font-size:13px; }
   :root[data-theme="buzhoushan"] .buzhou-session-window__project { margin-top:7px; font-size:11px; }
@@ -184,13 +184,13 @@
   :root[data-theme="buzhoushan"] .buzhou-session-toggle button:focus-visible { outline:1px solid #3794ff; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-empty-select { color:inherit; font:inherit; background:transparent; border:0; padding:8px 12px; cursor:pointer; }
   :root[data-theme="buzhoushan"] .buzhou-empty-select:hover { color:#3794ff; }
   :root[data-theme="buzhoushan"] .buzhou-empty-select:focus-visible { outline:2px solid #3794ff; outline-offset:3px; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-session-providers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
   :root[data-theme="buzhoushan"] .buzhou-session-provider { min-width:0; }
   :root[data-theme="buzhoushan"] .buzhou-session-provider + .buzhou-session-provider { border-left:1px solid #383838; padding-left:12px; }
@@ -202,7 +202,7 @@
 }
 
 /* Livestream focus keeps host navigation, while reserving height for conversation. */
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-focus .fleet-layout { grid-template-rows:36px minmax(0,1fr) 24px; grid-template-areas:"hosts" "editor" "status"; }
   :root[data-theme="buzhoushan"] .buzhou-focus .machine-rail { gap:6px; padding:0 10px; }
   :root[data-theme="buzhoushan"] .buzhou-focus .rail-heading .icon-button { width:26px; height:26px; min-width:26px; }
@@ -233,13 +233,13 @@
   :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-session-toggle { padding:0 8px; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-focus .rail-track { margin:0; scrollbar-width:none; }
   :root[data-theme="buzhoushan"] .buzhou-focus .session-call-actions .native-voice__trigger { width:26px; min-width:26px; height:26px; min-height:26px; padding:3px; }
 }
 
 .buzhou-focus-label { display:none; }
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-full-label { display:none; }
   :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-focus-label { display:inline; }
   :root[data-theme="buzhoushan"] .buzhou-focus .inspector-head { grid-template-columns:minmax(160px,1fr) auto auto; gap:8px; min-height:38px; }
@@ -252,11 +252,11 @@
   :root[data-theme="buzhoushan"] .buzhou-focus .session-facts > [role="status"] { max-width:180px; font-size:11px; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .timeline-event[data-heartbeat-clipped="true"] { visibility:hidden; pointer-events:none; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .topbar-actions { gap:8px; }
   :root[data-theme="buzhoushan"] .topbar-actions > .panel-voice-control > .button:not(.panel-voice-control__floating) { min-height:30px; height:30px; padding:4px 8px; gap:6px; font-size:12px; font-weight:500; }
   :root[data-theme="buzhoushan"] .topbar-actions > .panel-voice-control > .button:not(.panel-voice-control__floating) svg { width:15px; height:15px; }
@@ -267,18 +267,18 @@
   :root[data-theme="buzhoushan"] .topbar-actions > .icon-button svg { width:15px; height:15px; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-dock__chat { display:flex; flex:1; min-height:0; overflow:hidden; }
   :root[data-theme="buzhoushan"] .buzhou-dock__chat .conversation-viewport { flex:1; min-width:0; min-height:0; }
   :root[data-theme="buzhoushan"] .buzhou-dock__chat .timeline-event { padding-block:10px; }
   :root[data-theme="buzhoushan"] .buzhou-dock__chat .timeline-event p { padding:0; color:inherit; font-size:var(--buzhou-conversation-font-size); }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .timeline-scroll > div:has(> .buzhou-heartbeat:only-child) { min-height:100%; display:grid; place-items:center; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-live="false"] .buzhou-heartbeat__visual svg { animation-play-state:paused; }
   :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-status="syncing"] { color:#d7ba7d; }
   :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-status="syncing"] .buzhou-heartbeat__heart { fill:#393322; }
@@ -286,6 +286,6 @@
   :root[data-theme="buzhoushan"] .buzhou-heartbeat[data-status="uncertain"] .buzhou-heartbeat__heart { fill:#292929; }
 }
 
-@media (min-width:1101px) {
+@media (min-width:901px) {
   :root[data-theme="buzhoushan"] .buzhou-heartbeat__pulse > strong { font-weight:400; }
 }

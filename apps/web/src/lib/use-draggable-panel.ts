@@ -11,8 +11,9 @@ export function useDraggablePanel(panel: RefObject<HTMLElement | null>, visible:
     const rect = element.getBoundingClientRect();
     const scale = rect.width / element.offsetWidth || 1;
     const viewport = window.visualViewport;
-    const left = viewport?.offsetLeft ?? 0, top = viewport?.offsetTop ?? 0;
-    const width = viewport?.width ?? window.innerWidth, height = viewport?.height ?? window.innerHeight;
+    const stage=document.querySelector('.app-shell.buzhou-broadcast')?.getBoundingClientRect();
+    const left = stage?.left ?? viewport?.offsetLeft ?? 0, top = stage?.top ?? viewport?.offsetTop ?? 0;
+    const width = stage?.width ?? viewport?.width ?? window.innerWidth, height = stage?.height ?? viewport?.height ?? window.innerHeight;
     const x = Math.max(left + 8, Math.min(rect.left + dx, left + width - rect.width - 8));
     const y = Math.max(top + 8, Math.min(rect.top + dy, top + height - Math.min(rect.height, height - 16) - 8));
     current.current = { x: current.current.x + (x - rect.left) / scale, y: current.current.y + (y - rect.top) / scale };
@@ -26,6 +27,7 @@ export function useDraggablePanel(panel: RefObject<HTMLElement | null>, visible:
     clamp();
     const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(clamp) : undefined;
     if (panel.current) observer?.observe(panel.current);
+    const stage=document.querySelector(".app-shell");if(stage)observer?.observe(stage);
     window.addEventListener("resize", clamp);
     window.visualViewport?.addEventListener("resize", clamp);
     return () => { observer?.disconnect(); window.removeEventListener("resize", clamp); window.visualViewport?.removeEventListener("resize", clamp); };

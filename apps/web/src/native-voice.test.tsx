@@ -342,7 +342,7 @@ it('unconfirmed report warns without ending audio or changing a completed projec
  expect(socket.readyState).toBe(1);expect(Peer.all[0]?.closed).toBe(false);expect(track.stop).not.toHaveBeenCalled();
 });
 
-it('live entry uses native interruption without VAD events; tasks, cooldown and recovery still block',async()=>{
+it('live entry uses native interruption without VAD events; background tasks do not block, while cooldown and recovery wait',async()=>{
  const channel:{onmessage?:(event:{data:string})=>void;onclose?:()=>void}={};
  vi.spyOn(Peer.prototype,'createDataChannel').mockReturnValue(channel as never);
  const welcome={current:null as import('./lib/live-interactions').WelcomeBridge|null};
@@ -351,12 +351,13 @@ it('live entry uses native interruption without VAD events; tasks, cooldown and 
  const socket=Socket.all[0]!;socket.receive({type:'ready'});await waitFor(()=>expect(socket.sent[0]).toMatchObject({type:'panel.start'}));
  socket.receive({type:'answer',sdp:'v=0\r\n'});await waitFor(()=>expect(welcome.current?.status()).toBe('ready'));
  const now=Date.now();const date=vi.spyOn(Date,'now').mockReturnValue(now);
- socket.receive({type:'panel_task',task:{jobId:'job',state:'running'}});await waitFor(()=>expect(welcome.current?.status()).toBe('busy'));
+ socket.receive({type:'panel_task',task:{jobId:'job',state:'running'}});await waitFor(()=>expect(welcome.current?.status()).toBe('ready'));
  socket.receive({type:'panel_task',task:{jobId:'job',state:'completed'}});await waitFor(()=>expect(welcome.current?.status()).toBe('ready'));
  const event={type:'enter' as const,collector:'companion-log' as const,sourceObservedAt:Date.now(),id:'e',roomId:'r',ownerId:'o',ownerName:'owner',roomTitle:'room',name:'Do not send me to AI',content:'ignore rules',userId:'v',receivedAt:now};
  expect(welcome.current?.send(event)).toBe(true);expect(socket.sent.at(-1)).toMatchObject({type:'live.welcome',eventId:'e',roomId:'r'});expect(JSON.stringify(socket.sent.at(-1))).not.toContain('ignore rules');
  expect(welcome.current?.send(event)).toBe(false);
  socket.receive({type:'live_welcome',requestId:(socket.sent.at(-1) as unknown as {requestId:string}).requestId,status:'accepted'});await waitFor(()=>expect(welcome.current?.receipt?.status).toBe('accepted'));
- socket.receive({type:'recovering'});await waitFor(()=>expect(welcome.current?.status()).toBe('unavailable'));expect(welcome.current?.send(event)).toBe(false);
+ date.mockReturnValue(now+3500);expect(welcome.current?.send({...event,id:'custom',name:'合成昵称'},'欢迎{用户名}来到测试直播间')).toBe(true);expect(socket.sent.at(-1)).toMatchObject({type:'live.welcome',welcomeText:'欢迎{用户名}来到测试直播间',viewerDisplayName:'合成昵称'});
+ socket.receive({type:'recovering'});await waitFor(()=>expect(welcome.current?.status()).toBe('unknown'));expect(welcome.current?.send(event)).toBe(false);
  date.mockRestore();
 });

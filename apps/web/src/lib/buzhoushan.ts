@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { useTheme } from "./theme";
 
-const query = "(min-width: 1101px)";
+const query = "(min-width: 901px)";
 const subscribe = (notify: () => void) => {
   const media = window.matchMedia?.(query);
   media?.addEventListener?.("change", notify);

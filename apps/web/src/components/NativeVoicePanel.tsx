@@ -1,4 +1,5 @@
-import {welcomeEligible,type WelcomeBridge} from '../lib/live-interactions';
+import {displayName} from '../lib/display-name';
+import {DEFAULT_LIVE_WELCOME,normalizeWelcomeText,LIVE_WELCOME_INTERVAL_MS,welcomeEligible,type WelcomeBridge} from '../lib/live-interactions';
 import {VoiceAudioDevices,useVoiceDevicePreferences,voiceMicrophoneConstraints} from './VoiceAudioDevices';
 import type { SessionProgress } from "../lib/types";
 import { useDraggablePanel } from "../lib/use-draggable-panel";
@@ -187,14 +188,15 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   }
   if(welcomeRef)welcomeRef.current={
     get receipt(){const receipt=welcomeReceipt.current;return receipt?.status==='requested'&&Date.now()-welcomeSentAt.current>10000?{...receipt,status:'unknown'}:receipt;},
-    status:()=>phase!=='connected'||resources.current.recovering||playBlocked?'unavailable':Date.now()<welcomeNextAt.current||!['idle','completed','failed'].includes(taskPhase)?'busy':'ready',
-    send:event=>{
+    status:()=>resources.current.recovering||phase==='recovering'?'unknown':phase!=='connected'||playBlocked?'unavailable':Date.now()<welcomeNextAt.current?'busy':'ready',
+    send:(event,welcomeText=DEFAULT_LIVE_WELCOME)=>{
+      const text=normalizeWelcomeText(welcomeText);if(!text)return false;
       const socket=resources.current.socket;
       if(!welcomeEligible(event)||!globalMachineId||welcomeRef.current?.status()!=='ready'||socket?.readyState!==WebSocket.OPEN)return false;
       const requestId=crypto.randomUUID();
       welcomeReceipt.current={requestId,status:'requested'};welcomeSentAt.current=Date.now();
-      socket.send(JSON.stringify({type:'live.welcome',kind:'enter',source:'home-douyin-collector:companion-log',streamEnabled:true,nativeMethod:'WebcastMemberMessage',entryAction:'1',sourceObservedAt:event.sourceObservedAt,nativeInterruptible:true,requestId,eventId:event.id,roomId:event.roomId,ownerId:event.ownerId,viewerId:event.userId,observedAt:event.receivedAt}));
-      welcomeNextAt.current=Date.now()+30000;
+      socket.send(JSON.stringify({type:'live.welcome',welcomeText:text,viewerDisplayName:displayName(event.name),kind:'enter',source:'home-douyin-collector:companion-log',streamEnabled:true,nativeMethod:'WebcastMemberMessage',entryAction:'1',sourceObservedAt:event.sourceObservedAt,nativeInterruptible:true,requestId,eventId:event.id,roomId:event.roomId,ownerId:event.ownerId,viewerId:event.userId,observedAt:event.receivedAt}));
+      welcomeNextAt.current=Date.now()+LIVE_WELCOME_INTERVAL_MS;
       return true;
     },
   };
