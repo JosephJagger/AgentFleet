@@ -108,8 +108,21 @@ not constitute real Douyin capture or audible live verification.
 
 The toolbar's “16:9 画布” fits an actual 16:9 rectangle inside the viewport without
 nonuniform scaling. The status bar shows its current CSS pixel dimensions; hover
-for margins to crop. Capture that rectangle and fit proportionally to 1920×1080.
-Capturing the entire ultrawide window and stretching it still distorts the image.
+for canvas boundaries. In desktop Buzhoushan, browser-owned side gutters at least
+140 CSS pixels wide show static live-room introductions: mountain line art and
+AI programming on the left, connected computers and collaboration on the right.
+The center remains unchanged at 16:9; narrow gutters and other themes hide the
+introductions. No new animation, remote asset or voice task is involved.
+
+Under “直播采集设置 → 编辑直播介绍”, four plain-text fields update immediately
+and persist only in this browser. Titles wrap by short phrase, with long custom
+text allowed to wrap within the gutter. Exit 16:9 removes the introductions.
+Capture the entire window to retain both introductions, preserving its aspect
+ratio; capture only the center for a strict 1920×1080 work-area source. Capturing
+the entire ultrawide window and stretching it still distorts the image. Outer
+letterboxing added by Live Companion is outside the page and remains a capture
+setting. This feature fills browser gutters; it does not eliminate every black
+border in a 16:9 broadcast output.
 Voice/message panels are positioned and drag-clamped inside the canvas.
 
 “直播采集设置” downloads an inspectable `AgentFleets-Broadcast.cmd` launcher.

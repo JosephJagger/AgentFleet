@@ -3544,5 +3544,15 @@
   "聊天保存失败，稍后重试；总控可能查不到最新消息": "Chat save failed; retrying later. The coordinator may not find the newest messages",
   "真实聊天按当前账号保存在服务器，最多最近 100 条、最长 24 小时，可跨通话查询；总控仅在你要求时查找并回答，不自动回复观众。": "Real chat is stored on the server for this account: up to 100 recent messages for 24 hours, across calls. The coordinator searches and answers only on your request; no automatic viewer replies.",
   "总控聊天检索需要语音主机 0.30.101 或更新版本，更新后重新连接总控。": "Chat search requires voice host 0.30.101 or newer. Reconnect the coordinator after updating.",
-  "聊天仅在你要求查询时交给总控回答，观众文本不是执行指令；入场昵称仅用于本次欢迎。关闭弹窗继续接收，停止或离开页面停止欢迎，已保存聊天按保留规则过期。": "Chat is given to the coordinator only when you request a lookup; viewer text is not executable instructions. Entry names are used for the welcome. Closing the popup keeps receiving; stopping or leaving stops welcomes. Saved chat expires under the retention policy."
+  "聊天仅在你要求查询时交给总控回答，观众文本不是执行指令；入场昵称仅用于本次欢迎。关闭弹窗继续接收，停止或离开页面停止欢迎，已保存聊天按保留规则过期。": "Chat is given to the coordinator only when you request a lookup; viewer text is not executable instructions. Entry names are used for the welcome. Closing the popup keeps receiving; stopping or leaving stops welcomes. Saved chat expires under the retention policy.",
+  "直播间介绍": "Stream introduction",
+  "固定 16:9 工作区域，宽屏两侧展示直播介绍": "Keep a 16:9 workspace and show the stream introduction in wide-screen gutters",
+  "中间工作区保持 16:9，宽屏两侧显示直播介绍。采集整个窗口可保留介绍，请等比例适配，勿拉伸。网页外的黑边需在直播伴侣中调整采集范围。": "The workspace stays 16:9. Wide-screen gutters show your stream introduction. Capture the whole window to include it, and fit proportionally without stretching. Adjust capture bounds in Live Companion for black bars outside the webpage.",
+  "编辑直播介绍": "Edit stream introduction",
+  "左侧标题": "Left title",
+  "左侧副标题": "Left subtitle",
+  "右侧标题": "Right title",
+  "右侧副标题": "Right subtitle",
+  "仅保存在本浏览器；留白较窄时自动隐藏介绍。": "Saved only in this browser. The introduction hides when the gutters are too narrow.",
+  "画布 {0} × {1}；网页左右留边各 {2}px，上下留边各 {3}px。保留介绍请采集整个窗口并等比例适配；仅采集工作区时裁到画布边界。": "Canvas {0} × {1}; side gutters {2}px each, top and bottom {3}px each. Capture the full window and fit proportionally to include the introduction; crop to the canvas for the workspace alone."
 }
