@@ -1053,3 +1053,23 @@ it.each([['buzhoushan', true], ['daylight', true], ['buzhoushan', false]] as con
    expect(screen.queryByRole('region', {name: '子 Agent 进度'})).toBeNull();
  } finally {cleanup(); window.matchMedia = original; act(() => setTheme('daylight'));}
 });
+
+it('Buzhoushan shows running conversation normally while retaining both activity tabs',()=>{
+ const original=window.matchMedia;
+ window.matchMedia=(()=>({matches:true,addEventListener:()=>{},removeEventListener:()=>{}})) as unknown as typeof window.matchMedia;
+ try {
+  act(()=>setTheme('buzhoushan'));
+  const props=inspectorProps('A');
+  const running:SessionDetail={...props.detail,session:{...props.detail.session,activeTurnId:'active',state:{...props.detail.session.state,currentTurn:'in_progress',threadRuntime:'active'}},events:[{id:'reply',type:'item.completed',itemType:'agentMessage',actor:'agent',body:'正在检查布局',nativeTurnId:'active',nativeItemId:'reply',sessionSeq:1,occurredAt:'2026-10-13T00:00:00Z'}]};
+  const view=render(<SessionInspector {...props} detail={running}/>);
+  const main=view.container.querySelector('.conversation-viewport')!;
+  expect(within(main as HTMLElement).getByText('正在检查布局')).toBeTruthy();
+  expect(view.container.querySelector('.buzhou-heartbeat')).toBeNull();
+  expect(screen.getByRole('button',{name:'执行过程'})).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'人机对话'}));
+  expect(within(view.container.querySelector('.buzhou-dock__chat') as HTMLElement).getByText('正在检查布局')).toBeTruthy();
+  view.rerender(<SessionInspector {...props} detail={{...running,session:{...running.session,activeTurnId:undefined,state:{...running.session.state,currentTurn:'none',threadRuntime:'idle'}}}}/>);
+  expect(within(main as HTMLElement).getByText('正在检查布局')).toBeTruthy();
+  expect(view.container.querySelector('.buzhou-heartbeat')).toBeNull();
+ } finally {cleanup();window.matchMedia=original;act(()=>setTheme('daylight'));}
+});
