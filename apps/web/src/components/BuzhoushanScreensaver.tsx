@@ -118,7 +118,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
 
   return createPortal(
     <div className="buzhou-saver" data-active={active} data-busy={Boolean(status)} data-mode={mode} style={bounds} aria-hidden={!active} inert={!active ? true : undefined}>
-      <canvas key={mode} ref={canvasRef} className="buzhou-saver__canvas" aria-hidden="true" />
+      <canvas key={mode} ref={canvasRef} className="buzhou-saver__canvas" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} aria-hidden="true" />
       <div className="buzhou-saver__caption" role="status">
         <span className="buzhou-saver__brand">AGENTFLEETS</span>
         {status

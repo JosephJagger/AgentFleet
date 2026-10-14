@@ -197,12 +197,12 @@
   .buzhou-broadcast-rail--left { left:var(--buzhou-canvas-side); }
   .buzhou-broadcast-rail--right { right:var(--buzhou-canvas-side); }
   .buzhou-broadcast-rail__content { display:none; height:100%; box-sizing:border-box; }
-  @container (min-width:140px) {
-    .buzhou-broadcast-rail__content { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px clamp(12px,9cqw,40px); text-align:center; gap:20px; }
+  @container (min-width:100px) {
+    .buzhou-broadcast-rail__content { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:clamp(10px,4cqw,24px) clamp(8px,9cqw,40px); text-align:center; gap:clamp(8px,8cqw,20px); }
     .buzhou-broadcast-rail__eyebrow { color:#86a3bc; font:500 clamp(9px,3.5cqw,13px)/1.5 var(--mono,monospace); letter-spacing:.15em; }
-    .buzhou-broadcast-rail__art { width:80%; max-width:200px; height:auto; flex:none; opacity:.8; }
-    .buzhou-broadcast-rail h2 { margin:0; color:#e1edf7; font-size:clamp(22px,10cqw,46px); font-weight:600; line-height:1.5; text-wrap:balance; overflow-wrap:anywhere; }
-    .buzhou-broadcast-rail p { margin:0; color:#9cb5c9; font-size:clamp(12px,5.5cqw,22px); line-height:1.8; text-wrap:balance; overflow-wrap:anywhere; }
+    .buzhou-broadcast-rail__art { width:70%; max-width:200px; height:auto; flex:none; opacity:.8; }
+    .buzhou-broadcast-rail h2 { margin:0; color:#e1edf7; font-size:clamp(15px,10cqw,46px); font-weight:600; line-height:1.5; text-wrap:balance; overflow-wrap:anywhere; }
+    .buzhou-broadcast-rail p { margin:0; color:#9cb5c9; font-size:clamp(10px,5.5cqw,22px); line-height:1.7; text-wrap:balance; overflow-wrap:anywhere; }
     .buzhou-broadcast-rail__rule { width:32px; height:2px; background:#3a90d5; margin-top:6px; }
   }
 }
@@ -216,6 +216,6 @@
 .buzhou-broadcast-rail__separator { display:inline; }
 
 /* Reserve introductions inside the canvas only when the workspace remains usable. */
-@media (min-width:1200px) and (min-height:675px) {
-  :root[data-theme="buzhoushan"]:has(.buzhou-broadcast) { --buzhou-rail-width:clamp(140px,calc(var(--buzhou-canvas-width) * .12),240px); }
+@media (min-width:900px) and (min-height:506px) {
+  :root[data-theme="buzhoushan"]:has(.buzhou-broadcast) { --buzhou-rail-width:clamp(112px,calc(var(--buzhou-canvas-width) * .12),240px); }
 }
