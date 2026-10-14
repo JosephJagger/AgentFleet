@@ -3574,5 +3574,11 @@
   "待命中": "Standing by",
   "屏保测试": "Test screensaver",
   "立即预览直播屏保，点击任意处退出": "Preview the broadcast screensaver now; click anywhere to exit",
-  "效果测试中，点击任意处退出": "Effect test: click anywhere to exit"
+  "效果测试：1 粒子 · 2 流体 · 3 数字雨 · 4 环，←/→ 切换，点击退出": "Effect test: 1 particles · 2 fluid · 3 digital rain · 4 ring, ←/→ to switch, click to exit",
+  "屏保效果": "Screensaver effect",
+  "自动轮换": "Auto rotate",
+  "粒子引力场": "Particle gravity field",
+  "流体烟雾": "Fluid smoke",
+  "数字雨": "Digital rain",
+  "莫比乌斯环": "Möbius ring"
 }

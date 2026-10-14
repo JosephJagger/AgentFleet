@@ -1,10 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 /** Broadcast-effect screensaver preferences; stored locally and never affect app behaviour. */
-export type ScreensaverPrefs = { enabled: boolean; seconds: number };
+export type ScreensaverMode = "auto" | "particles" | "smoke" | "matrix" | "mobius";
+export const SCREENSAVER_MODES: ScreensaverMode[] = ["auto", "particles", "smoke", "matrix", "mobius"];
+export type ScreensaverPrefs = { enabled: boolean; seconds: number; mode: ScreensaverMode };
 const KEY = "agentfleet.buzhoushan.screensaver";
 const CHANGED = "agentfleet:buzhoushan-screensaver";
-export const SCREENSAVER_DEFAULT: ScreensaverPrefs = { enabled: true, seconds: 30 };
+export const SCREENSAVER_DEFAULT: ScreensaverPrefs = { enabled: true, seconds: 30, mode: "auto" };
 export const SCREENSAVER_MIN_SECONDS = 10;
 export const SCREENSAVER_MAX_SECONDS = 600;
 
@@ -19,11 +21,15 @@ function readRaw(): string {
 export function parseScreensaverPrefs(raw: string): ScreensaverPrefs {
   try {
     const saved = JSON.parse(raw || "{}");
-    return { enabled: saved?.enabled !== false, seconds: saved?.seconds === undefined ? SCREENSAVER_DEFAULT.seconds : clampSeconds(saved.seconds) };
+    return {
+      enabled: saved?.enabled !== false,
+      seconds: saved?.seconds === undefined ? SCREENSAVER_DEFAULT.seconds : clampSeconds(saved.seconds),
+      mode: SCREENSAVER_MODES.includes(saved?.mode) ? saved.mode : SCREENSAVER_DEFAULT.mode,
+    };
   } catch { return { ...SCREENSAVER_DEFAULT }; }
 }
 export function saveScreensaverPrefs(next: ScreensaverPrefs) {
-  const value = { enabled: next.enabled, seconds: clampSeconds(next.seconds) };
+  const value = { enabled: next.enabled, seconds: clampSeconds(next.seconds), mode: SCREENSAVER_MODES.includes(next.mode) ? next.mode : SCREENSAVER_DEFAULT.mode };
   try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* Preference still applies to this page load. */ }
   memory = JSON.stringify(value);
   window.dispatchEvent(new Event(CHANGED));
