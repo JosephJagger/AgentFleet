@@ -237,7 +237,8 @@ export class Fluid {
 
 /* ----------------------------------------------------------------- matrix rain */
 
-const GLYPHS = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789:.=*+-<>¦";
+// Latin letters, digits and code symbols only (no kana), so the rain reads as data rather than text.
+const GLYPHS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0101<>{}[]()/\\|=+-*#$%&@:;.";
 export class MatrixRain {
   cols = 0; rows = 0;
   head = new Float32Array(0); speed = new Float32Array(0); drawn = new Int32Array(0); prev = new Uint16Array(0);
