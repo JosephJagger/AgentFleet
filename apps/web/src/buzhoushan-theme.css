@@ -302,3 +302,4 @@
 .buzhou-saver__caption small { opacity:.7; font-size:14px; }
 .buzhou-saver[data-mode="matrix"] { color:#7dffb0; }
 @keyframes buzhou-saver-in { from { opacity:0; } to { opacity:1; } }
+.buzhou-saver__diag { font:11px/1.5 var(--mono,monospace); opacity:.65; max-width:90%; }

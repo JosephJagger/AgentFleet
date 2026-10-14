@@ -7,7 +7,7 @@
  *  - ThreeBody: Newtonian three-sun problem (velocity Verlet) from a perturbed figure-eight.
  *  - ProtonModel: uud valence quarks, colour-charge flux tubes and a fizzing quark–antiquark sea.
  */
-import { TAU, clamp, hslToRgb, hueFor, sizeCanvas, type Effect } from "./buzhoushan-effect-common";
+import { TAU, clamp, hslToRgb, hueFor, setupCanvas, type Effect, type Quality } from "./buzhoushan-effect-common";
 
 type Rand = () => number;
 
@@ -38,14 +38,14 @@ export class LorenzCloud {
   step(h: number) { for (let i = 0; i < this.n; i++) this.advance(i, h); }
 }
 
-export function attractorEffect(canvas: HTMLCanvasElement): Effect | undefined {
+export function attractorEffect(canvas: HTMLCanvasElement, q: Quality): Effect | undefined {
   const ctx = canvas.getContext("2d"); if (!ctx) return undefined;
-  const cloud = new LorenzCloud(7000);
+  const cloud = new LorenzCloud(q.attractor);
   const BUCKETS = 14;
   const paths: [number, number, number][][] = Array.from({ length: BUCKETS }, () => []);
   let w = 0, h = 0;
   return {
-    resize(width, height) { sizeCanvas(canvas, width, height); w = canvas.width; h = canvas.height; ctx.fillStyle = "#02040a"; ctx.fillRect(0, 0, w, h); },
+    resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); ctx.fillStyle = "#02040a"; ctx.fillRect(0, 0, w, h); },
     frame(dt, t, { busy, pointer }) {
       for (let s = 0; s < 3; s++) cloud.step(0.0045 * (busy ? 1.5 : 1) * Math.min(1, dt * 60));
       ctx.globalCompositeOperation = "source-over";
@@ -94,7 +94,7 @@ export function waveGridEffect(canvas: HTMLCanvasElement): Effect | undefined {
   let w = 0, h = 0;
   const cur = new Float32Array((COLS + 1) * 2), prev = new Float32Array((COLS + 1) * 2);
   return {
-    resize(width, height) { sizeCanvas(canvas, width, height); w = canvas.width; h = canvas.height; },
+    resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); },
     frame(_dt, t, { busy, pointer }) {
       const horizon = h * 0.36, focal = w * 0.06, speed = busy ? 3.2 : 1.8, cam = t * speed;
       const base = Math.floor(cam / DZ) * DZ, hue = busy ? 140 : 195;
@@ -151,9 +151,9 @@ export class Starfield {
   step(dz: number) { for (let i = 0; i < this.n; i++) { this.z[i] -= dz; if (this.z[i] <= 0.2) this.respawn(i); } }
 }
 
-export function starfieldEffect(canvas: HTMLCanvasElement): Effect | undefined {
+export function starfieldEffect(canvas: HTMLCanvasElement, q: Quality): Effect | undefined {
   const ctx = canvas.getContext("2d"); if (!ctx) return undefined;
-  const field = new Starfield(2600);
+  const field = new Starfield(q.stars);
   const far = Array.from({ length: 520 }, () => ({ x: Math.random(), y: Math.random(), p: Math.random() * TAU, s: 0.4 + Math.random() * 1.1 }));
   let w = 0, h = 0, nebula: HTMLCanvasElement | undefined;
   const paintNebula = () => {
@@ -166,7 +166,7 @@ export function starfieldEffect(canvas: HTMLCanvasElement): Effect | undefined {
     }
   };
   return {
-    resize(width, height) { sizeCanvas(canvas, width, height); w = canvas.width; h = canvas.height; paintNebula(); },
+    resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); paintNebula(); },
     frame(dt, t, { busy, pointer }) {
       const speed = busy ? 14 : 6.5;
       if (nebula) ctx.drawImage(nebula, 0, 0); else { ctx.fillStyle = "#01030a"; ctx.fillRect(0, 0, w, h); }
@@ -259,7 +259,7 @@ export function threeBodyEffect(canvas: HTMLCanvasElement): Effect | undefined {
     for (let i = 0; i < 160; i++) { tctx.fillStyle = `rgba(190,205,255,${0.15 + Math.random() * 0.35})`; tctx.fillRect(Math.random() * w, Math.random() * h, 1.2, 1.2); }
   };
   return {
-    resize(width, height) { sizeCanvas(canvas, width, height); w = canvas.width; h = canvas.height; trail.width = w; trail.height = h; zoom = Math.min(w, h) * 0.3; reset(); },
+    resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); trail.width = canvas.width; trail.height = canvas.height; tctx.setTransform(canvas.width / w, 0, 0, canvas.height / h, 0, 0); zoom = Math.min(w, h) * 0.3; reset(); },
     frame(dt, _t, { busy }) {
       acc += dt * (busy ? 1.9 : 1.2);
       for (let steps = 0; acc >= 0.003 && steps < 220; steps++) { sim.step(0.003); acc -= 0.003; }
@@ -280,7 +280,7 @@ export function threeBodyEffect(canvas: HTMLCanvasElement): Effect | undefined {
         last[i] = [sx, sy];
       }
       tctx.globalCompositeOperation = "source-over";
-      ctx.drawImage(trail, 0, 0);
+      ctx.drawImage(trail, 0, 0, w, h);
       ctx.globalCompositeOperation = "lighter";
       for (let i = 0; i < 3; i++) {
         const [sx, sy] = pos[i], s = suns[i], R = (16 + 7 * s.size) * (zoom / (Math.min(w, h) * 0.3)) ** 0.25;
@@ -341,7 +341,7 @@ export function protonEffect(canvas: HTMLCanvasElement): Effect | undefined {
   let w = 0, h = 0;
   const q = [[0, 0, 0], [0, 0, 0], [0, 0, 0]] as [number, number, number][];
   return {
-    resize(width, height) { sizeCanvas(canvas, width, height); w = canvas.width; h = canvas.height; ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, w, h); },
+    resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, w, h); },
     frame(dt, t, { busy, pointer }) {
       model.update(dt);
       const yaw = t * 0.32 + (pointer?.active ? (pointer.x - 0.5) * 2 : 0), pitch = 0.42 + (pointer?.active ? (pointer.y - 0.5) * 0.8 : 0);

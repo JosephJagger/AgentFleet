@@ -2,7 +2,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Download,MonitorUp,Ratio,Sparkles,X} from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {t} from '../i18n';
-import {SCREENSAVER_MODES,setScreensaverPreview,useScreensaverPrefs,type ScreensaverMode,saveScreensaverPrefs,SCREENSAVER_MIN_SECONDS,SCREENSAVER_MAX_SECONDS} from '../lib/buzhoushan-idle';
+import {SCREENSAVER_MODES,SCREENSAVER_QUALITIES,type ScreensaverQuality,setScreensaverPreview,useScreensaverPrefs,type ScreensaverMode,saveScreensaverPrefs,SCREENSAVER_MIN_SECONDS,SCREENSAVER_MAX_SECONDS} from '../lib/buzhoushan-idle';
 import {downloadBroadcastLauncher,openBroadcastWindow,fitBroadcastWindow} from '../lib/broadcast-launcher';
 
 type BroadcastIntro = {leftTitle:string;leftSubtitle:string;rightTitle:string;rightSubtitle:string};
@@ -52,6 +52,7 @@ export function BuzhoushanBroadcastControl({enabled,onChange}:{enabled:boolean;o
       <details className="buzhou-broadcast-editor"><summary>{t('空闲屏保特效')}</summary>
         <label><input type="checkbox" checked={saver.enabled} onChange={event=>saveScreensaverPrefs({...saver,enabled:event.target.checked})}/> {t('长时间无鼠标键盘操作时显示直播屏保')}</label>
         <label>{t('屏保效果')}<select value={saver.mode} onChange={event=>saveScreensaverPrefs({...saver,mode:event.target.value as ScreensaverMode})}>{SCREENSAVER_MODES.map(mode=><option key={mode} value={mode}>{t(({auto:'自动轮换',particles:'粒子引力场',smoke:'流体烟雾',matrix:'数字雨',attractor:'吸引子轨迹',wavegrid:'波浪网格',starfield:'星空',threebody:'三体太阳轨迹',proton:'质子'} as Record<ScreensaverMode,string>)[mode])}</option>)}</select></label>
+        <label>{t('画质')}<select value={saver.quality} onChange={event=>saveScreensaverPrefs({...saver,quality:event.target.value as ScreensaverQuality})}>{SCREENSAVER_QUALITIES.map(q=><option key={q} value={q}>{t({auto:'自动（按帧率降档）',high:'高',medium:'中',low:'低'}[q])}</option>)}</select></label>
         <label>{t('空闲秒数')}<input type="number" min={SCREENSAVER_MIN_SECONDS} max={SCREENSAVER_MAX_SECONDS} value={saver.seconds} onChange={event=>saveScreensaverPrefs({...saver,seconds:Number(event.target.value)})}/></label>
         <small>{t('仅为视觉特效：不拦截点击，不影响通话、互动消息和任务；任意操作立即退出。')}</small>
       </details>

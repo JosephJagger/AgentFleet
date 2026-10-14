@@ -6,10 +6,12 @@ export type ScreensaverMode = "auto" | EffectMode;
 /** Effects in rotation/test order; keys 1..n choose them in the preview. */
 export const SCREENSAVER_EFFECTS: EffectMode[] = ["particles", "smoke", "matrix", "attractor", "wavegrid", "starfield", "threebody", "proton"];
 export const SCREENSAVER_MODES: ScreensaverMode[] = ["auto", ...SCREENSAVER_EFFECTS];
-export type ScreensaverPrefs = { enabled: boolean; seconds: number; mode: ScreensaverMode };
+export type ScreensaverQuality = "auto" | "high" | "medium" | "low";
+export const SCREENSAVER_QUALITIES: ScreensaverQuality[] = ["auto", "high", "medium", "low"];
+export type ScreensaverPrefs = { enabled: boolean; seconds: number; mode: ScreensaverMode; quality: ScreensaverQuality };
 const KEY = "agentfleet.buzhoushan.screensaver";
 const CHANGED = "agentfleet:buzhoushan-screensaver";
-export const SCREENSAVER_DEFAULT: ScreensaverPrefs = { enabled: true, seconds: 30, mode: "auto" };
+export const SCREENSAVER_DEFAULT: ScreensaverPrefs = { enabled: true, seconds: 30, mode: "auto", quality: "auto" };
 export const SCREENSAVER_MIN_SECONDS = 10;
 export const SCREENSAVER_MAX_SECONDS = 600;
 
@@ -28,11 +30,12 @@ export function parseScreensaverPrefs(raw: string): ScreensaverPrefs {
       enabled: saved?.enabled !== false,
       seconds: saved?.seconds === undefined ? SCREENSAVER_DEFAULT.seconds : clampSeconds(saved.seconds),
       mode: SCREENSAVER_MODES.includes(saved?.mode) ? saved.mode : SCREENSAVER_DEFAULT.mode,
+      quality: SCREENSAVER_QUALITIES.includes(saved?.quality) ? saved.quality : SCREENSAVER_DEFAULT.quality,
     };
   } catch { return { ...SCREENSAVER_DEFAULT }; }
 }
 export function saveScreensaverPrefs(next: ScreensaverPrefs) {
-  const value = { enabled: next.enabled, seconds: clampSeconds(next.seconds), mode: SCREENSAVER_MODES.includes(next.mode) ? next.mode : SCREENSAVER_DEFAULT.mode };
+  const value = { enabled: next.enabled, seconds: clampSeconds(next.seconds), mode: SCREENSAVER_MODES.includes(next.mode) ? next.mode : SCREENSAVER_DEFAULT.mode, quality: SCREENSAVER_QUALITIES.includes(next.quality) ? next.quality : SCREENSAVER_DEFAULT.quality };
   try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* Preference still applies to this page load. */ }
   memory = JSON.stringify(value);
   window.dispatchEvent(new Event(CHANGED));

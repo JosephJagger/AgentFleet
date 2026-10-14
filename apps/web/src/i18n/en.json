@@ -3584,5 +3584,13 @@
   "波浪网格": "Wave grid",
   "星空": "Starfield",
   "三体太阳轨迹": "Three-body suns",
-  "质子": "Proton"
+  "质子": "Proton",
+  "画质": "Quality",
+  "自动（按帧率降档）": "Auto (steps down if frame rate is low)",
+  "高": "High",
+  "中": "Medium",
+  "低": "Low",
+  "帧率 {0} fps": "{0} fps",
+  "WebGL 不可用，可能未开启硬件加速": "WebGL unavailable; hardware acceleration may be off",
+  "软件渲染，请在浏览器设置中开启硬件加速": "Software rendering; enable hardware acceleration in browser settings"
 }

@@ -7,9 +7,9 @@
  *  - MatrixRain: classic falling glyph columns.
  * Each is a small class that can run headless, so the numerics are unit-testable.
  */
-import { TAU, clamp, hslToRgb, hueFor, sizeCanvas, type Effect, type EffectMode, type EffectParams, type Pointer } from "./buzhoushan-effect-common";
+import { TAU, clamp, hslToRgb, hueFor, qualityFor, setupCanvas, type Effect, type Quality, type EffectMode, type EffectParams, type Pointer } from "./buzhoushan-effect-common";
 import { attractorEffect, protonEffect, starfieldEffect, threeBodyEffect, waveGridEffect } from "./buzhoushan-effects-science";
-export { hslToRgb, hueFor };
+export { hslToRgb, hueFor, qualityFor };
 export type { Effect, EffectMode, EffectParams, Pointer };
 
 /* ------------------------------------------------------------------ particles */
@@ -41,8 +41,8 @@ export class ParticleField {
   private palette = new Uint8Array(256 * 3);
   private paletteBusy: boolean | undefined;
   // The curl flow is smooth, so it is evaluated on a coarse grid once per step and bilinearly sampled.
-  private static readonly GW = 96; private static readonly GH = 54;
-  private flowGrid = new Float32Array(97 * 55 * 2);
+  private static readonly GW = 192; private static readonly GH = 108;
+  private flowGrid = new Float32Array(193 * 109 * 2);
   constructor(n: number, w: number, h: number, private rand: () => number = Math.random) {
     this.n = n; this.w = w; this.h = h;
     this.x = new Float32Array(n); this.y = new Float32Array(n);
@@ -121,8 +121,10 @@ export class ParticleField {
   /** Fade the RGBA buffer (alpha stays opaque) then add every particle as a glowing point. */
   render(data: Uint8ClampedArray, dt: number, busy: boolean) {
     if (this.paletteBusy !== busy) this.buildPalette(busy);
-    const keep = Math.pow(0.9, dt * 60);
-    for (let i = 0; i < data.length; i += 4) { data[i] *= keep; data[i + 1] *= keep; data[i + 2] *= keep; }
+    // Fade each channel by 1/8 per frame using one 32-bit operation per pixel (alpha untouched).
+    void dt;
+    const px = new Uint32Array(data.buffer, data.byteOffset, data.length >> 2);
+    for (let i = 0; i < px.length; i++) { const v = px[i]; px[i] = v - ((v >>> 3) & 0x001f1f1f); }
     const { n, w, h, x, y, vx, vy, tint, palette } = this;
     const iw = Math.floor(w), ih = Math.floor(h);
     for (let i = 0; i < n; i++) {
@@ -275,36 +277,37 @@ export class MatrixRain {
 
 /* -------------------------------------------------------- canvas-bound effects */
 
-function particleEffect(canvas: HTMLCanvasElement): Effect | undefined {
+function particleEffect(canvas: HTMLCanvasElement, q: Quality): Effect | undefined {
   const ctx = canvas.getContext("2d"); const off = document.createElement("canvas"); const octx = off.getContext("2d");
   if (!ctx || !octx) return undefined;
-  let field: ParticleField | undefined, img: ImageData | undefined;
+  let field: ParticleField | undefined, img: ImageData | undefined, W = 0, H = 0;
   return {
-    resize(w, h) {
-      sizeCanvas(canvas, w, h);
-      off.width = Math.max(2, Math.floor(w / 2)); off.height = Math.max(2, Math.floor(h / 2));
+    resize(width, height, dpr = 1) {
+      ({ w: W, h: H } = setupCanvas(canvas, ctx, width, height, dpr));
+      const scale = q.particleScale * Math.min(dpr, 1.5);
+      off.width = Math.max(2, Math.floor(W * scale)); off.height = Math.max(2, Math.floor(H * scale));
       img = octx.createImageData(off.width, off.height);
       for (let i = 3; i < img.data.length; i += 4) img.data[i] = 255;
-      if (field) field.resize(off.width, off.height); else field = new ParticleField(40000, off.width, off.height);
+      if (field) field.resize(off.width, off.height); else field = new ParticleField(q.particles, off.width, off.height);
     },
     frame(dt, t, { busy, pointer }) {
       if (!field || !img) return;
       field.step(dt, t, busy, pointer);
       field.render(img.data, dt, busy); octx.putImageData(img, 0, 0);
-      ctx.imageSmoothingEnabled = true; ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high"; ctx.drawImage(off, 0, 0, W, H);
     },
     dispose() { field = undefined; img = undefined; },
   };
 }
 
-function smokeEffect(canvas: HTMLCanvasElement): Effect | undefined {
+function smokeEffect(canvas: HTMLCanvasElement, q: Quality): Effect | undefined {
   const ctx = canvas.getContext("2d"); const off = document.createElement("canvas"); const octx = off.getContext("2d");
   if (!ctx || !octx) return undefined;
-  let fluid: Fluid | undefined, img: ImageData | undefined, last: Pointer | undefined;
+  let fluid: Fluid | undefined, img: ImageData | undefined, last: Pointer | undefined, W = 0, H = 0;
   return {
-    resize(w, h) {
-      sizeCanvas(canvas, w, h);
-      const gw = 176, gh = Math.max(24, Math.round(gw * h / w));
+    resize(width, height, dpr = 1) {
+      ({ w: W, h: H } = setupCanvas(canvas, ctx, width, height, dpr));
+      const gw = q.smokeWidth, gh = Math.max(24, Math.round(gw * H / W));
       off.width = gw; off.height = gh; fluid = new Fluid(gw, gh); img = octx.createImageData(gw, gh);
     },
     frame(dt, t, { busy, pointer }) {
@@ -324,7 +327,7 @@ function smokeEffect(canvas: HTMLCanvasElement): Effect | undefined {
       last = pointer ? { ...pointer } : undefined;
       fluid.step(Math.min(dt, 0.033) * 2.4);
       fluid.render(img.data); octx.putImageData(img, 0, 0);
-      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high"; ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high"; ctx.drawImage(off, 0, 0, W, H);
     },
     dispose() { fluid = undefined; img = undefined; },
   };
@@ -334,23 +337,23 @@ function matrixEffect(canvas: HTMLCanvasElement): Effect | undefined {
   const ctx = canvas.getContext("2d"); if (!ctx) return undefined;
   const rain = new MatrixRain(16);
   return {
-    resize(w, h) {
-      sizeCanvas(canvas, w, h);
-      ctx.fillStyle = "#000602"; ctx.fillRect(0, 0, canvas.width, canvas.height); rain.resize(canvas.width, canvas.height);
+    resize(width, height, dpr = 1) {
+      const { w, h } = setupCanvas(canvas, ctx, width, height, dpr);
+      ctx.fillStyle = "#000602"; ctx.fillRect(0, 0, w, h); rain.resize(w, h);
     },
     frame(dt, _t, { busy, pointer }) { rain.frame(ctx, dt, busy, pointer); },
     dispose() {},
   };
 }
 
-export function createEffect(mode: EffectMode, canvas: HTMLCanvasElement): Effect | undefined {
+export function createEffect(mode: EffectMode, canvas: HTMLCanvasElement, q: Quality = qualityFor("high")): Effect | undefined {
   try {
-    if (mode === "particles") return particleEffect(canvas);
-    if (mode === "smoke") return smokeEffect(canvas);
+    if (mode === "particles") return particleEffect(canvas, q);
+    if (mode === "smoke") return smokeEffect(canvas, q);
     if (mode === "matrix") return matrixEffect(canvas);
-    if (mode === "attractor") return attractorEffect(canvas);
+    if (mode === "attractor") return attractorEffect(canvas, q);
     if (mode === "wavegrid") return waveGridEffect(canvas);
-    if (mode === "starfield") return starfieldEffect(canvas);
+    if (mode === "starfield") return starfieldEffect(canvas, q);
     if (mode === "threebody") return threeBodyEffect(canvas);
     if (mode === "proton") return protonEffect(canvas);
   } catch { /* A broken canvas must never affect the application underneath. */ }
