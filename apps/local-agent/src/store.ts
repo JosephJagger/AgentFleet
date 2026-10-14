@@ -1,3 +1,4 @@
+import {windowsProcessStartToken} from './windows-process-identity.js';
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { chmod, mkdir, open, readFile, rename } from "node:fs/promises";
@@ -228,18 +229,7 @@ export async function platformProcessStartToken(pid: number): Promise<string | u
       const started = stdout.trim();
       return started ? `darwin:${started}` : undefined;
     }
-    if (process.platform === "win32") {
-      // Same-user process identity does not need the WMI/CIM service, whose
-      // cold startup can exceed the ownership deadline on Windows.
-      const script = `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().Ticks`;
-      const { stdout } = await execFileAsync(
-        "powershell.exe",
-        ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script],
-        { timeout: 8_000, windowsHide: true, maxBuffer: 16_384, encoding: "utf8" },
-      );
-      const started = stdout.trim();
-      return /^\d+$/u.test(started) ? `windows:${started}` : undefined;
-    }
+    if (process.platform === "win32") return windowsProcessStartToken(pid);
   } catch {
     return undefined;
   }
