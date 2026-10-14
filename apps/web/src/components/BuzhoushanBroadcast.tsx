@@ -2,6 +2,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Download,MonitorUp,Ratio,X} from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {t} from '../i18n';
+import {useScreensaverPrefs,saveScreensaverPrefs,SCREENSAVER_MIN_SECONDS,SCREENSAVER_MAX_SECONDS} from '../lib/buzhoushan-idle';
 import {downloadBroadcastLauncher,openBroadcastWindow,fitBroadcastWindow} from '../lib/broadcast-launcher';
 
 type BroadcastIntro = {leftTitle:string;leftSubtitle:string;rightTitle:string;rightSubtitle:string};
@@ -34,6 +35,7 @@ export function BuzhoushanBroadcastIntro({intro=defaultIntro}:{intro?:BroadcastI
 export function BuzhoushanBroadcastControl({enabled,onChange}:{enabled:boolean;onChange:(enabled:boolean)=>void}) {
   const [intro,setIntro]=useState(readIntro);
   const [windowBlocked,setWindowBlocked]=useState(false);
+  const saver=useScreensaverPrefs();
   useEffect(()=>{fitBroadcastWindow();},[]);
   const [open,setOpen]=useState(false),root=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
   useEffect(()=>{if(!open)return;const outside=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node))setOpen(false);};document.addEventListener('pointerdown',outside);return()=>document.removeEventListener('pointerdown',outside);},[open]);
@@ -46,6 +48,11 @@ export function BuzhoushanBroadcastControl({enabled,onChange}:{enabled:boolean;o
       <button type="button" className="button" onClick={()=>setWindowBlocked(!openBroadcastWindow())}><MonitorUp size={14}/>{t('打开 16:9 直播窗口')}</button>
       {windowBlocked&&<p role="status">{t('窗口未打开，请允许本站弹出窗口后重试。')}</p>}
       <small>{t('新窗口不会转移当前通话；请勿关闭正在通话的原窗口。窗口尺寸可能受系统限制，以底部画布尺寸为准。')}</small>
+      <details className="buzhou-broadcast-editor"><summary>{t('空闲屏保特效')}</summary>
+        <label><input type="checkbox" checked={saver.enabled} onChange={event=>saveScreensaverPrefs({...saver,enabled:event.target.checked})}/> {t('长时间无鼠标键盘操作时显示直播屏保')}</label>
+        <label>{t('空闲秒数')}<input type="number" min={SCREENSAVER_MIN_SECONDS} max={SCREENSAVER_MAX_SECONDS} value={saver.seconds} onChange={event=>saveScreensaverPrefs({...saver,seconds:Number(event.target.value)})}/></label>
+        <small>{t('仅为视觉特效：不拦截点击，不影响通话、互动消息和任务；任意操作立即退出。')}</small>
+      </details>
       <details className="buzhou-broadcast-editor"><summary>{t('编辑直播介绍')}</summary>
         {(Object.keys(defaultIntro) as (keyof BroadcastIntro)[]).map((key,index)=><label key={key}>{t(['左侧标题','左侧副标题','右侧标题','右侧副标题'][index])}<input maxLength={40} value={intro[key]} onChange={event=>{const next={...intro,[key]:event.target.value};setIntro(next);try{localStorage.setItem(introKey,JSON.stringify(next));}catch{/* The current page still updates when storage is unavailable. */}}}/></label>)}
         <small>{t('仅保存在本浏览器；画布较小时自动隐藏介绍，优先保证工作区。')}</small>
