@@ -3,23 +3,10 @@ import type { SessionDetail } from "../lib/types";
 import { isBuzhoushanTurnActive } from "../lib/buzhoushan-events";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createEffect, type EffectMode, type Pointer } from "../lib/buzhoushan-effects";
+import { SCREENSAVER_EFFECTS } from "../lib/buzhoushan-idle";
 import { setScreensaverPreview, useIdle, useScreensaverPreview, useScreensaverPrefs } from "../lib/buzhoushan-idle";
 import { workbenchItems } from "./BuzhoushanActivity";
 import { t } from "../i18n";
-
-const SEGMENTS = 72;
-const RADIUS = 150;
-const SEGMENT_LENGTH = (2 * Math.PI * RADIUS) / SEGMENTS + 1.5;
-
-/** A Möbius strip assembled from twisted segments (half turn over the full loop). */
-function MobiusRing() {
-  return <div className="buzhou-saver__scene" aria-hidden="true"><div className="buzhou-saver__ring">
-    {Array.from({ length: SEGMENTS }, (_, index) => {
-      const angle = (index / SEGMENTS) * 360;
-      return <i key={index} style={{ transform: `rotateZ(${angle}deg) translateX(${RADIUS}px) rotateY(${angle / 2}deg)`, height: SEGMENT_LENGTH, animationDelay: `${-(index / SEGMENTS) * 6}s` }} />;
-    })}
-  </div></div>;
-}
 
 function taskStatus(detail?: SessionDetail) {
   if (!detail || !isBuzhoushanTurnActive(detail)) return undefined;
@@ -54,7 +41,7 @@ function useWorkspaceBounds(active: boolean): CSSProperties | undefined {
  * Visual-only idle effect for the captured broadcast. It is click-through
  * (pointer-events: none), never blocks input, and leaves all other components mounted.
  */
-const CYCLE: EffectMode[] = ["particles", "smoke", "matrix", "mobius"];
+const CYCLE: EffectMode[] = SCREENSAVER_EFFECTS;
 const CYCLE_MS = 45_000;
 let cycleStart = 0;
 
@@ -72,7 +59,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
   const busyRef = useRef(false);
   busyRef.current = Boolean(status);
 
-  // Preview: 1-4 or arrow keys choose an effect; any other key or a click ends it.
+  // Preview: number keys or arrow keys choose an effect; any other key or a click ends it.
   useEffect(() => {
     if (!preview) { setPreviewMode(undefined); return; }
     const end = () => setScreensaverPreview(false);
@@ -113,7 +100,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!active || !canvas || mode === "mobius") return;
+    if (!active || !canvas) return;
     const effect = createEffect(mode, canvas);
     if (!effect) return;
     let raf = 0, last = performance.now(), size = "";
@@ -131,13 +118,13 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
 
   return createPortal(
     <div className="buzhou-saver" data-active={active} data-busy={Boolean(status)} data-mode={mode} style={bounds} aria-hidden={!active} inert={!active ? true : undefined}>
-      {mode === "mobius" ? <MobiusRing /> : <canvas key={mode} ref={canvasRef} className="buzhou-saver__canvas" aria-hidden="true" />}
+      <canvas key={mode} ref={canvasRef} className="buzhou-saver__canvas" aria-hidden="true" />
       <div className="buzhou-saver__caption" role="status">
         <span className="buzhou-saver__brand">AGENTFLEETS</span>
         {status
           ? <><strong data-live={status.live}>{status.label}</strong>{status.total > 0 && <small>{t("已完成 {0} / {1} 步", status.done, status.total)}</small>}</>
           : <strong>{t("待命中")}</strong>}
-        {preview && <small>{t("效果测试：1 粒子 · 2 流体 · 3 数字雨 · 4 环，←/→ 切换，点击退出")}</small>}
+        {preview && <small>{t("效果测试：数字键 1–8 或 ←/→ 切换，点击退出")}</small>}
       </div>
     </div>, document.body);
 }

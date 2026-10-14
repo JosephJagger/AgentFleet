@@ -1,8 +1,11 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 /** Broadcast-effect screensaver preferences; stored locally and never affect app behaviour. */
-export type ScreensaverMode = "auto" | "particles" | "smoke" | "matrix" | "mobius";
-export const SCREENSAVER_MODES: ScreensaverMode[] = ["auto", "particles", "smoke", "matrix", "mobius"];
+import type { EffectMode } from "./buzhoushan-effect-common";
+export type ScreensaverMode = "auto" | EffectMode;
+/** Effects in rotation/test order; keys 1..n choose them in the preview. */
+export const SCREENSAVER_EFFECTS: EffectMode[] = ["particles", "smoke", "matrix", "attractor", "wavegrid", "starfield", "threebody", "proton"];
+export const SCREENSAVER_MODES: ScreensaverMode[] = ["auto", ...SCREENSAVER_EFFECTS];
 export type ScreensaverPrefs = { enabled: boolean; seconds: number; mode: ScreensaverMode };
 const KEY = "agentfleet.buzhoushan.screensaver";
 const CHANGED = "agentfleet:buzhoushan-screensaver";

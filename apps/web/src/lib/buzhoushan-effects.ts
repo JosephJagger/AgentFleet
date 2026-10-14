@@ -7,29 +7,10 @@
  *  - MatrixRain: classic falling glyph columns.
  * Each is a small class that can run headless, so the numerics are unit-testable.
  */
-export type EffectMode = "particles" | "smoke" | "matrix" | "mobius";
-export type Pointer = { x: number; y: number; active: boolean };
-export type EffectParams = { busy: boolean; pointer?: Pointer };
-export interface Effect {
-  resize(width: number, height: number): void;
-  frame(dt: number, time: number, params: EffectParams): void;
-  dispose(): void;
-}
-
-const TAU = Math.PI * 2;
-const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
-
-export function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-  const k = (n: number) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-  return [f(0) * 255, f(8) * 255, f(4) * 255];
-}
-
-/** Idle palette runs cyan → violet → magenta; a running task shifts it to green/teal. */
-export function hueFor(unit: number, busy: boolean): number {
-  return busy ? 95 + unit * 85 : 190 + unit * 120;
-}
+import { TAU, clamp, hslToRgb, hueFor, sizeCanvas, type Effect, type EffectMode, type EffectParams, type Pointer } from "./buzhoushan-effect-common";
+import { attractorEffect, protonEffect, starfieldEffect, threeBodyEffect, waveGridEffect } from "./buzhoushan-effects-science";
+export { hslToRgb, hueFor };
+export type { Effect, EffectMode, EffectParams, Pointer };
 
 /* ------------------------------------------------------------------ particles */
 
@@ -300,7 +281,7 @@ function particleEffect(canvas: HTMLCanvasElement): Effect | undefined {
   let field: ParticleField | undefined, img: ImageData | undefined;
   return {
     resize(w, h) {
-      canvas.width = Math.max(2, Math.floor(w)); canvas.height = Math.max(2, Math.floor(h));
+      sizeCanvas(canvas, w, h);
       off.width = Math.max(2, Math.floor(w / 2)); off.height = Math.max(2, Math.floor(h / 2));
       img = octx.createImageData(off.width, off.height);
       for (let i = 3; i < img.data.length; i += 4) img.data[i] = 255;
@@ -322,7 +303,7 @@ function smokeEffect(canvas: HTMLCanvasElement): Effect | undefined {
   let fluid: Fluid | undefined, img: ImageData | undefined, last: Pointer | undefined;
   return {
     resize(w, h) {
-      canvas.width = Math.max(2, Math.floor(w)); canvas.height = Math.max(2, Math.floor(h));
+      sizeCanvas(canvas, w, h);
       const gw = 176, gh = Math.max(24, Math.round(gw * h / w));
       off.width = gw; off.height = gh; fluid = new Fluid(gw, gh); img = octx.createImageData(gw, gh);
     },
@@ -354,7 +335,7 @@ function matrixEffect(canvas: HTMLCanvasElement): Effect | undefined {
   const rain = new MatrixRain(16);
   return {
     resize(w, h) {
-      canvas.width = Math.max(2, Math.floor(w)); canvas.height = Math.max(2, Math.floor(h));
+      sizeCanvas(canvas, w, h);
       ctx.fillStyle = "#000602"; ctx.fillRect(0, 0, canvas.width, canvas.height); rain.resize(canvas.width, canvas.height);
     },
     frame(dt, _t, { busy, pointer }) { rain.frame(ctx, dt, busy, pointer); },
@@ -367,6 +348,11 @@ export function createEffect(mode: EffectMode, canvas: HTMLCanvasElement): Effec
     if (mode === "particles") return particleEffect(canvas);
     if (mode === "smoke") return smokeEffect(canvas);
     if (mode === "matrix") return matrixEffect(canvas);
+    if (mode === "attractor") return attractorEffect(canvas);
+    if (mode === "wavegrid") return waveGridEffect(canvas);
+    if (mode === "starfield") return starfieldEffect(canvas);
+    if (mode === "threebody") return threeBodyEffect(canvas);
+    if (mode === "proton") return protonEffect(canvas);
   } catch { /* A broken canvas must never affect the application underneath. */ }
   return undefined;
 }

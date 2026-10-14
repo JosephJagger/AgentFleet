@@ -51,7 +51,7 @@ export function BuzhoushanBroadcastControl({enabled,onChange}:{enabled:boolean;o
       <small>{t('新窗口不会转移当前通话；请勿关闭正在通话的原窗口。窗口尺寸可能受系统限制，以底部画布尺寸为准。')}</small>
       <details className="buzhou-broadcast-editor"><summary>{t('空闲屏保特效')}</summary>
         <label><input type="checkbox" checked={saver.enabled} onChange={event=>saveScreensaverPrefs({...saver,enabled:event.target.checked})}/> {t('长时间无鼠标键盘操作时显示直播屏保')}</label>
-        <label>{t('屏保效果')}<select value={saver.mode} onChange={event=>saveScreensaverPrefs({...saver,mode:event.target.value as ScreensaverMode})}>{SCREENSAVER_MODES.map(mode=><option key={mode} value={mode}>{t({auto:'自动轮换',particles:'粒子引力场',smoke:'流体烟雾',matrix:'数字雨',mobius:'莫比乌斯环'}[mode])}</option>)}</select></label>
+        <label>{t('屏保效果')}<select value={saver.mode} onChange={event=>saveScreensaverPrefs({...saver,mode:event.target.value as ScreensaverMode})}>{SCREENSAVER_MODES.map(mode=><option key={mode} value={mode}>{t(({auto:'自动轮换',particles:'粒子引力场',smoke:'流体烟雾',matrix:'数字雨',attractor:'吸引子轨迹',wavegrid:'波浪网格',starfield:'星空',threebody:'三体太阳轨迹',proton:'质子'} as Record<ScreensaverMode,string>)[mode])}</option>)}</select></label>
         <label>{t('空闲秒数')}<input type="number" min={SCREENSAVER_MIN_SECONDS} max={SCREENSAVER_MAX_SECONDS} value={saver.seconds} onChange={event=>saveScreensaverPrefs({...saver,seconds:Number(event.target.value)})}/></label>
         <small>{t('仅为视觉特效：不拦截点击，不影响通话、互动消息和任务；任意操作立即退出。')}</small>
       </details>

@@ -43,3 +43,41 @@ it('matrix rain resets columns that leave the screen',()=>{
  expect(calls.length).toBeGreaterThan(100);
  expect(Array.from(m.head).every(h=>h<=m.rows+3)).toBe(true);
 });
+import {LorenzCloud,ProtonModel,Starfield,ThreeBody,waveHeight} from './lib/buzhoushan-effects-science';
+
+it('Lorenz orbits stay on the bounded attractor',()=>{
+ const c=new LorenzCloud(500,seeded());
+ for(let i=0;i<300;i++)c.step(.005);
+ for(let i=0;i<c.n;i++){expect(Math.abs(c.x[i])).toBeLessThan(40);expect(c.z[i]).toBeGreaterThan(-5);expect(c.z[i]).toBeLessThan(70);}
+});
+it('wave height is finite, bounded and ripples around the pointer',()=>{
+ let max=0;for(let i=0;i<500;i++){const v=waveHeight(i*.07-17,i*.13,i*.05);max=Math.max(max,Math.abs(v));expect(Number.isFinite(v)).toBe(true);}
+ expect(max).toBeLessThan(1.2);
+ expect(Math.abs(waveHeight(0,0,0,{x:0,z:0})-waveHeight(0,0,0))).toBeGreaterThan(.5);
+});
+it('stars always stay in front of the camera and respawn far away',()=>{
+ const s=new Starfield(2000,40,seeded());
+ for(let i=0;i<400;i++){s.step(.4);}
+ for(let i=0;i<s.n;i++){expect(s.z[i]).toBeGreaterThan(0.1);expect(s.z[i]).toBeLessThanOrEqual(40);}
+});
+it('three-body figure-eight conserves energy over many steps',()=>{
+ const b=new ThreeBody(seeded(),0.001);b.reseed(0);
+ const e0=b.energy();for(let i=0;i<4000;i++)b.step(0.002);
+ expect(Math.abs((b.energy()-e0)/e0)).toBeLessThan(5e-3);
+ expect(b.extent()).toBeLessThan(3);
+});
+it('three-body perturbation stays finite and the centre of mass does not drift',()=>{
+ const b=new ThreeBody(seeded());b.reseed(.06);
+ const [x0,y0]=b.center();
+ for(let i=0;i<20000;i++)b.step(.003);
+ for(let i=0;i<3;i++)expect(Number.isFinite(b.x[i]+b.vy[i])).toBe(true);
+ const [x1,y1]=b.center();expect(Math.hypot(x1-x0,y1-y0)).toBeLessThan(.5);
+});
+it('proton sea pairs spawn, age and annihilate within bounds',()=>{
+ const p=new ProtonModel(100,seeded());
+ for(let i=0;i<300;i++)p.update(1/60);
+ expect(p.pairs.length).toBeGreaterThan(0);expect(p.pairs.length).toBeLessThanOrEqual(60);
+ for(const q of p.pairs){expect(q.age).toBeLessThan(q.life);expect(Math.hypot(q.x,q.y,q.z)).toBeLessThanOrEqual(1.06);}
+ const a=p.quark(0,1.2),b=p.quark(1,1.2),c=p.quark(2,1.2);
+ for(const v of [a,b,c])expect(Math.hypot(...v)).toBeLessThan(1.5);
+});
