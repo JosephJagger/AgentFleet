@@ -290,9 +290,6 @@ export function threeBodyEffect(canvas: HTMLCanvasElement): Effect | undefined {
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, R * 3.2, 0, TAU); ctx.fill();
       }
       ctx.globalCompositeOperation = "source-over";
-      const stable = sim.time - sim.lastClose > 12;
-      ctx.font = "600 15px system-ui, sans-serif"; ctx.textBaseline = "top"; ctx.fillStyle = "rgba(255,225,170,.55)";
-      ctx.fillText(`三体 · ${stable ? "恒纪元" : "乱纪元"}`, 18, 16);
     },
     dispose() {},
   };
@@ -399,8 +396,6 @@ export function protonEffect(canvas: HTMLCanvasElement): Effect | undefined {
         ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(px, py, R, 0, TAU); ctx.fill();
       }
       ctx.globalCompositeOperation = "source-over";
-      ctx.font = "600 15px system-ui, sans-serif"; ctx.textBaseline = "top"; ctx.fillStyle = "rgba(190,205,255,.55)";
-      ctx.fillText("质子 · p⁺  uud", 18, 16);
     },
     dispose() {},
   };
