@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import type { SessionDetail } from "../lib/types";
 import { isBuzhoushanTurnActive } from "../lib/buzhoushan-events";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
 import { setScreensaverPreview, useIdle, useScreensaverPreview, useScreensaverPrefs } from "../lib/buzhoushan-idle";
 import { workbenchItems } from "./BuzhoushanActivity";
 import { t } from "../i18n";
@@ -30,6 +30,25 @@ function taskStatus(detail?: SessionDetail) {
   return { label, live, done: steps.filter(step => step.status === "completed").length, total: steps.length };
 }
 
+/** Follows the workspace (.app-shell) so the side introductions of the 16:9 canvas stay visible. */
+function useWorkspaceBounds(active: boolean): CSSProperties | undefined {
+  const [style, setStyle] = useState<CSSProperties>();
+  useLayoutEffect(() => {
+    const shell = document.querySelector(".app-shell");
+    if (!active || !shell) { setStyle(undefined); return; }
+    const measure = () => {
+      const r = shell.getBoundingClientRect();
+      setStyle({ inset: "auto", left: r.left, top: r.top, width: r.width, height: r.height });
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
+    observer?.observe(shell);
+    window.addEventListener("resize", measure);
+    return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
+  }, [active]);
+  return style;
+}
+
 /**
  * Visual-only idle effect for the captured broadcast. It is click-through
  * (pointer-events: none), never blocks input, and leaves all other components mounted.
@@ -47,8 +66,9 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
     return () => { clearTimeout(arm); window.removeEventListener("pointerdown", end, true); window.removeEventListener("keydown", end, true); };
   }, [preview]);
   const active = idle || preview;
+  const bounds = useWorkspaceBounds(active);
   return createPortal(
-    <div className="buzhou-saver" data-active={active} data-busy={Boolean(status)} aria-hidden={!active} inert={!active ? true : undefined}>
+    <div className="buzhou-saver" data-active={active} data-busy={Boolean(status)} style={bounds} aria-hidden={!active} inert={!active ? true : undefined}>
       <MobiusRing />
       <div className="buzhou-saver__caption" role="status">
         <span className="buzhou-saver__brand">AGENTFLEETS</span>

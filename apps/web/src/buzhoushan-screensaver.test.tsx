@@ -47,3 +47,12 @@ it('previews on demand and ends on the next click without waiting for idle',()=>
  act(()=>{vi.advanceTimersByTime(400);});fireEvent.pointerDown(document.body);
  expect(saver().dataset.active).toBe('false');
 });
+it('covers only the workspace so side introductions stay visible',()=>{
+ const shell=document.createElement('div');shell.className='app-shell';document.body.append(shell);
+ shell.getBoundingClientRect=()=>({left:240,top:44,width:1440,height:810,right:1680,bottom:854,x:240,y:44,toJSON(){}}) as DOMRect;
+ saveScreensaverPrefs({enabled:false,seconds:30});
+ render(<BuzhoushanScreensaver/>);
+ act(()=>{setScreensaverPreview(true);});
+ expect(saver().style.left).toBe('240px');expect(saver().style.width).toBe('1440px');expect(saver().style.height).toBe('810px');
+ shell.remove();
+});
