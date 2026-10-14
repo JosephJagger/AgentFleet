@@ -3571,5 +3571,8 @@
   "仅为视觉特效：不拦截点击，不影响通话、互动消息和任务；任意操作立即退出。": "Visual effect only: it does not intercept clicks or affect calls, live messages or tasks; any input exits it immediately.",
   "任务执行中": "Task running",
   "已完成 {0} / {1} 步": "{0} / {1} steps completed",
-  "待命中": "Standing by"
+  "待命中": "Standing by",
+  "屏保测试": "Test screensaver",
+  "立即预览直播屏保，点击任意处退出": "Preview the broadcast screensaver now; click anywhere to exit",
+  "效果测试中，点击任意处退出": "Effect test: click anywhere to exit"
 }

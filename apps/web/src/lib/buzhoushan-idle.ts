@@ -58,3 +58,19 @@ export function useIdle(timeoutMs: number, enabled: boolean): boolean {
   }, [timeoutMs, enabled]);
   return idle && enabled;
 }
+
+/** Manual preview from the toolbar; ends on the next click or key press. */
+let preview = false;
+const previewListeners = new Set<() => void>();
+export function setScreensaverPreview(value: boolean) {
+  if (preview === value) return;
+  preview = value;
+  previewListeners.forEach(listener => listener());
+}
+export function useScreensaverPreview(): boolean {
+  return useSyncExternalStore(
+    notify => { previewListeners.add(notify); return () => { previewListeners.delete(notify); }; },
+    () => preview,
+    () => false,
+  );
+}

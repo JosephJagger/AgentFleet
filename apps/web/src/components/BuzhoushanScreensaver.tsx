@@ -1,7 +1,8 @@
 import { createPortal } from "react-dom";
 import type { SessionDetail } from "../lib/types";
 import { isBuzhoushanTurnActive } from "../lib/buzhoushan-events";
-import { useIdle, useScreensaverPrefs } from "../lib/buzhoushan-idle";
+import { useEffect } from "react";
+import { setScreensaverPreview, useIdle, useScreensaverPreview, useScreensaverPrefs } from "../lib/buzhoushan-idle";
 import { workbenchItems } from "./BuzhoushanActivity";
 import { t } from "../i18n";
 
@@ -36,15 +37,25 @@ function taskStatus(detail?: SessionDetail) {
 export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
   const prefs = useScreensaverPrefs();
   const idle = useIdle(prefs.seconds * 1000, prefs.enabled);
+  const preview = useScreensaverPreview();
   const status = taskStatus(detail);
+  useEffect(() => {
+    if (!preview) return;
+    // Ignore the click that started the preview, then end it on the next click or key.
+    const end = () => setScreensaverPreview(false);
+    const arm = setTimeout(() => { window.addEventListener("pointerdown", end, true); window.addEventListener("keydown", end, true); }, 300);
+    return () => { clearTimeout(arm); window.removeEventListener("pointerdown", end, true); window.removeEventListener("keydown", end, true); };
+  }, [preview]);
+  const active = idle || preview;
   return createPortal(
-    <div className="buzhou-saver" data-active={idle} data-busy={Boolean(status)} aria-hidden={!idle} inert={!idle ? true : undefined}>
+    <div className="buzhou-saver" data-active={active} data-busy={Boolean(status)} aria-hidden={!active} inert={!active ? true : undefined}>
       <MobiusRing />
       <div className="buzhou-saver__caption" role="status">
         <span className="buzhou-saver__brand">AGENTFLEETS</span>
         {status
           ? <><strong data-live={status.live}>{status.label}</strong>{status.total > 0 && <small>{t("已完成 {0} / {1} 步", status.done, status.total)}</small>}</>
           : <strong>{t("待命中")}</strong>}
+        {preview && <small>{t("效果测试中，点击任意处退出")}</small>}
       </div>
     </div>, document.body);
 }

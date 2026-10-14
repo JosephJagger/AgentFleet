@@ -2,7 +2,7 @@
 import {act,cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {BuzhoushanScreensaver} from './components/BuzhoushanScreensaver';
-import {parseScreensaverPrefs,saveScreensaverPrefs} from './lib/buzhoushan-idle';
+import {parseScreensaverPrefs,saveScreensaverPrefs,setScreensaverPreview} from './lib/buzhoushan-idle';
 vi.mock('./i18n',()=>({t:(value:string,...args:unknown[])=>value.replace(/\{(\d+)\}/g,(_,i)=>String(args[Number(i)]))}));
 beforeEach(()=>{vi.useFakeTimers();});
 afterEach(()=>{cleanup();localStorage.clear();vi.useRealTimers();});
@@ -39,4 +39,11 @@ it('clamps and recovers preferences',()=>{
  expect(parseScreensaverPrefs('bad')).toEqual({enabled:true,seconds:30});
  expect(parseScreensaverPrefs('{"enabled":false,"seconds":1}')).toEqual({enabled:false,seconds:10});
  expect(parseScreensaverPrefs('{"seconds":99999}').seconds).toBe(600);
+});
+it('previews on demand and ends on the next click without waiting for idle',()=>{
+ saveScreensaverPrefs({enabled:false,seconds:30});
+ render(<BuzhoushanScreensaver/>);
+ act(()=>{setScreensaverPreview(true);});expect(saver().dataset.active).toBe('true');
+ act(()=>{vi.advanceTimersByTime(400);});fireEvent.pointerDown(document.body);
+ expect(saver().dataset.active).toBe('false');
 });
