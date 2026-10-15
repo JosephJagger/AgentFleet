@@ -154,7 +154,7 @@
 .theme-option__copy { min-width: 0; }
 .theme-option__copy strong, .theme-option__copy small { display: block; }
 .theme-option__copy strong { font-size: 13px; }
-.theme-option__copy small { margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.theme-option__copy small { margin-top: 5px; color: var(--muted); font-size:12px; line-height: 1.45; }
 .theme-option__check { display: grid; place-items: center; width: 20px; height: 20px; color: var(--canvas); background: transparent; border-radius: 50%; }
 .theme-option[aria-checked="true"] .theme-option__check { background: var(--cobalt); }
 
