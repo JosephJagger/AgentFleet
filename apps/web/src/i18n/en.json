@@ -3626,5 +3626,22 @@
   "离线主机显示最后上报版本；重新连接后自动检查。安装方式不影响后续服务更新。": "Offline hosts show their last reported version. Updates are checked after reconnecting, regardless of installation method.",
   "连接服务": "Connection service",
   "添加主机并连接后，可在这里查看更新进度。": "Connect a host to see update progress here.",
-  "离线，显示最后上报状态": "Offline; showing last reported status"
+  "离线，显示最后上报状态": "Offline; showing last reported status",
+  "接管管理": "Session control",
+  "整个工作区 · 所有主机与项目": "Entire workspace · All hosts and projects",
+  "闲置到期仅取消接管、释放写入权，不删除会话或历史。与下方正文保存时长独立。": "When idle time expires, only release session control and writer ownership. Sessions and history are not deleted. This is independent of content retention below.",
+  "闲置多久后自动取消接管": "Release session control after being idle for",
+  "闲置时长快捷选项": "Idle duration presets",
+  "自定义天数": "Custom days",
+  "1 至 30 的整数天": "A whole number from 1 to 30 days",
+  "从最近一次接管或 token 使用中较新的时间起算。每小时检查一次；任务、通话及待处理操作未安全结束时不会强制释放。": "Count from the later of the latest takeover or token usage. Checked hourly; tasks, calls and pending operations are never forcibly interrupted.",
+  "保存接管设置": "Save session control settings",
+  "已保存，下次闲置检查时按新设置执行。": "Saved. The next idle check will use this policy.",
+  "读取设置失败": "Failed to load settings",
+  "正在读取设置…": "Loading settings…",
+  "设置已在其他浏览器修改，请重新读取后保存": "Settings changed in another browser. Reload before saving.",
+  "闲置时长必须是 1 至 30 的整数天": "Idle duration must be a whole number from 1 to 30 days",
+  "保存失败，请重试": "Save failed. Please try again.",
+  "{0} 天": "{0} days",
+  "自定义": "Custom"
 }

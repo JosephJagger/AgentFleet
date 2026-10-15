@@ -1,3 +1,4 @@
+import { TakeoverPolicyCard } from "./TakeoverPolicyCard";
 import { UpdateCenter } from "./UpdateCenter";
 import { displayName } from "../lib/display-name";
 import {LongTermPreferencesPanel} from './LongTermPreferencesPanel';
@@ -118,7 +119,8 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
       <WritingAISettings />
       </div><div className="settings-category" hidden={category !== "appearance"}>
       <section className="settings-block theme-settings-block"><h2><SunMoon size={18} />{t("界面外观")}</h2><p className="subtle">{t("选择阅读更舒适的外观，自动保存在此浏览器。")}</p><ThemeSettings paginated /></section>
-      </div><div className="settings-category" hidden={category !== "history"}>
+      </div><div className="settings-category settings-category--history" hidden={category !== "history"}>
+      {category === "history" && <TakeoverPolicyCard key={dashboard.user.id}/>}
       <section className="settings-block"><h2>{t("云端历史")}</h2><p className="subtle">{t("按项目设置保存内容和时长。宿主机上的原始会话不受影响。")}</p>
         {machines.length === 0 ? <p className="subtle">{t("添加主机并发现项目后，可以设置历史保存方式。")}</p> : <>
           <label className="settings-field"><span>{t("主机")}</span><select aria-label={t("历史设置主机")} value={machineId} onChange={event => setSelectedMachineId(event.target.value)}>{machines.map(machine => <option key={machine.id} value={machine.id}>{displayName(machine.name)}</option>)}</select></label>

@@ -1535,3 +1535,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .update-center__summary > div { display: flex; justify-content: space-between; gap: 12px; }
   .update-center__summary dd { margin: 0; }
 }
+
+.takeover-policy-card > header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.takeover-policy-card > header h2 { margin:0; }
+.takeover-policy-options { border:0; padding:0; margin:18px 0 12px; min-width:0; }
+.takeover-policy-options legend { font-size:var(--text-small); margin-bottom:10px; }
+.takeover-policy-presets { display:flex; flex-wrap:wrap; gap:8px; }
+.takeover-policy-custom { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:12px; font-size:var(--text-small); }
+.takeover-policy-custom input { width:88px; min-width:0; }
+.takeover-policy-custom small { color:var(--muted); }
+.settings-category--history { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }

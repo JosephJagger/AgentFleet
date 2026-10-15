@@ -898,6 +898,8 @@ export const api = {
   async readHostOperation(operationId: string): Promise<HostOperation> {
     return mapHostOperation((await request<JsonObject>(`/api/operations/${encodeURIComponent(operationId)}`)).operation);
   },
+  takeoverPolicy: (signal?: AbortSignal) => request<{idleDays:number;revision:number}>("/api/settings/takeover-policy", {signal}),
+  saveTakeoverPolicy: (input:{idleDays:number;revision:number}) => request<{idleDays:number;revision:number}>("/api/settings/takeover-policy", {method:"PUT",body:JSON.stringify(input)}),
   updateProjectContentPolicy(projectId: string, syncContent: boolean, retentionDays: Project["retentionDays"]) {
     return request<{ project: JsonObject }>(`/api/projects/${encodeURIComponent(projectId)}/content-policy`, {
       method: "PATCH",

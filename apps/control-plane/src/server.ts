@@ -1,3 +1,4 @@
+import { TakeoverPolicy } from "./takeover-policy.js";
 import {LiveChatStore} from './live-chat.js';
 import {LiveWelcomeGate,liveWelcomePrompt} from './live-welcome.js';
 import {VoiceTranscriptTail} from './voice-transcript-tail.js';
@@ -1112,6 +1113,10 @@ export async function buildControlPlane(
     if(agent?.reconciliationReady) for(const offer of machineMaintenance.offers(machineId)) sendJson(agent.socket,offer);
     reply.code(202);return {operation};
   });
+  app.get("/api/settings/takeover-policy", { preHandler: authenticate }, async request =>
+    new TakeoverPolicy(db).read(request.principal!.workspaceId));
+  app.put("/api/settings/takeover-policy", { preHandler: mutate }, async request =>
+    new TakeoverPolicy(db).save(request.principal!, record(request.body)));
   app.patch("/api/projects/:id/content-policy", { preHandler: mutate }, async (request) => {
     const body = record(request.body);
     invariant(typeof body.syncContent === "boolean", 400, "INVALID_INPUT", "syncContent must be boolean");

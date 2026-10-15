@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 58) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 59) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1491,6 +1491,14 @@ export class ControlPlaneDatabase {
       ) STRICT;
       CREATE INDEX IF NOT EXISTS live_chat_owner_time ON live_chat_messages(workspace_id,user_id,observed_at);
       PRAGMA user_version=58`); });
+    if (version < 59) this.transaction(() => { this.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS takeover_policies (
+        workspace_id TEXT PRIMARY KEY REFERENCES workspaces(workspace_id),
+        idle_days INTEGER NOT NULL CHECK(idle_days BETWEEN 1 AND 30),
+        revision INTEGER NOT NULL CHECK(revision >= 1), updated_at TEXT NOT NULL
+      ) STRICT;
+      PRAGMA user_version=59`); });
+
 
   }
 
