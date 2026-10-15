@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 59) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 60) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1498,6 +1498,34 @@ export class ControlPlaneDatabase {
         revision INTEGER NOT NULL CHECK(revision >= 1), updated_at TEXT NOT NULL
       ) STRICT;
       PRAGMA user_version=59`); });
+    if (version < 60) this.transaction(() => { this.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS voice_transcript_settings (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id), user_id TEXT NOT NULL REFERENCES users(user_id),
+        enabled INTEGER NOT NULL CHECK(enabled IN (0,1)), revision INTEGER NOT NULL, updated_at TEXT NOT NULL,
+        PRIMARY KEY(workspace_id,user_id)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS voice_transcripts (
+        voice_id TEXT NOT NULL REFERENCES panel_voice_calls(voice_id), utterance_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('user','assistant')),
+        text TEXT NOT NULL, final INTEGER NOT NULL, sequence INTEGER NOT NULL, last_sequence INTEGER NOT NULL,
+        observed_at TEXT NOT NULL, updated_at TEXT NOT NULL, source TEXT NOT NULL,
+        PRIMARY KEY(voice_id,utterance_id)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS voice_transcripts_owner_time ON voice_transcripts(workspace_id,user_id,observed_at);
+      CREATE TABLE IF NOT EXISTS voice_transcript_requests (
+        voice_id TEXT PRIMARY KEY REFERENCES panel_voice_calls(voice_id), sequence INTEGER NOT NULL,
+        allowed INTEGER NOT NULL, expires_at TEXT NOT NULL, read_only INTEGER NOT NULL DEFAULT 0
+      ) STRICT;
+      INSERT OR IGNORE INTO voice_transcripts
+        SELECT voice_id,'legacy:' || segment,workspace_id,user_id,'user',text,final,segment,sequence,updated_at,updated_at,'legacy_partial'
+        FROM panel_voice_tails WHERE text<>'';
+      INSERT OR IGNORE INTO voice_transcripts
+        SELECT voice_id,'legacy:' || substr(id,length(voice_id)+2),workspace_id,user_id,'user',text,final,sequence,sequence,updated_at,updated_at,'legacy_partial'
+        FROM panel_voice_tail_drafts WHERE text<>'';
+      DROP TABLE panel_voice_tail_drafts;
+      DROP TABLE panel_voice_tails;
+      PRAGMA user_version=60`); });
+
 
 
   }

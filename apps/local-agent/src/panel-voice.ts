@@ -8,7 +8,9 @@ import { AgentError } from "./errors.js";
 import type { StateStore } from "./store.js";
 
 type PanelClient = Pick<CodexAppServer, 'start'|'stop'|'getProcessId'|'startPanelVoice'|'reportPanelVoice'|'stopVoice'|'updateVoicePreferences'>;
-interface Call { instanceId: string; pid?: number; suspendedUntil?: number; id: string; client: PanelClient; threadId?: string; directory?: string; lastSeen: number; cancelled: boolean; ready: Promise<void>; transcriptSeq?: number; tail?: {text:string;final:boolean}; }
+interface Call { instanceId: string; pid?: number; suspendedUntil?: number; id: string; client: PanelClient; threadId?: string; directory?: string; lastSeen: number; cancelled: boolean; ready: Promise<void>; transcriptSeq?: number; transcripts: Map<string, Transcript>; activeTranscripts: Map<string,string>; }
+
+interface Transcript {utteranceId:string;role:string;text:string;final:boolean;transcriptSeq:number;utteranceSeq:number;observedAt:string;}
 
 /** A dedicated ephemeral native writer, separate from all project sessions. */
 export class PanelVoiceRuntime {
@@ -33,10 +35,15 @@ export class PanelVoiceRuntime {
       onVolatile: event => {
         if (event.type !== 'voice.event' || this.current?.id !== id || this.current.cancelled) return;
         const call=this.current;
-        if(event.payload.event==='transcript'&&event.payload.role==='user'&&typeof event.payload.text==='string'){
-          call.tail={text:(event.payload.final?event.payload.text:(call.tail?.final?'':call.tail?.text??'')+event.payload.text).slice(-8000),final:Boolean(event.payload.final)};
-          call.transcriptSeq=(call.transcriptSeq??0)+1;
-          this.emit({type:'voice.event',voiceId:id,event:'transcript',role:'user',...call.tail,transcriptSnapshot:true,transcriptSeq:call.transcriptSeq,instanceId:call.instanceId});
+        if(event.payload.event==='transcript'&&['user','assistant'].includes(String(event.payload.role))&&typeof event.payload.text==='string'){
+          const role=String(event.payload.role);
+          const nativeId=typeof event.payload.utteranceId==='string'?event.payload.utteranceId:undefined;
+          const id=nativeId??call.activeTranscripts.get(role)??randomUUID();
+          const previous=call.transcripts.get(id);
+          const item:Transcript={utteranceId:id,utteranceSeq:previous?.utteranceSeq??(call.transcriptSeq??0)+1,role,text:event.payload.final?event.payload.text:(previous?.text??'')+event.payload.text,final:Boolean(event.payload.final),transcriptSeq:(call.transcriptSeq??0)+1,observedAt:previous?.observedAt??new Date().toISOString()};
+          call.transcriptSeq=item.transcriptSeq;call.transcripts.set(id,item);
+          if(item.final)call.activeTranscripts.delete(role);else call.activeTranscripts.set(role,id);
+          this.emit({type:'voice.event',voiceId:call.id,event:'transcript',...item,transcriptSnapshot:true,instanceId:call.instanceId});
         }else this.emit({ type: 'voice.event', voiceId: id, ...event.payload, resumeAck:true, instanceId: call.instanceId });
         // Native audio closure does not dispose the dedicated app-server process.
         // Do not await here: stopVoice drains the notification currently being handled.
@@ -58,7 +65,7 @@ export class PanelVoiceRuntime {
         });
       },
     });
-    const call: Call = { instanceId: randomUUID(), id, client, lastSeen: Date.now(), cancelled: false, ready: Promise.resolve() };
+    const call: Call = { instanceId: randomUUID(), id, client, lastSeen: Date.now(), cancelled: false, transcripts:new Map(), activeTranscripts:new Map(), ready: Promise.resolve() };
     this.current = call;
     call.ready = (async () => {
       call.directory = await mkdtemp(join(tmpdir(), 'agentfleet-panel-voice-'));
@@ -103,7 +110,12 @@ export class PanelVoiceRuntime {
     delete call.suspendedUntil;
     call.lastSeen = Date.now();
     if(requestId)this.emit({type:'voice.event',voiceId:id,event:'resumed',instanceId:call.instanceId,requestId});
-    if(call.tail)this.emit({type:'voice.event',voiceId:id,event:'transcript',role:'user',...call.tail,transcriptSnapshot:true,transcriptSeq:call.transcriptSeq,instanceId:call.instanceId});
+    for(const item of [...call.transcripts.values()].sort((a,b)=>a.utteranceSeq-b.utteranceSeq))this.emit({type:'voice.event',voiceId:id,event:'transcript',...item,transcriptSnapshot:true,transcriptReplay:true,instanceId:call.instanceId});
+  }
+  acknowledgeTranscript(id:string,utteranceId:unknown,sequence:unknown){
+    const call=this.current;if(!call||call.id!==id||typeof utteranceId!=='string')return;
+    const item=call.transcripts.get(utteranceId);
+    if(item?.final&&item.transcriptSeq===sequence)call.transcripts.delete(utteranceId);
   }
   heartbeat(id: string) { if (this.current?.id === id) this.current.lastSeen = Date.now(); }
   result(id: string, requestId: string, result: unknown) {

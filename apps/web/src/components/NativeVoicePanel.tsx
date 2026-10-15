@@ -41,7 +41,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const [preferenceState,setPreferenceState]=useState('');
   const [skipPreferences,setSkipPreferences]=useState(false);
   const [muted, setMuted] = useState(false);
-  const [transcript,setTranscript] = useState<{role:string;text:string;done:boolean}[]>([]);
+  const [transcript,setTranscript] = useState<{id?:string;role:string;text:string;done:boolean}[]>([]);
   const transcriptArea=useRef<HTMLDivElement>(null);
   useEffect(()=>{if(transcriptArea.current) transcriptArea.current.scrollTop=transcriptArea.current.scrollHeight;},[transcript]);
   const [playBlocked, setPlayBlocked] = useState(false);
@@ -146,11 +146,11 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       if (!current()) return;
       const socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/voice`);
       resources.current.socket = socket;
-      let offerSent = false;let userTranscriptSeq=0;
+      let offerSent = false;let userTranscriptSeq=0;const transcriptSequences=new Map<string,number>();
       socket.onmessage = event => {
         if (!current()) return;
         void (async () => {
-          const value = JSON.parse(String(event.data)) as { reason?:string;requestId?:string;transcriptSeq?:number;snapshot?:boolean;status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
+          const value = JSON.parse(String(event.data)) as { reason?:string;requestId?:string;utteranceId?:string;transcriptSeq?:number;snapshot?:boolean;status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
           if (value.type === "ready" && !offerSent) {
             offerSent = true;
             socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",skipPreferences,machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", skipPreferences, logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
@@ -163,10 +163,12 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
           else if(globalMachineId && value.type==="recovering") { resources.current.recovering=true; welcomeNextAt.current=0; setPhase("recovering"); }
           else if(globalMachineId && value.type==="recovered") { resources.current.recovering=false; setPhase(peer.connectionState==="connected"?"connected":"connecting"); }
           else if(value.type==="transcript" && ["user","assistant"].includes(String(value.role)) && typeof value.text==="string") {
-            if(value.role==='user'&&typeof value.transcriptSeq==='number'){if(value.transcriptSeq<=userTranscriptSeq)return;userTranscriptSeq=value.transcriptSeq;}
+            if(value.utteranceId&&typeof value.transcriptSeq==='number'){if((transcriptSequences.get(value.utteranceId)??0)>=value.transcriptSeq)return;transcriptSequences.set(value.utteranceId,value.transcriptSeq);}
+            if(!value.utteranceId&&value.role==='user'&&typeof value.transcriptSeq==='number'){if(value.transcriptSeq<=userTranscriptSeq)return;userTranscriptSeq=value.transcriptSeq;}
             setTranscript(previous=>{
               const last=previous.at(-1);const role=value.role!;
               const text=value.text!.slice(0,6000);
+              if(value.utteranceId){const item={id:value.utteranceId,role,text,done:Boolean(value.final)};return previous.some(v=>v.id===item.id)?previous.map(v=>v.id===item.id?item:v):[...previous.slice(-5),item];}
               if(last?.role===role && !last.done) return [...previous.slice(0,-1),{role,text:value.final || value.snapshot ? text : (last.text+text).slice(-6000),done:Boolean(value.final)}];
               return [...previous.slice(-5),{role,text,done:Boolean(value.final)}];
             });

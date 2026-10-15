@@ -627,8 +627,8 @@ export interface RuntimeReleaseStatus {
 
 export const api = {
   storeLiveChat:(messages:import('./live-interactions').LiveEvent[],signal:AbortSignal)=>request('/api/live-chat',{method:'POST',body:JSON.stringify({messages}),signal:timeoutSignal(signal,10000)}),
-  voiceTranscriptTails:()=>request<{items:import('../components/VoiceTranscriptDrafts').VoiceTranscriptDraft[]}>('/api/voice-transcript-tails'),
-  resolveVoiceTranscriptTail:(id:string,input:{revision:number;action:'save'|'discard';confirmed:boolean;text:string})=>request(`/api/voice-transcript-tails/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(input)}),
+  voiceTranscriptSettings:()=>request<{enabled:boolean;revision:number;retentionDays:number}>('/api/voice-transcript-settings'),
+  saveVoiceTranscriptSettings:(input:{enabled:boolean;revision:number})=>request<{enabled:boolean;revision:number;retentionDays:number}>('/api/voice-transcript-settings',{method:'PUT',body:JSON.stringify(input)}),
   agentReleaseStatus: (signal?: AbortSignal) => request<{status:string;expectedVersion:string|null;publicVersion:string|null;checkedAt:string}>("/api/agent-release-status", {signal}),
   async voiceTasks(view='recover',cursor?:string,signal?:AbortSignal):Promise<import('./types').VoiceTaskPage> {
     const query=new URLSearchParams({view,...(cursor?{cursor}:{})});return request(`/api/voice-tasks?${query}`,{signal});

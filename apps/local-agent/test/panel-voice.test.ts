@@ -149,3 +149,19 @@ test('live chat is a coordinator-local read-only query, not a project worker tas
  await internal.handleLine(JSON.stringify({method:'item/tool/call',id:10,params:{threadId:'coordinator',tool:'agentfleets_panel',arguments:{action:'live.chat.search',nickname:'合成观众'}}}));
  assert.deepEqual(calls,['live.chat.search']);assert.match(JSON.stringify(replies),/合成问题/);
 });
+
+test('transcript recovery replays every unacknowledged utterance in both roles with stable identity',async t=>{
+ let state:unknown;let cb!:AppServerCallbacks;const events:Record<string,unknown>[]=[];
+ const store={snapshot:()=>({panelVoiceRuntime:state}),setPanelVoiceRuntime:async(v:unknown)=>{state=v;}} as unknown as StateStore;
+ const runtime=new PanelVoiceRuntime(store,e=>events.push(e),callbacks=>{cb=callbacks;return {start:async()=>undefined,stop:async()=>undefined,getProcessId:()=>123,startPanelVoice:async()=>'thread',updateVoicePreferences:async()=>undefined,reportPanelVoice:async()=>undefined,stopVoice:async()=>undefined};});
+ t.after(()=>runtime.close());await runtime.start('pvoice_test','sdp');runtime.probe('pvoice_test','probe');const instance=events.at(-1)!.instanceId;
+ const send=(role:string,text:string,final:boolean)=>cb.onVolatile({type:'voice.event',payload:{event:'transcript',role,text,final}} as never,'epoch');
+ send('user','first ',false);const first=events.at(-1)!;send('user','first sentence',true);const completed=events.at(-1)!;
+ assert.equal(first.utteranceId,completed.utteranceId);assert.equal(completed.utteranceSeq,1);runtime.acknowledgeTranscript('pvoice_test',first.utteranceId,first.transcriptSeq);
+ runtime.suspend();send('assistant','answer one',true);send('user','second sentence',true);const count=events.length;
+ runtime.resume('pvoice_test',instance,'resume');const replay=events.slice(count).filter(e=>e.event==='transcript');
+ assert.deepEqual(replay.map(e=>e.text),['first sentence','answer one','second sentence']);assert.ok(replay.every(e=>e.transcriptReplay===true));
+ for(const e of replay)runtime.acknowledgeTranscript('pvoice_test',e.utteranceId,e.transcriptSeq);
+ const afterAck=events.length;runtime.suspend();runtime.resume('pvoice_test',instance,'resume2');assert.equal(events.slice(afterAck).filter(e=>e.event==='transcript').length,0);
+ assert.ok(PANEL_VOICE_TOOL.inputSchema.properties.action.enum.includes('transcript.search'));
+});

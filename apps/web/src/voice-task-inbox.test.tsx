@@ -4,7 +4,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {VoiceTaskInbox} from './components/VoiceTaskInbox';
 import {api} from './lib/api';
 import type {VoiceTaskPage,VoiceTaskRecord} from './lib/types';
-vi.mock('./lib/api',()=>({api:{voiceTasks:vi.fn(),cancelVoiceTodo:vi.fn(),acknowledgeVoiceTodo:vi.fn()}}));
+vi.mock('./lib/api',()=>({api:{voiceTranscriptSettings:()=>Promise.resolve({enabled:false,revision:0,retentionDays:30}),voiceTasks:vi.fn(),cancelVoiceTodo:vi.fn(),acknowledgeVoiceTodo:vi.fn()}}));
 afterEach(()=>{cleanup();vi.resetAllMocks();});
 const pending:VoiceTaskRecord={todoId:'todo',intent:'Develop this later',intentUnavailable:false,state:'pending',revision:2,sourceVoiceId:'old-call',createdAt:'2026-01-01',updatedAt:'2026-01-01',target:null,targetUnavailable:false,job:null};
 const finished:VoiceTaskRecord={...pending,todoId:'done',intent:'Original completed task',state:'dispatched',target:{machineId:'m',projectId:'p',sessionId:'s',host:'Host',project:'Project',title:'Session'},job:{jobId:'job',nativeTurnId:'turn',state:'completed',result:'Stored result',deliveredToVoice:true,acknowledgedAt:null}};

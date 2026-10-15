@@ -3643,5 +3643,12 @@
   "闲置时长必须是 1 至 30 的整数天": "Idle duration must be a whole number from 1 to 30 days",
   "保存失败，请重试": "Save failed. Please try again.",
   "{0} 天": "{0} days",
-  "自定义": "Custom"
+  "自定义": "Custom",
+  "支持搜索转写": "Supports transcript search",
+  "通话转写保存 30 天。勾选后，仅在你提出请求时搜索。": "Transcripts are kept for 30 days. When enabled, search runs only at your request.",
+  "保存与搜索说明": "Storage and search",
+  "仅保存本账号在当前工作区已上传的语音总控转写，含你和助手的文字。关闭搜索仍会保存；不会自动读取或执行历史指令。": "Only uploaded voice coordinator transcripts for your account in this workspace are saved, including your speech and assistant replies. Saving continues when search is off; history is never automatically read or executed.",
+  "例如：搜索通话转写中的“发布”。未识别或未上传且已丢失的内容无法恢复。": "For example: Search call transcripts for “release”. Unrecognized speech and lost, unuploaded text cannot be recovered.",
+  "转写设置读取失败，请重新打开面板": "Unable to load transcript settings. Reopen the panel.",
+  "保存失败或设置已变化，请重试": "Save failed or settings changed. Please retry."
 }

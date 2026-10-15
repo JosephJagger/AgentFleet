@@ -1,5 +1,5 @@
 import {ChevronDown,ListTodo,RefreshCw} from 'lucide-react';
-import {VoiceTranscriptDrafts} from './VoiceTranscriptDrafts';
+import {VoiceTranscriptSearch} from './VoiceTranscriptSearch';
 import { displayName } from "../lib/display-name";
 import {useEffect,useState} from 'react';
 import {api} from '../lib/api';
@@ -50,6 +50,6 @@ export function VoiceTaskInbox({onOpenSession}:{onOpenSession:(id:string)=>void}
    })}</div>
    <div className="voice-task-inbox__pages"><button className="button button--secondary" disabled={!trail.length} onClick={()=>{setCursor(trail.at(-1));setTrail(value=>value.slice(0,-1));}}>{t('上一页')}</button><span>{page?.total??0} {t('条记录')}</span><button className="button button--secondary" disabled={!page?.nextCursor} onClick={()=>{setTrail(value=>[...value,cursor]);setCursor(page?.nextCursor??undefined);}}>{t('下一页')}</button></div>
   </>}
-  <VoiceTranscriptDrafts/>
+  <VoiceTranscriptSearch/>
  </section>;
 }

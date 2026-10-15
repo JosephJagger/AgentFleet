@@ -80,7 +80,7 @@
 .live-interactions__switch input:disabled + span { opacity:.45; }
 
 /* Voice records use one disclosure row and one action row per task. */
-.voice-task-inbox,.voice-transcript-drafts { padding-top:10px; margin-top:12px; border-top:1px solid var(--line); }
+.voice-task-inbox { padding-top:10px; margin-top:12px; border-top:1px solid var(--line); }
 .voice-record-toggle { display:flex; align-items:center; gap:8px; width:100%; min-height:36px; padding:6px 0; border:0; background:none; color:var(--ink); text-align:left; cursor:pointer; font:inherit; }
 .voice-record-toggle > svg:first-child { color:var(--muted); }
 .voice-record-toggle > svg:last-child { margin-left:auto; color:var(--muted); }
@@ -95,7 +95,6 @@
 .voice-record-status[data-state="failed"] { color:var(--red); }
 .voice-record-id { font:10px/1.5 var(--mono,monospace); color:var(--muted); }
 .voice-record-empty { padding:20px 12px; border:1px dashed var(--line); border-radius:3px; color:var(--muted); text-align:center; }
-.voice-transcript-drafts textarea { width:100%; min-height:100px; resize:vertical; padding:10px; border:1px solid var(--line-strong,var(--line)); border-radius:3px; background:var(--paper); color:var(--ink); font:inherit; line-height:1.6; }
 .voice-audio-devices select { padding:7px 9px; border:1px solid var(--line-strong,var(--line)); border-radius:3px; color:var(--ink); background:var(--paper); }
 
 /* Keep call controls primary and recovered records compact in every theme. */
@@ -255,3 +254,8 @@
 @media (min-width:900px) and (min-height:506px) {
   :root[data-theme="buzhoushan"]:has(.buzhou-broadcast) { --buzhou-rail-width:clamp(112px,calc(var(--buzhou-canvas-width) * .12),240px); }
 }
+
+.voice-transcript-search { padding-top:12px; margin-top:12px; border-top:1px solid var(--line); }
+.panel-voice-control__settings .voice-transcript-search__toggle { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
+.voice-transcript-search__toggle input { width:16px; height:16px; margin:0; accent-color:var(--accent); }
+.voice-transcript-search .voice-record-note { margin:8px 0; }

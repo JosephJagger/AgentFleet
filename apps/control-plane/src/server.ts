@@ -1,7 +1,7 @@
 import { TakeoverPolicy } from "./takeover-policy.js";
 import {LiveChatStore} from './live-chat.js';
 import {LiveWelcomeGate,liveWelcomePrompt} from './live-welcome.js';
-import {VoiceTranscriptTail} from './voice-transcript-tail.js';
+import {VoiceTranscripts} from './voice-transcripts.js';
 import { NativeSubagentsBroker } from "./native-subagents-broker.js";
 import { createAgentReleaseStatus } from "./agent-release-status.js";
 import { deliveryPlan, deliveredPath } from './file-delivery.js';
@@ -259,8 +259,7 @@ export async function buildControlPlane(
   const sessionHistory=new SessionHistoryService(db,registry,(binding,cursor)=>historyBroker.read(binding,cursor));
   app.addHook('onClose',async()=>historyBroker.close());
   const panelVoice = new PanelVoiceService(db,registry,coordination,sessionProgress,sessionHistory);
-  const voiceTails=new VoiceTranscriptTail(db,panelVoice.memory);
-  for(const call of panelVoice.pending())voiceTails.review(call.voice_id);
+  const voiceTranscripts=new VoiceTranscripts(db);
   panelVoice.closeOrphans();
   const liveWelcomes=new Map<string,LiveWelcomeGate>();
   const liveChatReadOnly=new Map<string,number>();
@@ -314,7 +313,6 @@ export async function buildControlPlane(
     const binding=JSON.parse(call.binding_json);
     if(typeof binding.instanceId!=='string')return false; // Legacy agents cannot prove continuity.
     const newlyRecovering=!panelRecovery.has(id);
-    if(newlyRecovering)voiceTails.review(id);
     if(newlyRecovering)panelRecovery.set(id,{deadline:Date.now()+60000,lastProbe:0});
     if(call.state==='active'&&newlyRecovering){
       const owner=panelOwners.get(id);if(owner)sendJson(owner.socket,{type:'recovering'});
@@ -335,7 +333,6 @@ export async function buildControlPlane(
   };
   const stopPanel=(id:string)=>{
     liveWelcomes.delete(id);liveChatReadOnly.delete(id);
-    voiceTails.review(id);
     const call=panelVoice.get(id);if(!call||call.state==='closed')return;
     const sent=sendPanel(id,'stop');
     // A missing socket is not evidence that the retained native writer exited.
@@ -344,7 +341,7 @@ export async function buildControlPlane(
     panelOwners.delete(id);panelReports.delete(id);panelFailedReports.delete(id);preferenceCalls.delete(id);
   };
   const sweepPanel=()=>{
-    voiceTails.prune();
+    voiceTranscripts.prune();
     for(const call of panelVoice.pending()) {
       const owner=panelOwners.get(call.voice_id);
       let closeReason="SERVER_ERROR";
@@ -1177,8 +1174,8 @@ export async function buildControlPlane(
   app.post('/api/long-term-preferences',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body)));
   app.patch('/api/long-term-preferences/:id',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body),routeId(request)));
   app.delete('/api/long-term-preferences/:id',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body),routeId(request),true));
-  app.get("/api/voice-transcript-tails",{preHandler:authenticate},async(request,reply)=>{reply.header('cache-control','no-store');return {items:voiceTails.list(request.principal as Principal)};});
-  app.patch("/api/voice-transcript-tails/:id",{preHandler:mutate},async request=>voiceTails.resolve(request.principal as Principal,routeId(request),record(request.body)));
+  app.get("/api/voice-transcript-settings",{preHandler:authenticate},async(request,reply)=>{reply.header('cache-control','no-store');return voiceTranscripts.settings(request.principal as Principal);});
+  app.put("/api/voice-transcript-settings",{preHandler:mutate},async request=>voiceTranscripts.saveSettings(request.principal as Principal,record(request.body)));
   app.get("/api/voice-tasks", {preHandler:authenticate}, async (request,reply)=>{
     reply.header('cache-control','no-store');return panelVoice.recover(request.principal as Principal,request.query as {cursor?:unknown;view?:unknown});
   });
@@ -1987,6 +1984,12 @@ export async function buildControlPlane(
                 return;
               }
               invariant(panelVoiceBindingMatches(state,binding,'tool.result')&&binding.producerEpoch===message.producerEpoch&&binding.appServerEpoch===message.appServerEpoch,409,"VOICE_FENCED","Stale coordinator");
+              // Persist identity-verified transcripts even when the browser has left or the call is closing.
+              // Such late records never authorize tools. Acknowledgment follows the durable write.
+              if(message.event==='transcript'&&typeof message.text==='string'&&['user','assistant'].includes(String(message.role))){
+                voiceTranscripts.record(call,{...message,role:String(message.role),text:message.text,transcriptReplay:message.transcriptReplay===true||call.state!=='active'||!panelOwners.has(call.voice_id)});
+                if(typeof message.utteranceId==='string')sendPanel(call.voice_id,'transcript.ack',{utteranceId:message.utteranceId,transcriptSeq:message.transcriptSeq});
+              }
               if(message.event==='error')panelVoice.recordFailure(call.voice_id,message.message);
               if(call.state==='closed')return;
               const owner=panelOwners.get(call.voice_id);
@@ -2004,14 +2007,13 @@ export async function buildControlPlane(
               else if(message.event==='panel_tool'){
                 invariant(!panelRecovery.has(call.voice_id)&&(call.state==='active'||call.state==='starting'),409,'VOICE_FENCED','Voice recovery is pending');
                 const requestId=requiredString(message.requestId,'requestId',80);
-                const transcriptSequence=voiceTails.sequence(call.voice_id);
                 liveWelcomes.get(call.voice_id)?.beginWork();
                 void (async()=>{let result:unknown;
                 try {
                   const action=String((message.args as {action?:unknown})?.action);
-                  const segment=db.get<{segment:number}>('SELECT segment FROM panel_voice_tails WHERE voice_id=?',call.voice_id)?.segment??0;
+                  const segment=voiceTranscripts.sequence(call.voice_id);
                   if(action==='live.chat.search')liveChatReadOnly.set(call.voice_id,segment);
-                  invariant(liveChatReadOnly.get(call.voice_id)!==segment||['live.chat.search','search','status','history','recover','preference.list'].includes(action),409,'LIVE_CHAT_READ_ONLY','观众问答只能查询和回答；执行操作需要主播新的明确指令');
+                  invariant(liveChatReadOnly.get(call.voice_id)!==segment||['transcript.search','live.chat.search','search','status','history','recover','preference.list'].includes(action),409,'LIVE_CHAT_READ_ONLY','观众问答只能查询和回答；执行操作需要主播新的明确指令');
                   result=(message.args as {action?:unknown})?.action==='history'?await panelVoice.history(principal,call.voice_id,record(message.args)):panelVoice.tool(principal,call.voice_id,requestId,message.args);
                   // A status/search request must never trigger command dispatch as a side effect.
                   if (['dispatch','steer'].includes(String((message.args as {action?:unknown})?.action))) {
@@ -2019,10 +2021,9 @@ export async function buildControlPlane(
                     if(task.sessionId){const target=registry.getSession(principal,task.sessionId);dispatchPendingCommands(target.machineId,principal.workspaceId);broadcastSession(target.logicalSessionId,{type:"session.changed",logicalSessionId:target.logicalSessionId});}
                   }
                 }catch(error){result={error:error instanceof AppError?error.message:'请求未完成，请查询任务状态后再试',errorCode:error instanceof AppError?error.code:'PANEL_REQUEST_FAILED',...(error instanceof AppError?{details:error.details}:{}),executionStarted:error instanceof AppError&&error.code==='MACHINE_DRAINING'?false:null};}
-                if(result&&typeof result==='object'&&['dispatch','steer','todo.save'].includes(String((message.args as {action?:unknown})?.action)))voiceTails.receipt(call.voice_id,transcriptSequence,result as Record<string,unknown>);
                 sendPanel(call.voice_id,'tool.result',{requestId,result});})().finally(()=>liveWelcomes.get(call.voice_id)?.endWork());
               }
-              else if(message.event==='transcript'){if(typeof message.text==='string'&&message.text.length<=8000&&['user','assistant'].includes(String(message.role))){if(message.role==='user')voiceTails.record(call,{...message,text:message.text});sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final),snapshot:message.transcriptSnapshot===true,transcriptSeq:message.transcriptSeq});}}
+              else if(message.event==='transcript'){if(typeof message.text==='string'&&['user','assistant'].includes(String(message.role))){sendJson(owner.socket,{type:'transcript',text:message.text,role:message.role,final:Boolean(message.final),snapshot:message.transcriptSnapshot===true,transcriptSeq:message.transcriptSeq,utteranceId:message.utteranceId});}}
               else if(message.event==='error'){const code=panelVoice.recordFailure(call.voice_id,message.message);app.log.warn({voiceId:call.voice_id,machineId:identity.machineId,code},'Panel voice failed');sendJson(owner.socket,{type:'error',message:`总控语音连接失败（${code}），请重新连接`});stopPanel(call.voice_id);}
               return;
             }

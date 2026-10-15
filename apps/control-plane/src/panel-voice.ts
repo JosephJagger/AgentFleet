@@ -1,3 +1,4 @@
+import {VoiceTranscripts} from './voice-transcripts.js';
 import {LiveChatStore} from './live-chat.js';
 import {LongTermPreferences} from './long-term-preferences.js';
 import type { SessionHistoryService } from './session-history.js';
@@ -169,6 +170,9 @@ export class PanelVoiceService {
     invariant(typeof input==='object'&&input!==null&&!Array.isArray(input),400,"PANEL_INPUT","Invalid tool input");
     const args=input as Record<string,unknown>;
     this.own(principal,voiceId,args.action==='recover');
+    const transcripts=new VoiceTranscripts(this.db);
+    transcripts.assertReadOnly(voiceId,String(args.action));
+    if(args.action==='transcript.search')return transcripts.search(principal,voiceId,args);
     if(typeof args.action==='string'&&['preference.list','preference.save','preference.update','preference.delete'].includes(args.action))return new LongTermPreferences(this.db).tool(principal,args);
     if(args.action==='live.chat.search')return new LiveChatStore(this.db).search(principal,args);
     if(args.action==='recover')return this.recover(principal,{cursor:args.cursor,view:args.view});
