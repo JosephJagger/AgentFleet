@@ -676,3 +676,48 @@ test('schema 60 migrates only available legacy snippets and removes confirmation
  assert.equal(store.settings(f.principal).enabled,false);store.saveSettings(f.principal,{enabled:true,revision:0});
  const reopened=new ControlPlaneDatabase(path);assert.equal(new VoiceTranscripts(reopened).settings(f.principal).enabled,true);reopened.close();
 });
+
+test('dynamic directory combines identity tokens and typed filters without reading history or creating work',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const read=(input:Record<string,unknown>={})=>f.service.directory(f.principal,input);
+ assert.equal(read({query:'Mac Demo Test codex'}).total,1);
+ assert.equal(read({host:'Mac',project:'Demo',sessionName:'Test',provider:'codex',machineId:'m',projectId:'p'}).total,1);
+ assert.equal(read({host:'Mac',provider:'claude'}).total,0);
+ assert.equal(read({query:'Mac missing'}).total,0);
+ assert.equal(read({directoryStatus:'managed'}).sessions[0]?.id,f.session.logicalSessionId);
+ assert.equal(read({currentTask:true}).total,0);
+ f.db.run("UPDATE logical_sessions SET execution_state='running',active_turn_id='turn-current'");
+ const result=read({currentTask:true,project:'Demo'});
+ assert.equal(result.total,1);assert.equal(result.sessions[0]?.source,'host_session_projection');
+ assert.equal(result.sessions[0]?.activeTurnId,'turn-current');assert.equal(result.sessions[0]?.freshness,'live');
+ assert.ok(result.generatedAt&&result.sessions[0]?.hostHeartbeatAt);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM panel_voice_jobs')?.n,0);
+ assert.equal('messages' in result.sessions[0]!,false);
+ assert.throws(()=>read({provider:'invalid'}));assert.throws(()=>read({currentTask:'true'}));assert.throws(()=>read({directoryStatus:'invalid'}));
+ assert.equal(read({query:"%' OR 1=1 --"}).total,0);
+});
+
+test('directory and mutations reject stale or reconciling targets while preserving retry receipts',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const job=f.dispatch() as {jobId:string};
+ f.db.run("UPDATE machines SET last_heartbeat_at='2000-01-01T00:00:00Z'");
+ const result=f.service.directory(f.principal,{directoryStatus:'all'});
+ assert.equal(result.sessions[0]?.freshness,'stale');assert.equal(result.sessions[0]?.available,false);assert.equal(result.hostTotal,0);
+ assert.equal(f.service.directory(f.principal,{currentTask:true}).total,0);
+ assert.throws(()=>f.dispatch('new-request'),/待同步/);
+ assert.equal((f.dispatch() as {jobId:string}).jobId,job.jobId);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,1);
+});
+
+test('directory pagination scopes filters and workspace; online hosts without sessions remain discoverable',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ for(let i=0;i<22;i++)f.registry.createSession(f.principal,'m','p',`Extra ${i}`,`extra-${i}`);
+ const first=f.service.directory(f.principal,{project:'Demo'});assert.equal(first.sessions.length,20);assert.equal(first.total,23);assert.ok(first.nextCursor);
+ const second=f.service.directory(f.principal,{project:'Demo',cursor:first.nextCursor});assert.equal(second.sessions.length,3);assert.equal(second.nextCursor,null);
+ assert.equal(new Set([...first.sessions,...second.sessions].map(s=>s.id)).size,23);
+ assert.throws(()=>f.service.directory(f.principal,{provider:'claude',cursor:first.nextCursor}));
+ const foreign=f.service.directory({...f.principal,workspaceId:'other'},{query:'Demo'});assert.equal(foreign.total,0);assert.equal(foreign.hostTotal,0);
+ f.db.run('UPDATE logical_sessions SET deleted_at=?',new Date().toISOString());
+ const empty=f.service.directory(f.principal,{});assert.equal(empty.total,0);assert.equal(empty.hosts[0]?.id,'m');
+});

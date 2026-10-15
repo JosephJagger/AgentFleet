@@ -1174,6 +1174,10 @@ export async function buildControlPlane(
   app.post('/api/long-term-preferences',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body)));
   app.patch('/api/long-term-preferences/:id',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body),routeId(request)));
   app.delete('/api/long-term-preferences/:id',{preHandler:mutate},async request=>longTermPreferences.mutate(request.principal as Principal,record(request.body),routeId(request),true));
+  app.get('/api/voice-directory',{preHandler:authenticate},async(request,reply)=>{
+    reply.header('cache-control','no-store');const query=request.query as Record<string,unknown>;
+    return panelVoice.directory(request.principal as Principal,{...query,...(query.currentTask==='true'?{currentTask:true}:query.currentTask==='false'?{currentTask:false}:{})});
+  });
   app.get("/api/voice-transcript-settings",{preHandler:authenticate},async(request,reply)=>{reply.header('cache-control','no-store');return voiceTranscripts.settings(request.principal as Principal);});
   app.put("/api/voice-transcript-settings",{preHandler:mutate},async request=>voiceTranscripts.saveSettings(request.principal as Principal,record(request.body)));
   app.get("/api/voice-tasks", {preHandler:authenticate}, async (request,reply)=>{
@@ -2013,7 +2017,7 @@ export async function buildControlPlane(
                   const action=String((message.args as {action?:unknown})?.action);
                   const segment=voiceTranscripts.sequence(call.voice_id);
                   if(action==='live.chat.search')liveChatReadOnly.set(call.voice_id,segment);
-                  invariant(liveChatReadOnly.get(call.voice_id)!==segment||['transcript.search','live.chat.search','search','status','history','recover','preference.list'].includes(action),409,'LIVE_CHAT_READ_ONLY','观众问答只能查询和回答；执行操作需要主播新的明确指令');
+                  invariant(liveChatReadOnly.get(call.voice_id)!==segment||['transcript.search','live.chat.search','directory','search','status','history','recover','preference.list'].includes(action),409,'LIVE_CHAT_READ_ONLY','观众问答只能查询和回答；执行操作需要主播新的明确指令');
                   result=(message.args as {action?:unknown})?.action==='history'?await panelVoice.history(principal,call.voice_id,record(message.args)):panelVoice.tool(principal,call.voice_id,requestId,message.args);
                   // A status/search request must never trigger command dispatch as a side effect.
                   if (['dispatch','steer'].includes(String((message.args as {action?:unknown})?.action))) {

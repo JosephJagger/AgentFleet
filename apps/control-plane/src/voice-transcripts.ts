@@ -9,7 +9,7 @@ type TranscriptInput={text:string;role:string;final?:boolean;transcriptSeq?:numb
 type Row={utterance_id:string;text:string;final:number;sequence:number;last_sequence:number;observed_at:string;role:string};
 const isSearchRequest=(text:string)=>/^(?:(?:请|请帮我|帮我|麻烦你|麻烦|现在)[，,\s]*){0,3}(?:搜索|查找|查一下|找一下|检索|查一查)[\s\S]*(?:转写|通话|电话|语音|说过|说了|聊过|聊天)/.test(text.trim())||/^(?:please\s+)?(?:search|find|look up)\b[\s\S]*(?:transcript|call|said)/i.test(text.trim());
 const isNewInstruction=(text:string)=>/^(?:(?:请|请帮我|帮我|现在)[，,\s]*){0,3}(?:执行|开始|开发|修改|发布|保存|取消|删除|停止|继续|接管|追加|安排)/.test(text.trim())||/^(?:please\s+)?(?:execute|start|develop|change|publish|save|cancel|delete|stop|continue|dispatch|take over)\b/i.test(text.trim());
-const readActions=['transcript.search','live.chat.search','search','status','history','recover','preference.list'];
+const readActions=['transcript.search','live.chat.search','directory','search','status','history','recover','preference.list'];
 /** Search is opt-in, request-scoped and read-only. Storage never depends on search permission. */
 export class VoiceTranscripts {
  constructor(private db:ControlPlaneDatabase){}

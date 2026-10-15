@@ -259,3 +259,16 @@
 .panel-voice-control__settings .voice-transcript-search__toggle { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
 .voice-transcript-search__toggle input { width:16px; height:16px; margin:0; accent-color:var(--accent); }
 .voice-transcript-search .voice-record-note { margin:8px 0; }
+
+.voice-directory { border-top:1px solid var(--line); padding-top:12px; margin-top:12px; font-size:13px; }
+.voice-directory summary { cursor:pointer; padding:6px 0; font-size:13px; }
+.voice-directory__body { display:grid; gap:10px; padding-top:8px; }
+.voice-directory__filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.panel-voice-control__settings .voice-directory label { font-size:12px; gap:4px; }
+.panel-voice-control__settings .voice-directory input,.panel-voice-control__settings .voice-directory select { width:100%; min-width:0; padding:7px 9px; font-size:13px; }
+.voice-directory__refresh { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.voice-directory__list { display:grid; gap:6px; max-height:260px; overflow:auto; }
+.voice-directory__list button { display:grid; gap:4px; text-align:left; background:transparent; color:inherit; border:1px solid var(--line); border-radius:8px; padding:10px; cursor:pointer; }
+.voice-directory__list button:disabled { opacity:.55; cursor:default; }
+.voice-directory__list strong,.voice-directory__list span { overflow-wrap:anywhere; }
+.voice-directory__list span,.voice-directory__list small { font-size:12px; font-weight:400; }

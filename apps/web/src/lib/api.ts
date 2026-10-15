@@ -1,3 +1,4 @@
+export type VoiceDirectoryPage={generatedAt:string;hostTotal:number;hostsTruncated:boolean;hosts:{id:string;name:string;heartbeatAt:string|null}[];total:number;nextCursor:string|null;sessions:{id:string;title:string;provider:string;host:string;project:string;managed:boolean;executionState:string;freshness:string;hostHeartbeatAt:string|null;sessionUpdatedAt:string}[]};
 export type LongTermPreference={id:string;body:string;conditions:string;enabled:boolean;expiresAt:string|null;revision:number};
 export type LongTermPreferenceList={revision:number;items:LongTermPreference[];bytes:number;budget:number};
 export type VoicePreferences = { voice: string; revision: number; voices: string[] };
@@ -627,6 +628,7 @@ export interface RuntimeReleaseStatus {
 
 export const api = {
   storeLiveChat:(messages:import('./live-interactions').LiveEvent[],signal:AbortSignal)=>request('/api/live-chat',{method:'POST',body:JSON.stringify({messages}),signal:timeoutSignal(signal,10000)}),
+  voiceDirectory:(filters:Record<string,string>,signal?:AbortSignal)=>request<VoiceDirectoryPage>('/api/voice-directory?'+new URLSearchParams(Object.entries(filters).filter(([,v])=>v)),{signal}),
   voiceTranscriptSettings:()=>request<{enabled:boolean;revision:number;retentionDays:number}>('/api/voice-transcript-settings'),
   saveVoiceTranscriptSettings:(input:{enabled:boolean;revision:number})=>request<{enabled:boolean;revision:number;retentionDays:number}>('/api/voice-transcript-settings',{method:'PUT',body:JSON.stringify(input)}),
   agentReleaseStatus: (signal?: AbortSignal) => request<{status:string;expectedVersion:string|null;publicVersion:string|null;checkedAt:string}>("/api/agent-release-status", {signal}),
