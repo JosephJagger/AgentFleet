@@ -3608,5 +3608,9 @@
   "已有 Agent 安装会保持原状，不会重新配对。后续 Agent 升级仍由面板管理。": "Existing Agent installations are preserved without pairing again. The panel continues to manage Agent updates.",
   "运行 agentfleets status 查看已安装服务，并按终端给出的修复步骤处理；请勿删除主机或重复配对。": "Run agentfleets status to inspect the installed service, then follow the repair steps in the terminal. Do not delete the host or pair it again.",
   "连接命令会安装独立的后台服务；关闭终端或清理 npx 缓存不会停止服务，无需开放入站端口。": "The connect command installs an independent background service. Closing the terminal or clearing the npx cache will not stop it. No inbound ports are required.",
-  "npm uninstall -g agentfleets 只移除命令入口，不卸载后台 Agent。完整卸载请使用下方命令。": "npm uninstall -g agentfleets removes only the command entry point, not the background Agent. Use the command below to uninstall it completely."
+  "npm uninstall -g agentfleets 只移除命令入口，不卸载后台 Agent。完整卸载请使用下方命令。": "npm uninstall -g agentfleets removes only the command entry point, not the background Agent. Use the command below to uninstall it completely.",
+  "说出主机、项目和任务，即可派发。": "Name the host, project and task to delegate.",
+  "挂断后仍保留；查看记录不会执行任务。": "Records remain after the call. Viewing them does not run tasks.",
+  "找回通话中断或结束前的最后一句，按需核对。": "Recover and review the last words before a call ended or was interrupted.",
+  "用途与保留规则": "Purpose and retention"
 }

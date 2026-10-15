@@ -41,9 +41,9 @@ export function PanelVoiceControl({ machines, onOpenSession, liveInteractions=fa
     {active&&<button type="button" className="button button--secondary panel-voice-control__floating" onClick={()=>setExpanded(true)} aria-label={t("面板语音总控")}><Headset size={16}/>{t("总控通话控制")}</button>}
     <section ref={panel} style={dragging.style} className="panel-voice-control__settings" hidden={!expanded} aria-label={t("面板语音总控")}>
       <header className="voice-drag-handle" {...dragging.handle}><strong className="panel-voice-control__title"><Headset size={22}/>{t("语音总控")}</strong><button className="icon-button" aria-label={t("关闭")} onClick={()=>setExpanded(false)}><X size={17}/></button></header>
-      <p>{t("说出主机、项目和任务，不同项目可并行派发。")}</p>
+      <p className="panel-voice-control__intro">{t("说出主机、项目和任务，即可派发。")}</p>
       {reloadHost&&!active&&<p role="status">{t('页面已刷新，点击恢复语音重新建立通话；不会重发任务或补播欢迎。')}</p>}
-      <label>{t("语音主机")}<select value={selected} disabled={active||!eligible.length} onChange={e=>{setHost(e.target.value);setReloadHost('');}}>{host&&!eligible.some(m=>m.id===host)&&<option value={host}>{t("原语音主机暂不可用")}</option>}{!eligible.length&&!host&&<option value="">{t("等待支持总控的主机上线")}</option>}{eligible.map(m=><option key={m.id} value={m.id}>{displayName(m.name)}</option>)}</select></label>
+      <label className="panel-voice-control__host">{t("语音主机")}<select value={selected} disabled={active||!eligible.length} onChange={e=>{setHost(e.target.value);setReloadHost('');}}>{host&&!eligible.some(m=>m.id===host)&&<option value={host}>{t("原语音主机暂不可用")}</option>}{!eligible.length&&!host&&<option value="">{t("等待支持总控的主机上线")}</option>}{eligible.map(m=><option key={m.id} value={m.id}>{displayName(m.name)}</option>)}</select></label>
       <p className="panel-voice-control__hint">{t("使用此主机的 Codex 账号通话，可指挥其他主机。")}</p>
       {eligible.find(m=>m.id===selected)?.maintenance && <p role="status">{t("主机正在维护，等待安全重启；当前任务可继续，暂不接受新任务")}</p>}
       {!supportsDispatch&&selected&&<p>{t("接管与排队需要语音主机连接服务 0.30.98 或更新版本；更新后请重新通话")}</p>}

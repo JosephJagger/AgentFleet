@@ -26,7 +26,7 @@ export function VoiceTaskInbox({onOpenSession}:{onOpenSession:(id:string)=>void}
  return <section className="voice-task-inbox">
   <button className="voice-record-toggle" type="button" aria-expanded={expanded} onClick={()=>setExpanded(value=>!value)}><ListTodo size={16}/>{t('待办与结果记录')}<ChevronDown size={14}/></button>
   {expanded&&<>
-   <p>{t('记录保存在服务端，挂断后仍保留。恢复只读取记录，不会自动执行。')}</p>
+   <p className="voice-record-note">{t('挂断后仍保留；查看记录不会执行任务。')}</p>
    <div className="voice-record-toolbar"><label>{t('查看记录')}<select value={view} onChange={e=>{setView(e.target.value);setCursor(undefined);setTrail([]);}}><option value="recover">{t('待处理与未确认结果')}</option><option value="all">{t('全部记录')}</option></select></label>
    <button className="button button--secondary" type="button" onClick={()=>setRevision(value=>value+1)}><RefreshCw size={13}/>{t('刷新记录')}</button></div>
    {error&&<p role="alert">{error}</p>}
@@ -35,7 +35,7 @@ export function VoiceTaskInbox({onOpenSession}:{onOpenSession:(id:string)=>void}
    <div className="voice-task-inbox__records">{page?.items.map(record=>{
     const finished=record.job&&['completed','failed','interrupted'].includes(record.job.state);
     const state=record.state==='completed'?t('手动续办已完成'):record.state==='pending'?t('待确认，尚未派发'):record.state==='cancelled'?t('已取消'):record.job?.state==='completed'?t('已完成'):record.job?.state==='failed'?t('失败'):record.job?.state==='interrupted'?t('已停止'):record.job?.state==='queued'?t('排队中'):record.job?.state==='submitted'?t('等待主机'):record.job?.state==='running'?t('执行中'):t('状态待确认');
-    return <article key={record.todoId} className="panel-voice-control__task"><strong className="voice-record-status" data-state={record.state==='dispatched'?record.job?.state:record.state}>{state}</strong><p>{record.intent||t('原始意图已不可用')}</p>
+    return <article key={record.todoId} className="panel-voice-control__task"><strong className="voice-record-status" data-state={record.state==='dispatched'?record.job?.state:record.state}>{state}</strong>{record.intent&&record.intent.length>100?<details className="voice-record-intent"><summary><span>{record.intent.slice(0,80)}…</span><ChevronDown size={14} aria-hidden="true"/></summary><p>{record.intent}</p></details>:<p className="voice-record-intent-short">{record.intent||t('原始意图已不可用')}</p>}
      <small>{displayName(record.target?`${record.target.host} · ${record.target.project} · ${record.target.title}`:record.targetUnavailable?t('原目标暂不可访问'):t('尚未选择目标会话'))}{record.target?.provider&&<> · {record.target.provider==='claude'?'Claude Code':'Codex'}</>}{record.target?.managed!==undefined&&<> · {record.target.managed?t('已接管'):t('未接管')}</>}</small>
      {record.resolution&&<><small>{t('完成轮次')} · {record.resolution.nativeTurnId}</small>{record.resolution.result&&<details><summary>{t('续办完成结果')}</summary><p>{record.resolution.result}</p></details>}{record.resolution.historyLimited&&<small>{t('部分任务历史不可用')}</small>}<small>{t('以下为原派发任务记录，保留原执行结果')}</small></>}
      {record.job&&<small className="voice-record-id">{record.job.jobId}</small>}{record.job?.statusFreshness==='last_known'&&!finished&&<small>{t('主机状态未确认，显示最后已知任务状态')}</small>}
