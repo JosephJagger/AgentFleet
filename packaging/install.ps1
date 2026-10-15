@@ -38,6 +38,51 @@ function Assert-AgentFleetNpmFreshInstall {
   }
 }
 
+# Rename the directory itself. PowerShell Move-Item may move children one by
+# one and leave a partial release when an executable is temporarily locked.
+function Move-AgentFleetReleaseDirectory {
+  param([string]$Source, [string]$Destination)
+  for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    try { [IO.Directory]::Move($Source, $Destination); return }
+    catch [IO.IOException] {
+      if ((Test-Path -LiteralPath $Destination) -or $attempt -eq 19) { throw }
+      Start-Sleep -Milliseconds 250
+    }
+  }
+}
+
+function Protect-AgentFleetInvalidRelease {
+  param([string]$Target, [string]$AgentBinRoot, [string]$AgentStateRoot)
+  if ((Get-Item -LiteralPath $Target).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'installer: unsafe release directory' }
+  $version = Split-Path $Target -Leaf
+  foreach ($pointer in @('current.txt', 'previous.txt')) {
+    $path = Join-Path $AgentBinRoot $pointer
+    if (Test-Path -LiteralPath $path) {
+      $value = (Get-Content -Raw -LiteralPath $path).Trim()
+      if ($value -eq $version -or $value.StartsWith($Target, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'installer: invalid release is current or rollback; preserved for manual repair'
+      }
+    }
+  }
+  $transactionPath = Join-Path $AgentStateRoot 'update-state.json'
+  if (Test-Path -LiteralPath $transactionPath) {
+    $transaction = Get-Content -Raw -LiteralPath $transactionPath | ConvertFrom-Json
+    if ($transaction.phase -notin @('succeeded', 'rolled_back', 'failed') -and -not ($transaction.phase -eq 'preparing' -and $transaction.targetVersion -eq $version)) { throw 'installer: unfinished update; invalid release preserved' }
+  }
+  # Fail closed if Windows cannot enumerate users of this directory.
+  $processes = @(Get-CimInstance Win32_Process -ErrorAction Stop)
+  foreach ($process in $processes) {
+    foreach ($value in @($process.ExecutablePath, $process.CommandLine)) {
+      if ($value -and $value.IndexOf($Target, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        throw 'installer: invalid release is in use; preserved'
+      }
+    }
+  }
+  $quarantine = "$Target.invalid-$([Guid]::NewGuid().ToString('N'))"
+  Move-AgentFleetReleaseDirectory -Source $Target -Destination $quarantine
+  Write-Host 'Preserved incomplete unused release; preparing a verified replacement.'
+}
+
 $ErrorActionPreference = 'Stop'
 $env:AGENTFLEET_INSTALLER_PID = [string]$PID
 $ProgressPreference = 'SilentlyContinue'
@@ -228,19 +273,23 @@ try {
   if ($tarListExit -ne 0 -or $unsafeEntries.Count -gt 0) { throw 'installer: unsafe release archive' }
   New-Item -ItemType Directory -Force -Path $BinRoot | Out-Null
   $target = Join-Path $BinRoot $manifest.version
-  if (-not (Test-Path $target)) {
-    $stage = "$target.staging-$PID"
+  if (Test-Path -LiteralPath $target) {
+    $existingLauncher = Join-Path $target 'agentfleet.cmd'
+    $existingNode = Join-Path $target 'runtime\node.exe'
+    $valid = $false
+    if ((Test-Path -LiteralPath $existingLauncher -PathType Leaf) -and (Test-Path -LiteralPath $existingNode -PathType Leaf)) {
+      try { $valid = ((& $existingLauncher --version) -eq $manifest.version) -and $LASTEXITCODE -eq 0 } catch { $valid = $false }
+    }
+    if (-not $valid) { Protect-AgentFleetInvalidRelease -Target $target -AgentBinRoot $BinRoot -AgentStateRoot $StateRoot }
+  }
+  if (-not (Test-Path -LiteralPath $target)) {
+    $stage = "$target.staging-$([Guid]::NewGuid().ToString('N'))"
     New-Item -ItemType Directory -Path $stage | Out-Null
     & tar.exe -xzf $archive -C $stage --strip-components=1
     if ($LASTEXITCODE -ne 0) { throw 'installer: could not extract release' }
     $launcher = Join-Path $stage 'agentfleet.cmd'
-    if ((& $launcher --version) -ne $manifest.version) { throw 'installer: release version mismatch' }
-    Move-Item -LiteralPath $stage -Destination $target
-  } else {
-    $existingLauncher = Join-Path $target 'agentfleet.cmd'
-    if (-not (Test-Path $existingLauncher -PathType Leaf) -or ((& $existingLauncher --version) -ne $manifest.version)) {
-      throw 'installer: existing release directory is invalid'
-    }
+    if (((& $launcher --version) -ne $manifest.version) -or $LASTEXITCODE -ne 0) { throw 'installer: release version mismatch' }
+    Move-AgentFleetReleaseDirectory -Source $stage -Destination $target
   }
   $launcher = Join-Path $target 'agentfleet.cmd'
   if ($Mode -eq 'Prepare') { Write-Host "Prepared AgentFleet $($manifest.version); running service unchanged."; exit 0 }

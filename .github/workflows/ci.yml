@@ -73,6 +73,7 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path packaging/install.ps1), [ref]$tokens, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+          & ./packaging/test-windows-release-directory.ps1
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
