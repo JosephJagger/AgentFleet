@@ -366,9 +366,12 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
                 }}><span>{label}</span><small>{platform === value ? <><Check size={13} aria-hidden="true" />{t("已选择")}</> : t("点击选择")}</small></button>
               ))}
             </div>
-            {npmAvailable && <div className="pair-install-method" role="group" aria-label={t("安装方式")}>
-              <button type="button" aria-pressed={!npm} disabled={claimed} onClick={() => { setInstallMethod("direct"); setCopied(false); setNpmNpxCopied(false); }}>{t("直接安装")}</button>
-              <button type="button" aria-pressed={npm} disabled={claimed} onClick={() => { setInstallMethod("npm"); setCopied(false); setNpmNpxCopied(false); }}>{t("npm 安装")}</button>
+            {npmAvailable && <div className="pair-install-choice">
+              <span id="pair-install-method-label" className="pair-install-choice__label">{t("安装方式")}</span>
+              <div className="pair-install-method" role="group" aria-labelledby="pair-install-method-label">
+                <button type="button" aria-pressed={!npm} disabled={claimed} onClick={() => { setInstallMethod("direct"); setCopied(false); setNpmNpxCopied(false); }}><Check className="pair-install-method__check" size={15} aria-hidden="true" />{t("直接安装")}</button>
+                <button type="button" aria-pressed={npm} disabled={claimed} onClick={() => { setInstallMethod("npm"); setCopied(false); setNpmNpxCopied(false); }}><Check className="pair-install-method__check" size={15} aria-hidden="true" />{t("npm 安装")}</button>
+              </div>
             </div>}
             {enrollment?.machineReady ? (
               <section className="pair-complete"><CircleCheck size={28} /><h3>{displayName(enrollment.machineName)} {locale() === "en" ? " " : ""}{t("已连接")}</h3><DiscoveryStatus discovery={enrollment.discovery} /><form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!enrollment.machineId) return; setBusy(true); try { if (alias.trim() !== enrollment.machineName) await api.updateMachineAlias(enrollment.machineId, alias.trim() || null); onPaired(enrollment.machineId); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机显示名称")}</span><input aria-label={t("新主机显示名称")} value={alias} maxLength={80} onChange={(event) => setAlias(event.target.value)} /></label><button type="submit" className="button button--primary" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <ArrowRight size={16} />}{locale() === "en" ? " " : ""}{t("查看项目")}</button></form></section>

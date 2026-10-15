@@ -951,11 +951,18 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .platform-tab:disabled { cursor: default; opacity: .6; }
 .platform-tab--active:disabled { opacity: 1; }
 .pair-run-location { margin: 16px 0 12px; padding: 12px 14px; border-left: 3px solid var(--cobalt); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--cobalt-soft); color: var(--ink); font-size: var(--text-small); line-height: 1.75; }
-.pair-install-method { display: flex; gap: 4px; margin-top: 12px; }
-.pair-install-method button { background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--muted); font: inherit; font-size: var(--text-caption); padding: 7px 12px; }
-.pair-install-method button[aria-pressed="true"] { background: var(--paper-solid); border-color: var(--line-strong); color: var(--ink); }
+.pair-install-choice { align-items: center; display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 16px; }
+.pair-install-choice__label { color: var(--ink); font-size: var(--text-caption); font-weight: 600; }
+.pair-install-method { background: var(--canvas); border: 1px solid var(--line-strong); border-radius: calc(var(--radius-sm) + 4px); display: grid; flex: 1 1 260px; gap: 4px; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 360px; padding: 4px; }
+.pair-install-method button { align-items: center; background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--ink); cursor: pointer; display: flex; font: inherit; font-size: var(--text-small); font-weight: 600; gap: 7px; justify-content: center; line-height: 1.4; min-height: 36px; min-width: 0; padding: 8px 12px; }
+.pair-install-method button:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--cobalt-soft); border-color: var(--line-strong); }
+.pair-install-method button[aria-pressed="true"] { background: var(--cobalt); border-color: var(--cobalt-deep); color: var(--canvas); }
+.pair-install-method__check { flex: 0 0 auto; visibility: hidden; }
+.pair-install-method button[aria-pressed="true"] .pair-install-method__check { visibility: visible; }
 .pair-install-method button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
 .pair-install-method button:disabled { cursor: default; opacity: .6; }
+.pair-install-method button[aria-pressed="true"]:disabled { opacity: 1; }
+@media (pointer: coarse) { .pair-install-method button { min-height: 44px; } }
 .pair-npm-note { color: var(--muted); font-size: var(--text-caption); line-height: 1.6; margin: 10px 2px; }
 .pair-npx-option { border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--muted); font-size: var(--text-caption); margin-top: 10px; overflow: hidden; }
 .pair-npx-option summary { cursor: pointer; padding: 10px 12px; }
