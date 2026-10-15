@@ -1,248 +1,162 @@
 <p align="center">
-  <img src="docs/assets/hero.svg" alt="AgentFleets — Codex + Claude Code. Voice coordination across hosts." width="100%">
+  <img src="docs/assets/hero.svg" alt="AgentFleets — Codex and Claude Code across your computers" width="100%">
 </p>
 
 <p align="center">
   <a href="https://github.com/JosephJagger/AgentFleet/actions/workflows/ci.yml"><img src="https://github.com/JosephJagger/AgentFleet/actions/workflows/ci.yml/badge.svg" alt="Build and test status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-55def2?labelColor=111e35" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/deployment-self--hosted-a18bff?labelColor=111e35" alt="Self-hosted">
+  <a href="https://www.npmjs.com/package/agentfleets"><img src="https://img.shields.io/npm/v/agentfleets?label=npm&labelColor=111e35" alt="npm package version"></a>
 </p>
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a><br><br>
-  <a href="https://www.agentfleets.cn">Try it free</a> · <a href="#self-host">Self-host</a> · <a href="#built-for-your-native-sessions">Features</a> · <a href="#how-it-compares-to-codex">Compare with Codex</a> · <a href="#our-vision">Vision</a> · <a href="CONTRIBUTING.md">Contribute</a> · <a href="SECURITY.md">Security</a>
+  <a href="https://www.agentfleets.cn">Open AgentFleets</a> · <a href="#get-started">Installation</a> · <a href="#features">Features</a> · <a href="#self-host">Self-host</a> · <a href="#faq">FAQ</a>
 </p>
 
-<p align="center"><strong>One workspace for Codex and Claude Code.</strong><br>
-Coordinate hosts, projects and sessions by voice. Continue the original conversation.<br>
-Keep execution in your own environment.</p>
+<p align="center"><strong>One browser workspace for AI work across your computers.</strong><br>
+Continue Codex and Claude Code conversations, delegate work by voice,<br>
+and follow projects running on Linux, macOS and Windows.</p>
 
-<p align="center">A self-hosted workspace for Codex and Claude Code on Linux, macOS and Windows.<br>Manage native sessions, send files and images, use installed plugin skills, and track usage from one English or Chinese web interface.</p>
+![AgentFleets workspace with fictional hosts, conversations and usage data](docs/assets/workspace-en.png)
 
-![AgentFleets workspace showing native quota, credit balance, session usage and a running Codex conversation with fictional demo data](docs/assets/workspace-en.png)
+<p align="center"><sub>Product screenshots use fictional demo data. Some screenshots show an earlier interface.</sub></p>
 
-<p align="center"><sub>Actual interface with synthetic demo data. No production accounts, hosts, or conversations are shown.</sub></p>
+## Get started
 
-## Try AgentFleets for free
+You can use the **[hosted panel for free](https://www.agentfleets.cn)** or [deploy your own panel](#self-host). Install the host connection service on each computer where you want AI tasks to run. The computer opening the webpage can be a different machine, or a phone.
 
-Visit **[https://www.agentfleets.cn](https://www.agentfleets.cn)** to try the hosted panel for free, without deploying your own server.
+### 1. Prepare the computer you want to connect
 
-1. Open the console from the website and sign in with your email verification code.
-2. Choose **Add host**, then run the installation command on a computer where you already use Codex.
-3. Once connected, choose a project and session to continue your work from a desktop or mobile browser.
-
-Tasks execute on your connected host. Bring your own Codex account and available quota; the free panel experience does not include Codex credits. If you prefer to run the panel yourself, follow [Self-host](#self-host).
-
-## Recently shipped: coordinate projects by voice
-
-**Name the host, project and session. Let different projects move in parallel.** Experimental panel-wide voice control finds authorized target sessions, dispatches tasks and retrieves progress and results. Keep talking while tasks run, or add instructions to a supported active turn. Same-project and same-session conflict protection remains in place.
-
-For example: “Check the API project's tests on the Linux server and update the website navigation on the Mac. Tell me how each task is going.” This is an illustrative workflow, not a real task record.
-
-| Available feature | Where to use it |
-| --- | --- |
-| **Voice across hosts, projects and sessions** | Choose a Codex voice host from the top toolbar. Different projects run concurrently; task entries open their exact target sessions. |
-| **Live process and follow-up instructions** | Open session progress for available command output, file changes and process messages. Add voice or typed instructions to supported active turns. |
-| **To-dos, results and conversation history** | Open voice task records, or ask a new call to retrieve saved work and exact session history, including typed tasks. Recovery never automatically redispatches tasks. |
-| **Long-term voice preferences** | Settings → Long-term preferences: inspect, edit, disable or delete explicit rules. New calls load them; changes requiring old context removal take effect after reconnection. |
-| **Native Claude Code sessions** | Choose Claude Code beside the host to read history, continue original sessions, send attachments and respond to approvals or questions, using the host's existing CLI and account. |
-| **Reset predictions and reset cards** | Host quota view: conditional signals and a seven-day paginated timeline. Host account tools: available native cards, with expiry in UTC and Beijing time. |
-| **Shared defaults and voice selection** | Settings → Codex configuration: common defaults with host, project and session overrides. Voice choices follow the host's supported catalog. |
-| **Storage, versions and safe maintenance** | Hosts → Attachments and versions: inspect and clean redundant data. Safe publication waits for calls; host updates respect running work. |
-
-For the complete feature set, use Agent **0.30.91** and validated managed Codex **0.160.1**; availability follows reported host capabilities. Voice requires HTTPS and microphone permission and remains experimental. Closing or backgrounding the page can end a call without cancelling dispatched work. Claude Code does not imply parity with Codex-only voice, configuration or maintenance features.
-
-Details: [October 2026 release summary](docs/recent-updates-2026-10.md) · [Parallel voice and task records](docs/panel-voice-status.md) · [Read-only history](docs/voice-session-history.md) · [Preferences](docs/voice-long-term-preferences.md) · [Claude Code](docs/claude-code.md) · [Reset signals](docs/reset-radar.md)
-
-## One console for AI work across your machines
-
-Running Codex on several machines creates a management task of its own: finding the right session, checking which jobs are still running, returning to finished results, and keeping track of settings and usage. **AgentFleets brings those everyday operations into one graphical workspace.**
-
-Think of each enrolled host as a place where Codex executes work, and AgentFleets as the console you use to supervise it. This is particularly useful for **headless Linux servers**: the server runs Codex and the Agent, while you interact through a browser on another computer. No graphical desktop is required on the execution host. Once enrolled, hosts connect outward to your control plane; routine session management does not require opening an SSH terminal for each machine.
-
-| Available today | What it makes easier |
-| --- | --- |
-| **Graphical Codex session management** | Browse hosts, projects, and conversations; continue native sessions; adjust model settings and execution permissions in the panel. |
-| **Reuse a session in another task** | Copy a session link or choose one from the composer, then describe the task and send. AgentFleets validates access and stages a fixed, readable conversation snapshot on the target host; Codex searches it for relevant details. No panel AI summary is required. Reasoning and command output are excluded, and missing history is marked. Each reference is limited to 4 MB; up to two references may be sent together. |
-| **Files, folders, and images sent to a remote session** | Use one attachment menu to paste images or upload bounded files and folders. AgentFleets safely stages files on the selected host and sends native Codex references. |
-| **Native goals, Plan mode, and plugin skills** | Set a persistent session goal, switch the next turn to a host-advertised collaboration mode, and select skills from installed, enabled Codex plugins. |
-| **Host files in conversation results** | Open or download files linked by Codex directly from the message. Bytes stream on demand from the bound host and remain limited to that session's registered project. |
-| **An overview across multiple hosts** | Follow running work, return to completed-but-controlled sessions, queue follow-up messages, and inspect recorded tokens and reported account quota. |
-| **Scheduled work in a project** | Run a prompt once, every N minutes, daily, on weekdays, or on chosen weekdays in a named time zone. Use a managed session or create a fresh one per run; inspect results in the Scheduled tasks History. |
-| **Switchable interface themes** | Choose from 17 themes, with Castle in the Sky as the default for new browsers. Five Chinese classics join illustrated themes with coordinated messages, Markdown, code blocks and composers. |
-
-### Visual context, even on a headless server
-
-For example, paste a screenshot of a broken page on your laptop, select the session on your Linux host, and ask Codex to investigate the project there. The current composer accepts pasted **PNG, JPEG, and WebP images, up to four per message**, with previews and automatic resizing/compression. Submission requires a host runtime and model that support image input.
-
-Codex CLI already supports image and local-path inputs; AgentFleets makes those workflows accessible through a browser across enrolled hosts. See the [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli). The `+` menu accepts images and up to 32 files, with a 4 MB per-file and 8 MB combined limit, or a folder while preserving its relative structure. Supported inputs include structurally checked PDF and macro-free XLSX files, UTF-8 text, common source code, configuration, and structured data. Validation runs in the browser, control plane, and host Agent; changing a binary file's extension does not bypass it. Other Office formats, archives, audio, video, and executables are rejected. Accepted files are staged under the selected project and passed to Codex as native path references. Files that Codex links in a reply can also be previewed or downloaded from the execution host on demand.
-
-## Say what you need, even without the terminology
-
-You should not have to know the exact technical term before asking for help. **Writing assistance helps turn what you mean into a request you can review and send**, without leaving the conversation.
-
-- **Find the words as you type.** Chinese and English term suggestions cover programming, agents, office work, engineering, games, video editing, philosophy and cognition. Recall a name such as “ripple edit” or “metacognition” without interrupting your work to search for it.
-- **Start in everyday language.** “Play the next shot audio before cutting to its picture” can surface a suggestion for an audio lead-in. “Am I only looking for evidence supporting my own view” can prompt a check for confirmation bias. Suggestions help frame the question; they do not decide the answer for you.
-- **Improve wording when you want to.** Click **Improve wording** to request one concise rewrite that aims to preserve your intent and constraints. AI-assisted results are labeled, and you choose whether to apply, edit or ignore them.
-- **Keep familiar language close at hand.** Suitable terms and explicit rewrites from synced conversations are added automatically, so you do not have to maintain a dictionary or approve entries one by one.
-- **Use it comfortably on a phone or desktop.** Tap suggestions on mobile or use Tab for input completion on desktop. Longer wording suggestions show up to four lines on mobile, keeping the composer usable.
-
-Choose your writing assistance defaults once in Settings, then adjust individual conversations when needed. Basic completion and local wording suggestions work without an external AI account; the optional **Improve wording** action uses the provider you configure.
-
-The aim is fewer interruptions and clearer requests for both specialists and people working outside their expertise. Coverage continues to grow; a suggestion is an aid to expression, not a guarantee that every phrase is understood.
-
-### Writing assistance in action
-
-Type part of a term to find the name you need, then choose a suggestion without leaving the conversation.
-
-![English term completion suggesting Ripple edit in a fictional video-editing conversation](docs/assets/features/completion-en.jpg)
-
-| Refine your wording on mobile | Choose the help you want |
-| --- | --- |
-| ![English mobile example showing an AI-labeled rewrite for background music during dialogue](docs/assets/features/rewrite-en.jpg) | ![English writing assistance settings with completion, wording and automatic learning options](docs/assets/features/settings-en.jpg) |
-| **Improve wording** offers a concise alternative. Read it before applying it to your draft. | Set your defaults once. Individual conversations can inherit them or use different choices. |
-
-*Real interface with fictional conversations and simulated suggestions. No production account data or live model responses are shown.*
-
-## Our vision
-
-**Every computer. Any operating system. Codex as the interface. AgentFleets in control.**
-
-We want Codex to become the single entry point for operating every computer—from writing code and managing files to running applications and maintaining systems. AgentFleets would connect those computers into one workspace, where you can direct work, follow progress, and manage access without switching between machines or learning a different workflow for each operating system.
-
-Codex acts on each computer. AgentFleets coordinates the fleet. You decide what they can do.
-
-Today, AgentFleets manages native Codex sessions on supported Linux, macOS, and Windows hosts. The next horizon is broader operations through Codex:
-
-- **A consistent operations entry point:** extend the workflow from individual coding sessions toward everyday application and system maintenance across operating systems.
-- **Coordinated work across hosts:** move toward explicit multi-host workflows with task dependencies and progress tracking. Today's panel manages sessions on each host; it does not automatically schedule one job across the fleet or migrate its conversation and Git state.
-- **Richer remote inputs:** expand beyond the current bounded file, folder, image, goal, Plan mode, and installed-plugin workflows while retaining host-side validation.
-
-These are future directions, not shipped features or a delivery schedule. Universal operating-system support and a complete interface for every computer operation remain goals. AgentFleets currently provides Codex session operations, not a general server monitoring or operating-system patch management system. User workspaces are isolated; shared team permissions remain outside the current scope.
-
-## Built for your native sessions
-
-Scheduled tasks run through the same host and native-session controls as a manual send. If a host is offline or a project is busy, the latest due run waits; missed runs are coalesced, and anything more than 24 hours late expires. An uncertain result is recorded for review and is never sent again automatically. The **History** tab on the Scheduled tasks page keeps recent results; **Pending** remains for approvals and questions.
-
-<table>
-<tr>
-<td width="33%" valign="top"><h3>Find active work fast</h3>Click Running, Controlled, or Online hosts, then jump straight to the session or machine you need. Skip browsing project trees across your fleet.</td>
-<td width="33%" valign="top"><h3>Continue where you left off</h3>Take control, send a message, and release back to the host. Rename a session without changing its native identity.</td>
-<td width="33%" valign="top"><h3>Keep work moving</h3>Follow streaming output, add instructions to a running turn, or queue the next message. Choose execution permissions per session.</td>
-</tr>
-<tr>
-<td valign="top"><h3>Recover deliberately</h3>Unknown outcomes freeze writes. Verify the host and unfreeze manually, with no automatic replay of uncertain actions.</td>
-<td valign="top"><h3>See what you store</h3>Inspect staged files by type and session. Preview supported cleanup before confirming it, with conversation text and native session identity preserved.</td>
-<td valign="top"><h3>Keep your model preferences</h3>Inherit Codex model and reasoning-effort settings, set host defaults once, and override individual sessions when needed. Avoid configuring every conversation from scratch.</td>
-</tr>
-<tr>
-<td valign="top"><h3>Read native account limits</h3>Show weekly and five-hour quota windows plus the current credit balance reported by Codex on the host.</td>
-<td valign="top"><h3>Trace recorded token cost</h3>Compare total and current-cycle usage by project and session, including per-turn and weekly cache hit rates.</td>
-<td valign="top"><h3>Add richer turn context</h3>Attach supported files, folders and images; select installed plugins with <code>+</code> or <code>@</code>; keep goals and Plan mode visible in the composer.</td>
-</tr>
-</table>
-
-### Jump straight to active work
-
-The sidebar counts are shortcuts: click a category, then select a host or session to open it directly across your fleet. No need to remember which project contains a conversation or expand hosts and projects one by one.
-
-| Shortcut | What you can reach |
-| --- | --- |
-| **Running** | Sessions with an active turn, including work waiting for your answer or approval |
-| **Controlled** | Sessions still under AgentFleets control, including completed tasks whose results you want to review or follow up on |
-| **Online hosts** | Connected hosts, with direct access to their workspace |
-
-**Use Running to follow progress and Controlled to return to results.** When a turn finishes, its session leaves Running. As long as control has not been released, you can still find it under Controlled to review the output or send the next instruction without browsing hosts and projects again. Controlled also includes active sessions; it is not a completed-only filter.
-
-Counts and open lists update as reported state changes. **Controlled means currently controlled, not recently viewed or previously controlled**; released sessions are not a takeover-history list. This workflow is especially useful when several tasks are spread across multiple hosts and projects.
-
-### Model and reasoning settings that follow your workflow
-
-The model shortcut above the composer shows saved model settings and reasoning effort. Draft changes and failed saves do not update the shortcut or send settings; running tasks retain their current configuration.
-
-Keep using Codex's own configuration when no panel override is set. Or save host defaults once and make exceptions for a particular session. Existing project defaults participate in the same precedence:
-
-**Session settings → project settings → host defaults → Codex's own configuration** (highest priority first).
-
-For example, keep a host's everyday model and reasoning effort as its default, then give one demanding session a different supported model or deeper reasoning. Clear that session's override to return to the applicable defaults. Where the host runtime supports them, the panel also exposes plan/execution mode, service tier, and communication style.
-
-The save button tracks the selected target scope. It is disabled when the form already matches the saved host, project, or session configuration; editing a value enables it, and a successful save or reverting to the saved values disables it again. This makes pending configuration changes visible before the next send.
-
-- **Fewer repeated choices:** reuse saved settings across sessions instead of selecting the model and reasoning effort every time.
-- **Visible configuration:** inspect the selected source, recently observed runtime values, and the settings last accepted by the host. A saved preference is not proof of the provider's final model choice.
-- **Controlled changes:** saved defaults are used for subsequent sends; they do not rewrite the host's `config.toml` or change a turn already running. Choices are validated against the host's reported capabilities.
-
-Together with direct access to running and completed-but-controlled sessions, native-session continuity, message queues, and explicit recovery, these are the workflows AgentFleets focuses on making easier. They are practical product strengths, not claims that other Codex clients lack similar features.
-
-### Keep long native sessions usable
-
-AgentFleets continues the same native Codex thread, including its history and identity. Codex performs its own automatic context management as a conversation grows. When you want explicit control, the session tools can request native context compaction without creating a replacement conversation. The panel labels the request and its result separately because acceptance does not mean compaction has already finished.
-
-The composer keeps the active goal, Plan mode, installed plugin selection, model and reasoning effort close to the message. Plugins can be selected from the `+` menu or found by typing `@`; only capabilities advertised by the connected host are offered.
-
-### Themes for different working environments
-
-Choose from **17 themes**, with Castle in the Sky as the default for new browsers. Five Chinese classics join Cyberpunk, The Matrix, Frozen and other illustrated themes. Each coordinates scene artwork, component borders, message bubbles, Markdown tables and quotations, code blocks and the composer.
-
-On desktop, use the theme control below **Controlled** in the left sidebar. On narrow screens, open the navigation menu; the full theme selector is also available in Settings. The layout adapts to mobile widths, and the selected theme is remembered in the current browser.
-
-All screenshots use fictional demo data. Browse **[all 17 desktop themes and 6 mobile previews](docs/themes.md)**.
-
-| **Havoc in Heaven**<br>[![Havoc in Heaven demo](docs/assets/themes/wukong-desktop-en.jpg)](docs/themes.md) | **A Thousand Li of Rivers and Mountains**<br>[![A Thousand Li of Rivers and Mountains demo](docs/assets/themes/jiangshan-desktop-en.jpg)](docs/themes.md) |
-| --- | --- |
-| **Legend of the White Snake**<br>[![Legend of the White Snake demo](docs/assets/themes/whitesnake-desktop-en.jpg)](docs/themes.md) | **The Matrix**<br>[![The Matrix demo](docs/assets/themes/matrix-desktop-en.jpg)](docs/themes.md) |
-| **Harry Potter**<br>[![Harry Potter demo](docs/assets/themes/wizard-desktop-en.jpg)](docs/themes.md) | **Peter Rabbit Garden**<br>[![Peter Rabbit Garden demo](docs/assets/themes/eyecare-desktop-en.jpg)](docs/themes.md) |
-
-### Know what is using your quota
-
-![Usage dashboard with fictional quota, credit, token and cache data](docs/assets/features/usage-en.png)
-
-Open **Usage** or the summary on a host, project, or session to see three related views:
-
-- **Official account limits:** weekly and five-hour quota windows, reset times, and the current credit balance, read from native Codex on the host. Hosts that report the same account are deduplicated instead of having their limits added together.
-- **Recorded token usage:** total and current weekly-cycle tokens by machine, project, and session. Session timelines also show the tokens used by each completed turn when Codex reports them.
-- **Cache efficiency:** per-turn and weekly cache hit rates, calculated as cached input tokens divided by input tokens. Rankings show which projects and sessions account for the recorded usage, with pagination for longer lists.
-
-Quota and credits are shared by a Codex account; project and session figures are recorded observations, not an allocation of the account's official percentage or credit balance. Collection starts with managed-session notifications and does not reconstruct earlier history or standalone CLI work. Missing, partial, and stale data are labeled explicitly. Account limits update from native events, an initial connection query, and manual refresh; the browser reads the stored snapshot without polling every host each minute. See [usage accounting](docs/usage.md) for coverage and counting rules.
-
-*The dashboard above is the real interface populated only with fictional hosts, projects, sessions, quota and credit values.*
-
-## How it compares to Codex
-
-**AgentFleets adds a self-hosted management interface around Codex.** The host's Codex runtime still executes the work; AgentFleets does not supply a model, a subscription, or extra usage quota.
-
-[Codex CLI](https://learn.chatgpt.com/docs/cli) is the terminal interface. The [official desktop app](https://learn.chatgpt.com/docs/app) provides a graphical workspace. AgentFleets focuses on administering enrolled hosts and their native sessions through your own browser-based panel.
-
-| Area | Official desktop Remote Control | AgentFleets |
+| Host system | Supported architecture | Where to run installation commands |
 | --- | --- | --- |
-| Access | Supported desktop/mobile apps | Hosted or self-hosted web panel |
-| Device identity | Same ChatGPT account **and workspace**, plus device authorization | Independent panel login and one-time host enrollment |
-| Connection | Authorized devices connect through the official relay | Agent on each host connects outward to your control plane |
-| Continue work | Continue chats and steer active work remotely | Continue native sessions with explicit take-control/release handling |
-| Administration | Official app connection settings | Host/project/session overview, queues, manual unfreeze, retention and supported image cleanup |
-| Operation | Official client setup | You operate HTTPS, storage, backups and updates |
+| Windows | x64 | PowerShell, including the PowerShell tab in Windows Terminal |
+| macOS | Apple Silicon and Intel | Terminal |
+| Linux | x64 | Terminal, or an SSH session on the target server |
 
-**How do accounts and authorization differ across these three connection methods?**
+Use the same operating-system account that owns your projects and is signed in to Codex or Claude Code. To use Claude Code, install and sign in to its CLI on that host. AgentFleets uses your existing tool accounts and quota; the panel does not include model credits.
 
-- **Official Remote Control pairs devices.** To control your home computer from your laptop, both apps must use the same ChatGPT account and ChatGPT workspace—not a project folder. Enable remote access on the host and authorize the device pairing. Signing in alone does not grant control.
-- **Official SSH connects to projects on a server.** To use a Linux development server, you need SSH login access and Codex installed and authenticated there, then add a remote project in the desktop app. This uses SSH login rather than device pairing; the official SSH setup does not list matching ChatGPT accounts and workspaces as a requirement. See the [official remote connection guide](https://learn.chatgpt.com/docs/remote-connections).
-- **AgentFleets enrolls hosts in your own web panel.** Install an Agent on each host and pair it using a one-time credential issued by the panel. The panel account manages hosts; each host's Codex account runs its tasks. Those Codex accounts can differ from each other and from the panel email, but every host needs valid Codex authentication and permissions.
+**Choose either installation method below.** Direct installation does not require Node.js or npm. The npm method requires **Node.js 22 or newer**.
 
-AgentFleets supports multiple users through Django and Resend email verification. First sign-in creates a private workspace; machines, projects and sessions are isolated per user. Codex accounts and quotas remain on each host. Shared team permissions are not provided. The administrator-only **Admin** tab contains user management, managed upgrades and system information. Users retain control of their own hosts and sessions. See [permissions and account administration](docs/administration.md).
+### 2A. Direct installation — copy a command from the panel
 
-Use the official app if its remote workflow meets your needs. Choose AgentFleets when you want to operate and customize your own multi-host web panel. Features overlap: remote continuation is not exclusive to AgentFleets. AgentFleets controls sessions where they live; it does not currently migrate a conversation and its Git state between hosts. Release its writer before opening that same native session in another client.
+1. Sign in to the panel with your email verification code.
+2. Choose **Add host**, select Windows, macOS or Linux, and keep **Direct installation** selected.
+3. Copy the generated command and run it on the **host you want to connect**, using the account prepared above. On Windows, use PowerShell, not CMD.
+4. Return to the panel and wait for the host to appear online.
+
+The command includes a short-lived connection ticket. Copy it from your own panel; do not share it. The installation sets up the background connection service, so you do not need to keep the installer terminal open.
+
+### 2B. npm installation — install, then connect
+
+Install the public **[agentfleets](https://www.npmjs.com/package/agentfleets)** package on the target host:
+
+```sh
+npm install -g agentfleets
+```
+
+In the hosted panel, choose **Add host → npm installation** and copy its connection command. It has this form:
+
+```sh
+agentfleets connect --url https://panel.example.com --ticket 'YOUR_ONE_TIME_TICKET'
+```
+
+Replace the example URL and ticket with those from your own panel. Run the command on the target host, then return to the panel to check that it is online. Installing the npm package alone does not connect a computer.
+
+Prefer not to install a global package? Use the same connection details with:
+
+```sh
+npx agentfleets@latest connect --url https://panel.example.com --ticket 'YOUR_ONE_TIME_TICKET'
+```
+
+You can also omit `--ticket` to use the browser confirmation flow, including with a self-hosted panel:
+
+```sh
+agentfleets connect --url https://panel.example.com
+```
+
+Run `agentfleets status` to inspect the local installation and service status. Host Agent updates remain in the panel; `npm update -g agentfleets` updates only the npm installation tool. Existing managed installations are preserved rather than automatically reconnected or replaced. For a broken or partial installation, use the repair instructions on the host page.
+
+### 3. Open a project and start working
+
+1. Select the connected host and choose **Codex** or **Claude Code**, where installed.
+2. Open an existing project/session, or create a new one.
+3. Take control of the session and send a message. Follow the reply, respond to questions and approvals, and collect the result.
+
+Release control before continuing the same conversation in the host's terminal. When returning to the panel, close the terminal's active session first. This keeps two clients from writing to the same conversation at once.
+
+## Features
+
+### One place for hosts, projects and conversations
+
+Find your work by host, project and AI tool. **Running** helps you follow active work; **Controlled** helps you return to sessions whose results you want to review or continue. Continue the original Codex or Claude Code conversation instead of starting over with a copied prompt.
+
+The browser can manage a headless Linux server just as it manages a desktop computer. After enrollment, routine conversation work does not require opening SSH for each host.
+
+### Delegate work by voice
+
+Open **Voice coordination**, select a compatible Codex voice host, and describe the host, project and task you have in mind. For example:
+
+> “Check the API project's tests on the Linux server, then update the website navigation on the Mac. Tell me how each task is going.”
+
+Different projects can run in parallel, including supported Codex and Claude Code target sessions. View progress, jump to the target conversation, and return to saved to-dos and results after a call. Work in the same project or session still follows its conflict and queue rules.
+
+Voice is experimental and requires HTTPS, microphone permission and a compatible Codex runtime on the voice host. Saved records do not automatically restart tasks. Explicit long-term preferences can be reviewed and edited in Settings. [Voice guide](docs/panel-voice-status.md)
+
+### Keep conversations moving
+
+- **Continue or queue:** send a follow-up, add instructions to a supported running turn, or queue the next message.
+- **Plan before acting:** use supported Plan mode and answer the agent's questions in the panel.
+- **Keep settings close:** choose models, reasoning effort and permissions from the options reported by the host; reuse defaults and override individual conversations.
+- **Bring more context:** reference another conversation, attach screenshots, or choose available skills and plugins.
+- **Follow the work:** inspect available execution progress and intermediate messages alongside the conversation.
+
+Available controls differ between Codex, Claude Code and runtime versions. [Claude Code guide](docs/claude-code.md) · [Session navigation](docs/host-session-navigation.md)
+
+### Send files in, get finished files back
+
+Paste a screenshot, upload supported documents or source files, or send a folder while keeping its structure. Ask the agent to investigate a page, organize material, review a spreadsheet or produce a report. Supported file links in replies can be previewed or downloaded from the host.
+
+The upload menu shows size and format limits. Supported inputs include common text/source formats, PDF and macro-free XLSX; it is not an unrestricted file-transfer service. [File delivery](docs/file-delivery.md)
+
+### Schedule recurring work
+
+Create a one-off or recurring prompt for a project: daily checks, weekday summaries, or work at a chosen interval. Select a time zone and review the results in scheduled-task history. Offline hosts or busy projects can delay a run; uncertain outcomes are shown for review rather than blindly repeated.
+
+### Write clearer requests
+
+Chinese and English terminology suggestions help you find a word as you type. **Improve wording** offers a draft you can review before sending. Local suggestions work without an external AI account; optional AI rewriting uses the provider configured in Settings.
+
+| Find a term | Refine a request |
+| --- | --- |
+| ![English terminology suggestions](docs/assets/features/completion-en.jpg) | ![English wording assistance on mobile](docs/assets/features/rewrite-en.jpg) |
+
+### See usage and maintain your hosts
+
+See reported account quota, reset times, project/session token usage and available cache statistics. Missing or stale data is labeled. Host tools also provide updates, connection repair, attachment cleanup and version management.
+
+Optional reset forecasts are estimates, not changes to your account allowance. The native account report remains authoritative. [Usage guide](docs/usage.md) · [Host updates](docs/managed-runtime-updates.md)
+
+### A workspace for daily use and live demonstrations
+
+Choose from **19 themes**, including light, dark, illustrated and Chinese-inspired designs. The interface supports English and Chinese and adapts to desktop and mobile screens.
+
+The **Buzhoushan desktop theme** adds a livestream-oriented workspace: focus mode, a 16:9 presentation canvas, side introductions, compact host switching, and separate **Execution process** and **Human–AI dialogue** views.
+
+For your own Douyin broadcast, its **Interaction messages** window can connect to a separately installed local collector on the computer opening the webpage. Supported chat and independent viewer-entry events can be displayed; automatic welcomes additionally require an active voice coordinator. This is an experimental, unofficial integration whose available events depend on the collector. The panel does not install the collector, and connecting it alone does not guarantee that chat or entry events are available. [Integration requirements](docs/live-interactions.md)
+
+[Theme screenshot gallery](docs/themes.md)
+
+| Peter Rabbit Garden | The Matrix |
+| --- | --- |
+| ![Peter Rabbit Garden theme](docs/assets/themes/eyecare-desktop-en.jpg) | ![The Matrix theme](docs/assets/themes/matrix-desktop-en.jpg) |
 
 ## Self-host
 
-AgentFleets runs as a Docker Compose application. You need:
+Self-hosting runs the web panel on your server. You still connect each execution host using one of the installation methods above.
 
-- A Linux server with Git, Docker, and Docker Compose
-- A domain name with HTTPS for access from other devices
-- At least one Linux, macOS, or Windows host signed in to Codex
+**Prepare:** a Linux server with Git, Docker and Docker Compose; an HTTPS domain/reverse proxy; and a Resend account with a verified sending domain for email sign-in. The server needs internet access to download build dependencies and runtime packages.
 
-Source builds download dependencies and platform runtime artifacts, so the deployment server needs internet access.
-
-### 1. Download the project
+### 1. Download and configure
 
 ```sh
 git clone https://github.com/JosephJagger/AgentFleet.git
@@ -250,48 +164,26 @@ cd AgentFleet
 cp .env.example .env
 ```
 
-### 2. Configure the panel
+Edit `.env`. At minimum, set your own values for:
 
-Open `.env` and set these values:
+| Setting | What to enter |
+| --- | --- |
+| `ADMIN_EMAIL` | Your administrator email address |
+| `PUBLIC_ORIGIN`, `ALLOWED_ORIGINS` | The same panel URL, such as `https://panel.example.com`, with no path or trailing slash |
+| `DJANGO_AUTH_SERVICE_TOKEN`, `DJANGO_SECRET_KEY` | Two different secrets; run `openssl rand -hex 48` separately for each |
+| `RESEND_API_KEY` | Your Resend API key |
+| `RESEND_FROM_EMAIL` | A sender on your verified domain |
 
-```dotenv
-ADMIN_EMAIL=you@example.com
-AUTH_MODE=email
-DJANGO_AUTH_URL=http://identity:8000
-DJANGO_AUTH_SERVICE_TOKEN=generate-a-unique-secret-of-at-least-32-characters
-DJANGO_SECRET_KEY=generate-another-unique-secret-of-at-least-32-characters
-RESEND_API_KEY=your-resend-api-key
-RESEND_FROM_EMAIL=login@your-verified-domain.example
-RESEND_FROM_NAME=AgentFleets
-PUBLIC_ORIGIN=https://panel.example.com
-ALLOWED_ORIGINS=https://panel.example.com
-COOKIE_SECURE=true
-PUBLISH_HOST=127.0.0.1
-```
+Keep the template's email-auth settings, `COOKIE_SECURE=true` and `PUBLISH_HOST=127.0.0.1` for this HTTPS setup. Keep `.env` private. [Email sign-in setup](apps/identity/README.md)
 
-Replace the email, sender and example domain with your own values. Generate the two Django secrets independently with `openssl rand -hex 48`. Resend sends a six-digit code; no password is required. The sender must use a verified Resend domain. Keep the existing `ADMIN_EMAIL` on upgrades so its workspace is retained. Do not add a path or trailing slash to either origin. `.env` is excluded from Git. See the [Django identity service](apps/identity/README.md) for limits, local development and backup requirements.
-
-If the reverse proxy passes client-address headers, add only its verified direct address to `TRUSTED_PROXIES`. Leave that setting unset when you do not need forwarded client addresses.
-
-Host quota views can show **temporary Codex reset predictions** from hourly public-announcement checks. Conditional plans, confirmed resets and reset-card announcements remain distinct. Review seven days of paginated history. Predictions never change native quota or reset dates and are not official guarantees. For self-hosting, configure `AGENTFLEET_TIKHUB_API_KEY` and `AGENTFLEET_RADAR_DEEPSEEK_KEY` in the ignored `.env` and apply through the safe publication flow. Missing configuration and provider failures are explicit. See [reset feed setup](docs/reset-radar.md). Available cards and expiry come from native reports.
-
-### 3. Build and start
+### 2. Start the panel for the first time
 
 ```sh
 docker compose up -d --build
 curl --fail http://127.0.0.1:3215/ready
 ```
 
-A successful health check returns JSON with `"status":"ok"`. View service status and logs with:
-
-```sh
-docker compose ps
-docker compose logs -f control-plane
-```
-
-### 4. Add HTTPS
-
-Point your HTTPS reverse proxy at `http://127.0.0.1:3215`. WebSocket proxying must be enabled. For example, Caddy needs only:
+The health check should return `"status":"ok"`. Forward your HTTPS domain to `http://127.0.0.1:3215`, with WebSocket support. For Caddy:
 
 ```caddyfile
 panel.example.com {
@@ -299,88 +191,57 @@ panel.example.com {
 }
 ```
 
-Open the address configured in `PUBLIC_ORIGIN` and sign in with the verification code sent to your email. The account configured by `ADMIN_EMAIL` has access to the Admin tab; other verified emails receive their own private workspaces.
-
-For a same-machine trial without a domain, set both origins to `http://127.0.0.1:3215`, set `COOKIE_SECURE=false`, and open that address locally. Do not expose this HTTP configuration to a network or the internet.
-
-### 5. Connect a Codex host
-
-1. Sign in to Codex on the Linux, macOS, or Windows host using the operating-system account whose projects and native sessions you want to manage.
-2. In AgentFleets, click **Add host** and select the host operating system.
-3. Copy the generated one-time installation command and run it on that host under the same operating-system account.
-4. Return to the panel. When the host is online, add or select a project and open an existing session or create a new one.
-
-The enrollment ticket is single-use and short-lived; do not share it. The Agent connects outward to the control plane, so routine use does not require an inbound port on the Codex host. Write capability is enabled only after the host passes its operating-system, credential-protection, and Codex protocol checks.
-
-### 6. Update, recover, and back up
-
-Update the existing installation instead of cloning it again. After pulling source, build and verify the separate `agentfleet:prepared` image using [voice-safe deployment](docs/voice-safe-deployment.md). Replace the database placeholder with the actual persistent SQLite path. Active calls defer the switch:
+Open your domain, sign in, and choose **Add host**. Useful troubleshooting commands:
 
 ```sh
-cd AgentFleet
-git status --short
-git rev-parse --short HEAD
-git pull --ff-only
-# Build and verify agentfleet:prepared following the safe deployment guide first
-python3 packaging/deploy-control-plane.py --database /path/to/control-plane.sqlite --image agentfleet:prepared --wait-seconds 60
-curl --fail http://127.0.0.1:3215/ready
-```
-
-`git pull` updates the tracked project files. It does not replace the ignored `.env` file or erase the Docker named volumes. The publisher uses an already built and verified image and replaces only the panel container after existing calls end.
-
-If `git pull --ff-only` reports local tracked changes, preserve them before updating:
-
-```sh
-git stash push -u -m "before AgentFleets update"
-git pull --ff-only
-# Build and verify agentfleet:prepared following the safe deployment guide first
-python3 packaging/deploy-control-plane.py --database /path/to/control-plane.sqlite --image agentfleet:prepared --wait-seconds 60
-```
-
-Use `git stash list` and `git stash show -p` to review the saved changes. Apply them later with `git stash pop` only if they are still needed; old source changes may conflict with the new version. The ignored `.env` file is not included by this command.
-
-After an update, check the running revision and logs:
-
-```sh
-git rev-parse --short HEAD
 docker compose ps
-docker compose logs --tail=200 control-plane
+docker compose logs --tail=100 control-plane
 ```
 
-If the health check still fails, include those outputs when reporting the problem, after removing passwords, enrollment tickets, tokens, private hostnames, and conversation content.
+### 3. Update without interrupting a call
 
-Panel source updates and host Agent updates are separate. The commands above update the control plane and web interface. For interface-only changes, users just refresh the panel; no host Agent upgrade or repair is needed. When a release also requires an Agent update, use the host update action. If a host stays unreachable after it is powered on, connected to the network, and signed in to the OS account used for installation, run the platform-specific repair command shown on its host page. Repair is a troubleshooting step, not a routine step after time away.
+The first-start command above is not the update procedure for a live panel. For updates, build a separate image and follow the [voice-safe deployment guide](docs/voice-safe-deployment.md), which waits for active calls to finish.
 
-Compose keeps control-plane data and validated runtimes in the `agentfleet-data` and `agentfleet-runtime-releases` named volumes. Back up `.env` and these volumes before an upgrade. Do not run `docker compose down -v` unless you intend to erase the stored data.
+Back up `.env` and the `agentfleet-data`, `agentfleet-identity` and `agentfleet-runtime-releases` volumes. Keep your existing administrator email. Do not use `docker compose down -v` unless you intend to delete stored data. Update host Agents through the panel when required; a web-only update does not require reinstalling every host.
 
-See [release guidance](docs/web-only-release.md) for deployments that must preserve an existing set of Agent downloads.
+## FAQ
 
-## Worth knowing
+**Does npm install the whole web panel?**
+
+No. `agentfleets` installs the connection tool for an execution host. Use the hosted panel or Docker Compose for the web panel.
+
+**Which computer runs the task?**
+
+The selected connected host. Your browser computer can be different. Live interaction collection and microphone/speaker settings refer to the computer opening the webpage.
+
+**Can I use only Claude Code?**
+
+Claude Code sessions are supported on hosts where its CLI is installed and authenticated. Voice coordination itself currently needs a compatible Codex voice host; providers do not have identical feature coverage.
+
+**Do I need an inbound port on every host?**
+
+No. The host service connects outward to the panel. The panel itself must be reachable from those hosts.
+
+**Will refreshing the page keep a voice call alive?**
+
+No. A refresh ends the browser's existing call. Where available, use **Restore voice** to establish a new call. Already dispatched project tasks continue on their hosts.
+
+**What are transcript drafts for?**
+
+They help recover the last received words around a voice interruption or call end. They may be incomplete or already handled and are retained for seven days. Reviewing and saving a draft only creates a to-do; execution still requires an explicit instruction.
+
+**Where is my data?**
+
+Tasks and tool authentication stay on your hosts. The panel also stores synchronized conversation content, uploaded attachments and task records; protect its database and backups. Each signed-in user has a private workspace. [Administration](docs/administration.md) · [Security](SECURITY.md)
+
+## Documentation and contribution
+
+[Usage](docs/usage.md) · [Claude Code](docs/claude-code.md) · [Voice preferences](docs/voice-long-term-preferences.md) · [Themes](docs/themes.md) · [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
 
 <details>
-<summary><strong>Session ownership, recovery, and image cleanup</strong></summary>
+<summary>Development setup</summary>
 
-## Session control and recovery
-
-A native session has one writer. While the panel controls a session, do not open that same session with `codex resume` on the host. Release control in the panel and wait for the host to acknowledge it before resuming locally. To return to the panel, stop the local writer first, then take control again. Renaming changes the title, not the native session ID.
-
-A disconnect or restart can leave an operation's outcome unknown even if a reply is already visible. The panel freezes writes rather than automatically replaying an action. Check the host and native session first, then use the manual unfreeze button. Unfreezing does not prove that the previous operation failed and does not undo it; avoid sending the same action again until you know its outcome.
-
-## Data and images
-
-The control plane stores account and host enrollment data, synchronized conversation content, operation records, and uploaded images. Codex execution and model credentials remain on the host. Protect both the control-plane volumes and host data; this is not a storage-free relay.
-
-The default image quota is 50 MB per host. The host page combines image and uploaded-file cleanup by session. Before deletion, the Agent verifies every staged path, size, content hash, directory member, and symlink boundary. Cleanup removes verified staged files on Linux, macOS, and Windows while preserving text and native session identity. Native-history image cleanup is currently restricted to the validated Linux/Codex adapter and requires Python 3; unsupported or ambiguous data is rejected. Cleanup does not delete provider-side data or independent backups. Native history files may retain their byte length after image removal. Storage size is not a token-usage estimate. See [attachment cleanup](docs/panel-image-cleanup.md).
-
-
-</details>
-
-<details>
-<summary><strong>Development and project structure</strong></summary>
-
-## Development
-
-Use Node.js 24 and npm:
+Use Node.js 24:
 
 ```sh
 npm ci --prefix apps/control-plane
@@ -391,24 +252,12 @@ npm test
 npm run build
 ```
 
-| Directory | Purpose |
-| --- | --- |
-| `apps/control-plane` | Fastify API, authentication, SQLite state, host connections |
-| `apps/local-agent` | Host discovery, native session control, execution and recovery |
-| `apps/web` | React browser workspace |
-| `packaging` | Installers, runtime artifacts and container builds |
-| `experiments` | Isolated native-history compatibility tools and tests |
-
-See [contributing](CONTRIBUTING.md), [security reporting](SECURITY.md), and [packaging](packaging/README.md). Changes to session ownership, replay, or native history require focused recovery tests; passing UI tests alone is insufficient.
-
+See [packaging](packaging/README.md) for release tooling.
 
 </details>
 
 ---
 
-<p align="center">Built for people who run Codex on their own machines.<br>
-<a href="LICENSE">MIT licensed</a> · <a href="THIRD_PARTY_NOTICES.md">Third-party notices</a> · <a href="CONTRIBUTING.md">Contributions welcome</a></p>
+[MIT license](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-<sub>Independent project, not an official OpenAI or Anthropic product. Use the hosted panel or self-host; bring your own execution-tool accounts and quota.</sub>
-
-Unreachable hosts show a **Restore host connection** card with a repair command matched to Windows, macOS or Linux. Run it on that host using the original installation account. Repair retains pairing and session data; copying a command does not run it remotely. Power, network or operating-system failures still require local attention.
+Independent project, not an official OpenAI or Anthropic product. Bring your own tool accounts and available quota.
