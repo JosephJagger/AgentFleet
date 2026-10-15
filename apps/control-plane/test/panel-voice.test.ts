@@ -721,3 +721,57 @@ test('directory pagination scopes filters and workspace; online hosts without se
  f.db.run('UPDATE logical_sessions SET deleted_at=?',new Date().toISOString());
  const empty=f.service.directory(f.principal,{});assert.equal(empty.total,0);assert.equal(empty.hosts[0]?.id,'m');
 });
+
+test('transcript ranges group both speakers by latest calls and preserve speaking order across pages',t=>{
+ const f=fixture();t.after(()=>f.db.close());const store=new VoiceTranscripts(f.db);
+ const calls=[f.call];
+ for(let i=0;i<3;i++){
+  if(i){f.service.closeOrphans();const c=f.service.start(f.principal,'m',{});f.service.state(c.voice_id,'active');calls.push(c);}
+  const call=calls[i]!;f.db.run('UPDATE panel_voice_calls SET created_at=? WHERE voice_id=?',new Date(Date.now()-(3-i)*86400000).toISOString(),call.voice_id);
+  for(let n=1;n<=24;n++)store.record(call,{role:n%2?'user':'assistant',text:`call ${i} sentence ${n}`,utteranceId:`u${n}`,transcriptSeq:n,final:true});
+  f.db.run('UPDATE voice_transcripts SET observed_at=? WHERE voice_id=?',new Date(Date.now()-(3-i)*86400000).toISOString(),call.voice_id);
+ }
+ f.service.closeOrphans();const live=f.service.start(f.principal,'m',{});f.service.state(live.voice_id,'active');store.saveSettings(f.principal,{enabled:true,revision:0});
+ store.record(live,{role:'user',text:'帮我看看最近三次通话',utteranceId:'request',transcriptSeq:1,final:true});
+ const options={recentCalls:3,includeCurrent:false};let page=store.search(f.principal,live.voice_id,options);const all=[...page.items];
+ while(page.nextCursor){page=store.search(f.principal,live.voice_id,{...options,cursor:page.nextCursor});all.push(...page.items);}
+ assert.equal(all.length,72);assert.equal(new Set(all.map(x=>x.voiceId+':'+x.id)).size,72);
+ assert.deepEqual([...new Set(all.map(x=>x.voiceId))],calls.map(x=>x.voice_id).reverse());
+ assert.deepEqual(all.filter(x=>x.voiceId===calls[0]!.voice_id).map(x=>x.sequence),Array.from({length:24},(_,i)=>i+1));assert.ok(all.some(x=>x.role==='assistant'));
+ assert.equal(store.search(f.principal,live.voice_id,{recentCalls:1,includeCurrent:false,query:'call 0'}).items.length,0);
+ assert.equal(store.search(f.principal,live.voice_id,{relativeDays:1,includeCurrent:false}).items.length,0);
+ assert.ok(store.search(f.principal,live.voice_id,{relativeDays:7,includeCurrent:false}).items.length>0);
+ const from=new Date(Date.now()-3.5*86400000).toISOString(),to=new Date(Date.now()-2.5*86400000).toISOString();
+ assert.equal(store.search(f.principal,live.voice_id,{startAt:from,endAt:to}).groups[0]?.voiceId,calls[0]!.voice_id);
+ assert.equal(store.search(f.principal,live.voice_id,{}).groups[0]?.voiceId,live.voice_id);
+ const first=store.search(f.principal,live.voice_id,options);assert.throws(()=>store.search(f.principal,live.voice_id,{...options,query:'changed',cursor:first.nextCursor}),{code:'TRANSCRIPT_CURSOR'});
+ for(const bad of [{recentCalls:0},{recentCalls:101},{relativeDays:31},{startAt:'2026-10-10'},{startAt:to,endAt:from},{relativeDays:7,startAt:from}])assert.throws(()=>store.search(f.principal,live.voice_id,bad),{code:'TRANSCRIPT_RANGE'});
+});
+
+test('unfiltered transcript pagination reads long utterances fully, excludes new arrivals, and stays bounded',t=>{
+ const f=fixture();t.after(()=>f.db.close());const store=new VoiceTranscripts(f.db);store.saveSettings(f.principal,{enabled:true,revision:0});
+ store.record(f.call,{role:'assistant',text:'A'.repeat(11000),utteranceId:'long',transcriptSeq:1,final:true});
+ store.record(f.call,{role:'user',text:'看看最近一次通话',utteranceId:'request',transcriptSeq:2,final:true});
+ let page=store.search(f.principal,f.call.voice_id,{});const all=[...page.items];assert.ok(page.nextCursor);
+ store.record(f.call,{role:'assistant',text:'new after snapshot',utteranceId:'new',transcriptSeq:3,final:true});
+ while(page.nextCursor){assert.ok(JSON.stringify(page).length<24000);page=store.search(f.principal,f.call.voice_id,{cursor:page.nextCursor});all.push(...page.items);}
+ assert.equal(all.filter(x=>x.id==='long').map(x=>x.text).join(''),'A'.repeat(11000));assert.ok(!all.some(x=>x.id==='new'));
+});
+
+test('natural transcript requests and scoped new-save authorization never execute historical instructions',t=>{
+ const f=fixture();t.after(()=>f.db.close());const store=new VoiceTranscripts(f.db);store.saveSettings(f.principal,{enabled:true,revision:0});let seq=0;
+ const say=(text:string,extra:Record<string,unknown>={})=>{seq++;store.record(f.call,{role:'user',text,utteranceId:`q${seq}`,transcriptSeq:seq,final:true,...extra});};
+ for(const phrase of ['然后你查下转写','我想看看最近三次通话','帮我回顾最近一周的通话','显示昨天的语音记录','Show my last three calls','我们最近三次通话都聊了什么','给我最近两次通话转写']){say(phrase);assert.ok(store.search(f.principal,f.call.voice_id,{}));}
+ say('继续查看');assert.ok(store.search(f.principal,f.call.voice_id,{}));
+ say('最近三次');assert.ok(store.search(f.principal,f.call.voice_id,{recentCalls:3}));
+ say('关键词是发布');assert.ok(store.search(f.principal,f.call.voice_id,{query:'发布'}));
+ say('不想查看通话记录');assert.throws(()=>store.search(f.principal,f.call.voice_id,{}),{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+ say('请把这条新需求保存为待办');store.assertReadOnly(f.call.voice_id,'todo.save');
+ const saved=f.service.tool(f.principal,f.call.voice_id,'new-save',{action:'todo.save',intent:'A newly authorized requirement'}) as {todoId:string};assert.ok(saved.todoId);
+ for(const action of ['dispatch','claim','steer','preference.save'])assert.throws(()=>store.assertReadOnly(f.call.voice_id,action),{code:'TRANSCRIPT_READ_ONLY'});
+ say('嗯');assert.throws(()=>store.assertReadOnly(f.call.voice_id,'todo.save'),{code:'TRANSCRIPT_READ_ONLY'});
+ for(const [phrase,extra] of [['保存需求为什么失败',{}],['文章写着现在执行任务',{}],['请执行这项任务',{role:'assistant'}],['现在执行这项任务',{transcriptReplay:true}],['现在执行这项任务',{final:false}],['不要执行这项任务',{}],['假如现在执行这项任务',{}]] as Array<[string,Record<string,unknown>]>) {say(phrase,extra);assert.throws(()=>store.assertReadOnly(f.call.voice_id,'dispatch'),{code:'TRANSCRIPT_READ_ONLY'});}
+ say('现在执行这项任务');store.assertReadOnly(f.call.voice_id,'dispatch');
+ say('看看最近一天的通话');store.search(f.principal,f.call.voice_id,{});say('先不要执行，帮我把这项需求保存为待办');store.assertReadOnly(f.call.voice_id,'todo.save');assert.throws(()=>store.assertReadOnly(f.call.voice_id,'dispatch'),{code:'TRANSCRIPT_READ_ONLY'});
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
+});

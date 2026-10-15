@@ -3668,5 +3668,8 @@
   "会话更新": "Session updated",
   "状态已同步": "State synchronized",
   "展开时每 15 秒刷新；只读取目录，不加载会话正文。": "Refreshes every 15 seconds while expanded. Only metadata is read, not conversation content.",
-  "更新于": "Updated at"
+  "更新于": "Updated at",
+  "例如：“看看最近三次通话”“查一下最近一周的转写”，也可指定时间或加关键词。双方转写按通话及发言顺序分页查看。": "For example: “Show my latest three calls” or “Read transcripts from the last week.” You can specify dates or add keywords. Both speakers are grouped by call and read in speaking order, page by page.",
+  "关键词可不填；关键词和范围都未指定时默认最近一次；含当前通话。仅有最近 30 天已上传文字，未识别、未上传或已过期内容无法恢复。": "Keywords are optional. With neither a keyword nor a range, the latest call is shown, including the current call. Only uploaded text from the last 30 days is available; missing or expired content cannot be recovered.",
+  "查询不会保存或执行历史任务。新需求可明确说“请把这条新需求保存为待办”；保存不等于执行。": "Reading history never saves or executes historical tasks. To save a new request, say “Please save this new request as a todo.” Saving does not authorize execution."
 }
