@@ -52,3 +52,18 @@ body { font-feature-settings: "calt" 1, "kern" 1; }
   .catalog-heading-actions { flex-wrap: nowrap; flex-shrink: 0; gap: 6px; }
   .catalog-heading-actions .button { white-space: nowrap; padding-inline: 12px; }
 }
+
+/* Theme scenes are painted along the bottom of the rail; give the summary,
+   theme switcher and connection state a frosted backing so text never sits
+   directly on the artwork. */
+@media (min-width: 901px) {
+  .machine-rail .rail-status {
+    background: color-mix(in srgb, var(--canvas) 86%, transparent);
+    -webkit-backdrop-filter: blur(8px) saturate(1.1);
+    backdrop-filter: blur(8px) saturate(1.1);
+    border-radius: var(--radius-md);
+    box-sizing: border-box;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 10px 6px;
+  }
+}
