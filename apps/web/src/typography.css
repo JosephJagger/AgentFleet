@@ -67,3 +67,7 @@ body { font-feature-settings: "calt" 1, "kern" 1; }
     padding: 10px 6px;
   }
 }
+
+/* The 不周山 workbench pins its own 94px row height; empty lanes get the same
+   compact height as the other themes. */
+:root[data-theme="buzhoushan"] .buzhou-session-provider .buzhou-session-row:not(:has(.buzhou-session-window)) { min-height: 44px; }

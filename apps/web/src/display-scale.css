@@ -1,12 +1,12 @@
 /* Page density without CSS zoom. Zoom put text on fractional device pixels
-   (16px -> 12.8px) and made it soft; scaling the root font size keeps glyphs
+   (16px -> 12.8px) and made it soft; scaling the root font size (14px / 13.5px / 14.4px steps) keeps glyphs
    hinted and crisp. rem-based type and spacing follow; touch layouts keep 16px. */
 @media (min-width: 901px) and (pointer: fine) {
-  :root { font-size: 87.5%; }
+  :root { font-size: 78.75%; }
 }
 @media (min-width: 1920px) and (pointer: fine) {
-  :root { font-size: 93.75%; }
+  :root { font-size: 84.375%; }
 }
 @media (min-width: 2560px) and (pointer: fine) {
-  :root { font-size: 100%; }
+  :root { font-size: 90%; }
 }

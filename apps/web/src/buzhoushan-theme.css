@@ -10,7 +10,7 @@
     --teal:#89d185; --teal-soft:#213b29; --amber:#d7ba7d; --amber-soft:#3d3526;
     --red:#f48771; --red-soft:#432a29; --magenta:#c586c0; --magenta-soft:#3d2b3e;
     --radius-sm:3px; --radius-md:4px; --radius-lg:5px; --surface-shadow:none; --control-shadow:none; --shadow:0 6px 24px #0006;
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC Variable",sans-serif;
+    font-family:"Inter Variable",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC Variable","PingFang SC","Microsoft YaHei",sans-serif;
   }
   :root[data-theme="buzhoushan"] body { background:#1e1e1e; background-image:none; }
   :root[data-theme="buzhoushan"] .app-shell { min-height:100dvh; padding-left:48px; }
@@ -35,7 +35,7 @@
   :root[data-theme="buzhoushan"] .machine-link { flex:0 0 auto; width:auto; min-width:150px; padding:6px 12px; min-height:44px; margin:0; border:1px solid transparent; border-radius:3px; background:transparent; }
   :root[data-theme="buzhoushan"] .machine-link--active { background:#37373d; border-color:#454545; box-shadow:none; }
   :root[data-theme="buzhoushan"] .machine-link strong { font-size:12px; }
-  :root[data-theme="buzhoushan"] .machine-link small { font-size:10px; }
+  :root[data-theme="buzhoushan"] .machine-link small { font-size:11px; }
   :root[data-theme="buzhoushan"] .rail-node { width:22px; height:22px; border:0; box-shadow:none; background:transparent; }
   :root[data-theme="buzhoushan"] .machine-rail .rail-footer { display:none; }
   :root[data-theme="buzhoushan"] .fleet-main { grid-area:explorer; min-width:0; padding:0; overflow:auto; background:#252526; border-right:1px solid #383838; }
@@ -103,12 +103,12 @@
   :root[data-theme="buzhoushan"] .buzhou-dock__list svg { flex:none; color:#75beff; }
   :root[data-theme="buzhoushan"] .buzhou-dock__list span { min-width:0; }
   :root[data-theme="buzhoushan"] .buzhou-dock__list strong { display:block; font-size:11px; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  :root[data-theme="buzhoushan"] .buzhou-dock__list small { display:block; color:#9a9a9a; font-size:10px; margin-top:3px; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__list small { display:block; color:#9a9a9a; font-size:11px; margin-top:3px; }
   :root[data-theme="buzhoushan"] .buzhou-dock__output { display:flex; flex-direction:column; min-height:0; min-width:0; }
-  :root[data-theme="buzhoushan"] .buzhou-dock__caption { display:flex; align-items:center; justify-content:space-between; padding:3px 12px; font-size:10px; color:#aaa; flex:none; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__caption { display:flex; align-items:center; justify-content:space-between; padding:3px 12px; font-size:11px; color:#aaa; flex:none; }
   :root[data-theme="buzhoushan"] .buzhou-dock pre { flex:1; min-height:0; overflow:auto; margin:0; padding:8px 14px; border:0; border-radius:0; background:transparent; color:#ce9178; font:12px/1.6 Consolas,"SFMono-Regular",monospace; white-space:pre-wrap; overflow-wrap:anywhere; scrollbar-gutter:stable; }
   :root[data-theme="buzhoushan"] .buzhou-dock p { padding:8px 14px; color:#aaa; font-size:12px; }
-  :root[data-theme="buzhoushan"] .buzhou-dock__limit { padding:3px 12px; font-size:10px; color:#888; border-top:1px solid #292929; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__limit { padding:3px 12px; font-size:11px; color:#888; border-top:1px solid #292929; }
 }
 
 @media (min-width:901px) {
@@ -159,10 +159,10 @@
   :root[data-theme="buzhoushan"] .buzhou-session-window[aria-pressed="true"] { border-color:#3794ff; background:#253544; }
   :root[data-theme="buzhoushan"] .buzhou-session-window__title { display:flex; align-items:center; gap:6px; min-width:0; }
   :root[data-theme="buzhoushan"] .buzhou-session-window__title strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-size:12px; }
-  :root[data-theme="buzhoushan"] .buzhou-session-window__title small { color:#999; font-size:9px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-window__title small { color:#999; font-size:11px; }
   :root[data-theme="buzhoushan"] .buzhou-session-dot { width:6px; height:6px; border-radius:50%; background:#888; flex:none; }
   :root[data-theme="buzhoushan"] .buzhou-session-dot--running { background:#89d185; }
-  :root[data-theme="buzhoushan"] .buzhou-session-window__project { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; color:#aaa; margin-top:3px; }
+  :root[data-theme="buzhoushan"] .buzhou-session-window__project { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:#aaa; margin-top:3px; }
   :root[data-theme="buzhoushan"] .buzhou-session-window__preview { display:flex; align-items:center; gap:5px; margin-top:4px; border-top:1px solid #383838; padding-top:4px; font:10px/1.2 var(--mono); color:#9a9a9a; }
   :root[data-theme="buzhoushan"] .buzhou-session-window__preview span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   :root[data-theme="buzhoushan"] .buzhou-session-arrow { flex:0 0 20px; display:grid; place-items:center; padding:0; height:28px; border:0; background:transparent; color:#ccc; }
@@ -196,7 +196,7 @@
   :root[data-theme="buzhoushan"] .buzhou-session-provider + .buzhou-session-provider { border-left:1px solid #383838; padding-left:12px; }
   :root[data-theme="buzhoushan"] .buzhou-session-provider > header { display:flex; align-items:center; gap:10px; padding:4px 6px 8px; }
   :root[data-theme="buzhoushan"] .buzhou-session-provider h3 { font-size:12px; margin:0; color:#ddd; }
-  :root[data-theme="buzhoushan"] .buzhou-session-provider > header small { font-size:10px; color:#999; }
+  :root[data-theme="buzhoushan"] .buzhou-session-provider > header small { font-size:11px; color:#999; }
   :root[data-theme="buzhoushan"] .buzhou-session-provider .buzhou-session-row { min-height:94px; }
   :root[data-theme="buzhoushan"] .buzhou-session-provider .buzhou-session-row__label { flex-basis:92px; gap:5px; white-space:nowrap; }
 }
