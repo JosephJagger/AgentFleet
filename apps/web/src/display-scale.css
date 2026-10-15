@@ -10,7 +10,7 @@
     .fleet-layout { height: calc(125dvh - 68px); }
   }
 
-  @media (min-width: 901px) and (max-width: 1699px) and (pointer: fine) {
+  @media (min-width: 901px) and (max-width: 2199px) and (pointer: fine) {
     .fleet-layout { height: calc(125dvh - 124px); }
   }
 }

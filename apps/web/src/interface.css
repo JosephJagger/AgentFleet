@@ -762,7 +762,8 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 /* World time occupies the free space on either side of desktop navigation. */
 .world-clocks { display: none; }
 @media (min-width: 901px) {
- .topbar { grid-template-columns: 160px minmax(0,4fr) auto minmax(0,5fr) 170px; gap: 14px; }
+ .topbar { grid-template-columns: max-content minmax(0,4fr) max-content minmax(0,5fr) max-content; gap: 20px; }
+ .topbar > .topbar-actions { min-width: max-content; }
  .world-clocks { display: grid; gap: 8px; min-width: 0; }
  .world-clocks--left { grid-template-columns: repeat(4,minmax(0,1fr)); }
  .world-clocks--right { grid-template-columns: repeat(5,minmax(0,1fr)); }
@@ -773,7 +774,7 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
  .world-clock__weather { color: var(--muted); text-decoration: none; font-size: .6875rem; white-space: nowrap; }
  .world-clock__weather:hover { color: var(--cobalt); text-decoration: underline; }
 }
-@media (min-width: 901px) and (max-width: 1699px) {
+@media (min-width: 901px) and (max-width: 2199px) {
  .topbar { height: 124px; grid-template-columns: minmax(0,4fr) auto minmax(0,5fr); grid-template-rows: 52px 60px; row-gap: 0; }
  .topbar > .brand-lockup { grid-column: 1; grid-row: 1; }
  .topbar > .primary-nav { grid-column: 2; grid-row: 1; }
