@@ -53,6 +53,7 @@ export class RuntimePromotion {
     this.active = true;
     let state = channelState(this.directory);
     let attempted = false;
+    let retrySoon = false;
     const control = channelControl(this.directory);
     const update = (phase: RuntimeChannelState["phase"], message: string) => { state = { ...state, phase, message, workerHeartbeatAt: new Date().toISOString() }; this.save(state); };
     try {
@@ -88,11 +89,17 @@ export class RuntimePromotion {
       update("promoted", `Codex ${target.version} 已自动晋升，等待主机空闲更新`);
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 1200) : "自动验证失败";
+      retrySoon = error instanceof Error && !/SHA-256|schema|需要适配|checksum|digest/i.test(message) &&
+        (error.name === "TimeoutError" || /fetch failed|terminated|HTTP (?:429|5\d\d)\b|ECONNRESET|ETIMEDOUT/i.test(message));
       state.checks.push({ name: "验证未通过", state: "failed", detail: message });
       state.history = [{ at: new Date().toISOString(), version: state.latestVersion ?? "unknown", result: "blocked", message }, ...state.history].slice(0, 20);
       update(message.includes("需要适配") ? "blocked" : "failed", message);
     } finally {
-      if (attempted) { state.nextCheckAt = new Date(Date.now() + 6 * 60 * 60_000).toISOString(); this.save(state); }
+      if (attempted) {
+        state.transientFailures = retrySoon ? Math.min(6, (state.transientFailures ?? 0) + 1) : 0;
+        state.nextCheckAt = new Date(Date.now() + (retrySoon ? Math.min(30 * 60_000, 60_000 * 2 ** (state.transientFailures - 1)) : 6 * 60 * 60_000)).toISOString();
+        this.save(state);
+      }
       this.active = false;
     }
   }

@@ -67,7 +67,7 @@ async function tree(path: string): Promise<{bytes:number;safe:boolean}> {
 }
 async function metadata(o:Options) {
   const home=o.home??homedir(),platform=o.platform??process.platform;
-  const values=await Promise.all(["runtime-profile.json","update-state.json"].map(n=>text(join(o.dataDir,n))));
+  const values=await Promise.all(["runtime-profile.json","update-state.json","runtime-prepared.json"].map(n=>text(join(o.dataDir,n))));
   const pointers=platform==="win32" ? await Promise.all(["current.txt","previous.txt"].map(n=>text(join(o.dataDir,"bin",n)))) : await Promise.all(["agentfleet","agentfleet.previous"].map(async n=>{try{return await realpath(join(home,".local/bin",n));}catch(e){if(missing(e))return "";throw e;}}));
   return {values,pointers,digest:hash(JSON.stringify([values,pointers]))};
 }
@@ -77,7 +77,9 @@ async function scan(o:Options) {
   if(!profile?.codexExecutable)throw new AgentError("VERSION_PROFILE_MISSING","运行配置尚未就绪，暂不清理版本");
   if(tx&&!['succeeded','rolled_back','failed'].includes(tx.phase))throw new AgentError("VERSION_UPDATE_ACTIVE","安装或升级尚未完成，暂不清理版本");
   const processText=normal(await (o.processReferences??references)());
-  const persisted=normal(o.referenceText??"");
+  const prepared = JSON.parse(meta.values[2] || "null");
+  const preparedReference = typeof prepared?.directory === "string" && /^\d+\.\d+\.\d+-[\w-]+$/.test(prepared.directory) ? join(o.dataDir,"codex/releases",prepared.directory) + "/" : "";
+  const persisted=normal((o.referenceText??"") + "\n" + preparedReference);
   const roots: Array<{path:string;kind:VersionEntry['kind']}>=[{path:platform==="darwin"?join(home,".local/share/agentfleet/bin"):join(o.dataDir,"bin"),kind:"agent"},{path:join(o.dataDir,"codex/releases"),kind:"codex"},{path:join(o.dataDir,"updates"),kind:"backup"}];
   const current=normal(platform==="win32"?join(roots[0]!.path,meta.pointers[0]!.trim()):meta.pointers[0]!),previous=normal(platform==="win32"?join(roots[0]!.path,meta.pointers[1]!.trim()):meta.pointers[1]!);
   const rollbackTexts=[previous,normal(tx?.previousTarget??""),normal(tx?.backupDir??"")];

@@ -190,7 +190,6 @@ export class AgentMaintenance {
         result = { reconnected: true, discovery: this.options.runtime.getDiscoveryStatus() };
       } else {
         if (!this.options.updater) throw new AgentError("UPDATE_SERVICE_REQUIRED", "automatic updates require an installed AgentFleet service");
-        await this.options.store.setMaintenanceDrain(operationId);
         while (true) {
           if (expiresAt && Date.parse(expiresAt) <= Date.now()) throw new AgentError("OPERATION_EXPIRED", "update expired while waiting for idle");
           await progress({ phase: this.options.store.canSafelyRestart() ? "installing" : "waiting_for_idle" });

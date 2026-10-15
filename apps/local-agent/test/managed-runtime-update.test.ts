@@ -24,8 +24,8 @@ test("same Agent release still checks managed targets, waits for idle and preser
   const requests: string[] = [];
   const options = { currentVersion: "0.21.0", controlPlaneUrl: "https://fleet.example", dataDir: directory, store, runtimeSource: "managed" as const, currentRuntimeVersion: "0.153.2", canUpdate: () => false, onStaged: () => assert.fail("busy host cannot stage"), logger: { info() {}, warn() {} },
     fetchImpl: async (input: string | URL | Request) => { requests.push(String(input)); return new Response(JSON.stringify(String(input).endsWith("manifest.json") ? { schemaVersion: 1, version: "0.21.0" } : { target: target() })); },
-    prepareRuntime: async () => { assert.fail("busy host must not download or activate a runtime"); } };
-  assert.equal(await new AgentAutoUpdater(options).checkNow(), "busy"); assert.equal(requests.length, 2); assert.ok(store.snapshot().maintenanceDrain);
+    prepareRuntime: async () => async () => { assert.fail("busy host must not activate a runtime"); } };
+  assert.equal(await new AgentAutoUpdater(options).checkNow(), "busy"); assert.equal(requests.length, 2); assert.equal(store.snapshot().maintenanceDrain, undefined);
   requests.length = 0;
   assert.equal(await new AgentAutoUpdater({ ...options, runtimeSource: "host" }).checkNow(), "current"); assert.equal(requests.length, 1);
   assert.equal(await new AgentAutoUpdater({ ...options, currentRuntimeVersion: "0.153.4" }).checkNow(), "current");
@@ -44,4 +44,28 @@ test("failed runtime revision is not retried and download verification failure c
   release.revision = randomUUID();
   await assert.rejects(new AgentAutoUpdater(options).checkNow(), /checksum mismatch/);
   assert.equal(store.snapshot().maintenanceDrain, undefined);
+});
+
+test("Agent rollout deferral does not hide a reviewed Codex update", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-rollout-")); const store = new StateStore(dir); await store.initialize();
+  t.after(async () => { store.close(); await rm(dir, {recursive:true,force:true}); });
+  let prepared = 0;
+  const updater = new AgentAutoUpdater({currentVersion:"1.0.0",controlPlaneUrl:"https://fleet.example",dataDir:dir,store,
+    runtimeSource:"managed",currentRuntimeVersion:"0.153.2",canUpdate:()=>false,onStaged:()=>assert.fail("busy"),logger:{info(){},warn(){}},
+    fetchImpl:async input=>new Response(JSON.stringify(String(input).endsWith("manifest.json")?{schemaVersion:1,version:"1.1.0",rollout:{percentage:0,seed:"test"}}:{target:target()})),
+    prepareRuntime:async()=>{prepared++;return async()=>assert.fail("busy");}});
+  assert.equal(await updater.checkNow(),"busy"); assert.equal(prepared,1);
+  assert.equal(store.snapshot().maintenanceDrain,undefined);
+});
+
+test("withdrawn runtime target never activates a prepared candidate", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-withdrawn-")); const store = new StateStore(dir); await store.initialize();
+  t.after(async () => { store.close(); await rm(dir, {recursive:true,force:true}); });
+  let prepared = false; const release=target();
+  const updater = new AgentAutoUpdater({currentVersion:"1.0.0",controlPlaneUrl:"https://fleet.example",dataDir:dir,store,
+    runtimeSource:"managed",currentRuntimeVersion:"0.153.2",canUpdate:()=>true,onStaged:()=>assert.fail("withdrawn"),logger:{info(){},warn(){}},
+    fetchImpl:async input=>new Response(JSON.stringify(String(input).endsWith("manifest.json")?{schemaVersion:1,version:"1.0.0"}:{target:prepared?null:release})),
+    prepareRuntime:async()=>{prepared=true;return async()=>assert.fail("withdrawn");}});
+  assert.equal(await updater.checkNow(),"deferred");
+  assert.equal(store.snapshot().maintenanceDrain,undefined);
 });

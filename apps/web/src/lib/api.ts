@@ -1,3 +1,4 @@
+export type VoiceDirectoryPage={generatedAt:string;hostTotal:number;hostsTruncated:boolean;hosts:{id:string;name:string;heartbeatAt:string|null}[];total:number;nextCursor:string|null;sessions:{id:string;title:string;provider:string;host:string;project:string;managed:boolean;executionState:string;freshness:string;hostHeartbeatAt:string|null;sessionUpdatedAt:string}[]};
 export type LongTermPreference={id:string;body:string;conditions:string;enabled:boolean;expiresAt:string|null;revision:number};
 export type LongTermPreferenceList={revision:number;items:LongTermPreference[];bytes:number;budget:number};
 export type VoicePreferences = { voice: string; revision: number; voices: string[] };
@@ -627,8 +628,9 @@ export interface RuntimeReleaseStatus {
 
 export const api = {
   storeLiveChat:(messages:import('./live-interactions').LiveEvent[],signal:AbortSignal)=>request('/api/live-chat',{method:'POST',body:JSON.stringify({messages}),signal:timeoutSignal(signal,10000)}),
-  voiceTranscriptTails:()=>request<{items:import('../components/VoiceTranscriptDrafts').VoiceTranscriptDraft[]}>('/api/voice-transcript-tails'),
-  resolveVoiceTranscriptTail:(id:string,input:{revision:number;action:'save'|'discard';confirmed:boolean;text:string})=>request(`/api/voice-transcript-tails/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(input)}),
+  voiceDirectory:(filters:Record<string,string>,signal?:AbortSignal)=>request<VoiceDirectoryPage>('/api/voice-directory?'+new URLSearchParams(Object.entries(filters).filter(([,v])=>v)),{signal}),
+  voiceTranscriptSettings:()=>request<{enabled:boolean;revision:number;retentionDays:number}>('/api/voice-transcript-settings'),
+  saveVoiceTranscriptSettings:(input:{enabled:boolean;revision:number})=>request<{enabled:boolean;revision:number;retentionDays:number}>('/api/voice-transcript-settings',{method:'PUT',body:JSON.stringify(input)}),
   agentReleaseStatus: (signal?: AbortSignal) => request<{status:string;expectedVersion:string|null;publicVersion:string|null;checkedAt:string}>("/api/agent-release-status", {signal}),
   async voiceTasks(view='recover',cursor?:string,signal?:AbortSignal):Promise<import('./types').VoiceTaskPage> {
     const query=new URLSearchParams({view,...(cursor?{cursor}:{})});return request(`/api/voice-tasks?${query}`,{signal});
@@ -898,6 +900,8 @@ export const api = {
   async readHostOperation(operationId: string): Promise<HostOperation> {
     return mapHostOperation((await request<JsonObject>(`/api/operations/${encodeURIComponent(operationId)}`)).operation);
   },
+  takeoverPolicy: (signal?: AbortSignal) => request<{idleDays:number;revision:number}>("/api/settings/takeover-policy", {signal}),
+  saveTakeoverPolicy: (input:{idleDays:number;revision:number}) => request<{idleDays:number;revision:number}>("/api/settings/takeover-policy", {method:"PUT",body:JSON.stringify(input)}),
   updateProjectContentPolicy(projectId: string, syncContent: boolean, retentionDays: Project["retentionDays"]) {
     return request<{ project: JsonObject }>(`/api/projects/${encodeURIComponent(projectId)}/content-policy`, {
       method: "PATCH",

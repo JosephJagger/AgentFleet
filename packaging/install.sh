@@ -584,6 +584,20 @@ EXPECTED_ARTIFACT_METADATA="$TEMP_DIR/artifact-metadata.expected"
 artifact_metadata_record "$FILE" "$FORMAT" "$SHA256" "$SIZE" > "$EXPECTED_ARTIFACT_METADATA"
 
 acquire_install_lock
+# The npm entry only creates fresh installations. Recheck under the shared
+# installer lock: another installer may have finished after its first probe.
+if [ "${AGENTFLEET_NPM_FRESH_INSTALL:-}" = 1 ]; then
+  if [ "$INSTALL_UID" = 0 ]; then NPM_SERVICE_PATH=/etc/systemd/system/agentfleet.service
+  else NPM_SERVICE_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/agentfleet.service"; fi
+  for NPM_EXISTING_PATH in "$CURRENT_LINK" "$PREVIOUS_LINK" \
+    "${SERVICE_DATA_DIR:-$DATA_ROOT/agentfleet}/state.sqlite" \
+    "${SERVICE_DATA_DIR:-$DATA_ROOT/agentfleet}/runtime-profile.json" "$NPM_SERVICE_PATH"; do
+    if [ -e "$NPM_EXISTING_PATH" ] || [ -L "$NPM_EXISTING_PATH" ]; then
+      echo "installer: existing installation detected; preserved. Use the panel's repair or update instructions." >&2
+      exit 23
+    fi
+  done
+fi
 ARTIFACT="$TEMP_DIR/$FILE"
 CACHE_DIR="$DATA_ROOT/agentfleet/download-cache"
 [ ! -L "$CACHE_DIR" ] || { echo "installer: unsafe download cache" >&2; exit 1; }

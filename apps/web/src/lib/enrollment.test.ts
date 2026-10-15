@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enrollmentTicket, onboardCommand, uninstallCommand } from "./enrollment";
+import { enrollmentTicket, npmConnectCommand, npmInstallCommand, onboardCommand, uninstallCommand } from "./enrollment";
 
 describe("browser initiated enrollment", () => {
   it("keeps the opaque secret out of the control plane URL", () => {
@@ -27,6 +27,25 @@ describe("browser initiated enrollment", () => {
     expect(windows).toContain("https://fleet.example.com/install.ps1");
     expect(windows).toContain("-Name $env:COMPUTERNAME");
     expect(windows).not.toContain("-Project");
+  });
+});
+
+describe("npm enrollment commands", () => {
+  it("keeps installation separate from the one-time connection credential", () => {
+    expect(npmInstallCommand).toBe("npm install -g agentfleets");
+    for (const platform of ["linux", "macos", "windows"] as const) {
+      const command = npmConnectCommand("https://fleet.example.com/path?ignored=true", "enr_test.fixture-secret", platform);
+      expect(command).toBe("agentfleets connect --url 'https://fleet.example.com' --ticket 'enr_test.fixture-secret'");
+      expect(npmConnectCommand("https://fleet.example.com", "enr_test.fixture-secret", platform, true))
+        .toBe(`npx agentfleets@latest${command.slice("agentfleets".length)}`);
+    }
+    expect(() => npmConnectCommand("https://fleet.example.com", "")).toThrow("incomplete");
+  });
+
+  it("escapes PowerShell single quotes without enabling variable or expression expansion", () => {
+    const ticket = "enr_fixture.'; $env:TEST $(Write-Output injected)";
+    const command = npmConnectCommand("https://fleet.example.com", ticket, "windows");
+    expect(command).toBe("agentfleets connect --url 'https://fleet.example.com' --ticket 'enr_fixture.''; $env:TEST $(Write-Output injected)'");
   });
 });
 

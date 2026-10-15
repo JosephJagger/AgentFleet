@@ -1,4 +1,4 @@
-import {VoiceTranscriptTail} from '../src/voice-transcript-tail.js';
+import {VoiceTranscripts} from '../src/voice-transcripts.js';
 import test from 'node:test';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -11,9 +11,9 @@ import {RegistryService} from '../src/registry.js';
 import {CoordinationService} from '../src/coordination.js';
 import {PanelVoiceService} from '../src/panel-voice.js';
 
-function fixture() {
+function fixture(path=':memory:') {
   const config={...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:'};
-  const db=new ControlPlaneDatabase(':memory:');const {workspaceId}=db.bootstrap(config);
+  const db=new ControlPlaneDatabase(path);const {workspaceId}=db.bootstrap(config);
   const auth=new AuthService(db,config);const principal=auth.servicePrincipal('panel-test');
   const at=new Date().toISOString();
   db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,agent_version,reachability,compatibility,command_types_json,last_heartbeat_at,created_at,updated_at) VALUES('m',?,'key','fingerprint','Mac','linux','24','x64','0.30.69','online','compatible','["turn.start"]',?,?,?)`,workspaceId,at,at,at);
@@ -247,7 +247,7 @@ test('schema 49 migration preserves work and enables another host project after 
  let db=new ControlPlaneDatabase(path);
  db.sqlite.exec("DROP INDEX IF EXISTS panel_voice_one_session_job; CREATE UNIQUE INDEX panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown'); PRAGMA user_version=49");db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,58);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,60);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_jobs')?.job_id,original.jobId);
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
  const registry=new RegistryService(db,config);const service=new PanelVoiceService(db,registry,new CoordinationService(db,config));
@@ -330,7 +330,7 @@ test('schema 50 backfills existing jobs without execution and recovery paginates
  f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
  let db=new ControlPlaneDatabase(path);db.sqlite.exec('DROP TABLE panel_voice_todo_resolutions; DROP TABLE panel_voice_task_records; DROP TABLE panel_voice_todos; PRAGMA user_version=50');db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,58);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,60);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_task_records')?.job_id,old.jobId);
  assert.equal(db.get<{original_intent:string}>('SELECT original_intent FROM panel_voice_task_records')?.original_intent,'Read project status');
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
@@ -623,22 +623,155 @@ test('partial/commentary output cannot be spoken as final; late exact-turn final
  assert.equal(f.service.recover(f.principal).items[0]?.job?.acknowledgedAt,null);
 });
 
-test('transcript tails require owner confirmation, preserve receipts and never dispatch work',t=>{
- const f=fixture();t.after(()=>f.db.close());const tails=new VoiceTranscriptTail(f.db,f.service.memory),id=f.call.voice_id;
- tails.record(f.call,{text:'unfinished request',transcriptSnapshot:true,transcriptSeq:1});assert.deepEqual(tails.list(f.principal),[]);
- tails.review(id);assert.equal(tails.list(f.principal)[0]?.complete,false);
- tails.record(f.call,{text:'Complete request',final:true,transcriptSnapshot:true,transcriptSeq:2});
- tails.record(f.call,{text:'stale',final:true,transcriptSnapshot:true,transcriptSeq:1});
- const row=tails.list(f.principal)[0]!;assert.equal(row.text,'Complete request');
- assert.throws(()=>tails.resolve(f.principal,row.id,{action:'save',revision:row.revision,text:row.text}),/明确确认/);
- const other={...f.principal,userId:'foreign'};assert.deepEqual(tails.list(other),[]);assert.throws(()=>tails.resolve(other,row.id,{action:'discard',revision:row.revision}),/没有/);
- tails.record(f.call,{text:'new utterance',final:true,transcriptSnapshot:true,transcriptSeq:3});
- assert.equal(tails.list(f.principal)[0]?.text,'Complete request','new speech must not overwrite unconfirmed draft');
- const saved=tails.resolve(f.principal,row.id,{action:'save',revision:row.revision,text:'Reviewed request',confirmed:true});
- assert.equal(saved.dispatched,false);assert.ok(saved.todoId);assert.equal(f.db.all('SELECT * FROM commands').length,0);
- assert.throws(()=>tails.resolve(f.principal,row.id,{action:'save',revision:row.revision,text:'Again',confirmed:true}),/变化/);
- tails.record(f.call,{text:'already sent',final:true,transcriptSnapshot:true,transcriptSeq:4});tails.review(id);
- tails.receipt(id,4,{jobId:'job',commandId:'command'});const receipt=tails.list(f.principal)[0]!;
- assert.throws(()=>tails.resolve(f.principal,receipt.id,{action:'save',revision:receipt.revision,text:receipt.text,confirmed:true}),/回执/);
+
+test('transcripts save both roles with search off, deduplicate replay, and enforce fresh request plus account permission',t=>{
+ const f=fixture();t.after(()=>f.db.close());const store=new VoiceTranscripts(f.db),id=f.call.voice_id;
+ const record=(text:string,seq:number,extra:Record<string,unknown>={})=>store.record(f.call,{text,role:'user',final:true,transcriptSeq:seq,transcriptSnapshot:true,utteranceId:`u${seq}`, ...extra});
+ record('release alpha',1);record('release completed',2,{role:'assistant'});record('release completed',2,{role:'assistant',transcriptReplay:true});
+ assert.equal(f.db.all('SELECT * FROM voice_transcripts').length,2);
+ const search=()=>f.service.tool(f.principal,id,'search',{action:'transcript.search',query:'release'}) as {items:{role:string}[]};
+ assert.throws(search,{code:'TRANSCRIPT_SEARCH_DISABLED'});
+ store.saveSettings(f.principal,{enabled:true,revision:0});assert.throws(search,{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+ record('搜索通话转写中的 release',3,{role:'assistant'});assert.throws(search,{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+ record('搜索通话转写中的 release',4,{transcriptReplay:true});assert.throws(search,{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+ record('搜索通话转写中的 release',5,{final:false});assert.throws(search,{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+ record('搜索通话转写中的 release',6);assert.ok(search().items.some(r=>r.role==='assistant'));
+ for(const action of ['dispatch','steer','claim','todo.save','preference.save'])assert.throws(()=>f.service.tool(f.principal,id,'blocked',{action}),{code:'TRANSCRIPT_READ_ONLY'});
  assert.equal(f.db.all('SELECT * FROM commands').length,0);
+ assert.throws(()=>store.saveSettings(f.principal,{enabled:false,revision:0}),{code:'SETTINGS_REVISION_CONFLICT'});
+ store.saveSettings(f.principal,{enabled:false,revision:1});assert.throws(search,{code:'TRANSCRIPT_SEARCH_DISABLED'});
+ assert.equal(store.settings({...f.principal,userId:'foreign'}).enabled,false);
+ store.saveSettings(f.principal,{enabled:true,revision:2});assert.throws(search,{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+ record('不要搜索通话转写',7);assert.throws(search,{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+ record('我看到文章写着搜索通话转写',8);assert.throws(search,{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+ record('嗯',9);assert.throws(()=>f.dispatch('still-blocked'),{code:'TRANSCRIPT_READ_ONLY'});
+});
+
+test('transcript search spans calls, isolates owners and retains first time/order across snapshots, pruning at 30 days',t=>{
+ const f=fixture();t.after(()=>f.db.close());const store=new VoiceTranscripts(f.db);
+ const input={role:'user',utteranceId:'first',transcriptSnapshot:true,observedAt:new Date(Date.now()-5000).toISOString()};
+ store.record(f.call,{...input,text:'deploy',transcriptSeq:1});store.record(f.call,{...input,text:'deploy safely',final:true,transcriptSeq:2});
+ const row=f.db.get<{sequence:number;observed_at:string}>('SELECT * FROM voice_transcripts')!;assert.equal(row.sequence,1);assert.equal(row.observed_at,input.observedAt);
+ store.record(f.call,{...input,text:'stale',transcriptSeq:1});assert.equal(f.db.get<{text:string}>('SELECT text FROM voice_transcripts')?.text,'deploy safely');
+ f.service.closeOrphans();const next=f.service.start(f.principal,'m',{});f.service.state(next.voice_id,'active');
+ store.saveSettings(f.principal,{enabled:true,revision:0});store.record(next,{role:'user',utteranceId:'request',text:'搜索通话转写中的部署',final:true,transcriptSeq:1});
+ assert.equal(store.search(f.principal,next.voice_id,{query:'deploy'}).items.length,1);
+ store.record(next,{role:'assistant',utteranceId:'long',text:'x'.repeat(9000)+'needle',final:true,transcriptSeq:10,utteranceSeq:2});const long=store.search(f.principal,next.voice_id,{query:'needle'}).items[0]!;assert.equal(long.sequence,2);assert.ok(long.text.includes('needle'));assert.equal(long.truncated,true);assert.equal(f.db.get<{n:number}>("SELECT length(text) AS n FROM voice_transcripts WHERE utterance_id='long'")?.n,9006);
+ assert.throws(()=>store.search({...f.principal,workspaceId:'foreign'},next.voice_id,{query:'deploy'}),{code:'TRANSCRIPT_SEARCH_DISABLED'});
+ f.db.run("UPDATE voice_transcripts SET observed_at=? WHERE voice_id=?",new Date(Date.now()-31*86400000).toISOString(),f.call.voice_id);store.prune();assert.equal(store.search(f.principal,next.voice_id,{query:'deploy'}).items.length,0);
+ f.db.run("UPDATE voice_transcript_requests SET expires_at='2000-01-01'");assert.throws(()=>store.search(f.principal,next.voice_id,{query:'deploy'}),{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+});
+
+test('schema 60 migrates only available legacy snippets and removes confirmation storage without creating tasks',t=>{
+ const dir=mkdtempSync(join(tmpdir(),'voice-transcript-migration-')),path=join(dir,'db.sqlite');const f=fixture(path);
+ f.db.sqlite.exec(`DROP TABLE voice_transcript_settings; DROP TABLE voice_transcripts; DROP TABLE voice_transcript_requests;
+ CREATE TABLE panel_voice_tails(voice_id TEXT,workspace_id TEXT,user_id TEXT,text TEXT,final INTEGER,sequence INTEGER,segment INTEGER,revision INTEGER,state TEXT,review INTEGER,receipt_json TEXT,updated_at TEXT);
+ CREATE TABLE panel_voice_tail_drafts(id TEXT,voice_id TEXT,workspace_id TEXT,user_id TEXT,text TEXT,final INTEGER,sequence INTEGER,revision INTEGER,state TEXT,receipt_json TEXT,updated_at TEXT);
+ PRAGMA user_version=59;`);
+ f.db.run("INSERT INTO panel_voice_tails VALUES(?,?,?,?,1,4,3,1,'pending',0,NULL,?)",f.call.voice_id,f.principal.workspaceId,f.principal.userId,'available tail',new Date().toISOString());
+ f.db.run("INSERT INTO panel_voice_tail_drafts VALUES(?,?,?,?,?,1,4,1,'pending',NULL,?)",`${f.call.voice_id}:3`,f.call.voice_id,f.principal.workspaceId,f.principal.userId,'duplicate tail',new Date().toISOString());f.db.close();
+ const db=new ControlPlaneDatabase(path);t.after(()=>{db.close();rmSync(dir,{recursive:true,force:true});});const store=new VoiceTranscripts(db);
+ assert.deepEqual(db.all<{text:string;source:string}>('SELECT text,source FROM voice_transcripts').map(r=>({...r})),[{text:'available tail',source:'legacy_partial'}]);
+ assert.equal(db.get("SELECT name FROM sqlite_master WHERE name='panel_voice_tails'"),undefined);assert.equal(db.all('SELECT * FROM commands').length,0);
+ assert.equal(store.settings(f.principal).enabled,false);store.saveSettings(f.principal,{enabled:true,revision:0});
+ const reopened=new ControlPlaneDatabase(path);assert.equal(new VoiceTranscripts(reopened).settings(f.principal).enabled,true);reopened.close();
+});
+
+test('dynamic directory combines identity tokens and typed filters without reading history or creating work',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const read=(input:Record<string,unknown>={})=>f.service.directory(f.principal,input);
+ assert.equal(read({query:'Mac Demo Test codex'}).total,1);
+ assert.equal(read({host:'Mac',project:'Demo',sessionName:'Test',provider:'codex',machineId:'m',projectId:'p'}).total,1);
+ assert.equal(read({host:'Mac',provider:'claude'}).total,0);
+ assert.equal(read({query:'Mac missing'}).total,0);
+ assert.equal(read({directoryStatus:'managed'}).sessions[0]?.id,f.session.logicalSessionId);
+ assert.equal(read({currentTask:true}).total,0);
+ f.db.run("UPDATE logical_sessions SET execution_state='running',active_turn_id='turn-current'");
+ const result=read({currentTask:true,project:'Demo'});
+ assert.equal(result.total,1);assert.equal(result.sessions[0]?.source,'host_session_projection');
+ assert.equal(result.sessions[0]?.activeTurnId,'turn-current');assert.equal(result.sessions[0]?.freshness,'live');
+ assert.ok(result.generatedAt&&result.sessions[0]?.hostHeartbeatAt);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM panel_voice_jobs')?.n,0);
+ assert.equal('messages' in result.sessions[0]!,false);
+ assert.throws(()=>read({provider:'invalid'}));assert.throws(()=>read({currentTask:'true'}));assert.throws(()=>read({directoryStatus:'invalid'}));
+ assert.equal(read({query:"%' OR 1=1 --"}).total,0);
+});
+
+test('directory and mutations reject stale or reconciling targets while preserving retry receipts',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const job=f.dispatch() as {jobId:string};
+ f.db.run("UPDATE machines SET last_heartbeat_at='2000-01-01T00:00:00Z'");
+ const result=f.service.directory(f.principal,{directoryStatus:'all'});
+ assert.equal(result.sessions[0]?.freshness,'stale');assert.equal(result.sessions[0]?.available,false);assert.equal(result.hostTotal,0);
+ assert.equal(f.service.directory(f.principal,{currentTask:true}).total,0);
+ assert.throws(()=>f.dispatch('new-request'),/待同步/);
+ assert.equal((f.dispatch() as {jobId:string}).jobId,job.jobId);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,1);
+});
+
+test('directory pagination scopes filters and workspace; online hosts without sessions remain discoverable',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ for(let i=0;i<22;i++)f.registry.createSession(f.principal,'m','p',`Extra ${i}`,`extra-${i}`);
+ const first=f.service.directory(f.principal,{project:'Demo'});assert.equal(first.sessions.length,20);assert.equal(first.total,23);assert.ok(first.nextCursor);
+ const second=f.service.directory(f.principal,{project:'Demo',cursor:first.nextCursor});assert.equal(second.sessions.length,3);assert.equal(second.nextCursor,null);
+ assert.equal(new Set([...first.sessions,...second.sessions].map(s=>s.id)).size,23);
+ assert.throws(()=>f.service.directory(f.principal,{provider:'claude',cursor:first.nextCursor}));
+ const foreign=f.service.directory({...f.principal,workspaceId:'other'},{query:'Demo'});assert.equal(foreign.total,0);assert.equal(foreign.hostTotal,0);
+ f.db.run('UPDATE logical_sessions SET deleted_at=?',new Date().toISOString());
+ const empty=f.service.directory(f.principal,{});assert.equal(empty.total,0);assert.equal(empty.hosts[0]?.id,'m');
+});
+
+test('transcript ranges group both speakers by latest calls and preserve speaking order across pages',t=>{
+ const f=fixture();t.after(()=>f.db.close());const store=new VoiceTranscripts(f.db);
+ const calls=[f.call];
+ for(let i=0;i<3;i++){
+  if(i){f.service.closeOrphans();const c=f.service.start(f.principal,'m',{});f.service.state(c.voice_id,'active');calls.push(c);}
+  const call=calls[i]!;f.db.run('UPDATE panel_voice_calls SET created_at=? WHERE voice_id=?',new Date(Date.now()-(3-i)*86400000).toISOString(),call.voice_id);
+  for(let n=1;n<=24;n++)store.record(call,{role:n%2?'user':'assistant',text:`call ${i} sentence ${n}`,utteranceId:`u${n}`,transcriptSeq:n,final:true});
+  f.db.run('UPDATE voice_transcripts SET observed_at=? WHERE voice_id=?',new Date(Date.now()-(3-i)*86400000).toISOString(),call.voice_id);
+ }
+ f.service.closeOrphans();const live=f.service.start(f.principal,'m',{});f.service.state(live.voice_id,'active');store.saveSettings(f.principal,{enabled:true,revision:0});
+ store.record(live,{role:'user',text:'帮我看看最近三次通话',utteranceId:'request',transcriptSeq:1,final:true});
+ const options={recentCalls:3,includeCurrent:false};let page=store.search(f.principal,live.voice_id,options);const all=[...page.items];
+ while(page.nextCursor){page=store.search(f.principal,live.voice_id,{...options,cursor:page.nextCursor});all.push(...page.items);}
+ assert.equal(all.length,72);assert.equal(new Set(all.map(x=>x.voiceId+':'+x.id)).size,72);
+ assert.deepEqual([...new Set(all.map(x=>x.voiceId))],calls.map(x=>x.voice_id).reverse());
+ assert.deepEqual(all.filter(x=>x.voiceId===calls[0]!.voice_id).map(x=>x.sequence),Array.from({length:24},(_,i)=>i+1));assert.ok(all.some(x=>x.role==='assistant'));
+ assert.equal(store.search(f.principal,live.voice_id,{recentCalls:1,includeCurrent:false,query:'call 0'}).items.length,0);
+ assert.equal(store.search(f.principal,live.voice_id,{relativeDays:1,includeCurrent:false}).items.length,0);
+ assert.ok(store.search(f.principal,live.voice_id,{relativeDays:7,includeCurrent:false}).items.length>0);
+ const from=new Date(Date.now()-3.5*86400000).toISOString(),to=new Date(Date.now()-2.5*86400000).toISOString();
+ assert.equal(store.search(f.principal,live.voice_id,{startAt:from,endAt:to}).groups[0]?.voiceId,calls[0]!.voice_id);
+ assert.equal(store.search(f.principal,live.voice_id,{}).groups[0]?.voiceId,live.voice_id);
+ const first=store.search(f.principal,live.voice_id,options);assert.throws(()=>store.search(f.principal,live.voice_id,{...options,query:'changed',cursor:first.nextCursor}),{code:'TRANSCRIPT_CURSOR'});
+ for(const bad of [{recentCalls:0},{recentCalls:101},{relativeDays:31},{startAt:'2026-10-10'},{startAt:to,endAt:from},{relativeDays:7,startAt:from}])assert.throws(()=>store.search(f.principal,live.voice_id,bad),{code:'TRANSCRIPT_RANGE'});
+});
+
+test('unfiltered transcript pagination reads long utterances fully, excludes new arrivals, and stays bounded',t=>{
+ const f=fixture();t.after(()=>f.db.close());const store=new VoiceTranscripts(f.db);store.saveSettings(f.principal,{enabled:true,revision:0});
+ store.record(f.call,{role:'assistant',text:'A'.repeat(11000),utteranceId:'long',transcriptSeq:1,final:true});
+ store.record(f.call,{role:'user',text:'看看最近一次通话',utteranceId:'request',transcriptSeq:2,final:true});
+ let page=store.search(f.principal,f.call.voice_id,{});const all=[...page.items];assert.ok(page.nextCursor);
+ store.record(f.call,{role:'assistant',text:'new after snapshot',utteranceId:'new',transcriptSeq:3,final:true});
+ while(page.nextCursor){assert.ok(JSON.stringify(page).length<24000);page=store.search(f.principal,f.call.voice_id,{cursor:page.nextCursor});all.push(...page.items);}
+ assert.equal(all.filter(x=>x.id==='long').map(x=>x.text).join(''),'A'.repeat(11000));assert.ok(!all.some(x=>x.id==='new'));
+});
+
+test('natural transcript requests and scoped new-save authorization never execute historical instructions',t=>{
+ const f=fixture();t.after(()=>f.db.close());const store=new VoiceTranscripts(f.db);store.saveSettings(f.principal,{enabled:true,revision:0});let seq=0;
+ const say=(text:string,extra:Record<string,unknown>={})=>{seq++;store.record(f.call,{role:'user',text,utteranceId:`q${seq}`,transcriptSeq:seq,final:true,...extra});};
+ for(const phrase of ['然后你查下转写','我想看看最近三次通话','帮我回顾最近一周的通话','显示昨天的语音记录','Show my last three calls','我们最近三次通话都聊了什么','给我最近两次通话转写']){say(phrase);assert.ok(store.search(f.principal,f.call.voice_id,{}));}
+ say('继续查看');assert.ok(store.search(f.principal,f.call.voice_id,{}));
+ say('最近三次');assert.ok(store.search(f.principal,f.call.voice_id,{recentCalls:3}));
+ say('关键词是发布');assert.ok(store.search(f.principal,f.call.voice_id,{query:'发布'}));
+ say('不想查看通话记录');assert.throws(()=>store.search(f.principal,f.call.voice_id,{}),{code:'TRANSCRIPT_REQUEST_REQUIRED'});
+ say('请把这条新需求保存为待办');store.assertReadOnly(f.call.voice_id,'todo.save');
+ const saved=f.service.tool(f.principal,f.call.voice_id,'new-save',{action:'todo.save',intent:'A newly authorized requirement'}) as {todoId:string};assert.ok(saved.todoId);
+ for(const action of ['dispatch','claim','steer','preference.save'])assert.throws(()=>store.assertReadOnly(f.call.voice_id,action),{code:'TRANSCRIPT_READ_ONLY'});
+ say('嗯');assert.throws(()=>store.assertReadOnly(f.call.voice_id,'todo.save'),{code:'TRANSCRIPT_READ_ONLY'});
+ for(const [phrase,extra] of [['保存需求为什么失败',{}],['文章写着现在执行任务',{}],['请执行这项任务',{role:'assistant'}],['现在执行这项任务',{transcriptReplay:true}],['现在执行这项任务',{final:false}],['不要执行这项任务',{}],['假如现在执行这项任务',{}]] as Array<[string,Record<string,unknown>]>) {say(phrase,extra);assert.throws(()=>store.assertReadOnly(f.call.voice_id,'dispatch'),{code:'TRANSCRIPT_READ_ONLY'});}
+ say('现在执行这项任务');store.assertReadOnly(f.call.voice_id,'dispatch');
+ say('看看最近一天的通话');store.search(f.principal,f.call.voice_id,{});say('先不要执行，帮我把这项需求保存为待办');store.assertReadOnly(f.call.voice_id,'todo.save');assert.throws(()=>store.assertReadOnly(f.call.voice_id,'dispatch'),{code:'TRANSCRIPT_READ_ONLY'});
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
 });

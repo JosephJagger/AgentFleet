@@ -52,6 +52,17 @@ acquire_install_lock() {
 }
 trap cleanup_install EXIT HUP INT TERM
 acquire_install_lock
+# Recheck after locking so two fresh npm connections cannot re-onboard one host.
+if [ "${AGENTFLEET_NPM_FRESH_INSTALL:-}" = 1 ]; then
+  for NPM_EXISTING_PATH in "$CURRENT_LINK" "$PREVIOUS_LINK" \
+    "$DATA_ROOT/state.sqlite" "$RUNTIME_PROFILE" \
+    "$HOME/Library/LaunchAgents/cn.agentfleets.agent.plist"; do
+    if [ -e "$NPM_EXISTING_PATH" ] || [ -L "$NPM_EXISTING_PATH" ]; then
+      echo "installer: existing installation detected; preserved. Use the panel's repair or update instructions." >&2
+      exit 23
+    fi
+  done
+fi
 
 atomic_link() {
   LINK_TEMP="$1.tmp-$$"

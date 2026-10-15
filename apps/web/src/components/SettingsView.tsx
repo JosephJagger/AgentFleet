@@ -1,3 +1,5 @@
+import { TakeoverPolicyCard } from "./TakeoverPolicyCard";
+import { UpdateCenter } from "./UpdateCenter";
 import { displayName } from "../lib/display-name";
 import {LongTermPreferencesPanel} from './LongTermPreferencesPanel';
 import { SettingsSections } from "./SettingsSections";
@@ -41,7 +43,7 @@ function HistoryPolicy({ project, onSaved, onToast }: { project: Project; onSave
 }
 
 export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }: { initialMachineId?: string; dashboard: Dashboard; onUpdated: () => Promise<void>; onToast: Notice }) {
-  const [category, setCategory] = useState<"memory" | "codex" | "writing" | "appearance" | "history" | "security">("codex");
+  const [category, setCategory] = useState<"memory" | "codex" | "writing" | "appearance" | "history" | "security" | "updates">("codex");
   useEffect(() => { if (initialMachineId) setCategory("codex"); }, [initialMachineId]);
   const [sessions, setSessions] = useState<ClientSessionInfo[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
@@ -99,6 +101,7 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
   return <section className="wide-view settings-view">
     <div className="wide-view__heading"><div><h1>{t("设置")}</h1><p>{t("按用途管理默认配置、界面外观和数据。")}</p></div><ShieldCheck size={30} /></div>
     <SettingsSections label={t("设置分类")} value={category} onChange={setCategory} items={[
+      {id:"updates",label:t("更新中心"),icon:<Settings2 size={19}/>,description:t("版本、进度与恢复")},
       {id:"codex",label:t("Codex 配置"),icon:<Settings2 size={19}/>,description:t("模型、语音与权限")},
       {id:"memory",label:t("长期偏好"),icon:<MessageSquare size={19}/>,description:t("语音规则与跨通话恢复")},
       {id:"writing",label:t("输入辅助"),icon:<MessageSquare size={19}/>,description:t("补全与提示词优化")},
@@ -107,6 +110,7 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
       {id:"security",label:t("登录安全"),icon:<ShieldCheck size={19}/>,description:t("管理已登录浏览器")},
     ]}/>
     <div className="settings-layout settings-layout--grouped">
+      {category==="updates"&&<UpdateCenter dashboard={dashboard}/>}
       {category==="memory"&&<LongTermPreferencesPanel key={dashboard.user.id}/>}
       <div className="settings-category" hidden={category !== "codex"}>
       <CodexConfiguration machines={dashboard.machines} initialMachineId={initialMachineId} />
@@ -115,7 +119,8 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
       <WritingAISettings />
       </div><div className="settings-category" hidden={category !== "appearance"}>
       <section className="settings-block theme-settings-block"><h2><SunMoon size={18} />{t("界面外观")}</h2><p className="subtle">{t("选择阅读更舒适的外观，自动保存在此浏览器。")}</p><ThemeSettings paginated /></section>
-      </div><div className="settings-category" hidden={category !== "history"}>
+      </div><div className="settings-category settings-category--history" hidden={category !== "history"}>
+      {category === "history" && <TakeoverPolicyCard key={dashboard.user.id}/>}
       <section className="settings-block"><h2>{t("云端历史")}</h2><p className="subtle">{t("按项目设置保存内容和时长。宿主机上的原始会话不受影响。")}</p>
         {machines.length === 0 ? <p className="subtle">{t("添加主机并发现项目后，可以设置历史保存方式。")}</p> : <>
           <label className="settings-field"><span>{t("主机")}</span><select aria-label={t("历史设置主机")} value={machineId} onChange={event => setSelectedMachineId(event.target.value)}>{machines.map(machine => <option key={machine.id} value={machine.id}>{displayName(machine.name)}</option>)}</select></label>

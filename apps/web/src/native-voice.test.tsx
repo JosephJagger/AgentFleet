@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NativeVoicePanel } from "./components/NativeVoicePanel";
 import { api } from "./lib/api";
-vi.mock("./lib/api", () => ({ api: { acquireLease: vi.fn(), renewLease: vi.fn() } }));
+vi.mock("./lib/api", () => ({ api: { voiceTranscriptSettings:()=>Promise.resolve({enabled:false,revision:0,retentionDays:30}), acquireLease: vi.fn(), renewLease: vi.fn() } }));
 
 class Peer {
   static all: Peer[] = [];

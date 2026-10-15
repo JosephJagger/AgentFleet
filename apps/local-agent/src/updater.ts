@@ -228,6 +228,9 @@ export class AgentAutoUpdater {
   private active: Promise<void> | undefined;
   private controller: AbortController | undefined;
   private stopped = false;
+  private hintedRevision = "";
+  private wakePending = false;
+  private lastWakeAt = 0;
   private staged = false;
   private preparedVersion: string | undefined;
   private targetVersion = "";
@@ -243,6 +246,22 @@ export class AgentAutoUpdater {
   start(): void {
     if (this.stopped || this.timer || this.active) return;
     this.schedule(this.options.initialDelayMs ?? 30_000);
+  }
+
+  /** A hint only schedules a verified read; it never authorizes an installation. */
+  notifyRelease(revision: string): void {
+    if (this.stopped || this.staged || this.hintedRevision === revision) return;
+    this.hintedRevision = revision;
+    this.wakePending = true;
+    if (!this.active && !this.checkActive) this.scheduleHint();
+  }
+
+  private scheduleHint(): void {
+    this.wakePending = false;
+    if (this.timer) clearTimeout(this.timer);
+    const delay = Math.max(0, this.lastWakeAt + 30_000 - Date.now()) + Math.floor(Math.random() * 3_000);
+    this.lastWakeAt = Date.now() + delay;
+    this.schedule(delay);
   }
 
   async stop(): Promise<void> {
@@ -263,7 +282,7 @@ export class AgentAutoUpdater {
       const drain = this.options.store?.snapshot().maintenanceDrain;
       if (drain?.operationId.startsWith("agent-update-") || drain?.operationId.startsWith("runtime-update-")) await this.options.store?.setMaintenanceDrain(undefined);
       throw error;
-    }).finally(() => { this.checkActive = undefined; });
+    }).finally(() => { this.checkActive = undefined; if (this.wakePending && !this.active && !this.stopped && !this.staged) this.scheduleHint(); });
     return this.checkActive;
   }
 
@@ -274,8 +293,32 @@ export class AgentAutoUpdater {
   }
 
   private async performCheck(signal?: AbortSignal): Promise<UpdateCheckResult> {
+    let agent: UpdateCheckResult;
+    try { agent = await this.performAgentCheck(signal); }
+    catch (error) {
+      // A failed Agent check must not hide the Codex target. Preparation is safe,
+      // but never perform another activation while an Agent failure is unresolved.
+      const transaction = this.options.store ? await readUpdateTransaction(this.options.dataDir) : undefined;
+      if (!transaction || ["succeeded", "rolled_back", "failed"].includes(transaction.phase)) {
+        try { await this.performRuntimeCheck(signal, true); }
+        catch (runtimeError) { this.options.onRuntimeError?.(runtimeError instanceof Error ? runtimeError.message : "运行时准备失败"); }
+      }
+      this.checkingRuntime = false;
+      throw error;
+    }
+    if (agent === "staged") return agent;
+    const runtime = await this.performRuntimeCheck(signal, agent === "busy");
+    return runtime === "current" ? agent : runtime;
+  }
+
+  private async performAgentCheck(signal?: AbortSignal): Promise<UpdateCheckResult> {
     this.checkingRuntime = false;
     if (this.options.store) await clearCompletedAgentUpdateDrain(this.options.store, this.options.currentVersion);
+    if (this.options.store) {
+      const drain = this.options.store.snapshot().maintenanceDrain;
+      const tx = await readUpdateTransaction(this.options.dataDir);
+      if (drain && /^(agent|runtime)-update-/.test(drain.operationId) && (!tx || ["succeeded", "rolled_back", "failed"].includes(tx.phase))) await this.options.store.finishUpdateAdmission(drain.operationId);
+    }
     const baseUrl = this.options.controlPlaneUrl.replace(/\/$/, "");
     const manifest = await fetchBoundedText(
       this.fetchImpl,
@@ -284,8 +327,11 @@ export class AgentAutoUpdater {
       signal,
     );
     const availableVersion = releaseVersionFromManifest(manifest);
-    if (compareReleaseVersions(availableVersion, this.options.currentVersion) <= 0) return this.performRuntimeCheck(signal);
-    if (!eligibleForAgentRollout(manifest, this.options.machineId)) { await this.phase("rollout_wait", availableVersion); return "deferred"; }
+    if (compareReleaseVersions(availableVersion, this.options.currentVersion) <= 0) return "current";
+    if (!eligibleForAgentRollout(manifest, this.options.machineId)) {
+      await this.phase("rollout_wait", availableVersion);
+      return "deferred";
+    }
     const failed = this.options.store ? await readUpdateTransaction(this.options.dataDir) : undefined;
     if (failed && ["rolled_back", "failed"].includes(failed.phase) && failed.targetVersion === availableVersion && (!failed.retryable || (failed.attempts ?? 1) >= 3)) {
       throw new AgentError("UPDATE_ROLLOUT_PAUSED", "此版本此前在本机升级失败，已保留原运行版本并暂停重复安装；请使用主机安装命令修复，或等待修正版");
@@ -306,10 +352,6 @@ export class AgentAutoUpdater {
     if (this.options.store && Object.values(this.options.store.snapshot().commandJournal).some(command => command.state === "unknown")) {
       throw new AgentError("UPDATE_RECOVERY_REQUIRED", "主机有结果待核验的操作，升级未开始。请先点击「一键恢复连接」，再检查更新；不会重发原任务。");
     }
-    if (this.options.store) {
-      const drain = this.options.store.snapshot().maintenanceDrain;
-      await this.options.store.setMaintenanceDrain(drain?.operationId ?? `agent-update-${availableVersion}`);
-    }
     await this.phase("waiting_for_idle", availableVersion);
     if (!this.options.canUpdate()) return "busy";
     const installer = preparedInstaller ?? await fetchBoundedText(
@@ -322,6 +364,12 @@ export class AgentAutoUpdater {
       throw new AgentError("UPDATE_INSTALLER_INVALID", "downloaded installer is not an AgentFleet platform installer");
     }
     if (!this.options.canUpdate()) return "busy";
+    const admission = `agent-update-${availableVersion}`;
+    if (this.options.store && !await this.options.store.tryBeginUpdate(admission)) return "busy";
+    if (!this.options.canUpdate()) {
+      await this.options.store?.finishUpdateAdmission(admission);
+      return "busy";
+    }
     const transaction = this.options.store ? { ...await prepareUpdateTransaction(this.options.dataDir, availableVersion), attempts: failed?.targetVersion === availableVersion ? (failed.attempts ?? 1) + 1 : 1 } : undefined;
     if (transaction) await writeUpdateTransaction(this.options.dataDir, transaction);
     try {
@@ -350,7 +398,7 @@ export class AgentAutoUpdater {
     return "staged";
   }
 
-  private async performRuntimeCheck(signal?: AbortSignal): Promise<UpdateCheckResult> {
+  private async performRuntimeCheck(signal?: AbortSignal, prepareOnly = false): Promise<UpdateCheckResult> {
     this.checkingRuntime = true;
     if (this.options.runtimeSource !== "managed" || !this.options.currentRuntimeVersion || !this.options.store) return "current";
     const response = await retryUpdateDownload(() => this.fetchImpl(`${this.options.controlPlaneUrl.replace(/\/$/, "")}/api/runtime-release/target`, { redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(15_000), ...(signal ? [signal] : [])]) }), signal);
@@ -359,20 +407,30 @@ export class AgentAutoUpdater {
     const contents = await response.text(); if (contents.length > MAX_MANIFEST_BYTES) throw new AgentError("RUNTIME_TARGET_INVALID", "托管目标信息超限");
     const target = parseManagedRuntimeTarget(JSON.parse(contents).target);
     if (!target || (target.version === this.options.currentRuntimeVersion && !this.options.needsRuntimeRepair?.()) || (!target.rollback && compareReleaseVersions(target.version, this.options.currentRuntimeVersion) < 0)) {
-      if (this.options.store.snapshot().maintenanceDrain?.operationId.startsWith("runtime-update-")) await this.options.store.setMaintenanceDrain(undefined);
       this.options.onRuntimePhase?.("current", this.options.currentRuntimeVersion);
       return "current";
     }
     const failed = await readUpdateTransaction(this.options.dataDir);
     if (failed && ["rolled_back", "failed"].includes(failed.phase) && failed.targetRuntimeRevision === target.revision) throw new AgentError("RUNTIME_ROLLOUT_PAUSED", "这个托管版本在本机更新失败并已回退，等待新的验证目标");
-    const drain = this.options.store.snapshot().maintenanceDrain;
-    await this.options.store.setMaintenanceDrain(drain?.operationId ?? `runtime-update-${target.revision}`);
-    this.options.onRuntimePhase?.("waiting_for_idle", target.version);
-    if (!this.options.canUpdate()) return "busy";
-    this.options.onRuntimePhase?.("validating_runtime", target.version);
+    this.options.onRuntimePhase?.("preparing", target.version);
     const activate = await (this.options.prepareRuntime ?? prepareManagedRuntime)({ dataDir: this.options.dataDir, controlPlaneUrl: this.options.controlPlaneUrl, target, ...(signal ? { signal } : {}) });
     if (signal?.aborted) throw signal.reason;
-    if (!this.options.canUpdate()) return "busy";
+    this.options.onRuntimePhase?.("waiting_for_idle", target.version);
+    if (prepareOnly || !this.options.canUpdate()) return "busy";
+    // A prepared target may have been withdrawn while downloading. Never activate it blindly.
+    const refreshed = await retryUpdateDownload(() => this.fetchImpl(`${this.options.controlPlaneUrl.replace(/\/$/, "")}/api/runtime-release/target`, { redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(15_000), ...(signal ? [signal] : [])]) }), signal);
+    if (!refreshed.ok) throw new AgentError("RUNTIME_TARGET_UNAVAILABLE", `托管目标检查失败 HTTP ${refreshed.status}`);
+    const latestText = await refreshed.text();
+    if (latestText.length > MAX_MANIFEST_BYTES) throw new AgentError("RUNTIME_TARGET_INVALID", "托管目标信息超限");
+    const latest = parseManagedRuntimeTarget(JSON.parse(latestText).target);
+    if (JSON.stringify(latest) !== JSON.stringify(target)) return "deferred";
+    const admission = `runtime-update-${target.revision}`;
+    if (!this.options.canUpdate() || !await this.options.store.tryBeginUpdate(admission)) return "busy";
+    if (!this.options.canUpdate()) {
+      await this.options.store.finishUpdateAdmission(admission);
+      return "busy";
+    }
+    this.options.onRuntimePhase?.("activating", target.version);
     const transaction = { ...await prepareUpdateTransaction(this.options.dataDir, this.options.currentVersion), targetRuntimeVersion: target.version, targetRuntimeRevision: target.revision };
     try {
       await writeUpdateTransaction(this.options.dataDir, transaction);
@@ -410,6 +468,7 @@ export class AgentAutoUpdater {
       }
     }
     if (this.stopped || signal.aborted) return;
+    if (this.wakePending) { this.scheduleHint(); return; }
     this.schedule(result === "busy" ? 60_000 : this.options.intervalMs ?? (this.options.runtimeSource === "managed" ? 15 * 60_000 : 6 * 60 * 60_000));
   }
 }

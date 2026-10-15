@@ -80,7 +80,7 @@
 .live-interactions__switch input:disabled + span { opacity:.45; }
 
 /* Voice records use one disclosure row and one action row per task. */
-.voice-task-inbox,.voice-transcript-drafts { padding-top:10px; margin-top:12px; border-top:1px solid var(--line); }
+.voice-task-inbox { padding-top:10px; margin-top:12px; border-top:1px solid var(--line); }
 .voice-record-toggle { display:flex; align-items:center; gap:8px; width:100%; min-height:36px; padding:6px 0; border:0; background:none; color:var(--ink); text-align:left; cursor:pointer; font:inherit; }
 .voice-record-toggle > svg:first-child { color:var(--muted); }
 .voice-record-toggle > svg:last-child { margin-left:auto; color:var(--muted); }
@@ -95,8 +95,43 @@
 .voice-record-status[data-state="failed"] { color:var(--red); }
 .voice-record-id { font:10px/1.5 var(--mono,monospace); color:var(--muted); }
 .voice-record-empty { padding:20px 12px; border:1px dashed var(--line); border-radius:3px; color:var(--muted); text-align:center; }
-.voice-transcript-drafts textarea { width:100%; min-height:100px; resize:vertical; padding:10px; border:1px solid var(--line-strong,var(--line)); border-radius:3px; background:var(--paper); color:var(--ink); font:inherit; line-height:1.6; }
 .voice-audio-devices select { padding:7px 9px; border:1px solid var(--line-strong,var(--line)); border-radius:3px; color:var(--ink); background:var(--paper); }
+
+/* Keep call controls primary and recovered records compact in every theme. */
+.panel-voice-control__settings { --text-body:14px; --text-small:13px; --text-caption:12px; width:min(420px,calc(100vw - 32px)); padding:0 16px 16px; font-size:13px; line-height:1.55; scrollbar-width:thin; }
+.panel-voice-control__settings > header { position:sticky; top:0; z-index:2; min-height:52px; margin:0 -16px 12px; padding:0 16px; background:var(--paper-solid); border-bottom:1px solid var(--line); }
+.panel-voice-control__settings .panel-voice-control__title { font-size:15px; font-weight:600; gap:8px; }
+.panel-voice-control__settings .panel-voice-control__title svg { width:19px; height:19px; }
+.panel-voice-control__settings .panel-voice-control__intro { margin:0 0 14px; color:var(--muted); }
+.panel-voice-control__settings .panel-voice-control__host { grid-template-columns:auto minmax(0,1fr); align-items:center; gap:12px; font-size:12px; margin:0; }
+.panel-voice-control__settings select { min-height:36px; padding:7px 10px; font:inherit; }
+.panel-voice-control__settings .panel-voice-control__hint { margin:8px 0; line-height:1.5; }
+.panel-voice-control__settings .native-voice--panel { margin-top:12px; }
+.panel-voice-control__settings .native-voice__trigger { min-height:40px; padding:8px 12px; font-size:13px; font-weight:600; box-shadow:none; }
+.panel-voice-control__settings .panel-voice-control__task-summary { min-height:42px; padding:8px 12px; margin-top:10px; font:inherit; }
+.panel-voice-control__settings .panel-voice-control__task-summary strong { font-size:20px; font-weight:600; }
+.panel-voice-control__settings .voice-record-toggle { font-size:13px; font-weight:600; }
+.panel-voice-control__settings .voice-record-note { margin:6px 0 10px; font-size:12px; color:var(--muted); }
+.panel-voice-control__settings .voice-record-toolbar { align-items:flex-end; gap:8px; }
+.panel-voice-control__settings .voice-record-toolbar label { font-size:12px; color:var(--muted); }
+.panel-voice-control__settings .voice-record-toolbar .button { min-height:36px; }
+.panel-voice-control__settings .voice-task-inbox .button { font-size:12px; min-height:32px; padding:6px 9px; font-weight:500; box-shadow:none; }
+.panel-voice-control__settings .panel-voice-control__task { padding:12px; margin-top:8px; background:var(--paper); gap:8px; }
+.panel-voice-control__settings .panel-voice-control__task > p { margin:0; }
+.panel-voice-control__settings .panel-voice-control__task small { color:var(--muted); font-size:11px; }
+.panel-voice-control__settings .voice-task-inbox__records { max-height:none; overflow:visible; margin:10px 0; }
+.panel-voice-control__settings .voice-task-inbox__pages { border-top:1px solid var(--line); padding-top:10px; font-size:12px; }
+.voice-record-intent summary { display:flex; align-items:flex-start; gap:8px; cursor:pointer; list-style:none; font-size:13px; }
+.voice-record-intent summary::-webkit-details-marker { display:none; }
+.voice-record-intent summary span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.voice-record-intent summary svg { flex:0 0 auto; margin-top:3px; color:var(--muted); }
+.voice-record-intent[open] summary svg { transform:rotate(180deg); }
+.voice-record-intent[open] > p { padding-top:8px; border-top:1px solid var(--line); }
+.panel-voice-control__settings .voice-record-intent > p { max-height:none; overflow:visible; margin-bottom:0; }
+.voice-record-help { color:var(--muted); font-size:12px; margin:8px 0 12px; }
+.voice-record-help summary { cursor:pointer; }
+.panel-voice-control__settings .voice-record-help p { font-size:12px; margin:8px 0 0; }
+.voice-record-toggle:focus-visible,.voice-record-intent summary:focus-visible,.voice-record-help summary:focus-visible { outline:2px solid var(--cobalt); outline-offset:3px; border-radius:3px; }
 
 @media (min-width:901px) {
   :root[data-theme="buzhoushan"] :is(.panel-voice-control__settings,.native-voice__popover) { --text-body:13px; --text-small:12px; --text-caption:11px; font-size:12px; line-height:1.55; border-color:#454545; border-radius:5px; box-shadow:0 12px 40px #0005; scrollbar-width:thin; }
@@ -219,3 +254,21 @@
 @media (min-width:900px) and (min-height:506px) {
   :root[data-theme="buzhoushan"]:has(.buzhou-broadcast) { --buzhou-rail-width:clamp(112px,calc(var(--buzhou-canvas-width) * .12),240px); }
 }
+
+.voice-transcript-search { padding-top:12px; margin-top:12px; border-top:1px solid var(--line); }
+.panel-voice-control__settings .voice-transcript-search__toggle { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
+.voice-transcript-search__toggle input { width:16px; height:16px; margin:0; accent-color:var(--accent); }
+.voice-transcript-search .voice-record-note { margin:8px 0; }
+
+.voice-directory { border-top:1px solid var(--line); padding-top:12px; margin-top:12px; font-size:13px; }
+.voice-directory summary { cursor:pointer; padding:6px 0; font-size:13px; }
+.voice-directory__body { display:grid; gap:10px; padding-top:8px; }
+.voice-directory__filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.panel-voice-control__settings .voice-directory label { font-size:12px; gap:4px; }
+.panel-voice-control__settings .voice-directory input,.panel-voice-control__settings .voice-directory select { width:100%; min-width:0; padding:7px 9px; font-size:13px; }
+.voice-directory__refresh { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.voice-directory__list { display:grid; gap:6px; max-height:260px; overflow:auto; }
+.voice-directory__list button { display:grid; gap:4px; text-align:left; background:transparent; color:inherit; border:1px solid var(--line); border-radius:8px; padding:10px; cursor:pointer; }
+.voice-directory__list button:disabled { opacity:.55; cursor:default; }
+.voice-directory__list strong,.voice-directory__list span { overflow-wrap:anywhere; }
+.voice-directory__list span,.voice-directory__list small { font-size:12px; font-weight:400; }

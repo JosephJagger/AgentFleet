@@ -32,6 +32,8 @@ export function runtimeRollout(machine: Machine, target?: string, schemaHash?: s
     const phase = value("runtimeUpdateState");
     if (phase === "failed" || phase === "rolled_back") return { label: phase === "rolled_back" ? t("本机更新失败，已保留回退版本") : t("本机更新未完成，原运行时保留"), error: value("runtimeUpdateError"), failed: true };
     if (phase === "waiting_for_idle") return { label: t("等待任务或通话结束") };
+    if (phase === "preparing") return { label: t("后台准备新运行时，可继续工作") };
+    if (phase === "activating") return { label: t("正在切换已验证的运行时") };
     if (phase === "validating_runtime") return { label: t("正在本机验证新运行时") };
   }
   const agentPhase = value("agentUpdateState");

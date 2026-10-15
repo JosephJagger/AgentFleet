@@ -2006,6 +2006,7 @@ export class AgentRuntime {
     const id=String(value.voiceId??"");if(!/^pvoice_[A-Za-z0-9_-]+$/.test(id))throw new AgentError("VOICE_INVALID","Invalid panel voice identity");
     this.panelVoice??=new PanelVoiceRuntime(this.store,event=>this.callbacks.onVolatile({...event,producerEpoch:this.producerEpoch,appServerEpoch:this.getAppServerEpoch()}));
     if(value.action==='probe'){this.panelVoice.probe(id,String(value.requestId));return;}
+    if(value.action==='transcript.ack'){this.panelVoice.acknowledgeTranscript(id,value.utteranceId,value.transcriptSeq);return;}
     if(value.action==='resume'){this.panelVoice.resume(id,value.instanceId,typeof value.requestId==='string'?value.requestId:undefined);return;}
     if(value.action==='stop')return this.panelVoice.stop(id);
     if(value.action==='heartbeat'){this.panelVoice.heartbeat(id);return;}

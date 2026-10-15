@@ -1,3 +1,4 @@
+import { DEFAULT_TAKEOVER_IDLE_DAYS } from "./takeover-policy.js";
 import { directoryTurnConflict } from "./directory-turn-lock.js";
 import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
 import { parseOutputSchema } from "./output-schema.js";
@@ -424,41 +425,49 @@ export class CoordinationService {
   }
 
   /**
-   * Releases takeovers that have had no recorded token use for three days.
+   * Releases idle takeovers according to their independent workspace policy.
    *
    * This deliberately creates a normal thread.release command instead of
    * changing the projection directly: the host remains the authority that
    * releases the native writer and confirms the result.
    */
   releaseInactiveTakeovers(referenceTime = Date.now()): InactiveTakeoverReleaseResult {
-    const cutoff = new Date(referenceTime - 72 * 60 * 60 * 1_000).toISOString();
     const now = new Date(referenceTime).toISOString();
     const candidates = this.db.all<{
       logical_session_id: string;
       workspace_id: string;
+      idle_days: number;
       last_token_at: string | null;
       managed_at: string | null;
       created_at: string;
     }>(
-      `SELECT s.logical_session_id,s.workspace_id,
+      `SELECT s.logical_session_id,s.workspace_id,COALESCE(tp.idle_days,${DEFAULT_TAKEOVER_IDLE_DAYS}) AS idle_days,
         (SELECT MAX(ui.ends_at) FROM usage_intervals ui WHERE ui.logical_session_id=s.logical_session_id) AS last_token_at,
         (SELECT MAX(e.occurred_at) FROM durable_events e
           WHERE e.logical_session_id=s.logical_session_id AND e.type IN ('thread.claimed','thread.started')) AS managed_at,
         s.created_at
        FROM logical_sessions s
+       LEFT JOIN takeover_policies tp ON tp.workspace_id=s.workspace_id
        JOIN machines m ON m.machine_id=s.machine_id
        JOIN execution_segments es ON es.logical_session_id=s.logical_session_id AND es.ended_at IS NULL
        WHERE s.managed=1 AND s.deleted_at IS NULL AND es.native_thread_id IS NOT NULL
          AND s.execution_state IN ('idle','completed','failed','interrupted') AND s.active_turn_id IS NULL
          AND s.reachability='live' AND m.identity_state='active' AND m.security_state='normal'
          AND m.compatibility='compatible' AND m.reachability='online' AND m.runtime_read_only=0
+         AND NOT EXISTS(SELECT 1 FROM voice_sessions v WHERE v.project_id=s.project_id AND v.state<>'closed')
+         AND NOT EXISTS(SELECT 1 FROM panel_voice_calls v WHERE v.workspace_id=s.workspace_id AND v.state<>'closed')
          AND NOT EXISTS(SELECT 1 FROM approvals a WHERE a.logical_session_id=s.logical_session_id AND a.state='pending')
          AND NOT EXISTS(SELECT 1 FROM turn_queue q WHERE q.logical_session_id=s.logical_session_id AND q.state IN ('queued','dispatching','unknown'))
          AND NOT EXISTS(SELECT 1 FROM commands c JOIN command_projection cp ON cp.command_id=c.command_id
            WHERE c.logical_session_id=s.logical_session_id AND cp.state IN ('accepted','dispatching','unknown'))
          AND NOT EXISTS(SELECT 1 FROM control_leases l WHERE l.logical_session_id=s.logical_session_id AND l.state='active' AND l.expires_at>?)`,
       now,
-    ).filter(candidate => (candidate.last_token_at ?? candidate.managed_at ?? candidate.created_at) <= cutoff);
+    ).filter(candidate => {
+      // A new takeover resets the idle clock even when older token usage exists.
+      const times = [candidate.last_token_at, candidate.managed_at, candidate.created_at]
+        .filter((value): value is string => value !== null).map(Date.parse);
+      return times.every(Number.isFinite) && Math.max(...times) <= referenceTime - candidate.idle_days * 86_400_000;
+    });
 
     let scheduled = 0;
     for (const candidate of candidates) {
@@ -505,7 +514,7 @@ export class CoordinationService {
             controlLeaseId: lease.leaseId,
             action: "thread.auto_release.inactive",
             metadata: {
-              thresholdHours: 72,
+              thresholdHours: candidate.idle_days * 24,
               lastTokenAt: candidate.last_token_at,
               managedAt: candidate.managed_at,
               commandId: result.command.commandId,

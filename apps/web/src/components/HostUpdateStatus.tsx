@@ -2,14 +2,16 @@ import { t, locale } from "../i18n";
 import type { Machine, HostOperation } from "../lib/types";
 
 export type AgentReleaseStatus = {status:string;expectedVersion:string|null;publicVersion:string|null;checkedAt:string};
-export function HostUpdateStatus({machine, operations=[], release}: {machine: Pick<Machine, "agentVersion" | "reachability" | "codexProfile">;operations?:HostOperation[];release?:AgentReleaseStatus}) {
+export function HostUpdateStatus({machine, operations=[], release, compact=false}: {machine: Pick<Machine, "agentVersion" | "reachability" | "codexProfile">;operations?:HostOperation[];release?:AgentReleaseStatus; compact?:boolean}) {
   const profile = machine.codexProfile ?? {};
   const value = (key: string) => typeof profile[key] === "string" ? String(profile[key]) : "";
   const latest = operations.filter(o=>o.type==="agent.update").sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
   const recent = latest && (!value("agentUpdateCheckedAt") || Date.parse(latest.updatedAt)>=Date.parse(value("agentUpdateCheckedAt")));
-  const phase = recent ? latest.state==="succeeded" ? String(latest.result?.phase ?? "checked") : latest.state : value("agentUpdateState");
+  const reportedPhase = recent ? latest.state==="succeeded" ? String(latest.result?.phase ?? "checked") : latest.state : value("agentUpdateState");
+  const phase = ["restarting", "staged", "installing"].includes(reportedPhase) && machine.agentVersion === value("agentUpdateTarget") && !value("agentUpdateVerifiedAt") ? "verification_pending" : reportedPhase;
   const active = ["rollout_wait","downloading","prepared","waiting_for_idle","installing","preparing","staged","restarting","verifying","accepted","running"].includes(phase);
   const labels: Record<string,string> = {
+    verification_pending:t("已运行目标版本，升级健康回执待核验"),
     accepted:t("等待主机"), running:t("正在检查更新"), checked:t("检查完成"), unknown:t("结果待核验"), expired:t("操作已过期"),
     rollout_wait:t("新版正在分批发布，尚未轮到本机"), downloading:t("正在下载与校验"), prepared:t("新版已准备，等待切换"), waiting_for_idle:t("等待任务或通话结束"),
     installing:t("正在安装"), preparing:t("正在准备升级"), staged:t("已安装，等待启动"), restarting:t("正在重启连接服务"), verifying:t("正在确认连接与运行健康"),
@@ -17,6 +19,7 @@ export function HostUpdateStatus({machine, operations=[], release}: {machine: Pi
   };
   const status = release?.status==="mismatch" ? t("更新源不一致，暂无法确认最新版本") : release?.status!=="ready" ? t("暂无法确认最新版本") : machine.agentVersion===release.publicVersion ? t("当前运行版本与发布版本一致") : t("运行版本与发布版本不同，请检查更新");
   const installed=value("agentInstalledVersion");
+  if (compact) return <p className="subtle">{machine.reachability !== "live" ? t("离线，显示最后上报状态") : phase && labels[phase] ? labels[phase] : status}</p>;
   return <div className="host-update-status" aria-live="polite">
     <dl><div><dt>{t("实际运行版本")}</dt><dd>{machine.agentVersion}</dd></div>
       {installed!==machine.agentVersion && <div><dt>{t("已安装版本")}</dt><dd>{installed || t("等待主机报告")}</dd></div>}

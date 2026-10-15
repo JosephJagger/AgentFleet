@@ -114,6 +114,7 @@ export class RelayConnection {
   private sentEvents = new Set<string>();
   private projectMappings = new Map<string, string>();
   private readonly onMaintenance: ((offer: Record<string, unknown>) => Promise<void>) | undefined;
+  private readonly onUpdateHint: ((revision: string) => void) | undefined;
   private readonly onReady: (() => void) | undefined;
   private renewing = false;
   private readonly fileTransfers = new Map<string, AbortController>();
@@ -127,6 +128,7 @@ export class RelayConnection {
     logger: RelayLogger;
     onMaintenance?: (offer: Record<string, unknown>) => Promise<void>;
     onReady?: () => void;
+    onUpdateHint?: (revision: string) => void;
   }) {
     this.runtime = options.runtime;
     this.store = options.store;
@@ -136,6 +138,7 @@ export class RelayConnection {
     this.logger = options.logger;
     this.onMaintenance = options.onMaintenance;
     this.onReady = options.onReady;
+    this.onUpdateHint = options.onUpdateHint;
     this.runtime.setCallbacks({
       onOutboxChanged: () => void this.flushOutbox(),
       onVolatile: (event) => this.sendVolatile(event),
@@ -405,6 +408,8 @@ export class RelayConnection {
         await this.runtime.setProjectContentPolicy(value.projectExternalId, value.syncContent, Number(value.retentionDays));
         return;
       case "heartbeat.ack":
+        if (this.reconciliationReady && typeof value.updateRevision === "string" && /^[a-f0-9]{64}$/.test(value.updateRevision)) this.onUpdateHint?.(value.updateRevision);
+        return;
       case "maintenance.ack":
       case "command.ack.confirmed":
       case "pong":

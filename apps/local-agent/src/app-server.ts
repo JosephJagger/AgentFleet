@@ -1449,7 +1449,7 @@ export class CodexAppServer implements AppServerClient {
       const voiceId=this.voiceIds.get(threadId);
       if(voiceId && ["thread/realtime/transcript/delta","thread/realtime/transcript/done"].includes(method) && ["user","assistant"].includes(String(params.role))) {
         const text=method.endsWith("/done") ? params.text : params.delta;
-        if(typeof text==="string") this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event:"transcript",role:params.role,text:text.slice(0,8000),final:method.endsWith("/done")}},this.appServerEpoch);
+        if(typeof text==="string") this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event:"transcript",role:params.role,text,final:method.endsWith("/done")}},this.appServerEpoch);
       }
       if (voiceId && method === "thread/realtime/itemAdded" && isRecord(params.item) && params.item.type === "handoff_request") {
         this.callbacks.onVolatile({type:"voice.event",nativeThreadId:threadId,nativeTurnId:voiceId,payload:{event:"task",phase:"delegated"}},this.appServerEpoch);

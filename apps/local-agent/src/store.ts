@@ -613,6 +613,21 @@ export class StateStore {
     });
   }
 
+  /** Serialize admission with command claims; waiting for an update never drains work. */
+  async tryBeginUpdate(operationId: string): Promise<boolean> {
+    return this.update(state => {
+      if (state.maintenanceDrain || !this.canSafelyRestart()) return false;
+      state.maintenanceDrain = { operationId, startedAt: nowIso() };
+      return true;
+    });
+  }
+
+  async finishUpdateAdmission(operationId: string): Promise<void> {
+    await this.update(state => {
+      if (state.maintenanceDrain?.operationId === operationId) delete state.maintenanceDrain;
+    });
+  }
+
   async setPanelVoiceRuntime(value: {voiceId:string;pid?:number} | undefined) { await this.update(state=>{if(value)state.panelVoiceRuntime=value;else delete state.panelVoiceRuntime;}); }
 
   private auxiliaryActivities = new Set<string>();

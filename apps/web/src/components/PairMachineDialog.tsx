@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { enrollmentTicket, onboardCommand, uninstallCommand, type InstallPlatform } from "../lib/enrollment";
+import { enrollmentTicket, npmConnectCommand, npmInstallCommand, onboardCommand, uninstallCommand, type InstallPlatform } from "../lib/enrollment";
 import type { Enrollment } from "../lib/types";
 import { ApiError } from "../lib/types";
 import { DiscoveryStatus } from "./DiscoveryStatus";
@@ -82,7 +82,7 @@ function remainingLabel(expiresAt: string, now: number) {
   return t("{0}:{1} 后失效", String(minutes).padStart(2, "0"), String(seconds).padStart(2, "0"));
 }
 
-function FlowSteps({ copied, claimed, confirmed, ready }: { copied: boolean; claimed: boolean; confirmed: boolean; ready: boolean }) {
+function FlowSteps({ copied, claimed, confirmed, ready, npm }: { copied: boolean; claimed: boolean; confirmed: boolean; ready: boolean; npm: boolean }) {
   const states = [
     copied || claimed ? "done" : "active",
     claimed ? "done" : copied ? "active" : "idle",
@@ -90,7 +90,7 @@ function FlowSteps({ copied, claimed, confirmed, ready }: { copied: boolean; cla
     ready ? "done" : confirmed ? "active" : "idle",
   ];
   const steps = [
-    [t("安装"), t("复制一次命令")],
+    [t("安装"), npm ? t("安装后运行连接命令") : t("复制一次命令")],
     [t("验证身份"), t("自动识别主机")],
     [t("连接"), t("启动后台服务")],
     [t("发现项目"), t("同步已有会话")],
@@ -108,6 +108,11 @@ function FlowSteps({ copied, claimed, confirmed, ready }: { copied: boolean; cla
 }
 
 export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMachineDialogProps) {
+  const npmAvailable = import.meta.env.VITE_NPM_INSTALL_AVAILABLE === "true";
+  const [installMethod, setInstallMethod] = useState<"direct" | "npm">("direct");
+  const npm = npmAvailable && installMethod === "npm";
+  const [npmInstallCopied, setNpmInstallCopied] = useState(false);
+  const [npmNpxCopied, setNpmNpxCopied] = useState(false);
   const [uninstallCopied, setUninstallCopied] = useState(false);
   const [platform, setPlatform] = useState<InstallPlatform>("linux");
   const [enrollment, setEnrollment] = useState<Enrollment>();
@@ -153,6 +158,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
 
   async function beginEnrollment(force = false) {
     setCopied(false);
+    setNpmNpxCopied(false);
     setAlias("");
     setCreateError("");
     setPollError("");
@@ -198,6 +204,8 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
     if (!open) {
       creationRef.current = undefined;
       setEnrollment(undefined);
+      setInstallMethod("direct");
+      setNpmInstallCopied(false);
       return;
     }
     void beginEnrollment();
@@ -294,7 +302,8 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
     if (!enrollment?.id || !enrollment.bootstrapSecret) return "";
     return enrollmentTicket(enrollment.id, enrollment.bootstrapSecret);
   }, [enrollment?.id, enrollment?.bootstrapSecret]);
-  const command = useMemo(() => ticket ? onboardCommand(location.origin, ticket, platform) : "", [ticket, platform]);
+  const command = useMemo(() => ticket ? (npm ? npmConnectCommand(location.origin, ticket, platform) : onboardCommand(location.origin, ticket, platform)) : "", [ticket, platform, npm]);
+  const npxCommand = useMemo(() => ticket ? npmConnectCommand(location.origin, ticket, platform, true) : "", [ticket, platform]);
   const removeCommand = useMemo(() => uninstallCommand(location.origin, platform), [platform]);
   const claimed = enrollment?.status === "claimed" || enrollment?.status === "confirmed" || enrollment?.status === "redeemed";
   const browserConfirmed = enrollment?.status === "confirmed" || enrollment?.status === "redeemed";
@@ -328,6 +337,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
   if (!open) return null;
 
   const guidedExpired = enrollment?.status === "expired" || enrollment?.status === "cancelled";
+  const copyUnavailable = guidedExpired || ticketTimeElapsed;
   const verificationReady = (enrollment?.status === "claimed" || enrollment?.status === "confirmed") && Boolean(enrollment.verificationPhrase && enrollment.fingerprint);
 
   return (
@@ -343,19 +353,26 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
         </div>
 
         <>
-            <FlowSteps copied={copied} claimed={claimed} confirmed={browserConfirmed} ready={enrollment?.discovery?.state === "ready"} />
+            <FlowSteps copied={copied} claimed={claimed} confirmed={browserConfirmed} ready={enrollment?.discovery?.state === "ready"} npm={npm} />
             <div className="platform-tabs" role="tablist" aria-label={t("目标主机系统")}>
               {([['linux', 'Linux'], ['macos', 'macOS'], ['windows', 'Windows']] as const).map(([value, label]) => (
-                <button type="button" role="tab" aria-label={label} aria-selected={platform === value} tabIndex={platform === value ? 0 : -1} className={platform === value ? "platform-tab platform-tab--active" : "platform-tab"} key={value} disabled={claimed} onClick={() => { setPlatform(value); setCopied(false); setUninstallCopied(false); }} onKeyDown={(event) => {
+                <button type="button" role="tab" aria-label={label} aria-selected={platform === value} tabIndex={platform === value ? 0 : -1} className={platform === value ? "platform-tab platform-tab--active" : "platform-tab"} key={value} disabled={claimed} onClick={() => { setPlatform(value); setCopied(false); setNpmNpxCopied(false); setUninstallCopied(false); }} onKeyDown={(event) => {
                   const choices: InstallPlatform[] = ["linux", "macos", "windows"];
                   const index = choices.indexOf(value);
                   const next = event.key === "ArrowRight" ? (index + 1) % 3 : event.key === "ArrowLeft" ? (index + 2) % 3 : event.key === "Home" ? 0 : event.key === "End" ? 2 : undefined;
                   if (next === undefined) return;
-                  event.preventDefault(); setPlatform(choices[next]); setCopied(false); setUninstallCopied(false);
+                  event.preventDefault(); setPlatform(choices[next]); setCopied(false); setNpmNpxCopied(false); setUninstallCopied(false);
                   event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
                 }}><span>{label}</span><small>{platform === value ? <><Check size={13} aria-hidden="true" />{t("已选择")}</> : t("点击选择")}</small></button>
               ))}
             </div>
+            {npmAvailable && <div className="pair-install-choice">
+              <span id="pair-install-method-label" className="pair-install-choice__label">{t("安装方式")}</span>
+              <div className="pair-install-method" role="group" aria-labelledby="pair-install-method-label">
+                <button type="button" aria-pressed={!npm} disabled={claimed} onClick={() => { setInstallMethod("direct"); setCopied(false); setNpmNpxCopied(false); }}><Check className="pair-install-method__check" size={15} aria-hidden="true" />{t("直接安装")}</button>
+                <button type="button" aria-pressed={npm} disabled={claimed} onClick={() => { setInstallMethod("npm"); setCopied(false); setNpmNpxCopied(false); }}><Check className="pair-install-method__check" size={15} aria-hidden="true" />{t("npm 安装")}</button>
+              </div>
+            </div>}
             {enrollment?.machineReady ? (
               <section className="pair-complete"><CircleCheck size={28} /><h3>{displayName(enrollment.machineName)} {locale() === "en" ? " " : ""}{t("已连接")}</h3><DiscoveryStatus discovery={enrollment.discovery} /><form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!enrollment.machineId) return; setBusy(true); try { if (alias.trim() !== enrollment.machineName) await api.updateMachineAlias(enrollment.machineId, alias.trim() || null); onPaired(enrollment.machineId); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机显示名称")}</span><input aria-label={t("新主机显示名称")} value={alias} maxLength={80} onChange={(event) => setAlias(event.target.value)} /></label><button type="submit" className="button button--primary" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <ArrowRight size={16} />}{locale() === "en" ? " " : ""}{t("查看项目")}</button></form></section>
             ) : creating ? (
@@ -369,16 +386,32 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
             ) : command && enrollment ? (
               <>
                 <p className="pair-run-location" id="install-run-location" role="status"><strong>{t("在哪里运行：")}</strong>{runInstructions[platform]}</p>
+                {npm && <p className="pair-npm-note">{t("需要 Node.js 22 或更高版本及 npm。按顺序运行以下两条命令，或使用下方 npx 命令。")}</p>}
                 <section className={`connection-receipt${claimed ? " connection-receipt--claimed" : ""}`} aria-label={t("主机连接回执")}>
                   <header>
                     <span className="terminal-lights" aria-hidden="true"><i /><i /><i /></span>
                     <code>agentfleet / secure enrollment</code>
                     <span className="receipt-expiry">{remainingLabel(enrollment.expiresAt, now)}</span>
                   </header>
+                  {npm && <div className="receipt-command">
+                    <span>{t("1. 安装")}</span>
+                    <code>{npmInstallCommand}</code>
+                    <button type="button" className="receipt-copy" onClick={async () => {
+                      try {
+                        await copyText(npmInstallCommand);
+                        setNpmInstallCopied(true);
+                        onToast("success", t("npm 安装命令已复制；安装完成后，还需运行连接命令。"));
+                      } catch (error) {
+                        onToast("danger", errorMessage(error));
+                      }
+                    }} aria-label={t("复制 npm 安装命令")} aria-describedby="install-run-location">
+                      {npmInstallCopied ? <Check size={15} /> : <Copy size={15} />}{npmInstallCopied ? t("已复制") : t("复制")}
+                    </button>
+                  </div>}
                   <div className="receipt-command">
-                    <span>{t("安装")}</span>
+                    <span>{npm ? t("2. 连接") : t("安装")}</span>
                     <code>{command}</code>
-                    <button ref={copyButtonRef} type="button" className="receipt-copy" disabled={ticketTimeElapsed} onClick={async () => {
+                    <button ref={copyButtonRef} type="button" className="receipt-copy" disabled={copyUnavailable} onClick={async () => {
                       try {
                         await copyText(command);
                         setCopied(true);
@@ -386,14 +419,14 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
                       } catch (error) {
                         onToast("danger", errorMessage(error));
                       }
-                    }} aria-label={copied ? t("命令已复制") : t("复制安装命令")} aria-describedby="install-run-location">
+                    }} aria-label={npm ? t("复制连接命令") : copied ? t("命令已复制") : t("复制安装命令")} aria-describedby="install-run-location">
                       {copied ? <Check size={15} /> : <Copy size={15} />}{copied ? t("已复制") : t("复制")}
                     </button>
                   </div>
                   <div className="receipt-trace" aria-live="polite">
                     <div className={`receipt-line ${copied || claimed ? "receipt-line--done" : "receipt-line--active"}`}>
                       {copied || claimed ? <Check size={13} /> : <TerminalSquare size={13} />}
-                      <span>{t("安装命令")}</span><strong>{copied || claimed ? t("已复制") : t("等待复制")}</strong>
+                      <span>{npm ? t("连接命令") : t("安装命令")}</span><strong>{copied || claimed ? t("已复制") : t("等待复制")}</strong>
                     </div>
                     <div className={`receipt-line ${claimed ? "receipt-line--done" : copied ? "receipt-line--waiting" : "receipt-line--idle"}`}>
                       {claimed ? <Check size={13} /> : copied ? <LoaderCircle className="spin" size={13} /> : <span className="receipt-node" />}
@@ -405,6 +438,29 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
                     </div>
                   </div>
                 </section>
+
+                {npm && <>
+                  <details className="pair-npx-option">
+                    <summary>{t("免全局安装：使用 npx")}</summary>
+                    <div className="receipt-command">
+                      <span>npx</span>
+                      <code>{npxCommand}</code>
+                      <button type="button" className="receipt-copy" disabled={copyUnavailable} onClick={async () => {
+                        try {
+                          await copyText(npxCommand);
+                          setNpmNpxCopied(true);
+                          setCopied(true);
+                          onToast("success", t("命令已复制，在目标 {0} 主机粘贴运行", platform === "macos" ? "macOS" : platform === "windows" ? "Windows PowerShell" : "Linux"));
+                        } catch (error) {
+                          onToast("danger", errorMessage(error));
+                        }
+                      }} aria-label={t("复制 npx 连接命令")} aria-describedby="install-run-location">
+                        {npmNpxCopied ? <Check size={15} /> : <Copy size={15} />}{npmNpxCopied ? t("已复制") : t("复制")}
+                      </button>
+                    </div>
+                  </details>
+                  <p className="pair-npm-note">{t("已有 Agent 安装会保持原状，不会重新配对。后续 Agent 升级仍由面板管理。")}</p>
+                </>}
 
                 <div className="pair-download-note">
                   <ShieldCheck size={15} />
@@ -420,7 +476,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
                 ) : enrollment.status === "redeemed" && (enrollment.machineReachability === "online" || enrollment.discovery?.state === "error") ? (
                   <section className="pair-loading" role="status"><div><strong>{enrollment.discovery?.readiness === "action_required" || enrollment.discovery?.state === "error" ? t("主机已连接，自检发现需要处理的问题") : t("主机已连接，正在检查运行环境并扫描会话")}</strong><span>{t("连接凭据已保存，不需要删除主机或重新生成安装命令。")}</span><DiscoveryStatus discovery={enrollment.discovery} /><button type="button" className="button button--primary" onClick={() => { onPaired(enrollment.machineId); onClose(); }}>{t("查看主机与自检结果")}</button></div></section>
                 ) : credentialRecoveryElapsed ? (
-                  <div className="pair-loading" role="status"><LoaderCircle className="spin" size={19} /><div><strong>{t("仍在等待目标主机上线")}</strong><span>{t("若终端已显示配对完成，请重跑上方原命令以继续服务安装；只有终端明确报告恢复期已结束时，才关闭窗口后生成新票据。")}</span></div></div>
+                  <div className="pair-loading" role="status"><LoaderCircle className="spin" size={19} /><div><strong>{t("仍在等待目标主机上线")}</strong><span>{npm ? t("运行 agentfleets status 查看已安装服务，并按终端给出的修复步骤处理；请勿删除主机或重复配对。") : t("若终端已显示配对完成，请重跑上方原命令以继续服务安装；只有终端明确报告恢复期已结束时，才关闭窗口后生成新票据。")}</span></div></div>
                 ) : enrollment.status === "redeemed" && !enrollment.machineReady ? (
                   <div className="pair-loading" role="status"><LoaderCircle className="spin" size={19} /><div><strong>{t("凭据已签发，正在等待目标主机上线")}</strong><span>{t("终端正在启动后台服务；上线后 Agent 会立即发现 Codex 项目和会话。")}</span></div></div>
                 ) : ticketTimeElapsed ? (
@@ -439,11 +495,12 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
                     <p className="modal-note">{t("正在启动主机服务，无需再次确认。")}</p>
                   </section>
                 ) : (
-                  <p className="modal-note">{t("命令将自动安装并连接主机；上线后会立即发现 Codex 项目和会话，无需安装 npm 或开放入站端口。")}</p>
+                  <p className="modal-note">{npm ? t("连接命令会安装独立的后台服务；关闭终端或清理 npx 缓存不会停止服务，无需开放入站端口。") : t("命令将自动安装并连接主机；上线后会立即发现 Codex 项目和会话，无需安装 npm 或开放入站端口。")}</p>
                 )}
               </>
             ) : null}
             <div className="pair-uninstall-footer">
+              {npm && <p className="pair-uninstall-note">{t("npm uninstall -g agentfleets 只移除命令入口，不卸载后台 Agent。完整卸载请使用下方命令。")}</p>}
               <p className="pair-uninstall-note">{t("仅当你不再希望 AgentFleets 连接这台主机时，才运行下方卸载命令。它会卸载这台主机上的 AgentFleets Agent，并清除连接身份；完成后，请在面板的主机页面删除该主机记录。")}</p>
               <section className="connection-receipt connection-receipt--uninstall-command" aria-label={t("主机卸载命令")}>
                 <div className="receipt-command receipt-command--uninstall">

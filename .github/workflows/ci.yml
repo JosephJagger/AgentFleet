@@ -9,6 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  npm-installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, macos-15-intel, windows-2022]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm --prefix packages/agentfleets-cli run build
+      - run: npm --prefix packages/agentfleets-cli test
+      - name: Verify POSIX concurrent installation protection
+        if: runner.os != 'Windows'
+        run: python3 packaging/test-npm-fresh-install.py
+      - name: Verify Windows browser pairing and installation protection
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./packaging/test-windows-onboarding.ps1
   installation-lifecycle:
     strategy:
       fail-fast: false
@@ -38,6 +60,7 @@ jobs:
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path packaging/install.ps1), [ref]$tokens, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
           & ./packaging/test-windows-update-handoff.ps1
+          & ./packaging/test-windows-onboarding.ps1
   windows-installer:
     runs-on: windows-2022
     timeout-minutes: 5
@@ -50,6 +73,7 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path packaging/install.ps1), [ref]$tokens, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+          & ./packaging/test-windows-release-directory.ps1
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

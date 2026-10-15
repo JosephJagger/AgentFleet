@@ -1,3 +1,5 @@
+import {VoiceDirectory} from './voice-directory.js';
+import {VoiceTranscripts} from './voice-transcripts.js';
 import {LiveChatStore} from './live-chat.js';
 import {LongTermPreferences} from './long-term-preferences.js';
 import type { SessionHistoryService } from './session-history.js';
@@ -18,6 +20,7 @@ export class PanelVoiceService {
   readonly memory:VoiceTaskStore;
   private memoryCursor=0;
   constructor(private db:ControlPlaneDatabase,private registry:RegistryService,private coordination:CoordinationService,private progress=new SessionProgressService(db,registry),private historyService?:SessionHistoryService) {this.memory=new VoiceTaskStore(db,registry);}
+  directory(principal:Principal,input:Record<string,unknown>={}) {return new VoiceDirectory(this.db,this.registry).read(principal,input);}
   async history(principal:Principal,voiceId:string,input:Record<string,unknown>) {
     this.own(principal,voiceId);
     invariant(this.historyService,409,'HISTORY_UNSUPPORTED','会话历史查询尚未接通');
@@ -169,6 +172,9 @@ export class PanelVoiceService {
     invariant(typeof input==='object'&&input!==null&&!Array.isArray(input),400,"PANEL_INPUT","Invalid tool input");
     const args=input as Record<string,unknown>;
     this.own(principal,voiceId,args.action==='recover');
+    const transcripts=new VoiceTranscripts(this.db);
+    transcripts.assertReadOnly(voiceId,String(args.action));
+    if(args.action==='transcript.search')return transcripts.search(principal,voiceId,args);
     if(typeof args.action==='string'&&['preference.list','preference.save','preference.update','preference.delete'].includes(args.action))return new LongTermPreferences(this.db).tool(principal,args);
     if(args.action==='live.chat.search')return new LiveChatStore(this.db).search(principal,args);
     if(args.action==='recover')return this.recover(principal,{cursor:args.cursor,view:args.view});
@@ -222,6 +228,7 @@ export class PanelVoiceService {
         return {...this.describeClaim(principal,previous.command_id,args.sessionId),duplicate:true};
       }
       const session=this.registry.getSession(principal,args.sessionId);
+      new VoiceDirectory(this.db,this.registry).assertFresh(principal,session.logicalSessionId);
       invariant(!session.managed&&session.actions.claim.allowed,409,session.actions.claim.reasonCode??'PANEL_TARGET_BUSY',session.actions.claim.message??'目标当前不能接管');
       const pending=this.db.get<{command_id:string}>(`SELECT c.command_id FROM commands c JOIN command_projection p USING(command_id) WHERE c.logical_session_id=? AND c.type='thread.claim' AND p.state IN ('accepted','dispatching','unknown') LIMIT 1`,session.logicalSessionId);
       invariant(!pending,409,'PANEL_CLAIM_PENDING','已有接管操作，请查询原接管指令，不要重复执行',pending?{commandId:pending.command_id}:undefined);
@@ -244,6 +251,7 @@ export class PanelVoiceService {
         invariant(previous.logical_session_id===args.sessionId&&JSON.parse(previous.precondition_json).nativeTurnId===args.nativeTurnId&&previous.body_json&&JSON.parse(previous.body_json).prompt===args.prompt,409,'IDEMPOTENCY_KEY_REUSE','追加标识已使用且内容不同或已过期，请查询原指令');
         return {...this.describeSteer(principal,previous.command_id,args.sessionId),duplicate:true};
       }
+      new VoiceDirectory(this.db,this.registry).assertFresh(principal,session.logicalSessionId);
       const owner=this.db.get<{user_id:string;job_id:string}>('SELECT user_id,job_id FROM panel_voice_jobs WHERE workspace_id=? AND session_id=? AND native_turn_id=? LIMIT 1',principal.workspaceId,session.logicalSessionId,args.nativeTurnId);
       invariant(!owner||owner.user_id===principal.userId,403,'PANEL_TURN_OWNED_ELSEWHERE','当前任务属于其他调度用户，不能追加');
       invariant(session.activeTurnId===args.nativeTurnId,409,'ACTIVE_TURN_CONFLICT','当前任务已结束或发生变化，请重新查询；不会自动创建新任务');
@@ -251,11 +259,7 @@ export class PanelVoiceService {
       const result=this.coordination.createCommand(principal,session.logicalSessionId,{type:'turn.steer',clientMutationId:mutation,payload:{prompt:args.prompt},precondition:{nativeTurnId:args.nativeTurnId,turnControlVersion:session.turnControlVersion}},true);
       return {...this.describeSteer(principal,String(result.command.commandId),args.sessionId),duplicate:result.duplicate};
     }
-    if(args.action==='search') {
-      invariant(typeof args.query==='string'&&args.query.length<=200,400,"PANEL_QUERY","请提供主机、项目或会话关键词");
-      const page=this.registry.listSessionsPage(principal,{q:args.query,limit:20,...(typeof args.cursor==='string'?{cursor:args.cursor}:{})});
-      return {sessions:page.items.map(s=>({id:s.logicalSessionId,title:s.title,provider:s.provider,managed:s.managed,executionState:s.executionState,canClaim:s.actions.claim.allowed,claimUnavailableReason:s.actions.claim.allowed?null:{code:s.actions.claim.reasonCode,message:s.actions.claim.message},canQueue:Boolean(s.activeTurnId)&&s.actions.queue.allowed,queueUnavailableReason:!s.activeTurnId?{code:'QUEUE_NOT_NEEDED',message:'当前没有运行任务，请直接派发'}:s.actions.queue.allowed?null:{code:s.actions.queue.reasonCode,message:s.actions.queue.message},projectId:s.projectId,machineId:s.machineId,host:this.registry.getMachine(principal,s.machineId).name,project:s.projectAlias,available:s.actions.start.allowed,canAppend:s.actions.steer.allowed,activeTurnId:s.activeTurnId,appendUnavailableReason:s.actions.steer.allowed?null:{code:s.actions.steer.reasonCode,message:s.actions.steer.message},unavailableReason:s.actions.start.allowed?null:{code:s.actions.start.reasonCode,message:s.actions.start.message}})),nextCursor:page.nextCursor,total:page.total,instruction:"If ambiguous, ask the user. Never guess a target. Unmanaged targets require explicit current authorization then claim and verified receipt before dispatch. Running managed targets accept dispatch mode queue; steer is only for supplementing the current task, not a new task."};
-    }
+    if(args.action==='search'||args.action==='directory')return this.directory(principal,args);
     if(args.action==='status') {
       invariant(args.sessionId===undefined||(typeof args.sessionId==='string'&&args.sessionId.trim().length>0),400,'PANEL_INPUT','sessionId 必须是非空字符串');
       invariant(args.jobId===undefined||(typeof args.jobId==='string'&&args.jobId.trim().length>0),400,'PANEL_INPUT','jobId 必须是非空字符串');
@@ -293,6 +297,7 @@ export class PanelVoiceService {
     todo=todo??this.memory.save(principal,{intent:args.prompt,sessionId:session.logicalSessionId,key:`dispatch:${hashPayload({mutation})}`},voiceId);
     invariant(todo.state==='pending',409,'VOICE_TODO_CANCELLED','该待办已取消，不能派发');
     if(args.todoId===undefined)invariant(todo.intent===args.prompt&&todo.session_id===session.logicalSessionId,409,'VOICE_TODO_STALE','待办已修改，请读取最新版本并确认');
+    new VoiceDirectory(this.db,this.registry).assertFresh(principal,session.logicalSessionId);
     const queued=args.mode==='queue';
     const competing=this.db.all<PanelJob>(`SELECT j.* FROM panel_voice_jobs j JOIN logical_sessions s ON s.logical_session_id=j.session_id
       WHERE j.workspace_id=? AND s.project_id=? AND j.state NOT IN ('completed','failed','interrupted')`,principal.workspaceId,session.projectId)
