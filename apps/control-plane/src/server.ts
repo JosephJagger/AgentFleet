@@ -747,6 +747,15 @@ export async function buildControlPlane(
     return { agentManifestVersion, manifestStatus };
   };
   const agentReleaseStatus = createAgentReleaseStatus(readPublishedAgent, config.publicOrigin);
+  let agentReleaseHint = "";
+  const updateHint = () => {
+    // Discovery must not delay heartbeat acknowledgements or task handling.
+    void agentReleaseStatus().then(status => { if (status.revision) agentReleaseHint = status.revision; }).catch(() => undefined);
+    try {
+      const runtime = config.runtimeReleaseDir ? channelState(config.runtimeReleaseDir).target?.revision ?? "" : "";
+      return createHash("sha256").update(`${agentReleaseHint}:${runtime}`).digest("hex");
+    } catch { return undefined; }
+  };
   app.get("/api/agent-release-status", {preHandler:authenticate}, async () => agentReleaseStatus());
   const authenticateAdmin = async (request: FastifyRequest) => { await authenticate(request); auth.requirePlatformAdmin(request.principal!); };
   const mutateAdmin = async (request: FastifyRequest) => { await mutate(request); auth.requirePlatformAdmin(request.principal!); };
@@ -1820,7 +1829,7 @@ export async function buildControlPlane(
             registry.heartbeat(identity, message.capacity, message.activeTurns, message.unreachableReason, message.codexProfile, { readOnly: message.readOnly, readOnlyReasons: message.readOnlyReasons, maintenance: message.maintenance });
             usage.quota(identity.machineId,message.quota);
             if(message.discovery) registry.updateDiscovery(identity.machineId,message.discovery);
-            sendJson(socket, { type: "heartbeat.ack", serverTime: nowIso() });
+            sendJson(socket, { type: "heartbeat.ack", serverTime: nowIso(), updateRevision: updateHint() });
             dispatchPendingCommands(identity.machineId, identity.workspaceId);
             dispatchReadyQueues(identity.machineId, identity.workspaceId);
             for(const offer of machineMaintenance.offers(identity.machineId)) sendJson(socket,offer);

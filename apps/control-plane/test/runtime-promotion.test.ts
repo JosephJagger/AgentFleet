@@ -84,3 +84,14 @@ test("unknown releases wait for adapter review before downloading and retain the
   assert.equal(validatedCodexSchemaHash("0.159.0"), "81a88c04ae4984b16d73080f4109d0477682bc76c8adbe483e371175ce54c054");
   assert.equal(validatedCodexSchemaHash("0.158.0"), "5742a9a7dd41a8b44dca3138f506e013620d4a93573c792b1e5881c053f169a7");
 });
+
+test("temporary discovery failures retry sooner without changing the validated target", async t => {
+  const directory=await mkdtemp(join(tmpdir(),"runtime-retry-"));t.after(()=>rm(directory,{recursive:true,force:true}));
+  const initial=target("0.153.2");writeChannelJson(directory,"state.json",{...emptyChannel(),target:initial});
+  const worker=new RuntimePromotion(directory,directory,{discover:async()=>{throw new Error("官方版本检查失败 HTTP 503");}});
+  await worker.run(true);const first=channelState(directory);
+  assert.deepEqual(first.target,initial);assert.equal(first.transientFailures,1);
+  assert(Date.parse(first.nextCheckAt!)-Date.now()<65_000);
+  await worker.run(true);const second=channelState(directory);
+  assert.equal(second.transientFailures,2);assert(Date.parse(second.nextCheckAt!)-Date.now()>110_000);
+});

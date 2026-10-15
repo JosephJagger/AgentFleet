@@ -70,3 +70,26 @@ test("temporary transport failures may retry but corrupted or incompatible relea
   assert.equal(retryableUpdateFailure("UPDATE_INSTALL_FAILED","schema mismatch"),false);
   assert.equal(retryableUpdateFailure("UPDATE_INSTALL_FAILED","permission denied"),false);
 });
+
+test("late progress cannot overwrite a matching terminal health receipt", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "update-receipt-")); t.after(() => rm(dir, { recursive: true, force: true }));
+  const tx: UpdateTransaction = { updateId: "receipt", phase: "preparing", previousVersion: "0.1.0", targetVersion: AGENT_VERSION,
+    backupDir: join(dir, "updates", "backup"), launcher: "unused", previousTarget: "unused", profilePresent: false, codexPresent: false, startedAt: new Date().toISOString() };
+  await writeUpdateTransaction(dir, tx);
+  await writeUpdateTransaction(dir, { ...tx, phase: "staged" });
+  await writeUpdateTransaction(dir, { ...tx, phase: "verifying" });
+  await writeUpdateTransaction(dir, { ...tx, phase: "succeeded", verifiedAt: new Date().toISOString() });
+  await recordUpdateProgress(dir, "restarting", AGENT_VERSION);
+  assert.equal((await agentUpdateDiagnostics(dir)).agentUpdateState, "succeeded");
+  await new Promise(resolve => setTimeout(resolve, 5));
+  await recordUpdateProgress(dir, "downloading", "99.0.0");
+  const next = await agentUpdateDiagnostics(dir);
+  assert.equal(next.agentUpdateState, "downloading");
+  assert.equal(next.agentUpdateVerifiedAt, "", "old health proof must not certify a new target");
+});
+
+test("running a target without its health receipt is pending verification, not still restarting or successful", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "update-pending-")); t.after(() => rm(dir, { recursive: true, force: true }));
+  await recordUpdateProgress(dir, "restarting", AGENT_VERSION);
+  assert.equal((await agentUpdateDiagnostics(dir)).agentUpdateState, "verification_pending");
+});

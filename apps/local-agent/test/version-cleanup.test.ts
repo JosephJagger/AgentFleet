@@ -36,3 +36,13 @@ test("upgrade and clean cannot own the lock concurrently",async()=>{const f=awai
 test("automatic cleanup persists its result and does not repeatedly rescan the same installation",async()=>{const f=await fixture();try{let scans=0;const o={...f.options,processReferences:async()=>{scans++;return "";}};await automaticVersionCleanup(o);const n=scans;await automaticVersionCleanup(o);assert.equal(scans,n);const r=JSON.parse(await readFile(join(f.dataDir,"version-cleanup.json"),"utf8"));assert.equal(r.automatic,true);assert(r.deletedBytes>0);}finally{await f.dispose();}});
 
 test("automatic cleanup retries recently installed files after the grace period",async()=>{const f=await fixture();try{const now=Date.now();await utimes(join(f.bin,"1.0.0"),new Date(now),new Date(now));await automaticVersionCleanup({...f.options,now});assert((await readdir(f.bin)).includes("1.0.0"));await automaticVersionCleanup({...f.options,now:now+3_600_001});assert(!(await readdir(f.bin)).includes("1.0.0"));}finally{await f.dispose();}});
+
+test("a prepared runtime remains protected beyond the recent-file grace period",async()=>{
+ const f=await fixture();try{
+ await f.add(join(f.dataDir,"codex/releases/1.0.4-prepared"),"codex");
+ await writeFile(join(f.dataDir,"runtime-prepared.json"),JSON.stringify({directory:"1.0.4-prepared"}));
+ const report=await manageVersions(f.options,true);
+ assert.equal(report.entries.find(e=>e.name==="1.0.4-prepared")?.reason,"referenced");
+ assert.equal(await readFile(join(f.dataDir,"codex/releases/1.0.4-prepared/codex"),"utf8"),"binary");
+ }finally{await f.dispose();}
+});

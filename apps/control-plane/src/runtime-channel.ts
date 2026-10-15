@@ -17,6 +17,7 @@ export interface RuntimeChannelState {
   message: string; checks: { name: string; state: "passed" | "failed"; detail: string }[];
   target?: RuntimeTarget; previous?: RuntimeTarget;
   history: { at: string; version: string; result: string; message: string }[];
+  transientFailures?: number;
   handledCheck?: string; handledRollback?: string;
 }
 export interface RuntimeChannelControl { paused: boolean; checkId: string; rollbackId?: string }

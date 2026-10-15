@@ -387,7 +387,7 @@ export type ServerToAgentMessage =
     }
   | { type: "reconciliation.ack"; reconciliationId: string; serverTime: string }
   | { type: "content.epoch"; logicalSessionId: string; contentEpoch: number }
-  | { type: "heartbeat.ack"; serverTime: string }
+  | { type: "heartbeat.ack"; serverTime: string; updateRevision?: string }
   | {
       type: "event.ack";
       eventId: string;

@@ -336,6 +336,7 @@ async function run(args: ParsedArgs): Promise<void> {
     const relay = new RelayConnection({
       runtime, store, identity, pairing, requestedUrl: url, logger,
       onMaintenance: (offer) => maintenance.handle(offer),
+      onUpdateHint: revision => updater?.notifyRelease(revision),
       onReady: () => { connected = true; void maintenance.replay().catch((error) => logger.warn(publicError(error).message)); },
     });
     maintenance = new AgentMaintenance({ store, runtime, ...(updater ? { updater } : {}),

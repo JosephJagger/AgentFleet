@@ -62,7 +62,7 @@ class DeploymentFenceTests(unittest.TestCase):
             self.db.commit()
         self.assertTrue(deploy.wait_idle(self.db, 'owner', 10, sleep=user_hangs_up))
 
-    def invoke(self, fail=False, public_fail=False):
+    def invoke(self, fail=False, public_fail=False, validator_phase=None):
         commands = []
         def runner(*args):
             commands.append(args)
@@ -70,6 +70,8 @@ class DeploymentFenceTests(unittest.TestCase):
                 return json.dumps([{'Id':'sha256:fixture', 'Config':{'Env':['AGENTFLEET_BUILD_SHA=fixture-build']}}])
             if args[:2] == ('docker', 'inspect'):
                 return json.dumps([{'Config':{'Env':['PUBLIC_ORIGIN=https://example.test']}}])
+            if args[:2] == ('docker', 'exec'):
+                return json.dumps({'phase':validator_phase})
             if args[:2] == ('docker', 'run'):
                 return '1.2.3'
             if args[0] == 'node' and public_fail:
@@ -77,7 +79,7 @@ class DeploymentFenceTests(unittest.TestCase):
             if args[:2] == ('docker', 'compose') and fail:
                 raise RuntimeError('synthetic switch failure')
             return ''
-        with patch.object(deploy.sys, 'argv', ['deploy', '--database', str(self.path), '--image', 'fixture']), patch.object(deploy, 'run', runner), patch.object(deploy, 'health', return_value={'status':'ok','build':'fixture-build','voiceDeploymentGuard':1,'schemaVersion':52}):
+        with patch.object(deploy.sys, 'argv', ['deploy', '--database', str(self.path), '--image', 'fixture'] + (['--with-validator'] if validator_phase else [])), patch.object(deploy, 'run', runner), patch.object(deploy, 'health', return_value={'status':'ok','build':'fixture-build','voiceDeploymentGuard':1,'schemaVersion':52}):
             result = deploy.main()
         return result, commands
 
@@ -97,6 +99,17 @@ class DeploymentFenceTests(unittest.TestCase):
         self.assertEqual(commands[4][-4:], ('-d','--no-deps','--no-build','control-plane'))
         self.assertEqual(self.db.execute('SELECT count(*) FROM voice_deployment_guard').fetchone()[0], 0)
         self.assertEqual(len(list(self.path.parent.glob('*.predeploy-*.sqlite'))), 1)
+
+    def test_busy_validator_defers_without_restarting_any_service(self):
+        result, commands = self.invoke(validator_phase='validating')
+        self.assertEqual(result, 75)
+        self.assertFalse(any(cmd[:2] == ('docker', 'compose') for cmd in commands))
+        self.assertEqual(self.db.execute('SELECT count(*) FROM voice_deployment_guard').fetchone()[0], 0)
+
+    def test_idle_validator_is_included_only_when_requested(self):
+        result, commands = self.invoke(validator_phase='promoted')
+        self.assertEqual(result, 0)
+        self.assertTrue(any(cmd[-2:] == ('control-plane', 'runtime-validator') for cmd in commands))
 
     def test_public_failure_does_not_claim_publication_or_lock_healthy_calls(self):
         with self.assertRaisesRegex(RuntimeError, 'public release mismatch'):

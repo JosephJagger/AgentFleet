@@ -159,3 +159,52 @@ test("a staged update is not installed again while waiting for the worker to exi
   assert.deepEqual(await Promise.all([updater.checkNow(),updater.checkNow()]),["staged","staged"]);
   assert.equal(installations,1);assert.equal(restarts,1);assert.equal(requests,2);
 });
+
+test("update admission is exclusive, preserves busy work and releases only its own gate", async t => {
+  const { StateStore } = await import("../src/store.js");
+  const { rm } = await import("node:fs/promises");
+  const directory = await mkdtemp(join(tmpdir(), "update-admission-"));
+  const store = new StateStore(directory); await store.initialize();
+  t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+  await store.setPanelVoiceRuntime({ voiceId: "live-call" });
+  assert.equal(await store.tryBeginUpdate("candidate"), false);
+  assert.equal(store.snapshot().maintenanceDrain, undefined);
+  await store.setPanelVoiceRuntime(undefined);
+  const admission = await Promise.all([store.tryBeginUpdate("candidate-a"), store.tryBeginUpdate("candidate-b")]);
+  assert.deepEqual(admission, [true, false]);
+  await store.finishUpdateAdmission("candidate-b");
+  assert.equal(store.snapshot().maintenanceDrain?.operationId, "candidate-a");
+  await store.finishUpdateAdmission("candidate-a");
+  assert.equal(store.snapshot().maintenanceDrain, undefined);
+});
+
+test("busy Agent preparation leaves command admission open", async t => {
+  const { StateStore } = await import("../src/store.js");
+  const { rm } = await import("node:fs/promises");
+  const directory = await mkdtemp(join(tmpdir(), "update-busy-"));
+  const store = new StateStore(directory); await store.initialize();
+  t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+  let prepared = 0;
+  const updater = new AgentAutoUpdater({currentVersion:"1.0.0",controlPlaneUrl:"https://fleet.example",dataDir:directory,store,
+    canUpdate:()=>false,onStaged:()=>assert.fail("busy"),logger:{info(){},warn(){}},
+    fetchImpl:async input=>new Response(String(input).endsWith("manifest.json")?JSON.stringify({schemaVersion:1,version:"1.1.0"}):"#!/bin/sh\n"),
+    prepareUpdate:async()=>{prepared++;},stageUpdate:async()=>assert.fail("busy")});
+  assert.equal(await updater.checkNow(),"busy"); assert.equal(prepared,1);
+  assert.equal(store.snapshot().maintenanceDrain, undefined);
+});
+
+test("release hints coalesce, still verify the manifest, and stop after shutdown", async t => {
+  let reads = 0;
+  const updater = new AgentAutoUpdater({ currentVersion: "1.0.0", controlPlaneUrl: "https://fleet.example", dataDir: "/tmp/unused-hint",
+    initialDelayMs: 100_000, canUpdate: () => false, onStaged: () => assert.fail("hint is not activation"), logger: { info(){}, warn(){} },
+    fetchImpl: async () => { reads++; return new Response(JSON.stringify({schemaVersion:1,version:"1.0.0"})); } });
+  t.after(() => updater.stop());
+  updater.start();
+  updater.notifyRelease("first"); updater.notifyRelease("first");
+  await new Promise(resolve => setTimeout(resolve, 3200));
+  assert.equal(reads, 1);
+  updater.notifyRelease("first");
+  await updater.stop(); updater.notifyRelease("second");
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.equal(reads, 1);
+});

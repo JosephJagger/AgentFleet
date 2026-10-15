@@ -27,3 +27,12 @@ test("cancelled downloads never retry", async () => {
   await assert.rejects(retryUpdateDownload(async () => { count++; abort.abort(); throw new TypeError("fetch failed"); }, abort.signal));
   assert.equal(count, 1);
 });
+
+test("temporary HTTP failures retry; authentication failures remain visible", async () => {
+  let calls=0;
+  const result=await retryUpdateDownload(async()=>new Response("",{status:++calls<3?503:200}));
+  assert.equal(result.status,200); assert.equal(calls,3);
+  calls=0;
+  const denied=await retryUpdateDownload(async()=>{calls++;return new Response("",{status:403});});
+  assert.equal(denied.status,403); assert.equal(calls,1);
+});

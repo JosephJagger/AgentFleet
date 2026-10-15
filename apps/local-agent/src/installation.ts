@@ -72,11 +72,14 @@ export async function agentUpdateDiagnostics(dataDir: string): Promise<Record<st
   }
   try {
     const progress = JSON.parse(await readFile(join(dataDir, "update-progress.json"), "utf8"));
-    if (typeof progress.updatedAt === "string" && progress.updatedAt > (transaction?.updatedAt ?? transaction?.startedAt ?? "")) {
+    const terminalForTarget = transaction && transaction.targetVersion === progress.targetVersion && ["succeeded", "rolled_back", "failed"].includes(transaction.phase) && ["installing", "staged", "restarting", "verifying"].includes(progress.phase);
+    if (!terminalForTarget && typeof progress.updatedAt === "string" && progress.updatedAt > (transaction?.updatedAt ?? transaction?.startedAt ?? "")) {
       result.agentUpdateState = String(progress.phase).slice(0, 64);
       result.agentUpdateTarget = String(progress.targetVersion).slice(0, 32);
       result.agentUpdateError = String(progress.error ?? "").slice(0, 500);
       result.agentUpdateCheckedAt = progress.updatedAt;
+      result.agentUpdateVerifiedAt = "";
+      if (["restarting", "staged", "installing"].includes(result.agentUpdateState!) && progress.targetVersion === AGENT_VERSION) result.agentUpdateState = "verification_pending";
     }
   } catch { /* No prior automatic check. */ }
   return result;
