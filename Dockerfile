@@ -5,6 +5,7 @@ WORKDIR /build/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY apps/web/ ./
+ARG VITE_NPM_INSTALL_AVAILABLE=false
 RUN npm run build
 
 FROM node:24-bookworm-slim AS control-plane-build

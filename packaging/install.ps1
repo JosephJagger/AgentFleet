@@ -7,6 +7,37 @@ param(
   [string]$Alias,
   [switch]$Purge
 )
+
+# An absent ticket uses the native browser-confirmed pairing flow. Do not pass
+# an empty --ticket: the CLI would treat the following option as its value.
+function Get-AgentFleetOnboardArguments {
+  param([string]$PanelUrl, [string]$EnrollmentTicket, [string]$MachineName,
+        [string]$ProjectPath, [string]$AgentDataDir, [string]$ExecutablePath, [string]$ProjectAlias)
+  $onboardArguments = @('onboard', '--url', $PanelUrl, '--name', $MachineName,
+    '--project', $ProjectPath, '--data-dir', $AgentDataDir, '--executable', $ExecutablePath)
+  if ($EnrollmentTicket) { $onboardArguments += @('--ticket', $EnrollmentTicket) }
+  if ($ProjectAlias) { $onboardArguments += @('--alias', $ProjectAlias) }
+  return $onboardArguments
+}
+
+function Assert-AgentFleetNpmFreshInstall {
+  param([string]$AgentDataDir, [string]$AgentBinDir, [string]$LauncherPath)
+  if ($env:AGENTFLEET_NPM_FRESH_INSTALL -ne '1') { return }
+  foreach ($existingPath in @($LauncherPath, (Join-Path $AgentBinDir 'current.txt'),
+      (Join-Path $AgentBinDir 'previous.txt'), (Join-Path $AgentDataDir 'state.sqlite'),
+      (Join-Path $AgentDataDir 'runtime-profile.json'))) {
+    if (Get-Item -LiteralPath $existingPath -Force -ErrorAction SilentlyContinue) {
+      throw 'installer: existing installation detected; preserved. Use the panel repair or update instructions.'
+    }
+  }
+  # Even an orphaned registered task must not be replaced by a fresh npm install.
+  $taskLookupErrors = @()
+  $existingTask = Get-ScheduledTask -TaskName 'AgentFleet-Background' -ErrorAction SilentlyContinue -ErrorVariable taskLookupErrors
+  if ($existingTask -or @($taskLookupErrors | Where-Object { $_.CategoryInfo.Category -ne 'ObjectNotFound' }).Count -gt 0) {
+    throw 'installer: existing installation detected or task state unknown; preserved. Use the panel repair or update instructions.'
+  }
+}
+
 $ErrorActionPreference = 'Stop'
 $env:AGENTFLEET_INSTALLER_PID = [string]$PID
 $ProgressPreference = 'SilentlyContinue'
@@ -25,6 +56,8 @@ if ((Test-Path $installLockPath) -and ((Get-Item -LiteralPath $installLockPath).
 try { $installLock = [IO.File]::Open($installLockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }
 catch { throw 'installer: another installation, repair or rollback is running' }
 try {
+
+Assert-AgentFleetNpmFreshInstall -AgentDataDir $StateRoot -AgentBinDir $BinRoot -LauncherPath $StableLauncher
 
 # Windows PowerShell 5 does not consistently honor HTTPS_PROXY for its web
 # cmdlets. The background Agent detects the enabled Windows proxy and passes it
@@ -312,9 +345,8 @@ try {
     Register-AgentFleetUpdateHandoff
     Remove-Item -LiteralPath $cacheFile -Force
     Write-Host "Staged AgentFleet $($manifest.version); the task will restart into it."; exit 0 }
-  $args = @('onboard','--url',$BaseUrl,'--ticket',$Ticket,'--name',$Name,'--project',$Project,'--data-dir',$StateRoot,'--executable',$StableLauncher)
-  if ($Alias) { $args += @('--alias',$Alias) }
-  & $launcher @args
+  $onboardArguments = Get-AgentFleetOnboardArguments -PanelUrl $BaseUrl -EnrollmentTicket $Ticket -MachineName $Name -ProjectPath $Project -AgentDataDir $StateRoot -ExecutablePath $StableLauncher -ProjectAlias $Alias
+  & $launcher @onboardArguments
   exit $LASTEXITCODE
 } finally {
   if (Test-Path $temp) { Remove-Item -LiteralPath $temp -Recurse -Force }

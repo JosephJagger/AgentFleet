@@ -13,6 +13,14 @@ function powershellQuote(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+export const npmInstallCommand = "npm install -g agentfleets";
+
+export function npmConnectCommand(origin: string, ticket: string, platform: InstallPlatform = "linux", useNpx = false): string {
+  if (!ticket) throw new Error("Enrollment ticket is incomplete");
+  const quote = platform === "windows" ? powershellQuote : shellQuote;
+  return `${useNpx ? "npx agentfleets@latest" : "agentfleets"} connect --url ${quote(new URL(origin).origin)} --ticket ${quote(ticket)}`;
+}
+
 export function onboardCommand(origin: string, ticket: string, platform: InstallPlatform = "linux"): string {
   const normalizedOrigin = new URL(origin).origin;
   if (platform === "windows") {

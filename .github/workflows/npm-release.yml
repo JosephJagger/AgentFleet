@@ -1,0 +1,87 @@
+name: npm installer release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the tested tarball (requires npm trusted publisher)
+        type: boolean
+        default: false
+      channel:
+        description: npm distribution tag
+        type: choice
+        options: [next, latest]
+        default: next
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-installer-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, macos-15-intel, windows-2022]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm --prefix packages/agentfleets-cli run build
+      - run: npm --prefix packages/agentfleets-cli test
+      - if: runner.os != 'Windows'
+        run: python3 packaging/test-npm-fresh-install.py
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: ./packaging/test-windows-onboarding.ps1
+
+  pack:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - run: npm --prefix packages/agentfleets-cli run pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentfleets-npm-package
+          path: packages/agentfleets-cli/dist/*.tgz
+          if-no-files-found: error
+
+  publish:
+    if: inputs.publish && github.ref == 'refs/heads/main'
+    needs: pack
+    runs-on: ubuntu-24.04
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          name: agentfleets-npm-package
+          path: npm-package
+      - name: Publish tested artifact through npm OIDC
+        env:
+          NPM_RELEASE_CHANNEL: ${{ inputs.channel }}
+        run: |
+          npm install -g npm@11 --ignore-scripts --no-audit --no-fund
+          npm publish npm-package/*.tgz --access public --ignore-scripts --provenance --tag "$NPM_RELEASE_CHANNEL"
+      - name: Verify public tarball bytes
+        run: node packaging/verify-npm-release.mjs npm-package/*.tgz

@@ -3592,5 +3592,21 @@
   "低": "Low",
   "帧率 {0} fps": "{0} fps",
   "WebGL 不可用，可能未开启硬件加速": "WebGL unavailable; hardware acceleration may be off",
-  "软件渲染，请在浏览器设置中开启硬件加速": "Software rendering; enable hardware acceleration in browser settings"
+  "软件渲染，请在浏览器设置中开启硬件加速": "Software rendering; enable hardware acceleration in browser settings",
+  "安装后运行连接命令": "Run connect after installing",
+  "直接安装": "Direct installation",
+  "npm 安装": "npm installation",
+  "需要 Node.js 22 或更高版本及 npm。按顺序运行以下两条命令，或使用下方 npx 命令。": "Requires Node.js 22 or later and npm. Run the two commands in order, or use the npx command below.",
+  "1. 安装": "1. Install",
+  "2. 连接": "2. Connect",
+  "npm 安装命令已复制；安装完成后，还需运行连接命令。": "npm installation command copied. Run the connect command after installation.",
+  "复制 npm 安装命令": "Copy npm installation command",
+  "复制连接命令": "Copy connect command",
+  "连接命令": "Connect command",
+  "免全局安装：使用 npx": "Without global installation: use npx",
+  "复制 npx 连接命令": "Copy npx connect command",
+  "已有 Agent 安装会保持原状，不会重新配对。后续 Agent 升级仍由面板管理。": "Existing Agent installations are preserved without pairing again. The panel continues to manage Agent updates.",
+  "运行 agentfleets status 查看已安装服务，并按终端给出的修复步骤处理；请勿删除主机或重复配对。": "Run agentfleets status to inspect the installed service, then follow the repair steps in the terminal. Do not delete the host or pair it again.",
+  "连接命令会安装独立的后台服务；关闭终端或清理 npx 缓存不会停止服务，无需开放入站端口。": "The connect command installs an independent background service. Closing the terminal or clearing the npx cache will not stop it. No inbound ports are required.",
+  "npm uninstall -g agentfleets 只移除命令入口，不卸载后台 Agent。完整卸载请使用下方命令。": "npm uninstall -g agentfleets removes only the command entry point, not the background Agent. Use the command below to uninstall it completely."
 }

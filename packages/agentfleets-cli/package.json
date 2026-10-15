@@ -1,0 +1,19 @@
+{
+  "name": "agentfleets",
+  "version": "0.1.0",
+  "description": "Install and connect an AgentFleets host using the verified native installer.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "bin": { "agentfleets": "bin/agentfleets.mjs" },
+  "files": ["bin/", "src/", "dist/installers/", "dist/LICENSE", "README.md"],
+  "repository": { "type": "git", "url": "git+https://github.com/JosephJagger/AgentFleet.git", "directory": "packages/agentfleets-cli" },
+  "homepage": "https://github.com/JosephJagger/AgentFleet#readme",
+  "bugs": { "url": "https://github.com/JosephJagger/AgentFleet/issues" },
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "pack": "npm run build && npm pack --ignore-scripts --pack-destination dist"
+  }
+}

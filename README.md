@@ -29,6 +29,10 @@ Visit **[https://www.agentfleets.cn](https://www.agentfleets.cn)** to try the ho
 
 1. Open the console from the website and sign in with your email verification code.
 2. Choose **Add host**, then run the installation command on a computer where you already use Codex.
+
+An optional [npm installation entry](docs/npm-installation.md) supports global
+installation and npx. It uses the same native Agent and panel-managed updates;
+direct installation remains available without Node/npm.
 3. Once connected, choose a project and session to continue your work from a desktop or mobile browser.
 
 Tasks execute on your connected host. Bring your own Codex account and available quota; the free panel experience does not include Codex credits. If you prefer to run the panel yourself, follow [Self-host](#self-host).

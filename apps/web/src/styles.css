@@ -951,6 +951,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .platform-tab:disabled { cursor: default; opacity: .6; }
 .platform-tab--active:disabled { opacity: 1; }
 .pair-run-location { margin: 16px 0 12px; padding: 12px 14px; border-left: 3px solid var(--cobalt); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--cobalt-soft); color: var(--ink); font-size: var(--text-small); line-height: 1.75; }
+.pair-install-method { display: flex; gap: 4px; margin-top: 12px; }
+.pair-install-method button { background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--muted); font: inherit; font-size: var(--text-caption); padding: 7px 12px; }
+.pair-install-method button[aria-pressed="true"] { background: var(--paper-solid); border-color: var(--line-strong); color: var(--ink); }
+.pair-install-method button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+.pair-install-method button:disabled { cursor: default; opacity: .6; }
+.pair-npm-note { color: var(--muted); font-size: var(--text-caption); line-height: 1.6; margin: 10px 2px; }
+.pair-npx-option { border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--muted); font-size: var(--text-caption); margin-top: 10px; overflow: hidden; }
+.pair-npx-option summary { cursor: pointer; padding: 10px 12px; }
+.pair-npx-option .receipt-command { background: var(--terminal); border-top: 1px solid var(--line); border-bottom: 0; }
 @media (prefers-reduced-motion: reduce) { .platform-tab { transition: none; } }
 
 .pair-steps {
