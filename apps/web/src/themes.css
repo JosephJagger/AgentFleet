@@ -107,7 +107,7 @@
 /* Theme controls live beside language because both affect the whole workspace. */
 .login-preferences { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 24px; }
 .language-switcher, .theme-switcher { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; color: var(--muted); }
-.theme-switcher select { color: var(--ink); background: var(--paper-solid); border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit; font-size: 12px; padding: 6px; max-width: 116px; }
+.theme-switcher select { color: var(--ink); background: var(--paper-solid); border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit; font-size: var(--text-caption); padding: 6px; max-width: 116px; }
 .login-copy > .login-preferences { margin-bottom: 24px; }
 .login-preferences .language-switcher { margin-bottom: 0; }
 .rail-theme { grid-column: 1 / -1; margin-top: 4px; padding: 12px 3px 2px; border-top: 1px solid var(--line); }
@@ -153,8 +153,8 @@
 .theme-option__preview i:last-of-type { width: 58%; }
 .theme-option__copy { min-width: 0; }
 .theme-option__copy strong, .theme-option__copy small { display: block; }
-.theme-option__copy strong { font-size: 13px; }
-.theme-option__copy small { margin-top: 5px; color: var(--muted); font-size:12px; line-height: 1.45; }
+.theme-option__copy strong { font-size: var(--text-small); }
+.theme-option__copy small { margin-top: 5px; color: var(--muted); font-size:var(--text-caption); line-height: 1.45; }
 .theme-option__check { display: grid; place-items: center; width: 20px; height: 20px; color: var(--canvas); background: transparent; border-radius: 50%; }
 .theme-option[aria-checked="true"] .theme-option__check { background: var(--cobalt); }
 

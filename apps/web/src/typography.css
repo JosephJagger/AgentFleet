@@ -1,0 +1,54 @@
+/* Typography system: type scale tokens, numeric alignment, heading rhythm and a
+   size-matched monospace. Loaded last among the shared sheets; theme-specific
+   selectors (higher specificity) still win where a theme sets its own face. */
+
+/* Monospace glyphs are wider and taller than the UI face at the same size;
+   shrink the system faces slightly so paths and hashes sit level with text. */
+@font-face {
+  font-family: "AF Mono";
+  src: local("SF Mono"), local("SFMono-Regular"), local("Cascadia Mono"), local("Menlo"), local("Consolas"), local("Liberation Mono");
+  size-adjust: 92%;
+}
+
+/* Touch screens keep a 16px root, so the scale steps down one notch: secondary
+   rows stay compact while body copy and form fields remain at 16px. */
+@media (max-width: 900px), (pointer: coarse) {
+  :root {
+    --text-micro: .75rem;
+    --text-caption: .8125rem;
+    --text-small: .875rem;
+  }
+}
+
+/* Heading rhythm. Tight tracking only suits Latin; CJK keeps natural spacing. */
+:is(h1, h2, h3) { font-weight: 600; }
+:lang(en) :is(h1, h2, h3), :is(h1, h2, h3):lang(en) { letter-spacing: -.012em; }
+:lang(en) :is(.host-heading h2, .machine-summary h1) { letter-spacing: -.015em; }
+
+/* Counts, clocks and usage figures: fixed-width digits so values do not jitter. */
+.stat-value, .nav-count, time, .world-clock, .usage-table, .usage-table td,
+.settings-pagination, .version-storage-summary, [class*="count"], [class*="token"],
+[class*="usage"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Inter's contextual alternates and kerning improve small UI text. */
+body { font-feature-settings: "calt" 1, "kern" 1; }
+:lang(zh) body, body:lang(zh) { font-feature-settings: normal; }
+
+/* Empty provider lanes should not reserve the height of a session window. */
+.buzhou-session-provider .buzhou-session-row:not(:has(.buzhou-session-window)) { min-height: 44px; }
+.buzhou-session-provider .buzhou-session-row:not(:has(.buzhou-session-window)) .buzhou-session-track > p { padding-block: 8px; }
+
+/* Rail summary: keep a clear gap before the theme switcher below it. */
+@media (min-width: 901px) {
+  .rail-status { margin-bottom: 14px; }
+  .rail-theme { margin-top: 6px; }
+}
+
+/* Inter is slightly wider than the CJK face's Latin glyphs: keep the catalog
+   header actions on one row and let only the title wrap. */
+@media (min-width: 901px) {
+  .catalog-heading-actions { flex-wrap: nowrap; flex-shrink: 0; gap: 6px; }
+  .catalog-heading-actions .button { white-space: nowrap; padding-inline: 12px; }
+}

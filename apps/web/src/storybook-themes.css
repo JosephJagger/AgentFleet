@@ -2,7 +2,7 @@
 :root[data-theme="frozen"] {
   color-scheme: light;
   --canvas: #eaf4fb; --paper: #fafdff; --paper-solid: #e0eef8; --paper-raised: #f2f8fd; --terminal: #eaf3fc;
-  --ink: #213c57; --muted: #526c85; --faint: #60788e;
+  --ink: #213c57; --muted: #4b637a; --faint: #566c80;
   --line: #c5dcea; --line-strong: #86aec9; --component-line: #9dbdd5;
   --cobalt: #27699d; --cobalt-deep: #235488; --cobalt-soft: #d7eaf9;
   --teal: #22756d; --teal-soft: #dcefeb; --amber: #8b5c21; --amber-soft: #f7ecd7;

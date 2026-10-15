@@ -22,7 +22,7 @@
 :root[data-theme="spirited"] {
   color-scheme: light;
   --canvas: #f4eddf; --paper: #fffaf0; --paper-solid: #eee3cf; --paper-raised: #faf2e4; --terminal: #f2e9d9;
-  --ink: #40392e; --muted: #716351; --faint: #7c6b58;
+  --ink: #40392e; --muted: #675a4a; --faint: #726251;
   --line: #dccdb5; --line-strong: #a98d70; --component-line: #b69d7e;
   --cobalt: #a13e32; --cobalt-deep: #813026; --cobalt-soft: #f4ded3;
   --teal: #346e60; --teal-soft: #dfebe1; --amber: #8b5d20; --amber-soft: #f5e6c6;
@@ -32,7 +32,7 @@
 :root[data-theme="rivendell"] {
   color-scheme: light;
   --canvas: #edf0e6; --paper: #fbfcf5; --paper-solid: #e3e9d9; --paper-raised: #f3f6eb; --terminal: #eaf0e2;
-  --ink: #304538; --muted: #5b6e5b; --faint: #67745c;
+  --ink: #304538; --muted: #516251; --faint: #5e6a54;
   --line: #cbd5be; --line-strong: #93a17c; --component-line: #9cae8b;
   --cobalt: #386446; --cobalt-deep: #244b33; --cobalt-soft: #dce9d6;
   --teal: #296c69; --teal-soft: #dcebe7; --amber: #806222; --amber-soft: #eee6cc;
@@ -42,7 +42,7 @@
 :root[data-theme="mario"] {
   color-scheme: light;
   --canvas: #edf6fc; --paper: #fffefa; --paper-solid: #e2edf5; --paper-raised: #f6fafd; --terminal: #eaf2f9;
-  --ink: #263e54; --muted: #566b7d; --faint: #647387;
+  --ink: #263e54; --muted: #4f6273; --faint: #5c6a7c;
   --line: #c5d8e6; --line-strong: #789bb4; --component-line: #94b0c5;
   --cobalt: #b9362e; --cobalt-deep: #932a25; --cobalt-soft: #fce3dc;
   --teal: #287349; --teal-soft: #ddefdf; --amber: #866014; --amber-soft: #fbefc6;

@@ -140,7 +140,7 @@ dialog.modal.usage-dialog > .usage-body { flex: 1 1 auto; min-height: 0; overflo
   .settings-category--pair { grid-template-columns: minmax(0,1fr); gap: 16px; }
   .settings-view .settings-block, .hosts-view .host-workspace .settings-block { padding: 16px; }
   .settings-view .codex-configuration .settings-sections { gap: 12px; }
-  .settings-view .codex-configuration .settings-sections strong { font-size: .8125rem; }
+  .settings-view .codex-configuration .settings-sections strong { font-size: var(--text-micro); }
   .settings-view .codex-config-tabs .button { flex: 1 1 auto; }
   .settings-view .codex-settings-fields { gap: 16px; }
   .host-settings-link { padding: 14px 16px; }
@@ -157,10 +157,10 @@ dialog.modal.usage-dialog > .usage-body { flex: 1 1 auto; min-height: 0; overflo
 @media(max-width:600px) {
   .settings-view > .settings-sections { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); overflow: visible; }
   .settings-view > .settings-sections > button { padding: 10px 6px; justify-content: center; gap: 5px; }
-  .settings-view > .settings-sections strong { font-size: .8125rem; }
+  .settings-view > .settings-sections strong { font-size: var(--text-micro); }
   .settings-view > .settings-sections svg { width: 16px; height: 16px; }
   .settings-view .codex-config-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
-  .settings-view .codex-config-tabs .button { flex: 0 0 auto; white-space: nowrap; font-size: .8125rem; }
+  .settings-view .codex-config-tabs .button { flex: 0 0 auto; white-space: nowrap; font-size: var(--text-micro); }
 }
 .settings-view .settings-layout--grouped { margin-top: 16px; }
 

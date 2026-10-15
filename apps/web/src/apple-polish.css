@@ -77,7 +77,7 @@ h1, h2, h3 { font-weight: 650; letter-spacing: -.018em; }
 }
 @media (max-width: 660px) {
   .primary-nav { inset-inline: 8px; gap: 1px; padding: 5px; border-radius: 16px; background: var(--paper); }
-  .primary-nav button { border-radius: 12px; font-size: .75rem; line-height: 1.2; white-space: nowrap; }
+  .primary-nav button { border-radius: 12px; font-size: var(--text-micro); line-height: 1.2; white-space: nowrap; }
   .primary-nav .nav-label-full { display: none; }
   .primary-nav .nav-label-compact { display: inline; }
   .primary-nav button.active { background: var(--cobalt-soft); box-shadow: none; }

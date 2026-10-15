@@ -1,7 +1,7 @@
 /* Existing storage keys intentionally remain stable for returning users. */
 :root[data-theme="daylight"] {
   --canvas: #edf5fa; --paper: #fcfeff; --paper-solid: #e5eff5; --paper-raised: #f4f9fc; --terminal: #edf4f8;
-  --ink: #283f50; --muted: #576d7c; --faint: #657988;
+  --ink: #283f50; --muted: #516573; --faint: #5a6c79;
   --line: #ccdce5; --line-strong: #91acbd; --component-line: #a5bfce;
   --cobalt: #24688c; --cobalt-deep: #1a506f; --cobalt-soft: #dceef7;
   --teal: #38775d; --teal-soft: #e0efe4;
@@ -32,7 +32,7 @@
 }
 :root[data-theme="eyecare"] {
   --canvas: #f4ecd6; --paper: #fff9e9; --paper-solid: #ece1c1; --paper-raised: #faf1d9; --terminal: #f1e8cd;
-  --ink: #493e2a; --muted: #726146; --faint: #7b694c;
+  --ink: #493e2a; --muted: #685840; --faint: #716146;
   --line: #ddccaa; --line-strong: #aa8c57; --component-line: #b89d6e;
   --cobalt: #96532c; --cobalt-deep: #7c4025; --cobalt-soft: #f3dfbf;
   --teal: #526e3a; --teal-soft: #e6ecd2; --amber: #805e17; --amber-soft: #f8e8b1;

@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/noto-sans-sc";
 import "./styles.css";
 import "./themes.css";
@@ -19,6 +20,7 @@ import "./host-sessions.css";
 import "./buzhoushan-theme.css";
 import "./interaction-stability.css";
 import "./workbench-panels.css";
+import "./typography.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
