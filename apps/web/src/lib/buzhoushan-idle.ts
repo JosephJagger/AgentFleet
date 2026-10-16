@@ -5,8 +5,8 @@ import type { EffectMode } from "./buzhoushan-effect-common";
 export type ScreensaverMode = "auto" | EffectMode;
 /** Effects in rotation/test order; keys 1..n choose them in the preview. */
 export const SCREENSAVER_EFFECTS: EffectMode[] = ["particles", "smoke", "matrix", "attractor", "wavegrid", "starfield", "threebody", "proton", "glyph"];
-/** Effects the voice-call screensaver cycles through with the arrows: the glyph ripples first, then the rest. */
-export const VOICE_STYLES: EffectMode[] = ["glyph", ...SCREENSAVER_EFFECTS.filter(mode => mode !== "glyph")];
+/** The order the arrows step through; the glyph ripples (which mirror the call voice) come first. */
+export const SCREENSAVER_ORDER: EffectMode[] = ["glyph", ...SCREENSAVER_EFFECTS.filter(mode => mode !== "glyph")];
 export const SCREENSAVER_MODES: ScreensaverMode[] = ["auto", ...SCREENSAVER_EFFECTS];
 export type ScreensaverQuality = "auto" | "high" | "medium" | "low";
 export const SCREENSAVER_QUALITIES: ScreensaverQuality[] = ["auto", "high", "medium", "low"];
@@ -74,30 +74,14 @@ export function useIdle(timeoutMs: number, enabled: boolean): boolean {
   return idle && enabled;
 }
 
-/** Manual preview from the toolbar; ends on the next click or key press. */
-let preview = false;
-const previewListeners = new Set<() => void>();
-export function setScreensaverPreview(value: boolean) {
-  if (preview === value) return;
-  preview = value;
-  previewListeners.forEach(listener => listener());
-}
-export function useScreensaverPreview(): boolean {
+/** Toolbar request to raise the screensaver at once, without waiting for the idle timer. */
+let requests = 0;
+const requestListeners = new Set<() => void>();
+export function requestScreensaver() { requests++; requestListeners.forEach(listener => listener()); }
+export function useScreensaverRequests(): number {
   return useSyncExternalStore(
-    notify => { previewListeners.add(notify); return () => { previewListeners.delete(notify); }; },
-    () => preview,
-    () => false,
-  );
-}
-
-/** Toolbar request to raise the voice-call screensaver at once (only honoured while a call is connected). */
-let voiceRequests = 0;
-const voiceRequestListeners = new Set<() => void>();
-export function requestVoiceScreensaver() { voiceRequests++; voiceRequestListeners.forEach(listener => listener()); }
-export function useVoiceScreensaverRequests(): number {
-  return useSyncExternalStore(
-    notify => { voiceRequestListeners.add(notify); return () => { voiceRequestListeners.delete(notify); }; },
-    () => voiceRequests,
+    notify => { requestListeners.add(notify); return () => { requestListeners.delete(notify); }; },
+    () => requests,
     () => 0,
   );
 }

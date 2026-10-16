@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createEffect, qualityFor, type EffectMode, type Pointer } from "../lib/buzhoushan-effects";
 import { QUALITY_TIERS, describeGpu, type QualityTier } from "../lib/buzhoushan-effect-common";
 import { createDemoVoice, voiceSignal } from "../lib/voice-signal";
-import { SCREENSAVER_EFFECTS, VOICE_STYLES, setScreensaverPreview, useIdle, useScreensaverPreview, useScreensaverPrefs, useVoiceScreensaverRequests } from "../lib/buzhoushan-idle";
+import { SCREENSAVER_ORDER, useIdle, useScreensaverPrefs, useScreensaverRequests } from "../lib/buzhoushan-idle";
 import { useVoiceStatus } from "../lib/voice-status";
 import { workbenchItems } from "./BuzhoushanActivity";
 import { t } from "../i18n";
@@ -44,7 +44,7 @@ function useWorkspaceBounds(active: boolean): CSSProperties | undefined {
  * Visual-only idle effect for the captured broadcast. It is click-through
  * (pointer-events: none), never blocks input, and leaves all other components mounted.
  */
-const CYCLE: EffectMode[] = SCREENSAVER_EFFECTS;
+const ORDER: EffectMode[] = SCREENSAVER_ORDER;
 const CYCLE_MS = 45_000;
 let cycleStart = 0;
 /** Lowest tier "auto" has had to fall back to; kept so the next screensaver starts there. */
@@ -71,113 +71,103 @@ function gpuLine(diag: { fps: number; w: number; h: number; dpr: number; voice: 
   return `${base} · ${gpu.renderer}${gpu.software ? ` · ${t("软件渲染，请在浏览器设置中开启硬件加速")}` : ""}`;
 }
 
+type Source = "idle" | "call" | "manual";
+
+/**
+ * The one broadcast screensaver. It is raised by the idle timer, by a connected global voice call or by the
+ * toolbar button, shows task progress (or standby) plus the voice-call state, and a click or key press leaves
+ * it (mouse movement does not). The arrows switch effects. It never blocks input or touches calls/tasks.
+ */
 export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
   const prefs = useScreensaverPrefs();
   const idle = useIdle(prefs.seconds * 1000, prefs.enabled);
-  const preview = useScreensaverPreview();
+  const requests = useScreensaverRequests();
+  const voice = useVoiceStatus();
   const status = taskStatus(detail);
-  const [previewMode, setPreviewMode] = useState<EffectMode>();
-  const [cycle, setCycle] = useState(cycleStart);
+  const callLive = voice.phase === "connected" || voice.phase === "recovering";
+
+  const [source, setSource] = useState<Source>();
+  const on = source !== undefined;
+  const bounds = useWorkspaceBounds(on);
+  const [idx, setIdx] = useState(0);
+  const [picked, setPicked] = useState(false);
+  const [toast, setToast] = useState("");
+  const [speaker, setSpeaker] = useState<Speaker>("none");
   const [autoLevel, setAutoLevel] = useState<QualityTier>(autoTier);
   const [diag, setDiag] = useState<{ fps: number; w: number; h: number; dpr: number; voice: boolean }>();
   const tier: QualityTier = prefs.quality === "auto" ? autoLevel : prefs.quality;
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const previewRef = useRef(false);
-  previewRef.current = preview;
   const pointerRef = useRef<Pointer>({ x: 0.5, y: 0.5, active: false });
   const busyRef = useRef(false);
   const speakerRef = useRef<Speaker>("none");
-  busyRef.current = Boolean(status);
-
-  // Voice-call screensaver: entered when a global call connects; only a click or key press leaves it.
-  const voice = useVoiceStatus();
-  const prefsRef = useRef(prefs);
-  prefsRef.current = prefs;
-  const [voiceOn, setVoiceOn] = useState(false);
-  const active = idle || preview || voiceOn;
-  const bounds = useWorkspaceBounds(active);
-  const [voiceIdx, setVoiceIdx] = useState(0);
-  const [toast, setToast] = useState("");
-  const [speaker, setSpeaker] = useState<Speaker>("none");
-  const seenSeq = useRef(voice.connectedSeq);
-  const showToast = (text: string, ms = 2400) => { setToast(text); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), ms); };
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const prefsRef = useRef(prefs), voiceRef = useRef(voice), sourceRef = useRef(source), idxRef = useRef(idx);
+  busyRef.current = Boolean(status);
+  prefsRef.current = prefs; voiceRef.current = voice; sourceRef.current = source; idxRef.current = idx;
   useEffect(() => () => clearTimeout(toastTimer.current), []);
+
+  const showToast = (text: string, ms = 2400) => { setToast(text); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), ms); };
+  const setIndex = (next: number) => { idxRef.current = next; setIdx(next); };
+  /** Which effect a fresh screensaver starts with: the glyph ripples during a call, else the configured effect. */
+  const startIndex = () => {
+    const phase = voiceRef.current.phase;
+    if (phase === "connected" || phase === "recovering") return 0;
+    const mode = prefsRef.current.mode;
+    return mode === "auto" ? cycleStart % ORDER.length : Math.max(0, ORDER.indexOf(mode));
+  };
+  const enter = (from: Source) => {
+    if (sourceRef.current) return;
+    sourceRef.current = from;
+    setSource(from); setPicked(false); setIndex(startIndex());
+    showToast(t("屏保：← → 切换效果，点击或按键退出"), 4000);
+  };
+  const step = (direction: 1 | -1) => {
+    const next = (idxRef.current + direction + ORDER.length) % ORDER.length;
+    setPicked(true); setIndex(next);
+    showToast(`${t(EFFECT_LABEL[ORDER[next]])} · ${next + 1}/${ORDER.length}`);
+  };
+
+  // Three ways in: the idle timer, a connected global call, and the toolbar button.
+  useEffect(() => { if (idle) enter("idle"); }, [idle]);
+  const seenSeq = useRef(voice.connectedSeq);
   useEffect(() => {
     if (voice.connectedSeq === seenSeq.current) return;
     seenSeq.current = voice.connectedSeq;
     const current = prefsRef.current;
     if (voice.kind !== "global" || !current.enabled || !current.autoVoice) return;
     // Let the call windows finish collapsing first.
-    const timer = setTimeout(() => {
-      setVoiceIdx(0); // every call starts with the glyph ripples
-      setVoiceOn(true);
-      showToast(t("声纹屏保：← → 切换样式，点击或按键退出"), 5000);
-    }, 350);
+    const timer = setTimeout(() => { if (sourceRef.current) { setIndex(0); setPicked(true); } else enter("call"); }, 350);
     return () => clearTimeout(timer);
   }, [voice.connectedSeq, voice.kind]);
-  // The toolbar button raises the voice screensaver again at once (no waiting for idle), keeping the style last used in this call.
-  const requests = useVoiceScreensaverRequests();
   const seenRequests = useRef(requests);
-  const voiceRef = useRef(voice);
-  voiceRef.current = voice;
+  useEffect(() => { if (requests === seenRequests.current) return; seenRequests.current = requests; enter("manual"); }, [requests]);
+
+  // Hanging up leaves a screensaver that the call itself raised.
+  useEffect(() => { if (source === "call" && !callLive) setSource(undefined); }, [source, callLive]);
+  // Leaving: a click or a key press (mouse movement does not). Arrows switch effects instead.
   useEffect(() => {
-    if (requests === seenRequests.current) return;
-    seenRequests.current = requests;
-    const phase = voiceRef.current.phase;
-    if (phase !== "connected" && phase !== "recovering") return;
-    setVoiceOn(true);
-    showToast(t("声纹屏保：← → 切换样式，点击或按键退出"), 5000);
-  }, [requests]);
-  // Hanging up (or a failed connection) leaves the voice screensaver.
-  useEffect(() => { if (voiceOn && voice.phase !== "connected" && voice.phase !== "recovering") setVoiceOn(false); }, [voiceOn, voice.phase]);
-  const stepVoice = (direction: 1 | -1) => {
-    setVoiceIdx(index => {
-      const next = (index + direction + VOICE_STYLES.length) % VOICE_STYLES.length;
-      showToast(`${t(EFFECT_LABEL[VOICE_STYLES[next]])} · ${next + 1}/${VOICE_STYLES.length}`);
-      return next;
-    });
-  };
-  useEffect(() => {
-    if (!voiceOn) return;
-    const end = (event: Event) => { if ((event.target as Element | null)?.closest?.(".buzhou-saver__nav")) return; setVoiceOn(false); };
+    if (!on) return;
+    const end = (event: Event) => { if ((event.target as Element | null)?.closest?.(".buzhou-saver__nav")) return; setSource(undefined); };
     const key = (event: KeyboardEvent) => {
-      if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); event.stopPropagation(); stepVoice(event.key === "ArrowRight" ? 1 : -1); return; }
-      setVoiceOn(false);
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); event.stopPropagation(); step(event.key === "ArrowRight" ? 1 : -1); return; }
+      setSource(undefined);
     };
-    // Mouse movement does not leave this mode; only a click or a key does.
+    // Ignore the click that raised it.
     const arm = setTimeout(() => { window.addEventListener("pointerdown", end, true); window.addEventListener("keydown", key, true); }, 400);
     return () => { clearTimeout(arm); window.removeEventListener("pointerdown", end, true); window.removeEventListener("keydown", key, true); };
-  }, [voiceOn]);
-
-  // Preview: number keys or arrow keys choose an effect; any other key or a click ends it.
+  }, [on]);
+  // The configured "auto" rotation, unless a call is live or the broadcaster picked an effect.
   useEffect(() => {
-    if (!preview) { setPreviewMode(undefined); return; }
-    const end = () => setScreensaverPreview(false);
-    const key = (event: KeyboardEvent) => {
-      const index = Number(event.key) - 1;
-      if (index >= 0 && index < CYCLE.length) { setPreviewMode(CYCLE[index]); return; }
-      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-        const step = event.key === "ArrowRight" ? 1 : CYCLE.length - 1;
-        setPreviewMode(current => CYCLE[(CYCLE.indexOf(current ?? CYCLE[0]) + step) % CYCLE.length]);
-        return;
-      }
-      end();
-    };
-    // Ignore the click that started the preview.
-    const arm = setTimeout(() => { window.addEventListener("pointerdown", end, true); window.addEventListener("keydown", key, true); }, 300);
-    return () => { clearTimeout(arm); window.removeEventListener("pointerdown", end, true); window.removeEventListener("keydown", key, true); };
-  }, [preview]);
-  useEffect(() => {
-    if (!active || prefs.mode !== "auto" || preview || voiceOn) return;
-    const timer = setInterval(() => setCycle(value => { cycleStart = value + 1; return value + 1; }), CYCLE_MS);
+    if (!on || picked || prefs.mode !== "auto" || callLive) return;
+    const timer = setInterval(() => { const next = (idxRef.current + 1) % ORDER.length; cycleStart = next; setIndex(next); }, CYCLE_MS);
     return () => clearInterval(timer);
-  }, [active, prefs.mode, preview, voiceOn]);
-  const mode: EffectMode = voiceOn ? VOICE_STYLES[voiceIdx] : previewMode ?? (prefs.mode === "auto" ? CYCLE[cycle % CYCLE.length] : prefs.mode);
+  }, [on, picked, prefs.mode, callLive]);
+  const mode: EffectMode = ORDER[idx % ORDER.length];
 
-  // The pointer attracts/repels particles and stirs smoke; an idle screensaver ends on any movement, so this matters while previewing.
+  // The pointer attracts/repels particles and stirs smoke.
   useEffect(() => {
-    if (!active) return;
+    if (!on) return;
     const move = (event: PointerEvent) => {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect || rect.width === 0) return;
@@ -187,11 +177,11 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
     window.addEventListener("pointermove", move, { passive: true });
     document.addEventListener("pointerleave", leave);
     return () => { window.removeEventListener("pointermove", move); document.removeEventListener("pointerleave", leave); pointerRef.current = { x: 0.5, y: 0.5, active: false }; };
-  }, [active]);
+  }, [on]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!active || !canvas) return;
+    if (!on || !canvas) return;
     const quality = qualityFor(tier);
     const effect = createEffect(mode, canvas, quality);
     if (!effect) return;
@@ -203,11 +193,11 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
       const w = canvas.clientWidth, h = canvas.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, quality.maxDpr);
       const key = `${w}x${h}@${dpr}`;
       if (w > 0 && h > 0 && size !== key) { size = key; effect.resize(w, h, dpr); }
-      // Live call audio drives the effects; the preview plays a synthetic voice when no call is connected.
-      let voice = voiceSignal.poll(now);
-      if (!voice.connected && previewRef.current) voice = demoVoice(now);
-      if (size) effect.frame(dt, (now - start) / 1000, { busy: busyRef.current, pointer: pointerRef.current, voice });
-      const talking: Speaker = voice.ai > 0.14 && voice.ai >= voice.mic ? "ai" : voice.mic > 0.14 ? "mic" : "none";
+      // Live call audio drives the effects; a screensaver raised by hand with no call plays a synthetic voice so it can be seen.
+      let heard = voiceSignal.poll(now);
+      if (!heard.connected && sourceRef.current === "manual") heard = demoVoice(now);
+      if (size) effect.frame(dt, (now - start) / 1000, { busy: busyRef.current, pointer: pointerRef.current, voice: heard });
+      const talking: Speaker = heard.ai > 0.14 && heard.ai >= heard.mic ? "ai" : heard.mic > 0.14 ? "mic" : "none";
       if (talking !== speakerRef.current && now - speakerAt > 350) { speakerRef.current = talking; speakerAt = now; setSpeaker(talking); }
       frames++; spent += interval;
       if (now - windowStart >= 1000) {
@@ -216,17 +206,17 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
         if (prefs.quality === "auto" && now - start > 2500 && fps < 40 && tier !== "low") {
           autoTier = QUALITY_TIERS[QUALITY_TIERS.indexOf(tier) - 1]; setAutoLevel(autoTier); return;
         }
-        if (previewRef.current) setDiag({ fps: Math.round(fps), w, h, dpr, voice: voiceSignal.connected });
+        if (sourceRef.current === "manual") setDiag({ fps: Math.round(fps), w, h, dpr, voice: voiceSignal.connected });
         frames = 0; spent = 0; windowStart = now;
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); effect.dispose(); };
-  }, [active, mode, tier, prefs.quality]);
+  }, [on, mode, tier, prefs.quality]);
 
   return createPortal(
-    <div className="buzhou-saver" data-active={active} data-busy={Boolean(status)} data-mode={mode} style={bounds} aria-hidden={!active} inert={!active ? true : undefined}>
+    <div className="buzhou-saver" data-active={on} data-source={source} data-busy={Boolean(status)} data-mode={mode} style={bounds} aria-hidden={!on} inert={!on ? true : undefined}>
       <canvas key={mode} ref={canvasRef} className="buzhou-saver__canvas" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} aria-hidden="true" />
       <div className="buzhou-saver__caption" role="status">
         <span className="buzhou-saver__brand">AGENTFLEETS</span>
@@ -234,13 +224,12 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
           ? <><strong data-live={status.live}>{status.label}</strong>{status.total > 0 && <small>{t("已完成 {0} / {1} 步", status.done, status.total)}</small>}</>
           : <strong>{t("待命中")}</strong>}
         {voice.phase !== "idle" && voice.phase !== "error" && <small className="buzhou-saver__voice" data-phase={voice.phase} data-muted={voice.muted} data-speaker={speaker}><i aria-hidden="true" />{voiceLine(voice, speaker)}</small>}
-        {preview && <small>{t("效果测试：数字键 1–9 或 ←/→ 切换，点击退出")}</small>}
-        {preview && diag && <small className="buzhou-saver__diag">{gpuLine(diag, tier)}</small>}
+        {source === "manual" && diag && <small className="buzhou-saver__diag">{gpuLine(diag, tier)}</small>}
       </div>
       {toast && <div className="buzhou-saver__toast" role="status">{toast}</div>}
-      {voiceOn && <>
-        <button type="button" className="buzhou-saver__nav buzhou-saver__nav--left" aria-label={t("上一个声纹")} onClick={() => stepVoice(-1)}><ChevronLeft size={26} /></button>
-        <button type="button" className="buzhou-saver__nav buzhou-saver__nav--right" aria-label={t("下一个声纹")} onClick={() => stepVoice(1)}><ChevronRight size={26} /></button>
+      {on && <>
+        <button type="button" className="buzhou-saver__nav buzhou-saver__nav--left" aria-label={t("上一个效果")} onClick={() => step(-1)}><ChevronLeft size={26} /></button>
+        <button type="button" className="buzhou-saver__nav buzhou-saver__nav--right" aria-label={t("下一个效果")} onClick={() => step(1)}><ChevronRight size={26} /></button>
       </>}
     </div>, document.body);
 }
