@@ -1549,3 +1549,16 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .takeover-policy-custom input { width:88px; min-width:0; }
 .takeover-policy-custom small { color:var(--muted); }
 .settings-category--history { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
+
+/* Keep progress secondary to composing; expanded details never displace actions. */
+.runtime-progress-disclosure { position: relative; flex: 0 0 auto; align-self: flex-start; min-width: 0; max-width: calc(100% - 36px); margin: 2px 18px; z-index: 5; font-size: var(--text-caption); color: var(--muted); }
+.runtime-progress-disclosure > summary { display: flex; align-items: center; gap: 6px; min-height: 28px; cursor: pointer; list-style: none; border-radius: 4px; }
+.runtime-progress-disclosure > summary::-webkit-details-marker { display: none; }
+.runtime-progress-disclosure > summary::after { content: '⌃'; margin-left: 4px; }
+.runtime-progress-disclosure[open] > summary::after { content: '⌄'; }
+.runtime-progress-disclosure > summary small { font-size: inherit; opacity: .7; }
+.runtime-progress-disclosure > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.runtime-progress-disclosure__body { position: absolute; bottom: calc(100% + 6px); left: 0; width: min(440px, calc(100vw - 48px)); max-height: min(320px, 45vh); overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper-solid); box-shadow: 0 8px 24px #0002; }
+.runtime-progress-disclosure__body .runtime-progress { margin: 0; border: 0; background: transparent; }
+.composer .composer-actions { position: sticky; bottom: 0; z-index: 4; background: var(--paper-solid); }
+.composer-input { overflow: clip; }

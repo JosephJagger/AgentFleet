@@ -1,5 +1,5 @@
 import { displayName } from "../lib/display-name";
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Activity, FileCode2, Terminal, MessageSquare } from 'lucide-react';
 import { api } from '../lib/api';
 import type { SessionProgress } from '../lib/types';
@@ -41,6 +41,16 @@ export function useSessionProgress(sessionId:string, active:boolean, initial?:Se
 
 export function RuntimeProgress({sessionId,active,initial}:{sessionId:string;active:boolean;initial?:SessionProgress}) {
   const {progress,unavailable}=useSessionProgress(sessionId,active,initial);
+  const details = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (event: PointerEvent) => { if (details.current && !details.current.contains(event.target as Node)) details.current.open = false; };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, []);
   if(!active||!progress)return null;
-  return <ProgressView progress={progress} unavailable={unavailable}/>;
+  const status = unavailable ? t('进度暂时无法更新') : progress.waitingForApproval ? t('等待你确认') : progress.freshness === 'live' ? t('实时更新') : t('最后已知进度');
+  return <details ref={details} className="runtime-progress-disclosure" onKeyDown={event => { if(event.key === 'Escape' && details.current) { details.current.open=false; details.current.querySelector('summary')?.focus(); } }}>
+    <summary><Activity size={14} aria-hidden="true"/><span>{t('运行进度')}</span><small>{status}</small></summary>
+    <div className="runtime-progress-disclosure__body"><ProgressView progress={progress} unavailable={unavailable}/></div>
+  </details>;
 }

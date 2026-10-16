@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { RuntimeProgress } from './components/RuntimeProgress';
 import { api } from './lib/api';
@@ -12,10 +12,16 @@ it('shows partial progress before completion, marks failed polls stale and stops
   const view=render(<RuntimeProgress sessionId="session-a" active/>);
   await act(async()=>{});
   expect(screen.getByText('checking module 1')).toBeTruthy();
-  expect(screen.getByText('实时更新')).toBeTruthy();
+  expect(view.container.querySelector('summary')?.textContent).toContain('实时更新');
+  const disclosure = view.container.querySelector('details')!;
+  expect(disclosure.open).toBe(false);
+  fireEvent.click(disclosure.querySelector('summary')!);
+  expect(disclosure.open).toBe(true);
+  fireEvent.keyDown(disclosure, {key:'Escape'});
+  expect(disclosure.open).toBe(false);
   vi.mocked(api.sessionProgress).mockRejectedValueOnce(new Error('offline'));
   await act(async()=>{await vi.advanceTimersByTimeAsync(2000);});
-  expect(screen.getByText('进度暂时无法更新')).toBeTruthy();
+  expect(view.container.querySelector('summary')?.textContent).toContain('进度暂时无法更新');
   expect(screen.getByText('checking module 1')).toBeTruthy();
   view.rerender(<RuntimeProgress sessionId="session-a" active={false}/>);
   await act(async()=>{await vi.advanceTimersByTimeAsync(10000);});
