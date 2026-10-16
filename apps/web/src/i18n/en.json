@@ -3690,5 +3690,6 @@
   "下一个效果": "Next effect",
   "总控语音连接成功后自动进入屏保": "Start the screensaver automatically once the voice coordinator connects",
   "屏保设置": "Screensaver settings",
-  "仅为视觉特效：不影响通话、互动消息和任务；点击或按键退出。": "Visual effect only: it does not affect calls, live messages or tasks; click or press a key to exit."
+  "声音灵敏度": "Voice sensitivity",
+  "仅为视觉特效：不影响通话、互动消息和任务；点击或按键退出。灵敏度越高，越小的声音也会有反应。": "Visual effect only: it does not affect calls, live messages or tasks; click or press a key to exit. A higher sensitivity reacts to quieter sound."
 }

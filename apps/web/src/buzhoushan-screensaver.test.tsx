@@ -66,9 +66,16 @@ it('covers only the workspace so side introductions stay visible',()=>{
  expect(saver().style.left).toBe('240px');expect(saver().style.width).toBe('1440px');expect(saver().style.height).toBe('810px');
  shell.remove();
 });
+it('keeps the voice sensitivity within 0.5–3 and falls back to 1 when it is unusable',()=>{
+ expect(parseScreensaverPrefs('{"voiceSensitivity":0.1}').voiceSensitivity).toBe(0.5);
+ expect(parseScreensaverPrefs('{"voiceSensitivity":9}').voiceSensitivity).toBe(3);
+ expect(parseScreensaverPrefs('{"voiceSensitivity":1.84}').voiceSensitivity).toBe(1.8);
+ for(const bad of ['"x"','null','""','{}','[]'])expect(parseScreensaverPrefs(`{"voiceSensitivity":${bad}}`).voiceSensitivity).toBe(1);
+ expect(parseScreensaverPrefs('{}').voiceSensitivity).toBe(1);
+});
 it('clamps and recovers preferences and rejects unknown values',()=>{
- expect(parseScreensaverPrefs('bad')).toEqual({enabled:true,seconds:30,mode:'auto',quality:'auto',autoVoice:true});
- expect(parseScreensaverPrefs('{"enabled":false,"seconds":1}')).toEqual({enabled:false,seconds:10,mode:'auto',quality:'auto',autoVoice:true});
+ expect(parseScreensaverPrefs('bad')).toEqual({enabled:true,seconds:30,mode:'auto',quality:'auto',autoVoice:true,voiceSensitivity:1});
+ expect(parseScreensaverPrefs('{"enabled":false,"seconds":1}')).toEqual({enabled:false,seconds:10,mode:'auto',quality:'auto',autoVoice:true,voiceSensitivity:1});
  expect(parseScreensaverPrefs('{"seconds":99999}').seconds).toBe(600);
  expect(parseScreensaverPrefs('{"mode":"hack"}').mode).toBe('auto');
  expect(parseScreensaverPrefs('{"mode":"matrix","autoVoice":false}')).toMatchObject({mode:'matrix',autoVoice:false});

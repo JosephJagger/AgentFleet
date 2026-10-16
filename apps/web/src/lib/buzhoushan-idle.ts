@@ -10,13 +10,20 @@ export const SCREENSAVER_ORDER: EffectMode[] = ["glyph", ...SCREENSAVER_EFFECTS.
 export const SCREENSAVER_MODES: ScreensaverMode[] = ["auto", ...SCREENSAVER_EFFECTS];
 export type ScreensaverQuality = "auto" | "high" | "medium" | "low";
 export const SCREENSAVER_QUALITIES: ScreensaverQuality[] = ["auto", "high", "medium", "low"];
-export type ScreensaverPrefs = { enabled: boolean; seconds: number; mode: ScreensaverMode; quality: ScreensaverQuality; autoVoice: boolean };
+export type ScreensaverPrefs = { enabled: boolean; seconds: number; mode: ScreensaverMode; quality: ScreensaverQuality; autoVoice: boolean; voiceSensitivity: number };
 const KEY = "agentfleet.buzhoushan.screensaver";
 const CHANGED = "agentfleet:buzhoushan-screensaver";
-export const SCREENSAVER_DEFAULT: ScreensaverPrefs = { enabled: true, seconds: 30, mode: "auto", quality: "auto", autoVoice: true };
+export const SCREENSAVER_DEFAULT: ScreensaverPrefs = { enabled: true, seconds: 30, mode: "auto", quality: "auto", autoVoice: true, voiceSensitivity: 1 };
 export const SCREENSAVER_MIN_SECONDS = 10;
 export const SCREENSAVER_MAX_SECONDS = 600;
+export const VOICE_SENSITIVITY_MIN = 0.5;
+export const VOICE_SENSITIVITY_MAX = 3;
 
+const clampSensitivity = (value: unknown) => {
+  const usable = typeof value === "number" || (typeof value === "string" && value.trim() !== "");
+  const n = usable ? Number(value) : NaN;
+  return Number.isFinite(n) ? Math.min(VOICE_SENSITIVITY_MAX, Math.max(VOICE_SENSITIVITY_MIN, Math.round(n * 10) / 10)) : SCREENSAVER_DEFAULT.voiceSensitivity;
+};
 const clampSeconds = (value: unknown) => {
   const n = Math.round(Number(value));
   return Number.isFinite(n) ? Math.min(SCREENSAVER_MAX_SECONDS, Math.max(SCREENSAVER_MIN_SECONDS, n)) : SCREENSAVER_DEFAULT.seconds;
@@ -34,11 +41,12 @@ export function parseScreensaverPrefs(raw: string): ScreensaverPrefs {
       mode: SCREENSAVER_MODES.includes(saved?.mode) ? saved.mode : SCREENSAVER_DEFAULT.mode,
       quality: SCREENSAVER_QUALITIES.includes(saved?.quality) ? saved.quality : SCREENSAVER_DEFAULT.quality,
       autoVoice: saved?.autoVoice !== false,
+      voiceSensitivity: clampSensitivity(saved?.voiceSensitivity),
     };
   } catch { return { ...SCREENSAVER_DEFAULT }; }
 }
 export function saveScreensaverPrefs(next: ScreensaverPrefs) {
-  const value = { enabled: next.enabled, seconds: clampSeconds(next.seconds), mode: SCREENSAVER_MODES.includes(next.mode) ? next.mode : SCREENSAVER_DEFAULT.mode, quality: SCREENSAVER_QUALITIES.includes(next.quality) ? next.quality : SCREENSAVER_DEFAULT.quality, autoVoice: next.autoVoice !== false };
+  const value = { enabled: next.enabled, seconds: clampSeconds(next.seconds), mode: SCREENSAVER_MODES.includes(next.mode) ? next.mode : SCREENSAVER_DEFAULT.mode, quality: SCREENSAVER_QUALITIES.includes(next.quality) ? next.quality : SCREENSAVER_DEFAULT.quality, autoVoice: next.autoVoice !== false, voiceSensitivity: clampSensitivity(next.voiceSensitivity) };
   try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* Preference still applies to this page load. */ }
   memory = JSON.stringify(value);
   window.dispatchEvent(new Event(CHANGED));

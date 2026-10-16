@@ -7,7 +7,7 @@
  *  - MatrixRain: classic falling glyph columns.
  * Each is a small class that can run headless, so the numerics are unit-testable.
  */
-import { GLYPHS, TAU, clamp, hslToRgb, hueFor, qualityFor, setupCanvas, type Effect, type Quality, type EffectMode, type EffectParams, type Pointer } from "./buzhoushan-effect-common";
+import { GLYPHS, TAU, clamp, hslToRgb, hueFor, qualityFor, setupCanvas, type Effect, type Quality, type VoiceRole, type EffectMode, type EffectParams, type Pointer } from "./buzhoushan-effect-common";
 import { attractorEffect, glyphRippleEffect, protonEffect, starfieldEffect, threeBodyEffect, waveGridEffect } from "./buzhoushan-effects-science";
 export { hslToRgb, hueFor, qualityFor };
 export type { Effect, EffectMode, EffectParams, Pointer };
@@ -250,16 +250,33 @@ export class Fluid {
 export class MatrixRain {
   cols = 0; rows = 0;
   head = new Float32Array(0); speed = new Float32Array(0); drawn = new Int32Array(0); prev = new Uint16Array(0);
+  /** Seconds of voice pulse left per column, and its colour (0 none, 1 you, 2 the AI). */
+  boost = new Float32Array(0); tint = new Uint8Array(0);
   constructor(private cell = 16, private rand: () => number = Math.random) {}
   resize(w: number, h: number) {
     this.cols = Math.max(1, Math.floor(w / this.cell)); this.rows = Math.max(1, Math.floor(h / this.cell));
     this.head = new Float32Array(this.cols); this.speed = new Float32Array(this.cols);
     this.drawn = new Int32Array(this.cols).fill(-1); this.prev = new Uint16Array(this.cols);
+    this.boost = new Float32Array(this.cols); this.tint = new Uint8Array(this.cols);
     for (let c = 0; c < this.cols; c++) this.reset(c, true);
   }
   private reset(c: number, initial = false) {
     this.head[c] = initial ? this.rand() * this.rows : -this.rand() * this.rows * 0.6;
     this.speed[c] = 7 + this.rand() * 18; this.drawn[c] = Math.floor(this.head[c]) - 1;
+  }
+  /**
+   * A voice "click": the columns around `x` (0..1, by pitch) surge, light up in the speaker's colour, and any
+   * column that was idle off-screen restarts at the top so the burst is always visible.
+   */
+  pulse(x: number, strength: number, role: VoiceRole) {
+    const radius = Math.round(4 + 10 * strength), centre = x * this.cols;
+    for (let c = Math.max(0, Math.floor(centre - radius)); c <= Math.min(this.cols - 1, Math.ceil(centre + radius)); c++) {
+      const weight = 1 - Math.abs(c - centre) / (radius + 1);
+      if (weight <= 0) continue;
+      this.boost[c] = Math.max(this.boost[c], (0.45 + 0.55 * strength) * (0.5 + 0.5 * weight));
+      this.tint[c] = role === "mic" ? 1 : 2;
+      if (this.head[c] < 0 || this.head[c] > this.rows * 0.8) { this.head[c] = -this.rand() * 2; this.drawn[c] = Math.floor(this.head[c]) - 1; this.speed[c] = Math.max(this.speed[c], 14 + this.rand() * 10); }
+    }
   }
   glyph() { return Math.floor(this.rand() * GLYPHS.length); }
   frame(ctx: CanvasRenderingContext2D, dt: number, busy: boolean, pointer?: Pointer) {
@@ -269,14 +286,15 @@ export class MatrixRain {
     ctx.font = `${cell}px monospace`; ctx.textBaseline = "top";
     const pc = pointer?.active ? pointer.x * cols : -99;
     for (let c = 0; c < cols; c++) {
-      const boost = Math.abs(c - pc) < 5 ? 2.2 : 1;
+      const pulsing = this.boost[c] > 0, boost = (Math.abs(c - pc) < 5 ? 2.2 : 1) * (pulsing ? 1 + 3 * Math.min(1, this.boost[c]) : 1);
+      if (pulsing) { this.boost[c] = Math.max(0, this.boost[c] - dt); if (this.boost[c] === 0) this.tint[c] = 0; }
       this.head[c] += this.speed[c] * (busy ? 1.4 : 1) * boost * dt;
       const row = Math.floor(this.head[c]);
       if (row !== this.drawn[c] && row >= 0 && row < rows) {
-        const x = c * cell;
-        if (this.drawn[c] >= 0) { ctx.fillStyle = busy ? "#3cff9a" : "#12d45a"; ctx.fillText(GLYPHS[this.prev[c]], x, this.drawn[c] * cell); }
+        const x = c * cell, tint = this.tint[c];
+        if (this.drawn[c] >= 0) { ctx.fillStyle = tint === 1 ? "#3d9bff" : tint === 2 ? "#3dffa8" : busy ? "#3cff9a" : "#12d45a"; ctx.fillText(GLYPHS[this.prev[c]], x, this.drawn[c] * cell); }
         const g = this.glyph(); this.prev[c] = g;
-        ctx.fillStyle = "#dfffe9"; ctx.fillText(GLYPHS[g], x, row * cell);
+        ctx.fillStyle = tint === 1 ? "#bfe0ff" : tint === 2 ? "#c4ffe6" : "#dfffe9"; ctx.fillText(GLYPHS[g], x, row * cell);
         this.drawn[c] = row;
       }
       if (this.head[c] > rows + 2) this.reset(c);
@@ -359,7 +377,10 @@ function matrixEffect(canvas: HTMLCanvasElement): Effect | undefined {
       const { w, h } = setupCanvas(canvas, ctx, width, height, dpr);
       ctx.fillStyle = "#000602"; ctx.fillRect(0, 0, w, h); rain.resize(w, h);
     },
-    frame(dt, _t, { busy, pointer, voice }) { rain.frame(ctx, dt * (1 + ((voice?.mic ?? 0) + (voice?.ai ?? 0)) * 1.2), busy, pointer); },
+    frame(dt, _t, { busy, pointer, voice }) {
+      for (const im of voice?.impulses ?? []) rain.pulse(im.x, im.strength, im.role);
+      rain.frame(ctx, dt * (1 + ((voice?.mic ?? 0) + (voice?.ai ?? 0)) * 1.2), busy, pointer);
+    },
     dispose() {},
   };
 }

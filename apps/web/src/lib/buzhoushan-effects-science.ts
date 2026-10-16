@@ -213,7 +213,8 @@ export function starfieldEffect(canvas: HTMLCanvasElement, q: Quality): Effect |
   const ctx = canvas.getContext("2d"); if (!ctx) return undefined;
   const field = new Starfield(q.stars);
   const far = Array.from({ length: 520 }, () => ({ x: Math.random(), y: Math.random(), p: Math.random() * TAU, s: 0.4 + Math.random() * 1.1 }));
-  let w = 0, h = 0, nebula: HTMLCanvasElement | undefined, surge = 0;
+  let w = 0, h = 0, nebula: HTMLCanvasElement | undefined, surge = 0, kick = 0;
+  const shocks = new ShockRings(1.0);
   const paintNebula = () => {
     nebula = document.createElement("canvas"); nebula.width = w; nebula.height = h;
     const g = nebula.getContext("2d"); if (!g) return;
@@ -227,7 +228,11 @@ export function starfieldEffect(canvas: HTMLCanvasElement, q: Quality): Effect |
     resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); paintNebula(); },
     frame(dt, t, { busy, pointer, voice }) {
       surge += (((voice?.mic ?? 0) + (voice?.ai ?? 0)) * 9 - surge) * Math.min(1, dt * 4);
-      const speed = (busy ? 14 : 6.5) + surge;
+      // Each voice onset punches the ship forward and sends a coloured ring across the sky.
+      for (const im of voice?.impulses ?? []) kick += im.strength * 16;
+      kick *= Math.exp(-dt * 2.4);
+      shocks.add(voice?.impulses ?? [], w, h, t); shocks.prune(t);
+      const speed = (busy ? 14 : 6.5) + surge + kick;
       if (nebula) ctx.drawImage(nebula, 0, 0); else { ctx.fillStyle = "#01030a"; ctx.fillRect(0, 0, w, h); }
       ctx.globalCompositeOperation = "lighter";
       for (const s of far) { ctx.fillStyle = `rgba(200,220,255,${0.25 + 0.35 * Math.sin(t * 1.7 + s.p)})`; ctx.fillRect(s.x * w, s.y * h, s.s, s.s); }
@@ -246,6 +251,7 @@ export function starfieldEffect(canvas: HTMLCanvasElement, q: Quality): Effect |
       }
       field.step(speed * dt);
       ctx.globalCompositeOperation = "source-over";
+      shocks.draw(ctx, t, Math.min(w, h));
     },
     dispose() { nebula = undefined; },
   };
@@ -392,15 +398,19 @@ export class ProtonModel {
     out[0] = Math.cos(a) * r; out[1] = 0.42 * Math.sin(1.3 * t + k * 2.1); out[2] = Math.sin(a) * r;
     return out;
   }
+  private spawn() {
+    const u = this.rand() * TAU, v = this.rand() * 2 - 1, r = 1.05 * Math.cbrt(this.rand()), s = Math.sqrt(1 - v * v);
+    const a = this.rand() * TAU, b = this.rand() * 2 - 1, bs = Math.sqrt(1 - b * b);
+    this.pairs.push({ x: r * s * Math.cos(u), y: r * v, z: r * s * Math.sin(u), dx: bs * Math.cos(a), dy: b, dz: bs * Math.sin(a), age: 0, life: 0.45 + this.rand() * 0.7, hue: this.rand() * 360 });
+  }
+  /** A voice "click": a sudden fizz of extra quark–antiquark pairs (capped so a long talk stays light). */
+  burst(strength: number) {
+    for (let i = 0, n = Math.round(8 + 16 * strength); i < n && this.pairs.length < 90; i++) this.spawn();
+  }
   /** Spawn and age virtual quark–antiquark pairs; each lives a fraction of a second then annihilates. */
   update(dt: number) {
     this.spawnDebt += dt * 22;
-    while (this.spawnDebt >= 1 && this.pairs.length < 60) {
-      this.spawnDebt -= 1;
-      const u = this.rand() * TAU, v = this.rand() * 2 - 1, r = 1.05 * Math.cbrt(this.rand()), s = Math.sqrt(1 - v * v);
-      const a = this.rand() * TAU, b = this.rand() * 2 - 1, bs = Math.sqrt(1 - b * b);
-      this.pairs.push({ x: r * s * Math.cos(u), y: r * v, z: r * s * Math.sin(u), dx: bs * Math.cos(a), dy: b, dz: bs * Math.sin(a), age: 0, life: 0.45 + this.rand() * 0.7, hue: this.rand() * 360 });
-    }
+    while (this.spawnDebt >= 1 && this.pairs.length < 60) { this.spawnDebt -= 1; this.spawn(); }
     this.spawnDebt = Math.min(this.spawnDebt, 3);
     for (const p of this.pairs) p.age += dt;
     this.pairs = this.pairs.filter(p => p.age < p.life);
@@ -410,12 +420,17 @@ export class ProtonModel {
 export function protonEffect(canvas: HTMLCanvasElement): Effect | undefined {
   const ctx = canvas.getContext("2d"); if (!ctx) return undefined;
   const model = new ProtonModel();
-  let w = 0, h = 0;
+  let w = 0, h = 0, pulse = 0;
+  const shocks = new ShockRings(1.2);
   const q = [[0, 0, 0], [0, 0, 0], [0, 0, 0]] as [number, number, number][];
   return {
     resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, w, h); },
     frame(dt, t, { busy, pointer, voice }) {
       model.update(dt * (1 + ((voice?.mic ?? 0) + (voice?.ai ?? 0)) * 2.5));
+      // Each voice onset fizzes up extra quark pairs, swells the quarks and sends a coloured ring outward.
+      for (const im of voice?.impulses ?? []) { model.burst(im.strength); pulse = Math.min(1, pulse + 0.5 + 0.5 * im.strength); }
+      shocks.add(voice?.impulses ?? [], w, h, t); shocks.prune(t);
+      pulse *= Math.exp(-dt * 2.6);
       const yaw = t * 0.32 + (pointer?.active ? (pointer.x - 0.5) * 2 : 0), pitch = 0.42 + (pointer?.active ? (pointer.y - 0.5) * 0.8 : 0);
       const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch), S = Math.min(w, h) * 0.34;
       const project = (x: number, y: number, z: number): [number, number, number] => {
@@ -426,7 +441,7 @@ export function protonEffect(canvas: HTMLCanvasElement): Effect | undefined {
       ctx.fillStyle = `rgba(2,3,10,${Math.min(0.6, 0.38 * dt * 60)})`; ctx.fillRect(0, 0, w, h);
       ctx.globalCompositeOperation = "lighter";
       const halo = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, S * 1.5);
-      halo.addColorStop(0, busy ? "rgba(60,200,140,.14)" : "rgba(90,110,255,.14)"); halo.addColorStop(1, "rgba(0,0,0,0)");
+      halo.addColorStop(0, busy ? `rgba(60,200,140,${0.14 + pulse * 0.25})` : `rgba(90,110,255,${0.14 + pulse * 0.25})`); halo.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = halo; ctx.fillRect(0, 0, w, h);
       // Probability cloud of the bag.
       ctx.fillStyle = busy ? "rgba(150,255,200,.35)" : "rgba(170,190,255,.32)"; ctx.beginPath();
@@ -465,12 +480,13 @@ export function protonEffect(canvas: HTMLCanvasElement): Effect | undefined {
       }
       // Valence quarks, drawn last as bright colour-charge cores.
       for (let k = 0; k < 3; k++) {
-        const [px, py, f] = project(q[k][0], q[k][1], q[k][2]), [r, g, b] = QUARKS[k].rgb, R = 40 * f;
+        const [px, py, f] = project(q[k][0], q[k][1], q[k][2]), [r, g, b] = QUARKS[k].rgb, R = 40 * f * (1 + pulse * 0.7);
         const grad = ctx.createRadialGradient(px, py, 0, px, py, R);
         grad.addColorStop(0, "rgba(255,255,255,1)"); grad.addColorStop(0.25, `rgba(${r},${g},${b},.95)`); grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
         ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(px, py, R, 0, TAU); ctx.fill();
       }
       ctx.globalCompositeOperation = "source-over";
+      shocks.draw(ctx, t, Math.min(w, h));
     },
     dispose() {},
   };

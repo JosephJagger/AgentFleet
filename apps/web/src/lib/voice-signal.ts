@@ -22,15 +22,19 @@ export function analyseSpectrum(time: Uint8Array, freq: Uint8Array, sampleRate: 
   return { level, centroid: clamp((Math.log(hz) - Math.log(100)) / (Math.log(3500) - Math.log(100)), 0, 1) };
 }
 
-/** Emits a strength (0..1) when the level jumps above its slow average, with a cooldown. */
+/**
+ * Emits a strength (0..1) when the level jumps above its slow average, with a cooldown. The threshold is low so
+ * ordinary speech through a noise-suppressed microphone counts; the first sample only primes the average.
+ */
 export class OnsetDetector {
-  private avg = 0; private last = -Infinity;
-  constructor(private cooldownMs = 140, private floor = 0.035) {}
+  private avg = 0; private last = -Infinity; private primed = false;
+  constructor(private cooldownMs = 140, private floor = 0.012) {}
   update(level: number, nowMs: number): number {
-    const threshold = this.avg * 1.5 + 0.02;
+    if (!this.primed) { this.primed = true; this.avg = level; return 0; }
+    const threshold = this.avg * 1.35 + 0.006;
     let strength = 0;
     if (level > this.floor && level > threshold && nowMs - this.last >= this.cooldownMs) {
-      strength = clamp(0.3 + (level - this.avg) * 4, 0.3, 1);
+      strength = clamp(0.45 + (level - this.avg) * 5, 0.45, 1);
       this.last = nowMs;
     }
     // Rise quickly so sustained loudness stops counting as new onsets; fall a bit slower.
@@ -85,7 +89,8 @@ class VoiceSignal {
     void ctx?.close().catch(() => undefined);
   }
   /** Sample both streams once per animation frame. Repeated calls with the same timestamp return the same frame. */
-  poll(nowMs: number): VoiceParams {
+  /** `sensitivity` scales how loud the voice reads (0.5–3, 1 = normal), for both onsets and continuous level. */
+  poll(nowMs: number, sensitivity = 1): VoiceParams {
     if (!this.connected || !this.ctx) return EMPTY;
     if (nowMs === this.lastNow) return this.lastFrame;
     this.lastNow = nowMs;
@@ -102,12 +107,12 @@ class VoiceSignal {
     for (const role of ["mic", "ai"] as const) {
       const tap = this.taps[role], r = read[role];
       if (!tap || !r) continue;
-      const level = role === "mic" ? r.level * echo : r.level;
+      const level = (role === "mic" ? r.level * echo : r.level) * sensitivity;
       tap.level += (level - tap.level) * 0.35;
       const strength = tap.onset.update(level, nowMs);
       if (strength > 0) impulses.push(placeImpulse(role, r.centroid, strength, nowMs));
     }
-    return (this.lastFrame = { mic: clamp((this.taps.mic?.level ?? 0) * 3.2, 0, 1), ai: clamp((this.taps.ai?.level ?? 0) * 3.2, 0, 1), impulses, connected: true });
+    return (this.lastFrame = { mic: clamp((this.taps.mic?.level ?? 0) * 5, 0, 1), ai: clamp((this.taps.ai?.level ?? 0) * 5, 0, 1), impulses, connected: true });
   }
 }
 export const voiceSignal = new VoiceSignal();

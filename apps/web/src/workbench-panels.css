@@ -246,6 +246,9 @@
 .buzhou-broadcast-editor summary { cursor:pointer; }
 .buzhou-broadcast-editor label { display:grid; gap:3px; margin-top:8px; color:var(--muted); }
 .buzhou-broadcast-editor input { width:100%; min-width:0; box-sizing:border-box; padding:6px 8px; border:1px solid var(--line-strong); border-radius:3px; background:var(--paper); color:var(--ink); font:inherit; }
+.buzhou-broadcast-editor label:has(> input[type="checkbox"]) { display:flex; align-items:center; gap:8px; }
+.buzhou-broadcast-editor input[type="checkbox"] { width:auto; min-width:0; flex:none; margin:0; padding:0; }
+.buzhou-broadcast-editor input[type="range"] { padding:0; border:0; background:transparent; accent-color:#3794ff; cursor:pointer; }
 
 .buzhou-broadcast-rail__word { display:inline-block; max-width:100%; overflow-wrap:anywhere; vertical-align:top; }
 .buzhou-broadcast-rail__separator { display:inline; }

@@ -2,7 +2,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Download,MonitorUp,Ratio,Sparkles,X} from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {t} from '../i18n';
-import {SCREENSAVER_MODES,SCREENSAVER_QUALITIES,type ScreensaverQuality,requestScreensaver,useScreensaverPrefs,type ScreensaverMode,saveScreensaverPrefs,SCREENSAVER_MIN_SECONDS,SCREENSAVER_MAX_SECONDS} from '../lib/buzhoushan-idle';
+import {SCREENSAVER_MODES,SCREENSAVER_QUALITIES,type ScreensaverQuality,requestScreensaver,useScreensaverPrefs,type ScreensaverMode,saveScreensaverPrefs,SCREENSAVER_MIN_SECONDS,SCREENSAVER_MAX_SECONDS,VOICE_SENSITIVITY_MIN,VOICE_SENSITIVITY_MAX} from '../lib/buzhoushan-idle';
 import {downloadBroadcastLauncher,openBroadcastWindow,fitBroadcastWindow} from '../lib/broadcast-launcher';
 
 type BroadcastIntro = {leftTitle:string;leftSubtitle:string;rightTitle:string;rightSubtitle:string};
@@ -55,8 +55,9 @@ export function BuzhoushanBroadcastControl({enabled,onChange}:{enabled:boolean;o
         <label>{t('屏保效果')}<select value={saver.mode} onChange={event=>saveScreensaverPrefs({...saver,mode:event.target.value as ScreensaverMode})}>{SCREENSAVER_MODES.map(mode=><option key={mode} value={mode}>{t(MODE_LABEL[mode])}</option>)}</select></label>
         <label><input type="checkbox" checked={saver.autoVoice} onChange={event=>saveScreensaverPrefs({...saver,autoVoice:event.target.checked})}/> {t('总控语音连接成功后自动进入屏保')}</label>
         <label>{t('画质')}<select value={saver.quality} onChange={event=>saveScreensaverPrefs({...saver,quality:event.target.value as ScreensaverQuality})}>{SCREENSAVER_QUALITIES.map(q=><option key={q} value={q}>{t({auto:'自动（按帧率降档）',high:'高',medium:'中',low:'低'}[q])}</option>)}</select></label>
+        <label>{t('声音灵敏度')}：{saver.voiceSensitivity.toFixed(1)}×<input type="range" min={VOICE_SENSITIVITY_MIN} max={VOICE_SENSITIVITY_MAX} step={0.1} value={saver.voiceSensitivity} onChange={event=>saveScreensaverPrefs({...saver,voiceSensitivity:Number(event.target.value)})}/></label>
         <label>{t('空闲秒数')}<input type="number" min={SCREENSAVER_MIN_SECONDS} max={SCREENSAVER_MAX_SECONDS} value={saver.seconds} onChange={event=>saveScreensaverPrefs({...saver,seconds:Number(event.target.value)})}/></label>
-        <small>{t('仅为视觉特效：不影响通话、互动消息和任务；点击或按键退出。')}</small>
+        <small>{t('仅为视觉特效：不影响通话、互动消息和任务；点击或按键退出。灵敏度越高，越小的声音也会有反应。')}</small>
       </details>
       <details className="buzhou-broadcast-editor"><summary>{t('编辑直播介绍')}</summary>
         {(Object.keys(defaultIntro) as (keyof BroadcastIntro)[]).map((key,index)=><label key={key}>{t(['左侧标题','左侧副标题','右侧标题','右侧副标题'][index])}<input maxLength={40} value={intro[key]} onChange={event=>{const next={...intro,[key]:event.target.value};setIntro(next);try{localStorage.setItem(introKey,JSON.stringify(next));}catch{/* The current page still updates when storage is unavailable. */}}}/></label>)}

@@ -26,3 +26,10 @@ it('every top-bar broadcast button shares the 30px control height of the voice a
  }
  expect(rule('.topbar-actions .buzhou-broadcast-toggle--icon {')).toMatch(/width:\s*30px/);
 });
+
+it('the screensaver settings keep checkboxes inline and sliders unframed instead of inheriting the full-width text input style',()=>{
+ const css=read('workbench-panels.css').replace(/\s+/g,' ');
+ expect(css).toMatch(/\.buzhou-broadcast-editor input\[type="checkbox"\] \{[^}]*width:\s*auto/);
+ expect(css).toMatch(/\.buzhou-broadcast-editor label:has\(> input\[type="checkbox"\]\) \{[^}]*display:\s*flex/);
+ expect(css).toMatch(/\.buzhou-broadcast-editor input\[type="range"\] \{[^}]*border:\s*0/);
+});

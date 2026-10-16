@@ -123,3 +123,30 @@ it('shock rings push points outward from the click, then expire',()=>{
  const [lx]=s.displacement(500-200,300,.5,600);expect(lx).toBeLessThanOrEqual(0); // and left points left
  s.prune(2);expect(s.rings.length).toBe(0);expect(s.displacement(700,300,2,600)).toEqual([0,0]);
 });
+
+it('a voice pulse makes the matrix columns around its pitch surge, tinted for the speaker, and revives idle columns',()=>{
+ const m=new MatrixRain(16,seeded());m.resize(320,320);                       // 20 columns
+ for(let c=0;c<m.cols;c++){m.head[c]=-50;m.speed[c]=8;}                       // every column is idle above the screen
+ m.pulse(.5,.3,'mic');                                                          // a modest pulse: radius 7 columns
+ const near=10,far=0;
+ expect(m.boost[near]).toBeGreaterThan(.5);expect(m.tint[near]).toBe(1);
+ expect(m.boost[far]).toBe(0);expect(m.tint[far]).toBe(0);
+ expect(m.head[near]).toBeGreaterThanOrEqual(-2);expect(m.head[far]).toBe(-50);   // idle columns near the pulse restart at the top
+ expect(m.speed[near]).toBeGreaterThanOrEqual(14);
+ m.pulse(.5,.4,'ai');expect(m.tint[near]).toBe(2);                               // the latest speaker's colour wins
+ const calls:string[]=[];
+ const ctx={fillRect(){},fillText(){},set fillStyle(v:string){calls.push(v);},set font(_v:string){},set textBaseline(_v:string){}} as unknown as CanvasRenderingContext2D;
+ const before=m.head[near];m.frame(ctx,.1,false);
+ expect(m.head[near]-before).toBeGreaterThan(8*.1*2);                                // faster than the plain speed while pulsing
+ for(let i=0;i<40;i++)m.frame(ctx,.1,false);
+ expect(m.boost[near]).toBe(0);expect(m.tint[near]).toBe(0);                          // and it settles back
+});
+it('a voice burst fizzes up extra proton pairs but never beyond the cap',()=>{
+ const p=new ProtonModel(50,seeded());
+ const before=p.pairs.length;p.burst(1);
+ expect(p.pairs.length-before).toBe(24);
+ for(let i=0;i<20;i++)p.burst(1);
+ expect(p.pairs.length).toBeLessThanOrEqual(90);
+ for(const q of p.pairs){expect(Math.hypot(q.x,q.y,q.z)).toBeLessThanOrEqual(1.06);expect(q.life).toBeGreaterThan(0);}
+ p.burst(.1);expect(p.pairs.length).toBeLessThanOrEqual(90);
+});

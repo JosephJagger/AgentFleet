@@ -37,11 +37,21 @@ device-pixel backing store, capped per quality tier.
 ## Voice reactivity (`lib/voice-signal.ts`)
 While any `NativeVoicePanel` call is connected, read-only `AnalyserNode`s tap the microphone stream and the
 AI's remote stream. They are **never** routed to an output, only level/pitch/onset numbers are computed in
-memory, and nothing is recorded, stored or sent. Onsets act like clicks: broadcaster = blue and lower half,
-AI = green and upper half, x follows pitch; while the AI is audible the microphone response is damped
-(speaker echo). Taps are owned by the panel that attached them, so one panel unmounting cannot cut another's
-call. Every effect reacts: glyph rings, particle kicks, fluid bursts, wave ripples, starfield surge,
-matrix/proton boost, attractor shock + spin, three-body kick + shock ring.
+memory, and nothing is recorded, stored or sent. Taps are owned by the panel that attached them, so one panel
+unmounting cannot cut another's call.
+
+- An **onset** (each word or stress, a "click") fires when the level jumps above its slow average: floor 0.012,
+  threshold avg×1.35+0.006, 140 ms cooldown, strength 0.45–1. The first sample only primes the average.
+  You are blue and in the lower half, the AI is green and in the upper half, x follows pitch; while the AI is
+  audible the microphone response is damped (speaker echo).
+- The continuous **level** is RMS×5 (0..1). Both are multiplied by the **声音灵敏度** setting (0.5–3×, default 1,
+  in 屏保设置): a higher value reacts to quieter sound.
+- Reactions per onset: glyph rings; particle kicks; fluid dye bursts; wave-grid ripples; attractor spin + shock
+  front; three-body push on the nearest sun + shock ring; **digital rain** columns around the pitch surge and
+  light up in the speaker's colour (idle columns restart at the top); **starfield** warp punch + ring;
+  **proton** fizz of extra quark pairs, swollen quarks + ring. Level also speeds the rain, starfield, proton
+  and attractor, and speeds/swells the three-body system.
+- The settings popover styles its checkboxes inline and sliders unframed (`.buzhou-broadcast-editor`).
 
 ## Verifying changes
 - `npm run build` in `apps/web` (real `tsc -b`) and `NODE_ENV=test npx vitest run`.

@@ -185,7 +185,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
       const key = `${w}x${h}@${dpr}`;
       if (w > 0 && h > 0 && size !== key) { size = key; effect.resize(w, h, dpr); }
       // Live call audio drives the effects; a screensaver raised by hand with no call plays a synthetic voice so it can be seen.
-      let heard = voiceSignal.poll(now);
+      let heard = voiceSignal.poll(now, prefsRef.current.voiceSensitivity);
       if (!heard.connected && sourceRef.current === "manual") heard = demoVoice(now);
       if (size) effect.frame(dt, (now - start) / 1000, { busy: busyRef.current, pointer: pointerRef.current, voice: heard });
       const talking: Speaker = heard.ai > 0.14 && heard.ai >= heard.mic ? "ai" : heard.mic > 0.14 ? "mic" : "none";

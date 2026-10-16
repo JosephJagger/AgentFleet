@@ -79,3 +79,37 @@ it('a panel releasing its own call never cuts another panel\'s live call',()=>{
  voiceSignal.attach('mic',stream,'session-panel');          // session voice links the same way
  expect(voiceSignal.connected).toBe(true);
 });
+
+it('reacts to quiet speech that the old threshold missed, ignores a steady hum, and never fires on its first sample',()=>{
+ const quietSpeech=new OnsetDetector();let t=0,fired=0;
+ for(let i=0;i<60;i++,t+=16)quietSpeech.update(.004,t);          // very quiet room
+ for(let i=0;i<4;i++,t+=16)if(quietSpeech.update(.025,t)>0)fired++; // soft speech: RMS .025, below the previous .035 floor
+ expect(fired).toBe(1);
+ const hum=new OnsetDetector();let n=0;for(let i=0;i<400;i++)if(hum.update(.02,i*16)>0)n++;
+ expect(n).toBe(0);
+ expect(new OnsetDetector().update(.5,0)).toBe(0);                // the first sample only primes the average
+ const first=new OnsetDetector();first.update(.004,0);expect(first.update(.05,200)).toBeGreaterThanOrEqual(.45); // even a light onset is clearly visible
+});
+it('the sensitivity scales how loud the voice reads, for onsets and for the continuous level',()=>{
+ const reads=(sensitivity:number)=>{
+  let value=128+2;                                           // RMS ≈ 0.016, a soft voice
+  class A{fftSize=0;smoothingTimeConstant=0;frequencyBinCount=256;connect(){}disconnect(){}getByteTimeDomainData(a:Uint8Array){a.fill(value);}getByteFrequencyData(a:Uint8Array){a.fill(5);}}
+  class S{connect(){}disconnect(){}}
+  class C{sampleRate=48000;createMediaStreamSource(){return new S();}createAnalyser(){return new A();}resume(){return Promise.resolve();}close(){return Promise.resolve();}}
+  Object.defineProperty(window,'AudioContext',{value:C,configurable:true,writable:true});
+  voiceSignal.detachAll();
+  voiceSignal.attach('mic',{getAudioTracks:()=>[{}]} as unknown as MediaStream,'o');
+  let onsets=0,t=0;
+  for(let i=0;i<30;i++,t+=16)voiceSignal.poll(t,sensitivity);                // settle on a very quiet level
+  value=128;for(let i=0;i<30;i++,t+=16)voiceSignal.poll(t,sensitivity);
+  value=128+2;
+  for(let i=0;i<8;i++,t+=16)onsets+=voiceSignal.poll(t,sensitivity).impulses.length;
+  const level=voiceSignal.poll(t+16,sensitivity).mic;
+  voiceSignal.detachAll();
+  return {onsets,level};
+ };
+ const low=reads(.5),normal=reads(1),high=reads(3);
+ expect(high.level).toBeGreaterThan(normal.level*2);expect(normal.level).toBeGreaterThan(low.level*1.5);
+ expect(high.onsets).toBeGreaterThanOrEqual(normal.onsets);expect(high.onsets).toBeGreaterThanOrEqual(1);
+ expect(high.level).toBeLessThanOrEqual(1);
+});
