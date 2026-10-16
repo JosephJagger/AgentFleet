@@ -1,3 +1,4 @@
+import { isAcpProvider, supportsProviderCommand } from "./provider-catalog.js";
 import { DEFAULT_TAKEOVER_IDLE_DAYS } from "./takeover-policy.js";
 import { directoryTurnConflict } from "./directory-turn-lock.js";
 import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
@@ -557,8 +558,13 @@ export class CoordinationService {
       }
 
       const session = this.commandSession(principal, logicalSessionId);
+      if (isAcpProvider(session.provider)) {
+        const raw = this.db.get<{discovery_json:string|null}>("SELECT discovery_json FROM machines WHERE machine_id=?",session.machine_id);
+        invariant(supportsProviderCommand(JSON.parse(raw?.discovery_json ?? '{}')?.agentRuntimes?.[session.provider],input.type,Boolean(session.native_thread_id)),409,'AGENT_CAPABILITY_UNAVAILABLE','Official CLI has not reported support for this operation');
+        invariant(payload.settings === undefined && payload.outputSchema === undefined && payload.goal === undefined && payload.nativeCollaboration === undefined && !['images','attachments','references','plugins','pluginSkills'].some(key => Array.isArray(payload[key]) && (payload[key] as unknown[]).length),400,'AGENT_INPUT_UNSUPPORTED','This provider currently accepts text using its native settings');
+      }
       invariant(!blocksDuringMaintenance(session.maintenance_json,input.type),409,"MACHINE_DRAINING",MAINTENANCE_MESSAGE);
-      if (session.provider !== "claude" && (input.type === "turn.start" || input.type === "turn.queue")) {
+      if (session.provider === "codex" && (input.type === "turn.start" || input.type === "turn.queue")) {
         const preferences = new CodexPreferencesService(this.db).read(principal, logicalSessionId);
         payload.resolvedMode = (payload.settings as {mode?: string} | undefined)?.mode ?? preferences.effective.mode;
         if (payload.settings === undefined) {
@@ -593,9 +599,9 @@ export class CoordinationService {
       invariant(session.reachability === "live", 409, "SESSION_RECONCILING", "Session must finish reconciliation before accepting a command");
       invariant(session.identity_state === "active", 409, "MACHINE_REVOKED", "Machine is revoked");
       invariant(session.security_state === "normal", 409, "MACHINE_READ_ONLY", "Machine is degraded read-only");
-      invariant(session.compatibility === "compatible", 409, "MACHINE_INCOMPATIBLE", "Machine is not P0a-compatible");
+      invariant(isAcpProvider(session.provider) || session.compatibility === "compatible", 409, "MACHINE_INCOMPATIBLE", "Machine is not P0a-compatible");
       invariant(session.machine_reachability === "online", 409, "MACHINE_OFFLINE", "Machine must be online when accepting a command");
-      invariant(!session.runtime_read_only, 409, "MACHINE_READ_ONLY", "Agent runtime currently supports read-only access");
+      invariant(isAcpProvider(session.provider) || !session.runtime_read_only, 409, "MACHINE_READ_ONLY", "Agent runtime currently supports read-only access");
       invariant(session.provider !== "claude" || ["thread.claim", "thread.release", "turn.start", "turn.queue", "turn.cancel", "approval.decide_once", "input.respond"].includes(input.type),409,"AGENT_CAPABILITY_UNAVAILABLE","Claude Code does not support this operation");
       invariant(supportsCommand(session.command_types_json, input.type), 409, "AGENT_CAPABILITY_UNAVAILABLE", "Agent has not reported support for this operation; update the connection service");
       if (["turn.start", "turn.queue", "turn.compact", "turn.review", "thread.claim"].includes(input.type)) {
@@ -619,13 +625,13 @@ export class CoordinationService {
       const hasRichInput = images.length > 0 || attachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0;
       if (attachments.length || plugins.length || pluginSkills.length || payload.goal !== undefined) invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "ATTACHMENTS_NOT_ALLOWED", "此操作不能附带文件、插件或目标");
       if (payload.outputSchema !== undefined) {
-        invariant(session.provider !== "claude" && ["turn.start", "turn.queue"].includes(input.type), 400, "OUTPUT_SCHEMA_ACTION_DENIED", "结构化输出只能在新的 Codex 任务中设置");
+        invariant(session.provider === "codex" && ["turn.start", "turn.queue"].includes(input.type), 400, "OUTPUT_SCHEMA_ACTION_DENIED", "结构化输出只能在新的 Codex 任务中设置");
         invariant(this.db.get<{command_types_json:string|null}>("SELECT command_types_json FROM machines WHERE machine_id=?", session.machine_id)?.command_types_json?.includes('"codex.manage"'), 409, "AGENT_CAPABILITY_UNAVAILABLE", "请先更新主机连接服务，再使用结构化输出");
         try { payload.outputSchema = parseOutputSchema(payload.outputSchema); } catch { throw new AppError(400, "OUTPUT_SCHEMA_INVALID", "结构化输出的 JSON Schema 无效"); }
       }
       if (payload.nativeCollaboration !== undefined) invariant(typeof payload.nativeCollaboration === "boolean" && ["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "SUBAGENTS_INPUT", "原生分工只能随会话消息启用");
       if (payload.goal !== undefined) invariant(typeof payload.goal === "string" && payload.goal.trim().length > 0 && payload.goal.length <= 2_000 && !payload.goal.includes("\0"), 400, "GOAL_INVALID", "目标需要为 1–2000 个字符");
-      if (attachments.length && session.provider !== "claude") {
+      if (attachments.length && session.provider === "codex") {
         const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
         invariant(parseCodexCatalog(raw?.codex_catalog_json ? JSON.parse(raw.codex_catalog_json) : null)?.fileInput === true, 409, "AGENT_FILE_UNSUPPORTED", "请先更新这台主机的连接服务，当前版本不能接收文件");
       }
@@ -799,7 +805,7 @@ export class CoordinationService {
 
       // Snapshot inheritance only for NEW commands. Retries retain the accepted
       // snapshot even if defaults changed; the wire hash covers resolved values.
-      if (session.provider !== "claude" && ["thread.claim", "turn.start", "turn.queue", "turn.compact", "turn.review"].includes(input.type)) {
+      if (session.provider === "codex" && ["thread.claim", "turn.start", "turn.queue", "turn.compact", "turn.review"].includes(input.type)) {
         const permissions = new PermissionPreferencesService(this.db).read(principal, "sessions", logicalSessionId);
         invariant(permissions.supported || permissions.profile === "project", 409, "PERMISSION_AGENT_UPDATE_REQUIRED", "Update the host connection service before executing with expanded permissions");
         if (permissions.supported) {
@@ -1270,8 +1276,12 @@ export class CoordinationService {
         logicalSessionId,
       );
       if (!session || session.active_turn_id !== null || !["idle", "completed", "interrupted", "failed"].includes(session.execution_state) || session.managed !== 1 || session.reachability !== "live" ||
-          session.identity_state !== "active" || session.security_state !== "normal" || session.compatibility !== "compatible" ||
-          session.machine_reachability !== "online" || session.runtime_read_only === 1 || blocksDuringMaintenance(session.maintenance_json,"turn.start")) return null;
+          session.identity_state !== "active" || session.security_state !== "normal" || !isAcpProvider(session.provider) && session.compatibility !== "compatible" ||
+          session.machine_reachability !== "online" || !isAcpProvider(session.provider) && session.runtime_read_only === 1 || blocksDuringMaintenance(session.maintenance_json,"turn.start")) return null;
+      if (isAcpProvider(session.provider)) {
+        const raw=this.db.get<{discovery_json:string|null}>('SELECT discovery_json FROM machines WHERE machine_id=?',session.machine_id);
+        if(!supportsProviderCommand(JSON.parse(raw?.discovery_json??'{}')?.agentRuntimes?.[session.provider],'turn.start',Boolean(session.native_thread_id)))return null;
+      }
       if (directoryTurnConflict(this.db, session.project_id, logicalSessionId)) return null;
       if (this.pendingCodexMutation(session.machine_id) || this.db.get("SELECT 1 FROM voice_sessions WHERE project_id=? AND state<>'closed'",session.project_id)) return null;
       if (this.db.get("SELECT 1 FROM turn_queue WHERE logical_session_id=? AND state='unknown'", logicalSessionId)) return null;
@@ -1369,6 +1379,8 @@ export class CoordinationService {
         });
         return null;
       }
+      const runtimeTarget = this.db.get<{provider:string;discovery_json:string|null;type:string;native_thread_id:string|null}>(`SELECT p.provider,m.discovery_json,c.type,e.native_thread_id FROM commands c JOIN logical_sessions s ON s.logical_session_id=c.logical_session_id JOIN projects p ON p.project_id=s.project_id JOIN machines m ON m.machine_id=s.machine_id JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL WHERE c.command_id=?`,commandId);
+      if(runtimeTarget && isAcpProvider(runtimeTarget.provider) && !supportsProviderCommand(JSON.parse(runtimeTarget.discovery_json??'{}')?.agentRuntimes?.[runtimeTarget.provider],runtimeTarget.type,Boolean(runtimeTarget.native_thread_id)))return null;
       invariant(command.machine_id === target.machineId, 409, "DISPATCH_TARGET_MISMATCH", "Command targets another Machine");
       invariant(command.identity_state === "active" && command.security_state === "normal", 409, "MACHINE_READ_ONLY", "Machine cannot accept commands");
       invariant(command.reachability === "online", 409, "MACHINE_OFFLINE", "Machine is offline");

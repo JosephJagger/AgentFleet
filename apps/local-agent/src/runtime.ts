@@ -1,3 +1,5 @@
+import { threadProvider } from "./provider-identity.js";
+import { isAcpProvider, supportsProviderCommand, type ProviderId } from "./provider-catalog.js";
 import {snapshotWorkspace, workspaceChanges, type WorkspaceSnapshot} from "./workspace-changes.js";
 import {preferenceRules} from './voice-preference-rules.js';
 import { parseRealtimeVoice, supportsNativeVoice } from "./voice-options.js";
@@ -631,7 +633,7 @@ export class AgentRuntime {
     this.identity = options.identity;
     this.pairing = options.pairing;
     this.support = options.support;
-    this.appServerFactory = options.appServerFactory ?? ((callbacks) => createMultiRuntime(callbacks));
+    this.appServerFactory = options.appServerFactory ?? ((callbacks) => createMultiRuntime(callbacks, {codexReadable: this.support.readable ?? this.support.writable, additionalAllowed: this.support.providerHostSupported ?? this.support.writable}));
     this.restartSleep = options.restartSleep ?? ((milliseconds, signal) => delay(milliseconds, signal));
     this.restartDelay = options.restartDelay ?? appServerRestartDelay;
     this.catalogSync = new CatalogSyncScheduler(async change => {
@@ -687,7 +689,7 @@ export class AgentRuntime {
   }
 
   private canRead(): boolean {
-    return this.support.readable ?? this.support.writable;
+    return (this.support.readable ?? this.support.writable) || this.support.providerHostSupported === true;
   }
 
   readOnlyReasons(): string[] {
@@ -733,7 +735,7 @@ export class AgentRuntime {
         methods: this.isWritable()
           ? ["thread/list", "thread/read", "thread/resume", "thread/unsubscribe", "thread/start", "turn/start", "turn/steer", "turn/interrupt", "approval/reply-once"]
           : this.canRead() && this.appServer ? ["thread/list", "thread/read"] : [],
-        commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : [],
+        commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : this.support.providerHostSupported && this.appServer ? ["thread.claim","thread.release","turn.start","turn.queue","turn.cancel","approval.decide_once","input.respond"] : [],
         maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
         projectFiles: true,
         nativeSubagents: true,
@@ -866,13 +868,13 @@ export class AgentRuntime {
       provider: project.provider ?? "codex",
       alias: project.alias,
       canonicalRoot: project.root,
-      identityHash: sha256(canonicalJson({ device: project.device, inode: project.inode, root: project.root, ...(isClaudeProject(project) ? { provider: "claude" } : {}) })),
+      identityHash: sha256(canonicalJson({ device: project.device, inode: project.inode, root: project.root, ...(project.provider && project.provider !== "codex" ? { provider: project.provider } : {}) })),
       leaseVersion: project.identityVersion,
     }));
   }
 
   private capacityState(): "unknown" | "idle" | "busy" | "saturated" {
-    if (!this.isWritable()) return "unknown";
+    if (!this.isWritable() && !(this.support.providerHostSupported && this.appServer && !this.appServerFailure)) return "unknown";
     return Object.values(this.store.snapshot().managedThreads).some((thread) => thread.activeTurnId !== undefined)
       ? "busy"
       : "idle";
@@ -887,7 +889,7 @@ export class AgentRuntime {
     }
   }
 
-  async addProject(path: string, alias: string, createDirectory: boolean, provider: "codex" | "claude" = "codex"): Promise<ProjectRecord> {
+  async addProject(path: string, alias: string, createDirectory: boolean, provider: ProviderId = "codex"): Promise<ProjectRecord> {
     const project = await addProjectFromPanel(this.store, path, alias, createDirectory, provider);
     try { await this.refreshCatalog(); }
     finally { this.notifyRegistryChanged(); }
@@ -943,7 +945,12 @@ export class AgentRuntime {
       const project = projectById(this.store, command.projectId);
       if(Object.values(this.store.snapshot().managedThreads).some(t=>t.realtimeSessionId && (t.projectId===project.id || command.type==="codex.manage") && !(command.type==="turn.start" && t.logicalSessionId===command.logicalSessionId)) && !["turn.cancel","turn.steer","approval.decide_once","input.respond"].includes(command.type)) throw new AgentError("VOICE_PROJECT_BUSY", "请先结束项目的实时语音，再执行此操作");
       await verifyProjectIdentity(project);
-      if (!this.isWritable()) throw new AgentError("MACHINE_READ_ONLY", this.readOnlyReasons().join("; "));
+      if (isAcpProvider(project.provider)) {
+        if (!['thread.claim','thread.release','turn.start','turn.queue','turn.cancel','approval.decide_once','input.respond'].includes(command.type)) throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Unsupported native operation');
+        if (command.payload.settings !== undefined || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['images','attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');
+      }
+
+      if (isAcpProvider(project.provider) ? !(this.support.providerHostSupported ?? this.support.writable) || !supportsProviderCommand(this.appServer?.getAgentRuntimes?.()[project.provider],command.type,Boolean(command.precondition.nativeThreadId)) : !this.isWritable()) throw new AgentError("MACHINE_READ_ONLY", this.readOnlyReasons().join("; "));
       const server = this.appServer;
       if (!server) throw new AgentError("APP_SERVER_UNAVAILABLE", "codex app-server is not available");
       if (command.appServerEpoch !== undefined && command.appServerEpoch !== server.appServerEpoch) {
@@ -1150,7 +1157,7 @@ export class AgentRuntime {
   }
 
   private async syncNativeUsage(thread: ManagedThread, snapshot: ThreadHistorySnapshot): Promise<void> {
-    if (isClaudeThread(thread.nativeThreadId) || snapshot.nativeThreadId !== thread.nativeThreadId || this.imageMaintenanceSessions.has(thread.logicalSessionId ?? "")) return;
+    if (threadProvider(thread.nativeThreadId) !== "codex" || snapshot.nativeThreadId !== thread.nativeThreadId || this.imageMaintenanceSessions.has(thread.logicalSessionId ?? "")) return;
     const nativeUsage = this.store.snapshot().projectContentPolicies[thread.projectId]?.syncContent === false ? undefined : await readNativeUsage(this.support.codexProfile?.codexHome, snapshot.rolloutPath, thread.nativeThreadId);
     if (nativeUsage && thread.logicalSessionId && thread.executionSegmentId && (!thread.usageObservedAt || nativeUsage.occurredAt >= thread.usageObservedAt)) {
       const digest = sha256(canonicalJson(nativeUsage));
@@ -1282,18 +1289,18 @@ export class AgentRuntime {
           try {
             const currentState = this.store.snapshot();
             const priorThread = currentState.managedThreads[thread.nativeThreadId] ?? currentState.discoveredThreads[thread.nativeThreadId];
-            const sessionCwd = (isClaudeThread(thread.nativeThreadId) ? undefined : await readNativeSessionCwd(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId))
+            const sessionCwd = (threadProvider(thread.nativeThreadId) !== "codex" ? undefined : await readNativeSessionCwd(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId))
               ?? priorThread?.sessionCwd
               ?? thread.cwd;
             const project = await discoverProjectFromCwd(
               sessionCwd,
               [...knownProjects, ...discoveredProjects.values()],
-              isClaudeThread(thread.nativeThreadId) ? "claude" : "codex",
+              threadProvider(thread.nativeThreadId),
             );
             discoveredProjects.set(`${project.provider ?? "codex"}:${project.root}`, project);
             const priorUsage = this.store.snapshot().managedThreads[thread.nativeThreadId]?.nativeUsage ?? this.store.snapshot().discoveredThreads[thread.nativeThreadId]?.nativeUsage;
             const nativeUsage = this.store.snapshot().projectContentPolicies[project.id]?.syncContent === false
-              ? undefined : (isClaudeThread(thread.nativeThreadId) ? undefined : await readNativeUsage(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId)) ?? priorUsage;
+              ? undefined : (threadProvider(thread.nativeThreadId) !== "codex" ? undefined : await readNativeUsage(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId)) ?? priorUsage;
             observed.push({
               ...(nativeUsage ? { nativeUsage } : {}),
               externalId: thread.nativeThreadId,
@@ -1516,7 +1523,7 @@ export class AgentRuntime {
         return { nativeThreadId: boundThread.nativeThreadId, backgroundTerminalsStopped: true };
       }
       case "codex.manage": {
-        if (project.provider === "claude") throw new AgentError("AGENT_CAPABILITY_UNAVAILABLE", "Codex operations require a Codex project");
+        if (project.provider && project.provider !== "codex") throw new AgentError("AGENT_CAPABILITY_UNAVAILABLE", "Codex operations require a Codex project");
         if (!boundThread || boundThread.projectId !== project.id || boundThread.nativeThreadId !== command.precondition.nativeThreadId || boundThread.executionSegmentId !== command.executionSegmentId || command.precondition.projectLeaseVersion !== project.identityVersion || command.precondition.expectedActiveTurnId !== (boundThread.activeTurnId ?? null)) throw new AgentError("CODEX_TARGET_CHANGED", "Codex operation target changed");
         let request;
         try { request = parseCodexOperation(command.payload); } catch { throw new AgentError("CODEX_OPERATION_INVALID", "Invalid Codex operation"); }
@@ -1594,7 +1601,7 @@ export class AgentRuntime {
           throw new AgentError("PROJECT_VERSION_CONFLICT", "project identity version changed; refresh before claiming");
         }
         if (Object.values(this.store.snapshot().managedThreads).some(
-          (candidate) => candidate.projectId === project.id && candidate.activeTurnId !== undefined,
+          (candidate) => this.store.snapshot().projects.find(p => p.id === candidate.projectId)?.root === project.root && candidate.activeTurnId !== undefined,
         )) {
           throw new AgentError("PROJECT_BUSY", "project already has an active AgentFleet turn");
         }
@@ -1635,7 +1642,7 @@ export class AgentRuntime {
           logicalSessionId: command.logicalSessionId,
           executionSegmentId: command.executionSegmentId,
           appServerEpoch: server.appServerEpoch,
-          policyVersion: POLICY_VERSION,
+          policyVersion: isAcpProvider(project.provider) ? "native-acp-v1" : POLICY_VERSION,
           policyVerified: true,
           contentEpoch: command.contentEpoch,
           createdAt: nowIso(),
@@ -1658,7 +1665,7 @@ export class AgentRuntime {
             commandId: command.commandId,
             historyMode: resumed.history.historyMode,
             historyCompleteness: "partial",
-            policyVersion: POLICY_VERSION,
+            policyVersion: isAcpProvider(project.provider) ? "native-acp-v1" : POLICY_VERSION,
             policyVerified: true,
             managementRevision: thread.managementRevision,
             codexProfileId: thread.codexProfileId,
@@ -1734,7 +1741,7 @@ export class AgentRuntime {
         if (plugins.some(selected => !catalog?.plugins?.some(plugin => plugin.pluginId === selected.pluginId && plugin.pluginName === selected.pluginName))) throw new AgentError("PLUGIN_UNAVAILABLE", "所选插件已变化，请刷新后重选");
         if (pluginSkills.some(selected => !catalog?.pluginSkills?.some(skill => skill.pluginId === selected.pluginId && skill.name === selected.name && skill.path === selected.path))) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "所选插件技能已变化，请刷新后重选");
         const prompt = nativeAction ? "" : requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
-        const settings = isClaudeProject(project) ? parseClaudeSettings(command.payload.settings) : validateSettings(command.payload.settings, server.getCodexCatalog?.());
+        const settings = isClaudeProject(project) ? parseClaudeSettings(command.payload.settings) : isAcpProvider(project.provider) ? undefined : validateSettings(command.payload.settings, server.getCodexCatalog?.());
         const profile = permissionProfile(command.payload.permissionProfile);
         if (command.precondition.executionSegmentId !== command.executionSegmentId) {
           throw new AgentError("PRECONDITION_INVALID", "execution segment precondition does not match the command");
@@ -1743,7 +1750,7 @@ export class AgentRuntime {
           throw new AgentError("PROJECT_VERSION_CONFLICT", "project identity version changed; refresh before sending");
         }
         if (Object.values(this.store.snapshot().managedThreads).some(
-          (candidate) => candidate.projectId === project.id && candidate.activeTurnId !== undefined,
+          (candidate) => this.store.snapshot().projects.find(p => p.id === candidate.projectId)?.root === project.root && candidate.activeTurnId !== undefined,
         )) {
           throw new AgentError("PROJECT_BUSY", "project already has an active AgentFleet turn");
         }
@@ -1766,7 +1773,7 @@ export class AgentRuntime {
             logicalSessionId: command.logicalSessionId,
             executionSegmentId: command.executionSegmentId,
             appServerEpoch: server.appServerEpoch,
-            policyVersion: POLICY_VERSION,
+            policyVersion: isAcpProvider(project.provider) ? "native-acp-v1" : POLICY_VERSION,
             policyVerified: created.policyVerified,
             contentEpoch: command.contentEpoch,
             createdAt: nowIso(),
@@ -1787,7 +1794,7 @@ export class AgentRuntime {
             nativeThreadId: thread.nativeThreadId,
             payload: {
               commandId: command.commandId,
-              policyVersion: POLICY_VERSION,
+              policyVersion: isAcpProvider(project.provider) ? "native-acp-v1" : POLICY_VERSION,
               policyVerified: created.policyVerified,
               managementRevision: thread.managementRevision,
               codexProfileId: thread.codexProfileId,
@@ -1825,7 +1832,7 @@ export class AgentRuntime {
           await this.syncManagedHistory(thread, resumed.history, false);
         }
         if (thread.activeTurnId !== undefined) throw new AgentError("THREAD_BUSY", "thread still has an active turn");
-        const turnSettings = isClaudeProject(project) ? settings : nativeAction ? settings : resolveTurnMode(settings, thread.observedSettings, thread.acceptedSettings, command.payload.resolvedMode, server.getCodexCatalog?.());
+        const turnSettings = isClaudeProject(project) || isAcpProvider(project.provider) ? settings : nativeAction ? settings : resolveTurnMode(settings, thread.observedSettings, thread.acceptedSettings, command.payload.resolvedMode, server.getCodexCatalog?.());
         const clientUserMessageId = optionalString(command.payload.clientUserMessageId, "payload.clientUserMessageId");
         const materialized = nativeAction ? [] : await materializeAttachments(project, command.commandId, rawAttachments);
         const referenced = referenceInputs(prompt, materialized);
@@ -1840,7 +1847,7 @@ export class AgentRuntime {
         let completedBeforeResponse = false;
         const updated = await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => {
           delete candidate.activeTurnSettings;
-          candidate.acceptedPermissions = { profile, source: typeof command.payload.permissionSource === "string" ? command.payload.permissionSource : "default", acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
+          if (!isAcpProvider(project.provider)) candidate.acceptedPermissions = { profile, source: typeof command.payload.permissionSource === "string" ? command.payload.permissionSource : "default", acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
           if (turnSettings) candidate.acceptedSettings = { ...turnSettings, acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
           if (
             candidate.lastTurnId === result.nativeTurnId &&
@@ -1973,7 +1980,7 @@ export class AgentRuntime {
             nativeThreadId: approval.nativeThreadId,
             projectId: project.id,
             appServerEpoch: approval.appServerEpoch,
-            policyVersion: POLICY_VERSION,
+            policyVersion: isAcpProvider(project.provider) ? "native-acp-v1" : POLICY_VERSION,
             policyVerified: false,
             contentEpoch: command.contentEpoch,
             createdAt: approval.createdAt,
@@ -2058,7 +2065,7 @@ export class AgentRuntime {
       this.callbacks.onVolatile({type:'voice.event',voiceId,event:'reported',requestId:value.preferenceRequestId,producerEpoch:this.producerEpoch,appServerEpoch:this.appServer.appServerEpoch});
       return;
     }
-    if(isClaudeThread(thread.nativeThreadId)) throw new AgentError("VOICE_UNAVAILABLE", "Native voice requires a Codex session");
+    if(threadProvider(thread.nativeThreadId) !== "codex") throw new AgentError("VOICE_UNAVAILABLE", "Native voice requires a Codex session");
     if(value.action!=="start" || typeof value.sdp!=="string" || value.sdp.length>65536 || !value.sdp.startsWith("v=0\r\n") || !value.sdp.includes("m=audio ")) throw new AgentError("VOICE_INVALID", "Invalid voice offer");
     if(!this.isWritable() || this.store.snapshot().maintenanceDrain || !supportsNativeVoice(this.support.codexVersion) || !this.appServer.startVoice) throw new AgentError("VOICE_UNAVAILABLE", "请先升级托管 Codex 到支持实时语音的版本并完成会话接管");
     const snapshot=this.store.snapshot();
@@ -2190,7 +2197,7 @@ export class AgentRuntime {
         appServerEpoch: approval.appServerEpoch,
         expiresAt: approval.expiresAt,
         scope: "once",
-        policyVersion: POLICY_VERSION,
+        policyVersion: isAcpProvider(threadProvider(approval.nativeThreadId)) ? "native-acp-v1" : POLICY_VERSION,
         action: approval.params,
       },
     });

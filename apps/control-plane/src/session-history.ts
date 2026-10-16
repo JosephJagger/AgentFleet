@@ -35,7 +35,7 @@ export class SessionHistoryService {
   let nativeError:string|null=null;
   if(position?.source!=='synced'&&input.source!=='synced')try {
     invariant(machine.reachability==='online',409,'HISTORY_HOST_OFFLINE','主机离线，暂不能读取原生历史');
-    invariant(session.provider!=='claude'&&this.nativeRead&&binding.nativeThreadId,409,'HISTORY_UNSUPPORTED','当前原生历史接口不支持此会话');
+    invariant((session.provider??'codex')==='codex'&&this.nativeRead&&binding.nativeThreadId,409,'HISTORY_UNSUPPORTED','当前原生历史接口不支持此会话');
     const page=await this.nativeRead(binding,position?.cursor??null);
     const current=this.registry.getSession(principal,session.logicalSessionId);
     invariant(current.contentEpoch===binding.contentEpoch&&current.executionSegmentId===binding.executionSegmentId&&this.db.get<{sync_content:number}>('SELECT sync_content FROM projects WHERE project_id=?',current.projectId)?.sync_content,409,'HISTORY_TARGET_CHANGED','读取期间会话或正文权限已变化');

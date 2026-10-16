@@ -1,3 +1,4 @@
+import { PROVIDER_IDS, providerName } from "../lib/provider-catalog";
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {Activity,Layers3,ChevronLeft,ChevronRight,Terminal} from 'lucide-react';
 import {displayName} from '../lib/display-name';
@@ -21,7 +22,7 @@ function SessionWindow({session,selected,running,online,detail,onSelect}:{sessio
   const status=!online || session.state.reachability!=='live'?t('等待主机连接'):session.state.unknownFreeze?t('结果待核验'):session.state.waitReason==='approval'?t('等待确认'):session.state.waitReason==='user_input'?t('等待回答'):running?t('运行中'):t('空闲');
   const preview=running && session.state.waitReason==='none' ? event?.command || (event?.itemType==='fileChange'?t('修改文件'):event?.itemType==='reasoning'?t('推理中'):undefined) || scoped?.items.at(-1)?.title || status : status;
   return <button ref={element} type="button" className="buzhou-session-window" aria-pressed={selected} onClick={()=>onSelect(session.id)} title={`${displayName(session.title)} · ${displayName(session.projectAlias)}`}>
-    <span className="buzhou-session-window__title"><span className={running?'buzhou-session-dot buzhou-session-dot--running':'buzhou-session-dot'}/><strong>{displayName(session.title)}</strong><small>{session.provider==='claude'?'Claude':'Codex'}</small></span>
+    <span className="buzhou-session-window__title"><span className={running?'buzhou-session-dot buzhou-session-dot--running':'buzhou-session-dot'}/><strong>{displayName(session.title)}</strong><small>{providerName(session.provider ?? "codex")}</small></span>
     <span className="buzhou-session-window__project">{displayName(session.projectAlias)} · {status}</span>
     <span className="buzhou-session-window__preview"><Terminal size={12}/><span>{displayName(preview).replace(/\s+/g,' ').slice(0,180)}</span></span>
   </button>;
@@ -57,8 +58,8 @@ export function HostSessions({machine,sessions,selectedId,detail,onSelect,onBrow
   return <div className="host-session-editor buzhou-editor">
     {selectedId && <div className="buzhou-session-toggle"><button type="button" aria-controls="buzhou-session-picker" aria-expanded={showSwitcher} onClick={()=>setExpandedFor(showSwitcher?undefined:scope)}><Layers3 size={13}/>{showSwitcher?t('收起会话选择'):t('切换会话')}</button></div>}
     {showSwitcher && <div id="buzhou-session-picker" className="buzhou-session-switcher" aria-label={t('当前主机会话切换')}>
-      <div className="buzhou-session-providers">{(['codex','claude'] as const).map(provider=><section className="buzhou-session-provider" key={provider} aria-label={provider==='claude'?'Claude Code':'Codex'}>
-        <header><h3>{provider==='claude'?'Claude Code':'Codex'}</h3>{provider==='claude' && <small>{machine?.agentRuntimes?.claude?.installed===false?t('未安装'):machine?.agentRuntimes?.claude?.installed===true?'':t('安装状态未上报')}</small>}</header>
+      <div className="buzhou-session-providers">{PROVIDER_IDS.filter(provider => provider === 'codex' || provider === 'claude' || machine?.agentRuntimes?.[provider]?.installed || sessions.some(session => session.provider === provider)).map(provider=><section className="buzhou-session-provider" key={provider} aria-label={providerName(provider)}>
+        <header><h3>{providerName(provider)}</h3>{provider==='claude' && <small>{machine?.agentRuntimes?.claude?.installed===false?t('未安装'):machine?.agentRuntimes?.claude?.installed===true?'':t('安装状态未上报')}</small>}</header>
         {(['running','managed'] as const).map(kind=><SessionRow key={`${machine?.id}:${kind}`} kind={kind} sessions={groups[kind].filter(session=>(session.provider??'codex')===provider)} selectedId={picked?.machineId===machine?.id && picked?.id===selectedId ? selectedId : undefined} online={machine?.reachability==='live'} detail={detail} onSelect={select}/>)}
       </section>)}</div>
       {!groups.running.length&&!groups.managed.length&&<div className="buzhou-session-empty-actions"><button type="button" onClick={onBrowse}>{t('展开项目与会话')}</button><button type="button" onClick={onCreate} disabled={!machine||machine.reachability!=='live'}>{t('新会话')}</button></div>}

@@ -26,7 +26,7 @@ export class NativeVoiceService {
     return this.db.transaction(() => {
       assertVoiceAdmission(this.db);
       const session = this.registry.getSession(principal, id);
-      invariant(session.provider !== "claude" && session.managed && session.nativeThreadId && session.reachability === "live" && session.actions.start.allowed, 409, "VOICE_NOT_READY", "请等待主机在线、会话接管完成且项目空闲后开始语音");
+      invariant((session.provider ?? "codex") === "codex" && session.managed && session.nativeThreadId && session.reachability === "live" && session.actions.start.allowed, 409, "VOICE_NOT_READY", "请等待主机在线、会话接管完成且项目空闲后开始语音");
       const lease=this.db.get<{holder_client_session_id:string}>("SELECT holder_client_session_id FROM control_leases WHERE control_lease_id=? AND logical_session_id=? AND state='active' AND expires_at>?",leaseId,id,nowIso());
       invariant(lease && sameLeaseAccount(this.db,lease.holder_client_session_id,principal.clientSessionId), 409, "VOICE_CONTROL_REQUIRED", "请重新获取会话控制权");
       invariant(!this.db.get("SELECT 1 FROM voice_sessions WHERE project_id=? AND state<>'closed'", session.projectId), 409, "VOICE_PROJECT_BUSY", "此项目已有语音连接，或正在确认上次连接已结束");

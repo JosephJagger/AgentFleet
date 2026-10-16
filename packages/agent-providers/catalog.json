@@ -1,0 +1,9 @@
+[
+  {"id":"codex","name":"Codex","transport":"app-server"},
+  {"id":"claude","name":"Claude Code","transport":"claude-sdk"},
+  {"id":"qwen","name":"Qwen Code","transport":"acp","command":"qwen","args":["--acp"]},
+  {"id":"kimi","name":"Kimi Code","transport":"acp","command":"kimi","args":["acp"]},
+  {"id":"cursor","name":"Cursor","transport":"acp","command":"agent","args":["acp"]},
+  {"id":"codebuddy","name":"CodeBuddy Code","transport":"acp","command":"codebuddy","args":["--acp"]},
+  {"id":"grok","name":"Grok Build","transport":"acp","command":"grok","args":["--no-auto-update","agent","stdio"]}
+]

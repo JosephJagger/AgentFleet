@@ -1,3 +1,4 @@
+import { PROVIDER_IDS, type ProviderId } from "./provider-catalog.js";
 import { REVIEWED_CODEX_SCHEMAS } from "./reviewed-codex-schemas.js";
 /**
  * Stable P0a/P0b wire vocabulary shared by the dashboard and local Agent.
@@ -112,7 +113,7 @@ export const CODEX_COMPATIBILITY_PROFILE: CodexCompatibilityProfile = {
 };
 
 export interface ProjectSummary {
-  provider?: "codex" | "claude";
+  provider?: ProviderId;
   projectId: string;
   machineId: string;
   alias: string;
@@ -143,7 +144,7 @@ export interface LogicalSessionSummary {
   runtimeSyncUntil?: number | null;
   claudePermissionModes?:string[];
   claudeModels?: Array<{model:string;displayName:string;efforts:string[];supportsAutoMode?:boolean}>;
-  provider?: "codex" | "claude";
+  provider?: ProviderId;
   recordedTokens?: number | null;
   weeklyTokens?: number | null;
   weeklyBoundaryIncomplete?: boolean;
@@ -251,7 +252,7 @@ export interface DurableAgentEvent {
 }
 
 export interface AgentProjectHello {
-  provider?: "codex" | "claude";
+  provider?: ProviderId;
   externalId: string;
   alias: string;
   canonicalRoot: string;
@@ -501,7 +502,7 @@ export const apiSchemas = {
         path: { type: "string", minLength: 1, maxLength: 4096 },
         alias: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
         createDirectory: { type: "boolean" },
-        provider: { type: "string", enum: ["codex", "claude"] },
+        provider: { type: "string", enum: PROVIDER_IDS },
         clientMutationId: { type: "string", minLength: 8, maxLength: 200 },
       },
     },

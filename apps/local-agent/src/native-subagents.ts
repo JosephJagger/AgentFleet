@@ -1,10 +1,11 @@
+import type { ProviderId } from "./provider-catalog.js";
 import { AgentError } from "./errors.js";
 import { readConversation } from "./conversation-history.js";
 import { isRecord } from "./util.js";
 
 export interface NativeSubagent { id: string; title: string; status: string; description?: string; }
 export interface NativeSubagentMessage { id?: string; role: "user" | "assistant"; text: string; status?: string; truncated?: boolean; textOffset?: number; textLength?: number; }
-export interface NativeSubagentsPage { provider: "codex" | "claude"; items: NativeSubagent[]; messages?: NativeSubagentMessage[]; childId?: string; nextCursor: string | null; }
+export interface NativeSubagentsPage { provider: ProviderId; items: NativeSubagent[]; messages?: NativeSubagentMessage[]; childId?: string; nextCursor: string | null; }
 // Native application context is sticky. Clear the retired panel guidance even
 // when a queued request from an older client still carries the legacy flag.
 export const nativeCollaborationContext = (_legacyEnabled?: boolean) => ({ additionalContext: {} });

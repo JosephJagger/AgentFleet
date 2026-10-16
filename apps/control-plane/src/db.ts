@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 60) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 61) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1525,6 +1525,24 @@ export class ControlPlaneDatabase {
       DROP TABLE panel_voice_tail_drafts;
       DROP TABLE panel_voice_tails;
       PRAGMA user_version=60`); });
+    if (version < 61) {
+      // Rebuild only this table, preserving referencing IDs and all indexes.
+      // foreign_keys must be toggled outside the transaction (SQLite requirement).
+      this.sqlite.exec("PRAGMA foreign_keys=OFF");
+      try { this.transaction(() => {
+        const original = this.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE type='table' AND name='projects'")!.sql;
+        if (original.includes("'grok'")) { this.sqlite.exec("PRAGMA user_version=61"); return; }
+        const revised = original.replace(/CREATE TABLE ["`]?projects["`]?/i, 'CREATE TABLE projects_provider_v61').replace("CHECK(provider IN ('codex','claude'))", "CHECK(provider IN ('codex','claude','qwen','kimi','cursor','codebuddy','grok'))");
+        if (revised === original || !revised.includes("'grok'")) throw new Error('Unexpected projects schema');
+        const indexes = this.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='projects' AND type IN ('index','trigger') AND sql IS NOT NULL");
+        this.sqlite.exec(revised);
+        this.sqlite.exec("INSERT INTO projects_provider_v61 SELECT * FROM projects; DROP TABLE projects; ALTER TABLE projects_provider_v61 RENAME TO projects");
+        for (const index of indexes) this.sqlite.exec(index.sql);
+        if (this.all("PRAGMA foreign_key_check").length) throw new Error('Provider migration foreign-key violation');
+        this.sqlite.exec("PRAGMA user_version=61");
+      }); } finally { this.sqlite.exec("PRAGMA foreign_keys=ON"); }
+    }
+
 
 
 

@@ -1,3 +1,4 @@
+import type { ProviderId, AcpProviderId, ProviderAvailability } from "./provider-catalog";
 import type { TokenCounts } from "./usage";
 
 export type MachineIdentity = "paired" | "revoked";
@@ -6,7 +7,7 @@ export type MachineCompatibility = "compatible" | "degraded_read_only" | "incomp
 export type MachineCapacity = "unknown" | "idle" | "busy" | "saturated";
 
 export interface Project {
-  provider?: "codex" | "claude";
+  provider?: ProviderId;
   id: string;
   machineId: string;
   alias: string;
@@ -50,7 +51,7 @@ export interface ScheduledNotification {
 }
 
 export interface Machine {
-  agentRuntimes?: { claude?: { installed: boolean; version: string | null } };
+  agentRuntimes?: { claude?: { installed: boolean; version: string | null } } & Partial<Record<AcpProviderId, ProviderAvailability>>;
   codexCatalog?: import("./codex-settings").CodexCatalog | null;
   id: string;
   name: string;
@@ -152,7 +153,7 @@ export interface ClaudeModel {model:string;displayName:string;efforts:string[];s
 export interface FleetSession {
   claudeModels?: ClaudeModel[];
   claudePermissionModes?:string[];
-  provider?: "codex" | "claude";
+  provider?: ProviderId;
   recordedTokens?: number | null;
   weeklyTokens?: number | null;
   weeklyBoundaryIncomplete?: boolean;
@@ -379,7 +380,7 @@ export interface ImageSessionUsage { logicalSessionId: string; title: string; pr
 export interface VoiceTaskRecord {
   resolution?:{state:'completed';kind:'manual_continuation';nativeTurnId:string;createdAt:string;result:string;historyLimited:boolean}|null;
   todoId:string;intent:string;intentUnavailable:boolean;state:'pending'|'dispatched'|'cancelled'|'completed';revision:number;sourceVoiceId:string|null;createdAt:string;updatedAt:string;
-  target:{machineId:string;projectId:string;sessionId:string;host:string;project:string;title:string;provider?:'codex'|'claude';managed?:boolean}|null;targetUnavailable:boolean;
+  target:{machineId:string;projectId:string;sessionId:string;host:string;project:string;title:string;provider?:ProviderId;managed?:boolean}|null;targetUnavailable:boolean;
   job:{jobId:string;nativeTurnId:string|null;state:string;result?:string;error?:{code:string;message:string}|null;historyLimited?:boolean;statusFreshness?:'live'|'last_known';deliveredToVoice:boolean;acknowledgedAt:string|null}|null;
 }
 export interface VoiceTaskPage {items:VoiceTaskRecord[];total:number;nextCursor:string|null;instruction:string;}

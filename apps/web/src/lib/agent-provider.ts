@@ -1,1 +1,2 @@
-export const agentName = (provider?: string) => provider === "claude" ? "Claude Code" : "Codex";
+import { providerName } from "./provider-catalog";
+export const agentName = (provider?: string) => providerName(provider ?? "codex");

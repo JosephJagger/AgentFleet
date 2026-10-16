@@ -1,3 +1,4 @@
+import { isAcpProvider, type ProviderId } from "./lib/provider-catalog";
 import { matchesRuntimeTarget, runtimeRollout } from "./lib/runtime-rollout";
 import { HostSessions } from "./components/HostSessions";
 import { hostSessionGroups, preferredHostSession, rememberedHostSession, rememberHostSession } from "./lib/host-session-selection";
@@ -423,8 +424,8 @@ export function CompatibilityProfileCard({ machine, profile }: { machine: Machin
 export function MachineSummaryHeader({ machine, onAliasChange, provider = "codex", onProviderChange }: {
   machine: Machine;
   onAliasChange: (alias: string | null) => Promise<void>;
-  provider?: "codex" | "claude";
-  onProviderChange?: (provider: "codex" | "claude") => void;
+  provider?: ProviderId;
+  onProviderChange?: (provider: ProviderId) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(machine.displayAlias ?? "");
@@ -460,7 +461,7 @@ export function MachineSummaryHeader({ machine, onAliasChange, provider = "codex
           <div className="machine-name-line">
             <h1>{displayName(machine.name)}</h1>
             <IconButton label={t("修改主机显示名称")} onClick={() => setEditing(true)}><Pencil size={14} /></IconButton>
-            {onProviderChange && <AgentPicker value={provider} claudeInstalled={machine.agentRuntimes?.claude?.installed === true} onChange={onProviderChange} />}
+            {onProviderChange && <AgentPicker value={provider} claudeInstalled={machine.agentRuntimes?.claude?.installed === true} runtimes={machine.agentRuntimes} onChange={onProviderChange} />}
           </div>
         )}
         {machine.displayAlias && <span className="machine-hostname">hostname · {displayName(machine.hostname)}</span>}
@@ -902,10 +903,10 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const canSend = !hasActiveTurn && !pendingCommand && (session.actions?.start?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.threadRuntime === "idle" && !session.state.unknownFreeze));
   const canCancel = !pendingCommand && (session.actions?.cancel?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.currentTurn === "in_progress" && session.activeTurnId));
   const canQueueOrSteer = session.actions?.queue?.reasonCode !== "MACHINE_DRAINING" && Boolean(detail.writable && session.state.reachability === "live" && session.state.currentTurn === "in_progress" && session.activeTurnId);
-  const slashCommand = session.provider === "claude" ? undefined : parseCodexCommand(prompt);
+  const slashCommand = (session.provider ?? "codex") === "codex" ? parseCodexCommand(prompt) : undefined;
   let outputSchema: Record<string, unknown> | undefined;
   let outputSchemaError = false;
-  if (session.provider !== "claude" && outputSchemaDraft.trim()) { try { outputSchema = parseOutputSchema(JSON.parse(outputSchemaDraft)); } catch { outputSchemaError = true; } }
+  if ((session.provider ?? "codex") === "codex" && outputSchemaDraft.trim()) { try { outputSchema = parseOutputSchema(JSON.parse(outputSchemaDraft)); } catch { outputSchemaError = true; } }
   const additions: TurnAdditions | undefined = fileDraft.files.length || selectedPlugins.length || goal.trim() || referenceCards.length || outputSchema ? { ...(outputSchema ? { outputSchema } : {}), ...(fileDraft.files.length ? { attachments: fileDraft.files.map(({ name, relativePath, mimeType, data }) => ({ name, relativePath, mimeType, data })) } : {}), ...(referenceCards.length ? { references: referenceCards.filter(card => card.identity).map(card => ({ id: card.sourceId, version: card.identity!.version })) } : {}), ...(selectedPlugins.length ? { plugins: selectedPlugins } : {}), ...(goal.trim() ? { goal: goal.trim() } : {}) } : undefined;
   const referencesBlocked = referenceCards.some(card => card.error || !card.identity) || (referenceCards.length > 0 && !prompt.trim());
   const sendText = () => prompt.trim();
@@ -978,7 +979,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
       } catch(error) {setCommandMessage(errorMessage(error));}
       return;
     }
-    if (session.provider !== "claude" && slashCommand) { await runSlash(slashCommand.name, slashCommand.args); return; }
+    if ((session.provider ?? "codex") === "codex" && slashCommand) { await runSlash(slashCommand.name, slashCommand.args); return; }
     if (!hasInput || !canSend) return;
     setBusy(true);
     try {
@@ -1021,11 +1022,11 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
             {session.actions?.start?.reasonCode === "MACHINE_DRAINING" && <span role="status">{t("主机正在维护，等待安全重启；当前任务可继续，暂不接受新任务")}</span>}
             {buzhouDesktop && <UsageButton key={`header-quota:${session.machineId}:${session.provider}`} scope="machine" id={session.machineId} provider={session.provider} compactQuota/>}
             <div className="session-call-actions"><UsageButton scope="session" id={session.id} provider={session.provider}/>
-      {session.provider !== "claude" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
+      {(session.provider ?? "codex") === "codex" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
             </div>
           </div>
         <div className="inspector-head__actions">
-      {session.provider !== "claude" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
+      {(session.provider ?? "codex") === "codex" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
           <SessionActions>
             <button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(new URL(sessionPath(session.id), window.location.origin).href); setCommandMessage(t("已复制会话链接")); } catch { setCommandMessage(t("浏览器未允许复制会话链接")); } }}><Copy size={16} />{t("复制会话链接")}</button>
@@ -1059,7 +1060,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           <span className="share-strip__icon"><Share2 size={16} /></span>
           <div>
             <strong>{session.historyMode !== "unknown" ? t("宿主机共享会话") : t("仅可查看的宿主机会话")}</strong>
-            <span>{canClaim ? t(session.provider === "claude" ? "同步主机上的历史，继续原来的 Claude Code 会话" : "同步主机上的历史，继续原来的 Codex 会话") : systemText(session.actions?.claim?.message) || (session.state.threadRuntime === "active" ? t("请先结束宿主机正在运行的任务") : t("正在检查这个会话是否支持继续操作"))}</span>
+            <span>{canClaim ? t("同步主机上的历史，继续原来的 {0} 会话", agentName(session.provider)) : systemText(session.actions?.claim?.message) || (session.state.threadRuntime === "active" ? t("请先结束宿主机正在运行的任务") : t("正在检查这个会话是否支持继续操作"))}</span>
           </div>
             <button className="button button--share" type="button" disabled={!canClaim || busy} onClick={async () => { setBusy(true); try { await onClaim(); } finally { setBusy(false); } }}>{busy ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />}{locale() === "en" ? " " : ""}{t("接管并同步")}</button>
         </div>
@@ -1069,7 +1070,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
       {approval?.status === "pending" && (approval.type === "user_input"
         ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} onChanged={onRefresh} />
         : <ApprovalCard approval={approval} provider={session.provider} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
-      {buzhouDesktop ? <BuzhoushanActivity key={`activity:${draftOwner}:${session.id}`} detail={detail} conversation={<ConversationViewport events={conversationEvents}><Timeline events={conversationEvents} sessionId={session.id} provider={session.provider}/></ConversationViewport>}/> : session.provider!=="claude" && <RuntimeProgress key={`progress:${session.id}:${session.activeTurnId??"none"}`} sessionId={session.id} active={Boolean(session.activeTurnId)||session.state.currentTurn==="in_progress"||session.state.unknownFreeze} initial={detail.progress}/>}
+      {buzhouDesktop ? <BuzhoushanActivity key={`activity:${draftOwner}:${session.id}`} detail={detail} conversation={<ConversationViewport events={conversationEvents}><Timeline events={conversationEvents} sessionId={session.id} provider={session.provider}/></ConversationViewport>}/> : (session.provider??"codex")==="codex" && <RuntimeProgress key={`progress:${session.id}:${session.activeTurnId??"none"}`} sessionId={session.id} active={Boolean(session.activeTurnId)||session.state.currentTurn==="in_progress"||session.state.unknownFreeze} initial={detail.progress}/>}
       <OperationReceipts commands={detail.commands ?? []} mode="outstanding" />
       {(detail.session.state.unknownFreeze || (detail.commands ?? []).some(command => command.state === "unknown")) && <CommandRecovery key={`recovery:${draftOwner}:${session.machineId}`} machineId={session.machineId} online={session.state.reachability === "live"} supported={detail.commandRecoverySupported === true} onChanged={onRefresh} />}
       {detail.queue.some((item) => item.state === "queued" || item.state === "dispatching" || item.state === "unknown") && (
@@ -1095,10 +1096,10 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
       <SessionConfiguration key={`config:${draftOwner}:${session.id}`} request={configuration} title={displayName(session.title)} onClose={() => setConfiguration(undefined)}>
         {configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
-        {session.provider !== "claude" && <CodexSettingsPanel key={`${draftOwner}:${session.id}:${modeSettingsRevision}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />}
-        {session.provider !== "claude" && <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />}
+        {(session.provider ?? "codex") === "codex" && <CodexSettingsPanel key={`${draftOwner}:${session.id}:${modeSettingsRevision}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />}
+        {(session.provider ?? "codex") === "codex" && <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />}
         <SessionWritingPreferencesPanel key={`writing:${draftOwner}:${session.id}`} settings={writingSettings} />
-        {session.provider !== "claude" && <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
+        {(session.provider ?? "codex") === "codex" && <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
           <CodexOutputPanel value={outputSchemaDraft} error={outputSchemaError} onChange={setOutputSchemaDraft} />
           <CodexInspectionPanel key={`inspect:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} request={inspectionRequest?.sessionId === session.id ? inspectionRequest : undefined} onChanged={onRefresh} />
@@ -1107,14 +1108,15 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         <details className="session-sync-details session-config-section"><summary><span>{t("同步详情")}<small>{t("查看会话同步状态的排查信息")}</small></span></summary><p className="mono">seq {session.sessionSeq} · epoch {session.contentEpoch}</p></details>
       </SessionConfiguration>
       <form className="composer" onSubmit={event => { void submit(event); }}>
-        {session.provider !== "claude" && prompt.trimStart().startsWith("/") && <div className="codex-command-menu" role="group" aria-label={t("Codex 命令")}><p>{t("面板命令 · 点击待接入项可查看原因，不会发送给模型")}</p>{codexCommands.filter((item) => item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map((item) => <button type="button" key={item.name} onClick={() => void runSlash(item.name, slashCommand?.args)}><code>/{displayName(item.name)}</code><span>{item.label} · {coverageLabels[item.coverage]}</span></button>)}</div>}
+        {(session.provider ?? "codex") === "codex" && prompt.trimStart().startsWith("/") && <div className="codex-command-menu" role="group" aria-label={t("Codex 命令")}><p>{t("面板命令 · 点击待接入项可查看原因，不会发送给模型")}</p>{codexCommands.filter((item) => item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map((item) => <button type="button" key={item.name} onClick={() => void runSlash(item.name, slashCommand?.args)}><code>/{displayName(item.name)}</code><span>{item.label} · {coverageLabels[item.coverage]}</span></button>)}</div>}
         {!configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
         {voiceActive && <p className="composer-mode" role="status">{t("通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。")}</p>}
-        {hasActiveTurn && <div className="composer-mode"><Activity size={14} />{t(session.provider === "claude" ? "Claude Code 正在处理：可排到下一轮" : "Codex 正在处理：可补充当前任务，或排到下一轮")}</div>}
+        {hasActiveTurn && <div className="composer-mode"><Activity size={14} />{(session.provider ?? "codex") === "codex" ? t("Codex 正在处理：可补充当前任务，或排到下一轮") : t("{0} 正在处理：可排到下一轮", agentName(session.provider))}</div>}
+        {isAcpProvider(session.provider) && <p className="composer-mode">{t("权限沿用主机上的原生设置；需要确认时在面板处理。")}</p>}
         {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
 
-        {session.provider !== "claude" && <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>}
+        {(session.provider ?? "codex") === "codex" && <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>}
         {referenceCards.length > 0 && <div className="session-reference-cards" aria-label={t("复用的会话")}>
           {referenceCards.map(card => { const source = card.identity; const candidate = referenceCandidates.find(item => item.id === card.sourceId); const failed = Boolean(card.error); return <article className="session-reference-card" key={card.key}>
             <div className="session-reference-card__head"><strong>{displayName(source?.title ?? candidate?.title ?? card.sourceId)}</strong><button type="button" aria-label={t("删除引用卡片")} onClick={() => removeReference(card.key)}><X size={15} /></button></div>
@@ -1163,11 +1165,11 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div><button type="button" className="prompt-completions-dismiss" aria-label={t("收起补全建议")} title={t("收起补全建议")} onMouseDown={event => event.preventDefault()} onClick={() => { setDismissedCompletion(completionKey); textArea.current?.focus(); }}><X size={16} aria-hidden="true" /></button></div></CompletionSurface>}
         <textarea
           ref={textArea}
-          aria-label={t(session.provider === "claude" ? "发送给 Claude Code 的消息" : "发送给 Codex 的消息")}
+          aria-label={t("发送给 {0} 的消息", agentName(session.provider))}
           aria-autocomplete="list"
           aria-controls={completions.length > 0 ? "prompt-completions" : undefined}
           aria-activedescendant={completions.length > 0 ? `prompt-completion-${activeCompletion}` : undefined}
-          placeholder={canSend ? session.provider === "claude" ? t("告诉 Claude Code 下一步做什么…") : t("告诉 Codex 下一步做什么…") : hasActiveTurn ? t("补充当前任务，或写入下一轮队列…") : t("先写下想法，恢复可用后手动发送…")}
+          placeholder={canSend ? t("告诉 {0} 下一步做什么…", agentName(session.provider)) : hasActiveTurn ? t("补充当前任务，或写入下一轮队列…") : t("先写下想法，恢复可用后手动发送…")}
           value={prompt}
           onChange={(event) => { setPrompt(event.target.value); setCompletionFocused(true); setCompletionCaret(event.target.selectionStart); setCompletionSelectionEnd(event.target.selectionEnd); setDismissedCompletion(""); }}
           onFocus={() => setCompletionFocused(true)}
@@ -1229,22 +1231,22 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           <input ref={(node) => { folderInput.current = node; if (node) { node.setAttribute("webkitdirectory", ""); node.setAttribute("accept", ATTACHMENT_ACCEPT); } }} className="composer-image-input" type="file" multiple aria-label={t("选择要发送的文件夹")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
           <details ref={addMenu} open={addMenuOpen} onToggle={event => setAddMenuOpen(event.currentTarget.open)} className="composer-add-menu"><summary className="button button--secondary composer-add-trigger" aria-label={t("添加内容")} aria-expanded={addMenuOpen} title={t("添加内容")}><Plus size={19} /></summary><div className="composer-add-popover">
             <div className="composer-add-popover__head"><strong>{t("添加")}</strong><button type="button" className="composer-add-popover__close" aria-label={t("关闭")} onClick={closeAddMenu}><X size={19} /></button></div>
-            {session.provider !== "claude" && session.collaborationModes?.includes("default") && <div className="composer-mode-field"><Lightbulb size={17} aria-hidden="true"/><RuntimeModeSelect sessionId={session.id} summary={runtimeSummary} running={hasActiveTurn} onSaved={() => setModeSettingsRevision(n => n + 1)}/></div>}
+            {(session.provider ?? "codex") === "codex" && session.collaborationModes?.includes("default") && <div className="composer-mode-field"><Lightbulb size={17} aria-hidden="true"/><RuntimeModeSelect sessionId={session.id} summary={runtimeSummary} running={hasActiveTurn} onSaved={() => setModeSettingsRevision(n => n + 1)}/></div>}
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); fileInput.current?.click(); }}><FileUp size={17} /><span><b>{t("文件")}</b><small>{t("支持 PDF、XLSX、UTF-8 文本、源码与配置")}</small></span></button>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); folderInput.current?.click(); }}><FolderOpen size={17} /><span><b>{t("文件夹")}</b><small>{t("逐个校验支持类型，最多 32 个文件")}</small></span></button>
-            <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t(session.provider === "claude" ? "添加会话引用，由 Claude Code 按需查阅" : "添加会话引用，由 Codex 按需查阅")}</small></span></button>
+            {!isAcpProvider(session.provider) && <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t(session.provider === "claude" ? "添加会话引用，由 Claude Code 按需查阅" : "添加会话引用，由 Codex 按需查阅")}</small></span></button>}
             <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { closeAddMenu(); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
             {session.provider === "claude" && <button type="button" onClick={()=>{closeAddMenu();setClaudeSettingsOpen(n=>n+1);}}><Code2 size={17}/><span><b>{t("Claude Code 设置")}</b><small>{t("模型 · 思考强度 · 计划模式")}</small></span></button>}
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
             {session.provider === "claude" && session.collaborationModes?.includes("plan") && <button type="button" disabled={hasActiveTurn || !claudePrefs.ready} aria-pressed={claudePlan} onClick={() => { closeAddMenuAfterTouchChoice(); void claudePrefs.save({...claudePrefs.settings,mode:claudePlan?"default":"plan"}).catch(error=>setCommandMessage(errorMessage(error))); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{claudePlan ? t("已开启；下一轮按计划模式运行") : t("先分析并制定计划")}</small></span><i className={claudePlan ? "active" : ""} /></button>}
-            {session.provider !== "claude" && (session.plugins?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.plugins!.map(plugin => { const selected = selectedPlugins.some(item => item.pluginId === plugin.pluginId); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={plugin.pluginId} onClick={() => { setSelectedPlugins(current => selected ? current.filter(item => item.pluginId !== plugin.pluginId) : [...current, plugin]); closeAddMenuAfterTouchChoice(); }}><Puzzle size={17} /><span><b>{plugin.pluginName}</b></span></button>; })}</div></>}
+            {(session.provider ?? "codex") === "codex" && (session.plugins?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.plugins!.map(plugin => { const selected = selectedPlugins.some(item => item.pluginId === plugin.pluginId); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={plugin.pluginId} onClick={() => { setSelectedPlugins(current => selected ? current.filter(item => item.pluginId !== plugin.pluginId) : [...current, plugin]); closeAddMenuAfterTouchChoice(); }}><Puzzle size={17} /><span><b>{plugin.pluginName}</b></span></button>; })}</div></>}
           </div></details>
           {hasActiveTurn ? (
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>}
               </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={!(canQueueOrSteer || voiceActive && canSend) || Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setCommandMessage(""); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
-              {session.provider !== "claude" && hasActiveTurn && <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={!canQueueOrSteer || Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) { const { outputSchema: _outputSchema, ...steerAdditions } = additions; await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, steerAdditions); } else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setCommandMessage(""); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>}
+              {(session.provider ?? "codex") === "codex" && hasActiveTurn && <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={!canQueueOrSteer || Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) { const { outputSchema: _outputSchema, ...steerAdditions } = additions; await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, steerAdditions); } else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setCommandMessage(""); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>}
             </div>
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>
@@ -1449,7 +1451,7 @@ function App() {
   const [route, setRoute] = useState(() => routeFromPath(location.pathname));
   const view = route.view;
   const routeRef = useRef(route);
-  const [machineProviders, setMachineProviders] = useState<Record<string, "codex" | "claude">>({});
+  const [machineProviders, setMachineProviders] = useState<Record<string, ProviderId>>({});
   const [selectedMachineId, setSelectedMachineId] = useState<string | undefined>(route.machineId);
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(route.sessionId);
   const [detail, setDetail] = useState<SessionDetail>();
@@ -1679,9 +1681,9 @@ function App() {
 
   const selectedMachine = useMemo(() => dashboard?.machines.find((machine) => machine.id === selectedMachineId), [dashboard, selectedMachineId]);
   const selectedProvider = machineProviders[selectedMachineId ?? ""] ?? "codex";
-  const providerMachines = dashboard?.machines.filter(machine => selectedProvider !== "claude" || machine.agentRuntimes?.claude?.installed).map(machine => ({ ...machine, projects: machine.projects.filter(project => (project.provider ?? "codex") === selectedProvider) })) ?? [];
-  function selectProvider(provider: "codex" | "claude") {
-    if (!selectedMachineId || provider === "claude" && !selectedMachine?.agentRuntimes?.claude?.installed) return;
+  const providerMachines = dashboard?.machines.filter(machine => selectedProvider === "codex" || machine.agentRuntimes?.[selectedProvider]?.installed).map(machine => ({ ...machine, projects: machine.projects.filter(project => (project.provider ?? "codex") === selectedProvider) })) ?? [];
+  function selectProvider(provider: ProviderId) {
+    if (!selectedMachineId || provider !== "codex" && !selectedMachine?.agentRuntimes?.[provider]?.installed) return;
     setMachineProviders(current => ({ ...current, [selectedMachineId]: provider }));
     navigate({ view: "fleet", machineId: selectedMachineId });
   }

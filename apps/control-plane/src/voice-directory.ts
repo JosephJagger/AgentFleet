@@ -1,3 +1,4 @@
+import { isProviderId } from "./provider-catalog.js";
 import type {ControlPlaneDatabase} from './db.js';
 import type {RegistryService} from './registry.js';
 import type {Principal} from './auth.js';
@@ -10,7 +11,7 @@ export class VoiceDirectory {
  read(principal:Principal,input:Record<string,unknown>={}) {
   const text=(key:string)=>{const v=input[key];invariant(v===undefined||typeof v==='string'&&v.length<=200,400,'DIRECTORY_FILTER','目录筛选必须是至多 200 字的文字');return (v as string|undefined)?.trim()||'';};
   const query=text('query'),host=text('host'),project=text('project'),sessionName=text('sessionName'),machineId=text('machineId'),projectId=text('projectId'),provider=text('provider');
-  invariant(!provider||['codex','claude'].includes(provider),400,'DIRECTORY_FILTER','provider 必须是 codex 或 claude');
+  invariant(!provider||isProviderId(provider),400,'DIRECTORY_FILTER','不支持的 provider');
   invariant(input.currentTask===undefined||typeof input.currentTask==='boolean',400,'DIRECTORY_FILTER','currentTask 必须是布尔值');
   const status=input.currentTask===true?'running':text('directoryStatus')||'all';
   invariant(['all','active','online','managed','running'].includes(status),400,'DIRECTORY_FILTER','目录状态无效');

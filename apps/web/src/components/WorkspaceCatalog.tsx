@@ -1,3 +1,4 @@
+import { providerName, type ProviderId } from "../lib/provider-catalog";
 import { displayName } from "../lib/display-name";
 import { agentName } from "../lib/agent-provider";
 import { UsageButton } from "./UsageButton";
@@ -51,7 +52,7 @@ function ProjectGroup({ project, expanded, selectedId, refreshKey, onToggle, onS
   </section>;
 }
 
-export function WorkspaceCatalog({ provider = "codex", machineId, selectedSession, refreshKey, onSelect, onCreate, onCreateProject, onSchedule }: { provider?: "codex" | "claude"; machineId?: string; selectedSession?: FleetSession; refreshKey: string; onSelect: (id: string) => void; onCreate: (project?: Project) => void; onCreateProject?: () => void; onSchedule?: (project: Project) => void }) {
+export function WorkspaceCatalog({ provider = "codex", machineId, selectedSession, refreshKey, onSelect, onCreate, onCreateProject, onSchedule }: { provider?: ProviderId; machineId?: string; selectedSession?: FleetSession; refreshKey: string; onSelect: (id: string) => void; onCreate: (project?: Project) => void; onCreateProject?: () => void; onSchedule?: (project: Project) => void }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
@@ -95,7 +96,7 @@ export function WorkspaceCatalog({ provider = "codex", machineId, selectedSessio
     {error && <p className="catalog-error" role="alert">{systemText(error)}<button type="button" onClick={() => setRetry((value) => value + 1)}><RefreshCw size={13} />{t("重试")}</button></p>}
     {loading && !loaded && <div className="catalog-loading"><LoaderCircle className="spin" size={15} />{t("正在更新列表")}</div>}
     {searching ? <SessionRows sessions={matches.items} selectedId={selectedSession?.id} onSelect={onSelect} /> : visibleProjects.map((project) => <ProjectGroup key={project.id} project={project} expanded={expanded.has(project.id)} selectedId={selectedSession?.id} refreshKey={refreshKey} onToggle={() => setExpanded((current) => { const next = new Set(current); if (next.has(project.id)) next.delete(project.id); else next.add(project.id); return next; })} onSelect={onSelect} onCreate={onCreate} onSchedule={onSchedule} />)}
-    {loaded && !error && (searching ? matches.items.length === 0 : projects.items.length === 0) && <p className="catalog-empty">{searching ? t("没有匹配的会话，试试其他关键词或状态。") : t(provider === "claude" ? "暂无项目。连接主机后会自动发现已有 Claude Code 项目。" : "暂无项目。连接主机后会自动发现已有 Codex 项目。")}</p>}
+    {loaded && !error && (searching ? matches.items.length === 0 : projects.items.length === 0) && <p className="catalog-empty">{searching ? t("没有匹配的会话，试试其他关键词或状态。") : t("暂无项目。连接主机后会自动发现已有 {0} 项目。", providerName(provider))}</p>}
     {!searching && totalProjectPages > 1 && <nav className="project-pagination" aria-label={t("项目分页")}><span className="project-pagination__range">{t("第 {0} / {1} 页", projectPage, totalProjectPages)}</span><span className="project-pagination__actions"><button type="button" aria-label={t("上一页")} disabled={projectPage === 1 || loading} onClick={() => setProjectPage((page) => Math.max(1, page - 1))}><ChevronLeft size={15} /></button><button type="button" aria-label={t("下一页")} disabled={projectPage === totalProjectPages || loading} onClick={() => setProjectPage((page) => Math.min(totalProjectPages, page + 1))}><ChevronRight size={15} /></button></span></nav>}
     {searching && (previous.length > 0 || nextCursor) && <nav className="project-pagination" aria-label={t("会话分页")}><span className="project-pagination__range">{t("第 {0} 页", previous.length + 1)}</span><span className="project-pagination__actions"><button type="button" aria-label={t("上一页")} disabled={!previous.length || loading} onClick={() => { setCursor(previous.at(-1) ?? null); setPrevious((current) => current.slice(0, -1)); }}><ChevronLeft size={15} /></button><button type="button" aria-label={t("下一页")} disabled={!nextCursor || loading} onClick={() => { setPrevious((current) => [...current, cursor]); setCursor(nextCursor); }}><ChevronRight size={15} /></button></span></nav>}
   </section>;

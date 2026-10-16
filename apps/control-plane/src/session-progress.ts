@@ -8,7 +8,7 @@ export interface ProgressItem {
 }
 export interface SessionProgress {
   sessionId: string; nativeTurnId: string | null; state: string;
-  source: "codex_app_server_events" | "claude_events"; freshness: "live" | "stale" | "unavailable";
+  source: "codex_app_server_events" | "claude_events" | "native_acp_events"; freshness: "live" | "stale" | "unavailable";
   updatedAt: string | null; contentAvailable: boolean; waitingForApproval: boolean;
   items: ProgressItem[]; limited: boolean;
 }
@@ -98,6 +98,6 @@ export class SessionProgressService {
     const waitingForApproval=Boolean(turnId && turnId===session.activeTurnId && this.db.get("SELECT 1 FROM approvals WHERE logical_session_id=? AND state='pending' LIMIT 1",sessionId));
     const all=[...items.values()].filter(item=>!activity || item.kind==='commandExecution' || item.kind==='fileChange');
     const limit=activity?60:8;
-    return {sessionId,nativeTurnId:turnId,state,source:session.provider==='claude'?'claude_events':'codex_app_server_events',freshness:!turnId?'unavailable':online&&!end&&turnId===session.activeTurnId?'live':'stale',updatedAt,contentAvailable:Boolean(policy?.sync_content),waitingForApproval,items:all.slice(-limit),limited:limited||all.length>limit};
+    return {sessionId,nativeTurnId:turnId,state,source:session.provider==='claude'?'claude_events':session.provider==='codex'?'codex_app_server_events':'native_acp_events',freshness:!turnId?'unavailable':online&&!end&&turnId===session.activeTurnId?'live':'stale',updatedAt,contentAvailable:Boolean(policy?.sync_content),waitingForApproval,items:all.slice(-limit),limited:limited||all.length>limit};
   }
 }

@@ -82,6 +82,7 @@ export function evaluateSupport(inputs: PlatformInputs): SupportReport {
     reasons.push("machine credential protection could not be verified");
   }
   return {
+    providerHostSupported: reasons.every(reason => reason.startsWith("codex")),
     supported: reasons.length === 0,
     writable: reasons.length === 0,
     readOnlyReasons: reasons,

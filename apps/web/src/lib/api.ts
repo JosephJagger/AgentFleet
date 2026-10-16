@@ -1,3 +1,4 @@
+import { isProviderId, type ProviderId } from "./provider-catalog";
 export type VoiceDirectoryPage={generatedAt:string;hostTotal:number;hostsTruncated:boolean;hosts:{id:string;name:string;heartbeatAt:string|null}[];total:number;nextCursor:string|null;sessions:{id:string;title:string;provider:string;host:string;project:string;managed:boolean;executionState:string;freshness:string;hostHeartbeatAt:string|null;sessionUpdatedAt:string}[]};
 export type LongTermPreference={id:string;body:string;conditions:string;enabled:boolean;expiresAt:string|null;revision:number};
 export type LongTermPreferenceList={revision:number;items:LongTermPreference[];bytes:number;budget:number};
@@ -114,7 +115,7 @@ function mapProject(rawValue: unknown): Project {
   const raw = record(rawValue);
   return {
     id: string(raw.projectId),
-    provider: raw.provider === "claude" ? "claude" : "codex",
+    provider: isProviderId(raw.provider) ? raw.provider : "codex",
     machineId: string(raw.machineId),
     alias: string(raw.alias, t("未命名项目")),
     pathHint: string(raw.canonicalRoot, string(raw.repoRoot, t("路径未上报"))),
@@ -273,7 +274,7 @@ function mapSession(
     weeklyBoundaryIncomplete: raw.weeklyBoundaryIncomplete === true,
     recordedTokens: typeof raw.recordedTokens === "number" && Number.isSafeInteger(raw.recordedTokens) && raw.recordedTokens >= 0 ? raw.recordedTokens : null,
     id: string(raw.logicalSessionId),
-    provider: raw.provider === "claude" ? "claude" : "codex",
+    provider: isProviderId(raw.provider) ? raw.provider : "codex",
     claudePermissionModes: Array.isArray(raw.claudePermissionModes) ? raw.claudePermissionModes as string[] : [],
     claudeModels: Array.isArray(raw.claudeModels) ? raw.claudeModels as FleetSession["claudeModels"] : [],
     runtimeSettings: raw.runtimeSettings as FleetSession["runtimeSettings"],
@@ -667,7 +668,7 @@ export const api = {
   cancelSessionReference: (id: string) => request<{cancelled:boolean}>(`/api/session-references/${encodeURIComponent(id)}`, { method: "DELETE" }),
   writingNLP: (id: string, draft: string, signal: AbortSignal) => request<{suggestions:NLPSuggestion[]}>(`/api/sessions/${encodeURIComponent(id)}/writing-nlp`, {method:"POST",body:JSON.stringify({draft}),signal}),
   refreshQuota: (id:string) => request<{requested:boolean}>(`/api/machines/${encodeURIComponent(id)}/usage/refresh`,{method:"POST",body:"{}"}),
-  usage: (scope: "session" | "project" | "machine", id: string, signal?: AbortSignal, provider: "codex" | "claude" = "codex") => request<UsageSummary>(`/api/${scope === "session" ? "sessions" : scope === "project" ? "projects" : "machines"}/${encodeURIComponent(id)}/usage?provider=${provider}`, { signal }),
+  usage: (scope: "session" | "project" | "machine", id: string, signal?: AbortSignal, provider: ProviderId = "codex") => request<UsageSummary>(`/api/${scope === "session" ? "sessions" : scope === "project" ? "projects" : "machines"}/${encodeURIComponent(id)}/usage?provider=${provider}`, { signal }),
   imageSessions: (id: string, cursor = "", signal?: AbortSignal) => request<{sessions: import("./types").ImageSessionUsage[]; nextCursor: string | null}>(`/api/machines/${encodeURIComponent(id)}/images/sessions?cursor=${encodeURIComponent(cursor)}`, { signal }),
   async imageOperation(machineId: string, logicalSessionId: string, previewOperationId?: string): Promise<HostOperation> {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { method: "POST", body: JSON.stringify({type: previewOperationId ? "images.clean" : "images.preview", logicalSessionId, previewOperationId, clientMutationId: crypto.randomUUID()}) });
@@ -726,13 +727,13 @@ export const api = {
     const raw = await request<JsonObject>("/api/release");
     return { build: string(raw.controlPlaneBuild, t("未上报")), schema: integer(raw.dbSchemaVersion), agentVersion: string(raw.agentVersion, t("未确认")), manifestStatus: string(record(raw.agentManifest).status, "unavailable") };
   },
-  async projects(options: { provider?: "codex" | "claude"; machineId?: string; cursor?: string | null; q?: string; limit?: number; offset?: number }, signal?: AbortSignal): Promise<Page<Project>> {
+  async projects(options: { provider?: ProviderId; machineId?: string; cursor?: string | null; q?: string; limit?: number; offset?: number }, signal?: AbortSignal): Promise<Page<Project>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 8) });
     for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
     const raw = await request<JsonObject>(`/api/projects?${query}`, { signal });
     return { items: list(raw.items ?? raw.projects).map(mapProject), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null, total: integer(raw.total) };
   },
-  async sessions(options: { provider?: "codex" | "claude"; machineId?: string; projectId?: string; cursor?: string | null; q?: string; executionState?: string; managed?: boolean; limit?: number }, signal?: AbortSignal): Promise<Page<FleetSession>> {
+  async sessions(options: { provider?: ProviderId; machineId?: string; projectId?: string; cursor?: string | null; q?: string; executionState?: string; managed?: boolean; limit?: number }, signal?: AbortSignal): Promise<Page<FleetSession>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 30) });
     for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
     const raw = await request<JsonObject>(`/api/sessions?${query}`, { signal });
@@ -890,7 +891,7 @@ export const api = {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { method: "POST", body: JSON.stringify({ type, clientMutationId, ...(logicalSessionId ? {logicalSessionId} : {}) }) });
     return mapHostOperation(raw.operation);
   },
-  async createProject(machineId: string, path: string, alias: string, createDirectory: boolean, provider: "codex" | "claude" = "codex"): Promise<HostOperation> {
+  async createProject(machineId: string, path: string, alias: string, createDirectory: boolean, provider: ProviderId = "codex"): Promise<HostOperation> {
     const raw = await request<JsonObject>("/api/projects", {
       method: "POST",
       body: JSON.stringify({ machineId, path, alias, createDirectory, provider, clientMutationId: crypto.randomUUID() }),

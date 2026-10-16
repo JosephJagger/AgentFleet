@@ -1,3 +1,4 @@
+import { isProviderId, type ProviderId } from "./provider-catalog.js";
 import { parseClaudeMetadata } from "./claude-metadata.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import { invariant } from "./errors.js";
@@ -68,12 +69,12 @@ export class UsageService {
     this.db.run(`INSERT INTO machine_usage(machine_id,account_key,observed_at,windows_json,credits_json,reset_cards_available) VALUES(?,?,?,?,?,?)
       ON CONFLICT(machine_id) DO UPDATE SET account_key=excluded.account_key,observed_at=excluded.observed_at,windows_json=excluded.windows_json,credits_json=excluded.credits_json,reset_cards_available=excluded.reset_cards_available WHERE excluded.observed_at>=machine_usage.observed_at`,machineId,accountKey,new Date(at).toISOString(),JSON.stringify(windows),credits===null?null:JSON.stringify(credits),cardCount);
   }
-  read(workspaceId: string, scope: "session" | "project" | "machine", id: string, requestedProvider: "codex" | "claude" = "codex") {
+  read(workspaceId: string, scope: "session" | "project" | "machine", id: string, requestedProvider: ProviderId = "codex") {
     const table=scope==="session"?"logical_sessions":scope==="project"?"projects":"machines";
     const column=scope==="session"?"logical_session_id":scope==="project"?"project_id":"machine_id";
     invariant(this.db.get(`SELECT 1 FROM ${table} WHERE ${column}=? AND workspace_id=?${scope==="session"?" AND deleted_at IS NULL":""}`,id,workspaceId),404,"USAGE_SCOPE_NOT_FOUND","Usage scope was not found");
-    const provider = scope === "machine" ? requestedProvider : this.db.get<{provider:"codex"|"claude"}>(scope === "project" ? "SELECT provider FROM projects WHERE project_id=?" : "SELECT p.provider FROM projects p JOIN logical_sessions s USING(project_id) WHERE s.logical_session_id=?",id)!.provider;
-    const providerFilter = ` AND project_id IN (SELECT project_id FROM projects WHERE provider='${provider === "claude" ? "claude" : "codex"}')`;
+    const provider = scope === "machine" ? requestedProvider : this.db.get<{provider:ProviderId}>(scope === "project" ? "SELECT provider FROM projects WHERE project_id=?" : "SELECT p.provider FROM projects p JOIN logical_sessions s USING(project_id) WHERE s.logical_session_id=?",id)!.provider;
+    const providerFilter = ` AND project_id IN (SELECT project_id FROM projects WHERE provider='${isProviderId(provider) ? provider : "codex"}')`;
     const sessions=this.db.all<{logical_session_id:string;machine_id:string;title:string}>(`SELECT logical_session_id,machine_id,title FROM logical_sessions WHERE workspace_id=? AND ${column}=? AND deleted_at IS NULL${providerFilter}`,workspaceId,id);
     const rows=this.db.all<Row & {title:string;project_id:string;project_title:string}>(`SELECT u.*,s.title,s.project_id,p.alias AS project_title FROM session_usage u JOIN logical_sessions s USING(logical_session_id) JOIN projects p ON p.project_id=s.project_id WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")}`,workspaceId,id);
     const recorded=zero(); for(const row of rows) { const c=counts(JSON.parse(row.recorded_json))!; for(const key of keys) recorded[key]+=c[key]; }
@@ -83,7 +84,7 @@ export class UsageService {
     const targetKeys=new Set(quotaRows.filter(r=>machineIds.has(r.machine_id)).map(r=>r.account_key??r.machine_id));
     const creditByKey=new Map<string,string>();for(const r of quotaRows){const key=r.account_key??r.machine_id;if(r.credits_json&&!creditByKey.has(key))creditByKey.set(key,r.credits_json);}
     const cardsByKey=new Map<string,number>();for(const r of quotaRows){const key=r.account_key??r.machine_id;if(r.reset_cards_available!==null&&!cardsByKey.has(key))cardsByKey.set(key,r.reset_cards_available);}
-    const seen=new Set<string>();const accounts=(provider === "claude" ? [] : quotaRows).flatMap(r=>{const key=r.account_key??r.machine_id;if(!targetKeys.has(key)||seen.has(key))return [];seen.add(key);const credits=creditByKey.get(key);return [{sourceMachine:r.name,identityKnown:r.account_key!==null,observedAt:r.observed_at,stale:Date.now()-Date.parse(r.observed_at)>180_000,windows:JSON.parse(r.windows_json),credits:credits?JSON.parse(credits):null,resetCardsAvailable:cardsByKey.get(key)??null}];});
+    const seen=new Set<string>();const accounts=(provider !== "codex" ? [] : quotaRows).flatMap(r=>{const key=r.account_key??r.machine_id;if(!targetKeys.has(key)||seen.has(key))return [];seen.add(key);const credits=creditByKey.get(key);return [{sourceMachine:r.name,identityKnown:r.account_key!==null,observedAt:r.observed_at,stale:Date.now()-Date.parse(r.observed_at)>180_000,windows:JSON.parse(r.windows_json),credits:credits?JSON.parse(credits):null,resetCardsAvailable:cardsByKey.get(key)??null}];});
     const claudeAccounts=this.db.all<{machine_id:string;name:string;discovery_json:string|null}>("SELECT machine_id,name,discovery_json FROM machines WHERE workspace_id=? AND identity_state='active'",workspaceId).flatMap(machine=>{
       if(!machineIds.has(machine.machine_id))return [];
       const quota=parseClaudeMetadata(JSON.parse(machine.discovery_json ?? "{}").agentRuntimes?.claude).quota;

@@ -1,3 +1,4 @@
+import type { ProviderId } from "./provider-catalog.js";
 import { parseHostCodexOperation, sanitizeCodexResult } from "./codex-operations.js";
 import { CloudImages } from "./cloud-images.js";
 import type { ControlPlaneDatabase } from "./db.js";
@@ -11,7 +12,7 @@ export type MaintenanceType = (typeof MAINTENANCE_TYPES)[number];
 export class MaintenanceService {
   constructor(private readonly db: ControlPlaneDatabase) {}
 
-  create(principal: Principal, machineId: string, type: string, mutationId: string, logicalSessionId?: string, previewOperationId?: string, projectTarget?: { provider?: "codex" | "claude"; path: string; alias: string; createDirectory: boolean }, nativeRequest?: unknown): Record<string, unknown> {
+  create(principal: Principal, machineId: string, type: string, mutationId: string, logicalSessionId?: string, previewOperationId?: string, projectTarget?: { provider?: ProviderId; path: string; alias: string; createDirectory: boolean }, nativeRequest?: unknown): Record<string, unknown> {
     invariant(MAINTENANCE_TYPES.includes(type as MaintenanceType),400,"INVALID_OPERATION","Unsupported machine operation");
     invariant(mutationId.length>=8 && mutationId.length<=200,400,"INVALID_MUTATION_ID","clientMutationId must be between 8 and 200 characters");
     let hostRequest: ReturnType<typeof parseHostCodexOperation> | undefined;

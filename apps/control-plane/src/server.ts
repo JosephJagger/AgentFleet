@@ -1,3 +1,4 @@
+import { isProviderId, isAcpProvider } from "./provider-catalog.js";
 import { TakeoverPolicy } from "./takeover-policy.js";
 import {LiveChatStore} from './live-chat.js';
 import {LiveWelcomeGate,liveWelcomePrompt} from './live-welcome.js';
@@ -156,7 +157,7 @@ function record(value: unknown, message = "Request body must be a JSON object"):
 
 function listOptions(query: Record<string, unknown>): ListOptions {
   const options: ListOptions = { limit: pageLimit(query.limit) };
-  if (query.provider !== undefined) { invariant(query.provider === "codex" || query.provider === "claude",400,"INVALID_PROVIDER","Unknown agent provider"); options.provider = query.provider; }
+  if (query.provider !== undefined) { invariant(isProviderId(query.provider),400,"INVALID_PROVIDER","Unknown agent provider"); options.provider = query.provider; }
   for (const name of ["cursor", "machineId", "projectId", "q", "executionState"] as const) {
     if (query[name] !== undefined) options[name] = requiredString(query[name], name, name === "cursor" ? 8192 : 500);
   }
@@ -639,11 +640,11 @@ export async function buildControlPlane(
     );
     if (
       !eligibility || eligibility.identity_state !== "active" || eligibility.security_state !== "normal" ||
-      eligibility.compatibility !== "compatible" || eligibility.reachability !== "online"
+      eligibility.reachability !== "online"
     ) return;
-    const pending = db.all<{ command_id: string }>(
-      `SELECT c.command_id FROM commands c JOIN command_projection cp ON cp.command_id=c.command_id
-       JOIN logical_sessions s ON s.logical_session_id=c.logical_session_id
+    const pending = db.all<{ command_id: string; provider: string }>(
+      `SELECT c.command_id,p.provider FROM commands c JOIN command_projection cp ON cp.command_id=c.command_id
+       JOIN logical_sessions s ON s.logical_session_id=c.logical_session_id JOIN projects p ON p.project_id=s.project_id
        WHERE s.machine_id=? AND cp.state='accepted' AND c.expires_at>? ORDER BY c.created_at LIMIT 100`,
       machineId,
       nowIso(),
@@ -664,6 +665,7 @@ export async function buildControlPlane(
       expiresAt: systemPrincipal.expires_at,
     };
     for (const item of pending) {
+      if (eligibility.compatibility !== "compatible" && !isAcpProvider(item.provider)) continue;
       const command = coordination.getCommand(principal, item.command_id);
       dispatchCommand(command);
     }
@@ -1147,7 +1149,7 @@ export async function buildControlPlane(
       requiredString(body.clientMutationId, "clientMutationId", 200),
       undefined,
       undefined,
-      { path, alias, createDirectory: body.createDirectory, ...(body.provider === "claude" ? { provider: "claude" as const } : {}) },
+      { path, alias, createDirectory: body.createDirectory, ...(isProviderId(body.provider) ? { provider: body.provider } : {}) },
     );
     const agent = agents.get(machineId);
     if (agent?.reconciliationReady) for (const offer of machineMaintenance.offers(machineId)) sendJson(agent.socket, offer);
@@ -1256,9 +1258,9 @@ export async function buildControlPlane(
   for (const [path,scope] of [["sessions","session"],["projects","project"],["machines","machine"]] as const) {
     app.get(`/api/${path}/:id/usage`, { preHandler: authenticate }, async request => {
       const workspaceId=(request.principal as Principal).workspaceId,id=routeId(request);
-      const provider=(request.query as {provider?:string}).provider === "claude" ? "claude" : "codex";
-      const summary=usage.read(workspaceId,scope,id,provider);if(summary.provider !== "claude")quotaRefresh.request(workspaceId,scope,id);
-      if(scope!=="machine" || summary.provider === "claude")return summary;
+      const requestedProvider=(request.query as {provider?:string}).provider; invariant(requestedProvider === undefined || isProviderId(requestedProvider),400,"INVALID_PROVIDER","Unknown agent provider"); const provider=requestedProvider ?? "codex";
+      const summary=usage.read(workspaceId,scope,id,provider);if(summary.provider === "codex")quotaRefresh.request(workspaceId,scope,id);
+      if(scope!=="machine" || summary.provider !== "codex")return summary;
       const account=summary.accounts.length===1?summary.accounts[0]:null;
       const weekly=account?.windows.find((window:{bucket:string;windowMinutes:number;remainingPercent:number})=>window.bucket==="codex"&&window.windowMinutes===10080);
       const resetPrediction=await resetRadar.read(`${workspaceId}:${id}`,

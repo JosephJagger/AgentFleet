@@ -1,3 +1,4 @@
+import { ACP_PROVIDER_IDS, isAcpProvider, isProviderId, parseProviderAvailability, providerName, type ProviderId } from "./provider-catalog.js";
 import { parseMaintenance } from "./host-maintenance.js";
 import { parseClaudeMetadata } from "./claude-metadata.js";
 import { supportsClaudeControls } from "./claude-settings.js";
@@ -1957,6 +1958,7 @@ export class RegistryService {
 
       const seenProjectExternalIds = new Set<string>();
       for (const project of hello.projects) {
+        invariant(project.provider === undefined || isProviderId(project.provider),400,"INVALID_PROVIDER","Unknown project provider");
         const externalId = cleanText(project.externalId, "project.externalId", 200);
         invariant(!seenProjectExternalIds.has(externalId), 400, "DUPLICATE_PROJECT", "Duplicate project externalId in hello");
         seenProjectExternalIds.add(externalId);
@@ -1996,7 +1998,7 @@ export class RegistryService {
           project.leaseVersion,
           timestamp,
           timestamp,
-          project.provider === "claude" ? "claude" : "codex",
+          isProviderId(project.provider) ? project.provider : "codex",
         );
         projectMap[externalId] = projectId;
         const contentPolicy = this.db.get<{ sync_content: number; retention_days: number }>(
@@ -2574,6 +2576,7 @@ export class RegistryService {
       const runtimes = discovery.agentRuntimes as Record<string, unknown>;
       const claude = runtimes.claude as Record<string, unknown> | undefined;
       safe.agentRuntimes = { claude: { installed: claude?.installed === true, version: typeof claude?.version === "string" ? claude.version.slice(0, 100) : null, ...parseClaudeMetadata(claude) } };
+      for (const provider of ACP_PROVIDER_IDS) { const status = parseProviderAvailability(runtimes[provider]); if (status) (safe.agentRuntimes as Record<string,unknown>)[provider] = status; }
     }
     if (discovery.syncMode !== undefined) {
       invariant(discovery.syncMode === "events" || discovery.syncMode === "fallback",400,"INVALID_DISCOVERY","Invalid syncMode");
@@ -2621,7 +2624,7 @@ export class RegistryService {
   listProjects(principal: Principal, machineId?: string): ProjectSummary[] {
     const rows = machineId
       ? this.db.all<{
-          provider: "codex" | "claude"; project_id: string; machine_id: string; alias: string; canonical_root: string;
+          provider: ProviderId; project_id: string; machine_id: string; alias: string; canonical_root: string;
           identity_hash: string; repo_root: string | null; branch: string | null; dirty: number | null;
           lease_version: number; last_reported_at: string;
           sync_content: number; retention_days: 1 | 3 | 7 | 14 | 30;
@@ -2632,7 +2635,7 @@ export class RegistryService {
           machineId,
         )
       : this.db.all<{
-          provider: "codex" | "claude"; project_id: string; machine_id: string; alias: string; canonical_root: string;
+          provider: ProviderId; project_id: string; machine_id: string; alias: string; canonical_root: string;
           identity_hash: string; repo_root: string | null; branch: string | null; dirty: number | null;
           lease_version: number; last_reported_at: string;
           sync_content: number; retention_days: 1 | 3 | 7 | 14 | 30;
@@ -2670,7 +2673,7 @@ export class RegistryService {
     if (options.q) { where.push("(instr(lower(p.alias),lower(?))>0 OR instr(lower(p.canonical_root),lower(?))>0 OR instr(lower(m.name),lower(?))>0 OR instr(lower(coalesce(m.display_alias,'')),lower(?))>0)"); params.push(options.q, options.q, options.q, options.q); }
     const total = this.db.get<{ count: number }>(`SELECT count(*) AS count FROM projects p JOIN machines m ON m.machine_id=p.machine_id WHERE ${where.join(" AND ")}`, ...params)!.count;
     if (cursor) { where.push("(p.alias>? OR (p.alias=? AND p.project_id>?))"); params.push(cursor[0]!,cursor[0]!,cursor[1]!); }
-    const rows = this.db.all<{ provider: "codex" | "claude"; project_id: string; alias: string; machine_id: string; canonical_root: string; identity_hash: string; repo_root: string | null; branch: string | null; dirty: number | null; lease_version: number; last_reported_at: string; sync_content: number; retention_days: 1 | 3 | 7 | 14 | 30 }>(
+    const rows = this.db.all<{ provider: ProviderId; project_id: string; alias: string; machine_id: string; canonical_root: string; identity_hash: string; repo_root: string | null; branch: string | null; dirty: number | null; lease_version: number; last_reported_at: string; sync_content: number; retention_days: 1 | 3 | 7 | 14 | 30 }>(
       `SELECT p.* FROM projects p JOIN machines m ON m.machine_id=p.machine_id WHERE ${where.join(" AND ")} ORDER BY p.alias,p.project_id LIMIT ?${options.offset !== undefined ? " OFFSET ?" : ""}`,
       ...params, limit + 1, ...(options.offset !== undefined ? [options.offset] : []));
     const visible = rows.slice(0,limit);
@@ -2721,7 +2724,7 @@ export class RegistryService {
       const target = this.db.get<{
         machine_id: string;
         project_id: string;
-        provider: "codex" | "claude";
+        provider: ProviderId;
         discovery_json: string | null;
         compatibility: string;
         identity_state: string;
@@ -2737,8 +2740,12 @@ export class RegistryService {
       );
       invariant(target, 404, "TARGET_NOT_FOUND", "Machine or Project was not found");
       invariant(target.provider !== "claude" || (target.discovery_json && JSON.parse(target.discovery_json)?.agentRuntimes?.claude?.installed),409,"CLAUDE_NOT_INSTALLED","Host has not reported Claude Code installed");
+      if (isAcpProvider(target.provider)) {
+        const status = parseProviderAvailability(JSON.parse(target.discovery_json ?? '{}')?.agentRuntimes?.[target.provider]);
+        invariant(status?.state === 'ready' && status.capabilities.create,409,'AGENT_CAPABILITY_UNAVAILABLE','Official CLI has not reported session creation support');
+      }
       invariant(target.identity_state === "active", 409, "MACHINE_REVOKED", "Machine is revoked");
-      invariant(target.compatibility === "compatible", 409, "MACHINE_INCOMPATIBLE", "Machine is not P0a-compatible");
+      invariant(isAcpProvider(target.provider) || target.compatibility === "compatible", 409, "MACHINE_INCOMPATIBLE", "Machine is not P0a-compatible");
       invariant(target.security_state === "normal", 409, "MACHINE_READ_ONLY", "Machine is in degraded read-only mode");
       invariant(target.reachability === "online", 409, "MACHINE_NOT_ONLINE", "Machine is not online");
       const logicalSessionId = newId("ls");
@@ -2754,7 +2761,7 @@ export class RegistryService {
         machineId,
         projectId,
         logicalSessionId,
-        title ? cleanText(title, "title", 200) : target.provider === "claude" ? "New Claude Code session" : "New Codex session",
+        title ? cleanText(title, "title", 200) : `New ${providerName(target.provider)} session`,
         timestamp,
         timestamp,
       );
@@ -2820,7 +2827,7 @@ export class RegistryService {
       logical_session_id: string;
       machine_id: string;
       project_id: string;
-      provider: "codex" | "claude";
+      provider: ProviderId;
       title: string;
       managed: number;
       execution_state: LogicalSessionSummary["executionState"];
@@ -2870,13 +2877,13 @@ export class RegistryService {
       logicalSessionId: row.logical_session_id,
       recordedTokens: row.recorded_tokens,
       machineId: row.machine_id,
-      imageInputSupported: row.provider === "claude" || machineCatalog?.imageInput === true,
-      fileInputSupported: row.provider === "claude" || machineCatalog?.fileInput === true,
-      plugins: row.provider === "claude" ? [] : machineCatalog?.plugins ?? [],
-      pluginSkills: row.provider === "claude" ? [] : machineCatalog?.pluginSkills ?? [],
+      imageInputSupported: row.provider === "claude" || row.provider === "codex" && machineCatalog?.imageInput === true,
+      fileInputSupported: row.provider === "claude" || row.provider === "codex" && machineCatalog?.fileInput === true,
+      plugins: row.provider !== "codex" ? [] : machineCatalog?.plugins ?? [],
+      pluginSkills: row.provider !== "codex" ? [] : machineCatalog?.pluginSkills ?? [],
       claudePermissionModes: row.provider === "claude" && supportsClaudeControls(host?.agent_version,59) ? parseClaudeMetadata(JSON.parse(host?.discovery_json ?? "{}").agentRuntimes?.claude).permissionModes : [],
       claudeModels: row.provider === "claude" ? parseClaudeMetadata(JSON.parse(host?.discovery_json ?? "{}").agentRuntimes?.claude).models : [],
-      collaborationModes: row.provider === "claude" ? (supportsClaudeControls(host?.agent_version) ? ["default","plan"] : []) : machineCatalog?.modes ?? [],
+      collaborationModes: row.provider === "claude" ? (supportsClaudeControls(host?.agent_version) ? ["default","plan"] : []) : row.provider === "codex" ? machineCatalog?.modes ?? [] : [],
       cloudImageRevision: this.db.get<{ cloud_image_revision: number }>("SELECT cloud_image_revision FROM machines WHERE machine_id=?", row.machine_id)?.cloud_image_revision ?? 0,
       projectId: row.project_id,
       executionSegmentId: row.execution_segment_id,

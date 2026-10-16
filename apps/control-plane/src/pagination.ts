@@ -1,7 +1,8 @@
+import type { ProviderId } from "./provider-catalog.js";
 import { invariant } from "./errors.js";
 
 export interface ListOptions {
-  provider?: "codex" | "claude";
+  provider?: ProviderId;
   limit: number;
   offset?: number;
   cursor?: string;

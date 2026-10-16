@@ -1,3 +1,4 @@
+import {isAcpProvider,supportsProviderCommand} from "./provider-catalog.js";
 import { directoryTurnConflict } from "./directory-turn-lock.js";
 import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
 import type { ControlPlaneDatabase } from "./db.js";
@@ -67,6 +68,7 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     const action = actionName as Exclude<SessionAction, "read">;
     let availability = allowed;
     if (!row) availability = blocked("SESSION_NOT_FOUND", "会话不存在");
+    else if (isAcpProvider(row.provider) && !supportsProviderCommand(JSON.parse(row.discovery_json ?? '{}')?.agentRuntimes?.[row.provider],command,Boolean(row.native_thread_id))) availability = blocked('AGENT_CAPABILITY_UNAVAILABLE','原生智能体尚未报告支持此操作');
     else if (row.provider === "claude" && ["deletePreview", "delete", "rename", "archive", "unarchive", "fork", "compact", "review", "inspect", "manage", "stop", "steer"].includes(action)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "Claude Code 尚不支持此操作");
     else if (row.provider === "claude" && !(row.discovery_json && JSON.parse(row.discovery_json)?.agentRuntimes?.claude?.installed === true)) availability = blocked("CLAUDE_NOT_INSTALLED", "宿主机未安装 Claude Code");
     else if (!supportsCommand(row.command_types_json, command)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "主机尚未报告支持此操作，请更新连接服务");
@@ -74,8 +76,8 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     else if (row.machine_reachability !== "online") availability = blocked("MACHINE_OFFLINE", "等待主机重新连接");
     else if (blocksDuringMaintenance(row.maintenance_json,command)) availability = blocked("MACHINE_DRAINING", MAINTENANCE_MESSAGE);
     else if (row.reachability !== "live") availability = blocked("SESSION_RECONCILING", "会话正在同步");
-    else if (row.security_state !== "normal" || row.runtime_read_only) availability = blocked("MACHINE_READ_ONLY", "主机当前只能读取会话");
-    else if (row.compatibility !== "compatible") availability = blocked("MACHINE_INCOMPATIBLE", "当前运行环境尚未验证此操作");
+    else if (row.security_state !== "normal" || !isAcpProvider(row.provider) && row.runtime_read_only) availability = blocked("MACHINE_READ_ONLY", "主机当前只能读取会话");
+    else if (!isAcpProvider(row.provider) && row.compatibility !== "compatible") availability = blocked("MACHINE_INCOMPATIBLE", "当前运行环境尚未验证此操作");
     else if (row.frozen) availability = blocked("PROJECT_OUTCOME_UNKNOWN", "需要核验上一次操作结果");
     else if (heldElsewhere) availability = blocked("CONTROL_HELD_ELSEWHERE", "另一个账号正在操作此会话");
     else if (action === "claim" && row.managed) availability = blocked("SESSION_ALREADY_MANAGED", "会话已可在面板操作");

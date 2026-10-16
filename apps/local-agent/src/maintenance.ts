@@ -1,3 +1,4 @@
+import { isProviderId } from "./provider-catalog.js";
 import { manageVersions, automaticVersionCleanup } from "./version-cleanup.js";
 import { AGENT_VERSION } from "./constants.js";
 import { AgentError, publicError } from "./errors.js";
@@ -132,7 +133,7 @@ export class AgentMaintenance {
         if (!target || typeof target.path !== "string" || typeof target.alias !== "string" || typeof target.createDirectory !== "boolean") {
           throw new AgentError("PROJECT_TARGET_INVALID", "project path, alias, and directory option are required");
         }
-        const project = await this.options.runtime.addProject(target.path, target.alias, target.createDirectory, target.provider === "claude" ? "claude" : "codex");
+        const project = await this.options.runtime.addProject(target.path, target.alias, target.createDirectory, isProviderId(target.provider) ? target.provider : "codex");
         result = { projectExternalId: project.id, alias: project.alias, canonicalRoot: project.root };
       } else if (operationType === "images.preview" || operationType === "images.clean") {
         if (!operation.recoveryTarget) throw new AgentError("IMAGE_SCOPE_INVALID", "缺少会话清理目标");

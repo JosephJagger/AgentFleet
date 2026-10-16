@@ -1,3 +1,4 @@
+import type { ProviderId } from "./provider-catalog.js";
 import type { AllowedCommandType } from "./constants.js";
 
 export type CredentialProtectionLevel =
@@ -28,7 +29,7 @@ export interface PairingCredential {
 }
 
 export interface ProjectRecord {
-  provider?: "codex" | "claude";
+  provider?: ProviderId;
   id: string;
   alias: string;
   root: string;
@@ -175,7 +176,7 @@ export interface ManagedThread {
   logicalSessionId?: string;
   executionSegmentId?: string;
   appServerEpoch: string;
-  policyVersion: "remote-restricted-v1";
+  policyVersion: "remote-restricted-v1" | "native-acp-v1";
   policyVerified: boolean;
   contentEpoch: number;
   createdAt: string;
@@ -286,6 +287,7 @@ export interface HostCheck {
 }
 
 export interface SupportReport {
+  providerHostSupported?: boolean;
   checks?: HostCheck[];
   supported: boolean;
   writable: boolean;
