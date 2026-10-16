@@ -34,3 +34,15 @@
  :root .inspector-head--compact .session-config-trigger { width:30px; padding:4px; }
  :root .inspector-head--compact .native-voice__trigger { width:32px; height:32px; min-height:32px; }
 }
+
+/* Infrequent controls live inside More, without unmounting live voice. */
+:root .inspector-head--compact .session-actions-popover .lease-strip { display:block; }
+:root .inspector-head--compact .session-actions-popover .lease-strip__actions { display:flex; flex-direction:column; align-items:stretch; width:100%; gap:4px; }
+:root .inspector-head--compact .session-actions-popover .lease-strip button { display:flex; align-items:center; justify-content:flex-start; gap:8px; width:100%; min-height:40px; padding:8px 10px; border:0; border-radius:6px; color:var(--ink); background:transparent; font:inherit; }
+:root .inspector-head--compact .session-actions-popover .lease-strip button:hover { background:var(--paper-solid); }
+:root .inspector-head--compact .session-actions-popover .lease-strip--confirming { position:static; width:100%; max-width:300px; padding:8px; box-shadow:none; border:1px solid var(--line); }
+:root .inspector-head--compact .session-actions-popover .lease-strip--confirming > div:not(.lease-strip__actions) { margin-bottom:8px; white-space:normal; }
+:root .inspector-head--compact .session-actions-popover .native-voice__trigger--menu { display:flex; width:100%; height:auto; min-height:40px; justify-content:flex-start; gap:8px; padding:8px 10px; border:0; border-radius:6px; box-shadow:none; font-size:var(--text-caption); }
+:root .session-actions-popover:has(.native-voice__popover) { overflow:visible; }
+:root .inspector-head--compact .session-actions-popover > .button { min-height:40px; padding:8px 10px; border:0; border-radius:6px; box-shadow:none; font-size:var(--text-caption); gap:8px; }
+:root .inspector-head--compact .session-actions-popover > .native-voice { display:block; width:100%; }

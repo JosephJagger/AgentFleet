@@ -14,7 +14,7 @@ import { t } from "../i18n";
 export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;provider?:'codex'|'claude';managed?:boolean;queuePosition?:number|null;state:string;result:string;link:string;progress?:SessionProgress;historyLimited?:boolean;executionStarted?:boolean|null;error?:{code:string;message:string}|null; }
 type Phase = "idle" | "connecting" | "connected" | "recovering" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
-export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks, welcomeRef, reloadRecovery=false }: { reloadRecovery?:boolean; welcomeRef?:RefObject<WelcomeBridge|null>; globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
+export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks, welcomeRef, reloadRecovery=false, menuEntry=false }: { menuEntry?:boolean; reloadRecovery?:boolean; welcomeRef?:RefObject<WelcomeBridge|null>; globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
   const welcomeNextAt=useRef(0);
   const welcomeSentAt=useRef(0);
   const welcomeReceipt=useRef<WelcomeBridge["receipt"]>(undefined);
@@ -228,8 +228,9 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     {transcript.length > 0 && <details className="native-voice__transcript-details"><summary>{t("本次语音转写")}</summary><div className="native-voice__transcript" ref={transcriptArea} tabIndex={0}>{transcript.map((entry,index) => <p key={index}><strong>{entry.role === "user" ? t("你") : "Codex"}</strong><span>{entry.text}</span></p>)}</div></details>}
   </div>;
   return <div ref={control} className={`native-voice${globalMachineId ? " native-voice--panel" : ""}${active ? " native-voice--active" : ""}`}>
-    <button ref={trigger} type="button" className={`button ${globalMachineId ? "button--primary" : "button--secondary"} native-voice__trigger`} disabled={!active && !canStart} aria-label={t(globalMachineId ? active ? "总控通话控制" : reloadRecovery ? "恢复语音" : "开始总控通话" : active ? "语音控制" : "开始语音")} title={t(globalMachineId ? active ? "总控通话控制" : reloadRecovery ? "恢复语音" : "开始总控通话" : active ? "语音控制" : "开始语音")} aria-expanded={expanded} aria-controls={expanded ? popoverId : undefined} onClick={() => { if (active) setExpanded(value => !value); else void start(); }}>
+    <button ref={trigger} type="button" className={`button ${globalMachineId ? "button--primary" : "button--secondary"} native-voice__trigger${menuEntry ? " native-voice__trigger--menu" : ""}`} disabled={!active && !canStart} aria-label={t(globalMachineId ? active ? "总控通话控制" : reloadRecovery ? "恢复语音" : "开始总控通话" : active ? "语音控制" : "开始语音")} title={t(globalMachineId ? active ? "总控通话控制" : reloadRecovery ? "恢复语音" : "开始总控通话" : active ? "语音控制" : "开始语音")} aria-expanded={expanded} aria-controls={expanded ? popoverId : undefined} onClick={() => { if (active) setExpanded(value => !value); else void start(); }}>
       {phase === "connecting" || phase === "recovering" ? <LoaderCircle className="spin" size={19} /> : globalMachineId ? <Headset size={20} /> : <Phone size={19} />}
+      {menuEntry && !globalMachineId && <span>{t(active ? "语音控制" : "开始语音")}</span>}
       {globalMachineId && <span>{t(phase === "recovering" ? "恢复中…" : phase === "connecting" ? "正在连接…" : active ? "通话控制" : reloadRecovery ? "恢复语音" : "开始通话")}</span>}
       {active && <i className="native-voice__indicator" aria-hidden="true" />}
     </button>

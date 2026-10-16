@@ -962,6 +962,7 @@ it("voice composer sends while idle and keeps running work steerable",async()=>{
  const queue=vi.fn(noop),steer=vi.fn(noop),send=vi.fn(noop);const props=inspectorProps("A");
  const view=render(<SessionInspector {...props} onQueue={queue} onSteer={steer} onSend={send}/>);
  try {
+  fireEvent.click(screen.getByLabelText("更多会话操作"));
   fireEvent.click(screen.getByRole("button",{name:"开始语音"}));
   fireEvent.change(screen.getByRole("textbox",{name:"发送给 Codex 的消息"}),{target:{value:"独立任务"}});
   expect(screen.getByRole("button",{name:"发送"})).toBeTruthy();
@@ -992,6 +993,7 @@ it("idle voice send reaches the API with text and images, preserving draft on re
   vi.mocked(api.command).mockRejectedValueOnce(new Error("排队暂时失败")).mockResolvedValueOnce({ command });
   const view = render(<App />);
   try {
+    fireEvent.click(await screen.findByLabelText("更多会话操作"));
     fireEvent.click(await screen.findByRole("button", { name: "开始语音" }));
     const input = screen.getByRole("textbox", { name: "发送给 Codex 的消息" });
     fireEvent.change(input, { target: { value: "请检查这张截图" } });

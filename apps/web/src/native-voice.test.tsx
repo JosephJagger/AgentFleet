@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { SessionActions } from "./components/SessionActions";
 import { NativeVoicePanel } from "./components/NativeVoicePanel";
 import { api } from "./lib/api";
 vi.mock("./lib/api", () => ({ api: { voiceTranscriptSettings:()=>Promise.resolve({enabled:false,revision:0,retentionDays:30}), acquireLease: vi.fn(), renewLease: vi.fn() } }));
@@ -369,4 +370,21 @@ it('offers reload recovery without opening the microphone until the explicit cli
  await waitFor(()=>expect(Socket.all).toHaveLength(1));
  await act(async()=>Socket.all[0].receive({type:'ready'}));
  expect(Socket.all[0].sent.filter(x=>x.type==='panel.start')).toHaveLength(1);
+});
+
+it("closing More keeps the same voice connection and allows reopening its controls", async () => {
+  render(<div className="inspector"><SessionActions><NativeVoicePanel menuEntry sessionId="menu-session" canStart onActiveChange={()=>{}}/></SessionActions></div>);
+  const more=screen.getByLabelText("更多会话操作");
+  fireEvent.click(more);
+  fireEvent.click(screen.getByRole("button",{name:"开始语音"}));
+  await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  const socket=Socket.all[0]!;
+  await act(async()=>{socket.receive({type:"ready"});socket.receive({type:"answer",sdp:"v=0\r\n"});});
+  await waitFor(()=>expect(screen.getByRole("button",{name:"静音"})).toBeTruthy());
+  fireEvent.click(screen.getByRole("button",{name:"收起语音控制"}));
+  fireEvent.click(more);
+  expect((more.closest("details") as HTMLDetailsElement).open).toBe(false);
+  expect(track.stop).not.toHaveBeenCalled();expect(Peer.all[0].closed).toBe(false);expect(socket.readyState).toBe(1);
+  fireEvent.click(more);fireEvent.click(screen.getByRole("button",{name:"语音控制"}));
+  expect(screen.getByRole("button",{name:"挂断"})).toBeTruthy();expect(Socket.all).toHaveLength(1);
 });

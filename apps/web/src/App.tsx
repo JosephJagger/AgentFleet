@@ -1027,7 +1027,23 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
             </div>
           </div>
         <div className="inspector-head__actions">
-      {managed ? (
+      {!managed && (
+        <div title={canClaim ? t("同步主机上的历史，继续原来的 {0} 会话", agentName(session.provider)) : systemText(session.actions?.claim?.message) || t("正在检查这个会话是否支持继续操作")} className={`share-strip${canClaim ? " share-strip--ready" : ""}`}>
+          <span className="share-strip__icon"><Share2 size={16} /></span>
+          <div>
+            <strong>{session.historyMode !== "unknown" ? t("宿主机共享会话") : t("仅可查看的宿主机会话")}</strong>
+            <span>{canClaim ? t("同步主机上的历史，继续原来的 {0} 会话", agentName(session.provider)) : systemText(session.actions?.claim?.message) || (session.state.threadRuntime === "active" ? t("请先结束宿主机正在运行的任务") : t("正在检查这个会话是否支持继续操作"))}</span>
+          </div>
+            <button className="button button--share" type="button" disabled={!canClaim || busy} onClick={async () => { setBusy(true); try { await onClaim(); } finally { setBusy(false); } }}>{busy ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />}{locale() === "en" ? " " : ""}{t("接管并同步")}</button>
+        </div>
+      )}
+
+
+      {(session.provider ?? "codex") === "codex" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
+          <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
+          <SessionActions>
+      {(session.provider ?? "codex") === "codex" && managed && <NativeVoicePanel menuEntry key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
+      {managed && (
         <div title={lease && !lease.isMine ? t("其他账号正在操作") : detail.releaseManagementBlockedReason || t("可从面板继续会话")} className={`lease-strip${releaseConfirming ? " lease-strip--confirming" : ""}${lease?.isMine ? " lease-strip--mine" : ""}${(!lease || lease.isMine) && detail.releaseManagementSupported && !releaseConfirming ? " lease-strip--ready" : ""}`}>
           <span className="lease-strip__icon"><UserRoundCheck size={16} /></span>
           <div>
@@ -1046,21 +1062,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
             ))}
           </div>
         </div>
-      ) : (
-        <div title={canClaim ? t("同步主机上的历史，继续原来的 {0} 会话", agentName(session.provider)) : systemText(session.actions?.claim?.message) || t("正在检查这个会话是否支持继续操作")} className={`share-strip${canClaim ? " share-strip--ready" : ""}`}>
-          <span className="share-strip__icon"><Share2 size={16} /></span>
-          <div>
-            <strong>{session.historyMode !== "unknown" ? t("宿主机共享会话") : t("仅可查看的宿主机会话")}</strong>
-            <span>{canClaim ? t("同步主机上的历史，继续原来的 {0} 会话", agentName(session.provider)) : systemText(session.actions?.claim?.message) || (session.state.threadRuntime === "active" ? t("请先结束宿主机正在运行的任务") : t("正在检查这个会话是否支持继续操作"))}</span>
-          </div>
-            <button className="button button--share" type="button" disabled={!canClaim || busy} onClick={async () => { setBusy(true); try { await onClaim(); } finally { setBusy(false); } }}>{busy ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />}{locale() === "en" ? " " : ""}{t("接管并同步")}</button>
-        </div>
       )}
-
-      {(session.provider ?? "codex") === "codex" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
-      {(session.provider ?? "codex") === "codex" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
-          <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
-          <SessionActions>
             <button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(new URL(sessionPath(session.id), window.location.origin).href); setCommandMessage(t("已复制会话链接")); } catch { setCommandMessage(t("浏览器未允许复制会话链接")); } }}><Copy size={16} />{t("复制会话链接")}</button>
             {onSchedule && <button type="button" className="button button--quiet" onClick={onSchedule}><Clock3 size={16}/>{t("定时执行")}</button>}
             <button type="button" className="button button--quiet" onClick={onRefresh}><RefreshCw size={16} />{t("刷新会话")}</button>

@@ -429,6 +429,9 @@ describe("SessionInspector host sharing", () => {
 
     expect(screen.queryByRole("button", { name: /取得控制权|释放控制权/ })).toBeNull();
     expect(screen.getByText(/可在其他设备继续/)).toBeTruthy();
+    expect((screen.getByLabelText("更多会话操作").closest("details") as HTMLDetailsElement).open).toBe(false);
+    expect(screen.getByRole("button", { name: /取消接管/ }).closest(".session-actions-popover")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("更多会话操作"));
     fireEvent.click(screen.getByRole("button", { name: /取消接管/ }));
     expect(onReleaseManagement).not.toHaveBeenCalled();
     expect(screen.getByText(/主机会话、本地和云端历史都会保留/)).toBeTruthy();
