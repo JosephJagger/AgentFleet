@@ -99,10 +99,25 @@ it('keeps the provider picker visible with a collapsed session list and filters 
  const view=render(<HostSessions {...props}/>);
  expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'选择 Agent'}));
- expect(screen.getAllByRole('menuitemradio')).toHaveLength(7);
+ expect(screen.getAllByRole('menuitemradio')).toHaveLength(8);
  fireEvent.click(screen.getByRole('menuitemradio',{name:/Claude Code/}));
  expect(onProviderChange).toHaveBeenCalledWith('claude');
  view.rerender(<HostSessions {...props} selectedId={undefined} provider="claude"/>);
  expect(screen.getByText('claude-task')).toBeTruthy();expect(screen.queryByText('codex-task')).toBeNull();
  expect(screen.getByRole('button',{name:'选择 Agent'})).toBeTruthy();
+});
+
+it('defaults to all providers and keeps all while selecting a conversation',()=>{
+ const rows=[session('codex-all'),{...session('claude-all'),provider:'claude' as const},{...session('qwen-all'),provider:'qwen' as const},{...session('foreign'),machineId:'elsewhere'}];
+ const props={machine,sessions:rows,onProviderChange:vi.fn(),onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<div/>};
+ const view=render(<HostSessions {...props}/>);
+ expect(screen.getByRole('button',{name:'选择 Agent'}).textContent).toContain('全部');
+ for(const name of ['codex-all','claude-all','qwen-all'])expect(screen.getByText(name)).toBeTruthy();
+ expect(screen.queryByText('foreign')).toBeNull();
+ view.rerender(<HostSessions {...props} selectedId="claude-all"/>);
+ expect(screen.getByRole('button',{name:'选择 Agent'}).textContent).toContain('全部');
+ view.rerender(<HostSessions {...props} provider="claude"/>);
+ expect(screen.queryByText('codex-all')).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'选择 Agent'}));
+ fireEvent.click(screen.getByRole('menuitemradio',{name:/全部/}));expect(props.onProviderChange).toHaveBeenCalledWith('all');
 });

@@ -1457,6 +1457,7 @@ function App() {
   const view = route.view;
   const routeRef = useRef(route);
   const [machineProviders, setMachineProviders] = useState<Record<string, ProviderId>>({});
+  const [hostProviderFilters, setHostProviderFilters] = useState<Record<string, ProviderId | "all">>({});
   const [selectedMachineId, setSelectedMachineId] = useState<string | undefined>(route.machineId);
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(route.sessionId);
   const [detail, setDetail] = useState<SessionDetail>();
@@ -1835,7 +1836,11 @@ function App() {
           {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog key={`${selectedMachineId}:${selectedProvider}`} provider={selectedProvider} machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} onSchedule={project => openScheduled(project.id)} />}
           </div>
         </main>
-        <HostSessions key={`${dashboard.user.id}:${dashboard.user.clientSessionId}`} machine={selectedMachine} provider={selectedProvider} onProviderChange={selectProvider} sessions={dashboard.activitySessions ?? dashboard.sessions} selectedId={selectedSessionId} detail={detail} onSelect={selectSession} onBrowse={()=>{setStreamFocus(false);setCatalogCollapsed(false);}} onCreate={()=>openCreate()}>
+        <HostSessions key={`${dashboard.user.id}:${dashboard.user.clientSessionId}`} machine={selectedMachine} provider={hostProviderFilters[selectedMachineId ?? ""] ?? "all"} onProviderChange={provider=>{
+          if(!selectedMachineId)return;
+          setHostProviderFilters(current=>({...current,[selectedMachineId]:provider}));
+          if(provider==='all')navigate({view:'fleet',machineId:selectedMachineId});else selectProvider(provider);
+        }} sessions={dashboard.activitySessions ?? dashboard.sessions} selectedId={selectedSessionId} detail={detail} onSelect={selectSession} onBrowse={()=>{setStreamFocus(false);setCatalogCollapsed(false);}} onCreate={()=>openCreate()}>
         <SessionInspector catalogExpanded={!streamFocus && !catalogCollapsed} onBrowseSessions={()=>{if(streamFocus){setStreamFocus(false);setCatalogCollapsed(false);}else setCatalogCollapsed(value=>!value);}} referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
         </HostSessions>
         {buzhouDesktop && <BuzhoushanScreensaver detail={detail}/>}

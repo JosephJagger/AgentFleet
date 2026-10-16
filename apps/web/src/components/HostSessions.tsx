@@ -1,11 +1,11 @@
-import { PROVIDER_IDS, providerName, type ProviderId } from "../lib/provider-catalog";
+import { providerName, type ProviderId } from "../lib/provider-catalog";
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {Activity,Layers3,ChevronLeft,ChevronRight,Terminal} from 'lucide-react';
 import {displayName} from '../lib/display-name';
 import {hostSessionGroups} from '../lib/host-session-selection';
 import {t} from '../i18n';
 import type {FleetSession,Machine,SessionDetail} from '../lib/types';
-import {AgentPicker} from './AgentPicker';
+import {AgentPicker,PROVIDER_DISPLAY_ORDER} from './AgentPicker';
 import {useSessionProgress} from './RuntimeProgress';
 
 function SessionWindow({session,selected,running,online,detail,onSelect}:{session:FleetSession;selected:boolean;running:boolean;online:boolean;detail?:SessionDetail;onSelect:(id:string)=>void}) {
@@ -48,7 +48,7 @@ function SessionRow({kind,sessions,selectedId,online,detail,onSelect}:{kind:'run
     <button className="buzhou-session-arrow" type="button" disabled={edges.end} aria-label={t('向右查看更多会话')} onClick={()=>scroll(1)}><ChevronRight size={15}/></button>
   </section>;
 }
-export function HostSessions({machine,sessions,selectedId,detail,onSelect,onBrowse,onCreate,children,provider,onProviderChange}:{machine?:Machine;sessions:FleetSession[];selectedId?:string;detail?:SessionDetail;onSelect:(id:string)=>void;onBrowse:()=>void;onCreate:()=>void;children:ReactNode;provider?:ProviderId;onProviderChange?:(provider:ProviderId)=>void}) {
+export function HostSessions({machine,sessions,selectedId,detail,onSelect,onBrowse,onCreate,children,provider,onProviderChange}:{machine?:Machine;sessions:FleetSession[];selectedId?:string;detail?:SessionDetail;onSelect:(id:string)=>void;onBrowse:()=>void;onCreate:()=>void;children:ReactNode;provider?:ProviderId|"all";onProviderChange?:(provider:ProviderId|"all")=>void}) {
   const [expandedFor,setExpandedFor]=useState<string>();
   const [picked,setPicked]=useState<{machineId?:string;id:string}>();
   useEffect(()=>{setPicked(undefined);setExpandedFor(undefined);},[machine?.id]);
@@ -58,11 +58,11 @@ export function HostSessions({machine,sessions,selectedId,detail,onSelect,onBrow
   const select=(id:string)=>{setPicked({machineId:machine?.id,id});setExpandedFor(undefined);onSelect(id);};
   return <div className="host-session-editor buzhou-editor">
     <div className="host-agent-toolbar">
-      {onProviderChange && <AgentPicker value={provider ?? 'codex'} claudeInstalled={machine?.agentRuntimes?.claude?.installed} runtimes={machine?.agentRuntimes} onChange={onProviderChange}/>}
+      {onProviderChange && <AgentPicker value={provider && provider !== 'all' ? provider : 'codex'} allSelected={!provider || provider === 'all'} onAll={()=>onProviderChange('all')} claudeInstalled={machine?.agentRuntimes?.claude?.installed} runtimes={machine?.agentRuntimes} onChange={onProviderChange}/>}
       {selectedId && <div className="buzhou-session-toggle"><button type="button" aria-controls="buzhou-session-picker" aria-expanded={showSwitcher} onClick={()=>setExpandedFor(showSwitcher?undefined:scope)}><Layers3 size={13}/>{showSwitcher?t('收起会话选择'):t('切换会话')}</button></div>}
     </div>
     {showSwitcher && <div id="buzhou-session-picker" className="buzhou-session-switcher" aria-label={t('当前主机会话切换')}>
-      <div className={`buzhou-session-providers${provider ? " buzhou-session-providers--single" : ""}`}>{PROVIDER_IDS.filter(id => provider ? id === provider : id === 'codex' || id === 'claude' || machine?.agentRuntimes?.[id]?.installed || sessions.some(session => session.machineId === machine?.id && session.provider === id)).map(provider=><section className="buzhou-session-provider" key={provider} aria-label={providerName(provider)}>
+      <div className={`buzhou-session-providers${provider && provider !== "all" ? " buzhou-session-providers--single" : ""}`}>{PROVIDER_DISPLAY_ORDER.filter(id => !provider || provider === 'all' || id === provider).map(provider=><section className="buzhou-session-provider" key={provider} aria-label={providerName(provider)}>
         <header><h3>{providerName(provider)}</h3>{provider==='claude' && <small>{machine?.agentRuntimes?.claude?.installed===false?t('未安装'):machine?.agentRuntimes?.claude?.installed===true?'':t('安装状态未上报')}</small>}</header>
         {(['running','managed'] as const).map(kind=><SessionRow key={`${machine?.id}:${kind}`} kind={kind} sessions={groups[kind].filter(session=>(session.provider??'codex')===provider)} selectedId={picked?.machineId===machine?.id && picked?.id===selectedId ? selectedId : undefined} online={machine?.reachability==='live'} detail={detail} onSelect={select}/>)}
       </section>)}</div>
