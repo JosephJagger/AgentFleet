@@ -8,7 +8,7 @@
  * Each is a small class that can run headless, so the numerics are unit-testable.
  */
 import { GLYPHS, TAU, clamp, hslToRgb, hueFor, qualityFor, setupCanvas, type Effect, type Quality, type EffectMode, type EffectParams, type Pointer } from "./buzhoushan-effect-common";
-import { attractorEffect, glyphRippleEffect, protonEffect, starfieldEffect, threeBodyEffect, waveGridEffect } from "./buzhoushan-effects-science";
+import { attractorEffect, glyphRippleEffect, protonEffect, sonogramEffect, starfieldEffect, threeBodyEffect, voiceRingsEffect, waveGridEffect } from "./buzhoushan-effects-science";
 export { hslToRgb, hueFor, qualityFor };
 export type { Effect, EffectMode, EffectParams, Pointer };
 
@@ -367,6 +367,8 @@ function matrixEffect(canvas: HTMLCanvasElement): Effect | undefined {
 export function createEffect(mode: EffectMode, canvas: HTMLCanvasElement, q: Quality = qualityFor("high")): Effect | undefined {
   try {
     if (mode === "glyph") return glyphRippleEffect(canvas, q);
+    if (mode === "rings") return voiceRingsEffect(canvas, q);
+    if (mode === "sonogram") return sonogramEffect(canvas, q);
     if (mode === "particles") return particleEffect(canvas, q);
     if (mode === "smoke") return smokeEffect(canvas, q);
     if (mode === "matrix") return matrixEffect(canvas);

@@ -4,7 +4,7 @@
  * playback are untouched. Only volume/pitch numbers are computed, in memory: nothing is
  * recorded, stored or sent anywhere.
  */
-import { clamp, type Impulse, type VoiceParams, type VoiceRole } from "./buzhoushan-effect-common";
+import { VOICE_BANDS, clamp, type Impulse, type VoiceParams, type VoiceRole } from "./buzhoushan-effect-common";
 
 /** RMS level (0..1) and pitch-like spectral centroid (0 = low voice, 1 = high), from analyser data. */
 export function analyseSpectrum(time: Uint8Array, freq: Uint8Array, sampleRate: number): { level: number; centroid: number } {
@@ -20,6 +20,19 @@ export function analyseSpectrum(time: Uint8Array, freq: Uint8Array, sampleRate: 
   }
   const hz = mass > 200 ? weighted / mass : 600;
   return { level, centroid: clamp((Math.log(hz) - Math.log(100)) / (Math.log(3500) - Math.log(100)), 0, 1) };
+}
+
+/** Log-spaced spectrum levels (0..1) between 80 Hz and 7 kHz, written into `out` (low pitch first). */
+export function computeBands(freq: Uint8Array, sampleRate: number, out: Float32Array): Float32Array {
+  const n = out.length, binHz = sampleRate / (freq.length * 2), lo = 80, hi = Math.min(7000, sampleRate / 2 - 1);
+  for (let b = 0; b < n; b++) {
+    const f0 = lo * Math.pow(hi / lo, b / n), f1 = lo * Math.pow(hi / lo, (b + 1) / n);
+    const i0 = Math.max(1, Math.floor(f0 / binHz)), i1 = Math.max(i0 + 1, Math.ceil(f1 / binHz));
+    let sum = 0, count = 0;
+    for (let i = i0; i < i1 && i < freq.length; i++) { sum += freq[i]; count++; }
+    out[b] = count ? Math.pow(sum / count / 255, 0.8) : 0;
+  }
+  return out;
 }
 
 /** Emits a strength (0..1) when the level jumps above its slow average, with a cooldown. */
@@ -46,8 +59,10 @@ export function placeImpulse(role: VoiceRole, centroid: number, strength: number
   return { role, x: 0.06 + 0.88 * centroid, y: role === "ai" ? 0.2 + 0.28 * jitter : 0.54 + 0.28 * jitter, strength };
 }
 
-type Tap = { owner: unknown; source: MediaStreamAudioSourceNode; analyser: AnalyserNode; time: Uint8Array; freq: Uint8Array; onset: OnsetDetector; level: number };
+type Tap = { owner: unknown; source: MediaStreamAudioSourceNode; analyser: AnalyserNode; time: Uint8Array; freq: Uint8Array; onset: OnsetDetector; level: number; bands: Float32Array; raw: Float32Array; wave: Float32Array };
 const EMPTY: VoiceParams = { mic: 0, ai: 0, impulses: [], connected: false };
+const WAVE_SAMPLES = 96;
+const ZERO_BANDS = new Float32Array(VOICE_BANDS), ZERO_WAVE = new Float32Array(WAVE_SAMPLES);
 
 class VoiceSignal {
   private ctx?: AudioContext;
@@ -65,7 +80,7 @@ class VoiceSignal {
       const source = this.ctx.createMediaStreamSource(stream), analyser = this.ctx.createAnalyser();
       analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.35;
       source.connect(analyser); // analysis only: the analyser is not connected to the destination
-      this.taps[role] = { owner, source, analyser, time: new Uint8Array(analyser.fftSize), freq: new Uint8Array(analyser.frequencyBinCount), onset: new OnsetDetector(), level: 0 };
+      this.taps[role] = { owner, source, analyser, time: new Uint8Array(analyser.fftSize), freq: new Uint8Array(analyser.frequencyBinCount), onset: new OnsetDetector(), level: 0, bands: new Float32Array(VOICE_BANDS), raw: new Float32Array(VOICE_BANDS), wave: new Float32Array(WAVE_SAMPLES) };
     } catch { /* The effect is optional; a failure must never affect the call. */ }
   }
   detach(role: VoiceRole) {
@@ -104,10 +119,20 @@ class VoiceSignal {
       if (!tap || !r) continue;
       const level = role === "mic" ? r.level * echo : r.level;
       tap.level += (level - tap.level) * 0.35;
+      // Spectrum for voiceprint visuals: fast attack, slower release; the echo-damped microphone follows the same rule.
+      computeBands(tap.freq, rate, tap.raw);
+      const gain = role === "mic" ? echo : 1;
+      for (let b = 0; b < VOICE_BANDS; b++) { const v = tap.raw[b] * gain; tap.bands[b] += (v - tap.bands[b]) * (v > tap.bands[b] ? 0.6 : 0.18); }
+      const stride = Math.max(1, Math.floor(tap.time.length / WAVE_SAMPLES));
+      for (let i = 0; i < WAVE_SAMPLES; i++) tap.wave[i] = ((tap.time[i * stride] ?? 128) - 128) / 128 * gain;
       const strength = tap.onset.update(level, nowMs);
       if (strength > 0) impulses.push(placeImpulse(role, r.centroid, strength, nowMs));
     }
-    return (this.lastFrame = { mic: clamp((this.taps.mic?.level ?? 0) * 3.2, 0, 1), ai: clamp((this.taps.ai?.level ?? 0) * 3.2, 0, 1), impulses, connected: true });
+    return (this.lastFrame = {
+      mic: clamp((this.taps.mic?.level ?? 0) * 3.2, 0, 1), ai: clamp((this.taps.ai?.level ?? 0) * 3.2, 0, 1), impulses, connected: true,
+      bands: { mic: this.taps.mic?.bands ?? ZERO_BANDS, ai: this.taps.ai?.bands ?? ZERO_BANDS },
+      waves: { mic: this.taps.mic?.wave ?? ZERO_WAVE, ai: this.taps.ai?.wave ?? ZERO_WAVE },
+    });
   }
 }
 export const voiceSignal = new VoiceSignal();
@@ -115,6 +140,8 @@ export const voiceSignal = new VoiceSignal();
 /** Synthetic alternating voice used by the preview when no call is connected, so the effect can be seen. */
 export function createDemoVoice() {
   let next = 0, flip = false, level = 0;
+  const bands = { mic: new Float32Array(VOICE_BANDS), ai: new Float32Array(VOICE_BANDS) }, waves = { mic: new Float32Array(WAVE_SAMPLES), ai: new Float32Array(WAVE_SAMPLES) };
+  const peak = (x: number, c: number, w: number) => Math.exp(-(((x - c) / w) ** 2));
   return (nowMs: number): VoiceParams => {
     const impulses: Impulse[] = [];
     if (nowMs >= next) {
@@ -123,6 +150,13 @@ export function createDemoVoice() {
       level = 0.8;
     }
     level *= 0.94;
-    return { mic: flip ? level : 0, ai: flip ? 0 : level, impulses, connected: false };
+    const t = nowMs / 1000, speaking = flip ? "mic" : "ai", idle = flip ? "ai" : "mic";
+    for (let b = 0; b < VOICE_BANDS; b++) {
+      const x = b / VOICE_BANDS, f1 = 0.16 + 0.07 * Math.sin(t * 3.1), f2 = 0.4 + 0.09 * Math.sin(t * 2.3 + 1), f3 = 0.68 + 0.08 * Math.sin(t * 1.7 + 2);
+      const target = level * (peak(x, f1, 0.07) + 0.8 * peak(x, f2, 0.08) + 0.5 * peak(x, f3, 0.1)) + 0.04 * level * hash(b + Math.floor(t * 30));
+      bands[speaking][b] += (target - bands[speaking][b]) * 0.5; bands[idle][b] *= 0.85;
+    }
+    for (let i = 0; i < WAVE_SAMPLES; i++) { waves[speaking][i] = Math.sin(i * 0.5 + t * 40) * level * 0.7 * Math.sin((i / WAVE_SAMPLES) * Math.PI); waves[idle][i] *= 0.8; }
+    return { mic: flip ? level : 0, ai: flip ? 0 : level, impulses, connected: false, bands, waves };
   };
 }

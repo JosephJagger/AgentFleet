@@ -34,6 +34,20 @@ Effects react as: glyph rings, particle kicks, fluid bursts, wave ripples, starf
 matrix/proton boost, attractor shock + spin, three-body kick + shock ring.
 The preview plays a synthetic voice when no call is connected.
 
+## Voice-call screensaver ("声纹模式")
+- When the **global voice coordinator** connects, `NativeVoicePanel` tucks away both of its windows
+  once per call (the call window and the outer "语音总控" window; recovery never re-collapses them;
+  session voice keeps its window). The floating "总控通话控制" button brings them back.
+- The screensaver then enters automatically (setting "总控语音连接成功后自动进入声纹屏保", on by
+  default, and only when the screensaver itself is enabled). In this mode **only a click or a key
+  press leaves it** (mouse movement does not); hanging up leaves it too. `←/→` (or the faint on-screen
+  arrows) switch styles instead of exiting; the choice is remembered. Styles in order: 字符涟漪
+  (default), 声波环, 声纹谱图, then the other effects.
+- The caption shows the call state: 语音总控 连接中… / 已连接 · 聆听中 / 你在说话 / AI 在说话 / 已静音
+  (`lib/voice-status.ts`, published by `NativeVoicePanel`, owner-scoped like the audio taps).
+- 声波环 draws the log-spaced spectrum as two rings (you inner/blue, the AI outer/green);
+  声纹谱图 is a scrolling spectrogram (AI above the centre line, you below).
+
 ## Verifying changes
 - `npm run build` in `apps/web` (real `tsc -b`) and `NODE_ENV=test npx vitest run`.
 - `css-integrity.test.mjs` guards the stylesheets against unbalanced braces.

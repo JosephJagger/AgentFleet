@@ -2,10 +2,11 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Download,MonitorUp,Ratio,Sparkles,X} from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {t} from '../i18n';
-import {SCREENSAVER_MODES,SCREENSAVER_QUALITIES,type ScreensaverQuality,setScreensaverPreview,useScreensaverPrefs,type ScreensaverMode,saveScreensaverPrefs,SCREENSAVER_MIN_SECONDS,SCREENSAVER_MAX_SECONDS} from '../lib/buzhoushan-idle';
+import {SCREENSAVER_MODES,SCREENSAVER_QUALITIES,VOICE_STYLES,type ScreensaverQuality,setScreensaverPreview,useScreensaverPrefs,type ScreensaverMode,saveScreensaverPrefs,SCREENSAVER_MIN_SECONDS,SCREENSAVER_MAX_SECONDS} from '../lib/buzhoushan-idle';
 import {downloadBroadcastLauncher,openBroadcastWindow,fitBroadcastWindow} from '../lib/broadcast-launcher';
 
 type BroadcastIntro = {leftTitle:string;leftSubtitle:string;rightTitle:string;rightSubtitle:string};
+const MODE_LABEL:Record<ScreensaverMode,string>={auto:'自动轮换',particles:'粒子引力场',smoke:'流体烟雾',matrix:'数字雨',attractor:'吸引子轨迹',wavegrid:'波浪网格',starfield:'星空',threebody:'三体太阳轨迹',proton:'质子',glyph:'字符涟漪',rings:'声波环',sonogram:'声纹谱图'};
 const introKey='agentfleet:buzhoushan-broadcast-intro';
 const defaultIntro:BroadcastIntro={leftTitle:'AI 编程实战',leftSubtitle:'Codex · Claude Code',rightTitle:'多电脑 AI 协作直播中',rightSubtitle:'现场开发｜调试｜交流答疑'};
 function readIntro():BroadcastIntro {
@@ -51,7 +52,9 @@ export function BuzhoushanBroadcastControl({enabled,onChange}:{enabled:boolean;o
       <small>{t('新窗口不会转移当前通话；请勿关闭正在通话的原窗口。窗口尺寸可能受系统限制，以底部画布尺寸为准。')}</small>
       <details className="buzhou-broadcast-editor"><summary>{t('空闲屏保特效')}</summary>
         <label><input type="checkbox" checked={saver.enabled} onChange={event=>saveScreensaverPrefs({...saver,enabled:event.target.checked})}/> {t('长时间无鼠标键盘操作时显示直播屏保')}</label>
-        <label>{t('屏保效果')}<select value={saver.mode} onChange={event=>saveScreensaverPrefs({...saver,mode:event.target.value as ScreensaverMode})}>{SCREENSAVER_MODES.map(mode=><option key={mode} value={mode}>{t(({auto:'自动轮换',particles:'粒子引力场',smoke:'流体烟雾',matrix:'数字雨',attractor:'吸引子轨迹',wavegrid:'波浪网格',starfield:'星空',threebody:'三体太阳轨迹',proton:'质子',glyph:'字符涟漪'} as Record<ScreensaverMode,string>)[mode])}</option>)}</select></label>
+        <label>{t('屏保效果')}<select value={saver.mode} onChange={event=>saveScreensaverPrefs({...saver,mode:event.target.value as ScreensaverMode})}>{SCREENSAVER_MODES.map(mode=><option key={mode} value={mode}>{t(MODE_LABEL[mode])}</option>)}</select></label>
+        <label><input type="checkbox" checked={saver.autoVoice} onChange={event=>saveScreensaverPrefs({...saver,autoVoice:event.target.checked})}/> {t('总控语音连接成功后自动进入声纹屏保')}</label>
+        <label>{t('声纹屏保样式')}<select value={saver.voiceStyle} onChange={event=>saveScreensaverPrefs({...saver,voiceStyle:event.target.value as ScreensaverMode as never})}>{VOICE_STYLES.map(style=><option key={style} value={style}>{t(MODE_LABEL[style])}</option>)}</select></label>
         <label>{t('画质')}<select value={saver.quality} onChange={event=>saveScreensaverPrefs({...saver,quality:event.target.value as ScreensaverQuality})}>{SCREENSAVER_QUALITIES.map(q=><option key={q} value={q}>{t({auto:'自动（按帧率降档）',high:'高',medium:'中',low:'低'}[q])}</option>)}</select></label>
         <label>{t('空闲秒数')}<input type="number" min={SCREENSAVER_MIN_SECONDS} max={SCREENSAVER_MAX_SECONDS} value={saver.seconds} onChange={event=>saveScreensaverPrefs({...saver,seconds:Number(event.target.value)})}/></label>
         <small>{t('仅为视觉特效：不拦截点击，不影响通话、互动消息和任务；任意操作立即退出。')}</small>

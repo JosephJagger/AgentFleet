@@ -48,6 +48,12 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup();sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+/** The global coordinator collapses its call window once the call connects; reopen it to inspect controls. */
+async function reopenCall(){
+  await waitFor(()=>expect(screen.queryByRole('region',{name:'原生实时语音'})).toBeNull());
+  fireEvent.click(screen.getByRole('button',{name:'总控通话控制'}));
+}
+
 it("microphone opens only on explicit start; native answer connects, mute works, and ending closes all media", async () => {
   const active = vi.fn();
   const view = render(<div className="inspector"><header><NativeVoicePanel sessionId="session" canStart onActiveChange={active} /></header><form className="composer" /></div>);
@@ -198,6 +204,7 @@ it("global signaling survives page content changes without acquiring a project l
   await waitFor(()=>expect(socket.sent[0]).toMatchObject({type:'panel.start',machineId:'host'}));
   expect(api.acquireLease).not.toHaveBeenCalled();
   socket.receive({type:'answer',sdp:'v=0\r\n'});
+  await reopenCall();
   await waitFor(()=>expect(screen.getByRole('button',{name:'静音'})).toBeTruthy());
   view.rerender(<><NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart onActiveChange={()=>undefined} onPanelTask={task}/><main>Projects</main></>);
   expect(Socket.all).toHaveLength(1);expect(socket.readyState).toBe(1);expect(track.stop).not.toHaveBeenCalled();
@@ -215,6 +222,10 @@ it("panel control keeps the chosen voice host across dashboard refreshes and tar
   fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));
   await waitFor(()=>expect(Socket.all).toHaveLength(1));
   const socket=Socket.all[0]!;socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});
+  // Both windows tuck away once connected; the floating call button brings the control window back.
+  await waitFor(()=>expect(screen.queryByRole('region',{name:'面板语音总控'})).toBeNull());
+  expect(screen.queryByRole('region',{name:'原生实时语音'})).toBeNull();
+  fireEvent.click(screen.getAllByRole('button',{name:'面板语音总控'}).at(-1)!);
   await waitFor(()=>expect(screen.getByRole('combobox',{name:'语音主机'}).hasAttribute('disabled')).toBe(true));
   view.rerender(<PanelVoiceControl machines={[{...host,id:'other'},{...host,reachability:'stale'}] as never} onOpenSession={open}/>);
   expect(Socket.all).toHaveLength(1);expect(socket.readyState).toBe(1);expect(track.stop).not.toHaveBeenCalled();
@@ -238,6 +249,7 @@ it("panel task status failures and completion keep audio connected",async()=>{
  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));
  await waitFor(()=>expect(Socket.all).toHaveLength(1));
  const socket=Socket.all[0]!;socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});
+  await reopenCall();
  await waitFor(()=>expect(screen.getByRole('button',{name:'静音'}).getAttribute('disabled')).toBeNull());
  socket.receive({type:'task_status_unavailable'});
  await waitFor(()=>expect(screen.getByText('任务状态暂不可用，通话可继续')).toBeTruthy());
@@ -270,6 +282,7 @@ for (const global of [false, true]) it(`hidden and visible retain ${global ? 'gl
  const socket=Socket.all[0]!,peer=Peer.all[0]!;
  vi.useFakeTimers();
  await act(async()=>{socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});});
+ if(global)fireEvent.click(screen.getByRole('button',{name:'总控通话控制'})); // global windows collapse on connect
  const audio=view.container.querySelector('audio')!;audio.srcObject=stream;
  const pause=vi.mocked(HTMLMediaElement.prototype.pause);pause.mockClear();
  try {
@@ -309,6 +322,7 @@ it('global host recovery preserves microphone, peer and signaling without repeat
   fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));await waitFor(()=>expect(Socket.all).toHaveLength(1));
   const socket=Socket.all[0]!;act(()=>socket.receive({type:'ready'}));
   await act(async()=>socket.receive({type:'answer',sdp:'v=0\r\n'}));
+  await reopenCall();
   act(()=>socket.receive({type:'recovering'}));
   expect(screen.getByText('正在恢复主机连接，核验原通话中（最多 60 秒）')).toBeTruthy();
   expect(track.stop).not.toHaveBeenCalled();expect(Peer.all[0]!.closed).toBe(false);expect(socket.readyState).toBe(1);
@@ -325,6 +339,7 @@ it('global coordinator internal task turns never override authoritative project 
  render(<NativeVoicePanel globalMachineId="host" sessionId="panel" canStart onActiveChange={()=>undefined}/>);
  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));await waitFor(()=>expect(Socket.all).toHaveLength(1));const socket=Socket.all[0]!;
  act(()=>{socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});socket.receive({type:'panel_task',task:{jobId:'job',state:'completed'}});});
+  await reopenCall();
  await screen.findByText('项目任务已完成，结果见会话');
  act(()=>socket.receive({type:'task',phase:'running'}));expect(screen.getByText('项目任务已完成，结果见会话')).toBeTruthy();
 });
@@ -333,6 +348,7 @@ it('replayed user transcript snapshot after recovery is not duplicated',async()=
  render(<NativeVoicePanel globalMachineId="host" sessionId="panel" canStart onActiveChange={()=>undefined}/>);
  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));await waitFor(()=>expect(Socket.all).toHaveLength(1));const socket=Socket.all[0]!;
  act(()=>{socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});socket.receive({type:'transcript',role:'user',text:'One utterance',final:true,snapshot:true,transcriptSeq:2});socket.receive({type:'recovering'});socket.receive({type:'recovered'});socket.receive({type:'transcript',role:'user',text:'One utterance',final:true,snapshot:true,transcriptSeq:2});});
+  await reopenCall();
  expect(screen.getAllByText('One utterance')).toHaveLength(1);
 });
 
@@ -340,6 +356,7 @@ it('unconfirmed report warns without ending audio or changing a completed projec
  render(<NativeVoicePanel globalMachineId="host" sessionId="panel" canStart onActiveChange={()=>undefined}/>);
  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));await waitFor(()=>expect(Socket.all).toHaveLength(1));const socket=Socket.all[0]!;
  act(()=>{socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});socket.receive({type:'panel_task',task:{jobId:'job',state:'completed'}});socket.receive({type:'report_unavailable'});});
+  await reopenCall();
  expect(screen.getByText('结果播报未确认，请在待办与结果记录中查看；通话继续')).toBeTruthy();expect(screen.getByText('项目任务已完成，结果见会话')).toBeTruthy();
  expect(socket.readyState).toBe(1);expect(Peer.all[0]?.closed).toBe(false);expect(track.stop).not.toHaveBeenCalled();
 });
@@ -387,4 +404,28 @@ it("closing More keeps the same voice connection and allows reopening its contro
   expect(track.stop).not.toHaveBeenCalled();expect(Peer.all[0].closed).toBe(false);expect(socket.readyState).toBe(1);
   fireEvent.click(more);fireEvent.click(screen.getByRole("button",{name:"语音控制"}));
   expect(screen.getByRole("button",{name:"挂断"})).toBeTruthy();expect(Socket.all).toHaveLength(1);
+});
+
+it("the global coordinator collapses once when the call connects, not on recovery, and session voice keeps its window",async()=>{
+  const onConnected=vi.fn();
+  const view=render(<NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart onActiveChange={()=>undefined} onConnected={onConnected}/>);
+  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));
+  await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  expect(screen.getByRole('region',{name:'原生实时语音'})).toBeTruthy();      // visible while connecting
+  const socket=Socket.all[0]!;socket.receive({type:'ready'});socket.receive({type:'answer',sdp:'v=0\r\n'});
+  await waitFor(()=>expect(screen.queryByRole('region',{name:'原生实时语音'})).toBeNull());
+  expect(onConnected).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button',{name:'总控通话控制'}));          // user reopens on purpose
+  expect(screen.getByRole('region',{name:'原生实时语音'})).toBeTruthy();
+  const peer=Peer.all[0]!;
+  peer.connectionState='connected';peer.onconnectionstatechange?.();             // a later blip must not collapse again
+  expect(screen.getByRole('region',{name:'原生实时语音'})).toBeTruthy();expect(onConnected).toHaveBeenCalledTimes(1);
+  view.unmount();
+  const onSession=vi.fn();
+  render(<NativeVoicePanel sessionId="session" canStart onActiveChange={()=>undefined} onConnected={onSession}/>);
+  fireEvent.click(screen.getByRole('button',{name:'开始语音'}));
+  await waitFor(()=>expect(Socket.all.length).toBeGreaterThan(1));
+  const second=Socket.all.at(-1)!;second.receive({type:'ready'});second.receive({type:'answer',sdp:'v=0\r\n'});
+  await waitFor(()=>expect(screen.getByRole('button',{name:'静音'})).toBeTruthy());
+  expect(onSession).not.toHaveBeenCalled();
 });

@@ -79,3 +79,12 @@ it('a panel releasing its own call never cuts another panel\'s live call',()=>{
  voiceSignal.attach('mic',stream,'session-panel');          // session voice links the same way
  expect(voiceSignal.connected).toBe(true);
 });
+import {computeBands} from './lib/voice-signal';
+it('log-spaced bands separate low and high pitch and stay within 0..1',()=>{
+ const rate=48000,bins=256,at=(hz:number)=>{const f=new Uint8Array(bins);const i=Math.round(hz/(rate/(bins*2)));f[i]=255;f[i-1]=200;f[i+1]=200;return f;};
+ const out=new Float32Array(48),peak=(a:Float32Array)=>a.indexOf(Math.max(...a));
+ const low=peak(computeBands(at(200),rate,out)),high=peak(computeBands(at(3000),rate,out));
+ expect(high).toBeGreaterThan(low+15);
+ for(const v of computeBands(at(1000),rate,out)){expect(v).toBeGreaterThanOrEqual(0);expect(v).toBeLessThanOrEqual(1);}
+ expect(Math.max(...computeBands(new Uint8Array(bins),rate,out))).toBe(0);
+});
