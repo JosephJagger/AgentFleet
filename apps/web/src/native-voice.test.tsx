@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionActions } from "./components/SessionActions";
 import { NativeVoicePanel } from "./components/NativeVoicePanel";
 import { api } from "./lib/api";
+import { voiceStatus } from "./lib/voice-status";
 vi.mock("./lib/api", () => ({ api: { voiceTranscriptSettings:()=>Promise.resolve({enabled:false,revision:0,retentionDays:30}), acquireLease: vi.fn(), renewLease: vi.fn() } }));
 
 class Peer {
@@ -428,4 +429,110 @@ it("the global coordinator collapses once when the call connects, not on recover
   const second=Socket.all.at(-1)!;second.receive({type:'ready'});second.receive({type:'answer',sdp:'v=0\r\n'});
   await waitFor(()=>expect(screen.getByRole('button',{name:'静音'})).toBeTruthy());
   expect(onSession).not.toHaveBeenCalled();
+});
+
+/** Start a global call on the fake host and bring it to "connected", granting the resume token like the new server does. */
+async function connectedGlobalCall(grant:{token?:string;graceMs?:number}|null={token:'token-1',graceMs:30000}){
+  render(<NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart onActiveChange={()=>undefined}/>);
+  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));
+  await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  const first=Socket.all[0]!;
+  await act(async()=>{first.receive({type:'ready'});});
+  await waitFor(()=>expect(first.sent[0]).toMatchObject({type:'panel.start',machineId:'host',resume:true}));
+  if(grant)first.receive({type:'resume.token',voiceId:'pvoice_1',token:grant.token,graceMs:grant.graceMs});
+  await act(async()=>{first.receive({type:'answer',sdp:'v=0\r\n'});});
+  await waitFor(()=>expect(voiceStatus.get().phase).toBe('connected'));
+  return {first,peer:Peer.all[0]!};
+}
+const dropSocket=(socket:Socket,event:object={code:1006,wasClean:false,reason:''})=>act(()=>{socket.readyState=3;(socket.onclose as unknown as (e:object)=>void)?.(event);});
+
+it("a dropped signaling socket keeps the call and its audio, reconnects with the secret token and resumes; the token rotates",async()=>{
+  const {first,peer}=await connectedGlobalCall();
+  dropSocket(first);
+  expect(track.stop).not.toHaveBeenCalled();expect(peer.closed).toBe(false);          // the call and its audio are held
+  expect(voiceStatus.get().degraded).toBe(true);
+  await waitFor(()=>expect(Socket.all).toHaveLength(2));
+  const second=Socket.all[1]!;
+  await act(async()=>{second.receive({type:'ready'});});
+  expect(second.sent[0]).toMatchObject({type:'panel.resume',voiceId:'pvoice_1',resumeToken:'token-1',diag:{code:1006,wasClean:false,attempts:1,online:true}});
+  await act(async()=>{second.receive({type:'resumed',voiceId:'pvoice_1',token:'token-2',graceMs:30000});second.receive({type:'transcript',role:'assistant',text:'missed words',final:true});});
+  await waitFor(()=>expect(voiceStatus.get().degraded).toBe(false));
+  expect(track.stop).not.toHaveBeenCalled();
+  dropSocket(second,{code:1001,wasClean:false,reason:'going away'});                    // a second blip uses the rotated token
+  await waitFor(()=>expect(Socket.all).toHaveLength(3));
+  await act(async()=>{Socket.all[2]!.receive({type:'ready'});});
+  expect(Socket.all[2]!.sent[0]).toMatchObject({type:'panel.resume',resumeToken:'token-2',diag:{code:1001}});
+  expect(track.stop).not.toHaveBeenCalled();
+  expect(first.sent.filter(m=>m.type==='stop')).toHaveLength(0);                          // no stop is ever sent just because signaling dropped
+});
+
+it("the old socket closing after a resume does not start another reconnect, and the heartbeat moves to the new socket",async()=>{
+  const {first}=await connectedGlobalCall();
+  vi.useFakeTimers();
+  dropSocket(first);
+  await act(async()=>{vi.advanceTimersByTime(1);});
+  const second=Socket.all[1]!;await act(async()=>{second.receive({type:'ready'});second.receive({type:'resumed',voiceId:'pvoice_1',token:'token-2',graceMs:30000});});
+  dropSocket(first);                                                                       // a stale close event from the replaced socket
+  await act(async()=>{vi.advanceTimersByTime(5000);});
+  expect(Socket.all).toHaveLength(2);expect(voiceStatus.get().degraded).toBe(false);
+  await act(async()=>{vi.advanceTimersByTime(16_000);});
+  expect(second.sent.some(m=>m.type==='heartbeat')).toBe(true);
+  expect(first.sent.filter(m=>m.type==='heartbeat')).toHaveLength(0);
+  vi.useRealTimers();
+});
+
+it("a server that rejects the resume ends the call at once; no further attempts are made",async()=>{
+  const {first,peer}=await connectedGlobalCall();
+  dropSocket(first);await waitFor(()=>expect(Socket.all).toHaveLength(2));
+  await act(async()=>{Socket.all[1]!.receive({type:'ready'});Socket.all[1]!.receive({type:'error',message:'总控通话已结束，无法恢复'});});
+  await waitFor(()=>expect(peer.closed).toBe(true));expect(track.stop).toHaveBeenCalled();
+  await new Promise(r=>setTimeout(r,60));expect(Socket.all).toHaveLength(2);
+  expect(voiceStatus.get().phase).not.toBe('connected');
+});
+
+it("a server that never granted a resume token keeps the old behaviour: the call ends as soon as signaling closes",async()=>{
+  const {first,peer}=await connectedGlobalCall(null);
+  dropSocket(first);
+  await waitFor(()=>expect(peer.closed).toBe(true));expect(track.stop).toHaveBeenCalled();
+  expect(Socket.all).toHaveLength(1);
+});
+
+it("retries stop at the end of the hold window and the call then ends",async()=>{
+  const {first,peer}=await connectedGlobalCall({token:'token-1',graceMs:8000});         // budget = max(5 s, 8 s - 6 s) = 5 s
+  vi.useFakeTimers();
+  dropSocket(first);
+  for(let i=0;i<14&&!peer.closed;i++){
+    await act(async()=>{vi.advanceTimersByTime(1000);});
+    for(const s of Socket.all.slice(1))if(s.readyState===1)dropSocket(s);                // every attempt fails right away
+  }
+  expect(peer.closed).toBe(true);expect(track.stop).toHaveBeenCalled();
+  expect(Socket.all.length).toBeLessThanOrEqual(9);expect(Socket.all.length).toBeGreaterThan(2);
+  const attempts=Socket.all.length;await act(async()=>{vi.advanceTimersByTime(30_000);});expect(Socket.all).toHaveLength(attempts);   // and it stays ended
+  vi.useRealTimers();
+});
+
+it("an audio failure while signaling is down ends the call and stops reconnecting; hanging up does too",async()=>{
+  const {first,peer}=await connectedGlobalCall();
+  dropSocket(first);await waitFor(()=>expect(Socket.all).toHaveLength(2));
+  act(()=>{peer.connectionState='failed';peer.onconnectionstatechange?.();});
+  await waitFor(()=>expect(peer.closed).toBe(true));
+  await new Promise(r=>setTimeout(r,60));expect(Socket.all).toHaveLength(2);
+  cleanup();Socket.all=[];Peer.all=[];track.stop.mockClear();
+  const again=await connectedGlobalCall();dropSocket(again.first);
+  await reopenCall();fireEvent.click(screen.getByRole('button',{name:'挂断'}));
+  await waitFor(()=>expect(again.peer.closed).toBe(true));
+  const count=Socket.all.length;await new Promise(r=>setTimeout(r,80));expect(Socket.all).toHaveLength(count);
+});
+
+it("leaving a live call by reload or close asks for confirmation; an idle page and an ended call do not",async()=>{
+  const ask=()=>{const event=new Event('beforeunload',{cancelable:true});window.dispatchEvent(event);return event.defaultPrevented;};
+  render(<NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart onActiveChange={()=>undefined}/>);
+  expect(ask()).toBe(false);                                                                // nothing to protect yet
+  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));
+  await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  expect(ask()).toBe(true);                                                                 // connecting counts as a live call
+  const first=Socket.all[0]!;await act(async()=>{first.receive({type:'ready'});first.receive({type:'answer',sdp:'v=0\r\n'});});
+  await waitFor(()=>expect(voiceStatus.get().phase).toBe('connected'));expect(ask()).toBe(true);
+  await reopenCall();fireEvent.click(screen.getByRole('button',{name:'挂断'}));
+  await waitFor(()=>expect(ask()).toBe(false));                                              // hung up: no prompt
 });

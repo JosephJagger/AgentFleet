@@ -38,6 +38,36 @@ All normal backend and web container publications must use this entry point. Raw
 
 Tests: `python3 packaging/test-voice-deployment.py` and control-plane voice/deployment tests exercise old-binary fencing, simultaneous publishers, persistence after publisher loss, natural closure, timeout and ongoing-call tools.
 
+## Browser signaling resume (global voice coordinator)
+
+Between 10/2 and 10/16 the most common unwanted call ends were a dropped browser signaling WebSocket
+(`SIGNAL_CLOSED`, 25 of 119 calls) and page leaves (`PAGE_LEFT`, 17). The audio runs over WebRTC and the host
+keeps its own watchdog, so a short network blip need not end a call.
+
+- A global call started with `resume: true` (`panel.start`) receives a secret `resume.token` and the hold window
+  (`graceMs`, default 30 s; `panelResumeGraceMs` overrides it in tests). The call is held in a
+  `PanelChannel` (`apps/control-plane/src/panel-signal.ts`), which behaves like the browser socket while it is
+  connected.
+- If the signaling socket closes without an explicit `stop`, the call stays `active` (so deployments still wait
+  for it). Messages for the browser queue (400 at most; `answer`, `recovering`, `recovered`, `closed`, `error`
+  are never dropped for ordinary ones). When the window expires without a resume the call ends as
+  `SIGNAL_CLOSED`, exactly as before.
+- The browser keeps microphone and WebRTC, retries within the window (a few seconds short of it) and sends
+  `panel.resume {voiceId, resumeToken, diag}` on a new socket. The server accepts it only from the same
+  authenticated client session that owns the call, with the current token (constant-time compare, rotated on every
+  success, rate limited), then replies `resumed`, replays the queued messages in order and supersedes a half-open
+  old socket (close code 4001). A rejected attempt never ends the call. An explicit `stop` (hangup, page leave)
+  still ends it at once, and clients that did not ask for resume keep the old immediate behaviour.
+- The call's `binding_json` gains `signalEvents` (last 8): drop (WebSocket close code, call age, whether it was
+  held, host recovering), resumed (gap, replayed count, whitelisted client diagnostics such as `online`,
+  `visibility`, network type, rtt, attempts) and `grace_expired`. Use them to tell a network drop from sleep or
+  a throttled tab.
+- While signaling is being re-established the voice status is "degraded" and the screensaver shows
+  "网络波动，重连中…". A restart of the control plane still ends held calls (the deployment guard keeps that from
+  happening during a publication).
+- Refreshing or closing the page during a live call now asks for confirmation (`beforeunload`; the text is the
+  browser's own). It still ends the call if you confirm.
+
 ## Background calls and browser lifecycle
 
 The web client keeps microphone tracks, audio playback, WebRTC and signaling when

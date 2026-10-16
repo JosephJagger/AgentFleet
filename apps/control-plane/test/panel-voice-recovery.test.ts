@@ -5,8 +5,8 @@ import {loadConfig} from '../src/config.js';
 import {sha256} from '../src/crypto.js';
 import {WebSocket} from 'ws';
 
-async function fixture(t: import('node:test').TestContext,resumeAck=false) {
-  const config={...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'voice@example.test',ADMIN_PASSWORD:'voice-test-password',PUBLIC_ORIGIN:'http://voice.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:'};
+async function fixture(t: import('node:test').TestContext,resumeAck=false,options:{resumable?:boolean;graceMs?:number}={}) {
+  const config={...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'voice@example.test',ADMIN_PASSWORD:'voice-test-password',PUBLIC_ORIGIN:'http://voice.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:',...(options.graceMs?{panelResumeGraceMs:options.graceMs}:{})};
   const h=await buildControlPlane(config);const {app,db}=h;const address=await app.listen({host:"127.0.0.1",port:0});
   const sockets:WebSocket[]=[];
   t.after(async()=>{
@@ -36,11 +36,12 @@ async function fixture(t: import('node:test').TestContext,resumeAck=false) {
     const ack=await c.next('hello.ack');c.send({type:'reconciliation.complete',reconciliationId:ack.reconciliationId,reconciliationStreams:streams});await c.next('reconciliation.ack');return c;
   }
   const first=await host(1);const browser=await connect('/ws/voice',{cookie,origin:'http://voice.test'});await browser.next('ready');
-  browser.send({type:'panel.start',machineId:'m',sdp:'v=0\r\nm=audio 9\r\n'});
+  browser.send({type:'panel.start',machineId:'m',sdp:'v=0\r\nm=audio 9\r\n',...(options.resumable?{resume:true}:{})});
+  const resume=options.resumable?await browser.next('resume.token'):undefined;
   const start=await first.next('voice.control','start');const voiceId=String(start.voiceId),instanceId='fixture-original-instance';
   const event=(extra:Record<string,unknown>)=>({type:'voice.event',voiceId,producerEpoch:'producer',appServerEpoch:'native',...extra});
   first.send(event({event:'sdp',sdp:'v=0\r\nm=audio 9\r\n',instanceId,resumeAck}));await browser.next('answer');
-  return {...h,cookie,csrf:logged.json().csrfToken,first,browser,host,event,voiceId,instanceId,row:()=>db.get<{state:string;binding_json:string}>('SELECT state,binding_json FROM panel_voice_calls WHERE voice_id=?',voiceId)!};
+  return {...h,cookie,csrf:logged.json().csrfToken,first,browser,host,event,voiceId,instanceId,resume,connect,row:()=>db.get<{state:string;binding_json:string}>('SELECT state,binding_json FROM panel_voice_calls WHERE voice_id=?',voiceId)!};
 }
 
 test('short host reconnect restores only original call; stale proof and duplicate proof cannot rebind or start calls',async t=>{
@@ -173,4 +174,80 @@ test('authenticated chat ingestion is silent; coordinator lookup returns evidenc
  f.first.send(f.event({event:'panel_tool',requestId:'new-broadcaster-request',args:{action:'todo.save',intent:'合成用户新请求',idempotencyKey:'synthetic-new-request'}}));
  const next=await f.first.next('voice.control','tool.result');assert.ok((next.result as {todoId:string}).todoId);
 
+});
+
+const pause=(ms:number)=>new Promise(r=>setTimeout(r,ms));
+const resumeAs=async(f:Awaited<ReturnType<typeof fixture>>,token:unknown,extra:Record<string,unknown>={})=>{
+  const socket=await f.connect('/ws/voice',{cookie:f.cookie,origin:'http://voice.test'});await socket.next('ready');
+  socket.send({type:'panel.resume',voiceId:f.voiceId,resumeToken:token,...extra});return socket;
+};
+
+test('a dropped browser socket keeps a resumable call; the owner resumes with the secret token and receives what it missed',async t=>{
+  const f=await fixture(t,false,{resumable:true,graceMs:3000});
+  const token1=String(f.resume!.token);assert.equal(f.resume!.voiceId,f.voiceId);assert.ok(token1.length>=32);
+  f.browser.socket.terminate();await pause(40);
+  assert.equal(f.row().state,'active');                                              // held, not stopped
+  assert.ok(!f.first.frames.some(v=>v.action==='stop'));                              // the host was never told to stop
+  f.first.send(f.event({event:'transcript',role:'assistant',text:'said while you were away',final:true,transcriptSeq:1}));await pause(40);
+  const again=await resumeAs(f,token1,{diag:{code:1006,online:true,visibility:'visible',net:'4g',attempts:2,rtt:80,evil:'<script>'}});
+  const resumed=await again.next('resumed');assert.equal(resumed.voiceId,f.voiceId);assert.notEqual(resumed.token,token1);
+  assert.equal((await again.next('transcript')).text,'said while you were away');     // the missed message, in order, after "resumed"
+  assert.equal(f.row().state,'active');
+  const events=JSON.parse(f.row().binding_json).signalEvents as {kind:string;code?:number;client?:Record<string,unknown>;replayed?:number}[];
+  assert.deepEqual(events.map(e=>e.kind),['drop','resumed']);
+  assert.equal(typeof events[0]!.code,'number');assert.equal(events[1]!.replayed,1);
+  assert.deepEqual(events[1]!.client,{code:1006,online:true,visibility:'visible',net:'4g',attempts:2,rtt:80});   // only whitelisted diagnostics are kept
+  again.send({type:'heartbeat'});await again.next('heartbeat');                         // the new socket is the owner now
+  f.first.send(f.event({event:'transcript',role:'assistant',text:'live again',final:true,transcriptSeq:2}));assert.equal((await again.next('transcript')).text,'live again');
+  // The token rotates on every use: the old one is dead, and a failed attempt never ends the call.
+  const replayAttack=await resumeAs(f,token1);assert.ok((await replayAttack.next('error')).message);
+  assert.equal(f.row().state,'active');
+  again.send({type:'stop',reason:'USER_HANGUP'});await f.first.next('voice.control','stop');                  // hanging up still works on the resumed socket
+  assert.equal(JSON.parse(f.row().binding_json).closeReason,'USER_HANGUP');
+});
+
+test('rejected resume attempts leave the held call alone; a legacy client without the capability gets no grace',async t=>{
+  const f=await fixture(t,false,{resumable:true,graceMs:3000});
+  f.browser.socket.terminate();await pause(40);
+  for(const bad of [{resumeToken:'wrong-token'},{resumeToken:undefined},{resumeToken:42},{resumeToken:String(f.resume!.token),voiceId:'pvoice_does_not_exist'}]){
+    const socket=await f.connect('/ws/voice',{cookie:f.cookie,origin:'http://voice.test'});await socket.next('ready');
+    socket.send({type:'panel.resume',voiceId:f.voiceId,...bad});assert.ok((await socket.next('error')).message);
+  }
+  assert.equal(f.row().state,'active');                                                // still held after every rejection
+  const unauthenticated=new WebSocket(f.browser.socket.url.replace(/\/ws\/.*/,'/ws/voice'),{headers:{origin:'http://voice.test'}});
+  await new Promise<void>(resolve=>{unauthenticated.once('error',()=>resolve());unauthenticated.once('close',()=>resolve());unauthenticated.once('unexpected-response',()=>resolve());});
+  assert.equal(f.row().state,'active');
+  // Legacy behaviour is unchanged for a client that did not ask to be resumable.
+  const legacy=await fixture(t);
+  legacy.browser.socket.terminate();await legacy.first.next('voice.control','stop');
+  assert.equal(JSON.parse(legacy.row().binding_json).closeReason,'SIGNAL_CLOSED');
+  const events=JSON.parse(legacy.row().binding_json).signalEvents as {kind:string;resumable:boolean}[];
+  assert.deepEqual(events.map(e=>[e.kind,e.resumable]),[['drop',false]]);
+});
+
+test('without a resume the call ends when the grace period expires, and a late resume is refused',async t=>{
+  const f=await fixture(t,false,{resumable:true,graceMs:150});
+  const token=String(f.resume!.token);
+  f.browser.socket.terminate();await pause(60);assert.equal(f.row().state,'active');   // inside the grace window
+  await f.first.next('voice.control','stop');                                           // after the window the host is told to stop
+  const binding=JSON.parse(f.row().binding_json);assert.equal(binding.closeReason,'SIGNAL_CLOSED');
+  assert.deepEqual((binding.signalEvents as {kind:string}[]).map(e=>e.kind),['drop','grace_expired']);
+  const late=await resumeAs(f,token);assert.ok((await late.next('error')).message);
+});
+
+test('an old socket that closes after a resume cannot end the call, and a half-open old socket is superseded',async t=>{
+  const f=await fixture(t,false,{resumable:true,graceMs:3000});
+  const oldClosed=new Promise<number>(resolve=>f.browser.socket.once('close',code=>resolve(code)));
+  const again=await resumeAs(f,String(f.resume!.token));await again.next('resumed');   // the old socket never dropped (half-open on the browser side)
+  assert.equal(await oldClosed,4001);                                                     // the server closed it as superseded
+  await pause(60);assert.equal(f.row().state,'active');assert.equal(JSON.parse(f.row().binding_json).closeReason??null,null);
+  assert.ok(!f.first.frames.some(v=>v.action==='stop'));
+});
+
+test('an explicit stop ends the call at once even when the client asked to be resumable',async t=>{
+  const f=await fixture(t,false,{resumable:true,graceMs:3000});
+  f.browser.send({type:'stop',reason:'PAGE_LEFT'});await f.first.next('voice.control','stop');
+  assert.equal(JSON.parse(f.row().binding_json).closeReason,'PAGE_LEFT');
+  f.browser.socket.close();await pause(40);
+  assert.equal(JSON.parse(f.row().binding_json).closeReason,'PAGE_LEFT');                // the later socket close does not overwrite it
 });

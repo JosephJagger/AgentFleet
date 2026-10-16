@@ -8,6 +8,8 @@ export interface ControlPlaneConfig {
   host: string;
   port: number;
   databasePath: string;
+  /** Test override for how long a global voice call survives a dropped browser signaling socket (default 30 s). */
+  panelResumeGraceMs?: number;
   webDistDir?: string;
   releaseManifestUrl?: string;
   runtimeReleaseDir?: string;

@@ -72,6 +72,17 @@ export class PanelVoiceService {
     const code=typeof reason==='string'&&['USER_HANGUP','PAGE_HIDDEN','PAGE_LEFT','USER_LOGOUT','OTHER_CALL_STARTED','CLIENT_START_FAILED','AUDIO_DISCONNECTED','AUDIO_FAILED','CONNECT_TIMEOUT','SIGNAL_INVALID','SIGNAL_FAILED','CLIENT_DISPOSED','SIGNAL_CLOSED','NATIVE_CLOSED','HOST_DISCONNECTED','HOST_RECOVERY_TIMEOUT','VOICE_PROCESS_CHANGED','OWNER_EXPIRED','SERVER_ERROR'].includes(reason)?reason:'SERVER_ERROR';
     this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.closeReason',?,'$.closeRequestedAt',?) WHERE voice_id=? AND json_extract(binding_json,'$.closeReason') IS NULL",code,nowIso(),id);
   }
+  /**
+   * Diagnostics for dropped browser signaling (close code, whether it was held and resumed, client network state).
+   * Kept as a short ring in the call's binding so a later look can tell a network drop from sleep or a restart.
+   */
+  recordSignalEvent(id:string,event:Record<string,unknown>) {
+    const call=this.get(id);if(!call)return;
+    let binding:Record<string,unknown>;try{binding=JSON.parse(call.binding_json);}catch{return;}
+    const events=Array.isArray(binding.signalEvents)?binding.signalEvents as unknown[]:[];
+    events.push({...event,at:nowIso()});
+    this.db.run("UPDATE panel_voice_calls SET binding_json=json_set(binding_json,'$.signalEvents',json(?)) WHERE voice_id=?",JSON.stringify(events.slice(-8)),id);
+  }
   closeOrphans() {this.db.run("UPDATE panel_voice_calls SET state='closed' WHERE state<>'closed'");}
   private own(principal:Principal,voiceId:string,allowStarting=false) {
     const call=this.get(voiceId);

@@ -43,7 +43,9 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const [preferenceState,setPreferenceState]=useState('');
   const [skipPreferences,setSkipPreferences]=useState(false);
   const [muted, setMuted] = useState(false);
-  useEffect(() => { voiceStatus.publish(popoverId, { phase, muted, kind: globalMachineId ? "global" : "session" }); }, [phase, muted, globalMachineId, popoverId]);
+  // True while the signaling socket is down but the call (audio) is being held and reconnected.
+  const [signalLost, setSignalLost] = useState(false);
+  useEffect(() => { voiceStatus.publish(popoverId, { phase, muted, kind: globalMachineId ? "global" : "session", degraded: signalLost }); }, [phase, muted, globalMachineId, popoverId, signalLost]);
   useEffect(() => () => voiceStatus.release(popoverId), [popoverId]);
   const [transcript,setTranscript] = useState<{id?:string;role:string;text:string;done:boolean}[]>([]);
   const transcriptArea=useRef<HTMLDivElement>(null);
@@ -53,7 +55,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const outputSupported=typeof HTMLMediaElement!=='undefined'&&'setSinkId' in HTMLMediaElement.prototype;
   useEffect(()=>{let current=true;const element=audio.current as (HTMLAudioElement&{setSinkId?:(id:string)=>Promise<void>})|null;if(element?.setSinkId)void element.setSinkId(devices.speaker).then(()=>{if(current)setDeviceError('');}).catch(()=>{if(current)setDeviceError(t('扬声器切换失败，请检查权限或选择系统默认'));});return()=>{current=false;};},[devices.speaker]);
   const generation = useRef(0);
-  const resources = useRef<{ collapsed?: boolean; recovering?: boolean; starting?: boolean; signalingReady?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
+  const resources = useRef<{ signalLost?: boolean; resumeTimer?: ReturnType<typeof setTimeout>; attempt?: WebSocket; collapsed?: boolean; recovering?: boolean; starting?: boolean; signalingReady?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
   const connectedCallback = useRef(onConnected);
   connectedCallback.current = onConnected;
   const activeCallback = useRef(onActiveChange);
@@ -68,7 +70,9 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     const owned = resources.current;
     resources.current = {};
     setMeterStream(null);
-    clearInterval(owned.heartbeat); clearTimeout(owned.timeout); clearTimeout(owned.disconnectTimeout);
+    clearInterval(owned.heartbeat); clearTimeout(owned.timeout); clearTimeout(owned.disconnectTimeout); clearTimeout(owned.resumeTimer);
+    try { owned.attempt?.close(); } catch { /* already closed */ }
+    setSignalLost(false);
     voiceSignal.release(popoverId);
     owned.stream?.getTracks().forEach(track => track.stop());
     owned.peer?.close();
@@ -155,47 +159,113 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       if (!current()) return;
       const lease = globalMachineId ? undefined : (await api.acquireLease(sessionId)).lease;
       if (!current()) return;
-      const socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/voice`);
+      const socketUrl = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/voice`;
+      const socket = new WebSocket(socketUrl);
       resources.current.socket = socket;
       let offerSent = false;let userTranscriptSeq=0;const transcriptSequences=new Map<string,number>();
-      socket.onmessage = event => {
-        if (!current()) return;
-        void (async () => {
-          const value = JSON.parse(String(event.data)) as { reason?:string;requestId?:string;utteranceId?:string;transcriptSeq?:number;snapshot?:boolean;status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
-          if (value.type === "ready" && !offerSent) {
-            offerSent = true;
-            socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",skipPreferences,machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", skipPreferences, logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
-            resources.current.signalingReady = true;
-            resources.current.heartbeat = setInterval(() => {
-              if (!current() || socket.readyState !== WebSocket.OPEN) return;
-              socket.send(JSON.stringify({ type: "heartbeat" }));
-            }, 15_000);
-          } else if (value.type === "answer" && value.sdp) await peer.setRemoteDescription({ type: "answer", sdp: value.sdp });
-          else if(globalMachineId && value.type==="recovering") { resources.current.recovering=true; welcomeNextAt.current=0; setPhase("recovering"); }
-          else if(globalMachineId && value.type==="recovered") { resources.current.recovering=false; setPhase(peer.connectionState==="connected"?"connected":"connecting"); }
-          else if(value.type==="transcript" && ["user","assistant"].includes(String(value.role)) && typeof value.text==="string") {
-            if(value.utteranceId&&typeof value.transcriptSeq==='number'){if((transcriptSequences.get(value.utteranceId)??0)>=value.transcriptSeq)return;transcriptSequences.set(value.utteranceId,value.transcriptSeq);}
-            if(!value.utteranceId&&value.role==='user'&&typeof value.transcriptSeq==='number'){if(value.transcriptSeq<=userTranscriptSeq)return;userTranscriptSeq=value.transcriptSeq;}
-            setTranscript(previous=>{
-              const last=previous.at(-1);const role=value.role!;
-              const text=value.text!.slice(0,6000);
-              if(value.utteranceId){const item={id:value.utteranceId,role,text,done:Boolean(value.final)};return previous.some(v=>v.id===item.id)?previous.map(v=>v.id===item.id?item:v):[...previous.slice(-5),item];}
-              if(last?.role===role && !last.done) return [...previous.slice(0,-1),{role,text:value.final || value.snapshot ? text : (last.text+text).slice(-6000),done:Boolean(value.final)}];
-              return [...previous.slice(-5),{role,text,done:Boolean(value.final)}];
-            });
-          }
-          else if (!globalMachineId && value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
-          else if(value.type==='live_welcome'&&typeof value.requestId==='string'&&value.requestId===welcomeReceipt.current?.requestId){welcomeReceipt.current={requestId:value.requestId,status:value.status??'unknown',reason:value.reason};}
-          else if(value.type==='report_unavailable')setMessage(t('结果播报未确认，请在待办与结果记录中查看；通话继续'));
-          else if(value.type==="task_status_unavailable") setTaskPhase("unknown");
-          else if(value.type==="panel_task") { const tasks=Array.isArray(value.tasks)?value.tasks:value.task?[value.task]:[]; onPanelTasks?.(tasks); onPanelTask?.(value.task); if(!value.task){setTaskPhase("idle");return;} setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
-          else if(value.type==="preferences")setPreferenceState(value.status??"unavailable");
-          else if (value.type === "error") fail(value.message ?? t("原生实时语音暂不可用"), "SERVER_ERROR");
-          else if (value.type === "closed") { cleanup.current("NATIVE_CLOSED"); setPhase("idle"); }
-        })().catch(() => fail(t("原生实时语音暂不可用"), "SIGNAL_INVALID"));
+      // Global calls ask the server to hold the call if the signaling socket drops (audio runs over WebRTC and is unaffected).
+      let resume: { voiceId: string; token: string; graceMs: number } | undefined;
+      let resumeDiag: Record<string, unknown> = {};
+      let attemptSocket: WebSocket | undefined;
+      let settleAttempt: ((resumed: boolean) => void) | undefined;
+      let lastMessageAt = Date.now();
+      const startedAt = Date.now();
+      const startHeartbeat = (target: WebSocket) => {
+        clearInterval(resources.current.heartbeat);
+        resources.current.heartbeat = setInterval(() => {
+          if (!current() || target.readyState !== WebSocket.OPEN) return;
+          target.send(JSON.stringify({ type: "heartbeat" }));
+        }, 15_000);
       };
-      socket.onerror = () => fail(t("语音信令连接失败，麦克风已关闭，请刷新面板后重试"), "SIGNAL_FAILED");
-      socket.onclose = () => fail(t("语音连接已结束，麦克风已关闭"), "SIGNAL_CLOSED");
+      const finishResume = (target: WebSocket) => {
+        resources.current.socket = target; resources.current.signalLost = false; setSignalLost(false);
+        lastMessageAt = Date.now(); startHeartbeat(target);
+      };
+      const attemptResume = () => new Promise<boolean>(resolve => {
+        const target = new WebSocket(socketUrl);
+        attemptSocket = target; resources.current.attempt = target;
+        const timer = setTimeout(() => settle(false), 6_000);
+        function settle(resumed: boolean) {
+          clearTimeout(timer); settleAttempt = undefined;
+          if (!resumed) { if (attemptSocket === target) { attemptSocket = undefined; resources.current.attempt = undefined; } try { target.close(); } catch { /* already closed */ } }
+          resolve(resumed);
+        }
+        settleAttempt = settle;
+        wire(target, "resume");
+      });
+      const runResume = async () => {
+        // Stay inside the server's hold window; retry quickly first, then back off.
+        const deadline = Date.now() + Math.max(5_000, (resume?.graceMs ?? 30_000) - 6_000);
+        const delays = [0, 500, 1_000, 2_000, 3_000, 4_000];
+        for (let i = 0; current() && Date.now() < deadline; i++) {
+          await new Promise<void>(done => { resources.current.resumeTimer = setTimeout(done, delays[Math.min(i, delays.length - 1)]); });
+          if (!current()) return;
+          resumeDiag = { ...resumeDiag, attempts: i + 1 };
+          if (await attemptResume() || !current()) return;
+        }
+        if (current()) fail(t("语音连接已结束，麦克风已关闭"), "SIGNAL_CLOSED");
+      };
+      const signalDropped = (event?: CloseEvent) => {
+        const connection = (navigator as Navigator & { connection?: { effectiveType?: string; rtt?: number; downlink?: number } }).connection;
+        const usable = peer.connectionState !== "failed" && peer.connectionState !== "closed";
+        if (!current() || resources.current.signalLost) return;
+        if (!resume || !usable) { fail(t("语音连接已结束，麦克风已关闭"), "SIGNAL_CLOSED"); return; }
+        resources.current.signalLost = true; setSignalLost(true);
+        clearInterval(resources.current.heartbeat);
+        // What a later look needs to tell a network drop from sleep or a throttled background tab.
+        resumeDiag = { code: event?.code, wasClean: event?.wasClean, reason: event?.reason, online: navigator.onLine, visibility: document.visibilityState, net: connection?.effectiveType, rtt: connection?.rtt, downlink: connection?.downlink, lastMessageMs: Date.now() - lastMessageAt, callAgeSec: Math.round((Date.now() - startedAt) / 1000), attempts: 0 };
+        void runResume();
+      };
+      function wire(socket: WebSocket, mode: "start" | "resume") {
+        socket.onmessage = event => {
+          if (!current()) return;
+          lastMessageAt = Date.now();
+          void (async () => {
+            const value = JSON.parse(String(event.data)) as { token?:string;graceMs?:number;voiceId?:string;reason?:string;requestId?:string;utteranceId?:string;transcriptSeq?:number;snapshot?:boolean;status?:string;type?: string; sdp?: string; message?: string; role?: string; text?: string; final?: boolean; phase?: string; task?:PanelVoiceTask; tasks?:PanelVoiceTask[] };
+            if (value.type === "ready" && (mode === "resume" || !offerSent)) {
+              if (mode === "resume") { socket.send(JSON.stringify({ type: "panel.resume", voiceId: resume?.voiceId, resumeToken: resume?.token, diag: resumeDiag })); return; }
+              offerSent = true;
+              socket.send(JSON.stringify(globalMachineId ? {type:"panel.start",skipPreferences,resume:true,machineId:globalMachineId,sdp:peer.localDescription?.sdp} : { type: "start", skipPreferences, logicalSessionId: sessionId, leaseId: lease!.id, controlHeartbeat: true, sdp: peer.localDescription?.sdp }));
+              resources.current.signalingReady = true;
+              startHeartbeat(socket);
+            } else if (globalMachineId && value.type === "resume.token" && typeof value.token === "string" && typeof value.voiceId === "string") resume = { voiceId: value.voiceId, token: value.token, graceMs: typeof value.graceMs === "number" ? value.graceMs : 30_000 };
+            else if (globalMachineId && value.type === "resumed" && resume && socket === attemptSocket) {
+              // The server accepted the new socket and replays what was missed after this message.
+              if (typeof value.token === "string") resume.token = value.token;
+              attemptSocket = undefined; resources.current.attempt = undefined;
+              finishResume(socket); settleAttempt?.(true);
+            } else if (value.type === "answer" && value.sdp) await peer.setRemoteDescription({ type: "answer", sdp: value.sdp });
+            else if(globalMachineId && value.type==="recovering") { resources.current.recovering=true; welcomeNextAt.current=0; setPhase("recovering"); }
+            else if(globalMachineId && value.type==="recovered") { resources.current.recovering=false; setPhase(peer.connectionState==="connected"?"connected":"connecting"); }
+            else if(value.type==="transcript" && ["user","assistant"].includes(String(value.role)) && typeof value.text==="string") {
+              if(value.utteranceId&&typeof value.transcriptSeq==='number'){if((transcriptSequences.get(value.utteranceId)??0)>=value.transcriptSeq)return;transcriptSequences.set(value.utteranceId,value.transcriptSeq);}
+              if(!value.utteranceId&&value.role==='user'&&typeof value.transcriptSeq==='number'){if(value.transcriptSeq<=userTranscriptSeq)return;userTranscriptSeq=value.transcriptSeq;}
+              setTranscript(previous=>{
+                const last=previous.at(-1);const role=value.role!;
+                const text=value.text!.slice(0,6000);
+                if(value.utteranceId){const item={id:value.utteranceId,role,text,done:Boolean(value.final)};return previous.some(v=>v.id===item.id)?previous.map(v=>v.id===item.id?item:v):[...previous.slice(-5),item];}
+                if(last?.role===role && !last.done) return [...previous.slice(0,-1),{role,text:value.final || value.snapshot ? text : (last.text+text).slice(-6000),done:Boolean(value.final)}];
+                return [...previous.slice(-5),{role,text,done:Boolean(value.final)}];
+              });
+            }
+            else if (!globalMachineId && value.type === "task" && ["delegated", "running", "completed", "failed"].includes(String(value.phase))) setTaskPhase(value.phase!);
+            else if(value.type==='live_welcome'&&typeof value.requestId==='string'&&value.requestId===welcomeReceipt.current?.requestId){welcomeReceipt.current={requestId:value.requestId,status:value.status??'unknown',reason:value.reason};}
+            else if(value.type==='report_unavailable')setMessage(t('结果播报未确认，请在待办与结果记录中查看；通话继续'));
+            else if(value.type==="task_status_unavailable") setTaskPhase("unknown");
+            else if(value.type==="panel_task") { const tasks=Array.isArray(value.tasks)?value.tasks:value.task?[value.task]:[]; onPanelTasks?.(tasks); onPanelTask?.(value.task); if(!value.task){setTaskPhase("idle");return;} setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
+            else if(value.type==="preferences")setPreferenceState(value.status??"unavailable");
+            else if (value.type === "error") fail(value.message ?? t("原生实时语音暂不可用"), mode === "resume" ? "SIGNAL_CLOSED" : "SERVER_ERROR");
+            else if (value.type === "closed") { cleanup.current("NATIVE_CLOSED"); setPhase("idle"); }
+          })().catch(() => fail(t("原生实时语音暂不可用"), "SIGNAL_INVALID"));
+        };
+        socket.onerror = () => { if (mode === "start" && !resume) fail(t("语音信令连接失败，麦克风已关闭，请刷新面板后重试"), "SIGNAL_FAILED"); };
+        socket.onclose = event => {
+          if (socket === attemptSocket) { settleAttempt?.(false); return; }
+          if (socket !== resources.current.socket) return; // an old socket that a resumed one superseded
+          signalDropped(event);
+        };
+      }
+      wire(socket, "start");
     } catch (error) {
       const denied = error instanceof DOMException && ["NotAllowedError", "SecurityError"].includes(error.name);
       fail(denied ? t("请允许麦克风访问后重试") : error instanceof Error ? error.message : t("原生实时语音暂不可用"));
@@ -216,7 +286,14 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     },
   };
   const active = phase === "connecting" || phase === "connected" || phase === "recovering";
-  const status = active ? t(phase === "recovering" ? "正在恢复主机连接，核验原通话中（最多 60 秒）" : phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
+  const status = signalLost ? t("网络波动，正在自动重连信令（通话音频保持）…") : active ? t(phase === "recovering" ? "正在恢复主机连接，核验原通话中（最多 60 秒）" : phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
+  // Refreshing or closing the page ends the call, so ask before an accidental reload or close (no text is customisable in browsers).
+  useEffect(() => {
+    if (!active) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [active]);
   const callPanel = expanded && <div ref={panel} style={dragging.style} id={popoverId} className={`native-voice__popover${globalMachineId ? " native-voice__popover--global" : ""}`} role="region" aria-label={t("原生实时语音")}>
     <div className="native-voice__head voice-drag-handle" {...dragging.handle}><strong>{t(globalMachineId ? "面板语音总控" : "语音通话")}</strong><button type="button" className="native-voice__close" aria-label={t("收起语音控制")} onClick={() => { setExpanded(false); trigger.current?.focus(); }}><X size={16} /></button></div>
     <div className={`native-voice__orb${active && !muted ? " native-voice__orb--live" : ""}`} aria-hidden="true">{(phase === "connecting" || phase === "recovering") && <LoaderCircle className="spin" size={24} />}</div>

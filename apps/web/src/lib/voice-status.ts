@@ -6,8 +6,8 @@
 import { useSyncExternalStore } from "react";
 
 export type VoicePhase = "idle" | "connecting" | "connected" | "recovering" | "error";
-export type VoiceStatus = { phase: VoicePhase; muted: boolean; kind: "global" | "session"; connectedSeq: number };
-const IDLE: VoiceStatus = { phase: "idle", muted: false, kind: "global", connectedSeq: 0 };
+export type VoiceStatus = { phase: VoicePhase; muted: boolean; kind: "global" | "session"; connectedSeq: number; /** The call is held while its signaling socket reconnects. */ degraded: boolean };
+const IDLE: VoiceStatus = { phase: "idle", muted: false, kind: "global", connectedSeq: 0, degraded: false };
 
 let state = IDLE, owner: unknown;
 const listeners = new Set<() => void>();
@@ -17,11 +17,11 @@ export const voiceStatus = {
   get: () => state,
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   /** `connectedSeq` increases only on connecting → connected, never on recovery, so it marks "a call just connected". */
-  publish(by: unknown, next: { phase: VoicePhase; muted: boolean; kind: "global" | "session" }) {
+  publish(by: unknown, next: { phase: VoicePhase; muted: boolean; kind: "global" | "session"; degraded?: boolean }) {
     if (next.phase === "idle") { if (owner === by) this.release(by); return; }
     const previous = owner === by ? state.phase : "idle";
     owner = by;
-    state = { ...next, connectedSeq: state.connectedSeq + (next.phase === "connected" && previous === "connecting" ? 1 : 0) };
+    state = { ...next, degraded: next.degraded === true, connectedSeq: state.connectedSeq + (next.phase === "connected" && previous === "connecting" ? 1 : 0) };
     emit();
   },
   release(by: unknown) {

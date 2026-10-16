@@ -39,6 +39,7 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import cookie from "@fastify/cookie";
 import websocket from "@fastify/websocket";
 import { WebSocket, type RawData } from "ws";
+import { PanelChannel, PANEL_RESUME_GRACE_MS, cleanClientDiagnostics } from "./panel-signal.js";
 import type { ControlPlaneConfig } from "./config.js";
 import { loadConfig } from "./config.js";
 import { ControlPlaneDatabase } from "./db.js";
@@ -193,7 +194,8 @@ function userAgent(request: FastifyRequest): string {
   return typeof value === "string" ? value.slice(0, 1000) : "unknown";
 }
 
-function sendJson(socket: WebSocket, message: unknown): boolean {
+type JsonSocket = { readyState: number; send(data: string): void };
+function sendJson(socket: JsonSocket, message: unknown): boolean {
   if (socket.readyState !== WebSocket.OPEN) return false;
   try {
     socket.send(JSON.stringify(message));
@@ -264,7 +266,8 @@ export async function buildControlPlane(
   panelVoice.closeOrphans();
   const liveWelcomes=new Map<string,LiveWelcomeGate>();
   const liveChatReadOnly=new Map<string,number>();
-  const panelOwners=new Map<string,{socket:WebSocket;token:string;lastSeen:number;lastPing:number}>();
+  const panelOwners=new Map<string,{socket:PanelChannel;token:string;lastSeen:number;lastPing:number}>();
+  const resumeGraceMs=config.panelResumeGraceMs??PANEL_RESUME_GRACE_MS;
   const sendPanel=(voiceId:string,action:string,extra:Record<string,unknown>={})=>{
     const call=panelVoice.get(voiceId);if(!call||call.state==='closed'||panelRecovery.has(voiceId) && !['stop','resume'].includes(action))return false;
     const agent=agents.get(call.machine_id);const binding=JSON.parse(call.binding_json);
@@ -286,10 +289,10 @@ export async function buildControlPlane(
     preferenceCalls.set(id,{userId:p.userId,workspaceId:p.workspaceId,initialReset:snapshot.resetRevision,disabled,hash,pending:requestId,received:'',needsReconnect:false,rules:new Set(snapshot.rules.map(r=>r.id))});
     return {preferenceText:snapshot.text,preferenceRequestId:requestId};
   }
-  function preferenceStatus(id:string,socket:WebSocket) {
+  function preferenceStatus(id:string,socket:JsonSocket) {
     const state=preferenceCalls.get(id);if(state)sendJson(socket,{type:'preferences',status:state.disabled?'disabled':state.needsReconnect?'reconnect_required':state.received===state.pending?'loaded':'pending'});
   }
-  function refreshPreferences(id:string,p:Principal,socket:WebSocket) {
+  function refreshPreferences(id:string,p:Principal,socket:JsonSocket) {
     const state=preferenceCalls.get(id);if(!state||state.userId!==p.userId||state.workspaceId!==p.workspaceId)return;
     if(state.disabled){preferenceStatus(id,socket);return;}
     try {
@@ -339,7 +342,20 @@ export async function buildControlPlane(
     // A missing socket is not evidence that the retained native writer exited.
     panelVoice.state(id,sent||JSON.parse(call.binding_json).instanceId?'closing':'closed');
     if(!sent&&recoverPanel(id))probePanel(id);
-    panelOwners.delete(id);panelReports.delete(id);panelFailedReports.delete(id);preferenceCalls.delete(id);
+    panelOwners.get(id)?.socket.dispose();panelOwners.delete(id);panelReports.delete(id);panelFailedReports.delete(id);preferenceCalls.delete(id);
+  };
+  // The browser's signaling socket dropped: keep a resumable call alive for a short grace period instead of ending it.
+  const detachPanel=(id:string,code:number)=>{
+    const owner=panelOwners.get(id),call=panelVoice.get(id);
+    if(!owner||!call||!['starting','active'].includes(call.state))return false;
+    const ageSec=Math.round((Date.now()-Date.parse(call.created_at))/1000);
+    const held=owner.socket.detach(resumeGraceMs,()=>{
+      panelVoice.recordSignalEvent(id,{kind:'grace_expired',queued:owner.socket.queued});
+      panelVoice.recordCloseReason(id,'SIGNAL_CLOSED');stopPanel(id);
+    });
+    panelVoice.recordSignalEvent(id,{kind:'drop',code,ageSec,state:call.state,resumable:owner.socket.resumable,held,hostRecovering:panelRecovery.has(id)});
+    if(held)app.log.info({voiceId:id,machineId:call.machine_id,code},'Panel voice browser signaling dropped; holding the call for resume');
+    return held;
   };
   const sweepPanel=()=>{
     voiceTranscripts.prune();
@@ -348,6 +364,7 @@ export async function buildControlPlane(
       let closeReason="SERVER_ERROR";
       try {
         if(call.state==='closing'){if(!sendPanel(call.voice_id,'stop')){if(recoverPanel(call.voice_id))probePanel(call.voice_id);else panelVoice.state(call.voice_id,'closed');}continue;}
+        if(owner&&owner.socket.detachedAt!==undefined&&Date.now()-owner.socket.detachedAt>resumeGraceMs+5000){closeReason='SIGNAL_CLOSED';throw new Error('Signaling lost');}
         if(!owner||Date.now()-owner.lastSeen>120000){closeReason='OWNER_EXPIRED';throw new Error('Call disconnected');}
         const principal=auth.authenticateToken(owner.token);
         if(principal.clientSessionId!==call.owner_id)throw new Error('Owner changed');
@@ -1623,11 +1640,26 @@ export async function buildControlPlane(
           const voice=new VoicePreferencesService(db).forStart(principal,String(machine.agentVersion));
           const preferenceSnapshot=preferenceStart(principal,String(machine.agentVersion),value.skipPreferences===true);
           const call=panelVoice.start(principal,machineId,{producerEpoch:agent.producerEpoch,appServerEpoch:agent.appServerEpoch,transportGeneration:agent.identity.transportGeneration});
-          voiceId=call.voice_id;panelOwners.set(voiceId,{socket,token,lastSeen:Date.now(),lastPing:Date.now()});
+          voiceId=call.voice_id;const channel=new PanelChannel(socket,value.resume===true);panelOwners.set(voiceId,{socket:channel,token,lastSeen:Date.now(),lastPing:Date.now()});
+          if(channel.resumable)sendJson(socket,{type:'resume.token',voiceId,token:channel.currentToken(),graceMs:resumeGraceMs});
           liveWelcomes.set(voiceId,new LiveWelcomeGate());
           invariant(sendPanel(voiceId,'start',{sdp:value.sdp,voice,...trackPreferences(voiceId,principal,preferenceSnapshot,String(machine.agentVersion),value.skipPreferences===true)}),409,"VOICE_OFFLINE","主机连接中断");
+        } else if(value.type==="panel.resume") {
+          limiter.check(`panel-resume:${principal.clientSessionId}`,30,60000);
+          invariant(!voiceId,400,"VOICE_INVALID","无效的总控恢复请求");
+          const id=requiredString(value.voiceId,"voiceId",200);
+          const call=panelVoice.get(id),owner=panelOwners.get(id);
+          // Only the browser session that owns the call, holding the current secret token, may take it back.
+          invariant(id.startsWith('pvoice_')&&call&&owner&&['starting','active'].includes(call.state)&&call.workspace_id===principal.workspaceId&&call.user_id===principal.userId&&call.owner_id===principal.clientSessionId&&owner.socket.resumable&&owner.socket.matches(value.resumeToken),403,"VOICE_RESUME_REJECTED","总控通话已结束，无法恢复");
+          const attached=owner.socket.attach(socket);
+          owner.token=token;owner.lastSeen=Date.now();voiceId=id;
+          sendJson(socket,{type:'resumed',voiceId:id,token:owner.socket.currentToken(),graceMs:resumeGraceMs});
+          const replayed=attached.flush();
+          if(panelRecovery.has(id))sendJson(socket,{type:'recovering'});
+          panelVoice.recordSignalEvent(id,{kind:'resumed',gapMs:attached.gapMs,replayed,client:cleanClientDiagnostics(value.diag)});
+          app.log.info({voiceId:id,machineId:call.machine_id,gapMs:attached.gapMs,replayed},'Panel voice browser signaling resumed');
         } else if(voiceId?.startsWith('pvoice_')) {
-          const owner=panelOwners.get(voiceId);invariant(owner?.socket===socket,403,"VOICE_NOT_OWNER","总控通话已结束");
+          const owner=panelOwners.get(voiceId);invariant(owner&&owner.socket.isCurrent(socket),403,"VOICE_NOT_OWNER","总控通话已结束");
           if(value.type==='heartbeat'){owner.lastSeen=Date.now();sendPanel(voiceId,'heartbeat');refreshPreferences(voiceId,principal,socket);sendJson(socket,{type:'heartbeat'});}
           else if(value.type==='stop'){panelVoice.recordCloseReason(voiceId,value.reason);stopPanel(voiceId);}
           else if(value.type==='live.welcome'){
@@ -1681,7 +1713,14 @@ export async function buildControlPlane(
       if (!voiceId || !voiceOwners.get(voiceId)?.controlHeartbeat) return;
       try { refreshVoiceControl(voiceId); } catch { stopVoice(voiceId); }
     });
-    socket.on("close",()=>{if(voiceId)preferenceCalls.delete(voiceId);if(voiceId?.startsWith("pvoice_")){panelVoice.recordCloseReason(voiceId,"SIGNAL_CLOSED");stopPanel(voiceId);return;}if(voiceId) { nativeVoice.recordCloseReason(voiceId,"SIGNAL_CLOSED"); voiceOwners.delete(voiceId);stopVoice(voiceId); }});
+    socket.on("close",(code:number)=>{if(voiceId?.startsWith("pvoice_")){
+      const owner=panelOwners.get(voiceId);
+      // A socket that a resumed one superseded (or that belongs to an ended call) must not end the call.
+      if(owner&&!owner.socket.isCurrent(socket))return;
+      preferenceCalls.delete(voiceId);
+      if(owner&&detachPanel(voiceId,code))return;
+      panelVoice.recordCloseReason(voiceId,"SIGNAL_CLOSED");stopPanel(voiceId);return;}
+    if(voiceId)preferenceCalls.delete(voiceId);if(voiceId) { nativeVoice.recordCloseReason(voiceId,"SIGNAL_CLOSED"); voiceOwners.delete(voiceId);stopVoice(voiceId); }});
   });
 
   app.get(
@@ -1964,7 +2003,7 @@ export async function buildControlPlane(
                 if(message.recoveryState==='absent') {
                   panelVoice.recordCloseReason(call.voice_id,'VOICE_PROCESS_CHANGED');panelVoice.state(call.voice_id,'closed');
                   if(owner){sendJson(owner.socket,{type:'error',message:'原语音进程已结束，请重新开始通话；已派发任务继续执行'});owner.socket.close();}
-                  panelOwners.delete(call.voice_id);panelReports.delete(call.voice_id);preferenceCalls.delete(call.voice_id);panelRecovery.delete(call.voice_id);return;
+                  panelOwners.get(call.voice_id)?.socket.dispose();panelOwners.delete(call.voice_id);panelReports.delete(call.voice_id);preferenceCalls.delete(call.voice_id);panelRecovery.delete(call.voice_id);return;
                 }
                 if(message.recoveryState!=='present'||message.instanceId!==binding.instanceId)return;
                 const sameEpoch=binding.producerEpoch===message.producerEpoch&&binding.appServerEpoch===message.appServerEpoch;
@@ -1999,7 +2038,7 @@ export async function buildControlPlane(
               if(message.event==='error')panelVoice.recordFailure(call.voice_id,message.message);
               if(call.state==='closed')return;
               const owner=panelOwners.get(call.voice_id);
-              if(message.event==='stopped'){liveWelcomes.delete(call.voice_id);liveChatReadOnly.delete(call.voice_id);panelRecovery.delete(call.voice_id);panelVoice.state(call.voice_id,'closed');if(owner)sendJson(owner.socket,{type:'closed'});panelOwners.delete(call.voice_id);panelReports.delete(call.voice_id);return;}
+              if(message.event==='stopped'){liveWelcomes.delete(call.voice_id);liveChatReadOnly.delete(call.voice_id);panelRecovery.delete(call.voice_id);panelVoice.state(call.voice_id,'closed');if(owner)sendJson(owner.socket,{type:'closed'});panelOwners.get(call.voice_id)?.socket.dispose();panelOwners.delete(call.voice_id);panelReports.delete(call.voice_id);return;}
               if(message.event==='closed'){panelVoice.recordCloseReason(call.voice_id,'NATIVE_CLOSED');if(owner)sendJson(owner.socket,{type:'closed'});stopPanel(call.voice_id);return;}
               if(!owner){stopPanel(call.voice_id);return;}
               const principal=auth.authenticateToken(owner.token);

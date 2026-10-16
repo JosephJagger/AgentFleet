@@ -56,10 +56,10 @@ const EFFECT_LABEL: Record<EffectMode, string> = {
 };
 type Speaker = "none" | "mic" | "ai";
 
-function voiceLine(status: { phase: string; muted: boolean; kind: string }, speaker: Speaker) {
+function voiceLine(status: { phase: string; muted: boolean; kind: string; degraded?: boolean }, speaker: Speaker) {
   const who = t(status.kind === "global" ? "语音总控" : "会话语音");
   const state = status.phase === "connecting" ? t("连接中…") : status.phase === "recovering" ? t("恢复连接中…") : t("已连接");
-  const extra = status.phase !== "connected" ? "" : status.muted ? ` · ${t("已静音")}` : ` · ${t(speaker === "mic" ? "你在说话" : speaker === "ai" ? "AI 在说话" : "聆听中")}`;
+  const extra = status.degraded ? ` · ${t("网络波动，重连中…")}` : status.phase !== "connected" ? "" : status.muted ? ` · ${t("已静音")}` : ` · ${t(speaker === "mic" ? "你在说话" : speaker === "ai" ? "AI 在说话" : "聆听中")}`;
   return `${who} ${state}${extra}`;
 }
 
