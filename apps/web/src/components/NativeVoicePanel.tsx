@@ -1,5 +1,5 @@
 import { voiceSignal } from "../lib/voice-signal";
-import { voiceStatus } from "../lib/voice-status";
+import { MAX_AUTO_REDIALS, voiceStatus } from "../lib/voice-status";
 import {saveReloadConnection,clearReloadConnection} from '../lib/reload-connections';
 import {displayName} from '../lib/display-name';
 import {DEFAULT_LIVE_WELCOME,normalizeWelcomeText,LIVE_WELCOME_INTERVAL_MS,welcomeEligible,type WelcomeBridge} from '../lib/live-interactions';
@@ -15,6 +15,12 @@ import { t } from "../i18n";
 export interface PanelVoiceTask { jobId:string;sessionId:string;title:string;project:string;host:string;provider?:'codex'|'claude';managed?:boolean;queuePosition?:number|null;state:string;result:string;link:string;progress?:SessionProgress;historyLimited?:boolean;executionStarted?:boolean|null;error?:{code:string;message:string}|null; }
 type Phase = "idle" | "connecting" | "connected" | "recovering" | "error";
 /** Audio goes directly over WebRTC. This socket carries authenticated signaling only. */
+/** A connected global call that ends unexpectedly is re-dialled automatically, at most twice in a row. */
+const REDIAL_DELAYS_MS = [2_000, 6_000];
+/** A re-dialled call must stay up this long before it earns a fresh redial budget. */
+const REDIAL_STABLE_MS = 60_000;
+const UNEXPECTED_END_CODES = new Set(["SIGNAL_CLOSED", "AUDIO_DISCONNECTED", "AUDIO_FAILED", "SERVER_ERROR", "NATIVE_CLOSED"]);
+
 export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveChange, globalMachineId, onPanelTask, onPanelTasks, welcomeRef, reloadRecovery=false, menuEntry=false, onConnected }: { onConnected?:()=>void; menuEntry?:boolean; reloadRecovery?:boolean; welcomeRef?:RefObject<WelcomeBridge|null>; globalMachineId?: string; onPanelTasks?: (tasks: PanelVoiceTask[]) => void; onPanelTask?: (task: PanelVoiceTask | undefined) => void; sessionId: string; canStart: boolean; activeTurnId?: string | null; onActiveChange: (active: boolean) => void }) {
   const welcomeNextAt=useRef(0);
   const welcomeSentAt=useRef(0);
@@ -45,7 +51,12 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const [muted, setMuted] = useState(false);
   // True while the signaling socket is down but the call (audio) is being held and reconnected.
   const [signalLost, setSignalLost] = useState(false);
-  useEffect(() => { voiceStatus.publish(popoverId, { phase, muted, kind: globalMachineId ? "global" : "session", degraded: signalLost }); }, [phase, muted, globalMachineId, popoverId, signalLost]);
+  // 0 normally; 1..MAX_AUTO_REDIALS while an unexpectedly ended call is being re-dialled.
+  const [redial, setRedial] = useState(0);
+  const redialTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const redialCount = useRef(0);
+  const redialHold = useRef(false);
+  useEffect(() => { voiceStatus.publish(popoverId, { phase, muted, kind: globalMachineId ? "global" : "session", degraded: signalLost, redial }); }, [phase, muted, globalMachineId, popoverId, signalLost, redial]);
   useEffect(() => () => voiceStatus.release(popoverId), [popoverId]);
   const [transcript,setTranscript] = useState<{id?:string;role:string;text:string;done:boolean}[]>([]);
   const transcriptArea=useRef<HTMLDivElement>(null);
@@ -55,7 +66,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   const outputSupported=typeof HTMLMediaElement!=='undefined'&&'setSinkId' in HTMLMediaElement.prototype;
   useEffect(()=>{let current=true;const element=audio.current as (HTMLAudioElement&{setSinkId?:(id:string)=>Promise<void>})|null;if(element?.setSinkId)void element.setSinkId(devices.speaker).then(()=>{if(current)setDeviceError('');}).catch(()=>{if(current)setDeviceError(t('扬声器切换失败，请检查权限或选择系统默认'));});return()=>{current=false;};},[devices.speaker]);
   const generation = useRef(0);
-  const resources = useRef<{ signalLost?: boolean; resumeTimer?: ReturnType<typeof setTimeout>; attempt?: WebSocket; collapsed?: boolean; recovering?: boolean; starting?: boolean; signalingReady?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
+  const resources = useRef<{ connectedAt?: number; auto?: boolean; signalLost?: boolean; resumeTimer?: ReturnType<typeof setTimeout>; attempt?: WebSocket; collapsed?: boolean; recovering?: boolean; starting?: boolean; signalingReady?: boolean; stream?: MediaStream; peer?: RTCPeerConnection; socket?: WebSocket; heartbeat?: ReturnType<typeof setInterval>; disconnectTimeout?: ReturnType<typeof setTimeout>; timeout?: ReturnType<typeof setTimeout> }>({});
   const connectedCallback = useRef(onConnected);
   connectedCallback.current = onConnected;
   const activeCallback = useRef(onActiveChange);
@@ -67,6 +78,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     welcomeReceipt.current=undefined;
     welcomeNextAt.current=0;
     generation.current++;
+    if (!redialHold.current) { clearTimeout(redialTimer.current); redialTimer.current = undefined; setRedial(0); }
     const owned = resources.current;
     resources.current = {};
     setMeterStream(null);
@@ -84,7 +96,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
   useEffect(() => {
     const leavePage = () => { if (resources.current.starting || resources.current.peer || resources.current.stream) { const resume=globalMachineId&&resources.current.signalingReady?globalMachineId:undefined;cleanup.current("PAGE_LEFT");if(resume)saveReloadConnection('voice',resume);setPhase("idle"); } };
     const logout = () => { clearReloadConnection('voice');cleanup.current("USER_LOGOUT"); setPhase("idle"); };
-    const otherCall = (event:Event) => {if((event as CustomEvent).detail!==popoverId&&(resources.current.starting||resources.current.peer)){cleanup.current("OTHER_CALL_STARTED");setPhase("idle");}};
+    const otherCall = (event:Event) => {if((event as CustomEvent).detail!==popoverId&&(resources.current.starting||resources.current.peer||redialTimer.current)){cleanup.current("OTHER_CALL_STARTED");setPhase("idle");}};
     // Hidden is not destroyed: keep microphone, playback, WebRTC and signaling.
     // The server's protocol ping/pong already tolerates throttled UI timers.
     const visibility = () => {
@@ -109,14 +121,37 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     };
   }, [sessionId]);
 
-  async function start() {
+  /**
+   * After an unexpected end, schedule one automatic redial if the budget allows. Returns false when the caller
+   * should surface the end to the user instead. Only global calls re-dial, never after a user action.
+   */
+  function scheduleRedial(): boolean {
+    if (!globalMachineId || redialCount.current >= MAX_AUTO_REDIALS) return false;
+    const attempt = ++redialCount.current;
+    setRedial(attempt); setPhase("connecting"); setMessage(""); activeCallback.current(true);
+    redialTimer.current = setTimeout(() => { redialTimer.current = undefined; void start(true); }, REDIAL_DELAYS_MS[attempt - 1] ?? 6_000);
+    return true;
+  }
+  async function start(auto = false) {
     if(globalMachineId)clearReloadConnection('voice');
     window.dispatchEvent(new CustomEvent("agentfleet:voice-start",{detail:popoverId}));
+    redialHold.current = auto; // keep the "re-dialling" state while the new attempt replaces the old call
     cleanup.current();
+    redialHold.current = false;
     const attempt = generation.current;
     const current = () => attempt === generation.current;
-    const fail = (reason: string, code = "CLIENT_START_FAILED") => { if (current()) { cleanup.current(code); setMessage(reason); setPhase("error"); setExpanded(true); } };
-    setExpanded(true); setPhase("connecting"); setMessage(""); setMuted(false); setPlayBlocked(false); setTranscript([]); setTaskPhase("idle"); onPanelTask?.(undefined); onPanelTasks?.([]);
+    const fail = (reason: string, code = "CLIENT_START_FAILED", final = false) => {
+      if (!current()) return;
+      const owned = resources.current; // read before cleanup resets it
+      if (owned.connectedAt && Date.now() - owned.connectedAt >= REDIAL_STABLE_MS) redialCount.current = 0;
+      // Worth re-dialling: a call that had connected and then ended for a non-user reason, or a failed re-dial attempt.
+      const eligible = !final && Boolean(globalMachineId) && ((Boolean(owned.connectedAt) && UNEXPECTED_END_CODES.has(code)) || owned.auto === true);
+      cleanup.current(code);
+      if (eligible && scheduleRedial()) return;
+      setMessage(reason); setPhase("error"); setExpanded(true);
+    };
+    resources.current.auto = auto;
+    setExpanded(!auto); setPhase("connecting"); setMessage(""); setMuted(false); setPlayBlocked(false); setTranscript([]); setTaskPhase("idle"); onPanelTask?.(undefined); onPanelTasks?.([]);
     activeCallback.current(true);
     resources.current.starting=true;
     try {
@@ -137,7 +172,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       };
       peer.onconnectionstatechange = () => {
         if (!current()) return;
-        if (peer.connectionState === "connected") { clearTimeout(resources.current.timeout); clearTimeout(resources.current.disconnectTimeout); resources.current.disconnectTimeout = undefined; setPhase(resources.current.recovering ? "recovering" : "connected");
+        if (peer.connectionState === "connected") { resources.current.connectedAt ??= Date.now(); setRedial(0); clearTimeout(resources.current.timeout); clearTimeout(resources.current.disconnectTimeout); resources.current.disconnectTimeout = undefined; setPhase(resources.current.recovering ? "recovering" : "connected");
           // The global coordinator tucks its windows away once per call, so one connection needs no manual closing.
           if (globalMachineId && !resources.current.recovering && !resources.current.collapsed) { resources.current.collapsed = true; setExpanded(false); connectedCallback.current?.(); } }
         // Cellular transitions can briefly disconnect ICE without ending the call.
@@ -255,7 +290,12 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
             else if(value.type==="panel_task") { const tasks=Array.isArray(value.tasks)?value.tasks:value.task?[value.task]:[]; onPanelTasks?.(tasks); onPanelTask?.(value.task); if(!value.task){setTaskPhase("idle");return;} setTaskPhase(value.task.state === "submitted" ? "delegated" : value.task.state === "interrupted" ? "failed" : value.task.state); }
             else if(value.type==="preferences")setPreferenceState(value.status??"unavailable");
             else if (value.type === "error") fail(value.message ?? t("原生实时语音暂不可用"), mode === "resume" ? "SIGNAL_CLOSED" : "SERVER_ERROR");
-            else if (value.type === "closed") { cleanup.current("NATIVE_CLOSED"); setPhase("idle"); }
+            else if (value.type === "closed") {
+              const wasConnected = Boolean(resources.current.connectedAt);
+              if (wasConnected && resources.current.connectedAt && Date.now() - resources.current.connectedAt >= REDIAL_STABLE_MS) redialCount.current = 0;
+              cleanup.current("NATIVE_CLOSED");
+              if (!(wasConnected && scheduleRedial())) setPhase("idle");
+            }
           })().catch(() => fail(t("原生实时语音暂不可用"), "SIGNAL_INVALID"));
         };
         socket.onerror = () => { if (mode === "start" && !resume) fail(t("语音信令连接失败，麦克风已关闭，请刷新面板后重试"), "SIGNAL_FAILED"); };
@@ -268,7 +308,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       wire(socket, "start");
     } catch (error) {
       const denied = error instanceof DOMException && ["NotAllowedError", "SecurityError"].includes(error.name);
-      fail(denied ? t("请允许麦克风访问后重试") : error instanceof Error ? error.message : t("原生实时语音暂不可用"));
+      fail(denied ? t("请允许麦克风访问后重试") : error instanceof Error ? error.message : t("原生实时语音暂不可用"), "CLIENT_START_FAILED", denied);
     }
   }
   if(welcomeRef)welcomeRef.current={
@@ -286,7 +326,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     },
   };
   const active = phase === "connecting" || phase === "connected" || phase === "recovering";
-  const status = signalLost ? t("网络波动，正在自动重连信令（通话音频保持）…") : active ? t(phase === "recovering" ? "正在恢复主机连接，核验原通话中（最多 60 秒）" : phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
+  const status = redial > 0 ? t("通话意外中断，正在自动重拨（{0}/{1}）…", redial, MAX_AUTO_REDIALS) : signalLost ? t("网络波动，正在自动重连信令（通话音频保持）…") : active ? t(phase === "recovering" ? "正在恢复主机连接，核验原通话中（最多 60 秒）" : phase === "connecting" ? "正在连接麦克风与 Codex…" : muted ? "麦克风已静音" : "语音已连接，直接与 Codex 对话") : t("实验功能 · 使用主机的 Codex 登录账号");
   // Refreshing or closing the page ends the call, so ask before an accidental reload or close (no text is customisable in browsers).
   useEffect(() => {
     if (!active) return;

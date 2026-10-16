@@ -68,6 +68,24 @@ keeps its own watchdog, so a short network blip need not end a call.
 - Refreshing or closing the page during a live call now asks for confirmation (`beforeunload`; the text is the
   browser's own). It still ends the call if you confirm.
 
+### Automatic re-dial (global voice coordinator)
+
+When a global call that had connected ends unexpectedly, `NativeVoicePanel` re-dials it by itself instead of
+leaving the broadcaster on a dead call. "Unexpected" means: the signaling resume failed or its hold window
+expired (`SIGNAL_CLOSED`), the audio connection failed (`AUDIO_DISCONNECTED`, `AUDIO_FAILED`), the host ended
+the native session (`closed`), or the server reported a mid-call end (`error`).
+
+- At most `MAX_AUTO_REDIALS` (2) in a row, after 2 s and 6 s. A re-dialled call that stays up for 60 s earns a
+  fresh budget. A failed re-dial attempt (host busy, deployment wait) is retried within the same budget; when
+  it is used up the error window opens as before.
+- Never after anything the user did (hangup, leaving the page, logout, another call starting), a refused
+  microphone, a call that never connected, or a session (non-global) call. Hanging up while a re-dial is
+  pending cancels it.
+- It is quiet: no window opens. The voice status carries `redial` (1..2), the call window (if opened) reads
+  "通话意外中断，正在自动重拨（n/2）…", and a screensaver the call raised stays up and shows
+  "自动重拨中（n/2）…". A re-dialled call is a new native call (new session context); dispatched tasks are
+  unaffected.
+
 ## Background calls and browser lifecycle
 
 The web client keeps microphone tracks, audio playback, WebRTC and signaling when

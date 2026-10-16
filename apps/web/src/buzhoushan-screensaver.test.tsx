@@ -163,3 +163,15 @@ it('an idle panel can never overwrite another panel\'s live call state',()=>{
  expect(voiceStatus.get().phase).toBe('connected');
  voiceStatus.release('a');expect(voiceStatus.get().phase).toBe('idle');
 });
+
+it('stays up and shows the re-dial while an unexpectedly ended call is being re-dialled',()=>{
+ prefs({seconds:600});
+ render(<BuzhoushanScreensaver/>);
+ act(()=>{connect();});settle();expect(saver().dataset.source).toBe('call');
+ act(()=>{call('connecting',{redial:1});});                                    // the call ended unexpectedly and is being re-dialled
+ expect(saver().dataset.active).toBe('true');                                     // a screensaver the call raised does not flicker away
+ expect(document.querySelector('.buzhou-saver__voice')!.textContent).toContain('自动重拨中（1/2）');
+ act(()=>{call('connecting',{redial:1});call('connected',{redial:0});});
+ expect(saver().dataset.active).toBe('true');
+ act(()=>{call('idle');});expect(saver().dataset.active).toBe('false');         // and it still ends with the call itself
+});

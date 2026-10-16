@@ -47,7 +47,7 @@ beforeEach(() => {
   getUserMedia.mockResolvedValue(stream);
   vi.mocked(api.acquireLease).mockResolvedValue({ lease: { id: "lease", version: 1 } } as Awaited<ReturnType<typeof api.acquireLease>>);
 });
-afterEach(() => { cleanup();sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); cleanup();sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 /** The global coordinator collapses its call window once the call connects; reopen it to inspect controls. */
 async function reopenCall(){
@@ -333,7 +333,10 @@ it('global host recovery preserves microphone, peer and signaling without repeat
   expect(screen.getByText('正在恢复主机连接，核验原通话中（最多 60 秒）')).toBeTruthy();
   act(()=>socket.receive({type:'recovered'}));expect(screen.getByText('语音已连接，直接与 Codex 对话')).toBeTruthy();
   expect(socket.sent.filter(v=>v.type==='panel.start')).toHaveLength(1);expect(Peer.all).toHaveLength(1);expect(active).toHaveBeenLastCalledWith(true);
-  act(()=>socket.receive({type:'error',message:'语音恢复超时'}));expect(track.stop).toHaveBeenCalled();expect(active).toHaveBeenLastCalledWith(false);
+  act(()=>socket.receive({type:'error',message:'语音恢复超时'}));expect(track.stop).toHaveBeenCalled();
+  expect(voiceStatus.get().redial).toBe(1);expect(active).toHaveBeenLastCalledWith(true);           // a connected call that ended unexpectedly is re-dialled
+  fireEvent.click(screen.getByRole('button',{name:'挂断'}));                                           // the window is still open from above
+  expect(active).toHaveBeenLastCalledWith(false);expect(voiceStatus.get()).toMatchObject({phase:'idle',redial:0});   // hanging up cancels it for good
 });
 
 it('global coordinator internal task turns never override authoritative project task status',async()=>{
@@ -507,7 +510,10 @@ it("retries stop at the end of the hold window and the call then ends",async()=>
   }
   expect(peer.closed).toBe(true);expect(track.stop).toHaveBeenCalled();
   expect(Socket.all.length).toBeLessThanOrEqual(9);expect(Socket.all.length).toBeGreaterThan(2);
-  const attempts=Socket.all.length;await act(async()=>{vi.advanceTimersByTime(30_000);});expect(Socket.all).toHaveLength(attempts);   // and it stays ended
+  expect(voiceStatus.get().redial).toBe(1);                                                // not resumed any more: the unexpectedly ended call is re-dialled
+  const attempts=Socket.all.length;
+  fireEvent.click(screen.getByRole('button',{name:'总控通话控制'}));fireEvent.click(screen.getByRole('button',{name:'挂断'}));   // cancel the re-dial
+  await act(async()=>{vi.advanceTimersByTime(30_000);});expect(Socket.all).toHaveLength(attempts);   // and the signaling retries stay stopped
   vi.useRealTimers();
 });
 
@@ -535,4 +541,126 @@ it("leaving a live call by reload or close asks for confirmation; an idle page a
   await waitFor(()=>expect(voiceStatus.get().phase).toBe('connected'));expect(ask()).toBe(true);
   await reopenCall();fireEvent.click(screen.getByRole('button',{name:'挂断'}));
   await waitFor(()=>expect(ask()).toBe(false));                                              // hung up: no prompt
+});
+
+// ---- automatic re-dial after an unexpected end of a connected global call
+const settle=async(ms:number)=>{await vi.advanceTimersByTimeAsync(ms);for(let i=0;i<6;i++)await act(async()=>{await Promise.resolve();});};   // also let pending promises (getUserMedia, offers) finish
+/** Bring the call that a re-dial started (the newest socket/peer) to "connected". */
+async function connectNewest(){
+  const socket=Socket.all.at(-1)!;
+  await act(async()=>{socket.receive({type:'ready'});socket.receive({type:'resume.token',voiceId:'pvoice_n',token:'tn',graceMs:30000});socket.receive({type:'answer',sdp:'v=0\r\n'});});
+  expect(voiceStatus.get()).toMatchObject({phase:'connected',redial:0});
+  return socket;
+}
+
+it("re-dials once, quietly, when the host ends a connected call, and the new call connects normally",async()=>{
+  const {first,peer}=await connectedGlobalCall();vi.useFakeTimers();
+  act(()=>{first.receive({type:'closed'});});
+  expect(peer.closed).toBe(true);expect(track.stop).toHaveBeenCalledTimes(1);                 // the old call's media is fully released
+  expect(voiceStatus.get()).toMatchObject({phase:'connecting',redial:1});
+  expect(screen.queryByRole('region',{name:'原生实时语音'})).toBeNull();                       // no window pops up in front of the broadcast
+  await settle(1999);expect(Socket.all).toHaveLength(1);
+  await settle(10);expect(getUserMedia).toHaveBeenCalledTimes(2);expect(Socket.all).toHaveLength(2);
+  await act(async()=>{Socket.all[1]!.receive({type:'ready'});});
+  expect(Socket.all[1]!.sent[0]).toMatchObject({type:'panel.start',machineId:'host',resume:true});
+  await connectNewest();
+  expect(screen.queryByRole('region',{name:'原生实时语音'})).toBeNull();                       // still quiet once connected
+  vi.useRealTimers();
+});
+
+it("re-dials after an audio failure and after a server-reported mid-call end",async()=>{
+  const {peer}=await connectedGlobalCall();vi.useFakeTimers();
+  act(()=>{peer.connectionState='failed';peer.onconnectionstatechange?.();});
+  expect(voiceStatus.get()).toMatchObject({phase:'connecting',redial:1});
+  await settle(2010);expect(Socket.all).toHaveLength(2);
+  const second=await connectNewest();
+  act(()=>{second.receive({type:'error',message:'总控连接已结束，已派发任务继续执行；重新连接后可查询结果'});});
+  expect(voiceStatus.get()).toMatchObject({phase:'connecting',redial:2});                       // the second of two
+  await settle(6010);expect(Socket.all).toHaveLength(3);
+  vi.useRealTimers();
+});
+
+it("never re-dials after anything the user did: hangup, leaving the page, another call, logout",async()=>{
+  for(const act_ of ['hangup','pagehide','other','logout'] as const){
+    cleanup();Socket.all=[];Peer.all=[];getUserMedia.mockClear();
+    const {first}=await connectedGlobalCall();vi.useFakeTimers();
+    if(act_==='hangup'){fireEvent.click(screen.getByRole('button',{name:'总控通话控制'}));fireEvent.click(screen.getByRole('button',{name:'挂断'}));}
+    else if(act_==='pagehide')act(()=>{window.dispatchEvent(new Event('pagehide'));});
+    else if(act_==='other')act(()=>{window.dispatchEvent(new CustomEvent('agentfleet:voice-start',{detail:'someone-else'}));});
+    else act(()=>{window.dispatchEvent(new Event('agentfleet:logout'));});
+    await settle(20_000);
+    expect(Socket.all,act_).toHaveLength(1);expect(getUserMedia,act_).toHaveBeenCalledTimes(1);expect(voiceStatus.get().redial,act_).toBe(0);
+    void first;vi.useRealTimers();
+  }
+});
+
+it("hanging up while a re-dial is pending cancels it, and so does another call starting",async()=>{
+  const {first}=await connectedGlobalCall();vi.useFakeTimers();
+  act(()=>{first.receive({type:'closed'});});expect(voiceStatus.get().redial).toBe(1);
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'总控通话控制'}));});    // reopen the window during the wait
+  expect(screen.getByText('通话意外中断，正在自动重拨（1/2）…')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'挂断'}));
+  expect(voiceStatus.get()).toMatchObject({phase:'idle',redial:0});
+  await settle(20_000);expect(Socket.all).toHaveLength(1);expect(getUserMedia).toHaveBeenCalledTimes(1);
+  vi.useRealTimers();
+});
+
+it("gives up after two quick re-dials, but a call that stayed up for a minute earns a fresh budget",async()=>{
+  const {first}=await connectedGlobalCall();vi.useFakeTimers();
+  act(()=>{first.receive({type:'closed'});});await settle(2010);
+  let current=await connectNewest();
+  act(()=>{current.receive({type:'closed'});});expect(voiceStatus.get().redial).toBe(2);await settle(6010);
+  current=await connectNewest();
+  act(()=>{current.receive({type:'closed'});});                                                  // third quick end: no budget left
+  expect(voiceStatus.get()).toMatchObject({phase:'idle',redial:0});
+  await settle(30_000);expect(Socket.all).toHaveLength(3);
+  // A fresh sequence where the last call was stable for a minute: the budget starts over.
+  vi.useRealTimers();cleanup();Socket.all=[];Peer.all=[];
+  const again=await connectedGlobalCall();vi.useFakeTimers();
+  act(()=>{again.first.receive({type:'closed'});});await settle(2010);
+  current=await connectNewest();
+  act(()=>{current.receive({type:'closed'});});await settle(6010);
+  current=await connectNewest();
+  await settle(61_000);                                                                           // stable for over a minute
+  act(()=>{current.receive({type:'closed'});});
+  expect(voiceStatus.get()).toMatchObject({phase:'connecting',redial:1});                       // re-dialled again, counting from one
+  vi.useRealTimers();
+});
+
+it("a failed re-dial attempt is retried within the budget, then the error is shown to the user",async()=>{
+  const {first}=await connectedGlobalCall();vi.useFakeTimers();
+  act(()=>{first.receive({type:'closed'});});await settle(2010);
+  await act(async()=>{Socket.all[1]!.receive({type:'ready'});Socket.all[1]!.receive({type:'error',message:'语音主机暂不可用'});});
+  expect(voiceStatus.get()).toMatchObject({phase:'connecting',redial:2});                       // retried once more
+  await settle(6010);expect(Socket.all).toHaveLength(3);
+  await act(async()=>{Socket.all[2]!.receive({type:'ready'});Socket.all[2]!.receive({type:'error',message:'语音主机暂不可用'});});
+  expect(voiceStatus.get().phase).toBe('error');expect(voiceStatus.get().redial).toBe(0);
+  await waitForText('语音主机暂不可用');                                                           // and the window opens to tell the user
+  vi.useRealTimers();
+});
+const waitForText=async(text:string)=>{for(let i=0;i<20&&!screen.queryByText(text);i++)await act(async()=>{await Promise.resolve();});expect(screen.getByText(text)).toBeTruthy();};
+
+it("never re-dials a call that did not connect, a refused microphone, or a session call",async()=>{
+  // 1. The first start fails before ever connecting.
+  render(<NativeVoicePanel sessionId="panel:host" globalMachineId="host" canStart onActiveChange={()=>undefined}/>);
+  fireEvent.click(screen.getByRole('button',{name:'开始总控通话'}));await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  vi.useFakeTimers();
+  await act(async()=>{Socket.all[0]!.receive({type:'ready'});Socket.all[0]!.receive({type:'error',message:'语音主机暂不可用'});});
+  expect(voiceStatus.get()).toMatchObject({phase:'error',redial:0});
+  await settle(20_000);expect(Socket.all).toHaveLength(1);vi.useRealTimers();
+  // 2. A re-dial whose microphone is refused ends for good.
+  cleanup();Socket.all=[];Peer.all=[];getUserMedia.mockClear();
+  const {first}=await connectedGlobalCall();vi.useFakeTimers();
+  getUserMedia.mockRejectedValueOnce(new DOMException('denied','NotAllowedError'));
+  act(()=>{first.receive({type:'closed'});});await settle(2010);
+  expect(voiceStatus.get()).toMatchObject({phase:'error',redial:0});
+  await settle(30_000);expect(getUserMedia).toHaveBeenCalledTimes(2);vi.useRealTimers();
+  // 3. A session (non-global) call is never re-dialled.
+  cleanup();Socket.all=[];Peer.all=[];getUserMedia.mockClear();
+  render(<NativeVoicePanel sessionId="session" canStart onActiveChange={()=>undefined}/>);
+  fireEvent.click(screen.getByRole('button',{name:'开始语音'}));await waitFor(()=>expect(Socket.all).toHaveLength(1));
+  await act(async()=>{Socket.all[0]!.receive({type:'ready'});Socket.all[0]!.receive({type:'answer',sdp:'v=0\r\n'});});
+  await waitFor(()=>expect(voiceStatus.get().phase).toBe('connected'));
+  vi.useFakeTimers();act(()=>{Socket.all[0]!.receive({type:'closed'});});
+  expect(voiceStatus.get().redial).toBe(0);await settle(20_000);expect(Socket.all).toHaveLength(1);vi.useRealTimers();
 });

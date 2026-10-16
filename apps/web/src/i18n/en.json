@@ -3693,5 +3693,7 @@
   "声音灵敏度": "Voice sensitivity",
   "仅为视觉特效：不影响通话、互动消息和任务；点击或按键退出。灵敏度越高，越小的声音也会有反应。": "Visual effect only: it does not affect calls, live messages or tasks; click or press a key to exit. A higher sensitivity reacts to quieter sound.",
   "网络波动，正在自动重连信令（通话音频保持）…": "Network hiccup: reconnecting signaling automatically (call audio is kept)…",
-  "网络波动，重连中…": "Network hiccup, reconnecting…"
+  "网络波动，重连中…": "Network hiccup, reconnecting…",
+  "通话意外中断，正在自动重拨（{0}/{1}）…": "The call ended unexpectedly; re-dialling automatically ({0}/{1})…",
+  "自动重拨中（{0}/{1}）…": "Re-dialling ({0}/{1})…"
 }

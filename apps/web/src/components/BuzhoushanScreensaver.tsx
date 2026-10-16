@@ -7,7 +7,7 @@ import { createEffect, qualityFor, type EffectMode, type Pointer } from "../lib/
 import { QUALITY_TIERS, type QualityTier } from "../lib/buzhoushan-effect-common";
 import { createDemoVoice, voiceSignal } from "../lib/voice-signal";
 import { SCREENSAVER_ORDER, useIdle, useScreensaverPrefs, useScreensaverRequests } from "../lib/buzhoushan-idle";
-import { useVoiceStatus } from "../lib/voice-status";
+import { MAX_AUTO_REDIALS, useVoiceStatus } from "../lib/voice-status";
 import { workbenchItems } from "./BuzhoushanActivity";
 import { t } from "../i18n";
 
@@ -56,9 +56,9 @@ const EFFECT_LABEL: Record<EffectMode, string> = {
 };
 type Speaker = "none" | "mic" | "ai";
 
-function voiceLine(status: { phase: string; muted: boolean; kind: string; degraded?: boolean }, speaker: Speaker) {
+function voiceLine(status: { phase: string; muted: boolean; kind: string; degraded?: boolean; redial?: number }, speaker: Speaker) {
   const who = t(status.kind === "global" ? "语音总控" : "会话语音");
-  const state = status.phase === "connecting" ? t("连接中…") : status.phase === "recovering" ? t("恢复连接中…") : t("已连接");
+  const state = (status.redial ?? 0) > 0 ? t("自动重拨中（{0}/{1}）…", status.redial, MAX_AUTO_REDIALS) : status.phase === "connecting" ? t("连接中…") : status.phase === "recovering" ? t("恢复连接中…") : t("已连接");
   const extra = status.degraded ? ` · ${t("网络波动，重连中…")}` : status.phase !== "connected" ? "" : status.muted ? ` · ${t("已静音")}` : ` · ${t(speaker === "mic" ? "你在说话" : speaker === "ai" ? "AI 在说话" : "聆听中")}`;
   return `${who} ${state}${extra}`;
 }
@@ -76,7 +76,8 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
   const requests = useScreensaverRequests();
   const voice = useVoiceStatus();
   const status = taskStatus(detail);
-  const callLive = voice.phase === "connected" || voice.phase === "recovering";
+  // A call that is being re-dialled still counts as live, so a screensaver it raised does not flicker away.
+  const callLive = voice.phase === "connected" || voice.phase === "recovering" || voice.redial > 0;
 
   const [source, setSource] = useState<Source>();
   const on = source !== undefined;
