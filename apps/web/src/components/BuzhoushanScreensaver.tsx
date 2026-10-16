@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import type { SessionDetail } from "../lib/types";
+import type { FleetSession, SessionDetail } from "../lib/types";
 import { isBuzhoushanTurnActive } from "../lib/buzhoushan-events";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -19,6 +19,28 @@ function taskStatus(detail?: SessionDetail) {
   const steps = workbenchItems(detail);
   // Only counts are shown: command text may hold secrets and this layer is broadcast.
   return { label, live, done: steps.filter(step => step.status === "completed").length, total: steps.length };
+}
+
+/** Use the existing global dashboard subscription, not only the selected conversation. */
+function projectStatus(detail: SessionDetail | undefined, sessions: FleetSession[] | undefined, connected: boolean) {
+  if (!connected) return { label: t("运行状态待确认"), live: false, done: 0, total: 0 };
+  if (!sessions) return taskStatus(detail);
+  const active = sessions.filter(session => isBuzhoushanTurnActive({
+    session,
+    events: detail?.session.id === session.id && detail.session.activeTurnId === session.activeTurnId ? detail.events : [],
+  } as SessionDetail));
+  const uncertain = sessions.some(session => session.state.unknownFreeze || session.state.reachability === "unreachable");
+  const live = active.filter(session => !session.state.unknownFreeze && session.state.reachability !== "unreachable");
+  if (!live.length) return uncertain || active.length ? { label: t("运行状态待确认"), live: false, done: 0, total: 0 } : undefined;
+  if (live.length === 1) {
+    const session = live[0];
+    if (detail?.session.id === session.id && detail.session.activeTurnId === session.activeTurnId) {
+      const status = taskStatus({ ...detail, session });
+      if (status) return status;
+    }
+    return { label: t(session.state.waitReason === "approval" ? "等待确认" : session.state.waitReason === "user_input" ? "等待回答" : "任务执行中"), live: true, done: 0, total: 0 };
+  }
+  return { label: t("进行中的项目会话：{0}", live.length), live: true, done: 0, total: 0 };
 }
 
 /** Follows the workspace (.app-shell) so the side introductions of the 16:9 canvas stay visible. */
@@ -70,12 +92,12 @@ type Source = "idle" | "call" | "manual";
  * toolbar button, shows task progress (or standby) plus the voice-call state, and a click or key press leaves
  * it (mouse movement does not). The arrows switch effects. It never blocks input or touches calls/tasks.
  */
-export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
+export function BuzhoushanScreensaver({ detail, sessions, connected = true }: { detail?: SessionDetail; sessions?: FleetSession[]; connected?: boolean }) {
   const prefs = useScreensaverPrefs();
   const idle = useIdle(prefs.seconds * 1000, prefs.enabled);
   const requests = useScreensaverRequests();
   const voice = useVoiceStatus();
-  const status = taskStatus(detail);
+  const status = projectStatus(detail, sessions, connected);
   // A call that is being re-dialled still counts as live, so a screensaver it raised does not flicker away.
   const callLive = voice.phase === "connected" || voice.phase === "recovering" || voice.redial > 0;
 
@@ -213,7 +235,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
         <span className="buzhou-saver__brand">AGENTFLEETS</span>
         {status
           ? <><strong data-live={status.live}>{status.label}</strong>{status.total > 0 && <small>{t("已完成 {0} / {1} 步", status.done, status.total)}</small>}</>
-          : <strong>{t("待命中")}</strong>}
+          : <strong>{t("暂无运行中的项目任务")}</strong>}
         {voice.phase !== "idle" && voice.phase !== "error" && <small className="buzhou-saver__voice" data-phase={voice.phase} data-muted={voice.muted} data-speaker={speaker}><i aria-hidden="true" />{voiceLine(voice, speaker)}</small>}
       </div>
       {toast && <div className="buzhou-saver__toast" role="status">{toast}</div>}

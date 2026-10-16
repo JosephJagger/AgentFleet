@@ -45,7 +45,7 @@ it('shows task progress as counts only, or standby, in the one caption',()=>{
  prefs();
  const {rerender}=render(<BuzhoushanScreensaver/>);
  act(()=>{requestScreensaver();});
- expect(caption()).toContain('待命中');
+ expect(caption()).toContain('暂无运行中的项目任务');
  rerender(<BuzhoushanScreensaver detail={detail()}/>);
  expect(saver().dataset.busy).toBe('true');expect(caption()).toContain('任务执行中');
 });
@@ -174,4 +174,36 @@ it('stays up and shows the re-dial while an unexpectedly ended call is being re-
  act(()=>{call('connecting',{redial:1});call('connected',{redial:0});});
  expect(saver().dataset.active).toBe('true');
  act(()=>{call('idle');});expect(saver().dataset.active).toBe('false');         // and it still ends with the call itself
+});
+
+
+it('follows global sessions even when another conversation is selected, and updates on completion',()=>{
+ const selected=detail({session:{id:'selected',state:{currentTurn:'none',reachability:'live'}}});
+ const running={id:'other',activeTurnId:'turn',state:{currentTurn:'in_progress',reachability:'live'}} as never;
+ const view=render(<BuzhoushanScreensaver detail={selected} sessions={[running]}/>);
+ expect(caption()).toContain('任务执行中');
+ view.rerender(<BuzhoushanScreensaver detail={selected} sessions={[]}/>);
+ expect(caption()).toContain('暂无运行中的项目任务');
+ view.rerender(<BuzhoushanScreensaver sessions={[running,{...running as object,id:'third'} as never]}/>);
+ expect(caption()).toContain('进行中的项目会话：2');
+ view.rerender(<BuzhoushanScreensaver sessions={[]} connected={false}/>);
+ expect(caption()).toContain('运行状态待确认');
+});
+it('does not call offline work idle or use a stale selected turn over a newer dashboard turn',()=>{
+ const session={id:'s',activeTurnId:'new',state:{currentTurn:'in_progress',reachability:'live'}} as never;
+ const stale=detail({session:{id:'s',activeTurnId:'old',state:{currentTurn:'completed',reachability:'live'}}});
+ const view=render(<BuzhoushanScreensaver detail={stale} sessions={[session]}/>);
+ expect(caption()).toContain('任务执行中');
+ view.rerender(<BuzhoushanScreensaver sessions={[{id:'s',activeTurnId:'new',state:{currentTurn:'in_progress',reachability:'unreachable'}} as never]}/>);
+ expect(caption()).toContain('运行状态待确认');
+});
+it('separates listening from project execution and keeps approval waits explicit',()=>{
+ const running={id:'other',activeTurnId:'turn',state:{currentTurn:'in_progress',reachability:'live',waitReason:'approval'}} as never;
+ const view=render(<BuzhoushanScreensaver sessions={[running]}/>);
+ act(()=>{connect();});
+ expect(caption()).toContain('等待确认');
+ expect(caption()).toContain('聆听中');
+ view.rerender(<BuzhoushanScreensaver sessions={[]}/>);
+ expect(caption()).toContain('暂无运行中的项目任务');
+ expect(caption()).toContain('聆听中');
 });

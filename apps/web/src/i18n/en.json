@@ -3695,5 +3695,7 @@
   "网络波动，正在自动重连信令（通话音频保持）…": "Network hiccup: reconnecting signaling automatically (call audio is kept)…",
   "网络波动，重连中…": "Network hiccup, reconnecting…",
   "通话意外中断，正在自动重拨（{0}/{1}）…": "The call ended unexpectedly; re-dialling automatically ({0}/{1})…",
-  "自动重拨中（{0}/{1}）…": "Re-dialling ({0}/{1})…"
+  "自动重拨中（{0}/{1}）…": "Re-dialling ({0}/{1})…",
+  "进行中的项目会话：{0}": "Active project sessions: {0}",
+  "暂无运行中的项目任务": "No project tasks running"
 }
