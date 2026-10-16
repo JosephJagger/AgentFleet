@@ -8,6 +8,7 @@ it('offers the five new providers only when ready and excludes deferred provider
  const onChange=vi.fn();const runtimes=Object.fromEntries(ACP_PROVIDER_IDS.map(id=>[id,{installed:true,version:'fixture',state:id==='qwen'?'ready':'unverified',checkedAt:new Date().toISOString(),capabilities:unavailableCapabilities()}]));
  render(<AgentPicker value="codex" claudeInstalled={true} runtimes={runtimes} onChange={onChange}/>);
  fireEvent.click(screen.getByRole('button',{name:'选择 Agent'}));
+ expect(screen.getAllByRole('menuitemradio').map(el=>el.querySelector('strong')?.textContent)).toEqual(['Codex','Claude Code','Cursor','Qwen Code','Kimi Code','CodeBuddy Code','Grok Build']);
  expect((screen.getByRole('menuitemradio',{name:/Kimi Code/}) as HTMLButtonElement).disabled).toBe(true);
  expect(screen.queryByText(/Copilot|Antigravity|Gemini|TRAE/)).toBeNull();
  fireEvent.click(screen.getByRole('menuitemradio',{name:/Qwen Code/}));expect(onChange).toHaveBeenCalledWith('qwen');

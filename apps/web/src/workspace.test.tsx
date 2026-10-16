@@ -220,7 +220,7 @@ describe("会话工作区", () => {
   it("状态放在标题行、同步详情移入配置，发送与快捷键提示位于输入框内部", () => {
     render(<SessionInspector {...inspectorProps("A")} />);
     const title = screen.getByRole("heading", { name: "会话A" });
-    const titleRow = title.closest(".inspector-title-row")!;
+    const titleRow = title.closest(".inspector-head--compact")!;
     expect(within(titleRow as HTMLElement).getByText("空闲")).toBeTruthy();
     expect(within(titleRow as HTMLElement).getByText("完整历史")).toBeTruthy();
     expect(within(titleRow as HTMLElement).queryByText("同步详情")).toBeNull();

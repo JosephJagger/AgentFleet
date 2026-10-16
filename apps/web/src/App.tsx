@@ -1011,40 +1011,31 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
 
   return (
     <aside className="inspector">
-      <header className="inspector-head">
+      <header className="inspector-head inspector-head--compact">
         <IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton>
-        <div className="eyebrow inspector-context" title={displayName(`${session.machineName} · ${agentName(session.provider)} · ${session.projectAlias}`)}>{displayName(session.machineName)} · {agentName(session.provider)} · {displayName(session.projectAlias)}</div>
-        <div className="inspector-title-row">
+        <div className="session-heading">
           <h2 title={displayName(session.title)}>{displayName(session.title)}</h2>
+        <div className="eyebrow inspector-context" title={displayName(`${session.machineName} · ${agentName(session.provider)} · ${session.projectAlias}`)}>{displayName(session.machineName)} · {agentName(session.provider)} · {displayName(session.projectAlias)}</div>
+        </div>
           <div className="session-facts">
             <StatePill session={session} />
             <span className={`history-mark history-mark--${session.state.history}`}>{{ complete: t("完整历史"), partial: t("部分历史"), summary_only: t("历史摘要"), metadata_only: t("仅会话信息"), unavailable: t("历史暂不可用") }[session.state.history]}</span>
             {session.actions?.start?.reasonCode === "MACHINE_DRAINING" && <span role="status">{t("主机正在维护，等待安全重启；当前任务可继续，暂不接受新任务")}</span>}
             {buzhouDesktop && <UsageButton key={`header-quota:${session.machineId}:${session.provider}`} scope="machine" id={session.machineId} provider={session.provider} compactQuota/>}
             <div className="session-call-actions"><UsageButton scope="session" id={session.id} provider={session.provider}/>
-      {(session.provider ?? "codex") === "codex" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
+
             </div>
           </div>
         <div className="inspector-head__actions">
-      {(session.provider ?? "codex") === "codex" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
-          <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
-          <SessionActions>
-            <button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(new URL(sessionPath(session.id), window.location.origin).href); setCommandMessage(t("已复制会话链接")); } catch { setCommandMessage(t("浏览器未允许复制会话链接")); } }}><Copy size={16} />{t("复制会话链接")}</button>
-            {onSchedule && <button type="button" className="button button--quiet" onClick={onSchedule}><Clock3 size={16}/>{t("定时执行")}</button>}
-            <button type="button" className="button button--quiet" onClick={onRefresh}><RefreshCw size={16} />{t("刷新会话")}</button>
-            <NativeSessionDeletion key={`delete:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} pending={pendingCommand} onChanged={onRefresh} />
-          </SessionActions>
-        </div>
-        </div>
-      </header>
       {managed ? (
-        <div className={`lease-strip${lease?.isMine ? " lease-strip--mine" : ""}${(!lease || lease.isMine) && detail.releaseManagementSupported && !releaseConfirming ? " lease-strip--ready" : ""}`}>
+        <div title={lease && !lease.isMine ? t("其他账号正在操作") : detail.releaseManagementBlockedReason || t("可从面板继续会话")} className={`lease-strip${releaseConfirming ? " lease-strip--confirming" : ""}${lease?.isMine ? " lease-strip--mine" : ""}${(!lease || lease.isMine) && detail.releaseManagementSupported && !releaseConfirming ? " lease-strip--ready" : ""}`}>
           <span className="lease-strip__icon"><UserRoundCheck size={16} /></span>
           <div>
             <strong>{lease && !lease.isMine ? t("其他账号正在操作") : t("可从面板继续会话")}</strong>
             <span>{!detail.releaseManagementSupported ? detail.releaseManagementBlockedReason : releaseConfirming ? t("等待主机释放面板写入占用；主机会话、本地和云端历史都会保留。有后台任务时不会强制交接") : lease && !lease.isMine ? t("等待对方操作结束后继续") : t("可在其他设备继续，执行中的任务保持运行。")}</span>
           </div>
           <div className="lease-strip__actions">
+            {(lease && !lease.isMine || !detail.releaseManagementSupported) && <small>{lease && !lease.isMine ? t("其他账号正在操作") : t("已接管")}</small>}
             {detail.releaseManagementSupported && (releaseConfirming ? (
               <>
                 <button type="button" disabled={busy} onClick={() => setReleaseConfirming(false)}>{t("保留接管")}</button>
@@ -1056,7 +1047,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           </div>
         </div>
       ) : (
-        <div className={`share-strip${canClaim ? " share-strip--ready" : ""}`}>
+        <div title={canClaim ? t("同步主机上的历史，继续原来的 {0} 会话", agentName(session.provider)) : systemText(session.actions?.claim?.message) || t("正在检查这个会话是否支持继续操作")} className={`share-strip${canClaim ? " share-strip--ready" : ""}`}>
           <span className="share-strip__icon"><Share2 size={16} /></span>
           <div>
             <strong>{session.historyMode !== "unknown" ? t("宿主机共享会话") : t("仅可查看的宿主机会话")}</strong>
@@ -1065,6 +1056,18 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
             <button className="button button--share" type="button" disabled={!canClaim || busy} onClick={async () => { setBusy(true); try { await onClaim(); } finally { setBusy(false); } }}>{busy ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />}{locale() === "en" ? " " : ""}{t("接管并同步")}</button>
         </div>
       )}
+
+      {(session.provider ?? "codex") === "codex" && managed && <NativeVoicePanel key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
+      {(session.provider ?? "codex") === "codex" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
+          <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
+          <SessionActions>
+            <button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(new URL(sessionPath(session.id), window.location.origin).href); setCommandMessage(t("已复制会话链接")); } catch { setCommandMessage(t("浏览器未允许复制会话链接")); } }}><Copy size={16} />{t("复制会话链接")}</button>
+            {onSchedule && <button type="button" className="button button--quiet" onClick={onSchedule}><Clock3 size={16}/>{t("定时执行")}</button>}
+            <button type="button" className="button button--quiet" onClick={onRefresh}><RefreshCw size={16} />{t("刷新会话")}</button>
+            <NativeSessionDeletion key={`delete:${draftOwner}:${session.id}`} session={session} commands={detail.commands ?? []} pending={pendingCommand} onChanged={onRefresh} />
+          </SessionActions>
+        </div>
+      </header>
       {session.state.unknownFreeze && <div className="freeze-banner"><AlertTriangle size={17} /><div><strong>{t("结果不确定，写入已冻结")}</strong><span>{t("可以点击解除冻结核验主机结果；系统不会自动重发原命令。")}</span><SessionRecovery key={`${draftOwner}:${session.id}`} machineId={session.machineId} sessionId={session.id} online={detail.hostOnline === true} supported={detail.recoverySupported === true} onChanged={onRefresh} /></div></div>}
       <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? rawEvents : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}</ConversationViewport>
       {approval?.status === "pending" && (approval.type === "user_input"
@@ -1830,7 +1833,7 @@ function App() {
           {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog key={`${selectedMachineId}:${selectedProvider}`} provider={selectedProvider} machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} onSchedule={project => openScheduled(project.id)} />}
           </div>
         </main>
-        <HostSessions key={`${dashboard.user.id}:${dashboard.user.clientSessionId}`} machine={selectedMachine} sessions={dashboard.activitySessions ?? dashboard.sessions} selectedId={selectedSessionId} detail={detail} onSelect={selectSession} onBrowse={()=>{setStreamFocus(false);setCatalogCollapsed(false);}} onCreate={()=>openCreate()}>
+        <HostSessions key={`${dashboard.user.id}:${dashboard.user.clientSessionId}`} machine={selectedMachine} provider={selectedProvider} onProviderChange={selectProvider} sessions={dashboard.activitySessions ?? dashboard.sessions} selectedId={selectedSessionId} detail={detail} onSelect={selectSession} onBrowse={()=>{setStreamFocus(false);setCatalogCollapsed(false);}} onCreate={()=>openCreate()}>
         <SessionInspector catalogExpanded={!streamFocus && !catalogCollapsed} onBrowseSessions={()=>{if(streamFocus){setStreamFocus(false);setCatalogCollapsed(false);}else setCatalogCollapsed(value=>!value);}} referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
         </HostSessions>
         {buzhouDesktop && <BuzhoushanScreensaver detail={detail}/>}

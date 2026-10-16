@@ -21,6 +21,7 @@ import "./buzhoushan-theme.css";
 import "./interaction-stability.css";
 import "./workbench-panels.css";
 import "./typography.css";
+import "./session-toolbar.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

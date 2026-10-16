@@ -75,3 +75,10 @@
  background-image:none;
  border:0;
 }
+
+/* Agent selection remains available even with both catalogs collapsed. */
+.host-agent-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:0 0 auto; min-width:0; padding:3px 12px; border-bottom:1px solid var(--line); background:var(--paper-solid); }
+.host-agent-toolbar:empty { display:none; }
+.host-agent-toolbar > .buzhou-session-toggle { margin-left:auto; padding:0; background:transparent; }
+.host-agent-toolbar .agent-picker-trigger { min-height:30px; }
+.buzhou-session-providers.buzhou-session-providers--single { grid-template-columns:minmax(0,1fr); }

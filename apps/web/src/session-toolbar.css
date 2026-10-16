@@ -1,0 +1,36 @@
+/* One shared compact header; secondary information yields before actions. */
+:root .inspector .inspector-head--compact { display:flex; align-items:center; flex-wrap:nowrap; gap:12px; min-height:54px; padding:8px 14px; position:relative; }
+:root .inspector-head--compact .session-heading { flex:1 1 200px; min-width:80px; overflow:hidden; }
+:root .inspector-head--compact .session-heading h2 { margin:0; font-size:var(--text-small); line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+:root .inspector-head--compact .inspector-context { display:block; margin:2px 0 0; font-size:var(--text-micro); line-height:1.3; opacity:.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+:root .inspector-head--compact .session-facts { display:flex; flex:0 1 auto; flex-wrap:nowrap; align-items:center; gap:8px; margin:0; min-width:0; }
+:root .inspector-head--compact .inspector-head__actions { display:flex; position:static; flex:0 0 auto; gap:5px; align-items:center; }
+:root .inspector-head--compact .inspector-head__actions > :is(.button,.icon-button),
+:root .inspector-head--compact .session-config-trigger { min-height:30px; height:30px; padding:4px 7px; font-size:var(--text-caption); }
+:root .inspector-head--compact :is(.lease-strip,.share-strip) { display:flex; flex:0 0 auto; align-items:center; gap:6px; padding:0; margin:0; border:0; background:transparent; box-shadow:none; min-height:0; }
+:root .inspector-head--compact :is(.lease-strip,.share-strip) > :is(.lease-strip__icon,.share-strip__icon,div:not(.lease-strip__actions)) { display:none; }
+:root .inspector-head--compact :is(.lease-strip,.share-strip) button { min-height:30px; padding:4px 7px; font-size:var(--text-caption); white-space:nowrap; }
+:root .inspector-head--compact .lease-strip--confirming { position:absolute; z-index:25; top:calc(100% + 4px); right:12px; width:min(380px,calc(100% - 24px)); padding:12px; background:var(--paper-solid); border:1px solid var(--line); border-radius:var(--radius-sm); box-shadow:0 8px 24px #0002; flex-wrap:wrap; }
+:root .inspector-head--compact .lease-strip--confirming > div:not(.lease-strip__actions) { display:block; flex-basis:100%; }
+:root .inspector-head--compact .lease-strip--confirming .lease-strip__actions { margin-left:auto; }
+@container host-editor (max-width:1100px) {
+ :root .inspector-head--compact .session-facts .session-call-actions,
+ :root .inspector-head--compact .session-facts .history-mark { display:none; }
+ :root .inspector-head--compact .buzhou-full-label { display:none; }
+ :root .inspector-head--compact .buzhou-focus-label { display:inline; }
+}
+@container host-editor (max-width:760px) {
+ :root .inspector .inspector-head--compact { gap:6px; padding:6px 10px; }
+ :root .inspector-head--compact .session-facts { display:none; }
+ :root .inspector-head--compact .session-heading { min-width:60px; }
+ :root .inspector-head--compact .inspector-head__actions { flex:0 1 auto; flex-wrap:wrap; justify-content:flex-end; max-width:65%; }
+ :root .inspector-head--compact .inspector-back { position:static; flex:none; }
+}
+@container host-editor (max-width:760px) {
+ :root .inspector-head--compact .inspector-head__actions { max-width:none; flex:0 0 auto; flex-wrap:nowrap; gap:2px; }
+ :root .inspector-head--compact .inspector-context { display:none; }
+ :root .inspector-head--compact .inspector-head__actions .buzhou-focus-label,
+ :root .inspector-head--compact .inspector-head__actions .buzhou-full-label { display:none; }
+ :root .inspector-head--compact .session-config-trigger { width:30px; padding:4px; }
+ :root .inspector-head--compact .native-voice__trigger { width:32px; height:32px; min-height:32px; }
+}

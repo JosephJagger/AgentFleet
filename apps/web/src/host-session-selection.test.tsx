@@ -92,3 +92,17 @@ it('always separates Codex and Claude Code, including hosts with no Claude insta
  view.rerender(<HostSessions {...props} sessions={[codex]}/>);
  expect(claudeGroup.getByText('暂无运行会话')).toBeTruthy();expect(claudeGroup.getByText('暂无已接管会话')).toBeTruthy();
 });
+
+it('keeps the provider picker visible with a collapsed session list and filters the open list',()=>{
+ const onProviderChange=vi.fn();const sessions=[session('codex-task'),{...session('claude-task'),provider:'claude' as const}];
+ const props={machine:{...machine,agentRuntimes:{claude:{installed:true}}} as Machine,sessions,selectedId:'codex-task',provider:'codex' as const,onProviderChange,onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<div>conversation</div>};
+ const view=render(<HostSessions {...props}/>);
+ expect(screen.queryByLabelText('当前主机会话切换')).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'选择 Agent'}));
+ expect(screen.getAllByRole('menuitemradio')).toHaveLength(7);
+ fireEvent.click(screen.getByRole('menuitemradio',{name:/Claude Code/}));
+ expect(onProviderChange).toHaveBeenCalledWith('claude');
+ view.rerender(<HostSessions {...props} selectedId={undefined} provider="claude"/>);
+ expect(screen.getByText('claude-task')).toBeTruthy();expect(screen.queryByText('codex-task')).toBeNull();
+ expect(screen.getByRole('button',{name:'选择 Agent'})).toBeTruthy();
+});
