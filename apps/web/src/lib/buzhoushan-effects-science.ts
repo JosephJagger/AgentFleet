@@ -7,7 +7,7 @@
  *  - ThreeBody: Newtonian three-sun problem (velocity Verlet) from a perturbed figure-eight.
  *  - ProtonModel: uud valence quarks, colour-charge flux tubes and a fizzing quark–antiquark sea.
  */
-import { TAU, clamp, hslToRgb, hueFor, setupCanvas, type Effect, type Quality } from "./buzhoushan-effect-common";
+import { GLYPHS, TAU, clamp, hslToRgb, hueFor, setupCanvas, type Effect, type Impulse, type Quality } from "./buzhoushan-effect-common";
 
 type Rand = () => number;
 
@@ -88,15 +88,31 @@ export function waveHeight(x: number, z: number, t: number, bump?: { x: number; 
   return y;
 }
 
+export type Ripple = { x: number; z: number; t0: number; amp: number };
+/** Expanding ring bumps (voice "clicks") added to the wave surface; world units, seconds. */
+export function rippleHeight(x: number, z: number, t: number, ripples: Ripple[]): number {
+  let y = 0;
+  for (const r of ripples) {
+    const age = t - r.t0;
+    if (age < 0 || age > 3.5) continue;
+    const d = Math.hypot(x - r.x, z - r.z), k = (d - 4.5 * age) / 0.9;
+    y += r.amp * Math.exp(-k * k) * Math.exp(-age * 0.9);
+  }
+  return y;
+}
+
 export function waveGridEffect(canvas: HTMLCanvasElement): Effect | undefined {
   const ctx = canvas.getContext("2d"); if (!ctx) return undefined;
   const COLS = 84, ROWS = 64, DZ = 0.6, XR = 13, CAM_H = 5.2, AMP = 1.7;
   let w = 0, h = 0;
   const cur = new Float32Array((COLS + 1) * 2), prev = new Float32Array((COLS + 1) * 2);
+  let ripples: Ripple[] = [];
   return {
     resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); },
-    frame(_dt, t, { busy, pointer }) {
+    frame(_dt, t, { busy, pointer, voice }) {
       const horizon = h * 0.36, focal = w * 0.06, speed = busy ? 3.2 : 1.8, cam = t * speed;
+      for (const im of voice?.impulses ?? []) ripples.push({ x: (im.x - 0.5) * 2 * XR * 0.85, z: cam + 2 + (1 - im.y) * ROWS * DZ * 0.5, t0: t, amp: 1.4 * im.strength });
+      ripples = ripples.filter(r => t - r.t0 < 3.5).slice(-14);
       const base = Math.floor(cam / DZ) * DZ, hue = busy ? 140 : 195;
       const sky = ctx.createLinearGradient(0, 0, 0, horizon + 40);
       sky.addColorStop(0, "#02030a"); sky.addColorStop(1, busy ? "#04281a" : "#0a1f46");
@@ -111,7 +127,7 @@ export function waveGridEffect(canvas: HTMLCanvasElement): Effect | undefined {
         if (d < -0.4) continue;
         const k = focal / (d + 1), depth = clamp(d / (ROWS * DZ), 0, 1);
         for (let c = 0; c <= COLS; c++) {
-          const X = (c / COLS - 0.5) * 2 * XR, Y = AMP * waveHeight(X, zw, t, bump);
+          const X = (c / COLS - 0.5) * 2 * XR, Y = AMP * waveHeight(X, zw, t, bump) + rippleHeight(X, zw, t, ripples);
           cur[c * 2] = w / 2 + X * k; cur[c * 2 + 1] = horizon + (CAM_H - Y) * k;
         }
         // Hidden-line removal: everything below this ridge hides what lies behind it.
@@ -155,7 +171,7 @@ export function starfieldEffect(canvas: HTMLCanvasElement, q: Quality): Effect |
   const ctx = canvas.getContext("2d"); if (!ctx) return undefined;
   const field = new Starfield(q.stars);
   const far = Array.from({ length: 520 }, () => ({ x: Math.random(), y: Math.random(), p: Math.random() * TAU, s: 0.4 + Math.random() * 1.1 }));
-  let w = 0, h = 0, nebula: HTMLCanvasElement | undefined;
+  let w = 0, h = 0, nebula: HTMLCanvasElement | undefined, surge = 0;
   const paintNebula = () => {
     nebula = document.createElement("canvas"); nebula.width = w; nebula.height = h;
     const g = nebula.getContext("2d"); if (!g) return;
@@ -167,8 +183,9 @@ export function starfieldEffect(canvas: HTMLCanvasElement, q: Quality): Effect |
   };
   return {
     resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); paintNebula(); },
-    frame(dt, t, { busy, pointer }) {
-      const speed = busy ? 14 : 6.5;
+    frame(dt, t, { busy, pointer, voice }) {
+      surge += (((voice?.mic ?? 0) + (voice?.ai ?? 0)) * 9 - surge) * Math.min(1, dt * 4);
+      const speed = (busy ? 14 : 6.5) + surge;
       if (nebula) ctx.drawImage(nebula, 0, 0); else { ctx.fillStyle = "#01030a"; ctx.fillRect(0, 0, w, h); }
       ctx.globalCompositeOperation = "lighter";
       for (const s of far) { ctx.fillStyle = `rgba(200,220,255,${0.25 + 0.35 * Math.sin(t * 1.7 + s.p)})`; ctx.fillRect(s.x * w, s.y * h, s.s, s.s); }
@@ -339,8 +356,8 @@ export function protonEffect(canvas: HTMLCanvasElement): Effect | undefined {
   const q = [[0, 0, 0], [0, 0, 0], [0, 0, 0]] as [number, number, number][];
   return {
     resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, w, h); },
-    frame(dt, t, { busy, pointer }) {
-      model.update(dt);
+    frame(dt, t, { busy, pointer, voice }) {
+      model.update(dt * (1 + ((voice?.mic ?? 0) + (voice?.ai ?? 0)) * 2.5));
       const yaw = t * 0.32 + (pointer?.active ? (pointer.x - 0.5) * 2 : 0), pitch = 0.42 + (pointer?.active ? (pointer.y - 0.5) * 0.8 : 0);
       const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch), S = Math.min(w, h) * 0.34;
       const project = (x: number, y: number, z: number): [number, number, number] => {
@@ -398,5 +415,91 @@ export function protonEffect(canvas: HTMLCanvasElement): Effect | undefined {
       ctx.globalCompositeOperation = "source-over";
     },
     dispose() {},
+  };
+}
+
+/* ---------------------------------------------------------------- glyph ripple */
+
+export type GlyphRipple = { cx: number; cy: number; t0: number; strength: number; kind: 0 | 1 | 2 };
+/** Brightness (0..1) of a ring-shaped wave at distance `d` cells from its origin, `age` seconds after the click. */
+export function rippleBrightness(d: number, age: number, strength: number): number {
+  if (age < 0 || age > 2.4) return 0;
+  const radius = (13 + 14 * strength) * age, width = 1.3 + 1.7 * strength, k = (d - radius) / width;
+  return (0.45 + 0.75 * strength) * Math.exp(-k * k) * Math.exp(-age * 1.35);
+}
+
+const GLYPH_COLORS = ["rgb(125,178,210)", "rgb(70,150,255)", "rgb(70,255,170)", "rgb(238,250,255)"];
+
+/** A dim field of glyphs; clicks (pointer, voice onsets) send expanding rings of light through it. */
+export function glyphRippleEffect(canvas: HTMLCanvasElement, _q: Quality): Effect | undefined {
+  const ctx = canvas.getContext("2d"); const base = document.createElement("canvas"); const bctx = base.getContext("2d");
+  if (!ctx || !bctx) return undefined;
+  const CELL = 15, G = GLYPHS.length;
+  let w = 0, h = 0, cols = 0, rows = 0, cp = 0, dpr = 1, lastBase = -1, lastPointer: { x: number; y: number; t: number } | undefined, nextAmbient = 0.6;
+  let glyph = new Uint8Array(0), lit = [new Float32Array(0), new Float32Array(0), new Float32Array(0)], atlas: HTMLCanvasElement[] = [], ripples: GlyphRipple[] = [];
+  const buildAtlas = () => {
+    atlas = GLYPH_COLORS.map(color => {
+      const c = document.createElement("canvas"); c.width = G * cp; c.height = cp;
+      const g = c.getContext("2d"); if (!g) return c;
+      g.font = `600 ${Math.round(cp * 0.84)}px monospace`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = color;
+      for (let i = 0; i < G; i++) g.fillText(GLYPHS[i], i * cp + cp / 2, cp / 2 + cp * 0.04);
+      return c;
+    });
+  };
+  const sprite = (target: CanvasRenderingContext2D, color: number, gi: number, col: number, row: number) =>
+    target.drawImage(atlas[color], gi * cp, 0, cp, cp, col * CELL, row * CELL, CELL, CELL);
+  const redrawBase = () => {
+    bctx.globalAlpha = 1; bctx.fillStyle = "#02050b"; bctx.fillRect(0, 0, w, h);
+    bctx.globalAlpha = 0.17;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) sprite(bctx, 0, glyph[r * cols + c], c, r);
+    bctx.globalAlpha = 1;
+  };
+  const add = (cx: number, cy: number, t: number, strength: number, kind: 0 | 1 | 2) => { ripples.push({ cx, cy, t0: t, strength, kind }); if (ripples.length > 16) ripples.shift(); };
+  return {
+    resize(width, height, ratio = 1) {
+      ({ w, h } = setupCanvas(canvas, ctx, width, height, ratio));
+      dpr = canvas.width / w; cp = Math.ceil(CELL * dpr);
+      base.width = canvas.width; base.height = canvas.height; bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cols = Math.ceil(w / CELL); rows = Math.ceil(h / CELL);
+      glyph = Uint8Array.from({ length: cols * rows }, () => Math.floor(Math.random() * G));
+      lit = [new Float32Array(cols * rows), new Float32Array(cols * rows), new Float32Array(cols * rows)];
+      buildAtlas(); redrawBase(); lastBase = -1;
+    },
+    frame(_dt, t, { pointer, voice }) {
+      // The glyph field slowly rewrites itself.
+      if (t - lastBase > 0.2) {
+        for (let i = 0, n = Math.ceil(glyph.length * 0.04); i < n; i++) glyph[Math.floor(Math.random() * glyph.length)] = Math.floor(Math.random() * G);
+        redrawBase(); lastBase = t;
+      }
+      for (const im of voice?.impulses ?? []) add(im.x * cols, im.y * rows, t, im.strength, im.role === "mic" ? 1 : 2);
+      if (pointer?.active) {
+        const moved = lastPointer ? Math.hypot(pointer.x - lastPointer.x, pointer.y - lastPointer.y) : 1;
+        if (!lastPointer || (moved > 0.04 && t - lastPointer.t > 0.3)) { add(pointer.x * cols, pointer.y * rows, t, 0.55, 0); lastPointer = { x: pointer.x, y: pointer.y, t }; }
+      } else lastPointer = undefined;
+      if (t >= nextAmbient) { add(Math.random() * cols, Math.random() * rows, t, 0.35, 0); nextAmbient = t + 4 + Math.random() * 4; }
+      ripples = ripples.filter(r => t - r.t0 < 2.4);
+      for (const r of ripples) {
+        const age = t - r.t0, reach = (13 + 14 * r.strength) * age + 6;
+        const c0 = Math.max(0, Math.floor(r.cx - reach)), c1 = Math.min(cols - 1, Math.ceil(r.cx + reach));
+        const r0 = Math.max(0, Math.floor(r.cy - reach)), r1 = Math.min(rows - 1, Math.ceil(r.cy + reach));
+        const layer = lit[r.kind];
+        for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) {
+          const v = rippleBrightness(Math.hypot(col - r.cx, row - r.cy), age, r.strength);
+          if (v > 0.03) layer[row * cols + col] += v;
+        }
+      }
+      ctx.imageSmoothingEnabled = false; ctx.globalAlpha = 1;
+      ctx.drawImage(base, 0, 0, w, h);
+      for (let i = 0; i < glyph.length; i++) {
+        const a = lit[0][i], b = lit[1][i], c = lit[2][i], total = a + b + c;
+        if (total <= 0.03) continue;
+        const color = b > c && b > a ? 1 : c > a ? 2 : 0, bright = Math.min(1, total);
+        ctx.globalAlpha = 0.3 + 0.7 * bright;
+        sprite(ctx, bright > 0.85 ? 3 : color, glyph[i], i % cols, Math.floor(i / cols));
+        lit[0][i] = 0; lit[1][i] = 0; lit[2][i] = 0;
+      }
+      ctx.globalAlpha = 1;
+    },
+    dispose() { ripples = []; },
   };
 }

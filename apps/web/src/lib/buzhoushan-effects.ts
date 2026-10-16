@@ -7,8 +7,8 @@
  *  - MatrixRain: classic falling glyph columns.
  * Each is a small class that can run headless, so the numerics are unit-testable.
  */
-import { TAU, clamp, hslToRgb, hueFor, qualityFor, setupCanvas, type Effect, type Quality, type EffectMode, type EffectParams, type Pointer } from "./buzhoushan-effect-common";
-import { attractorEffect, protonEffect, starfieldEffect, threeBodyEffect, waveGridEffect } from "./buzhoushan-effects-science";
+import { GLYPHS, TAU, clamp, hslToRgb, hueFor, qualityFor, setupCanvas, type Effect, type Quality, type EffectMode, type EffectParams, type Pointer } from "./buzhoushan-effect-common";
+import { attractorEffect, glyphRippleEffect, protonEffect, starfieldEffect, threeBodyEffect, waveGridEffect } from "./buzhoushan-effects-science";
 export { hslToRgb, hueFor, qualityFor };
 export type { Effect, EffectMode, EffectParams, Pointer };
 
@@ -58,6 +58,16 @@ export class ParticleField {
   private respawn(i: number) {
     this.x[i] = this.rand() * this.w; this.y[i] = this.rand() * this.h;
     this.vx[i] = 0; this.vy[i] = 0; this.life[i] = 4 + this.rand() * 8;
+  }
+  /** One-shot radial push (a "click"): particles within `radius` are thrown outward. */
+  kick(px: number, py: number, strength: number, radius: number) {
+    const { n, x, y, vx, vy } = this, r2 = radius * radius, push = strength * this.h * 1.1;
+    for (let i = 0; i < n; i++) {
+      const dx = x[i] - px, dy = y[i] - py, d2 = dx * dx + dy * dy;
+      if (d2 >= r2) continue;
+      const d = Math.sqrt(d2) + 1e-3, f = (1 - d / radius) ** 2 * push;
+      vx[i] += (dx / d) * f; vy[i] += (dy / d) * f;
+    }
   }
   step(dt: number, t: number, busy: boolean, pointer?: Pointer) {
     const { n, w, h, x, y, vx, vy, life } = this;
@@ -237,8 +247,6 @@ export class Fluid {
 
 /* ----------------------------------------------------------------- matrix rain */
 
-// Latin letters, digits and code symbols only (no kana), so the rain reads as data rather than text.
-const GLYPHS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0101<>{}[]()/\\|=+-*#$%&@:;.";
 export class MatrixRain {
   cols = 0; rows = 0;
   head = new Float32Array(0); speed = new Float32Array(0); drawn = new Int32Array(0); prev = new Uint16Array(0);
@@ -291,8 +299,9 @@ function particleEffect(canvas: HTMLCanvasElement, q: Quality): Effect | undefin
       for (let i = 3; i < img.data.length; i += 4) img.data[i] = 255;
       if (field) field.resize(off.width, off.height); else field = new ParticleField(q.particles, off.width, off.height);
     },
-    frame(dt, t, { busy, pointer }) {
+    frame(dt, t, { busy, pointer, voice }) {
       if (!field || !img) return;
+      for (const im of voice?.impulses ?? []) field.kick(im.x * field.w, im.y * field.h, im.strength, 0.24 * field.h);
       field.step(dt, t, busy, pointer);
       field.render(img.data, dt, busy); octx.putImageData(img, 0, 0);
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high"; ctx.drawImage(off, 0, 0, W, H);
@@ -311,8 +320,16 @@ function smokeEffect(canvas: HTMLCanvasElement, q: Quality): Effect | undefined 
       const gw = q.smokeWidth, gh = Math.max(24, Math.round(gw * H / W));
       off.width = gw; off.height = gh; fluid = new Fluid(gw, gh); img = octx.createImageData(gw, gh);
     },
-    frame(dt, t, { busy, pointer }) {
+    frame(dt, t, { busy, pointer, voice }) {
       if (!fluid || !img) return;
+      // Voice onsets burst outward like a click: a ring of splats, blue for the broadcaster, green for the AI.
+      for (const im of voice?.impulses ?? []) {
+        const [r, g, bl] = hslToRgb(im.role === "mic" ? 205 : 160, 0.95, 0.58);
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * TAU, c = Math.cos(a), sn = Math.sin(a);
+          fluid.splat(clamp(im.x + 0.03 * c, 0.02, 0.98), clamp(im.y + 0.045 * sn, 0.02, 0.98), c * fluid.w * 0.4 * im.strength, sn * fluid.w * 0.4 * im.strength, [r / 255 * 0.55 * im.strength, g / 255 * 0.55 * im.strength, bl / 255 * 0.55 * im.strength], 0.03);
+        }
+      }
       for (let k = 0; k < 3; k++) {
         const a = 0.37 * t + k * 2.1, b = 0.53 * t + k * 1.3;
         const x = 0.5 + 0.38 * Math.sin(a), y = 0.5 + 0.34 * Math.cos(b);
@@ -342,13 +359,14 @@ function matrixEffect(canvas: HTMLCanvasElement): Effect | undefined {
       const { w, h } = setupCanvas(canvas, ctx, width, height, dpr);
       ctx.fillStyle = "#000602"; ctx.fillRect(0, 0, w, h); rain.resize(w, h);
     },
-    frame(dt, _t, { busy, pointer }) { rain.frame(ctx, dt, busy, pointer); },
+    frame(dt, _t, { busy, pointer, voice }) { rain.frame(ctx, dt * (1 + ((voice?.mic ?? 0) + (voice?.ai ?? 0)) * 1.2), busy, pointer); },
     dispose() {},
   };
 }
 
 export function createEffect(mode: EffectMode, canvas: HTMLCanvasElement, q: Quality = qualityFor("high")): Effect | undefined {
   try {
+    if (mode === "glyph") return glyphRippleEffect(canvas, q);
     if (mode === "particles") return particleEffect(canvas, q);
     if (mode === "smoke") return smokeEffect(canvas, q);
     if (mode === "matrix") return matrixEffect(canvas);

@@ -81,3 +81,27 @@ it('proton sea pairs spawn, age and annihilate within bounds',()=>{
  const a=p.quark(0,1.2),b=p.quark(1,1.2),c=p.quark(2,1.2);
  for(const v of [a,b,c])expect(Math.hypot(...v)).toBeLessThan(1.5);
 });
+import {GlyphRipple,rippleBrightness,rippleHeight} from './lib/buzhoushan-effects-science';
+it('a voice kick throws nearby particles outward and leaves distant ones alone',()=>{
+ const f=new ParticleField(2,400,300,()=>.5);
+ f.x.set([210,390]);f.y.set([150,290]);f.vx.fill(0);f.vy.fill(0);
+ f.kick(200,150,.8,60);
+ expect(f.vx[0]).toBeGreaterThan(0);expect(Math.abs(f.vy[0])).toBeLessThan(1e-3);
+ expect(f.vx[1]).toBe(0);expect(f.vy[1]).toBe(0);
+});
+it('wave ripples are rings that expand and fade',()=>{
+ const r=[{x:0,z:10,t0:0,amp:1}];
+ const at=(d:number,t:number)=>rippleHeight(d,10,t,r);
+ expect(at(4.5*1,1)).toBeGreaterThan(at(0,1));          // the crest is out at the ring radius
+ expect(at(4.5*2,2)).toBeLessThan(at(4.5*1,1));          // and fades with age
+ expect(at(3,4)).toBe(0);                                // expired
+ expect(rippleHeight(0,0,0,[])).toBe(0);
+});
+it('glyph ripple brightness peaks on the expanding ring and is bounded',()=>{
+ const age=.8,radius=(13+14*.7)*age;
+ expect(rippleBrightness(radius,age,.7)).toBeGreaterThan(rippleBrightness(0,age,.7));
+ expect(rippleBrightness(radius,age,.7)).toBeGreaterThan(rippleBrightness(radius+8,age,.7));
+ expect(rippleBrightness(radius,3,.7)).toBe(0);
+ for(const a of [0,.3,1,2])for(const d of [0,5,20,60])expect(rippleBrightness(d,a,1)).toBeLessThanOrEqual(1.3);
+ const _t:GlyphRipple|undefined=undefined;void _t;
+});

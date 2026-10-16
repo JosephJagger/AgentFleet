@@ -1,6 +1,12 @@
-export type EffectMode = "particles" | "smoke" | "matrix" | "attractor" | "wavegrid" | "starfield" | "threebody" | "proton";
+export type EffectMode = "glyph" | "particles" | "smoke" | "matrix" | "attractor" | "wavegrid" | "starfield" | "threebody" | "proton";
 export type Pointer = { x: number; y: number; active: boolean };
-export type EffectParams = { busy: boolean; pointer?: Pointer };
+export type VoiceRole = "mic" | "ai";
+/** One voice onset, placed by pitch (x) and speaker (y band); strength is 0..1. */
+export type Impulse = { role: VoiceRole; x: number; y: number; strength: number };
+export type VoiceParams = { mic: number; ai: number; impulses: Impulse[]; connected: boolean };
+export type EffectParams = { busy: boolean; pointer?: Pointer; voice?: VoiceParams };
+/** Latin letters, digits and code symbols only (no kana), shared by the glyph-based effects. */
+export const GLYPHS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0101<>{}[]()/\\|=+-*#$%&@:;.";
 export interface Effect {
   /** `dpr` is the (already capped) device pixel ratio the backing store should use. */
   resize(width: number, height: number, dpr?: number): void;

@@ -1,3 +1,4 @@
+import { voiceSignal } from "../lib/voice-signal";
 import {saveReloadConnection,clearReloadConnection} from '../lib/reload-connections';
 import {displayName} from '../lib/display-name';
 import {DEFAULT_LIVE_WELCOME,normalizeWelcomeText,LIVE_WELCOME_INTERVAL_MS,welcomeEligible,type WelcomeBridge} from '../lib/live-interactions';
@@ -63,6 +64,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     resources.current = {};
     setMeterStream(null);
     clearInterval(owned.heartbeat); clearTimeout(owned.timeout); clearTimeout(owned.disconnectTimeout);
+    if(globalMachineId)voiceSignal.detachAll();
     owned.stream?.getTracks().forEach(track => track.stop());
     owned.peer?.close();
     if (owned.socket?.readyState === WebSocket.OPEN) owned.socket.send(JSON.stringify({ type: "stop", reason }));
@@ -113,6 +115,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       const stream = await navigator.mediaDevices.getUserMedia(voiceMicrophoneConstraints(devices.microphone));
       if (!current()) { stream.getTracks().forEach(track => track.stop()); return; }
       resources.current.stream = stream;setMeterStream(stream);
+      if(globalMachineId)voiceSignal.attach("mic", stream);
       const peer = new RTCPeerConnection();
       resources.current.peer = peer;
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -120,6 +123,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       peer.ontrack = event => {
         if (!current() || !audio.current) return;
         audio.current.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+        if(globalMachineId)voiceSignal.attach("ai", audio.current.srcObject as MediaStream);
         void audio.current.play().catch(() => { if (current()) setPlayBlocked(true); });
       };
       peer.onconnectionstatechange = () => {

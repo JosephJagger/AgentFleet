@@ -3581,7 +3581,6 @@
   "粒子引力场": "Particle gravity field",
   "流体烟雾": "Fluid smoke",
   "数字雨": "Digital rain",
-  "效果测试：数字键 1–8 或 ←/→ 切换，点击退出": "Effect test: keys 1–8 or ←/→ to switch, click to exit",
   "吸引子轨迹": "Strange attractor",
   "波浪网格": "Wave grid",
   "星空": "Starfield",
@@ -3673,5 +3672,9 @@
   "更新于": "Updated at",
   "例如：“看看最近三次通话”“查一下最近一周的转写”，也可指定时间或加关键词。双方转写按通话及发言顺序分页查看。": "For example: “Show my latest three calls” or “Read transcripts from the last week.” You can specify dates or add keywords. Both speakers are grouped by call and read in speaking order, page by page.",
   "关键词可不填；关键词和范围都未指定时默认最近一次；含当前通话。仅有最近 30 天已上传文字，未识别、未上传或已过期内容无法恢复。": "Keywords are optional. With neither a keyword nor a range, the latest call is shown, including the current call. Only uploaded text from the last 30 days is available; missing or expired content cannot be recovered.",
-  "查询不会保存或执行历史任务。新需求可明确说“请把这条新需求保存为待办”；保存不等于执行。": "Reading history never saves or executes historical tasks. To save a new request, say “Please save this new request as a todo.” Saving does not authorize execution."
+  "查询不会保存或执行历史任务。新需求可明确说“请把这条新需求保存为待办”；保存不等于执行。": "Reading history never saves or executes historical tasks. To save a new request, say “Please save this new request as a todo.” Saving does not authorize execution.",
+  "效果测试：数字键 1–9 或 ←/→ 切换，点击退出": "Effect test: keys 1–9 or ←/→ to switch, click to exit",
+  "字符涟漪": "Glyph ripples",
+  "语音联动：已连接": "Voice link: connected",
+  "语音联动：未连接（演示声音）": "Voice link: not connected (demo sound)"
 }

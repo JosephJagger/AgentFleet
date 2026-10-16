@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { EffectMode } from "./buzhoushan-effect-common";
 export type ScreensaverMode = "auto" | EffectMode;
 /** Effects in rotation/test order; keys 1..n choose them in the preview. */
-export const SCREENSAVER_EFFECTS: EffectMode[] = ["particles", "smoke", "matrix", "attractor", "wavegrid", "starfield", "threebody", "proton"];
+export const SCREENSAVER_EFFECTS: EffectMode[] = ["particles", "smoke", "matrix", "attractor", "wavegrid", "starfield", "threebody", "proton", "glyph"];
 export const SCREENSAVER_MODES: ScreensaverMode[] = ["auto", ...SCREENSAVER_EFFECTS];
 export type ScreensaverQuality = "auto" | "high" | "medium" | "low";
 export const SCREENSAVER_QUALITIES: ScreensaverQuality[] = ["auto", "high", "medium", "low"];

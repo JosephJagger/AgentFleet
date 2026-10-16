@@ -4,6 +4,7 @@ import { isBuzhoushanTurnActive } from "../lib/buzhoushan-events";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createEffect, qualityFor, type EffectMode, type Pointer } from "../lib/buzhoushan-effects";
 import { QUALITY_TIERS, describeGpu, type QualityTier } from "../lib/buzhoushan-effect-common";
+import { createDemoVoice, voiceSignal } from "../lib/voice-signal";
 import { SCREENSAVER_EFFECTS } from "../lib/buzhoushan-idle";
 import { setScreensaverPreview, useIdle, useScreensaverPreview, useScreensaverPrefs } from "../lib/buzhoushan-idle";
 import { workbenchItems } from "./BuzhoushanActivity";
@@ -49,9 +50,9 @@ let cycleStart = 0;
 let autoTier: QualityTier = "high";
 const TIER_LABEL: Record<QualityTier, string> = { low: "低", medium: "中", high: "高" };
 
-function gpuLine(diag: { fps: number; w: number; h: number; dpr: number }, tier: QualityTier) {
+function gpuLine(diag: { fps: number; w: number; h: number; dpr: number; voice: boolean }, tier: QualityTier) {
   const gpu = describeGpu();
-  const base = `${t("帧率 {0} fps", diag.fps)} · ${diag.w}×${diag.h} @${diag.dpr}x · ${t("画质")} ${t(TIER_LABEL[tier])}`;
+  const base = `${t("帧率 {0} fps", diag.fps)} · ${diag.w}×${diag.h} @${diag.dpr}x · ${t("画质")} ${t(TIER_LABEL[tier])} · ${t(diag.voice ? "语音联动：已连接" : "语音联动：未连接（演示声音）")}`;
   if (!gpu.renderer) return `${base} · ${t("WebGL 不可用，可能未开启硬件加速")}`;
   return `${base} · ${gpu.renderer}${gpu.software ? ` · ${t("软件渲染，请在浏览器设置中开启硬件加速")}` : ""}`;
 }
@@ -66,7 +67,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
   const [previewMode, setPreviewMode] = useState<EffectMode>();
   const [cycle, setCycle] = useState(cycleStart);
   const [autoLevel, setAutoLevel] = useState<QualityTier>(autoTier);
-  const [diag, setDiag] = useState<{ fps: number; w: number; h: number; dpr: number }>();
+  const [diag, setDiag] = useState<{ fps: number; w: number; h: number; dpr: number; voice: boolean }>();
   const tier: QualityTier = prefs.quality === "auto" ? autoLevel : prefs.quality;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef(false);
@@ -120,6 +121,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
     const quality = qualityFor(tier);
     const effect = createEffect(mode, canvas, quality);
     if (!effect) return;
+    const demoVoice = createDemoVoice();
     let raf = 0, last = performance.now(), size = "", frames = 0, spent = 0, windowStart = last;
     const start = last;
     const loop = (now: number) => {
@@ -127,7 +129,10 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
       const w = canvas.clientWidth, h = canvas.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, quality.maxDpr);
       const key = `${w}x${h}@${dpr}`;
       if (w > 0 && h > 0 && size !== key) { size = key; effect.resize(w, h, dpr); }
-      if (size) effect.frame(dt, (now - start) / 1000, { busy: busyRef.current, pointer: pointerRef.current });
+      // Live call audio drives the effects; the preview plays a synthetic voice when no call is connected.
+      let voice = voiceSignal.poll(now);
+      if (!voice.connected && previewRef.current) voice = demoVoice(now);
+      if (size) effect.frame(dt, (now - start) / 1000, { busy: busyRef.current, pointer: pointerRef.current, voice });
       frames++; spent += interval;
       if (now - windowStart >= 1000) {
         const fps = (frames * 1000) / spent;
@@ -135,7 +140,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
         if (prefs.quality === "auto" && now - start > 2500 && fps < 40 && tier !== "low") {
           autoTier = QUALITY_TIERS[QUALITY_TIERS.indexOf(tier) - 1]; setAutoLevel(autoTier); return;
         }
-        if (previewRef.current) setDiag({ fps: Math.round(fps), w, h, dpr });
+        if (previewRef.current) setDiag({ fps: Math.round(fps), w, h, dpr, voice: voiceSignal.connected });
         frames = 0; spent = 0; windowStart = now;
       }
       raf = requestAnimationFrame(loop);
@@ -152,7 +157,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
         {status
           ? <><strong data-live={status.live}>{status.label}</strong>{status.total > 0 && <small>{t("已完成 {0} / {1} 步", status.done, status.total)}</small>}</>
           : <strong>{t("待命中")}</strong>}
-        {preview && <small>{t("效果测试：数字键 1–8 或 ←/→ 切换，点击退出")}</small>}
+        {preview && <small>{t("效果测试：数字键 1–9 或 ←/→ 切换，点击退出")}</small>}
         {preview && diag && <small className="buzhou-saver__diag">{gpuLine(diag, tier)}</small>}
       </div>
     </div>, document.body);
