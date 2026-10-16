@@ -54,6 +54,8 @@ export function HostSessions({machine,sessions,selectedId,detail,onSelect,onBrow
   useEffect(()=>{setPicked(undefined);setExpandedFor(undefined);},[machine?.id]);
   const scope=JSON.stringify([machine?.id,selectedId]);
   const groups=hostSessionGroups(sessions,machine);
+  const managedProviders = new Set(sessions.filter(session => session.machineId === machine?.id && session.state.ownership === 'agentfleet_owned' && Boolean(session.nativeThreadId)).map(session => session.provider ?? 'codex'));
+  const orderedProviders = [...PROVIDER_DISPLAY_ORDER].sort((a,b)=>Number(managedProviders.has(b))-Number(managedProviders.has(a)));
   const showSwitcher=!selectedId || expandedFor===scope;
   const select=(id:string)=>{setPicked({machineId:machine?.id,id});setExpandedFor(undefined);onSelect(id);};
   return <div className="host-session-editor buzhou-editor">
@@ -62,7 +64,7 @@ export function HostSessions({machine,sessions,selectedId,detail,onSelect,onBrow
       {selectedId && <div className="buzhou-session-toggle"><button type="button" aria-controls="buzhou-session-picker" aria-expanded={showSwitcher} onClick={()=>setExpandedFor(showSwitcher?undefined:scope)}><Layers3 size={13}/>{showSwitcher?t('收起会话选择'):t('切换会话')}</button></div>}
     </div>
     {showSwitcher && <div id="buzhou-session-picker" className="buzhou-session-switcher" aria-label={t('当前主机会话切换')}>
-      <div className={`buzhou-session-providers${provider && provider !== "all" ? " buzhou-session-providers--single" : ""}`}>{PROVIDER_DISPLAY_ORDER.filter(id => !provider || provider === 'all' || id === provider).map(provider=><section className="buzhou-session-provider" key={provider} aria-label={providerName(provider)}>
+      <div className={`buzhou-session-providers${provider && provider !== "all" ? " buzhou-session-providers--single" : ""}`}>{orderedProviders.filter(id => !provider || provider === 'all' || id === provider).map(provider=><section className="buzhou-session-provider" key={provider} aria-label={providerName(provider)}>
         <header><h3>{providerName(provider)}</h3>{provider==='claude' && <small>{machine?.agentRuntimes?.claude?.installed===false?t('未安装'):machine?.agentRuntimes?.claude?.installed===true?'':t('安装状态未上报')}</small>}</header>
         {(['running','managed'] as const).map(kind=><SessionRow key={`${machine?.id}:${kind}`} kind={kind} sessions={groups[kind].filter(session=>(session.provider??'codex')===provider)} selectedId={picked?.machineId===machine?.id && picked?.id===selectedId ? selectedId : undefined} online={machine?.reachability==='live'} detail={detail} onSelect={select}/>)}
       </section>)}</div>

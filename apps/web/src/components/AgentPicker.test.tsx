@@ -16,3 +16,15 @@ it('offers the five new providers only when ready and excludes deferred provider
 it('renders the selected native identity without relabeling it as Claude',()=>{
  render(<AgentPicker value="grok" claudeInstalled={true} onChange={()=>{}}/>);expect(screen.getByText('Grok Build')).toBeTruthy();expect(screen.queryByText('Claude Code')).toBeNull();
 });
+
+it('keeps internal scroll and scrollbar interaction open, but closes outside the menu',()=>{
+ render(<AgentPicker value="codex" claudeInstalled onChange={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'选择 Agent'}));
+ const menu=screen.getByRole('menu');
+ fireEvent.pointerDown(menu);fireEvent.scroll(menu);
+ fireEvent.scroll(screen.getByRole('menuitemradio',{name:/Claude Code/}));
+ expect(screen.getByRole('menu')).toBe(menu);
+ fireEvent.pointerDown(document.body);expect(screen.queryByRole('menu')).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'选择 Agent'}));fireEvent.scroll(window);
+ expect(screen.queryByRole('menu')).toBeNull();
+});

@@ -121,3 +121,13 @@ it('defaults to all providers and keeps all while selecting a conversation',()=>
  fireEvent.click(screen.getByRole('button',{name:'选择 Agent'}));
  fireEvent.click(screen.getByRole('menuitemradio',{name:/全部/}));expect(props.onProviderChange).toHaveBeenCalledWith('all');
 });
+
+it('puts owned native sessions first, including running ones, and retains display order for ties',()=>{
+ const props={machine,onSelect:vi.fn(),onBrowse:vi.fn(),onCreate:vi.fn(),children:<div/>};
+ const rows=[{...session('kimi-owned',true),provider:'kimi' as const},{...session('claude-owned'),provider:'claude' as const},{...session('foreign'),machineId:'other'},{...session('unmanaged',true),provider:'cursor' as const,state:{...session('unmanaged').state,ownership:'claimable' as const,currentTurn:'in_progress' as const}}];
+ const view=render(<HostSessions {...props} sessions={rows}/>);
+ const names=()=>[...view.container.querySelectorAll('.buzhou-session-provider h3')].map(el=>el.textContent);
+ expect(names()).toEqual(['Claude Code','Kimi Code','Codex','Cursor','Qwen Code','CodeBuddy Code','Grok Build']);
+ view.rerender(<HostSessions {...props} sessions={[]}/>);
+ expect(names()).toEqual(['Codex','Claude Code','Cursor','Qwen Code','Kimi Code','CodeBuddy Code','Grok Build']);
+});

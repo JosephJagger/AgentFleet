@@ -46,3 +46,7 @@
 :root .session-actions-popover:has(.native-voice__popover) { overflow:visible; }
 :root .inspector-head--compact .session-actions-popover > .button { min-height:40px; padding:8px 10px; border:0; border-radius:6px; box-shadow:none; font-size:var(--text-caption); gap:8px; }
 :root .inspector-head--compact .session-actions-popover > .native-voice { display:block; width:100%; }
+
+/* A full, light outline makes every provider group distinct across themes. */
+:root .host-session-editor .buzhou-session-providers > .buzhou-session-provider { border:1px solid var(--line-strong); border-radius:6px; padding:8px; }
+:root .host-session-editor .buzhou-session-providers--single { grid-template-columns:minmax(0,1fr); }

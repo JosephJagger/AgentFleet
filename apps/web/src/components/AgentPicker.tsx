@@ -23,14 +23,19 @@ export function AgentPicker({ value, claudeInstalled, runtimes, onChange, allSel
     setPosition({ top, maxHeight, left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)), width });
     const frame = requestAnimationFrame(() => {
       const selected = menu.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]:not(:disabled)');
-      (selected ?? menu.current?.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus();
+      (selected ?? menu.current?.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus({preventScroll:true});
     });
     const outside = (event: PointerEvent) => { if (!trigger.current?.contains(event.target as Node) && !menu.current?.contains(event.target as Node)) setOpen(false); };
     const close = () => setOpen(false);
+    const scroll = (event: Event) => {
+      // Capture sees scrolling inside the portaled menu too; only page scrolling invalidates its anchor.
+      if (event.target instanceof Node && menu.current?.contains(event.target)) return;
+      close();
+    };
     document.addEventListener("pointerdown", outside);
     window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
-    return () => { cancelAnimationFrame(frame); document.removeEventListener("pointerdown", outside); window.removeEventListener("resize", close); window.removeEventListener("scroll", close, true); };
+    window.addEventListener("scroll", scroll, true);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener("pointerdown", outside); window.removeEventListener("resize", close); window.removeEventListener("scroll", scroll, true); };
   }, [open]);
   function choose(provider: Provider) { onChange(provider); setOpen(false); trigger.current?.focus(); }
   return <>
@@ -38,7 +43,7 @@ export function AgentPicker({ value, claudeInstalled, runtimes, onChange, allSel
       <span className={`agent-picker-mark agent-picker-mark--${value}`} aria-hidden="true">{allSelected ? <Layers3 size={15}/> : value === "codex" ? <Code2 size={15} /> : <Sparkles size={15} />}</span>
       <span>{allSelected ? t("全部") : providerName(value)}</span><ChevronDown className="agent-picker-chevron" size={13} aria-hidden="true" />
     </button>
-    {open && createPortal(<div ref={menu} id={id} className="agent-picker-menu" role="menu" aria-label={t("选择 Agent")} style={{ position: "fixed", overflowY: "auto", ...position }} onKeyDown={event => {
+    {open && createPortal(<div ref={menu} id={id} className="agent-picker-menu" role="menu" aria-label={t("选择 Agent")} style={{ position: "fixed", overflowY: "auto", overscrollBehavior: "contain", ...position }} onKeyDown={event => {
       if (event.key === "Escape" || event.key === "Tab") { setOpen(false); if (event.key === "Escape") { event.preventDefault(); trigger.current?.focus(); } return; }
       if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
         event.preventDefault(); const buttons = [...menu.current!.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")]; const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
