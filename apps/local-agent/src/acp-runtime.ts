@@ -57,7 +57,12 @@ export class AcpRuntime {
       const capabilities=init.agentCapabilities,sessionCapabilities=isRecord(capabilities.sessionCapabilities)?capabilities.sessionCapabilities:{};
       this.availability={installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),capabilities:{...unavailableCapabilities(),create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
       return connection;
-    } catch(error) {connection.close();this.availability.state='unverified';this.availability.capabilities=unavailableCapabilities();throw error;}
+    } catch(error) {connection.close();this.markFailure(error);throw error;}
+  }
+  /** ACP reports missing credentials as JSON-RPC -32000 (auth_required). */
+  private markFailure(error:unknown) {
+    const login=error instanceof AgentError&&/\(-32000\)/.test(error.message);
+    this.availability.state=login?'login_required':'unverified';this.availability.capabilities=unavailableCapabilities();
   }
   async listThreads():Promise<DiscoveredThreadSummary[]> {
     await this.start();if(!this.executable)return [];
@@ -78,7 +83,7 @@ export class AcpRuntime {
       if(!complete)throw new AgentError('ACP_CATALOG_LIMIT','Native catalog exceeds supported page limit');
       for(const id of this.catalog.keys())if(!observed.has(id)&&!this.sessions.has(id))this.catalog.delete(id);
       return [...this.catalog.values()];
-    }finally{connection.close();}
+    }catch(error){if(error instanceof AgentError&&/\(-32000\)/.test(error.message))this.markFailure(error);throw error;}finally{connection.close();}
   }
   private async open(id:string,cwd:string,fresh=false):Promise<Session> {
     if(fresh)return this.openOwned(id,cwd,true);
@@ -100,7 +105,7 @@ export class AcpRuntime {
       if(fresh){if(typeof result.sessionId!=='string')throw new AgentError('ACP_SESSION_INVALID','Native session ID missing');session.id=encodeProviderThread(this.provider,result.sessionId);}
       else if(typeof result.sessionId==='string'&&result.sessionId!==this.native(id))throw new AgentError('PROVIDER_RESUME_MISMATCH','Native CLI restored a different session');
       session.loading=false;this.sessions.set(session.id,session);return session;
-    }catch(error){session.lost=true;session.connection.close();throw error;}
+    }catch(error){session.lost=true;session.connection.close();if(error instanceof AgentError&&/\(-32000\)/.test(error.message))this.markFailure(error);throw error;}
   }
   async createThread(project:ProjectRecord,_profile?:PermissionProfile,name?:string):Promise<ThreadStartResult> {
     const session=await this.open('',project.root,true);
