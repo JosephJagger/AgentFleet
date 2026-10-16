@@ -99,3 +99,13 @@ test('workspace snapshot provenance, empty result and partial capture survive pr
  const item=f.progress.read(f.principal,f.session.logicalSessionId,undefined,true).items[0]!;
  assert.equal(item.source,'workspace_snapshot');assert.equal(item.limited,true);assert.equal(item.supported,true);assert.match(item.output!,/actual edit/);
 });
+
+test('activity counts restore from durable items in a fresh progress service without volatile browser state',t=>{
+ const f=fixture();t.after(()=>f.db.close());f.running();
+ for(let n=0;n<25;n++)f.event(n<11?'item.completed':'item.started',{item:{id:`cmd-${n}`,type:'commandExecution',command:'fixture command'}});
+ const restored=new SessionProgressService(f.db,f.registry).read(f.principal,f.session.logicalSessionId,undefined,true);
+ assert.equal(restored.items.length,25);
+ assert.equal(restored.items.filter(item=>item.status==='completed').length,11);
+ assert.equal(restored.nativeTurnId,'turn-current');
+ assert.equal(restored.limited,false);
+});

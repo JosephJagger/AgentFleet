@@ -8,15 +8,16 @@ import { QUALITY_TIERS, type QualityTier } from "../lib/buzhoushan-effect-common
 import { createDemoVoice, voiceSignal } from "../lib/voice-signal";
 import { SCREENSAVER_ORDER, useIdle, useScreensaverPrefs, useScreensaverRequests } from "../lib/buzhoushan-idle";
 import { MAX_AUTO_REDIALS, useVoiceStatus } from "../lib/voice-status";
+import { useSessionProgress } from "./RuntimeProgress";
 import { workbenchItems } from "./BuzhoushanActivity";
 import { t } from "../i18n";
 
-function taskStatus(detail?: SessionDetail) {
-  if (!detail || !isBuzhoushanTurnActive(detail)) return undefined;
+function taskStatus(detail?: SessionDetail, projected = false) {
+  if (!detail || !isBuzhoushanTurnActive(projected ? { ...detail, events: [] } : detail)) return undefined;
   const { session } = detail;
   const live = !session.state.unknownFreeze && session.state.reachability !== "unreachable" && detail.hostOnline !== false;
   const label = !live ? t("运行状态待确认") : session.state.waitReason === "approval" ? t("等待确认") : session.state.waitReason === "user_input" ? t("等待回答") : t("任务执行中");
-  const steps = workbenchItems(detail);
+  const steps = workbenchItems(detail, detail.progress);
   // Only counts are shown: command text may hold secrets and this layer is broadcast.
   return { label, live, done: steps.filter(step => step.status === "completed").length, total: steps.length };
 }
@@ -25,18 +26,30 @@ function taskStatus(detail?: SessionDetail) {
 function projectStatus(detail: SessionDetail | undefined, sessions: FleetSession[] | undefined, connected: boolean) {
   if (!connected) return { label: t("运行状态待确认"), live: false, done: 0, total: 0 };
   if (!sessions) return taskStatus(detail);
-  const active = sessions.filter(session => isBuzhoushanTurnActive({
-    session,
-    events: detail?.session.id === session.id && detail.session.activeTurnId === session.activeTurnId ? detail.events : [],
-  } as SessionDetail));
-  const uncertain = sessions.some(session => session.state.unknownFreeze || session.state.reachability === "unreachable");
+  // Dashboard summaries and selected-detail reads complete independently. Use the
+  // newest projection, never let an older list hide a just-started selected task.
+  const merged = new Map(sessions.map(session => [session.id, session]));
+  if (detail) {
+    const selected = detail.session, listed = merged.get(selected.id);
+    if (!listed || (selected.projectionEpoch ?? 0) > (listed.projectionEpoch ?? 0) ||
+      (selected.projectionEpoch ?? 0) === (listed.projectionEpoch ?? 0) &&
+      ((selected.sessionSeq ?? 0) > (listed.sessionSeq ?? 0) ||
+       (selected.sessionSeq ?? 0) === (listed.sessionSeq ?? 0) && selected.lastActivityAt > listed.lastActivityAt)) {
+      merged.set(selected.id, selected);
+    }
+  }
+  sessions = [...merged.values()];
+  // The list's projected state is authoritative. Old detail lifecycle events
+  // must not cancel a newer running summary, even when a turn ID is reused.
+  const active = sessions.filter(session => isBuzhoushanTurnActive({ session, events: [] } as unknown as SessionDetail));
+  const uncertain = sessions.some(session => session.state.currentTurn === "unknown" || session.state.unknownFreeze && session.state.currentTurn === "in_progress");
   const live = active.filter(session => !session.state.unknownFreeze && session.state.reachability !== "unreachable");
   if (!live.length) return uncertain || active.length ? { label: t("运行状态待确认"), live: false, done: 0, total: 0 } : undefined;
   if (live.length === 1) {
     const session = live[0];
     if (detail?.session.id === session.id && detail.session.activeTurnId === session.activeTurnId) {
-      const status = taskStatus({ ...detail, session });
-      if (status) return status;
+      const status = taskStatus({ ...detail, session }, true);
+      if (status?.live) return status;
     }
     return { label: t(session.state.waitReason === "approval" ? "等待确认" : session.state.waitReason === "user_input" ? "等待回答" : "任务执行中"), live: true, done: 0, total: 0 };
   }
@@ -92,18 +105,38 @@ type Source = "idle" | "call" | "manual";
  * toolbar button, shows task progress (or standby) plus the voice-call state, and a click or key press leaves
  * it (mouse movement does not). The arrows switch effects. It never blocks input or touches calls/tasks.
  */
-export function BuzhoushanScreensaver({ detail, sessions, connected = true }: { detail?: SessionDetail; sessions?: FleetSession[]; connected?: boolean }) {
+export function BuzhoushanScreensaver({ detail, sessions, connected = true, onRefresh }: { detail?: SessionDetail; sessions?: FleetSession[]; connected?: boolean; onRefresh?: (silent: boolean) => Promise<void> }) {
   const prefs = useScreensaverPrefs();
   const idle = useIdle(prefs.seconds * 1000, prefs.enabled);
   const requests = useScreensaverRequests();
   const voice = useVoiceStatus();
-  const status = projectStatus(detail, sessions, connected);
   // A call that is being re-dialled still counts as live, so a screensaver it raised does not flicker away.
   const callLive = voice.phase === "connected" || voice.phase === "recovering" || voice.redial > 0;
 
   const [source, setSource] = useState<Source>();
   const on = source !== undefined;
+  // Restore the existing activity projection after reload; the paginated timeline
+  // alone may contain no command items. Scope strictly to the selected turn.
+  const {progress} = useSessionProgress(detail?.session.id ?? "", on && Boolean(detail) && isBuzhoushanTurnActive(detail!), undefined, on && Boolean(detail));
+  const progressDetail = detail ? { ...detail, progress: detail.progress?.contentAvailable === false ? detail.progress : progress ?? detail.progress } : undefined;
+  const status = projectStatus(progressDetail, sessions, connected);
   const bounds = useWorkspaceBounds(on);
+  // Session event subscriptions cover the selected conversation only. Refresh
+  // global metadata on entry and while visible; never fetch all session bodies.
+  useEffect(() => {
+    if (!on || !onRefresh) return;
+    let pending = false;
+    const refresh = async () => {
+      if (pending || document.visibilityState === "hidden") return;
+      pending = true;
+      try { await onRefresh(true); } catch { /* Existing dashboard error handling owns failures. */ }
+      finally { pending = false; }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 5000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, [on, onRefresh]);
   const [idx, setIdx] = useState(0);
   const [picked, setPicked] = useState(false);
   const [toast, setToast] = useState("");

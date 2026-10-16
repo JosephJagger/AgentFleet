@@ -207,3 +207,123 @@ it('separates listening from project execution and keeps approval waits explicit
  expect(caption()).toContain('暂无运行中的项目任务');
  expect(caption()).toContain('聆听中');
 });
+
+it('keeps a newer selected projection when the global list lags, but accepts a newer completion',()=>{
+ const running={id:'s',activeTurnId:'t',projectionEpoch:1,sessionSeq:20,lastActivityAt:'2026-10-16T12:00:00Z',state:{currentTurn:'in_progress',reachability:'live'}};
+ const selected=detail({session:running});
+ const view=render(<BuzhoushanScreensaver detail={selected} sessions={[]}/>);
+ expect(caption()).toContain('任务执行中');
+ view.rerender(<BuzhoushanScreensaver detail={selected} sessions={[{...running,sessionSeq:19,state:{...running.state,currentTurn:'completed'}} as never]}/>);
+ expect(caption()).toContain('任务执行中');
+ view.rerender(<BuzhoushanScreensaver detail={selected} sessions={[{...running,sessionSeq:21,state:{...running.state,currentTurn:'completed'}} as never]}/>);
+ expect(caption()).toContain('暂无运行中的项目任务');
+});
+
+it('does not let old detail terminal events suppress a newer global running projection',()=>{
+ const running={id:'s',activeTurnId:'t',projectionEpoch:1,sessionSeq:21,state:{currentTurn:'in_progress',reachability:'live'}};
+ render(<BuzhoushanScreensaver sessions={[running as never]} detail={detail({session:{...running,sessionSeq:19},events:[{nativeTurnId:'t',type:'turn.completed',sessionSeq:19}]})}/>);
+ expect(caption()).toContain('任务执行中');
+});
+
+it('refreshes metadata on every entry and while open without overlapping or continuing after exit',async()=>{
+ prefs({enabled:false});
+ let release!:()=>void;
+ const refresh=vi.fn(()=>new Promise<void>(resolve=>{release=resolve;}));
+ render(<BuzhoushanScreensaver onRefresh={refresh}/>);
+ expect(refresh).not.toHaveBeenCalled();
+ act(()=>requestScreensaver());
+ expect(refresh).toHaveBeenCalledTimes(1);
+ act(()=>vi.advanceTimersByTime(10_000));
+ expect(refresh).toHaveBeenCalledTimes(1);
+ await act(async()=>release());
+ act(()=>vi.advanceTimersByTime(5000));
+ expect(refresh).toHaveBeenCalledTimes(2);
+ await act(async()=>release());
+ fireEvent.keyDown(window,{key:'Escape'});
+ act(()=>vi.advanceTimersByTime(10_000));
+ expect(refresh).toHaveBeenCalledTimes(2);
+ act(()=>requestScreensaver());
+ expect(refresh).toHaveBeenCalledTimes(3);
+ await act(async()=>release());
+});
+
+it.each(['codex','claude','cursor','qwen','kimi','codebuddy','grok'])('maps real dashboard payloads for %s through running, approval and idle without provider filtering',async(provider)=>{
+ const {api}=await import('./lib/api');
+ let executionState='running';
+ const fetchMock=vi.spyOn(globalThis,'fetch').mockImplementation(async(input)=>{
+  const url=String(input);
+  const session={logicalSessionId:'other',provider,executionState,reachability:'live',latestSessionSeq:10,projectionEpoch:1};
+  const payload=url==='/api/auth/status'?{authenticated:true,user:{userId:'u'}}:
+   url==='/api/dashboard'?{activitySessions:[session]}:{items:[]};
+  return new Response(JSON.stringify(payload),{status:200});
+ });
+ const dashboard=await api.dashboard();
+ expect(dashboard.activitySessions?.[0].provider).toBe(provider);
+ const view=render(<BuzhoushanScreensaver sessions={dashboard.activitySessions}/>);
+ expect(caption()).toContain('任务执行中');
+ executionState='awaiting_approval';
+ view.rerender(<BuzhoushanScreensaver sessions={(await api.dashboard()).activitySessions}/>);
+ expect(caption()).toContain('等待确认');
+ executionState='completed';
+ view.rerender(<BuzhoushanScreensaver sessions={(await api.dashboard()).activitySessions}/>);
+ expect(caption()).toContain('暂无运行中的项目任务');
+ executionState='idle';
+ view.rerender(<BuzhoushanScreensaver sessions={(await api.dashboard()).activitySessions}/>);
+ expect(caption()).toContain('暂无运行中的项目任务');
+ fetchMock.mockRestore();
+});
+
+it('does not let an offline idle host make all idle projects look uncertain',()=>{
+ render(<BuzhoushanScreensaver sessions={[{id:'idle',state:{currentTurn:'none',reachability:'unreachable'}} as never]}/>);
+ expect(caption()).toContain('暂无运行中的项目任务');
+});
+
+const savedSteps=()=>({sessionId:'s',nativeTurnId:'t',state:'running',source:'codex_app_server_events',freshness:'live',contentAvailable:true,waitingForApproval:false,limited:false,updatedAt:'2026-10-16T12:00:00Z',items:Array.from({length:25},(_,i)=>({id:`cmd-${i}`,kind:'commandExecution',status:i<11?'completed':'running',title:'private command',updatedAt:'2026-10-16T12:00:00Z'}))}) as never;
+it('restores recorded activity counts from the persisted progress projection after a page remount',()=>{
+ const input=detail({progress:savedSteps(),events:[]});
+ const first=render(<BuzhoushanScreensaver detail={input}/>);
+ expect(caption()).toContain('已完成 11 / 25 步');
+ first.unmount();
+ render(<BuzhoushanScreensaver detail={input}/>);
+ expect(caption()).toContain('已完成 11 / 25 步');
+ expect(caption()).not.toContain('private command');
+});
+it('keeps recorded counts when dashboard and detail sequence numbers differ within the same turn',()=>{
+ const session={id:'s',activeTurnId:'t',projectionEpoch:1,sessionSeq:30,state:{currentTurn:'in_progress',reachability:'live'}};
+ const input=detail({session:{...session,sessionSeq:25},progress:savedSteps(),events:[]});
+ const view=render(<BuzhoushanScreensaver detail={input} sessions={[session as never]}/>);
+ expect(caption()).toContain('已完成 11 / 25 步');
+ view.rerender(<BuzhoushanScreensaver detail={input} sessions={[{...session,activeTurnId:'next'} as never]}/>);
+ expect(caption()).toContain('任务执行中');
+ expect(caption()).not.toContain('/ 25');
+});
+it('never shows counts from another turn or from content whose synchronization was disabled',()=>{
+ const view=render(<BuzhoushanScreensaver detail={detail({progress:{...savedSteps() as object,nativeTurnId:'old'}})}/>);
+ expect(caption()).not.toContain('/ 25');
+ view.rerender(<BuzhoushanScreensaver detail={detail({progress:{...savedSteps() as object,contentAvailable:false}})}/>);
+ expect(caption()).not.toContain('/ 25');
+});
+it('reads the activity endpoint on opening and restores counts without loading more timeline pages',async()=>{
+ const {api}=await import('./lib/api');
+ const read=vi.spyOn(api,'sessionProgress').mockResolvedValue(savedSteps());
+ render(<BuzhoushanScreensaver detail={detail()}/>);
+ expect(caption()).not.toContain('/ 25');
+ await act(async()=>requestScreensaver());
+ expect(read).toHaveBeenCalledWith('s',expect.any(AbortSignal),true);
+ expect(caption()).toContain('已完成 11 / 25 步');
+});
+
+it('does not replace restored activity with the shorter detail preview on dashboard refresh, and keeps polling',async()=>{
+ const {api}=await import('./lib/api');
+ const full=savedSteps() as unknown as import('./lib/types').SessionProgress;
+ const read=vi.spyOn(api,'sessionProgress').mockResolvedValue(full);
+ const input=detail({progress:{...full,items:full.items.slice(-8),limited:true}});
+ const view=render(<BuzhoushanScreensaver detail={input}/>);
+ await act(async()=>requestScreensaver());
+ expect(caption()).toContain('已完成 11 / 25 步');
+ view.rerender(<BuzhoushanScreensaver detail={detail({progress:{...full,items:full.items.slice(-8),limited:true}})}/>);
+ expect(caption()).toContain('已完成 11 / 25 步');
+ read.mockResolvedValue({...full,items:full.items.map((item,i)=>i===11?{...item,status:'completed'}:item)});
+ await act(async()=>vi.advanceTimersByTimeAsync(2000));
+ expect(caption()).toContain('已完成 12 / 25 步');
+});
