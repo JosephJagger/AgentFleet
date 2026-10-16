@@ -50,3 +50,24 @@
 /* A full, light outline makes every provider group distinct across themes. */
 :root .host-session-editor .buzhou-session-providers > .buzhou-session-provider { border:1px solid var(--line-strong); border-radius:6px; padding:8px; }
 :root .host-session-editor .buzhou-session-providers--single { grid-template-columns:minmax(0,1fr); }
+
+/* Keep the unselected-session prompt compact and give the catalog the space. */
+:root .host-session-editor.buzhou-editor > .inspector.inspector--empty {
+ display:grid;
+ grid-template-columns:27px minmax(0,auto);
+ justify-content:center;
+ align-content:center;
+ column-gap:12px;
+ row-gap:4px;
+ flex:0 0 auto;
+ min-height:0;
+ padding:12px 20px;
+}
+:root .host-session-editor.buzhou-editor > .inspector--empty > svg { grid-row:1 / 3; align-self:center; }
+:root .host-session-editor.buzhou-editor > .inspector--empty > h2 { margin:0; text-align:left; }
+:root .host-session-editor.buzhou-editor > .inspector--empty > p { grid-column:2; text-align:left; }
+:root .host-session-editor:has(> .inspector--empty) > .buzhou-session-switcher {
+ max-height:calc(100% - 108px);
+ flex-shrink:1;
+ min-height:0;
+}
