@@ -9,6 +9,8 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -53,6 +55,48 @@ def wait_idle(db, token, seconds, sleep=time.sleep, clock=time.monotonic):
         sleep(min(2, max(0, deadline - clock())))
 
 
+DEFAULT_KEEP_BACKUPS = 5
+
+
+def prune_backups(db_path, keep):
+    """Delete the oldest pre-deploy backups of this database, keeping the newest `keep`.
+
+    Only files named exactly `<db>.predeploy-<32 hex>.sqlite` (and their -wal/-shm sidecars) are touched.
+    Every publication writes a full copy of the database, so without this the data volume fills up.
+    """
+    db_path = Path(db_path)
+    pattern = re.compile(re.escape(db_path.name) + r'\.predeploy-[0-9a-f]{32}\.sqlite')
+    backups = sorted((p for p in db_path.parent.iterdir() if pattern.fullmatch(p.name)), key=lambda p: (p.stat().st_mtime, p.name), reverse=True)
+    removed = []
+    for old in backups[max(0, keep):]:
+        for suffix in ('', '-wal', '-shm'):
+            with contextlib.suppress(FileNotFoundError):
+                Path(str(old) + suffix).unlink()
+        removed.append(old.name)
+    return removed
+
+
+def backup_database(db, backup_path):
+    """Back the database up; a failed (for example disk-full) backup never leaves a partial file behind."""
+    fd = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    os.close(fd)
+    try:
+        with contextlib.closing(sqlite3.connect(backup_path)) as backup:
+            db.backup(backup)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(backup_path)
+        raise
+
+
+def ensure_backup_space(db_path):
+    need = Path(db_path).stat().st_size * 12 // 10 + 256 * 2**20
+    free = shutil.disk_usage(Path(db_path).parent).free
+    if free < need:
+        raise RuntimeError(f'Not enough free disk space for the pre-deploy backup ({free // 2**20} MB free, {need // 2**20} MB needed). '
+                           'Nothing was changed; free some space and retry.')
+
+
 def run(*args):
     return subprocess.check_output(args, cwd=ROOT, text=True).strip()
 
@@ -70,9 +114,12 @@ def main():
     parser.add_argument('--ready-url', default='http://127.0.0.1:3215/ready')
     parser.add_argument('--public-origin', help='Public panel origin; defaults to running service PUBLIC_ORIGIN')
     parser.add_argument('--with-validator', action='store_true', help='Also update the idle Codex validation worker; defer while validation is running')
+    parser.add_argument('--keep-backups', type=int, default=DEFAULT_KEEP_BACKUPS, help='Pre-deploy database backups to keep (default 5); older ones are deleted before a new one is written')
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--release', action='store_true', help='Explicitly release an abandoned fence after checking service health')
     args = parser.parse_args()
+    if args.keep_backups < 1:
+        parser.error('--keep-backups must be at least 1')
     if not 0 <= args.wait_seconds <= 3600:
         parser.error('--wait-seconds must be between 0 and 3600')
     if sum([args.check, args.release, bool(args.image)]) != 1:
@@ -119,10 +166,12 @@ def main():
                 expected_version = run('docker', 'run', '--rm', '--entrypoint', 'node', image_id,
                                        '-e', "console.log(JSON.parse(require('node:fs').readFileSync('/app/web/downloads/manifest.json','utf8')).version)")
                 backup_path = str(path) + '.predeploy-' + token + '.sqlite'
-                fd = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-                os.close(fd)
-                with contextlib.closing(sqlite3.connect(backup_path)) as backup:
-                    db.backup(backup)
+                # Make room first: keep the newest (keep - 1) so that, with the new one, `keep` remain.
+                pruned = prune_backups(path, args.keep_backups - 1)
+                if pruned:
+                    print(json.dumps({'phase': 'pruned_backups', 'removed': len(pruned)}), flush=True)
+                ensure_backup_space(path)
+                backup_database(db, backup_path)
                 # Fence remains in the shared DB throughout recreation and startup.
                 switching = True
                 run('docker', 'tag', image_id, 'agentfleet:local')

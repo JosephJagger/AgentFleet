@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import sqlite3
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -9,6 +10,58 @@ import json
 spec = importlib.util.spec_from_file_location('deploy', Path(__file__).with_name('deploy-control-plane.py'))
 deploy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(deploy)
+
+class BackupRetentionTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.db = self.dir / 'control-plane.sqlite'
+        self.db.write_bytes(b'live')
+        self.addCleanup(self.tmp.cleanup)
+
+    def backup(self, token, age):
+        path = self.dir / f'control-plane.sqlite.predeploy-{token * 32}.sqlite'
+        path.write_bytes(b'x')
+        os.utime(path, (1_000_000 + age, 1_000_000 + age))
+        return path
+
+    def remaining(self):
+        return sorted(p.name.split('predeploy-')[1][0] for p in self.dir.glob('control-plane.sqlite.predeploy-' + '?' * 32 + '.sqlite'))
+
+    def test_keeps_the_newest_and_touches_nothing_else(self):
+        made = [self.backup(token, age) for age, token in enumerate('1234567')]   # 7 is the newest
+        sidecar = self.dir / (made[0].name + '-wal')
+        sidecar.write_bytes(b'w')
+        others = [self.dir / 'pre-blog-assignment-repair-20260922T0055Z.sqlite',
+                  self.dir / 'control-plane.sqlite.predeploy-notahexname.sqlite',
+                  self.dir / ('other.sqlite.predeploy-' + 'a' * 32 + '.sqlite')]
+        for path in others:
+            path.write_bytes(b'keep me')
+        removed = deploy.prune_backups(self.db, 3)
+        self.assertEqual(len(removed), 4)
+        self.assertEqual(self.remaining(), ['5', '6', '7'])
+        self.assertFalse(sidecar.exists())
+        self.assertTrue(self.db.exists() and all(path.exists() for path in others))
+        self.assertEqual(deploy.prune_backups(self.db, 3), [])                     # idempotent
+        self.assertEqual(len(deploy.prune_backups(self.db, 0)), 3)                 # keep=0 removes only matching backups
+        self.assertTrue(self.db.exists() and all(path.exists() for path in others))
+
+    def test_failed_backup_leaves_no_partial_file(self):
+        class FullDisk:
+            def backup(self, _target):
+                raise sqlite3.OperationalError('database or disk is full')
+        target = self.dir / ('control-plane.sqlite.predeploy-' + 'd' * 32 + '.sqlite')
+        with self.assertRaisesRegex(sqlite3.OperationalError, 'disk is full'):
+            deploy.backup_database(FullDisk(), str(target))
+        self.assertFalse(target.exists())
+
+    def test_refuses_to_start_a_backup_without_enough_space(self):
+        with patch.object(deploy.shutil, 'disk_usage', return_value=type('Usage', (), {'free': 10 * 2**20})()):
+            with self.assertRaisesRegex(RuntimeError, 'Not enough free disk space'):
+                deploy.ensure_backup_space(self.db)
+        with patch.object(deploy.shutil, 'disk_usage', return_value=type('Usage', (), {'free': 10 * 2**30})()):
+            deploy.ensure_backup_space(self.db)
+
 
 class DeploymentFenceTests(unittest.TestCase):
     def setUp(self):
