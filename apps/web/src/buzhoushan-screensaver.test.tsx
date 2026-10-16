@@ -2,7 +2,7 @@
 import {act,cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {BuzhoushanScreensaver} from './components/BuzhoushanScreensaver';
-import {VOICE_STYLES,parseScreensaverPrefs,saveScreensaverPrefs,setScreensaverPreview} from './lib/buzhoushan-idle';
+import {VOICE_STYLES,parseScreensaverPrefs,requestVoiceScreensaver,saveScreensaverPrefs,setScreensaverPreview} from './lib/buzhoushan-idle';
 vi.mock('./i18n',()=>({t:(value:string,...args:unknown[])=>value.replace(/\{(\d+)\}/g,(_,i)=>String(args[Number(i)]))}));
 beforeEach(()=>{vi.useFakeTimers();vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(null);});
 afterEach(()=>{cleanup();vi.restoreAllMocks();localStorage.clear();vi.useRealTimers();});
@@ -126,4 +126,18 @@ it('an idle panel can never overwrite another panel\'s live call state',()=>{
  voiceStatus.publish('b',{phase:'idle',muted:false,kind:'session'});voiceStatus.release('b');
  expect(voiceStatus.get().phase).toBe('connected');
  voiceStatus.release('a');expect(voiceStatus.get().phase).toBe('idle');
+});
+
+it('the toolbar request raises the voice screensaver immediately after leaving it, only while a call is connected',()=>{
+ saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',autoVoice:true});
+ render(<BuzhoushanScreensaver/>);
+ act(()=>{requestVoiceScreensaver();});expect(saver().dataset.active).toBe('false');                        // no call: nothing to raise
+ act(()=>{connect();});act(()=>{vi.advanceTimersByTime(400);});act(()=>{vi.advanceTimersByTime(500);});
+ fireEvent.keyDown(window,{key:'ArrowRight'});expect(saver().dataset.mode).toBe('particles');
+ fireEvent.keyDown(window,{key:'a'});expect(saver().dataset.active).toBe('false');                         // left by a key
+ act(()=>{requestVoiceScreensaver();});
+ expect(saver().dataset.active).toBe('true');expect(saver().dataset.mode).toBe('particles');                // back at once, same style, no idle wait
+ expect(document.querySelector('.buzhou-saver__voice')!.textContent).toContain('语音总控 已连接');
+ act(()=>{vi.advanceTimersByTime(500);});fireEvent.pointerDown(document.body);expect(saver().dataset.active).toBe('false'); // still click/key to leave
+ act(()=>{call('idle');});act(()=>{requestVoiceScreensaver();});expect(saver().dataset.active).toBe('false'); // hung up: ignored
 });

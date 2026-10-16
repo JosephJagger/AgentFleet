@@ -3696,5 +3696,7 @@
   "声纹屏保：← → 切换样式，点击或按键退出": "Voiceprint screensaver: ← → to switch style, click or press a key to exit",
   "上一个声纹": "Previous voiceprint",
   "下一个声纹": "Next voiceprint",
-  "总控语音连接成功后自动进入声纹屏保": "Enter the voiceprint screensaver automatically once the voice coordinator connects"
+  "总控语音连接成功后自动进入声纹屏保": "Enter the voiceprint screensaver automatically once the voice coordinator connects",
+  "声纹屏保": "Voiceprint screensaver",
+  "立即进入声纹屏保，点击或按键退出": "Enter the voiceprint screensaver now; click or press a key to exit"
 }

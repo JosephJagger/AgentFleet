@@ -42,6 +42,9 @@ The preview plays a synthetic voice when no call is connected.
   default, and only when the screensaver itself is enabled). In this mode **only a click or a key
   press leaves it** (mouse movement does not); hanging up leaves it too. `←/→` (or the faint on-screen
   arrows) switch between the existing effects instead of exiting; every call starts with 字符涟漪.
+- The toolbar button changes with the call: without a call it is **屏保测试** (preview of the idle
+  screensaver); while a call is connected it becomes **声纹屏保** and raises the voice screensaver
+  immediately (no idle wait), at the style last used in this call, with the same exit rules.
 - The caption shows the call state: 语音总控 连接中… / 已连接 · 聆听中 / 你在说话 / AI 在说话 / 已静音
   (`lib/voice-status.ts`, published by `NativeVoicePanel`, owner-scoped like the audio taps).
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import {cleanup,fireEvent,render,screen} from '@testing-library/react';
+import {act,cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {afterEach,expect,it,vi} from 'vitest';
 import {BuzhoushanBroadcastControl} from './components/BuzhoushanBroadcast';
 vi.mock('./i18n',()=>({t:(value:string)=>value}));
@@ -48,4 +48,20 @@ it('never resizes the original window and fits only the dedicated popup once',()
  popup.rerender(<BuzhoushanBroadcastControl enabled={false} onChange={()=>{}}/>);
  expect(resize).toHaveBeenCalledTimes(1);
  window.name=originalName;resize.mockRestore();
+});
+
+it('the screensaver button previews without a call and raises the voice screensaver during one, under a new name',async()=>{
+ const {voiceStatus}=await import('./lib/voice-status');
+ const idle=await import('./lib/buzhoushan-idle');
+ const preview=vi.spyOn(idle,'setScreensaverPreview'),raise=vi.spyOn(idle,'requestVoiceScreensaver');
+ const view=render(<BuzhoushanBroadcastControl enabled={false} onChange={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'屏保测试'}));
+ expect(preview).toHaveBeenCalledWith(true);expect(raise).not.toHaveBeenCalled();
+ act(()=>{voiceStatus.publish('x',{phase:'connecting',muted:false,kind:'global'});voiceStatus.publish('x',{phase:'connected',muted:false,kind:'global'});});
+ expect(screen.queryByRole('button',{name:'屏保测试'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'声纹屏保'}));
+ expect(raise).toHaveBeenCalledTimes(1);expect(preview).toHaveBeenCalledTimes(1);
+ act(()=>{voiceStatus.release('x');});
+ expect(screen.getByRole('button',{name:'屏保测试'})).toBeTruthy();
+ view.unmount();preview.mockRestore();raise.mockRestore();
 });

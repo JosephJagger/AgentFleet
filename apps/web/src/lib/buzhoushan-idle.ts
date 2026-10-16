@@ -89,3 +89,15 @@ export function useScreensaverPreview(): boolean {
     () => false,
   );
 }
+
+/** Toolbar request to raise the voice-call screensaver at once (only honoured while a call is connected). */
+let voiceRequests = 0;
+const voiceRequestListeners = new Set<() => void>();
+export function requestVoiceScreensaver() { voiceRequests++; voiceRequestListeners.forEach(listener => listener()); }
+export function useVoiceScreensaverRequests(): number {
+  return useSyncExternalStore(
+    notify => { voiceRequestListeners.add(notify); return () => { voiceRequestListeners.delete(notify); }; },
+    () => voiceRequests,
+    () => 0,
+  );
+}

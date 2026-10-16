@@ -2,7 +2,8 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Download,MonitorUp,Ratio,Sparkles,X} from 'lucide-react';
 import {createPortal} from 'react-dom';
 import {t} from '../i18n';
-import {SCREENSAVER_MODES,SCREENSAVER_QUALITIES,type ScreensaverQuality,setScreensaverPreview,useScreensaverPrefs,type ScreensaverMode,saveScreensaverPrefs,SCREENSAVER_MIN_SECONDS,SCREENSAVER_MAX_SECONDS} from '../lib/buzhoushan-idle';
+import {SCREENSAVER_MODES,SCREENSAVER_QUALITIES,type ScreensaverQuality,setScreensaverPreview,requestVoiceScreensaver,useScreensaverPrefs,type ScreensaverMode,saveScreensaverPrefs,SCREENSAVER_MIN_SECONDS,SCREENSAVER_MAX_SECONDS} from '../lib/buzhoushan-idle';
+import {useVoiceStatus} from '../lib/voice-status';
 import {downloadBroadcastLauncher,openBroadcastWindow,fitBroadcastWindow} from '../lib/broadcast-launcher';
 
 type BroadcastIntro = {leftTitle:string;leftSubtitle:string;rightTitle:string;rightSubtitle:string};
@@ -37,12 +38,14 @@ export function BuzhoushanBroadcastControl({enabled,onChange}:{enabled:boolean;o
   const [intro,setIntro]=useState(readIntro);
   const [windowBlocked,setWindowBlocked]=useState(false);
   const saver=useScreensaverPrefs();
+  const call=useVoiceStatus();
+  const inCall=call.phase==='connected'||call.phase==='recovering';
   useEffect(()=>{fitBroadcastWindow();},[]);
   const [open,setOpen]=useState(false),root=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
   useEffect(()=>{if(!open)return;const outside=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node))setOpen(false);};document.addEventListener('pointerdown',outside);return()=>document.removeEventListener('pointerdown',outside);},[open]);
   return <div ref={root} className="buzhou-broadcast-controls" onKeyDown={event=>{if(event.key==='Escape'&&open){event.stopPropagation();setOpen(false);trigger.current?.focus();}}}>
     <button type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" aria-pressed={enabled} title={t('工作区与两侧介绍共同组成 16:9 画布')} onClick={()=>onChange(!enabled)}><Ratio size={14}/>{t(enabled?'退出 16:9':'16:9 画布')}</button>
-    <button type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" title={t('立即预览直播屏保，点击任意处退出')} onClick={()=>setScreensaverPreview(true)}><Sparkles size={14}/>{t('屏保测试')}</button>
+    <button type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" title={t(inCall?'立即进入声纹屏保，点击或按键退出':'立即预览直播屏保，点击任意处退出')} onClick={()=>inCall?requestVoiceScreensaver():setScreensaverPreview(true)}><Sparkles size={14}/>{t(inCall?'声纹屏保':'屏保测试')}</button>
     <button ref={trigger} type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" aria-label={t('直播采集设置')} aria-expanded={open} onClick={()=>setOpen(v=>!v)}><MonitorUp size={14}/></button>
     {open&&<section className="buzhou-broadcast-help" aria-label={t('直播采集设置')}>
       <header><strong>{t('直播采集设置')}</strong><button type="button" className="icon-button" aria-label={t('关闭')} onClick={()=>{setOpen(false);trigger.current?.focus();}}><X size={15}/></button></header>

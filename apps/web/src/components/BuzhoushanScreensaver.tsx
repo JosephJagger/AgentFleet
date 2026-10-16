@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createEffect, qualityFor, type EffectMode, type Pointer } from "../lib/buzhoushan-effects";
 import { QUALITY_TIERS, describeGpu, type QualityTier } from "../lib/buzhoushan-effect-common";
 import { createDemoVoice, voiceSignal } from "../lib/voice-signal";
-import { SCREENSAVER_EFFECTS, VOICE_STYLES, setScreensaverPreview, useIdle, useScreensaverPreview, useScreensaverPrefs } from "../lib/buzhoushan-idle";
+import { SCREENSAVER_EFFECTS, VOICE_STYLES, setScreensaverPreview, useIdle, useScreensaverPreview, useScreensaverPrefs, useVoiceScreensaverRequests } from "../lib/buzhoushan-idle";
 import { useVoiceStatus } from "../lib/voice-status";
 import { workbenchItems } from "./BuzhoushanActivity";
 import { t } from "../i18n";
@@ -116,6 +116,19 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
     }, 350);
     return () => clearTimeout(timer);
   }, [voice.connectedSeq, voice.kind]);
+  // The toolbar button raises the voice screensaver again at once (no waiting for idle), keeping the style last used in this call.
+  const requests = useVoiceScreensaverRequests();
+  const seenRequests = useRef(requests);
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+  useEffect(() => {
+    if (requests === seenRequests.current) return;
+    seenRequests.current = requests;
+    const phase = voiceRef.current.phase;
+    if (phase !== "connected" && phase !== "recovering") return;
+    setVoiceOn(true);
+    showToast(t("声纹屏保：← → 切换样式，点击或按键退出"), 5000);
+  }, [requests]);
   // Hanging up (or a failed connection) leaves the voice screensaver.
   useEffect(() => { if (voiceOn && voice.phase !== "connected" && voice.phase !== "recovering") setVoiceOn(false); }, [voiceOn, voice.phase]);
   const stepVoice = (direction: 1 | -1) => {
