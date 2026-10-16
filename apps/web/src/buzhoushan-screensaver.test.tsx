@@ -2,7 +2,7 @@
 import {act,cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {BuzhoushanScreensaver} from './components/BuzhoushanScreensaver';
-import {parseScreensaverPrefs,saveScreensaverPrefs,setScreensaverPreview} from './lib/buzhoushan-idle';
+import {VOICE_STYLES,parseScreensaverPrefs,saveScreensaverPrefs,setScreensaverPreview} from './lib/buzhoushan-idle';
 vi.mock('./i18n',()=>({t:(value:string,...args:unknown[])=>value.replace(/\{(\d+)\}/g,(_,i)=>String(args[Number(i)]))}));
 beforeEach(()=>{vi.useFakeTimers();vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(null);});
 afterEach(()=>{cleanup();vi.restoreAllMocks();localStorage.clear();vi.useRealTimers();});
@@ -10,7 +10,7 @@ const saver=()=>document.querySelector('.buzhou-saver') as HTMLElement;
 const detail=(over:object={})=>({hostOnline:true,events:[],session:{id:'s',activeTurnId:'t',state:{currentTurn:'in_progress',reachability:'live'}}, ...over}) as never;
 
 it('appears after the idle time and any input dismisses it without being intercepted',()=>{
- saveScreensaverPrefs({enabled:true,seconds:30,mode:'matrix',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+ saveScreensaverPrefs({enabled:true,seconds:30,mode:'matrix',quality:'auto',autoVoice:true});
  render(<BuzhoushanScreensaver/>);
  expect(saver().dataset.active).toBe('false');
  act(()=>{vi.advanceTimersByTime(29_000);});expect(saver().dataset.active).toBe('false');
@@ -20,15 +20,15 @@ it('appears after the idle time and any input dismisses it without being interce
  expect(click).toHaveBeenCalled();expect(saver().dataset.active).toBe('false');
 });
 it('resets the timer on activity and never starts when disabled',()=>{
- saveScreensaverPrefs({enabled:true,seconds:30,mode:'matrix',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+ saveScreensaverPrefs({enabled:true,seconds:30,mode:'matrix',quality:'auto',autoVoice:true});
  render(<BuzhoushanScreensaver/>);
  act(()=>{vi.advanceTimersByTime(20_000);});fireEvent.keyDown(window,{key:'a'});
  act(()=>{vi.advanceTimersByTime(20_000);});expect(saver().dataset.active).toBe('false');
- act(()=>{saveScreensaverPrefs({enabled:false,seconds:30,mode:'matrix',quality:'auto',voiceStyle:'glyph',autoVoice:true});});
+ act(()=>{saveScreensaverPrefs({enabled:false,seconds:30,mode:'matrix',quality:'auto',autoVoice:true});});
  act(()=>{vi.advanceTimersByTime(120_000);});expect(saver().dataset.active).toBe('false');
 });
 it('shows task status as counts only and a standby label otherwise',()=>{
- saveScreensaverPrefs({enabled:true,seconds:10,mode:'matrix',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+ saveScreensaverPrefs({enabled:true,seconds:10,mode:'matrix',quality:'auto',autoVoice:true});
  const {rerender}=render(<BuzhoushanScreensaver/>);
  expect(screen.getByRole('status',{hidden:true}).textContent).toContain('待命中');
  rerender(<BuzhoushanScreensaver detail={detail()}/>);
@@ -36,12 +36,12 @@ it('shows task status as counts only and a standby label otherwise',()=>{
  expect(screen.getByRole('status',{hidden:true}).textContent).toContain('任务执行中');
 });
 it('clamps and recovers preferences',()=>{
- expect(parseScreensaverPrefs('bad')).toEqual({enabled:true,seconds:30,mode:'auto',quality:'auto',voiceStyle:'glyph',autoVoice:true});
- expect(parseScreensaverPrefs('{"enabled":false,"seconds":1}')).toEqual({enabled:false,seconds:10,mode:'auto',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+ expect(parseScreensaverPrefs('bad')).toEqual({enabled:true,seconds:30,mode:'auto',quality:'auto',autoVoice:true});
+ expect(parseScreensaverPrefs('{"enabled":false,"seconds":1}')).toEqual({enabled:false,seconds:10,mode:'auto',quality:'auto',autoVoice:true});
  expect(parseScreensaverPrefs('{"seconds":99999}').seconds).toBe(600);
 });
 it('previews on demand and ends on the next click without waiting for idle',()=>{
- saveScreensaverPrefs({enabled:false,seconds:30,mode:'matrix',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+ saveScreensaverPrefs({enabled:false,seconds:30,mode:'matrix',quality:'auto',autoVoice:true});
  render(<BuzhoushanScreensaver/>);
  act(()=>{setScreensaverPreview(true);});expect(saver().dataset.active).toBe('true');
  act(()=>{vi.advanceTimersByTime(400);});fireEvent.pointerDown(document.body);
@@ -50,7 +50,7 @@ it('previews on demand and ends on the next click without waiting for idle',()=>
 it('covers only the workspace so side introductions stay visible',()=>{
  const shell=document.createElement('div');shell.className='app-shell';document.body.append(shell);
  shell.getBoundingClientRect=()=>({left:240,top:44,width:1440,height:810,right:1680,bottom:854,x:240,y:44,toJSON(){}}) as DOMRect;
- saveScreensaverPrefs({enabled:false,seconds:30,mode:'matrix',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+ saveScreensaverPrefs({enabled:false,seconds:30,mode:'matrix',quality:'auto',autoVoice:true});
  render(<BuzhoushanScreensaver/>);
  act(()=>{setScreensaverPreview(true);});
  expect(saver().style.left).toBe('240px');expect(saver().style.width).toBe('1440px');expect(saver().style.height).toBe('810px');
@@ -67,7 +67,7 @@ const connect=(over:object={})=>{call('connecting',over);call('connected',over);
 afterEach(()=>{voiceStatus.release('panel');setScreensaverPreview(false);});
 
 it('a connected global call enters the voiceprint screensaver; only a click or key leaves it, mouse movement does not',()=>{
- saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+ saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',autoVoice:true});
  render(<BuzhoushanScreensaver/>);
  expect(saver().dataset.active).toBe('false');
  act(()=>{connect();});act(()=>{vi.advanceTimersByTime(400);});act(()=>{vi.advanceTimersByTime(500);});
@@ -81,21 +81,21 @@ it('a connected global call enters the voiceprint screensaver; only a click or k
  expect(saver().dataset.active).toBe('true');
  fireEvent.keyDown(window,{key:'a'});expect(saver().dataset.active).toBe('false'); // a key leaves it
 });
-it('left and right arrows switch voiceprint styles without leaving, remember the choice, and the on-screen arrows work',()=>{
- saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+it('left and right arrows switch between the existing effects without leaving, and the on-screen arrows work',()=>{
+ saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',autoVoice:true});
  render(<BuzhoushanScreensaver/>);
  act(()=>{connect();});act(()=>{vi.advanceTimersByTime(400);});act(()=>{vi.advanceTimersByTime(500);});
- fireEvent.keyDown(window,{key:'ArrowRight'});expect(saver().dataset.mode).toBe('rings');expect(saver().dataset.active).toBe('true');
- fireEvent.keyDown(window,{key:'ArrowRight'});expect(saver().dataset.mode).toBe('sonogram');
+ expect(saver().dataset.mode).toBe('glyph');                                                               // every call starts with the glyph ripples
+ fireEvent.keyDown(window,{key:'ArrowRight'});expect(saver().dataset.mode).toBe('particles');expect(saver().dataset.active).toBe('true');
+ fireEvent.keyDown(window,{key:'ArrowRight'});expect(saver().dataset.mode).toBe('smoke');
  fireEvent.keyDown(window,{key:'ArrowLeft'});fireEvent.keyDown(window,{key:'ArrowLeft'});expect(saver().dataset.mode).toBe('glyph');
- fireEvent.keyDown(window,{key:'ArrowLeft'});expect(saver().dataset.mode).toBe('matrix');                 // wraps around
+ fireEvent.keyDown(window,{key:'ArrowLeft'});expect(saver().dataset.mode).toBe('proton');                  // wraps around
  fireEvent.click(screen.getByLabelText('下一个声纹'));expect(saver().dataset.mode).toBe('glyph');
  expect(saver().dataset.active).toBe('true');                                                              // the arrow buttons are not a "click anywhere"
- fireEvent.click(screen.getByLabelText('下一个声纹'));
- expect(parseScreensaverPrefs(localStorage.getItem('agentfleet.buzhoushan.screensaver')||'').voiceStyle).toBe('rings');
+ expect(VOICE_STYLES).toHaveLength(9);expect(new Set(VOICE_STYLES).size).toBe(9);
 });
 it('shows the voice coordinator connection state, including muted, and hanging up leaves the voiceprint mode',()=>{
- saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+ saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',autoVoice:true});
  render(<BuzhoushanScreensaver/>);
  act(()=>{call('connecting');});
  expect(document.querySelector('.buzhou-saver__voice')!.textContent).toContain('语音总控 连接中');
@@ -108,15 +108,15 @@ it('shows the voice coordinator connection state, including muted, and hanging u
  expect(saver().dataset.active).toBe('false');expect(document.querySelector('.buzhou-saver__voice')).toBeNull();
 });
 it('does not enter on session voice, when disabled, or when automatic entry is switched off, and recovery is not a new connection',()=>{
- saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',voiceStyle:'glyph',autoVoice:true});
+ saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',autoVoice:true});
  render(<BuzhoushanScreensaver/>);
  act(()=>{connect({kind:'session'});});act(()=>{vi.advanceTimersByTime(400);});act(()=>{vi.advanceTimersByTime(500);});expect(saver().dataset.active).toBe('false');
  act(()=>{call('idle');});
- act(()=>{saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',voiceStyle:'glyph',autoVoice:false});});
+ act(()=>{saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',autoVoice:false});});
  act(()=>{connect();});act(()=>{vi.advanceTimersByTime(400);});act(()=>{vi.advanceTimersByTime(500);});expect(saver().dataset.active).toBe('false');
- act(()=>{call('idle');saveScreensaverPrefs({enabled:false,seconds:600,mode:'auto',quality:'auto',voiceStyle:'glyph',autoVoice:true});});
+ act(()=>{call('idle');saveScreensaverPrefs({enabled:false,seconds:600,mode:'auto',quality:'auto',autoVoice:true});});
  act(()=>{connect();});act(()=>{vi.advanceTimersByTime(400);});act(()=>{vi.advanceTimersByTime(500);});expect(saver().dataset.active).toBe('false');
- act(()=>{call('idle');saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',voiceStyle:'glyph',autoVoice:true});});
+ act(()=>{call('idle');saveScreensaverPrefs({enabled:true,seconds:600,mode:'auto',quality:'auto',autoVoice:true});});
  act(()=>{call('connecting');call('connected');call('recovering');call('connected');});
  const seq=voiceStatus.get().connectedSeq;act(()=>{call('recovering');call('connected');});
  expect(voiceStatus.get().connectedSeq).toBe(seq);                                                         // recovery never counts

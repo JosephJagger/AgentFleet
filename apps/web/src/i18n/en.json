@@ -3686,8 +3686,6 @@
   "暂无项目。连接主机后会自动发现已有 {0} 项目。": "No projects yet. Existing {0} projects will be discovered after connecting a host.",
   "权限沿用主机上的原生设置；需要确认时在面板处理。": "Permissions follow the native host settings. Approval requests appear in the panel.",
   "效果测试：数字键 1–9 或 ←/→ 切换，点击退出": "Effect test: keys 1–9 or ←/→ to switch, click to exit",
-  "声波环": "Voice rings",
-  "声纹谱图": "Voiceprint spectrogram",
   "会话语音": "Session voice",
   "连接中…": "Connecting…",
   "恢复连接中…": "Reconnecting…",
@@ -3698,6 +3696,5 @@
   "声纹屏保：← → 切换样式，点击或按键退出": "Voiceprint screensaver: ← → to switch style, click or press a key to exit",
   "上一个声纹": "Previous voiceprint",
   "下一个声纹": "Next voiceprint",
-  "总控语音连接成功后自动进入声纹屏保": "Enter the voiceprint screensaver automatically once the voice coordinator connects",
-  "声纹屏保样式": "Voiceprint screensaver style"
+  "总控语音连接成功后自动进入声纹屏保": "Enter the voiceprint screensaver automatically once the voice coordinator connects"
 }

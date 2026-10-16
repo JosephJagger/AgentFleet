@@ -7,7 +7,7 @@
  *  - ThreeBody: Newtonian three-sun problem (velocity Verlet) from a perturbed figure-eight.
  *  - ProtonModel: uud valence quarks, colour-charge flux tubes and a fizzing quark–antiquark sea.
  */
-import { GLYPHS, TAU, VOICE_BANDS, clamp, hslToRgb, hueFor, setupCanvas, type Effect, type Impulse, type Quality, type VoiceParams, type VoiceRole } from "./buzhoushan-effect-common";
+import { GLYPHS, TAU, clamp, hslToRgb, hueFor, setupCanvas, type Effect, type Impulse, type Quality, type VoiceParams, type VoiceRole } from "./buzhoushan-effect-common";
 
 type Rand = () => number;
 
@@ -559,82 +559,5 @@ export function glyphRippleEffect(canvas: HTMLCanvasElement, _q: Quality): Effec
       ctx.globalAlpha = 1;
     },
     dispose() { ripples = []; },
-  };
-}
-
-/* ------------------------------------------------------------ voiceprint effects */
-
-const ROLE_HUE: Record<VoiceRole, number> = { mic: 205, ai: 160 };
-const quiet = new Float32Array(VOICE_BANDS);
-
-/** Circular spectrum: the broadcaster's voice on the inner ring (blue), the AI's on the outer ring (green). */
-export function voiceRingsEffect(canvas: HTMLCanvasElement, _q: Quality): Effect | undefined {
-  const ctx = canvas.getContext("2d"); if (!ctx) return undefined;
-  let w = 0, h = 0;
-  const shocks = new ShockRings(1.3);
-  return {
-    resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); ctx.fillStyle = "#02040a"; ctx.fillRect(0, 0, w, h); },
-    frame(dt, t, { voice }) {
-      shocks.add(voice?.impulses ?? [], w, h, t); shocks.prune(t);
-      ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = `rgba(2,4,10,${Math.min(0.6, 0.24 * dt * 60)})`; ctx.fillRect(0, 0, w, h);
-      ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
-      const cx = w / 2, cy = h / 2, unit = Math.min(w, h), N = VOICE_BANDS * 2;
-      for (const [role, radius, spin] of [["mic", 0.2, 1], ["ai", 0.31, -1]] as const) {
-        const bands = voice?.bands?.[role] ?? quiet, level = role === "mic" ? voice?.mic ?? 0 : voice?.ai ?? 0, r0 = unit * radius, max = unit * 0.14, hue = ROLE_HUE[role];
-        const glow = ctx.createRadialGradient(cx, cy, r0 * 0.4, cx, cy, r0 * 1.5);
-        glow.addColorStop(0, `hsla(${hue},95%,60%,${0.05 + level * 0.18})`); glow.addColorStop(1, `hsla(${hue},95%,60%,0)`);
-        ctx.fillStyle = glow; ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = `hsla(${hue},90%,65%,${0.22 + level * 0.3})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, r0, 0, TAU); ctx.stroke();
-        ctx.lineWidth = Math.max(2, unit * 0.0055);
-        for (let i = 0; i < N; i++) {
-          const band = i < VOICE_BANDS ? i : N - 1 - i, a = (i / N) * TAU + spin * t * 0.12 - Math.PI / 2;
-          const len = 2 + bands[band] * max + 1.2 * Math.sin(t * 2 + i * 0.7) * (0.4 + level);
-          const x0 = cx + Math.cos(a) * r0, y0 = cy + Math.sin(a) * r0, x1 = cx + Math.cos(a) * (r0 + len), y1 = cy + Math.sin(a) * (r0 + len);
-          ctx.strokeStyle = `hsla(${hue + band * 0.7},95%,${55 + bands[band] * 25}%,${0.35 + bands[band] * 0.65})`;
-          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-        }
-      }
-      shocks.draw(ctx, t, unit * 0.5);
-      ctx.globalCompositeOperation = "source-over";
-    },
-    dispose() {},
-  };
-}
-
-/** Literal voiceprint: a scrolling spectrogram, the AI above the centre line and the broadcaster below it. */
-export function sonogramEffect(canvas: HTMLCanvasElement, _q: Quality): Effect | undefined {
-  const ctx = canvas.getContext("2d"); const buf = document.createElement("canvas"); const bctx = buf.getContext("2d");
-  if (!ctx || !bctx) return undefined;
-  let w = 0, h = 0, dpr = 1, acc = 0;
-  const SPEED = 120, GAP = 3;
-  const reset = () => { bctx.fillStyle = "#02040a"; bctx.fillRect(0, 0, w, h); };
-  return {
-    resize(width, height, ratio = 1) {
-      ({ w, h } = setupCanvas(canvas, ctx, width, height, ratio));
-      dpr = canvas.width / w; buf.width = canvas.width; buf.height = canvas.height; bctx.setTransform(dpr, 0, 0, dpr, 0, 0); reset();
-    },
-    frame(dt, _t, { voice }) {
-      acc += SPEED * dt;
-      const cols = Math.floor(acc);
-      if (cols >= 1) {
-        acc -= cols;
-        const px = Math.round(cols * dpr); // scroll left: copy everything but the leftmost `cols` pixels one step over
-        bctx.globalCompositeOperation = "copy"; bctx.drawImage(buf, px, 0, buf.width - px, buf.height, 0, 0, w - px / dpr, h); bctx.globalCompositeOperation = "source-over";
-        const cy = h / 2, bh = (h / 2 - GAP - 12) / VOICE_BANDS, x = w - cols;
-        bctx.fillStyle = "#02040a"; bctx.fillRect(x, 0, cols, h);
-        for (const role of ["ai", "mic"] as const) {
-          const bands = voice?.bands?.[role] ?? quiet, hue = ROLE_HUE[role], up = role === "ai";
-          for (let b = 0; b < VOICE_BANDS; b++) {
-            const v = bands[b];
-            if (v < 0.02) continue;
-            const y = up ? cy - GAP - (b + 1) * bh : cy + GAP + b * bh;
-            bctx.fillStyle = `hsl(${hue + b * 0.8},90%,${6 + 62 * Math.pow(v, 0.9)}%)`; bctx.fillRect(x, y, cols, bh + 0.6);
-          }
-        }
-        bctx.fillStyle = "rgba(160,200,255,.18)"; bctx.fillRect(x, cy - 1, cols, 2);
-      }
-      ctx.drawImage(buf, 0, 0, w, h);
-    },
-    dispose() {},
   };
 }

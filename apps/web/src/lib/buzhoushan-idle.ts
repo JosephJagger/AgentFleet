@@ -4,16 +4,16 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { EffectMode } from "./buzhoushan-effect-common";
 export type ScreensaverMode = "auto" | EffectMode;
 /** Effects in rotation/test order; keys 1..n choose them in the preview. */
-export const SCREENSAVER_EFFECTS: EffectMode[] = ["particles", "smoke", "matrix", "attractor", "wavegrid", "starfield", "threebody", "proton", "glyph", "rings", "sonogram"];
-/** Styles the voice-call screensaver cycles through with the left/right arrows; the first one is the default. */
-export const VOICE_STYLES: EffectMode[] = ["glyph", "rings", "sonogram", "particles", "smoke", "wavegrid", "starfield", "attractor", "threebody", "proton", "matrix"];
+export const SCREENSAVER_EFFECTS: EffectMode[] = ["particles", "smoke", "matrix", "attractor", "wavegrid", "starfield", "threebody", "proton", "glyph"];
+/** Effects the voice-call screensaver cycles through with the arrows: the glyph ripples first, then the rest. */
+export const VOICE_STYLES: EffectMode[] = ["glyph", ...SCREENSAVER_EFFECTS.filter(mode => mode !== "glyph")];
 export const SCREENSAVER_MODES: ScreensaverMode[] = ["auto", ...SCREENSAVER_EFFECTS];
 export type ScreensaverQuality = "auto" | "high" | "medium" | "low";
 export const SCREENSAVER_QUALITIES: ScreensaverQuality[] = ["auto", "high", "medium", "low"];
-export type ScreensaverPrefs = { enabled: boolean; seconds: number; mode: ScreensaverMode; quality: ScreensaverQuality; voiceStyle: EffectMode; autoVoice: boolean };
+export type ScreensaverPrefs = { enabled: boolean; seconds: number; mode: ScreensaverMode; quality: ScreensaverQuality; autoVoice: boolean };
 const KEY = "agentfleet.buzhoushan.screensaver";
 const CHANGED = "agentfleet:buzhoushan-screensaver";
-export const SCREENSAVER_DEFAULT: ScreensaverPrefs = { enabled: true, seconds: 30, mode: "auto", quality: "auto", voiceStyle: "glyph", autoVoice: true };
+export const SCREENSAVER_DEFAULT: ScreensaverPrefs = { enabled: true, seconds: 30, mode: "auto", quality: "auto", autoVoice: true };
 export const SCREENSAVER_MIN_SECONDS = 10;
 export const SCREENSAVER_MAX_SECONDS = 600;
 
@@ -33,13 +33,12 @@ export function parseScreensaverPrefs(raw: string): ScreensaverPrefs {
       seconds: saved?.seconds === undefined ? SCREENSAVER_DEFAULT.seconds : clampSeconds(saved.seconds),
       mode: SCREENSAVER_MODES.includes(saved?.mode) ? saved.mode : SCREENSAVER_DEFAULT.mode,
       quality: SCREENSAVER_QUALITIES.includes(saved?.quality) ? saved.quality : SCREENSAVER_DEFAULT.quality,
-      voiceStyle: VOICE_STYLES.includes(saved?.voiceStyle) ? saved.voiceStyle : SCREENSAVER_DEFAULT.voiceStyle,
       autoVoice: saved?.autoVoice !== false,
     };
   } catch { return { ...SCREENSAVER_DEFAULT }; }
 }
 export function saveScreensaverPrefs(next: ScreensaverPrefs) {
-  const value = { enabled: next.enabled, seconds: clampSeconds(next.seconds), mode: SCREENSAVER_MODES.includes(next.mode) ? next.mode : SCREENSAVER_DEFAULT.mode, quality: SCREENSAVER_QUALITIES.includes(next.quality) ? next.quality : SCREENSAVER_DEFAULT.quality, voiceStyle: VOICE_STYLES.includes(next.voiceStyle) ? next.voiceStyle : SCREENSAVER_DEFAULT.voiceStyle, autoVoice: next.autoVoice !== false };
+  const value = { enabled: next.enabled, seconds: clampSeconds(next.seconds), mode: SCREENSAVER_MODES.includes(next.mode) ? next.mode : SCREENSAVER_DEFAULT.mode, quality: SCREENSAVER_QUALITIES.includes(next.quality) ? next.quality : SCREENSAVER_DEFAULT.quality, autoVoice: next.autoVoice !== false };
   try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* Preference still applies to this page load. */ }
   memory = JSON.stringify(value);
   window.dispatchEvent(new Event(CHANGED));

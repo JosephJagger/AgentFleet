@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createEffect, qualityFor, type EffectMode, type Pointer } from "../lib/buzhoushan-effects";
 import { QUALITY_TIERS, describeGpu, type QualityTier } from "../lib/buzhoushan-effect-common";
 import { createDemoVoice, voiceSignal } from "../lib/voice-signal";
-import { SCREENSAVER_EFFECTS, VOICE_STYLES, saveScreensaverPrefs, setScreensaverPreview, useIdle, useScreensaverPreview, useScreensaverPrefs } from "../lib/buzhoushan-idle";
+import { SCREENSAVER_EFFECTS, VOICE_STYLES, setScreensaverPreview, useIdle, useScreensaverPreview, useScreensaverPrefs } from "../lib/buzhoushan-idle";
 import { useVoiceStatus } from "../lib/voice-status";
 import { workbenchItems } from "./BuzhoushanActivity";
 import { t } from "../i18n";
@@ -52,7 +52,7 @@ let autoTier: QualityTier = "high";
 const TIER_LABEL: Record<QualityTier, string> = { low: "低", medium: "中", high: "高" };
 
 const EFFECT_LABEL: Record<EffectMode, string> = {
-  glyph: "字符涟漪", rings: "声波环", sonogram: "声纹谱图", particles: "粒子引力场", smoke: "流体烟雾", matrix: "数字雨",
+  glyph: "字符涟漪", particles: "粒子引力场", smoke: "流体烟雾", matrix: "数字雨",
   attractor: "吸引子轨迹", wavegrid: "波浪网格", starfield: "星空", threebody: "三体太阳轨迹", proton: "质子",
 };
 type Speaker = "none" | "mic" | "ai";
@@ -110,7 +110,7 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
     if (voice.kind !== "global" || !current.enabled || !current.autoVoice) return;
     // Let the call windows finish collapsing first.
     const timer = setTimeout(() => {
-      setVoiceIdx(Math.max(0, VOICE_STYLES.indexOf(current.voiceStyle)));
+      setVoiceIdx(0); // every call starts with the glyph ripples
       setVoiceOn(true);
       showToast(t("声纹屏保：← → 切换样式，点击或按键退出"), 5000);
     }, 350);
@@ -121,7 +121,6 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
   const stepVoice = (direction: 1 | -1) => {
     setVoiceIdx(index => {
       const next = (index + direction + VOICE_STYLES.length) % VOICE_STYLES.length;
-      saveScreensaverPrefs({ ...prefsRef.current, voiceStyle: VOICE_STYLES[next] });
       showToast(`${t(EFFECT_LABEL[VOICE_STYLES[next]])} · ${next + 1}/${VOICE_STYLES.length}`);
       return next;
     });
