@@ -4,7 +4,7 @@ import { isBuzhoushanTurnActive } from "../lib/buzhoushan-events";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createEffect, qualityFor, type EffectMode, type Pointer } from "../lib/buzhoushan-effects";
-import { QUALITY_TIERS, describeGpu, type QualityTier } from "../lib/buzhoushan-effect-common";
+import { QUALITY_TIERS, type QualityTier } from "../lib/buzhoushan-effect-common";
 import { createDemoVoice, voiceSignal } from "../lib/voice-signal";
 import { SCREENSAVER_ORDER, useIdle, useScreensaverPrefs, useScreensaverRequests } from "../lib/buzhoushan-idle";
 import { useVoiceStatus } from "../lib/voice-status";
@@ -49,7 +49,6 @@ const CYCLE_MS = 45_000;
 let cycleStart = 0;
 /** Lowest tier "auto" has had to fall back to; kept so the next screensaver starts there. */
 let autoTier: QualityTier = "high";
-const TIER_LABEL: Record<QualityTier, string> = { low: "低", medium: "中", high: "高" };
 
 const EFFECT_LABEL: Record<EffectMode, string> = {
   glyph: "字符涟漪", particles: "粒子引力场", smoke: "流体烟雾", matrix: "数字雨",
@@ -62,13 +61,6 @@ function voiceLine(status: { phase: string; muted: boolean; kind: string }, spea
   const state = status.phase === "connecting" ? t("连接中…") : status.phase === "recovering" ? t("恢复连接中…") : t("已连接");
   const extra = status.phase !== "connected" ? "" : status.muted ? ` · ${t("已静音")}` : ` · ${t(speaker === "mic" ? "你在说话" : speaker === "ai" ? "AI 在说话" : "聆听中")}`;
   return `${who} ${state}${extra}`;
-}
-
-function gpuLine(diag: { fps: number; w: number; h: number; dpr: number; voice: boolean }, tier: QualityTier) {
-  const gpu = describeGpu();
-  const base = `${t("帧率 {0} fps", diag.fps)} · ${diag.w}×${diag.h} @${diag.dpr}x · ${t("画质")} ${t(TIER_LABEL[tier])} · ${t(diag.voice ? "语音联动：已连接" : "语音联动：未连接（演示声音）")}`;
-  if (!gpu.renderer) return `${base} · ${t("WebGL 不可用，可能未开启硬件加速")}`;
-  return `${base} · ${gpu.renderer}${gpu.software ? ` · ${t("软件渲染，请在浏览器设置中开启硬件加速")}` : ""}`;
 }
 
 type Source = "idle" | "call" | "manual";
@@ -94,7 +86,6 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
   const [toast, setToast] = useState("");
   const [speaker, setSpeaker] = useState<Speaker>("none");
   const [autoLevel, setAutoLevel] = useState<QualityTier>(autoTier);
-  const [diag, setDiag] = useState<{ fps: number; w: number; h: number; dpr: number; voice: boolean }>();
   const tier: QualityTier = prefs.quality === "auto" ? autoLevel : prefs.quality;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -206,7 +197,6 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
         if (prefs.quality === "auto" && now - start > 2500 && fps < 40 && tier !== "low") {
           autoTier = QUALITY_TIERS[QUALITY_TIERS.indexOf(tier) - 1]; setAutoLevel(autoTier); return;
         }
-        if (sourceRef.current === "manual") setDiag({ fps: Math.round(fps), w, h, dpr, voice: voiceSignal.connected });
         frames = 0; spent = 0; windowStart = now;
       }
       raf = requestAnimationFrame(loop);
@@ -224,7 +214,6 @@ export function BuzhoushanScreensaver({ detail }: { detail?: SessionDetail }) {
           ? <><strong data-live={status.live}>{status.label}</strong>{status.total > 0 && <small>{t("已完成 {0} / {1} 步", status.done, status.total)}</small>}</>
           : <strong>{t("待命中")}</strong>}
         {voice.phase !== "idle" && voice.phase !== "error" && <small className="buzhou-saver__voice" data-phase={voice.phase} data-muted={voice.muted} data-speaker={speaker}><i aria-hidden="true" />{voiceLine(voice, speaker)}</small>}
-        {source === "manual" && diag && <small className="buzhou-saver__diag">{gpuLine(diag, tier)}</small>}
       </div>
       {toast && <div className="buzhou-saver__toast" role="status">{toast}</div>}
       {on && <>

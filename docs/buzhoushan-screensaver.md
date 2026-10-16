@@ -11,8 +11,8 @@ and must never affect calls, live messages, tasks or any other function. Other t
   session voice keeps its window) and the screensaver starts at the glyph ripples (setting "总控语音连接成功后
   自动进入屏保", on by default, and only when the screensaver is enabled).
 - **Toolbar button "屏保"**: raises it at once, with or without a call (also when disabled). With no call it
-  plays a synthetic voice and shows a diagnostic line (fps, canvas size/DPR, quality tier, renderer; software
-  rendering is called out).
+  plays a synthetic voice so the voice reaction can be seen. It looks the same as any other screensaver: there
+  is no diagnostic text on screen.
 
 ## Behaviour
 - Leaves **only on a click or a key press**; mouse movement does not leave it. A click or key raised it is
@@ -47,4 +47,4 @@ matrix/proton boost, attractor shock + spin, three-body kick + shock ring.
 - `npm run build` in `apps/web` (real `tsc -b`) and `NODE_ENV=test npx vitest run`.
 - `css-integrity.test.mjs` guards the stylesheets against unbalanced braces.
 - Headless Chrome screenshots of a small harness are useful for visuals, but they do not load the app CSS and
-  have no GPU; verify served assets after deployment and check the diagnostic line on the real Windows machine.
+  have no GPU; verify served assets after deployment and judge frame rate and sharpness on the real Windows machine.

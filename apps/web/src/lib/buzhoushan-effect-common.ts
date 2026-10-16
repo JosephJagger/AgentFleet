@@ -50,17 +50,3 @@ const TIERS: Record<QualityTier, Quality> = {
   high: { tier: "high", maxDpr: 2, particleScale: 0.85, particles: 45000, smokeWidth: 192, attractor: 8000, stars: 3200 },
 };
 export const qualityFor = (tier: QualityTier): Quality => TIERS[tier];
-
-/** GPU description via WebGL; software renderers mean hardware acceleration is off. */
-let gpu: { renderer: string; software: boolean } | undefined;
-export function describeGpu(): { renderer: string; software: boolean } {
-  if (gpu) return gpu;
-  try {
-    const gl = document.createElement("canvas").getContext("webgl") as WebGLRenderingContext | null;
-    if (!gl) return (gpu = { renderer: "", software: true });
-    const info = gl.getExtension("WEBGL_debug_renderer_info");
-    const renderer = String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
-    gl.getExtension("WEBGL_lose_context")?.loseContext();
-    return (gpu = { renderer, software: /swiftshader|basic render|llvmpipe|software|softpipe/i.test(renderer) });
-  } catch { return (gpu = { renderer: "", software: true }); }
-}
