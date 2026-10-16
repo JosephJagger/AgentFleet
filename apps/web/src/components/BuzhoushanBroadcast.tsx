@@ -43,7 +43,7 @@ export function BuzhoushanBroadcastControl({enabled,onChange}:{enabled:boolean;o
   return <div ref={root} className="buzhou-broadcast-controls" onKeyDown={event=>{if(event.key==='Escape'&&open){event.stopPropagation();setOpen(false);trigger.current?.focus();}}}>
     <button type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" aria-pressed={enabled} title={t('工作区与两侧介绍共同组成 16:9 画布')} onClick={()=>onChange(!enabled)}><Ratio size={14}/>{t(enabled?'退出 16:9':'16:9 画布')}</button>
     <button type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" title={t('立即进入屏保，点击或按键退出')} onClick={requestScreensaver}><Sparkles size={14}/>{t('屏保')}</button>
-    <button ref={trigger} type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle" aria-label={t('直播采集设置')} aria-expanded={open} onClick={()=>setOpen(v=>!v)}><MonitorUp size={14}/></button>
+    <button ref={trigger} type="button" className="buzhou-focus-toggle buzhou-broadcast-toggle buzhou-broadcast-toggle--icon" aria-label={t('直播采集设置')} aria-expanded={open} onClick={()=>setOpen(v=>!v)}><MonitorUp size={14}/></button>
     {open&&<section className="buzhou-broadcast-help" aria-label={t('直播采集设置')}>
       <header><strong>{t('直播采集设置')}</strong><button type="button" className="icon-button" aria-label={t('关闭')} onClick={()=>{setOpen(false);trigger.current?.focus();}}><X size={15}/></button></header>
       <p>{t('工作区与介绍都在 16:9 画布内。建议打开独立直播窗口，采集时裁掉标题栏和画布外黑边，再等比适配；不要拉伸铺满。')}</p>

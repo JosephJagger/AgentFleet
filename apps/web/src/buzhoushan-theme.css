@@ -265,6 +265,11 @@
   :root[data-theme="buzhoushan"] .topbar-actions > .language-switcher svg { width:14px; height:14px; }
   :root[data-theme="buzhoushan"] .topbar-actions > .icon-button { min-width:30px; width:30px; min-height:30px; height:30px; padding:6px; }
   :root[data-theme="buzhoushan"] .topbar-actions > .icon-button svg { width:15px; height:15px; }
+  /* One control height across the whole top bar, broadcast buttons included. */
+  :root[data-theme="buzhoushan"] .topbar-actions .buzhou-focus-toggle { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:30px; height:30px; padding:4px 10px; border-radius:3px; font-size:12px; font-weight:500; line-height:1; white-space:nowrap; }
+  :root[data-theme="buzhoushan"] .topbar-actions .buzhou-broadcast-toggle--icon { min-width:30px; width:30px; padding:0; }
+  :root[data-theme="buzhoushan"] .topbar-actions .buzhou-focus-toggle svg { width:15px; height:15px; flex:none; }
+  :root[data-theme="buzhoushan"] .topbar-actions > .icon-button { border-radius:3px; }
 }
 
 @media (min-width:901px) {

@@ -17,3 +17,12 @@ it('the screensaver canvas rule is top level, not nested in a media query',()=>{
 it('detects the unclosed block that shipped in 0196643',()=>{
  expect(balance('@media (x) { .a { color:red; }\n.b { color:blue; }')).toBe(1);
 });
+
+it('every top-bar broadcast button shares the 30px control height of the voice and language controls',()=>{
+ const css=read('buzhoushan-theme.css').replace(/\s+/g,' ');
+ const rule=(selector)=>{const i=css.indexOf(selector);return i<0?'':css.slice(i,css.indexOf('}',i));};
+ for(const sel of ['.topbar-actions .buzhou-focus-toggle {','.topbar-actions > .panel-voice-control > .button:not(.panel-voice-control__floating) {','.topbar-actions > .language-switcher select {','.topbar-actions > .icon-button {']){
+  expect(rule(sel),sel).toMatch(/(^|[^-])height:\s*30px/);
+ }
+ expect(rule('.topbar-actions .buzhou-broadcast-toggle--icon {')).toMatch(/width:\s*30px/);
+});
