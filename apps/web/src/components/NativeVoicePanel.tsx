@@ -64,7 +64,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
     resources.current = {};
     setMeterStream(null);
     clearInterval(owned.heartbeat); clearTimeout(owned.timeout); clearTimeout(owned.disconnectTimeout);
-    if(globalMachineId)voiceSignal.detachAll();
+    voiceSignal.release(popoverId);
     owned.stream?.getTracks().forEach(track => track.stop());
     owned.peer?.close();
     if (owned.socket?.readyState === WebSocket.OPEN) owned.socket.send(JSON.stringify({ type: "stop", reason }));
@@ -115,7 +115,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       const stream = await navigator.mediaDevices.getUserMedia(voiceMicrophoneConstraints(devices.microphone));
       if (!current()) { stream.getTracks().forEach(track => track.stop()); return; }
       resources.current.stream = stream;setMeterStream(stream);
-      if(globalMachineId)voiceSignal.attach("mic", stream);
+      voiceSignal.attach("mic", stream, popoverId);
       const peer = new RTCPeerConnection();
       resources.current.peer = peer;
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -123,7 +123,7 @@ export function NativeVoicePanel({ sessionId, canStart, activeTurnId, onActiveCh
       peer.ontrack = event => {
         if (!current() || !audio.current) return;
         audio.current.srcObject = event.streams[0] ?? new MediaStream([event.track]);
-        if(globalMachineId)voiceSignal.attach("ai", audio.current.srcObject as MediaStream);
+        voiceSignal.attach("ai", audio.current.srcObject as MediaStream, popoverId);
         void audio.current.play().catch(() => { if (current()) setPlayBlocked(true); });
       };
       peer.onconnectionstatechange = () => {

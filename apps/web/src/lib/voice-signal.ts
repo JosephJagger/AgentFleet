@@ -46,7 +46,7 @@ export function placeImpulse(role: VoiceRole, centroid: number, strength: number
   return { role, x: 0.06 + 0.88 * centroid, y: role === "ai" ? 0.2 + 0.28 * jitter : 0.54 + 0.28 * jitter, strength };
 }
 
-type Tap = { source: MediaStreamAudioSourceNode; analyser: AnalyserNode; time: Uint8Array; freq: Uint8Array; onset: OnsetDetector; level: number };
+type Tap = { owner: unknown; source: MediaStreamAudioSourceNode; analyser: AnalyserNode; time: Uint8Array; freq: Uint8Array; onset: OnsetDetector; level: number };
 const EMPTY: VoiceParams = { mic: 0, ai: 0, impulses: [], connected: false };
 
 class VoiceSignal {
@@ -54,7 +54,8 @@ class VoiceSignal {
   private taps: Partial<Record<VoiceRole, Tap>> = {};
   private lastNow = -1; private lastFrame: VoiceParams = EMPTY;
   get connected() { return Boolean(this.taps.mic || this.taps.ai); }
-  attach(role: VoiceRole, stream: MediaStream) {
+  /** `owner` identifies the call panel, so one panel closing can never cut another panel's live call. */
+  attach(role: VoiceRole, stream: MediaStream, owner: unknown = "default") {
     this.detach(role);
     try {
       const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -64,7 +65,7 @@ class VoiceSignal {
       const source = this.ctx.createMediaStreamSource(stream), analyser = this.ctx.createAnalyser();
       analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.35;
       source.connect(analyser); // analysis only: the analyser is not connected to the destination
-      this.taps[role] = { source, analyser, time: new Uint8Array(analyser.fftSize), freq: new Uint8Array(analyser.frequencyBinCount), onset: new OnsetDetector(), level: 0 };
+      this.taps[role] = { owner, source, analyser, time: new Uint8Array(analyser.fftSize), freq: new Uint8Array(analyser.frequencyBinCount), onset: new OnsetDetector(), level: 0 };
     } catch { /* The effect is optional; a failure must never affect the call. */ }
   }
   detach(role: VoiceRole) {
@@ -72,6 +73,11 @@ class VoiceSignal {
     if (!tap) return;
     try { tap.source.disconnect(); tap.analyser.disconnect(); } catch { /* already disconnected */ }
     delete this.taps[role];
+  }
+  /** Detach only the taps this owner attached; close the audio context when nothing is left. */
+  release(owner: unknown) {
+    for (const role of ["mic", "ai"] as const) if (this.taps[role]?.owner === owner) this.detach(role);
+    if (!this.connected) this.detachAll();
   }
   detachAll() {
     this.detach("mic"); this.detach("ai");

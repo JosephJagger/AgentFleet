@@ -7,9 +7,43 @@
  *  - ThreeBody: Newtonian three-sun problem (velocity Verlet) from a perturbed figure-eight.
  *  - ProtonModel: uud valence quarks, colour-charge flux tubes and a fizzing quark–antiquark sea.
  */
-import { GLYPHS, TAU, clamp, hslToRgb, hueFor, setupCanvas, type Effect, type Impulse, type Quality } from "./buzhoushan-effect-common";
+import { GLYPHS, TAU, clamp, hslToRgb, hueFor, setupCanvas, type Effect, type Impulse, type Quality, type VoiceParams, type VoiceRole } from "./buzhoushan-effect-common";
 
 type Rand = () => number;
+
+/* -------------------------------------------------------------- voice shock rings */
+
+export type Shock = { x: number; y: number; t0: number; strength: number; role: VoiceRole };
+/** Expanding "click" rings in screen space (pixels), shared by effects without a natural ripple medium. */
+export class ShockRings {
+  rings: Shock[] = [];
+  constructor(private life = 1.1) {}
+  add(impulses: Impulse[], w: number, h: number, t: number) { for (const im of impulses) this.rings.push({ x: im.x * w, y: im.y * h, t0: t, strength: im.strength, role: im.role }); if (this.rings.length > 12) this.rings.splice(0, this.rings.length - 12); }
+  prune(t: number) { this.rings = this.rings.filter(r => t - r.t0 < this.life); }
+  /** Outward push (px) on a screen point from all rings: a travelling shock front. */
+  displacement(px: number, py: number, t: number, scale: number, out: [number, number] = [0, 0]): [number, number] {
+    out[0] = 0; out[1] = 0;
+    for (const r of this.rings) {
+      const age = t - r.t0; if (age < 0 || age >= this.life) continue;
+      const dx = px - r.x, dy = py - r.y, d = Math.sqrt(dx * dx + dy * dy) + 1e-3;
+      const radius = scale * (0.25 + 0.45 * r.strength) * (age / this.life) * 1.6, k = (d - radius) / (scale * 0.08);
+      const push = scale * 0.07 * r.strength * Math.exp(-k * k) * (1 - age / this.life);
+      out[0] += (dx / d) * push; out[1] += (dy / d) * push;
+    }
+    return out;
+  }
+  draw(ctx: CanvasRenderingContext2D, t: number, scale: number) {
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    for (const r of this.rings) {
+      const age = t - r.t0; if (age < 0 || age >= this.life) continue;
+      const u = age / this.life, radius = scale * (0.25 + 0.45 * r.strength) * u * 1.6;
+      ctx.strokeStyle = `hsla(${r.role === "mic" ? 205 : 160},95%,62%,${0.65 * (1 - u) * r.strength})`; ctx.lineWidth = 1.5 + 3 * (1 - u);
+      ctx.beginPath(); ctx.arc(r.x, r.y, radius, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+const voiceLevel = (v?: VoiceParams) => (v?.mic ?? 0) + (v?.ai ?? 0);
 
 /* ----------------------------------------------------------- Lorenz attractor */
 
@@ -43,14 +77,19 @@ export function attractorEffect(canvas: HTMLCanvasElement, q: Quality): Effect |
   const cloud = new LorenzCloud(q.attractor);
   const BUCKETS = 14;
   const paths: [number, number, number][][] = Array.from({ length: BUCKETS }, () => []);
-  let w = 0, h = 0;
+  let w = 0, h = 0, yawKick = 0, yawOffset = 0;
+  const shocks = new ShockRings(), shift: [number, number] = [0, 0];
   return {
     resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); ctx.fillStyle = "#02040a"; ctx.fillRect(0, 0, w, h); },
-    frame(dt, t, { busy, pointer }) {
-      for (let s = 0; s < 3; s++) cloud.step(0.0045 * (busy ? 1.5 : 1) * Math.min(1, dt * 60));
+    frame(dt, t, { busy, pointer, voice }) {
+      // Voice: speed follows loudness, each onset spins the view and sends a shock front through the orbits.
+      shocks.add(voice?.impulses ?? [], w, h, t); shocks.prune(t);
+      for (const im of voice?.impulses ?? []) yawKick += (im.role === "mic" ? 1 : -1) * 1.3 * im.strength;
+      yawOffset += yawKick * dt; yawKick *= Math.pow(0.12, dt);
+      for (let s = 0; s < 3; s++) cloud.step(0.0045 * (busy ? 1.5 : 1) * (1 + voiceLevel(voice) * 0.9) * Math.min(1, dt * 60));
       ctx.globalCompositeOperation = "source-over";
       ctx.fillStyle = `rgba(2,4,10,${Math.min(0.5, 0.09 * dt * 60)})`; ctx.fillRect(0, 0, w, h);
-      const yaw = t * 0.22 + (pointer?.active ? (pointer.x - 0.5) * 2 : 0), pitch = 0.35 + 0.15 * Math.sin(t * 0.13) + (pointer?.active ? (pointer.y - 0.5) * 0.8 : 0);
+      const yaw = t * 0.22 + yawOffset + (pointer?.active ? (pointer.x - 0.5) * 2 : 0), pitch = 0.35 + 0.15 * Math.sin(t * 0.13) + (pointer?.active ? (pointer.y - 0.5) * 0.8 : 0);
       const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
       const S = h * 0.0185, cx = w / 2, cyy = h * 0.5;
       for (const p of paths) p.length = 0;
@@ -58,7 +97,9 @@ export function attractorEffect(canvas: HTMLCanvasElement, q: Quality): Effect |
         const x0 = cloud.x[i], y0 = cloud.y[i], z0 = cloud.z[i] - 25;
         const x1 = x0 * cy - y0 * sy, y1 = x0 * sy + y0 * cy;
         const y2 = y1 * cp - z0 * sp, z2 = y1 * sp + z0 * cp;
-        const f = 1 / (1 + y2 * 0.012), sx = cx + x1 * S * f * 1.15, sY = cyy - z2 * S * f;
+        const f = 1 / (1 + y2 * 0.012);
+        let sx = cx + x1 * S * f * 1.15, sY = cyy - z2 * S * f;
+        if (shocks.rings.length) { shocks.displacement(sx, sY, t, h, shift); sx += shift[0]; sY += shift[1]; }
         const speed = Math.abs(cloud.x[i] * cloud.y[i]) / 40;
         const b = Math.min(BUCKETS - 1, Math.max(0, Math.floor(clamp(speed, 0, 1) * (BUCKETS - 1))));
         paths[b].push([sx, sY, f]);
@@ -72,6 +113,7 @@ export function attractorEffect(canvas: HTMLCanvasElement, q: Quality): Effect |
         ctx.fill();
       }
       ctx.globalCompositeOperation = "source-over";
+      shocks.draw(ctx, t, h);
     },
     dispose() {},
   };
@@ -249,6 +291,17 @@ export class ThreeBody {
     this.time += h;
     if (this.minDistance() < 0.3) this.lastClose = this.time;
   }
+  /** Index of the sun closest to a world point. */
+  nearest(x: number, y: number): number {
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < 3; i++) { const d = (this.x[i] - x) ** 2 + (this.y[i] - y) ** 2; if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+  /** Voice "click": nudge the nearest sun directly away from the point (a small velocity change). */
+  kick(x: number, y: number, strength: number, dv = 0.14) {
+    const i = this.nearest(x, y), dx = this.x[i] - x, dy = this.y[i] - y, d = Math.hypot(dx, dy) || 1;
+    this.vx[i] += (dx / d) * dv * strength; this.vy[i] += (dy / d) * dv * strength;
+  }
   energy(): number {
     let e = 0;
     for (let i = 0; i < 3; i++) e += 0.5 * (this.vx[i] ** 2 + this.vy[i] ** 2);
@@ -270,15 +323,19 @@ export function threeBodyEffect(canvas: HTMLCanvasElement): Effect | undefined {
   const sim = new ThreeBody();
   const suns = [{ r: 255, g: 170, b: 70, size: 1.1 }, { r: 255, g: 244, b: 205, size: 1.3 }, { r: 255, g: 105, b: 80, size: 0.95 }];
   let w = 0, h = 0, cx = 0, cy = 0, zoom = 120, acc = 0;
-  const last: ([number, number] | undefined)[] = [undefined, undefined, undefined];
+  const last: ([number, number] | undefined)[] = [undefined, undefined, undefined], shocks = new ShockRings();
   const reset = () => {
     sim.reseed(); tctx.fillStyle = "#01020a"; tctx.fillRect(0, 0, w, h); last.fill(undefined);
     for (let i = 0; i < 160; i++) { tctx.fillStyle = `rgba(190,205,255,${0.15 + Math.random() * 0.35})`; tctx.fillRect(Math.random() * w, Math.random() * h, 1.2, 1.2); }
   };
   return {
     resize(width, height, dpr = 1) { ({ w, h } = setupCanvas(canvas, ctx, width, height, dpr)); trail.width = canvas.width; trail.height = canvas.height; tctx.setTransform(canvas.width / w, 0, 0, canvas.height / h, 0, 0); zoom = Math.min(w, h) * 0.3; reset(); },
-    frame(dt, _t, { busy }) {
-      acc += dt * (busy ? 1.9 : 1.2);
+    frame(dt, t, { busy, voice }) {
+      const level = voiceLevel(voice);
+      // Voice onsets shove the nearest sun and light a shock ring; loudness speeds time and swells the suns.
+      for (const im of voice?.impulses ?? []) sim.kick((im.x * w - w / 2) / zoom + cx, (im.y * h - h / 2) / zoom + cy, im.strength);
+      shocks.add(voice?.impulses ?? [], w, h, t); shocks.prune(t);
+      acc += dt * (busy ? 1.9 : 1.2) * (1 + level * 0.8);
       for (let steps = 0; acc >= 0.003 && steps < 220; steps++) { sim.step(0.003); acc -= 0.003; }
       if (acc > 0.05) acc = 0;
       if (!(sim.extent() < 9)) reset();
@@ -300,13 +357,14 @@ export function threeBodyEffect(canvas: HTMLCanvasElement): Effect | undefined {
       ctx.drawImage(trail, 0, 0, w, h);
       ctx.globalCompositeOperation = "lighter";
       for (let i = 0; i < 3; i++) {
-        const [sx, sy] = pos[i], s = suns[i], R = (16 + 7 * s.size) * (zoom / (Math.min(w, h) * 0.3)) ** 0.25;
+        const [sx, sy] = pos[i], s = suns[i], R = (16 + 7 * s.size) * (zoom / (Math.min(w, h) * 0.3)) ** 0.25 * (1 + level * 0.45);
         const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, R * 3.2);
         g.addColorStop(0, `rgba(255,255,255,1)`); g.addColorStop(0.16, `rgba(${s.r},${s.g},${s.b},0.95)`);
         g.addColorStop(0.45, `rgba(${s.r},${s.g},${s.b},0.22)`); g.addColorStop(1, `rgba(${s.r},${s.g},${s.b},0)`);
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, R * 3.2, 0, TAU); ctx.fill();
       }
       ctx.globalCompositeOperation = "source-over";
+      shocks.draw(ctx, t, Math.min(w, h));
     },
     dispose() {},
   };

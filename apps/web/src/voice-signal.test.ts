@@ -64,3 +64,18 @@ it('the preview demo alternates roles and produces valid impulses',()=>{
  for(let t=0;t<20000;t+=16)for(const i of demo(t).impulses){roles.add(i.role);expect(i.strength).toBeGreaterThan(0);expect(i.strength).toBeLessThanOrEqual(1);}
  expect([...roles].sort()).toEqual(['ai','mic']);
 });
+it('a panel releasing its own call never cuts another panel\'s live call',()=>{
+ class A{fftSize=0;smoothingTimeConstant=0;frequencyBinCount=8;connect(){}disconnect(){}getByteTimeDomainData(a:Uint8Array){a.fill(200);}getByteFrequencyData(a:Uint8Array){a.fill(5);}}
+ class S{connect(){}disconnect(){}}
+ let closed=0;
+ class C{sampleRate=48000;createMediaStreamSource(){return new S();}createAnalyser(){return new A();}resume(){return Promise.resolve();}close(){closed++;return Promise.resolve();}}
+ Object.defineProperty(window,'AudioContext',{value:C,configurable:true,writable:true});
+ const stream={getAudioTracks:()=>[{}]} as unknown as MediaStream;
+ voiceSignal.attach('mic',stream,'global-panel');voiceSignal.attach('ai',stream,'global-panel');
+ voiceSignal.release('idle-session-panel');                 // an unrelated panel unmounting
+ expect(voiceSignal.connected).toBe(true);expect(closed).toBe(0);
+ voiceSignal.release('global-panel');                        // the owner ending its call
+ expect(voiceSignal.connected).toBe(false);expect(closed).toBe(1);
+ voiceSignal.attach('mic',stream,'session-panel');          // session voice links the same way
+ expect(voiceSignal.connected).toBe(true);
+});

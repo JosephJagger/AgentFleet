@@ -105,3 +105,21 @@ it('glyph ripple brightness peaks on the expanding ring and is bounded',()=>{
  for(const a of [0,.3,1,2])for(const d of [0,5,20,60])expect(rippleBrightness(d,a,1)).toBeLessThanOrEqual(1.3);
  const _t:GlyphRipple|undefined=undefined;void _t;
 });
+import {ShockRings} from './lib/buzhoushan-effects-science';
+it('a three-body voice kick pushes the nearest sun away and the system stays finite',()=>{
+ const b=new ThreeBody(seeded(),0.04);b.reseed(0);
+ const i=b.nearest(b.x[1]+.05,b.y[1]);expect(i).toBe(1);
+ const before=[b.vx[1],b.vy[1]],dx=b.x[1]-(b.x[1]+.05);
+ b.kick(b.x[1]+.05,b.y[1],1);
+ expect(Math.sign(b.vx[1]-before[0])).toBe(Math.sign(dx));
+ expect(Math.hypot(b.vx[1]-before[0],b.vy[1]-before[1])).toBeCloseTo(.14,6);
+ for(let n=0;n<6000;n++){if(n%400===0)b.kick(Math.sin(n)*2,Math.cos(n)*2,.8);b.step(.003);}
+ for(let k=0;k<3;k++)expect(Number.isFinite(b.x[k]+b.y[k]+b.vx[k]+b.vy[k])).toBe(true);
+});
+it('shock rings push points outward from the click, then expire',()=>{
+ const s=new ShockRings(1.1);s.add([{role:'mic',x:.5,y:.5,strength:1}],1000,600,0);
+ let best=0;for(let t=0;t<1.1;t+=.05)for(let r=20;r<500;r+=10){const [dx,dy]=s.displacement(500+r,300,t,600);best=Math.max(best,dx);expect(Math.abs(dy)).toBeLessThan(1e-9);}
+ expect(best).toBeGreaterThan(5);                              // points on the right are pushed right
+ const [lx]=s.displacement(500-200,300,.5,600);expect(lx).toBeLessThanOrEqual(0); // and left points left
+ s.prune(2);expect(s.rings.length).toBe(0);expect(s.displacement(700,300,2,600)).toEqual([0,0]);
+});
