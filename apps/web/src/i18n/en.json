@@ -3733,5 +3733,11 @@
   "官方清单缺少签名，拒绝使用": "The official manifest has no signature. Refusing to use it",
   "此确认由连接服务更新器处理": "This confirmation is handled by the connection-service updater",
   "已验证，等待你确认更新": "Verified. Waiting for your confirmation",
-  "仅平台管理员可更新连接服务": "Only the platform administrator can update the connection service"
+  "仅平台管理员可更新连接服务": "Only the platform administrator can update the connection service",
+  "已提交 {0} 台主机的确认，主机会在任务和通话结束后切换。": "Confirmation submitted for {0} host(s). Each host switches after its tasks and calls finish.",
+  "等待确认的 Codex 更新": "Codex updates awaiting confirmation",
+  "{0} 台主机已验证新的 Codex，等待你确认后才会更新。": "{0} host(s) have a verified new Codex and will update only after you confirm.",
+  "确认全部 {0} 台主机的 Codex 更新": "Confirm the Codex update on all {0} host(s)",
+  "只更新 AgentFleets 独立管理的程序，不修改你自装的 Codex。以下验证与晋升设置适用于所有主机；晋升后各主机经管理员确认才会更新。": "Only the program managed by AgentFleets is updated; your own Codex is not modified. These validation and promotion settings apply to every host; after promotion each host updates only once an administrator confirms.",
+  "Codex {0} 已通过验证并晋升，各主机经管理员确认后才会更新": "Codex {0} is validated and promoted. Each host updates only after an administrator confirms."
 }

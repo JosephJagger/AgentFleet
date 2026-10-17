@@ -86,7 +86,7 @@ export class RuntimePromotion {
       state.target = target;
       state.checks.push({ name: "兼容性与执行测试", state: "passed", detail: "Linux schema、会话接口和 Code Mode 实际执行通过；4 平台主程序及执行依赖摘要通过，各主机应用前再次本地验证" });
       state.history = [{ at: target.validatedAt, version: target.version, result: "promoted", message: "自动验证通过并晋升" }, ...state.history].slice(0, 20);
-      update("promoted", `Codex ${target.version} 已自动晋升，等待主机空闲更新`);
+      update("promoted", `Codex ${target.version} 已通过验证并晋升，各主机经管理员确认后才会更新`);
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 1200) : "自动验证失败";
       retrySoon = error instanceof Error && !/SHA-256|schema|需要适配|checksum|digest/i.test(message) &&

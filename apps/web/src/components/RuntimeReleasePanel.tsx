@@ -33,7 +33,7 @@ export function RuntimeReleasePanel({ machine }: { machine?: Machine }) {
   const description = data?.target?.version ? t("{0} · 当前目标 {1}", phase, data.target.version) : phase;
   return <HostDisclosure className={`runtime-release-disclosure${running ? " is-running" : ""}`} title={t("托管 Codex 自动升级")} description={description} icon={<RefreshCw size={21} />}>
     <section className="runtime-release-panel" aria-label={t("托管 Codex 自动升级")}>
-    <p>{t("只更新 AgentFleets 独立管理的程序，不修改你自装的 Codex。以下验证与晋升设置适用于所有主机。")}</p>
+    <p>{t("只更新 AgentFleets 独立管理的程序，不修改你自装的 Codex。以下验证与晋升设置适用于所有主机；晋升后各主机经管理员确认才会更新。")}</p>
     {data && <>
       <div className="runtime-release-versions"><div><span>{t("当前托管目标")}</span><strong>{target ?? t("正在准备基线")}</strong></div><ArrowRight aria-hidden="true" size={20} /><div><span>{t(data.workerOnline ? "官方最新稳定版" : "上次获取的官方稳定版")}</span><strong>{data.latestVersion ?? t("尚未发现")}</strong></div></div>
       {!data.configured ? <p role="status">{t("自动验证服务尚未配置，继续使用内置托管版本。")}</p> : !data.workerOnline && <p className="catalog-error" role="status">{t("验证服务未连接，暂不能自动验证或晋升；已发布目标不变。")}</p>}

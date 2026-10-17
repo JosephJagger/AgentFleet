@@ -5,7 +5,7 @@ import { UpdateCenter } from './components/UpdateCenter';
 import { HostUpdateStatus } from './components/HostUpdateStatus';
 import { api } from './lib/api';
 import type { Dashboard, HostOperation } from './lib/types';
-vi.mock('./lib/api',()=>({api:{agentReleaseStatus:vi.fn(),hostOperations:vi.fn(),hostOperation:vi.fn(),release:vi.fn()}}));
+vi.mock('./lib/api',()=>({api:{agentReleaseStatus:vi.fn(),hostOperations:vi.fn(),hostOperation:vi.fn(),release:vi.fn(),providerRuntimeOperation:vi.fn()}}));
 vi.mock('./components/RuntimeReleasePanel',()=>({RuntimeReleasePanel:()=>null}));
 afterEach(()=>{cleanup();vi.useRealTimers();vi.resetAllMocks();});
 it('does not certify a running version without its health receipt',()=>{
@@ -48,4 +48,28 @@ it('disables connection-service updates for users who are not the platform admin
   const button=screen.getByText('检查并更新').closest('button') as HTMLButtonElement;
   expect(button.disabled).toBe(true);fireEvent.click(button);
   expect(api.hostOperation).not.toHaveBeenCalled();
+});
+
+it('lets the administrator confirm every host awaiting a validated Codex update with one explicit click',async()=>{
+  vi.mocked(api.agentReleaseStatus).mockResolvedValue({status:'ready',expectedVersion:'1.0.1',publicVersion:'1.0.1',checkedAt:''});
+  vi.mocked(api.hostOperations).mockResolvedValue([]);vi.mocked(api.release).mockResolvedValue({build:'test'} as never);
+  vi.mocked(api.providerRuntimeOperation).mockResolvedValue({id:'op',type:'provider.runtime',state:'accepted'} as never);
+  const host=(id:string,state:string)=>({id,name:id,identity:'paired',os:'linux',reachability:'live',agentVersion:'1.0.1',codexVersion:'0.162.1',maintenanceCapabilities:['agent.update','provider.runtime'],codexProfile:{source:'managed',runtimeUpdateState:state,runtimeUpdateTarget:'0.163.0'}});
+  const dashboard={user:{platformAdmin:true},compatibilityProfile:{managedCodexVersion:'0.163.0',schemaHash:'',validationStatus:'verified'},machines:[host('host-a','awaiting_confirmation'),host('host-b','awaiting_confirmation'),host('host-c','preparing')]} as unknown as Dashboard;
+  render(<UpdateCenter dashboard={dashboard}/>);
+  await act(async()=>{});
+  expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText('确认全部 2 台主机的 Codex 更新'));
+  await act(async()=>{});
+  expect(api.providerRuntimeOperation).toHaveBeenCalledTimes(2);
+  expect(vi.mocked(api.providerRuntimeOperation).mock.calls.map(call=>[call[0],call[1]])).toEqual([['host-a',{action:'confirm',provider:'codex',version:'0.163.0'}],['host-b',{action:'confirm',provider:'codex',version:'0.163.0'}]]);
+  expect(screen.getByText('已提交 2 台主机的确认，主机会在任务和通话结束后切换。')).toBeTruthy();
+});
+it('shows non-administrators no Codex target and no confirmation controls',async()=>{
+  vi.mocked(api.agentReleaseStatus).mockResolvedValue({status:'ready',expectedVersion:'1.0.1',publicVersion:'1.0.1',checkedAt:''});
+  vi.mocked(api.hostOperations).mockResolvedValue([]);
+  const dashboard={user:{platformAdmin:false},compatibilityProfile:{managedCodexVersion:'',schemaHash:'',validationStatus:'unknown'},machines:[{id:'host-a',name:'host-a',identity:'paired',os:'linux',reachability:'live',agentVersion:'1.0.1',codexVersion:'0.162.1',codexProfile:{source:'managed'}}]} as unknown as Dashboard;
+  render(<UpdateCenter dashboard={dashboard}/>);
+  await act(async()=>{});
+  expect(screen.queryByText('本站托管 Codex 目标')).toBeNull();expect(screen.queryByText(/确认全部/)).toBeNull();expect(screen.getByText('0.162.1')).toBeTruthy();
 });

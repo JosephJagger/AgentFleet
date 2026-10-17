@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import type { Dashboard, HostOperation } from "../lib/types";
 import { displayName } from "../lib/display-name";
 import { runtimeRollout } from "../lib/runtime-rollout";
+import { providerUpdateOffer } from "../lib/provider-updates";
+import type { Machine } from "../lib/types";
 import { t, systemText } from "../i18n";
 import { HostUpdateStatus, type AgentReleaseStatus } from "./HostUpdateStatus";
 import { RuntimeReleasePanel } from "./RuntimeReleasePanel";
@@ -14,6 +16,8 @@ export function UpdateCenter({ dashboard }: { dashboard: Dashboard }) {
   const [error, setError] = useState("");
   const [operations, setOperations] = useState<Record<string, HostOperation[]>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
+  const [confirming, setConfirming] = useState(false);
+  const [notice, setNotice] = useState("");
   const mutations = useRef(new Map<string, string>());
   const inFlight = useRef(new Set<string>());
   const hosts = dashboard.machines.filter(machine => machine.identity === "paired");
@@ -37,6 +41,25 @@ export function UpdateCenter({ dashboard }: { dashboard: Dashboard }) {
     if (dashboard.user.platformAdmin) void api.release().then(value => { if (!controller.signal.aborted) setBuild(value.build); }).catch(() => undefined);
     return () => { controller.abort(); window.clearInterval(timer); };
   }, [hostKey, dashboard.user.platformAdmin]);
+  const codexOffer = (machine: Machine) => {
+    const offer = providerUpdateOffer("codex", machine, undefined, machine.codexVersion);
+    return offer?.kind === "codex-confirm" ? offer : undefined;
+  };
+  const awaiting = dashboard.user.platformAdmin ? hosts.filter(machine => codexOffer(machine)) : [];
+  /** One explicit approval per host and per exact version; the host re-checks that version is still the pending one. */
+  async function confirmCodex(targets: Machine[]) {
+    if (confirming) return;
+    setConfirming(true); setError(""); setNotice("");
+    let accepted = 0;
+    for (const machine of targets) {
+      const offer = codexOffer(machine);
+      if (!offer) continue;
+      try { await api.providerRuntimeOperation(machine.id, { action: "confirm", provider: "codex", version: offer.latest }, crypto.randomUUID()); accepted += 1; }
+      catch (reason) { setError(`${displayName(machine.name)}：${reason instanceof Error ? reason.message : t("操作未完成")}`); }
+    }
+    if (accepted) setNotice(t("已提交 {0} 台主机的确认，主机会在任务和通话结束后切换。", accepted));
+    setConfirming(false);
+  }
   async function check(id: string) {
     if (inFlight.current.has(id)) return;
     inFlight.current.add(id); setSubmitting(value => ({ ...value, [id]: true })); setError("");
@@ -54,9 +77,14 @@ export function UpdateCenter({ dashboard }: { dashboard: Dashboard }) {
     <dl className="update-center__summary">
       <div><dt>{t("网页面板")}</dt><dd>{build || t("由管理员发布")}</dd></div>
       <div><dt>{t("连接服务发布版本")}</dt><dd>{release?.publicVersion || t("等待核验")}</dd></div>
-      <div><dt>{t("本站托管 Codex 目标")}</dt><dd>{dashboard.compatibilityProfile.managedCodexVersion}</dd></div>
+      {dashboard.user.platformAdmin && <div><dt>{t("本站托管 Codex 目标")}</dt><dd>{dashboard.compatibilityProfile.managedCodexVersion}</dd></div>}
     </dl>
     {error && <p role="alert" className="catalog-error">{systemText(error)}</p>}
+    {notice && <p role="status">{notice}</p>}
+    {awaiting.length > 0 && <div className="update-center__confirm" role="group" aria-label={t("等待确认的 Codex 更新")}>
+      <p>{t("{0} 台主机已验证新的 Codex，等待你确认后才会更新。", awaiting.length)}</p>
+      <button type="button" className="button button--primary" disabled={confirming} onClick={() => void confirmCodex(awaiting)}>{t("确认全部 {0} 台主机的 Codex 更新", awaiting.length)}</button>
+    </div>}
     <p className="subtle">{t("离线主机显示最后上报版本；重新连接后自动检查。安装方式不影响后续服务更新。")}</p>
     <div className="update-center__hosts">
       {hosts.map(machine => {
@@ -66,7 +94,7 @@ export function UpdateCenter({ dashboard }: { dashboard: Dashboard }) {
         return <article key={machine.id} className="update-center__host">
           <header><strong>{displayName(machine.name)}</strong><span>{machine.os} · {t(machine.reachability === "live" ? "在线" : "离线")}</span><button type="button" className="button button--quiet" disabled={Boolean(submitting[machine.id]) || pending || machine.reachability !== "live" || !machine.maintenanceCapabilities?.includes("agent.update") || !dashboard.user.platformAdmin} title={dashboard.user.platformAdmin ? undefined : t("仅平台管理员可更新连接服务")} onClick={() => void check(machine.id)}><RefreshCw size={14}/>{pending ? t("等待主机核验") : t("检查并更新")}</button></header>
           <HostUpdateStatus machine={machine} operations={history} release={release} compact/><div className="update-center__components"><details><summary>{t("连接服务")} <strong>{machine.agentVersion}</strong></summary><HostUpdateStatus machine={machine} operations={history} release={release}/></details>
-          <div><p>Codex <strong>{machine.codexVersion || t("尚未上报")}</strong></p>{dashboard.user.platformAdmin && <><small>{runtime.label}</small>{runtime.error && <p className="catalog-error">{systemText(runtime.error)}</p>}</>}</div></div>
+          <div><p>Codex <strong>{machine.codexVersion || t("尚未上报")}</strong></p>{dashboard.user.platformAdmin && <><small>{runtime.label}</small>{runtime.error && <p className="catalog-error">{systemText(runtime.error)}</p>}{codexOffer(machine) && <button type="button" className="button button--quiet" disabled={confirming} onClick={() => void confirmCodex([machine])}>{t("确认更新到 {0}", codexOffer(machine)!.latest)}</button>}</>}</div></div>
         </article>;
       })}
       {!hosts.length && <p>{t("添加主机并连接后，可在这里查看更新进度。")}</p>}
