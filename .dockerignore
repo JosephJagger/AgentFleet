@@ -10,6 +10,7 @@ output
 release
 packaging/build
 .agentfleet
+.agentfleets
 agentfleet-state
 **/*.sqlite
 **/*.sqlite-*

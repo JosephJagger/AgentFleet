@@ -79,6 +79,7 @@ export interface Machine {
 }
 
 export interface DiscoveryProgress {
+  providerRuntimePolicy?: import("./provider-runtime-policy").ProviderRuntimeState;
   syncMode?: "events" | "fallback";
   reconcileIntervalSeconds?: number;
   backgroundSync?: boolean;
@@ -105,7 +106,7 @@ export interface HostCheck {
   action?: MaintenanceType;
 }
 
-export type MaintenanceType = "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host" | "versions.preview" | "versions.clean";
+export type MaintenanceType = "provider.runtime" | "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host" | "versions.preview" | "versions.clean";
 export interface HostOperation {
   id: string;
   type: MaintenanceType;

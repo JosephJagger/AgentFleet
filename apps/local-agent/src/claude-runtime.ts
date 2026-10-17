@@ -25,7 +25,7 @@ export const isClaudeThread = (id: string) => id.startsWith(CLAUDE_PREFIX);
 export const isClaudeProject = (project: ProjectRecord) => project.provider === "claude";
 const nativeId = (id: string) => id.slice(CLAUDE_PREFIX.length);
 const execFileAsync = promisify(execFile);
-export interface ClaudeAvailability { installed: boolean; version: string | null; error?: string; models?: ClaudeModel[]; quota?: ClaudeQuota; permissionModes?: string[]; }
+export interface ClaudeAvailability { managed?: boolean; installed: boolean; version: string | null; error?: string; models?: ClaudeModel[]; quota?: ClaudeQuota; permissionModes?: string[]; }
 
 export async function detectClaude(): Promise<ClaudeAvailability & { path?: string }> {
   const names = process.platform === "win32" ? ["claude.exe", "claude.cmd"] : ["claude"];
@@ -119,10 +119,26 @@ export class ClaudeRuntime implements AppServerClient {
     if (!this.binary || (!force && Date.now()-this.metadataAt<60_000)) return;
     if(this.metadataPending)return this.metadataPending;
     this.metadataAt=Date.now();
-    this.metadataPending=(async()=>{try {const metadata=await this.sdk.inspectClaudeMetadata(this.binary!,this.owned);this.availability={...this.availability,...metadata,models:metadata.models.length ? metadata.models : this.availability.models ?? []};} catch {if(this.availability.quota)this.availability.quota={...this.availability.quota,available:false,windows:[]};}finally{this.metadataPending=undefined;}})();
+    const binary=this.binary;
+    this.metadataPending=(async()=>{try {const metadata=await this.sdk.inspectClaudeMetadata(binary,this.owned,this.availability.managed);if(this.binary!==binary)return;this.availability={...this.availability,...metadata,models:metadata.models.length ? metadata.models : this.availability.models ?? []};} catch {if(this.availability.quota)this.availability.quota={...this.availability.quota,available:false,windows:[]};}finally{this.metadataPending=undefined;}})();
     return this.metadataPending;
   }
-  async start() { const { path, ...availability } = await this.sdk.detectClaude(); this.binary = path; this.availability = path ? {...this.availability,...availability} : availability; void this.refreshMetadata(); }
+  private discoveryGeneration = 0;
+  async start() {
+    const generation = ++this.discoveryGeneration;
+    try {
+      const { path, ...availability } = await this.sdk.detectClaude();
+      if (generation !== this.discoveryGeneration) return;
+      if(this.binary!==path)this.metadataAt=0;
+      this.binary = path;
+      this.availability = path ? {...this.availability,...availability,managed:availability.managed===true} : availability;
+      void this.refreshMetadata();
+    } catch {
+      if(generation!==this.discoveryGeneration)return;
+      this.binary=undefined;
+      this.availability={installed:false,version:null,error:"Claude 运行时不可用，请检查版本；其他智能体不受影响"};
+    }
+  }
   async stop() { await Promise.all([...this.writers.keys()].map(id => this.unsubscribeThread(id))); }
   private available() { if (!this.binary) throw new AgentError("CLAUDE_NOT_INSTALLED", "宿主机未安装 Claude Code"); }
   private panelTitle(id: string) {
@@ -284,6 +300,7 @@ export class ClaudeRuntime implements AppServerClient {
     const input = async function* () { while (!writer.closed) { const message = writer.input.shift(); if (message) yield message; else await new Promise<void>(resolve => { writer.wake = resolve; }); } };
     const options: Options = {
       cwd: thread.sessionCwd ?? project.root, pathToClaudeCodeExecutable: this.binary!,
+      ...(this.availability.managed ? {env:{...process.env,DISABLE_AUTOUPDATER:"1"}} : {}),
       settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code" },
       includePartialMessages: true, permissionMode: settings?.mode === "plan" ? "plan" : (settings as ClaudeSettings|undefined)?.permissionMode ?? "default", permissionPrompts: "host",
       ...(writer.fresh ? { sessionId: nativeId(id), ...(thread.titleSource === "name" && thread.title ? { title: thread.title } : {}) } : { resume: nativeId(id) }),

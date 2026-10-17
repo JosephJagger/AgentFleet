@@ -230,7 +230,7 @@ export interface NativeThreadBinding {
   title?: string;
 }
 
-export type MaintenanceType = "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host" | "versions.preview" | "versions.clean";
+export type MaintenanceType = "provider.runtime" | "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host" | "versions.preview" | "versions.clean";
 export interface MaintenanceOperation {
   recoveryTarget?: Record<string, unknown>;
   commands?: string[];
@@ -253,6 +253,7 @@ export interface ProjectDiscoveryStatus {
 }
 
 export interface AgentState {
+  providerRuntimeState?: import("./provider-runtime-policy.js").ProviderRuntimeState;
   extraSkillRoots?: string[];
   panelVoiceRuntime?: {voiceId:string;pid?:number};
   nativeDeletionTombstones: Record<string,string>;

@@ -286,3 +286,20 @@ for (const ending of ["parent-result", "stream-error", "release"] as const) test
   assert.deepEqual(Object.fromEntries(after.items.map(item => [item.id, item.status])), { completed: "completed", failed: "failed", killed: "killed", stopped: "stopped", unconfirmed: "unknown" });
   await runtime.stop();
 });
+
+test('late host discovery cannot overwrite a newly selected managed runtime; switching back clears managed flag',async()=>{
+ let resolve!: (value:{installed:boolean;version:string;path:string})=>void;
+ let calls=0;
+ const runtime=new ClaudeRuntime({} as AppServerCallbacks,'epoch',{
+  detectClaude:async()=>{calls++;if(calls===1)return new Promise(r=>{resolve=r;});return {installed:true,version:'new',path:'/managed/claude',managed:calls===2};},
+  inspectClaudeMetadata:async()=>({models:[],quota:{observedAt:new Date().toISOString(),available:false,subscriptionType:null,windows:[]}})
+ });
+ const old=runtime.start();await runtime.start();resolve({installed:true,version:'old',path:'/host/claude'});await old;
+ assert.equal(runtime.availability.version,'new');assert.equal(runtime.availability.managed,true);
+ await runtime.start();assert.equal(runtime.availability.managed,false);
+});
+
+test('damaged optional Claude runtime is reported without failing shared runtime startup',async()=>{
+ const runtime=new ClaudeRuntime({} as AppServerCallbacks,'epoch',{detectClaude:async()=>{throw new Error('checksum mismatch');}});
+ await runtime.start();assert.equal(runtime.availability.installed,false);assert.match(runtime.availability.error??'',/其他智能体不受影响/);
+});

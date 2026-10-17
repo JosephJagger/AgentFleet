@@ -1,3 +1,4 @@
+import { ProviderRuntimeManager } from "./provider-runtime-manager.js";
 import { threadProvider } from "./provider-identity.js";
 import { isAcpProvider, supportsProviderCommand, type ProviderId } from "./provider-catalog.js";
 import {snapshotWorkspace, workspaceChanges, type WorkspaceSnapshot} from "./workspace-changes.js";
@@ -380,7 +381,7 @@ export class AgentRuntime {
     ];
     const readiness = checks.some(item => item.state === "failed") ? "action_required"
       : visibleState !== "ready" ? "checking" : this.isWritable() ? "ready" : "read_only";
-    return { ...this.discoveryStatus, state: visibleState, backgroundSync, agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {},
+    return { ...this.discoveryStatus, state: visibleState, backgroundSync, providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {},
       ...(serverUnavailable ? { error: "Codex 会话服务启动失败，项目和会话扫描暂不可用。连接服务会自动重试。" } : {}),
       syncMode: this.catalogWatcher?.mode ?? "fallback", reconcileIntervalSeconds: CATALOG_RECONCILE_MS / 1000,
       ...(completed ? { scannedCount: completed.scannedCount, discoveredCount: completed.discoveredCount, lastSuccessfulAt: completed.lastSuccessfulAt } : {}),
@@ -537,6 +538,17 @@ export class AgentRuntime {
 
   async refreshQuota(): Promise<void> { await this.appServer?.refreshQuota?.(); }
 
+  private readonly providerRuntimeManager: ProviderRuntimeManager;
+  async manageProviderRuntime(value: unknown, operationId: string): Promise<Record<string, unknown>> {
+    await this.providerRuntimeManager.operate(value, operationId);
+    const report = await this.providerRuntimeManager.inventory(this.appServer?.getAgentRuntimes?.() ?? {}, {version:this.support.codexVersion, source:this.support.codexProfile?.source, compatibility:this.support.writable ? "compatible" : "unverified"});
+    this.notifyRegistryChanged();
+    return report;
+  }
+  async automaticProviderUpdate(): Promise<void> {
+    await this.providerRuntimeManager.automatic();
+  }
+
   async manageHostCodex(value: unknown, operationId: string): Promise<Record<string, unknown>> {
     const request = parseHostCodexOperation(value);
     if (!this.appServer?.manageHostCodex) throw new AgentError("AGENT_CAPABILITY_UNAVAILABLE", "Native host management is unavailable");
@@ -633,7 +645,11 @@ export class AgentRuntime {
     this.identity = options.identity;
     this.pairing = options.pairing;
     this.support = options.support;
-    this.appServerFactory = options.appServerFactory ?? ((callbacks) => createMultiRuntime(callbacks, {codexReadable: this.support.readable ?? this.support.writable, additionalAllowed: this.support.providerHostSupported ?? this.support.writable}));
+    this.providerRuntimeManager = new ProviderRuntimeManager(this.store, async () => {
+      if (this.shuttingDown || !this.appServer?.refreshManagedClaude) throw new AgentError("PROVIDER_RUNTIME_UNAVAILABLE", "Claude adapter is not ready");
+      await this.appServer.refreshManagedClaude(); this.notifyRegistryChanged();
+    });
+    this.appServerFactory = options.appServerFactory ?? ((callbacks) => createMultiRuntime(callbacks, {codexReadable: this.support.readable ?? this.support.writable, additionalAllowed: this.support.providerHostSupported ?? this.support.writable, detectClaude:()=>this.providerRuntimeManager.detectClaude()}));
     this.restartSleep = options.restartSleep ?? ((milliseconds, signal) => delay(milliseconds, signal));
     this.restartDelay = options.restartDelay ?? appServerRestartDelay;
     this.catalogSync = new CatalogSyncScheduler(async change => {
@@ -736,7 +752,7 @@ export class AgentRuntime {
           ? ["thread/list", "thread/read", "thread/resume", "thread/unsubscribe", "thread/start", "turn/start", "turn/steer", "turn/interrupt", "approval/reply-once"]
           : this.canRead() && this.appServer ? ["thread/list", "thread/read"] : [],
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : this.support.providerHostSupported && this.appServer ? ["thread.claim","thread.release","turn.start","turn.queue","turn.cancel","approval.decide_once","input.respond"] : [],
-        maintenanceTypes: ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
+        maintenanceTypes: ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
         projectFiles: true,
         nativeSubagents: true,
         conversationHistory: this.canRead() && Boolean(this.appServer?.readConversation),
@@ -748,7 +764,7 @@ export class AgentRuntime {
       },
       resumeStreams,
       capacity: this.capacityState(),
-      discovery: { ...this.getDiscoveryStatus(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       projects: this.projectSummaries(),
       sessions: [...Object.values(state.managedThreads).flatMap((thread) => {
@@ -843,7 +859,7 @@ export class AgentRuntime {
       activeTurns: Object.values(state.managedThreads).filter((thread) => thread.activeTurnId !== undefined).length,
       readOnly: !this.isWritable(),
       readOnlyReasons: this.readOnlyReasons(),
-      discovery: { ...this.getDiscoveryStatus(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       ...(this.support.codexProfile ? { codexProfile: this.support.codexProfile } : {}),
       ...(this.isWritable() ? {} : { unreachableReason: this.readOnlyReasons().join("; ") }),
@@ -1088,6 +1104,7 @@ export class AgentRuntime {
 
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
+    await this.providerRuntimeManager.stop();
     for(const id of this.workspaceWatches.keys())this.discardWorkspaceWatch(id);
     await this.panelVoice?.close();
     this.catalogSync.close();

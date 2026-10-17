@@ -1,3 +1,4 @@
+import { parseProviderRuntimeState } from "./provider-runtime-policy.js";
 import { ACP_PROVIDER_IDS, isAcpProvider, isProviderId, parseProviderAvailability, providerName, type ProviderId } from "./provider-catalog.js";
 import { parseMaintenance } from "./host-maintenance.js";
 import { parseClaudeMetadata } from "./claude-metadata.js";
@@ -2572,6 +2573,8 @@ export class RegistryService {
   updateDiscovery(machineId: string, discovery: Record<string, unknown>): void {
     invariant(discovery && typeof discovery === "object" && !Array.isArray(discovery) && ["scanning","ready","error"].includes(String(discovery.state)),400,"INVALID_DISCOVERY","Invalid discovery state");
     const safe: Record<string,unknown>={state:discovery.state};
+    const providerPolicy=parseProviderRuntimeState(discovery.providerRuntimePolicy);
+    if(providerPolicy)safe.providerRuntimePolicy=providerPolicy;
     if (discovery.agentRuntimes && typeof discovery.agentRuntimes === "object" && !Array.isArray(discovery.agentRuntimes)) {
       const runtimes = discovery.agentRuntimes as Record<string, unknown>;
       const claude = runtimes.claude as Record<string, unknown> | undefined;

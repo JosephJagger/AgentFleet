@@ -1,3 +1,4 @@
+import {AGENT_VERSION} from "./constants.js";
 import {randomUUID} from 'node:crypto';
 import {homedir} from 'node:os';
 import {isAbsolute,resolve} from 'node:path';
@@ -52,7 +53,7 @@ export class AcpRuntime {
       }});
     this.connections.add(connection);connection.start();if(connection.pid)this.owned.add(connection.pid);
     try {
-      const init=await connection.call('initialize',{protocolVersion:1,clientCapabilities:{},clientInfo:{name:'agentfleets',version:'0.30.108'}});
+      const init=await connection.call('initialize',{protocolVersion:1,clientCapabilities:{},clientInfo:{name:'agentfleets',version:AGENT_VERSION}});
       if(!isRecord(init)||init.protocolVersion!==1||!isRecord(init.agentCapabilities))throw new AgentError('ACP_INCOMPATIBLE','Unsupported native protocol handshake');
       const capabilities=init.agentCapabilities,sessionCapabilities=isRecord(capabilities.sessionCapabilities)?capabilities.sessionCapabilities:{};
       this.availability={installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),capabilities:{...unavailableCapabilities(),create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};

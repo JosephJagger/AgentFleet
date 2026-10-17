@@ -77,3 +77,22 @@ test('schema 60 migration preserves project IDs, sessions, references and reopen
  upgraded.run("UPDATE projects SET provider='qwen' WHERE project_id='qwen'");upgraded.close();upgraded=new ControlPlaneDatabase(path);
  assert.equal(upgraded.get<{provider:string}>("SELECT provider FROM projects WHERE project_id='qwen'")?.provider,'qwen');upgraded.close();
 });
+
+test('schema 61 runtime-operation migration preserves existing receipts and indexes',t=>{
+ const dir=mkdtempSync(join(tmpdir(),'provider-management-migration-'));const path=join(dir,'db.sqlite');const f=fixture(path);t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const at=new Date().toISOString();
+ f.db.run(`INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at,result_json) VALUES('old-operation','m',?,?,'unique-mutation','catalog.refresh','succeeded',?,?,?,?)`,f.principal.workspaceId,f.principal.clientSessionId,at,at,at,JSON.stringify({kept:true}));
+ const schema=f.db.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")!.sql;const indexes=f.db.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='machine_operations' AND type='index' AND sql IS NOT NULL");
+ f.db.transaction(()=>{f.db.sqlite.exec('ALTER TABLE machine_operations RENAME TO old_ops');f.db.sqlite.exec(schema.replace(",'provider.runtime'",''));f.db.sqlite.exec('INSERT INTO machine_operations SELECT * FROM old_ops; DROP TABLE old_ops');for(const index of indexes)f.db.sqlite.exec(index.sql);f.db.sqlite.exec('PRAGMA user_version=61');});f.db.close();
+ const upgraded=new ControlPlaneDatabase(path);t.after(()=>upgraded.close());assert.equal(upgraded.get<{user_version:number}>('PRAGMA user_version')?.user_version,62);
+ assert.equal(upgraded.get<{result_json:string}>("SELECT result_json FROM machine_operations WHERE operation_id='old-operation'")?.result_json,JSON.stringify({kept:true}));
+ assert.ok(upgraded.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")?.sql.includes("'provider.runtime'"));assert.equal(upgraded.all('PRAGMA foreign_key_check').length,0);
+ for(const index of indexes)assert.ok(upgraded.get('SELECT 1 FROM sqlite_master WHERE sql=?',index.sql));
+});
+
+test('provider policy heartbeat preserves newest revision without exposing arbitrary host fields',t=>{
+ const f=fixture();t.after(()=>f.db.close());f.registry.updateDiscovery('m',{state:'ready',providerRuntimePolicy:{revision:7,mode:'auto',phase:'waiting_idle',stableVersion:'2.1.292',token:'secret',binaryPath:'/private/claude'}});
+ const discovery=JSON.parse(f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json);
+ assert.deepEqual(discovery.providerRuntimePolicy,{revision:7,mode:'auto',phase:'waiting_idle',stableVersion:'2.1.292'});
+ f.registry.updateDiscovery('m',{state:'ready',providerRuntimePolicy:{revision:-1,mode:'evil'}});assert.equal(JSON.parse(f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json).providerRuntimePolicy,undefined);
+});

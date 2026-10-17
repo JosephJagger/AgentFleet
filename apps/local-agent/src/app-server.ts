@@ -199,6 +199,7 @@ export interface AppServerClient {
   stopVoice?(threadId: string): Promise<void>;
   manageHostCodex?(request: unknown, mutationId: string): Promise<CodexOperationResult>;
   manageCodex?(thread: ManagedThread, request: unknown, mutationId: string): Promise<CodexOperationResult>;
+  refreshManagedClaude?(): Promise<void>;
   getAgentRuntimes?(): Record<string, unknown>;
   refreshQuota?(): Promise<void>;
   refreshCodexCatalog?(): Promise<void>;

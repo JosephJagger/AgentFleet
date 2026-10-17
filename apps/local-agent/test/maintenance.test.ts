@@ -193,3 +193,13 @@ test("interrupted version cleanup is never replayed and clears its drain",async 
  await maintenance.replay();
  assert.equal(store.snapshot().maintenanceDrain,undefined);assert.equal(reports.at(-1)?.state,'failed');assert.equal((reports.at(-1)?.error as {code:string}).code,'VERSION_CLEANUP_UNCONFIRMED');
 });
+
+test('provider policy mutations use exact request once; interrupted operations never replay or restart voice',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'provider-maintenance-'));const store=new StateStore(directory);await store.initialize();t.after(async()=>{store.close();await rm(directory,{recursive:true,force:true});});
+ let calls=0;const target={action:'configure',provider:'claude',mode:'auto',expectedRevision:0};
+ const runtime={manageProviderRuntime:async(value:unknown)=>{assert.deepEqual(value,target);calls++;return {checkedAt:new Date().toISOString(),providers:{}};}} as unknown as AgentRuntime;
+ const maintenance=new AgentMaintenance({store,runtime,signal:new AbortController().signal,report:()=>{}});
+ const offer={operationId:'provider-change',operationType:'provider.runtime',recoveryTarget:target};await maintenance.handle(offer);await maintenance.handle(offer);assert.equal(calls,1);
+ await store.recordMaintenance({operationId:'interrupted-provider',operationType:'provider.runtime',state:'running',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),recoveryTarget:target});
+ await maintenance.replay();assert.equal(calls,1);assert.equal(store.snapshot().maintenanceOperations['interrupted-provider']?.state,'failed');
+});

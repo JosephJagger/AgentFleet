@@ -10,7 +10,7 @@ import { readUpdateTransaction, workerHealthDiagnostics } from "./supervisor.js"
 import { collectServiceDiagnostics } from "./service-diagnostics.js";
 import { delay } from "./util.js";
 
-const TYPES: readonly MaintenanceType[] = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"];
+const TYPES: readonly MaintenanceType[] = ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"];
 
 export class AgentMaintenance {
   private readonly active = new Set<string>();
@@ -53,8 +53,8 @@ export class AgentMaintenance {
 
   async replay(): Promise<void> {
     for (const operation of Object.values(this.options.store.snapshot().maintenanceOperations)) {
-      if (operation.state === "running" && ["images.preview", "images.clean", "codex.host", "versions.preview", "versions.clean"].includes(operation.operationType) && !this.active.has(operation.operationId) && (["images.clean", "codex.host", "versions.clean"].includes(operation.operationType) || operation.expiresAt && Date.parse(operation.expiresAt) <= Date.now())) {
-        const stopped: MaintenanceOperation = { ...operation, state: "failed", updatedAt: new Date().toISOString(), error: { code: operation.operationType === "codex.host" ? "OPERATION_UNCONFIRMED" : operation.operationType.startsWith("versions.") ? "VERSION_CLEANUP_UNCONFIRMED" : "IMAGE_CLEANUP_UNCONFIRMED", message: "操作已中断或过期，请先核验实际结果；不会自动重试" } };
+      if (operation.state === "running" && ["provider.runtime", "images.preview", "images.clean", "codex.host", "versions.preview", "versions.clean"].includes(operation.operationType) && !this.active.has(operation.operationId) && (["provider.runtime", "images.clean", "codex.host", "versions.clean"].includes(operation.operationType) || operation.expiresAt && Date.parse(operation.expiresAt) <= Date.now())) {
+        const stopped: MaintenanceOperation = { ...operation, state: "failed", updatedAt: new Date().toISOString(), error: { code: ["codex.host","provider.runtime"].includes(operation.operationType) ? "OPERATION_UNCONFIRMED" : operation.operationType.startsWith("versions.") ? "VERSION_CLEANUP_UNCONFIRMED" : "IMAGE_CLEANUP_UNCONFIRMED", message: "操作已中断或过期，请先核验实际结果；不会自动重试" } };
         await this.options.store.recordMaintenance(stopped);
         if (this.options.store.snapshot().maintenanceDrain?.operationId === operation.operationId) await this.options.store.setMaintenanceDrain(undefined);
         this.report(stopped); continue;
@@ -85,8 +85,8 @@ export class AgentMaintenance {
       if (previous) this.report(previous);
       return;
     }
-    if (previous && ["images.clean", "codex.host", "versions.clean"].includes(operationType)) {
-      const stopped: MaintenanceOperation = { ...previous, state: "failed", error: { code: operationType === "codex.host" ? "OPERATION_UNCONFIRMED" : operationType === "versions.clean" ? "VERSION_CLEANUP_UNCONFIRMED" : "IMAGE_CLEANUP_UNCONFIRMED", message: "操作曾启动但未收到完整回执，请先核验实际结果；不会自动重试" }, updatedAt: new Date().toISOString() };
+    if (previous && ["provider.runtime", "images.clean", "codex.host", "versions.clean"].includes(operationType)) {
+      const stopped: MaintenanceOperation = { ...previous, state: "failed", error: { code: ["codex.host","provider.runtime"].includes(operationType) ? "OPERATION_UNCONFIRMED" : operationType === "versions.clean" ? "VERSION_CLEANUP_UNCONFIRMED" : "IMAGE_CLEANUP_UNCONFIRMED", message: "操作曾启动但未收到完整回执，请先核验实际结果；不会自动重试" }, updatedAt: new Date().toISOString() };
       await this.options.store.recordMaintenance(stopped);
       if (this.options.store.snapshot().maintenanceDrain?.operationId === operationId) await this.options.store.setMaintenanceDrain(undefined);
       this.report(stopped); return;
@@ -100,14 +100,16 @@ export class AgentMaintenance {
       await this.options.store.recordMaintenance(operation);
       this.report(operation);
     };
-    if (["connection.repair", "session.reconcile", "images.preview", "images.clean", "project.add", "codex.host"].includes(operationType)) operation.recoveryTarget = previous?.recoveryTarget ?? (offer.recoveryTarget as Record<string, unknown>);
+    if (["provider.runtime", "connection.repair", "session.reconcile", "images.preview", "images.clean", "project.add", "codex.host"].includes(operationType)) operation.recoveryTarget = previous?.recoveryTarget ?? (offer.recoveryTarget as Record<string, unknown>);
     if (operationType === "commands.reconcile" && Array.isArray(offer.commands) && offer.commands.length <= 20 && offer.commands.every(id => typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id))) operation.commands = offer.commands;
     const versionsMayClean = operationType !== "versions.clean" || this.options.store.canSafelyRestart();
     await progress({ phase: "running" });
     let staged = false;
     try {
       let result: Record<string, unknown>;
-      if (operationType === "versions.preview" || operationType === "versions.clean") {
+      if (operationType === "provider.runtime") {
+        result = await this.options.runtime.manageProviderRuntime(operation.recoveryTarget, operationId);
+      } else if (operationType === "versions.preview" || operationType === "versions.clean") {
         if (operationType === "versions.clean" && (!versionsMayClean || this.options.store.snapshot().maintenanceDrain)) throw new AgentError("VERSION_HOST_BUSY", "请在任务或通话结束后清理版本");
         if (operationType === "versions.clean") await this.options.store.setMaintenanceDrain(operationId);
         result = { ...await manageVersions({ dataDir: this.options.store.dataDir, referenceText: JSON.stringify(this.options.store.snapshot()) }, operationType === "versions.clean") };

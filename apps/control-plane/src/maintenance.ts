@@ -1,3 +1,4 @@
+import { parseProviderRuntimeRequest } from "./provider-runtime-policy.js";
 import type { ProviderId } from "./provider-catalog.js";
 import { parseHostCodexOperation, sanitizeCodexResult } from "./codex-operations.js";
 import { CloudImages } from "./cloud-images.js";
@@ -6,7 +7,7 @@ import type { Principal } from "./auth.js";
 import { invariant } from "./errors.js";
 import { futureIso, newId, nowIso } from "./crypto.js";
 
-export const MAINTENANCE_TYPES = ["connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"] as const;
+export const MAINTENANCE_TYPES = ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"] as const;
 export type MaintenanceType = (typeof MAINTENANCE_TYPES)[number];
 
 export class MaintenanceService {
@@ -17,11 +18,12 @@ export class MaintenanceService {
     invariant(mutationId.length>=8 && mutationId.length<=200,400,"INVALID_MUTATION_ID","clientMutationId must be between 8 and 200 characters");
     let hostRequest: ReturnType<typeof parseHostCodexOperation> | undefined;
     if (type === "codex.host") { try { hostRequest = parseHostCodexOperation(nativeRequest); } catch { invariant(false,400,"INVALID_CODEX_OPERATION","此操作或参数不适用于主机级管理"); } }
+    const providerRequest = type === "provider.runtime" ? (() => {try{return parseProviderRuntimeRequest(nativeRequest);}catch{invariant(false,400,"INVALID_PROVIDER_RUNTIME_REQUEST","Invalid provider runtime request");}})() : undefined;
     return this.db.transaction(()=>{
       const previous=this.db.get<{operation_id:string;type:string;request_json:string|null}>("SELECT operation_id,type,request_json FROM machine_operations WHERE machine_id=? AND actor_client_session_id=? AND client_mutation_id=?",machineId,principal.clientSessionId,mutationId);
       if(previous) {
         const previousRequest = previous.request_json ? JSON.parse(previous.request_json) : {};
-        invariant(previous.type===type && (type!=="codex.host" || JSON.stringify(previousRequest)===JSON.stringify(hostRequest)) && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
+        invariant(previous.type===type && (type!=="provider.runtime" || JSON.stringify(previousRequest)===JSON.stringify(providerRequest)) && (type!=="codex.host" || JSON.stringify(previousRequest)===JSON.stringify(hostRequest)) && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
         return this.get(principal,previous.operation_id);
       }
       const machine=this.db.get<{identity_state:string;reachability:string;maintenance_types_json:string}>("SELECT identity_state,reachability,maintenance_types_json FROM machines WHERE machine_id=? AND workspace_id=?",machineId,principal.workspaceId);
@@ -30,7 +32,11 @@ export class MaintenanceService {
       invariant(machine.reachability==="online",409,"MACHINE_OFFLINE","Machine must be online");
       invariant((JSON.parse(machine.maintenance_types_json) as string[]).includes(type),409,"AGENT_CAPABILITY_UNAVAILABLE","Update the connection service to use this operation");
       let target: Record<string,unknown> | null = null;
-      if(type === "versions.preview" || type === "versions.clean") {
+      if(type === "provider.runtime") {
+        invariant(logicalSessionId === undefined && previewOperationId === undefined && projectTarget === undefined,400,"INVALID_OPERATION_TARGET","Runtime management does not accept session or project targets");
+        invariant(!this.db.get("SELECT 1 FROM machine_operations WHERE machine_id=? AND type IN ('provider.runtime','agent.update','versions.clean') AND state IN ('accepted','running','unknown') LIMIT 1",machineId),409,"PROVIDER_OPERATION_PENDING","Wait for the previous runtime operation to finish");
+        target={...providerRequest!};
+      } else if(type === "versions.preview" || type === "versions.clean") {
         invariant(logicalSessionId === undefined && previewOperationId === undefined && nativeRequest === undefined && projectTarget === undefined,400,"INVALID_OPERATION_TARGET","版本清理不接受目录或会话参数");
         invariant(!this.db.get("SELECT 1 FROM machine_operations WHERE machine_id=? AND type IN ('versions.preview','versions.clean','agent.update') AND state IN ('accepted','running','unknown') LIMIT 1", machineId),409,"VERSION_CLEANUP_BUSY","版本检查或升级正在进行，请稍后重试");
       } else if(type === "codex.host") {

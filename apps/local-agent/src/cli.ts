@@ -343,6 +343,7 @@ async function run(args: ParsedArgs): Promise<void> {
       report: (result) => relay.reportMaintenance(result), signal: abort.signal });
     let healthChecking = false;
     let healthySince = 0;
+    let providerUpdatePending = false;
     let nextVersionCleanup = Date.now() + 60_000;
     let handledUpdateId: string | undefined;
     let nextUpdateDiagnostics = 0;
@@ -362,6 +363,10 @@ async function run(args: ParsedArgs): Promise<void> {
         await writeWorkerHealth(dataDir, runtime!.support.codexVersion ?? undefined);
         if (Date.now() >= nextVersionCleanup) {
           nextVersionCleanup = Date.now() + 300_000;
+          if (!providerUpdatePending) {
+            providerUpdatePending = true;
+            void runtime!.automaticProviderUpdate().catch(error => logger.warn(publicError(error).message)).finally(() => {providerUpdatePending=false;});
+          }
           await maintenance.automaticVersionCleanup().catch(error => logger.warn(publicError(error).message));
         }
         if (transaction && transaction.updateId !== handledUpdateId && ["succeeded", "rolled_back", "failed"].includes(transaction.phase)) {

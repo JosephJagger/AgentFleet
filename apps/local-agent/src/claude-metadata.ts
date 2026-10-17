@@ -33,10 +33,10 @@ export function normalizeClaudeMetadata(models: unknown, usage: unknown) {
 }
 
 /** Native metadata only: the input stream never yields a user message or starts inference. */
-export async function inspectClaudeMetadata(binary:string,owned:Set<number>) {
+export async function inspectClaudeMetadata(binary:string,owned:Set<number>,managed=false) {
   let release:(()=>void)|undefined;
   const prompt=async function*(){await new Promise<void>(resolve=>{release=resolve;});};
-  const q=query({prompt:prompt(),options:{cwd:homedir(),pathToClaudeCodeExecutable:binary,settingSources:["user","project","local"],spawnClaudeCodeProcess:options=>{
+  const q=query({prompt:prompt(),options:{...(managed?{env:{...process.env,DISABLE_AUTOUPDATER:"1"}}:{}),cwd:homedir(),pathToClaudeCodeExecutable:binary,settingSources:["user","project","local"],spawnClaudeCodeProcess:options=>{
     const child=spawn(options.command,options.args,{cwd:options.cwd,env:options.env,stdio:["pipe","pipe","pipe"],windowsHide:true});
     if(child.pid){owned.add(child.pid);child.once("close",()=>owned.delete(child.pid!));}return child;
   }}});

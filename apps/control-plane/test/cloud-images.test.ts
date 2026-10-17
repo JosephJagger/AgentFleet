@@ -198,3 +198,23 @@ test("version maintenance is host scoped, capability gated and excludes concurre
  assert.equal(db.all('PRAGMA foreign_key_check').length,0);
  assert.equal((await app.inject({method:'POST',url:'/api/machines/image-a/operations',payload:{type:'versions.clean',clientMutationId:crypto.randomUUID()}})).statusCode,401);
 });
+
+test('provider runtime operations use auth/CSRF, workspace scope, strict arguments and mutation idempotency',async t=>{
+ const {app,db,headers}=await fixture(t);
+ db.run("UPDATE machines SET reachability='online',maintenance_types_json=? WHERE machine_id='image-a'",JSON.stringify(['provider.runtime']));
+ const payload={type:'provider.runtime',clientMutationId:'provider-check-unique',nativeRequest:{action:'check'}};
+ const start=(data=payload,h=headers,id='image-a')=>app.inject({method:'POST',url:`/api/machines/${id}/operations`,headers:h,payload:data});
+ assert.equal((await start(payload,{} as typeof headers)).statusCode,401);
+ assert.equal((await start(payload,{cookie:headers.cookie} as typeof headers)).statusCode,403);
+ assert.equal((await start(payload,headers,'unknown-host')).statusCode,404);
+ assert.equal((await start({...payload,nativeRequest:{action:'check',url:'https://evil'} as never})).statusCode,400);
+ const first=await start();assert.equal(first.statusCode,202,first.body);
+ const duplicate=await start();assert.equal(duplicate.json().operation.operationId,first.json().operation.operationId);
+ assert.equal((await start({...payload,nativeRequest:{action:'configure',provider:'claude',mode:'auto',expectedRevision:0} as never})).statusCode,409);
+ assert.equal((await start({...payload,clientMutationId:'second-request'})).statusCode,409);
+ const {MaintenanceService}=await import('../src/maintenance.js');const service=new MaintenanceService(db);
+ assert.deepEqual(service.offers('image-a')[0]?.recoveryTarget,{action:'check'});
+ service.result('image-a',first.json().operation.operationId,'succeeded',{checkedAt:new Date().toISOString(),providers:{}},undefined);
+ const next=await start({...payload,clientMutationId:'second-request',nativeRequest:{action:'configure',provider:'claude',mode:'auto',expectedRevision:0} as never});assert.equal(next.statusCode,202,next.body);
+ assert.ok(db.get("SELECT 1 FROM audit_entries WHERE action='machine.operation.request' AND machine_id='image-a'"));
+});

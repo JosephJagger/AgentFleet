@@ -1,3 +1,4 @@
+import { parseProviderRuntimeState } from "./provider-runtime-policy";
 import { isProviderId, type ProviderId } from "./provider-catalog";
 export type VoiceDirectoryPage={generatedAt:string;hostTotal:number;hostsTruncated:boolean;hosts:{id:string;name:string;heartbeatAt:string|null}[];total:number;nextCursor:string|null;sessions:{id:string;title:string;provider:string;host:string;project:string;managed:boolean;executionState:string;freshness:string;hostHeartbeatAt:string|null;sessionUpdatedAt:string}[]};
 export type LongTermPreference={id:string;body:string;conditions:string;enabled:boolean;expiresAt:string|null;revision:number};
@@ -187,7 +188,7 @@ function mapMachine(rawValue: unknown, projects: Project[]): Machine {
 function mapDiscovery(rawValue: unknown): DiscoveryProgress | undefined {
   const raw = record(rawValue);
   if (!["scanning", "ready", "error"].includes(string(raw.state))) return undefined;
-  return { scanId: string(raw.scanId) || undefined, state: raw.state as DiscoveryProgress["state"], discoveredProjects: integer(raw.discoveredProjects), discoveredSessions: integer(raw.discoveredSessions), scannedPages: integer(raw.scannedPages), scannedCount: integer(raw.scannedCount), lastSuccessfulAt: string(raw.lastSuccessfulAt) || null, error: string(raw.error) || null, errorCode: string(raw.errorCode) || null,
+  return { providerRuntimePolicy: parseProviderRuntimeState(raw.providerRuntimePolicy), scanId: string(raw.scanId) || undefined, state: raw.state as DiscoveryProgress["state"], discoveredProjects: integer(raw.discoveredProjects), discoveredSessions: integer(raw.discoveredSessions), scannedPages: integer(raw.scannedPages), scannedCount: integer(raw.scannedCount), lastSuccessfulAt: string(raw.lastSuccessfulAt) || null, error: string(raw.error) || null, errorCode: string(raw.errorCode) || null,
     skippedCount: integer(raw.skippedCount),
     readiness: ["ready", "checking", "read_only", "action_required"].includes(string(raw.readiness)) ? raw.readiness as DiscoveryProgress["readiness"] : undefined,
     backgroundSync: raw.backgroundSync === true,
@@ -878,6 +879,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ alias }),
     });
+  },
+  async providerRuntimeOperation(machineId: string, nativeRequest: import("./provider-runtime-policy").ProviderRuntimeRequest, clientMutationId: string): Promise<HostOperation> {
+    const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, {method:"POST",body:JSON.stringify({type:"provider.runtime",clientMutationId,nativeRequest})});
+    return mapHostOperation(raw.operation);
   },
   async hostCodexOperation(machineId: string, nativeRequest: { operation: string; arguments: Record<string, unknown> }, clientMutationId: string): Promise<HostOperation> {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { method: "POST", body: JSON.stringify({ type: "codex.host", clientMutationId, nativeRequest }) });

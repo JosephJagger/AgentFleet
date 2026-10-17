@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 61) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 62) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1543,9 +1543,20 @@ export class ControlPlaneDatabase {
       }); } finally { this.sqlite.exec("PRAGMA foreign_keys=ON"); }
     }
 
-
-
-
+    if (version < 62) this.transaction(() => {
+      const schema=this.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE type='table' AND name='machine_operations'")!.sql;
+      if (!schema.includes("'provider.runtime'")) {
+        const indexes=this.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='machine_operations' AND type IN ('index','trigger') AND sql IS NOT NULL");
+        const revised=schema.replace("'versions.clean'", "'versions.clean','provider.runtime'");
+        if(revised===schema)throw new Error('Unexpected machine operation schema');
+        this.sqlite.exec("ALTER TABLE machine_operations RENAME TO machine_operations_v61");
+        this.sqlite.exec(revised);
+        this.sqlite.exec("INSERT INTO machine_operations SELECT * FROM machine_operations_v61; DROP TABLE machine_operations_v61");
+        for(const index of indexes)this.sqlite.exec(index.sql);
+      }
+      if(this.all("PRAGMA foreign_key_check").length)throw new Error('Provider runtime migration foreign-key violation');
+      this.sqlite.exec("PRAGMA user_version=62");
+    });
   }
 
   transaction<T>(operation: () => T): T {
