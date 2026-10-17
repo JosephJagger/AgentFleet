@@ -1,14 +1,31 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdtemp, rm, mkdir, symlink, writeFile } from "node:fs/promises";
+import os, { tmpdir } from "node:os";
+import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
-import test from "node:test";
+import test, {type TestContext} from "node:test";
 import { parseManagedRuntimeTarget } from "../src/managed-runtime-update.js";
 import { REQUIRED_CODEX_SCHEMA_HASH } from "../src/constants.js";
 import { AgentAutoUpdater } from "../src/updater.js";
 import { StateStore } from "../src/store.js";
 import { writeUpdateTransaction } from "../src/supervisor.js";
+// Use a complete synthetic installation: CI has no real launcher, while a
+// developer machine might. Never depend on or back up the real installation.
+async function isolatedInstallation(t: TestContext): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "runtime-install-"));
+  t.mock.method(os, "homedir", () => root);
+  syncBuiltinESMExports();
+  t.after(async () => { t.mock.restoreAll(); syncBuiltinESMExports(); await rm(root, {recursive:true,force:true}); });
+  const dataDir = join(root, ".local", "share", "agentfleet");
+  await mkdir(join(dataDir, "bin", "1.0.0"), {recursive:true});
+  if (process.platform === "win32") await writeFile(join(dataDir, "bin", "current.txt"), "1.0.0");
+  else {
+    await mkdir(join(root, ".local", "bin"), {recursive:true});
+    await symlink(join(dataDir, "bin", "1.0.0", "agentfleet"), join(root, ".local", "bin", "agentfleet"));
+  }
+  return dataDir;
+}
 const target = () => ({ schemaVersion: 1, revision: randomUUID(), version: "0.153.4", schemaHash: REQUIRED_CODEX_SCHEMA_HASH, artifacts: { "linux-x64": { file: `codex-linux-x64-0.153.4-${"a".repeat(16)}`, sha256: "a".repeat(64), size: 100, format: "raw" } } });
 test("managed targets reject schema changes, path injection, invalid hashes and previews", () => {
   assert.equal(parseManagedRuntimeTarget(target())?.version, "0.153.4");
@@ -70,7 +87,7 @@ test("withdrawn runtime target never activates a prepared candidate", async t =>
   assert.equal(store.snapshot().maintenanceDrain,undefined);
 });
 test("forward runtime upgrades wait for user confirmation; repairs and rollbacks do not", async t => {
-  const dir = await mkdtemp(join(tmpdir(), "runtime-confirm-")); const store = new StateStore(dir); await store.initialize();
+  const dir = await isolatedInstallation(t); const store = new StateStore(dir); await store.initialize();
   t.after(async () => { store.close(); await rm(dir, {recursive:true,force:true}); });
   const release = target(); const phases: string[] = []; let prepared = 0, activated = 0, staged = 0, body: object = {target: release};
   const options = {currentVersion:"1.0.0",controlPlaneUrl:"https://fleet.example",dataDir:dir,store,runtimeSource:"managed" as const,currentRuntimeVersion:"0.153.2",canUpdate:()=>true,
@@ -85,14 +102,20 @@ test("forward runtime upgrades wait for user confirmation; repairs and rollbacks
   assert.equal(store.snapshot().confirmedRuntimeVersion, undefined);
   await updater.confirmRuntime("0.153.4");
   assert.equal(store.snapshot().confirmedRuntimeVersion, "0.153.4");
-  for (let i = 0; i < 100 && !staged; i++) await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(await updater.checkNow(), "staged", "await the check started by confirmation, including any error");
   assert.deepEqual([prepared, activated, staged], [1, 1, 1], "approval applies the verified runtime");
   assert.equal(store.snapshot().confirmedRuntimeVersion, undefined, "the approval is consumed after activation");
+  // Finish the synthetic worker's health receipt before the next update.
+  const {readUpdateTransaction} = await import("../src/supervisor.js");
+  await writeUpdateTransaction(dir, {...(await readUpdateTransaction(dir))!, phase:"verifying"});
+  await writeUpdateTransaction(dir, {...(await readUpdateTransaction(dir))!, phase:"succeeded"});
   // A rollback target and a same-version repair never wait for approval.
   const rollbackBody = {target: {...target(), rollback: true, version: "0.153.2", artifacts: {"linux-x64": {file: `codex-linux-x64-0.153.2-${"a".repeat(16)}`, sha256: "a".repeat(64), size: 100, format: "raw"}}}};
   body = rollbackBody; prepared = 0; staged = 0;
   assert.notEqual(await new AgentAutoUpdater({...options, currentRuntimeVersion: "0.153.4"}).checkNow(), "x");
   assert.equal(prepared, 1, "rollbacks apply without waiting");
+  await writeUpdateTransaction(dir, {...(await readUpdateTransaction(dir))!, phase:"verifying"});
+  await writeUpdateTransaction(dir, {...(await readUpdateTransaction(dir))!, phase:"succeeded"});
   body = {target: release}; prepared = 0;
   assert.equal(await new AgentAutoUpdater({...options, currentRuntimeVersion: "0.153.4", needsRuntimeRepair: () => true}).checkNow() !== undefined, true);
   assert.equal(prepared, 1, "repairing a broken runtime is not gated");
