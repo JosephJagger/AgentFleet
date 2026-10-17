@@ -52,7 +52,7 @@ import { AppError, invariant } from "./errors.js";
 import { apiSchemas, CODEX_COMPATIBILITY_PROFILE, type AgentToServerMessage, type ClientToServerMessage, type CreateCommandRequest } from "./api-schema.js";
 import { canonicalJson, newId, nowIso, sha256 } from "./crypto.js";
 import { pageLimit, type ListOptions } from "./pagination.js";
-import { MaintenanceService } from "./maintenance.js";
+import { MaintenanceService, requiresPlatformAdmin } from "./maintenance.js";
 import { CredentialRenewalService } from "./credentials.js";
 import { CodexPreferencesService } from "./codex-preferences.js";
 import { PermissionPreferencesService } from "./permission-preferences.js";
@@ -1124,6 +1124,7 @@ export async function buildControlPlane(
   }));
   app.post("/api/machines/:id/operations",{preHandler:mutate},async(request,reply)=>{
     const body=record(request.body);const machineId=routeId(request);
+    if(requiresPlatformAdmin(typeof body.type==="string"?body.type:"",body.nativeRequest))auth.requirePlatformAdmin(request.principal as Principal);
     const operation=machineMaintenance.create(request.principal as Principal,machineId,requiredString(body.type,"type",100),requiredString(body.clientMutationId,"clientMutationId",200),typeof body.logicalSessionId === "string" ? body.logicalSessionId : undefined,typeof body.previewOperationId === "string" ? body.previewOperationId : undefined, undefined, body.nativeRequest);
     const agent=agents.get(machineId);
     if(agent?.reconciliationReady) for(const offer of machineMaintenance.offers(machineId)) sendJson(agent.socket,offer);

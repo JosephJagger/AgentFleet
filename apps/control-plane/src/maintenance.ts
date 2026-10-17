@@ -10,6 +10,16 @@ import { futureIso, newId, nowIso } from "./crypto.js";
 export const MAINTENANCE_TYPES = ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"] as const;
 export type MaintenanceType = (typeof MAINTENANCE_TYPES)[number];
 
+/**
+ * Codex runtimes and the connection service are distributed by this panel, so choosing when they change is an
+ * operator decision. Claude Code policy and the other agents stay with whoever owns the host.
+ */
+export function requiresPlatformAdmin(type: string, nativeRequest: unknown): boolean {
+  if (type === "agent.update") return true;
+  if (type !== "provider.runtime") return false;
+  try { return parseProviderRuntimeRequest(nativeRequest).action === "confirm"; } catch { return false; }
+}
+
 export class MaintenanceService {
   constructor(private readonly db: ControlPlaneDatabase) {}
 

@@ -29,7 +29,7 @@ it('offers explicit confirmations and notices from discovery, and never acts on 
  vi.mocked(api.hostOperations).mockResolvedValue([]);vi.mocked(api.providerRuntimeOperation).mockResolvedValue({...report,id:'confirmed'});
  const m={...machine,agentRuntimes:{qwen:{installed:true,version:'0.24.0',state:'ready'}},codexProfile:{source:'managed',runtimeUpdateState:'awaiting_confirmation',runtimeUpdateTarget:'0.163.0'},
   discovery:{state:'ready',providerRuntimePolicy:{revision:2,mode:'pinned',current:{version:'2.1.292',sha256:'a'.repeat(64),size:1,platform:'linux-x64',checkedAt:'2026-10-17T00:00:00Z',sdkVersion:'0.3.285'},latest:{claude:{version:'2.1.300',checkedAt:'2026-10-17T00:00:00Z'},qwen:{version:'0.25.2',checkedAt:'2026-10-17T00:00:00Z'}}}}} as unknown as Machine;
- render(<HostProviderVersions machine={m}/>);
+ render(<HostProviderVersions machine={m} canConfirmCodex/>);
  await screen.findByText('确认更新到 0.163.0');await screen.findByText('更新到 2.1.300');await screen.findByText('有新版本 0.25.2，请用原安装方式更新');
  expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
  fireEvent.click(screen.getByText('确认更新到 0.163.0'));
@@ -43,4 +43,11 @@ it('Claude update carries the policy revision and is disabled on hosts that cann
  await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith('test-host',{action:'update',provider:'claude',expectedRevision:5},expect.any(String)));
  r.unmount();render(<HostProviderVersions machine={{...machine,maintenanceCapabilities:[],discovery:{state:'ready',providerRuntimePolicy:policy}} as unknown as Machine}/>);
  expect((await screen.findByText('更新到 2.1.300') as HTMLButtonElement).closest('button')!.disabled).toBe(true);
+});
+
+it('members who are not the platform administrator see Codex awaiting confirmation but cannot confirm it',async()=>{
+ vi.mocked(api.hostOperations).mockResolvedValue([]);
+ const m={...machine,codexProfile:{source:'managed',runtimeUpdateState:'awaiting_confirmation',runtimeUpdateTarget:'0.163.0'}} as unknown as Machine;
+ render(<HostProviderVersions machine={m}/>);
+ await screen.findByText('需平台管理员确认');expect(screen.queryByText('确认更新到 0.163.0')).toBeNull();expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
 });

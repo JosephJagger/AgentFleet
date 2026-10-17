@@ -12,7 +12,7 @@ type VersionRow={version?:string|null;hostVersion?:string|null;source?:string;co
 type Report={checkedAt:string;providers:Partial<Record<ProviderId,VersionRow>> & {claude?:VersionRow & ProviderRuntimeState}};
 const order:ProviderId[]=['codex','claude','cursor','qwen','kimi','codebuddy','grok'];
 function reportOf(o?:HostOperation):Report|undefined {const r=o?.result;return r&&typeof r.checkedAt==='string'&&r.providers&&typeof r.providers==='object'?r as Report:undefined;}
-export function HostProviderVersions({machine}:{machine:Machine}) {
+export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Machine;canConfirmCodex?:boolean}) {
   const [operation,setOperation]=useState<HostOperation>();const [report,setReport]=useState<Report>();const [error,setError]=useState('');const [sending,setSending]=useState(false);const submitting=useRef(false);
   const [mode,setMode]=useState<ProviderRuntimeState['mode']>('host');
   const supported=machine.maintenanceCapabilities?.includes('provider.runtime');
@@ -45,7 +45,7 @@ export function HostProviderVersions({machine}:{machine:Machine}) {
       const canAct=supported&&!pending&&machine.reachability==='live';
       return <div className="provider-versions__row" key={id}><div><strong>{PROVIDER_NAMES[id]}</strong><span>{version|| (row?.installed===false?t('未安装'):t('尚未上报'))}</span></div><div><span>{source==='managed'?t('独立托管'):source==='host'?t('宿主机安装'):t('尚未上报')}</span><small>{compatibility==='compatible'?t('已通过兼容验证'):compatibility==='protocol_checked'?t('协议检查通过'):t('待验证')}</small></div>
         {offer&&<div className="provider-versions__offer" role="status">
-          {offer.kind==='codex-confirm'?<><span>{t('{0} 已通过验证，确认后才会更新',offer.latest)}</span><button className="button button--primary" type="button" disabled={!canAct} onClick={()=>void operate({action:'confirm',provider:'codex',version:offer.latest})}>{t('确认更新到 {0}',offer.latest)}</button></>
+          {offer.kind==='codex-confirm'?<><span>{t('{0} 已通过验证，确认后才会更新',offer.latest)}</span>{canConfirmCodex?<button className="button button--primary" type="button" disabled={!canAct} onClick={()=>void operate({action:'confirm',provider:'codex',version:offer.latest})}>{t('确认更新到 {0}',offer.latest)}</button>:<small>{t('需平台管理员确认')}</small>}</>
           :offer.kind==='claude-update'?<><span>{t('官方稳定版 {0} 可用',offer.latest)}</span><button className="button button--primary" type="button" disabled={!canAct||!policy} onClick={()=>{if(policy)void operate({action:'update',provider:'claude',expectedRevision:policy.revision});}}>{t('更新到 {0}',offer.latest)}</button></>
           :<span>{t('有新版本 {0}，请用原安装方式更新',offer.latest)}</span>}
         </div>}
