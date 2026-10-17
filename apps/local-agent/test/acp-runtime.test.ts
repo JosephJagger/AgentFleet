@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {AcpRuntime} from '../src/acp-runtime.js';
 import {AcpConnection} from '../src/acp-connection.js';
+import {acpImageInput,acpImageBlocks} from '../src/acp-images.js';
 import {ACP_PROVIDER_IDS} from '../src/provider-catalog.js';
 import type {AppServerCallbacks,AppEvent} from '../src/app-server.js';
 import type {ApprovalRecord,ManagedThread,ProjectRecord} from '../src/types.js';
@@ -18,14 +19,15 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line);
  if(m.id===991 && !m.method) { send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:JSON.stringify(m.result)}}}});send({id:promptId,result:{stopReason:'end_turn'}});return; }
  switch(m.method) {
- case 'initialize':send({id:m.id,result:{protocolVersion:1,agentCapabilities:{loadSession:true,sessionCapabilities:{list:{}}}}});break;
+ case 'initialize':send({id:m.id,result:{protocolVersion:1,agentCapabilities:{loadSession:true,promptCapabilities:{image:process.env.ACP_TEST_IMAGES==='yes'},sessionCapabilities:{list:{}}}}});break;
  case 'session/list':send({id:m.id,result:{sessions:[{sessionId,cwd:process.cwd(),title:'Synthetic'}]}});break;
  case 'session/new':send({id:m.id,result:{sessionId}});break;
- case 'session/load':send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Retained history'}}}});send({id:m.id,result:{}});break;
+ case 'session/load':if(process.env.ACP_TEST_IMAGES==='yes')send({method:'session/update',params:{sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='}}}});send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Retained history'}}}});send({id:m.id,result:{}});break;
  case 'session/prompt':
    promptId=m.id;requestKind=m.params.prompt[0].text;
    if(requestKind==='disconnect'){process.exit(7);return;}
    if(requestKind==='wait')return;
+   if(requestKind==='images'||requestKind===''){send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:JSON.stringify(m.params.prompt)}}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
    if(requestKind==='permission'){send({id:991,method:'session/request_permission',params:{sessionId,toolCall:{title:'Synthetic write'},options:[{optionId:'one',kind:'allow_once'},{optionId:'all',kind:'allow_always'},{optionId:'no',kind:'reject_once'}]}});return;}
    if(requestKind==='question'){send({id:991,method:'cursor/ask_question',params:{toolCallId:'q',questions:[{id:'q1',prompt:'Choose',options:[{id:'a',label:'Alpha'},{id:'b',label:'Beta'}]}]}});return;}
    send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Hello '}}}});
@@ -34,14 +36,14 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  case 'session/cancel':send({id:promptId,result:{stopReason:'cancelled'}});break;
  }
 });`;
-async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]='qwen') {
+async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]='qwen',imageInput=false) {
  const dir=await mkdtemp(join(tmpdir(),'acp-test-'));const file=join(dir,'peer.cjs');await writeFile(file,peer);
  const events:AppEvent[]=[];const approvals:ApprovalRecord[]=[];const exits:string[]=[];
  const project:ProjectRecord={id:'project-test',alias:'synthetic',provider,root:dir,device:'test',inode:'test',identityVersion:1,addedAt:new Date().toISOString()};
  let thread:ManagedThread|undefined;
  const callbacks:AppServerCallbacks={findManagedThread:id=>thread?.nativeThreadId===id?thread:undefined,findProject:()=>project,onEvent:async e=>{events.push(e);},onVolatile:()=>{},onApproval:async a=>{approvals.push(a);},onApprovalResolved:async()=>{},onExit:async()=>{},onThreadExit:async id=>{exits.push(id);}};
  const counts={connections:0};
- const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async()=>{},connection:options=>{counts.connections++;return new AcpConnection(options);}});
+ const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async()=>{},connection:options=>{counts.connections++;return new AcpConnection({...options,env:{...process.env,ACP_TEST_IMAGES:imageInput?'yes':'no'}});}});
  t.after(async()=>{await runtime.stop();await rm(dir,{recursive:true,force:true});});
  await runtime.start();const created=await runtime.createThread(project);
  thread={nativeThreadId:created.nativeThreadId,projectId:project.id,appServerEpoch:'epoch-test',policyVersion:'remote-restricted-v1',policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),historyMode:'legacy'} as ManagedThread;
@@ -77,7 +79,7 @@ test('cancel waits for native completion and a dropped connection never reports 
  assert.equal(f.events.filter(e=>e.type==='turn.completed').length,1);assert.equal(await f.runtime.readTurnOutcome(f.thread.nativeThreadId,turn.nativeTurnId),null);
 });
 test('unsupported inputs fail before native work',async t=>{
- const f=await fixture(t);await assert.rejects(f.runtime.startTurn(f.thread,f.project,'hello',undefined,{model:'other'}),/plain text/);assert.equal(f.events.length,0);
+ const f=await fixture(t);await assert.rejects(f.runtime.startTurn(f.thread,f.project,'hello',undefined,{model:'other'}),/native settings/);assert.equal(f.events.length,0);
 });
 test('transport fences malformed stdout and never retries timed out requests',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'acp-wire-'));t.after(()=>rm(dir,{recursive:true,force:true}));
@@ -103,4 +105,43 @@ test('concurrent history restore and claim share one native session writer',asyn
  const f=await fixture(t);await f.runtime.unsubscribeThread(f.thread.nativeThreadId);const before=f.counts.connections;
  await Promise.all([f.runtime.resumeThread(f.thread.nativeThreadId,f.project),f.runtime.readThread(f.thread.nativeThreadId)]);
  assert.equal(f.counts.connections-before,1);
+});
+
+const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
+for(const provider of ACP_PROVIDER_IDS)test(`${provider}: images use ACP blocks and survive history, including image-only prompts`,async t=>{
+ const f=await fixture(t,provider,true);assert.equal(f.runtime.availability.capabilities.images,true);
+ for(const prompt of ['images','']) {
+  const before=f.events.filter(e=>e.type==='turn.completed').length;
+  await f.runtime.startTurn(f.thread,f.project,prompt,undefined,undefined,[png,png]);
+  await until(()=>f.events.filter(e=>e.type==='turn.completed').length===before+1);
+  const reply=f.events.filter(e=>e.type==='item.completed'&&(e.payload.item as {type?:string})?.type==='agentMessage').at(-1)!;
+  const blocks=JSON.parse(String((reply.payload.item as {text:string}).text));
+  assert.deepEqual(blocks,[{type:'text',text:prompt},...acpImageBlocks([png,png])]);
+  const history=await f.runtime.readThread(f.thread.nativeThreadId);
+  assert.deepEqual(history.items.filter(e=>e.item?.type==='userMessage').at(-1)!.item!.content,[{type:'text',text:prompt},{type:'image',url:png},{type:'image',url:png}]);
+ }
+});
+test('unsupported or malformed images are rejected without starting a turn; another handshake cannot override session capability',async t=>{
+ const f=await fixture(t);assert.equal(f.runtime.availability.capabilities.images,false);
+ f.runtime.availability.capabilities.images=true;
+ await assert.rejects(f.runtime.startTurn(f.thread,f.project,'images',undefined,undefined,[png]),{code:'AGENT_IMAGE_UNSUPPORTED'});
+ await assert.rejects(f.runtime.startTurn(f.thread,f.project,'images',undefined,undefined,['file:///private/test.png']));
+ assert.equal(f.events.length,0);
+ assert.equal((await f.runtime.readThread(f.thread.nativeThreadId)).executionState,'idle');
+});
+test('Grok image workaround is restricted to the verified native version and identity',()=>{
+ const init={agentCapabilities:{promptCapabilities:{image:false}},_meta:{grokShell:true}};
+ assert.equal(acpImageInput('grok','grok 1.0.62 (fixture) [stable]',init),true);
+ for(const version of ['grok 1.0.63','grok 1.0.620','synthetic-1.0.62','grok 0.2.87'])assert.equal(acpImageInput('grok',version,init),false);
+ assert.equal(acpImageInput('qwen','grok 1.0.62',init),false);
+ assert.equal(acpImageInput('grok','grok 1.0.62',{agentCapabilities:{}}),false);
+ for(const provider of ACP_PROVIDER_IDS)assert.equal(acpImageInput(provider,'new-version',{agentCapabilities:{promptCapabilities:{image:true}}}),true);
+});
+
+test('native image history remains visible after releasing and restoring a session',async t=>{
+ const f=await fixture(t,'grok',true);
+ await f.runtime.unsubscribeThread(f.thread.nativeThreadId);
+ const restored=await f.runtime.resumeThread(f.thread.nativeThreadId,f.project);
+ const user=restored.history.items.find(i=>i.item?.type==='userMessage');
+ assert.deepEqual(user?.item?.content,[{type:'text',text:''},{type:'image',url:png}]);
 });

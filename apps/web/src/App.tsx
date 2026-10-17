@@ -1,3 +1,4 @@
+import {sessionConnectionHint,useSessionSyncRefresh} from "./lib/session-connectivity";
 import { isAcpProvider, type ProviderId } from "./lib/provider-catalog";
 import { matchesRuntimeTarget, runtimeRollout } from "./lib/runtime-rollout";
 import { HostSessions } from "./components/HostSessions";
@@ -678,7 +679,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   catalogExpanded?: boolean;
   onLoadHistory?: () => void;
   historyLoading?: boolean;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
   onClaim: () => Promise<void>;
   onContinueManaged: () => Promise<void>;
   onReleaseManagement: () => Promise<void>;
@@ -693,6 +694,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   onNewSession?: () => void;
 }) {
   const buzhouDesktop = useBuzhoushanDesktop();
+  useSessionSyncRefresh(detail,onRefresh);
   const [voiceActive, setVoiceActive] = useState(false);
   const [prompt, setPrompt] = useSessionDraft(draftOwner ?? "preview", detail?.session.id);
   const writingSettings = useCompletionPreferences(draftOwner ?? "preview", detail?.session.id);
@@ -903,6 +905,9 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const canSend = !hasActiveTurn && !pendingCommand && (session.actions?.start?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.threadRuntime === "idle" && !session.state.unknownFreeze));
   const canCancel = !pendingCommand && (session.actions?.cancel?.allowed ?? Boolean(detail.writable && (!lease || lease.isMine) && session.state.currentTurn === "in_progress" && session.activeTurnId));
   const canQueueOrSteer = session.actions?.queue?.reasonCode !== "MACHINE_DRAINING" && Boolean(detail.writable && session.state.reachability === "live" && session.state.currentTurn === "in_progress" && session.activeTurnId);
+  const connectionHint = sessionConnectionHint(detail);
+  const composerHint = connectionHint && (!detail.writeBlockedReason || detail.writeBlockedReason === t("等待主机恢复在线并完成对账")) ? connectionHint : detail.writeBlockedReason;
+
   const slashCommand = (session.provider ?? "codex") === "codex" ? parseCodexCommand(prompt) : undefined;
   let outputSchema: Record<string, unknown> | undefined;
   let outputSchemaError = false;
@@ -1150,7 +1155,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         {fileDraft.processing && <p className="image-draft-notice" role="status">{t("正在读取文件…")}</p>}
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
         {fileDraft.error && <p className="image-draft-notice" role="alert">{systemText(fileDraft.error)}</p>}
-        {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("请先在主机页更新连接服务，才能发送图片") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
+        {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("当前智能体暂不可接收图片，请检查其原生版本、模型及主机连接服务") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
         {completions.length > 0 && <CompletionSurface anchor={textArea}><div className={`prompt-completions-shell${completions.some(item => item.kind === "rewrite") ? " prompt-completions-shell--rewrite" : ""}`}><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={completions[0]?.kind === "plugin" ? t("插件") : t("编程提示语补全")}>
           <div className="prompt-completions__head" role="presentation">{completions[0]?.kind === "plugin" ? <Puzzle size={14} aria-hidden="true" /> : <Code2 size={14} aria-hidden="true" />}<span>{completions[0]?.kind === "plugin" ? t("插件") : t("输入建议")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
           {completions.map((completion, index) => <button
@@ -1228,8 +1233,8 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           }}
         />
         <div className="composer-actions">
-          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(modeBlocked ? t("计划模式需要先确认模型配置") : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
-          <span className="composer-touch-hint">{(modeBlocked ? t("计划模式需要先确认模型配置") : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-keyboard-hint" title={composerHint || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(modeBlocked ? t("计划模式需要先确认模型配置") : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : composerHint) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : canQueueOrSteer ? ((session.provider ?? "codex") === "codex" ? t("任务执行中，可追加本轮或加入队列") : t("任务执行中，可加入队列")) : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-touch-hint">{(modeBlocked ? t("计划模式需要先确认模型配置") : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : composerHint) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
           <div className="composer-button-group">
           <input ref={imageInput} className="composer-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label={t("选择要发送的图片")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void imageDraft.addFiles(files); }} />
           <input ref={fileInput} className="composer-image-input" type="file" accept={ATTACHMENT_ACCEPT} multiple aria-label={t("选择要发送的文件")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
@@ -1841,7 +1846,7 @@ function App() {
           setHostProviderFilters(current=>({...current,[selectedMachineId]:provider}));
           if(provider==='all')navigate({view:'fleet',machineId:selectedMachineId});else selectProvider(provider);
         }} sessions={dashboard.activitySessions ?? dashboard.sessions} selectedId={selectedSessionId} detail={detail} onSelect={selectSession} onBrowse={()=>{setStreamFocus(false);setCatalogCollapsed(false);}} onCreate={()=>openCreate()}>
-        <SessionInspector catalogExpanded={!streamFocus && !catalogCollapsed} onBrowseSessions={()=>{if(streamFocus){setStreamFocus(false);setCatalogCollapsed(false);}else setCatalogCollapsed(value=>!value);}} referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => void loadDetail(selectedSessionId)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
+        <SessionInspector catalogExpanded={!streamFocus && !catalogCollapsed} onBrowseSessions={()=>{if(streamFocus){setStreamFocus(false);setCatalogCollapsed(false);}else setCatalogCollapsed(value=>!value);}} referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => loadDetail(selectedSessionId, true)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
         </HostSessions>
         {buzhouDesktop && <BuzhoushanScreensaver detail={detail} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onRefresh={loadDashboard}/>}
         {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong>{broadcastCanvas&&<BuzhoushanBroadcastStatus/>}<FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayName(displayedSession?.projectAlias)}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}

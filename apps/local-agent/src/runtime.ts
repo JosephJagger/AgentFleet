@@ -966,7 +966,7 @@ export class AgentRuntime {
       await verifyProjectIdentity(project);
       if (isAcpProvider(project.provider)) {
         if (!['thread.claim','thread.release','turn.start','turn.queue','turn.cancel','approval.decide_once','input.respond'].includes(command.type)) throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Unsupported native operation');
-        if (command.payload.settings !== undefined || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['images','attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');
+        if (command.payload.settings !== undefined || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text and supported images with native settings are supported');
       }
 
       if (isAcpProvider(project.provider) ? !(this.support.providerHostSupported ?? this.support.writable) || !supportsProviderCommand(this.appServer?.getAgentRuntimes?.()[project.provider],command.type,Boolean(command.precondition.nativeThreadId)) : !this.isWritable()) throw new AgentError("MACHINE_READ_ONLY", this.readOnlyReasons().join("; "));

@@ -1075,3 +1075,40 @@ it('Buzhoushan shows running conversation normally while retaining both activity
   expect(view.container.querySelector('.buzhou-heartbeat')).toBeNull();
  } finally {cleanup();window.matchMedia=original;act(()=>setTheme('daylight'));}
 });
+
+it.each(['grok','qwen','kimi','cursor','codebuddy'] as const)('%s 图片能力可用时发送原始图片，不注入 Codex 设置；能力撤回时保留草稿并说明原因',async provider=>{
+ const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
+ localStorage.setItem("agentfleet.images:user-1:A",JSON.stringify([png]));
+ const props=inspectorProps("A");
+ props.detail={...props.detail,session:{...props.detail.session,provider,imageInputSupported:false}};
+ const onSend=vi.fn().mockResolvedValue(undefined);
+ const view=render(<SessionInspector {...props} onSend={onSend}/>);
+ expect(screen.getByText('当前智能体暂不可接收图片，请检查其原生版本、模型及主机连接服务')).toBeTruthy();
+ expect((screen.getByRole('button',{name:'发送'}) as HTMLButtonElement).disabled).toBe(true);
+ expect(screen.queryByText('请先在主机页更新连接服务，才能发送图片')).toBeNull();
+ props.detail={...props.detail,session:{...props.detail.session,imageInputSupported:true}};
+ view.rerender(<SessionInspector {...props} onSend={onSend}/>);
+ fireEvent.click(screen.getByRole('button',{name:'发送'}));
+ await waitFor(()=>expect(onSend).toHaveBeenCalledWith('',undefined,[png]));
+ expect(localStorage.getItem('agentfleet.images:user-1:A')).toBeNull();
+});
+
+it('运行中可追加时不误报连接错误；同步期间保留草稿和写入保护，恢复后自动解除提示',async()=>{
+ const props=inspectorProps('A');
+ props.detail={...props.detail,session:{...props.detail.session,activeTurnId:'active',state:{...props.detail.session.state,currentTurn:'in_progress',threadRuntime:'active'}},writable:true};
+ const onQueue=vi.fn(),onSteer=vi.fn();
+ const view=render(<SessionInspector {...props} onQueue={onQueue} onSteer={onSteer}/>);
+ const input=screen.getByRole('textbox',{name:'发送给 Codex 的消息'});
+ fireEvent.change(input,{target:{value:'Keep this draft'}});
+ expect(screen.getByText('任务执行中，可追加本轮或加入队列')).toBeTruthy();
+ expect(screen.queryByText('请先检查会话连接与执行状态')).toBeNull();
+ const syncing={...props.detail,writable:false,hostOnline:false,runtimeSyncUntil:Date.now()+15000,writeBlockedReason:'等待主机恢复在线并完成对账',session:{...props.detail.session,state:{...props.detail.session.state,reachability:'reconciling' as const}}};
+ view.rerender(<SessionInspector {...props} detail={syncing} onQueue={onQueue} onSteer={onSteer}/>);
+ expect(screen.getAllByText('主机连接正常，正在同步会话状态；同步后恢复发送').length).toBeGreaterThan(0);
+ expect((screen.getByRole('button',{name:'追加本轮'}) as HTMLButtonElement).disabled).toBe(true);
+ expect((input as HTMLTextAreaElement).value).toBe('Keep this draft');
+ view.rerender(<SessionInspector {...props} onQueue={onQueue} onSteer={onSteer}/>);
+ expect((screen.getByRole('button',{name:'追加本轮'}) as HTMLButtonElement).disabled).toBe(false);
+ expect(screen.queryByText('主机连接正常，正在同步会话状态；同步后恢复发送')).toBeNull();
+ expect(onQueue).not.toHaveBeenCalled();expect(onSteer).not.toHaveBeenCalled();
+});

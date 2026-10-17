@@ -318,7 +318,7 @@
   "正在处理图片…": "Processing images…",
   "添加图片": "Add images",
   "选择要发送的图片": "Choose images to send",
-  "请先在主机页更新连接服务，才能发送图片": "Update the host's connection service before sending images",
+  "当前智能体暂不可接收图片，请检查其原生版本、模型及主机连接服务": "Image input is unavailable for this agent. Check its CLI version, model, and host connection service",
   "图片请搭配普通消息发送，不与 / 命令一起执行": "Send images with a regular message, not a slash command",
   "图片已处理为发送尺寸 · 可点击预览 · 最多 4 张": "Images resized for sending · Click to preview · Up to 4 images",
   "发送给 Codex 的消息": "Message to Codex",
@@ -3742,5 +3742,11 @@
   "Codex {0} 已通过验证并晋升，各主机经管理员确认后才会更新": "Codex {0} is validated and promoted. Each host updates only after an administrator confirms.",
   "正在下载官方 Claude Code {0}：{1} / {2} MB（{3}%），期间可继续使用，不影响任务。": "Downloading official Claude Code {0}: {1} / {2} MB ({3}%). You can keep working; tasks are not affected.",
   "正在下载官方 Claude Code，期间可继续使用，不影响任务。": "Downloading official Claude Code. You can keep working; tasks are not affected.",
-  "下载完成，正在校验文件并做兼容检查…": "Download finished. Verifying the file and running compatibility checks…"
+  "下载完成，正在校验文件并做兼容检查…": "Download finished. Verifying the file and running compatibility checks…",
+  "主机连接正常，正在同步会话状态；同步后恢复发送": "Host connected. Syncing session status; sending resumes after sync",
+  "会话状态同步尚未完成，暂不能发送；草稿已保留": "Session sync is incomplete. Sending is paused; your draft is preserved",
+  "主机在线，正在核验会话状态；草稿已保留": "Host online. Verifying session status; your draft is preserved",
+  "主机连接尚未恢复，暂不能发送；草稿已保留": "Host connection has not recovered. Sending is paused; your draft is preserved",
+  "任务执行中，可加入队列": "Task running. Queue the next task",
+  "任务执行中，可追加本轮或加入队列": "Task running. Add to this turn or queue the next task"
 }
