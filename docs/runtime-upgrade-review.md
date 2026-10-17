@@ -53,3 +53,17 @@ Isolated Linux probes passed version/schema/initialize/configuration/history che
 The native writer test previously captured a deletion preview before another writer resumed a descendant. Native metadata can change on resume, so the stale-preview guard sometimes rejected the request before the expected writer-ownership check. The test now previews after acquisition to reach the intended check; production deletion protections are unchanged. All five opt-in native checks then passed together.
 
 Agent 0.30.95 carries the reviewed hash and unchanged realtime capability gate. The central validator must still verify all four platform binaries, execution helpers and sandbox helper before publishing the target. macOS/Windows artifacts are verified by digest; physical-device operation and live voice are not certified by these Linux tests. Hosts apply only when idle, repeat local validation and retain rollback health acknowledgement.
+
+## Codex 0.163.0 review (2026-10-17)
+
+Official release: https://github.com/openai/codex/releases/tag/rust-v0.163.0
+
+The release is neither draft nor prerelease. The Linux musl archive matches the GitHub-published SHA-256 `beb339e8ecd9ba057a6bb2dc81ad8ca474812edfbf0fc5056ca818797648dde4`; `--version` reports `codex-cli 0.163.0` and the generated v2 schema is `d204b96d8560d56600127423b89df9db471b3e22338e8809bb91d5a952998978`. The same procedure reproduced the documented 0.162.1 archive and schema hashes, which was used as the control.
+
+Compared with 0.162.1, no definition or request method is removed and no required field is added. Additions: `ThreadReadState*`/`ThreadUnreadPosition` definitions, optional `ThreadListParams.excludedThreadIds`, optional `TurnToolOutput.retain`, `RealtimeVoicesList.v3`, and new `RealtimeVoice` values. AgentFleets keeps its own explicit voice allowlist, so the new voices are not exposed until reviewed.
+
+Isolated Linux checks with the official binary (temporary root-owned directory, empty Codex homes, no account credentials or real model requests) passed: legacy and paginated writer handoff, on-disk conversation read without resume, and image delivery to a local Responses fixture with release/resume. The Agent carries the reviewed hash and keeps the realtime capability gate. The central validator must still verify all four platform binaries and helpers before promotion; macOS/Windows are not certified by these Linux tests.
+
+## Codex 0.163.0 兼容性评审（2026-10-17）
+
+协议与 0.162.1 相比只有新增：无删除、无新增必填字段。官方 Linux 安装包摘要核对一致，版本与协议哈希已写入已验证清单；Linux 隔离测试（会话互斥/恢复、历史读取、图片）全部通过，未使用账号或真实模型请求。新增的语音名称暂不开放。验证器仍须校验四平台文件后才晋升，主机照旧空闲、本地验证后才升级。
