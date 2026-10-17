@@ -5,7 +5,7 @@ This branch adds Qwen Code, Kimi Code, Cursor, CodeBuddy Code and Grok Build. Gi
 ## Using the integration
 
 1. Install and log in to the official CLI on the target host using the provider's instructions. AgentFleets does not install these CLIs or copy account credentials.
-2. Run the updated connection service (Agent 0.30.113) and matching panel. Optional CLI discovery runs in the background, at most once per minute. A slow optional CLI does not block Codex/Claude catalog reads.
+2. Run the updated connection service (Agent 0.30.114) and matching panel. Optional CLI discovery runs in the background, at most once per minute. A slow optional CLI does not block Codex/Claude catalog reads.
 3. Choose the provider beside the host's project list. Unavailable or unverified runtimes remain disabled. Create a project/session or select an existing session when the CLI advertises session listing and restoration.
 4. Send ordinary text. Native approval requests appear in the existing approval interface; only one-time approval is offered by this bridge. Cursor single-choice questions and plan approval use the existing interaction interface.
 5. The Codex voice coordinator can search and dispatch to these providers through the same authorized directory/command path. Finding a session does not authorize execution. The target host does not acquire native voice capabilities from another provider.

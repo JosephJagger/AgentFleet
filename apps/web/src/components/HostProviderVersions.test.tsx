@@ -55,3 +55,12 @@ it('members who are not the platform administrator see only the Codex version, w
  r.unmount();render(<HostProviderVersions machine={m} canConfirmCodex/>);
  await screen.findByText('确认更新到 0.163.0');expect(screen.getByText('独立托管')).toBeTruthy();
 });
+
+it('shows what a long managed-Claude update is doing instead of an idle spinner',async()=>{
+ vi.mocked(api.hostOperations).mockResolvedValue([]);
+ const policy=(extra:object)=>({revision:1,mode:'host',stableVersion:'2.1.292',phase:'checking',...extra});
+ const r=render(<HostProviderVersions machine={{...machine,discovery:{state:'ready',providerRuntimePolicy:policy({step:'downloading',progress:{received:117440512,total:235017328}})}} as unknown as Machine}/>);
+ await screen.findByText('正在下载官方 Claude Code 2.1.292：112 / 224 MB（49%），期间可继续使用，不影响任务。');
+ r.unmount();render(<HostProviderVersions machine={{...machine,discovery:{state:'ready',providerRuntimePolicy:policy({step:'verifying'})}} as unknown as Machine}/>);
+ await screen.findByText('下载完成，正在校验文件并做兼容检查…');
+});

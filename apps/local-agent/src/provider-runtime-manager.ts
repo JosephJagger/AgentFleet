@@ -48,8 +48,23 @@ export function reviewedManifest(raw:unknown,version:string,platform:string):Man
   if (!artifact || !/^[a-f0-9]{64}$/.test(String(artifact.checksum)) || !Number.isSafeInteger(artifact.size) || Number(artifact.size)<=0 || Number(artifact.size)>MAX_BINARY || artifact.binary!==(platform.startsWith('win32')?'claude.exe':'claude')) throw new AgentError('PROVIDER_ARTIFACT_INVALID','官方版本文件信息不完整');
   return {version,sha256:String(artifact.checksum),size:Number(artifact.size),platform,checkedAt:new Date().toISOString(),sdkVersion:CLAUDE_SDK_VERSION};
 }
-async function response(path:string,timeout=20_000,signal?:AbortSignal) {const r=await fetch(`${CLAUDE_RELEASE_BASE}/${path}`,{redirect:'error',signal:AbortSignal.any([AbortSignal.timeout(timeout),...(signal?[signal]:[])])});if(!r.ok)throw new AgentError('PROVIDER_RELEASE_UNAVAILABLE','无法读取官方 Claude 版本',{status:r.status});return r;}
-async function limitedBytes(path:string,signal?:AbortSignal) {const r=await response(path,20_000,signal);if(!r.body)throw new Error('Empty release response');const chunks:Buffer[]=[];let size=0;for await(const b of Readable.fromWeb(r.body as import("node:stream/web").ReadableStream)){const chunk=Buffer.from(b);size+=chunk.length;if(size>256_000)throw new Error('Release response too large');chunks.push(chunk);}return Buffer.concat(chunks);}
+/** `timeout` bounds only the connection and response headers; bodies are bounded by a stall guard so slow links still finish. */
+async function response(path:string,timeout=20_000,signal?:AbortSignal) {
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(new DOMException('Release request timed out','TimeoutError')),timeout);
+  try {
+    const r=await fetch(`${CLAUDE_RELEASE_BASE}/${path}`,{redirect:'error',signal:AbortSignal.any([controller.signal,...(signal?[signal]:[])])});
+    if(!r.ok)throw new AgentError('PROVIDER_RELEASE_UNAVAILABLE','无法读取官方 Claude 版本',{status:r.status});
+    return r;
+  } finally {clearTimeout(timer);}
+}
+/** Aborts a transfer that stops delivering data for `ms`, without limiting how long a steadily progressing one may take. */
+export function stallGuard(readable:Readable,ms:number):Readable {
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  const arm=()=>{if(timer)clearTimeout(timer);timer=setTimeout(()=>readable.destroy(new DOMException('Release download stalled','TimeoutError')),ms);};
+  arm();readable.on('data',arm);readable.once('close',()=>{if(timer)clearTimeout(timer);});
+  return readable;
+}
+async function limitedBytes(path:string,signal?:AbortSignal) {const r=await response(path,20_000,signal);if(!r.body)throw new Error('Empty release response');const chunks:Buffer[]=[];let size=0;for await(const b of stallGuard(Readable.fromWeb(r.body as import("node:stream/web").ReadableStream),30_000)){const chunk=Buffer.from(b);size+=chunk.length;if(size>256_000)throw new Error('Release response too large');chunks.push(chunk);}return Buffer.concat(chunks);}
 async function limitedText(path:string,signal?:AbortSignal) {return (await limitedBytes(path,signal)).toString('utf8');}
 /** Releases from 2.1.89 publish a detached OpenPGP signature of manifest.json; the manifest vouches for every binary digest. */
 async function signedManifest(version:string,signal?:AbortSignal):Promise<unknown> {
@@ -58,11 +73,13 @@ async function signedManifest(version:string,signal?:AbortSignal):Promise<unknow
   return JSON.parse(manifest.toString('utf8'));
 }
 async function digest(file:string) {const hash=createHash('sha256');for await(const chunk of createReadStream(file))hash.update(chunk);return hash.digest('hex');}
-async function download(release:ManagedProviderRelease,file:string,signal?:AbortSignal) {
-  const r=await response(`${release.version}/${release.platform}/${release.platform.startsWith('win32')?'claude.exe':'claude'}`,180_000,signal);
+async function download(release:ManagedProviderRelease,file:string,signal?:AbortSignal,onProgress?:(received:number)=>void) {
+  // 90 minutes is an upper bound for a very slow but live connection; a stalled one is cut off after a minute of silence.
+  const bounded=AbortSignal.any([AbortSignal.timeout(90*60_000),...(signal?[signal]:[])]);
+  const r=await response(`${release.version}/${release.platform}/${release.platform.startsWith('win32')?'claude.exe':'claude'}`,60_000,bounded);
   if(!r.body)throw new Error('Empty binary response');const temp=`${file}.${randomUUID()}.partial`;await mkdir(join(file,'..'),{recursive:true,mode:0o700});
   const handle=await open(temp,'wx',0o700);const hash=createHash('sha256');let size=0;
-  try {for await(const chunk of Readable.fromWeb(r.body as import("node:stream/web").ReadableStream)){size+=chunk.byteLength;if(size>release.size)throw new Error('Binary too large');hash.update(chunk);await handle.writeFile(chunk);}if(size!==release.size||hash.digest('hex')!==release.sha256)throw new AgentError('PROVIDER_DIGEST_MISMATCH','Claude 文件校验失败');await handle.sync();await handle.close();await rename(temp,file);}
+  try {for await(const chunk of stallGuard(Readable.fromWeb(r.body as import("node:stream/web").ReadableStream),60_000)){size+=chunk.byteLength;if(size>release.size)throw new Error('Binary too large');hash.update(chunk);await handle.writeFile(chunk);onProgress?.(size);}if(size!==release.size||hash.digest('hex')!==release.sha256)throw new AgentError('PROVIDER_DIGEST_MISMATCH','Claude 文件校验失败');await handle.sync();await handle.close();await rename(temp,file);}
   catch(e){await handle.close().catch(()=>{});await rm(temp,{force:true});throw e;}
 }
 /** No prompt, no login, no task: validate the actual pinned SDK's control handshake. */
@@ -101,7 +118,22 @@ export class ProviderRuntimeManager {
     if(state.current.sdkVersion!==CLAUDE_SDK_VERSION)throw new AgentError('PROVIDER_SDK_CHANGED','Claude SDK 已变更，请重新核验托管版本');
     const path=await this.verify(state.current);return {installed:true,version:state.current.version,path,managed:true};
   }
-  private async save(patch:Partial<ProviderRuntimeState>){await this.store.update(s=>{s.providerRuntimeState={...(s.providerRuntimeState??{revision:0,mode:'host'}),...patch};});}
+  /** A patch value of `undefined` removes the field. */
+  private async save(patch:{[K in keyof ProviderRuntimeState]?:ProviderRuntimeState[K]|undefined}){
+    await this.store.update(s=>{
+      const next:Record<string,unknown>={...(s.providerRuntimeState??{revision:0,mode:'host'}),...patch};
+      for(const [key,value] of Object.entries(patch))if(value===undefined)delete next[key];
+      s.providerRuntimeState=next as unknown as ProviderRuntimeState;
+    });
+  }
+  /** Progress is advisory: throttled, best effort, and never allowed to fail or slow the transfer. */
+  private progressReporter(total:number){
+    let last=0;
+    return (received:number)=>{
+      const now=this.now();if(received<total&&now-last<3000)return;last=now;
+      void this.save({step:'downloading',progress:{received:Math.min(received,total),total}}).catch(()=>undefined);
+    };
+  }
   async inventory(runtimes:Record<string,unknown>,codex:Record<string,unknown>):Promise<Record<string,unknown>> {
     const host=await this.deps.host();const state=this.state();
     let managedValid=false;if(state.current&&state.current.sdkVersion===CLAUDE_SDK_VERSION){try{await this.verify(state.current);managedValid=true;}catch{/* Report damaged files as unverified; never silently fall back. */}}
@@ -186,7 +218,8 @@ export class ProviderRuntimeManager {
       }
       await this.save({phase:'checking',stableVersion:version,checkedAt:new Date().toISOString()});
       const target=await this.deps.manifest(version,claudePlatform(),signal);
-      const file=this.file(target);try{await this.verify(target);}catch{await this.deps.download(target,file,signal);await this.verify(target);}
+      const file=this.file(target);try{await this.verify(target);}catch{await this.save({step:'downloading',progress:{received:0,total:target.size}});await this.deps.download(target,file,signal,this.progressReporter(target.size));await this.save({step:'verifying',progress:undefined});await this.verify(target);}
+      await this.save({step:'verifying',progress:undefined});
       await this.deps.probe(file,version,signal);
       if(await this.deps.stable(signal)!==version)throw new AgentError('PROVIDER_TARGET_CHANGED','官方稳定目标已变化，请重新检查');
       admitted=await this.store.tryBeginUpdate(operationId);
@@ -203,7 +236,7 @@ export class ProviderRuntimeManager {
         this.noteFailure(e);
       }
       throw e instanceof AgentError ? e : new AgentError('PROVIDER_UPDATE_FAILED','版本验证或切换失败，保留原版本；请检查主机连接和运行环境');
-    } finally {try{if(admitted)await this.store.finishUpdateAdmission(operationId);}finally{try{if(!signal.aborted)await this.prune();}catch{/* Cleanup is best effort; never mask the operation result. */}this.busy=false;done();}}
+    } finally {try{if(admitted)await this.store.finishUpdateAdmission(operationId);}finally{try{if(!signal.aborted){if(this.state().step||this.state().progress)await this.save({step:undefined,progress:undefined});await this.prune();}}catch{/* Cleanup is best effort; never mask the operation result. */}this.busy=false;done();}}
   }
   private async commit(next:ProviderRuntimeState,previous:ProviderRuntimeState) {
     this.controller.signal.throwIfAborted();

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
+import { api } from "../lib/api";
 import { afterEach, expect, it, vi } from "vitest";
 import { HostsView } from "./HostsView";
 import type { Machine } from "../lib/types";
@@ -29,4 +30,19 @@ it("keeps one recovery panel when switching between offline hosts and removes it
     expect(screen.queryByRole("region", { name: "恢复主机连接" })).toBeNull();
     expect(errors.mock.calls.filter(args => args.some(arg => String(arg).includes("same key")))).toHaveLength(0);
   } finally { errors.mockRestore(); }
+});
+
+it("labels the recovery button as restoring only while a connection repair is actually running", async () => {
+  const machine = { id: "home", name: "home", os: "darwin", reachability: "live", maintenanceCapabilities: ["connection.repair", "provider.runtime"] } as Machine;
+  const props = { onSelect: vi.fn(), onPair: vi.fn(), onRemove: vi.fn(), onChanged: vi.fn().mockResolvedValue(undefined), renderCompatibility: () => null, machines: [machine], selectedId: "home" };
+  const operation = (type: string) => ({ id: type, type, state: "running", createdAt: "2026-10-17T00:00:00Z", updatedAt: "2026-10-17T00:00:00Z" });
+  vi.mocked(api.hostOperations).mockResolvedValue([operation("provider.runtime")] as never);
+  const first = render(<HostsView {...props} />);
+  const button = await screen.findByRole("button", { name: /一键恢复连接/ });
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: /正在恢复/ })).toBeNull();
+  first.unmount();
+  vi.mocked(api.hostOperations).mockResolvedValue([operation("connection.repair")] as never);
+  render(<HostsView {...props} />);
+  expect(await screen.findByRole("button", { name: /正在恢复/ })).toBeTruthy();
 });

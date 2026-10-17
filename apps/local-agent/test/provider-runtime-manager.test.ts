@@ -5,8 +5,9 @@ import {join,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
 import {StateStore} from '../src/store.js';
-import {ProviderRuntimeManager,reviewedManifest,CLAUDE_SDK_VERSION,claudePlatform,newerVersion} from '../src/provider-runtime-manager.js';
+import {ProviderRuntimeManager,reviewedManifest,CLAUDE_SDK_VERSION,claudePlatform,newerVersion,stallGuard} from '../src/provider-runtime-manager.js';
 import {AgentError} from '../src/errors.js';
+import {Readable,PassThrough} from 'node:stream';
 import {parseProviderRuntimeRequest} from '../src/provider-runtime-policy.js';
 async function fixture(t:test.TestContext) {
  const dir=await mkdtemp(join(tmpdir(),'provider-runtime-test-'));const store=new StateStore(dir);await store.initialize();t.after(async()=>{store.close();await rm(dir,{recursive:true,force:true});});
@@ -16,7 +17,7 @@ async function fixture(t:test.TestContext) {
   latest:async(id)=>latestVersions[id]??null,
   stable:async()=>{if(stableError)throw stableError;return version;},
   manifest:async(v,p)=>{if(manifestError)throw manifestError;return {version:v,platform:p,sha256:createHash('sha256').update(v).digest('hex'),size:v.length,sdkVersion:CLAUDE_SDK_VERSION,checkedAt:new Date().toISOString()};},
-  download:async(r,file)=>{downloads++;files.push(file);await mkdir(dirname(file),{recursive:true});await writeFile(file,r.version);},
+  download:async(r,file,_signal,onProgress)=>{downloads++;files.push(file);await mkdir(dirname(file),{recursive:true});onProgress?.(r.size);await writeFile(file,r.version);},
   probe:async()=>{probes++;if(failProbe)throw new Error('probe failed');}
  },()=>clock);
  const configure=(mode:'host'|'pinned'|'auto')=>manager.operate({action:'configure',provider:'claude',mode,expectedRevision:manager.state().revision},'op-update');
@@ -131,4 +132,38 @@ test('Codex confirmation requests are parsed strictly and never reach the Claude
  assert.deepEqual(parseProviderRuntimeRequest({action:'confirm',provider:'codex',version:'0.163.0'}),{action:'confirm',provider:'codex',version:'0.163.0'});
  for(const bad of [{action:'confirm',provider:'codex'},{action:'confirm',provider:'codex',version:'0.163'},{action:'confirm',provider:'codex',version:'0.163.0',path:'/x'},{action:'confirm',provider:'claude',version:'0.163.0'},{action:'confirm',provider:'codex',version:'latest'},{action:'update',provider:'codex',expectedRevision:0}])assert.throws(()=>parseProviderRuntimeRequest(bad));
  const f=await fixture(t);await assert.rejects(f.manager.operate({action:'confirm',provider:'codex',version:'0.163.0'},'c'),/更新器/);
+});
+
+test('a stalled transfer is cut off after silence, but a slow steady one is never limited by total time',async()=>{
+ const stalled=new PassThrough();stalled.write('first');
+ const guarded=stallGuard(stalled,60);const seen:string[]=[];
+ await assert.rejects((async()=>{for await(const chunk of guarded)seen.push(String(chunk));})(),(error:Error)=>error.name==='TimeoutError');
+ assert.deepEqual(seen,['first']);
+ const steady=new PassThrough();let total='';
+ const writer=(async()=>{for(let i=0;i<12;i++){steady.write('x');await new Promise(r=>setTimeout(r,25));}steady.end();})();
+ for await(const chunk of stallGuard(steady,120))total+=String(chunk);await writer;
+ assert.equal(total.length,12,'twelve chunks over ~300ms with a 120ms stall limit completes');
+ assert.deepEqual([...await (async()=>{const out:string[]=[];for await(const c of stallGuard(Readable.from(['a','b']),50))out.push(String(c));return out;})()],['a','b']);
+});
+test('a long download publishes its step and progress, and clears them when finished or failed',async t=>{
+ const f=await fixture(t);
+ const dir=await mkdtemp(join(tmpdir(),'provider-progress-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const store=new StateStore(dir);await store.initialize();t.after(()=>store.close());
+ let release!:()=>void;const gate=new Promise<void>(r=>{release=r;});let midway:unknown;let fail=false;
+ const manager=new ProviderRuntimeManager(store,async()=>undefined,{
+  host:async()=>({installed:true,version:'2.1.290 (Claude Code)',path:'/host/claude'}),acp:async()=>null,latest:async()=>null,stable:async()=>'2.1.292',
+  manifest:async(v,p)=>({version:v,platform:p,sha256:createHash('sha256').update(v).digest('hex'),size:v.length,sdkVersion:CLAUDE_SDK_VERSION,checkedAt:new Date().toISOString()}),
+  download:async(r,file,_s,onProgress)=>{onProgress?.(3);await new Promise(resolve=>setTimeout(resolve,20));midway=store.snapshot().providerRuntimeState;await gate;if(fail)throw new Error('connection reset');await mkdir(dirname(file),{recursive:true});await writeFile(file,r.version);},
+  probe:async()=>undefined});
+ const running=manager.operate({action:'configure',provider:'claude',mode:'pinned',expectedRevision:0},'op-progress');
+ await new Promise(resolve=>setTimeout(resolve,80));
+ const during=store.snapshot().providerRuntimeState!;assert.equal(during.step,'downloading');assert.equal(during.progress?.received,3);assert.equal(during.progress?.total,7);
+ assert.ok(midway);release();await running;
+ assert.equal(manager.state().step,undefined);assert.equal(manager.state().progress,undefined);assert.equal(manager.state().current?.version,'2.1.292');
+ // A failed attempt must not leave a stale progress bar behind either.
+ fail=true;await rm(join(dir,'provider-runtimes'),{recursive:true,force:true});
+ await manager.operate({action:'configure',provider:'claude',mode:'host',expectedRevision:manager.state().revision},'op-host');
+ const again=manager.operate({action:'configure',provider:'claude',mode:'auto',expectedRevision:manager.state().revision},'op-auto');
+ await assert.rejects(again);assert.equal(manager.state().step,undefined);assert.equal(manager.state().progress,undefined);
+ void f;
 });

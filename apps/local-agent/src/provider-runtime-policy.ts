@@ -22,6 +22,8 @@ export interface ProviderRuntimeState {
   hostCompatibility?:{version:string;checkedAt:string;state:'protocol_checked'|'unverified';sdkVersion:string};
   /** Newest official release per agent, from read-only discovery. Never an instruction to install. */
   latest?:Record<string,{version:string;checkedAt:string}>;
+  /** What a long-running update is doing right now, so the panel can show progress instead of an idle spinner. */
+  step?:'downloading'|'verifying';progress?:{received:number;total:number};
   checkedAt?:string;stableVersion?:string;phase?:'idle'|'waiting_idle'|'checking'|'ready'|'blocked';error?:string;failedVersion?:string;
 }
 /** Bounded public status; no binary paths, environment or credentials cross the relay. */
@@ -46,6 +48,9 @@ export function parseProviderRuntimeState(value:unknown):ProviderRuntimeState|un
   }
   if(typeof v.checkedAt==='string'&&v.checkedAt.length<=40&&Number.isFinite(Date.parse(v.checkedAt)))result.checkedAt=v.checkedAt;
   for(const key of ['stableVersion','failedVersion'] as const)if(typeof v[key]==='string'&&(v[key]===''||validVersion(v[key])))result[key]=v[key];
+  if(['downloading','verifying'].includes(String(v.step)))result.step=v.step as NonNullable<ProviderRuntimeState['step']>;
+  const pr=v.progress as {received?:unknown;total?:unknown}|undefined;
+  if(pr&&typeof pr==='object'&&Number.isSafeInteger(pr.received)&&Number.isSafeInteger(pr.total)&&Number(pr.total)>0&&Number(pr.total)<=512*1024*1024&&Number(pr.received)>=0&&Number(pr.received)<=Number(pr.total))result.progress={received:Number(pr.received),total:Number(pr.total)};
   if(typeof v.error==='string')result.error=v.error.slice(0,500);
   if(['idle','waiting_idle','checking','ready','blocked'].includes(String(v.phase)))result.phase=v.phase as NonNullable<ProviderRuntimeState['phase']>;
   const h=v.hostCompatibility as ProviderRuntimeState['hostCompatibility'];

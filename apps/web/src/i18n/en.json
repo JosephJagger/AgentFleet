@@ -3739,5 +3739,8 @@
   "{0} 台主机已验证新的 Codex，等待你确认后才会更新。": "{0} host(s) have a verified new Codex and will update only after you confirm.",
   "确认全部 {0} 台主机的 Codex 更新": "Confirm the Codex update on all {0} host(s)",
   "只更新 AgentFleets 独立管理的程序，不修改你自装的 Codex。以下验证与晋升设置适用于所有主机；晋升后各主机经管理员确认才会更新。": "Only the program managed by AgentFleets is updated; your own Codex is not modified. These validation and promotion settings apply to every host; after promotion each host updates only once an administrator confirms.",
-  "Codex {0} 已通过验证并晋升，各主机经管理员确认后才会更新": "Codex {0} is validated and promoted. Each host updates only after an administrator confirms."
+  "Codex {0} 已通过验证并晋升，各主机经管理员确认后才会更新": "Codex {0} is validated and promoted. Each host updates only after an administrator confirms.",
+  "正在下载官方 Claude Code {0}：{1} / {2} MB（{3}%），期间可继续使用，不影响任务。": "Downloading official Claude Code {0}: {1} / {2} MB ({3}%). You can keep working; tasks are not affected.",
+  "正在下载官方 Claude Code，期间可继续使用，不影响任务。": "Downloading official Claude Code. You can keep working; tasks are not affected.",
+  "下载完成，正在校验文件并做兼容检查…": "Download finished. Verifying the file and running compatibility checks…"
 }

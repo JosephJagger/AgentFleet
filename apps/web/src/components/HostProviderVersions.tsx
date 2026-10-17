@@ -59,6 +59,8 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
       <p className="subtle">{t('托管会下载独立版本，不覆盖系统安装；先核验 SDK 与协议，任务和通话结束后才切换。失败保留原版本，回退后暂停自动更新。')}</p>
       {policy?.stableVersion&&<small>{t('官方稳定版：{0} · SDK：{1}',policy.stableVersion,checked?.sdkVersion??'—')}</small>}
       <div className="provider-versions__actions"><button className="button button--primary" type="submit" disabled={!policy||pending||machine.reachability!=='live'}>{t('应用更新方式')}</button><button className="button button--quiet" type="button" disabled={!policy?.previous||pending||machine.reachability!=='live'} onClick={()=>policy&&void operate({action:'rollback',provider:'claude',expectedRevision:policy.revision})}>{t('回退并固定版本')}</button></div>
+      {policy?.step==='downloading'&&<p role="status">{policy.progress?t('正在下载官方 Claude Code {0}：{1} / {2} MB（{3}%），期间可继续使用，不影响任务。',policy.stableVersion??'',(policy.progress.received/1048576).toFixed(0),(policy.progress.total/1048576).toFixed(0),Math.floor(100*policy.progress.received/policy.progress.total)):t('正在下载官方 Claude Code，期间可继续使用，不影响任务。')}</p>}
+      {policy?.step==='verifying'&&<p role="status">{t('下载完成，正在校验文件并做兼容检查…')}</p>}
       {policy?.phase==='waiting_idle'&&<p role="status">{t('已验证目标，等待任务或通话结束后再应用。')}</p>}
       {policy?.error&&<p role="status">{systemText(policy.error)}</p>}
       <p className="subtle">{t('发现新版本只作提示：Codex 与托管的 Claude Code 经你确认后才会更新；其他智能体仍由原安装方式更新，本页不会修改其安装或自动更新设置。')}</p>
