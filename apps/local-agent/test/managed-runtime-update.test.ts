@@ -12,11 +12,11 @@ import { StateStore } from "../src/store.js";
 import { writeUpdateTransaction } from "../src/supervisor.js";
 // Use a complete synthetic installation: CI has no real launcher, while a
 // developer machine might. Never depend on or back up the real installation.
-async function isolatedInstallation(t: TestContext): Promise<string> {
+async function isolatedInstallation(t: TestContext): Promise<{dataDir:string;root:string}> {
   const root = await mkdtemp(join(tmpdir(), "runtime-install-"));
   t.mock.method(os, "homedir", () => root);
   syncBuiltinESMExports();
-  t.after(async () => { t.mock.restoreAll(); syncBuiltinESMExports(); await rm(root, {recursive:true,force:true}); });
+  t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
   const dataDir = join(root, ".local", "share", "agentfleet");
   await mkdir(join(dataDir, "bin", "1.0.0"), {recursive:true});
   if (process.platform === "win32") await writeFile(join(dataDir, "bin", "current.txt"), "1.0.0");
@@ -24,7 +24,7 @@ async function isolatedInstallation(t: TestContext): Promise<string> {
     await mkdir(join(root, ".local", "bin"), {recursive:true});
     await symlink(join(dataDir, "bin", "1.0.0", "agentfleet"), join(root, ".local", "bin", "agentfleet"));
   }
-  return dataDir;
+  return {dataDir,root};
 }
 const target = () => ({ schemaVersion: 1, revision: randomUUID(), version: "0.153.4", schemaHash: REQUIRED_CODEX_SCHEMA_HASH, artifacts: { "linux-x64": { file: `codex-linux-x64-0.153.4-${"a".repeat(16)}`, sha256: "a".repeat(64), size: 100, format: "raw" } } });
 test("managed targets reject schema changes, path injection, invalid hashes and previews", () => {
@@ -87,8 +87,8 @@ test("withdrawn runtime target never activates a prepared candidate", async t =>
   assert.equal(store.snapshot().maintenanceDrain,undefined);
 });
 test("forward runtime upgrades wait for user confirmation; repairs and rollbacks do not", async t => {
-  const dir = await isolatedInstallation(t); const store = new StateStore(dir); await store.initialize();
-  t.after(async () => { store.close(); await rm(dir, {recursive:true,force:true}); });
+  const {dataDir:dir,root} = await isolatedInstallation(t); const store = new StateStore(dir); await store.initialize();
+  t.after(async () => { store.close(); await rm(root, {recursive:true,force:true}); });
   const release = target(); const phases: string[] = []; let prepared = 0, activated = 0, staged = 0, body: object = {target: release};
   const options = {currentVersion:"1.0.0",controlPlaneUrl:"https://fleet.example",dataDir:dir,store,runtimeSource:"managed" as const,currentRuntimeVersion:"0.153.2",canUpdate:()=>true,
     confirmRuntimeUpgrade:true,onStaged:()=>{staged++;},logger:{info(){},warn(){}},onRuntimePhase:(phase:string)=>{phases.push(phase);},

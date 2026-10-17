@@ -28,8 +28,13 @@ export class PanelVoiceService {
     this.own(principal,voiceId);
     return result;
   }
-  syncSessionMemory(sessionId:string) {
-    for(const job of this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE session_id=?",sessionId))this.refresh(job);
+  syncSessionMemory(sessionId:string, nativeTurnId?:string) {
+    // A late result must still refresh its own turn. Unbound jobs also need the
+    // event to resolve their turn, but unrelated historical jobs do not.
+    const jobs=nativeTurnId
+      ? this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE session_id=? AND (native_turn_id=? OR native_turn_id IS NULL)",sessionId,nativeTurnId)
+      : this.db.all<PanelJob>("SELECT * FROM panel_voice_jobs WHERE session_id=?",sessionId);
+    for(const job of jobs)this.refresh(job);
   }
   syncMemory(principal?:Principal) {
     this.memory.purgeUnavailable();

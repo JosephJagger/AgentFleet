@@ -1979,7 +1979,7 @@ export async function buildControlPlane(
               if (!result.duplicate) {
                 try { writingMemory.learnEvent(result.eventId); } catch { app.log.warn("Writing memory extraction failed; event remains acknowledged"); }
                 if (["turn.started","turn.completed","turn.failed","turn.interrupted","item.completed"].includes(message.event.type)) {
-                  try { panelVoice.syncSessionMemory(message.event.logicalSessionId); } catch { app.log.warn("Voice task record projection failed; durable event will be reconciled"); }
+                  try { panelVoice.syncSessionMemory(message.event.logicalSessionId,message.event.nativeTurnId); } catch { app.log.warn("Voice task record projection failed; durable event will be reconciled"); }
                 }
                 broadcastSession(message.event.logicalSessionId, { type: "event", event: result.event });
                 // Fleet views do not subscribe to every conversation. Notify authorized

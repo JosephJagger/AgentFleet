@@ -28,3 +28,19 @@ Publish the panel and immutable Agent artifacts together. An auto-update-enabled
 host prepares the new runtime and waits for tasks, approvals and voice to finish
 before switching. A prepared download is not proof that the running worker has
 changed. Never force a worker restart to bypass this boundary.
+
+## Control-plane catch-up
+
+The server also needs to remain responsive while receiving a backlog. Schema 64
+adds `durable_events_turn_idx(logical_session_id,native_turn_id,session_seq)`;
+turn progress and result lookups no longer scan every event in a long session and
+sort them. Event-triggered voice task projection refreshes the matching turn and
+jobs whose turn has not yet been resolved. Late events for an older turn still
+refresh that older job; events without a turn retain the previous session scope.
+Authorization, event acknowledgement, retention and task execution are unchanged.
+
+An isolated database-copy check of 60 result lookups reduced elapsed time from
+1,617 ms to 21 ms with identical row counts. This is a diagnostic observation,
+not a latency guarantee. Synthetic tests verify the selected query plan, schema
+migration, matching/unbound jobs, and late historical results. A control-plane-only
+publication preserves the already published Agent artifacts byte for byte.
