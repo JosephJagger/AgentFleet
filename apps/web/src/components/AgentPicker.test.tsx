@@ -8,10 +8,18 @@ it('offers the five new providers only when ready and excludes deferred provider
  const onChange=vi.fn();const runtimes=Object.fromEntries(ACP_PROVIDER_IDS.map(id=>[id,{installed:true,version:'fixture',state:id==='qwen'?'ready':'unverified',checkedAt:new Date().toISOString(),capabilities:unavailableCapabilities()}]));
  render(<AgentPicker value="codex" claudeInstalled={true} runtimes={runtimes} onChange={onChange}/>);
  fireEvent.click(screen.getByRole('button',{name:'选择 Agent'}));
- expect(screen.getAllByRole('menuitemradio').map(el=>el.querySelector('strong')?.textContent)).toEqual(['Codex','Claude Code','Cursor','Qwen Code','Kimi Code','CodeBuddy Code','Grok Build']);
+ expect(screen.getAllByRole('menuitemradio').map(el=>el.querySelector('strong')?.textContent)).toEqual(['Codex','Claude Code','Qwen Code','Cursor','Kimi Code','CodeBuddy Code','Grok Build']);
  expect((screen.getByRole('menuitemradio',{name:/Kimi Code/}) as HTMLButtonElement).disabled).toBe(true);
  expect(screen.queryByText(/Copilot|Antigravity|Gemini|TRAE/)).toBeNull();
  fireEvent.click(screen.getByRole('menuitemradio',{name:/Qwen Code/}));expect(onChange).toHaveBeenCalledWith('qwen');
+});
+it('lists ready Grok Build third, after 全部 and Codex and ahead of other ready agents',()=>{
+ const runtimes=Object.fromEntries(ACP_PROVIDER_IDS.map(id=>[id,{installed:id==='grok'||id==='cursor',version:'fixture',state:id==='grok'?'ready':'unverified',checkedAt:new Date().toISOString(),capabilities:unavailableCapabilities()}]));
+ render(<AgentPicker value="grok" claudeInstalled={true} runtimes={runtimes} onAll={()=>{}} onChange={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'选择 Agent'}));
+ expect(screen.getAllByRole('menuitemradio').map(el=>el.querySelector('strong')?.textContent)).toEqual(['全部','Codex','Grok Build','Claude Code','Cursor','Qwen Code','Kimi Code','CodeBuddy Code']);
+ expect((screen.getByRole('menuitemradio',{name:/Grok Build/}) as HTMLButtonElement).disabled).toBe(false);
+ expect((screen.getByRole('menuitemradio',{name:/Cursor/}) as HTMLButtonElement).disabled).toBe(true);
 });
 it('renders the selected native identity without relabeling it as Claude',()=>{
  render(<AgentPicker value="grok" claudeInstalled={true} onChange={()=>{}}/>);expect(screen.getByText('Grok Build')).toBeTruthy();expect(screen.queryByText('Claude Code')).toBeNull();

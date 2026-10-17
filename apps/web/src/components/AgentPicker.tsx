@@ -9,6 +9,9 @@ type Provider = ProviderId;
 export const PROVIDER_DISPLAY_ORDER: ProviderId[] = ['codex', 'claude', 'cursor', 'qwen', 'kimi', 'codebuddy', 'grok'];
 export function AgentPicker({ value, claudeInstalled, runtimes, onChange, allSelected=false, onAll }: { allSelected?:boolean; onAll?:()=>void; value: Provider; claudeInstalled?: boolean; runtimes?: Partial<Record<AcpProviderId, ProviderAvailability>>; onChange: (value: Provider) => void }) {
   const available = (provider: Provider) => provider === 'codex' || provider === 'claude' && claudeInstalled || isAcpProvider(provider) && runtimes?.[provider]?.state === 'ready';
+  // Availability outranks the catalog. 全部 stays first; ready Grok Build is the next row after Codex.
+  const weight = (provider: Provider) => !available(provider) ? 100 + PROVIDER_DISPLAY_ORDER.indexOf(provider) : provider === 'codex' ? 0 : provider === 'grok' ? 1 : 2 + PROVIDER_DISPLAY_ORDER.indexOf(provider);
+  const ordered = [...PROVIDER_DISPLAY_ORDER].sort((a, b) => weight(a) - weight(b));
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 276, maxHeight: 500 });
   const trigger = useRef<HTMLButtonElement>(null);
@@ -52,7 +55,7 @@ export function AgentPicker({ value, claudeInstalled, runtimes, onChange, allSel
     }}>
       <div className="agent-picker-menu__label">{t("选择 Agent")}</div>
       {onAll && <button type="button" role="menuitemradio" aria-checked={allSelected} className={`agent-picker-option${allSelected ? " is-selected" : ""}`} onClick={()=>{onAll();setOpen(false);trigger.current?.focus();}}><span className="agent-picker-mark"><Layers3 size={18}/></span><span className="agent-picker-option__copy"><strong>{t("全部")}</strong><small>{t("当前主机的全部智能体会话")}</small></span>{allSelected&&<Check className="agent-picker-check" size={16}/>}</button>}
-      {PROVIDER_DISPLAY_ORDER.map(provider => <button key={provider} type="button" role="menuitemradio" aria-checked={!allSelected && value === provider} disabled={!available(provider)} className={`agent-picker-option${!allSelected && value === provider ? " is-selected" : ""}`} onClick={() => choose(provider)}>
+      {ordered.map(provider => <button key={provider} type="button" role="menuitemradio" aria-checked={!allSelected && value === provider} disabled={!available(provider)} className={`agent-picker-option${!allSelected && value === provider ? " is-selected" : ""}`} onClick={() => choose(provider)}>
         <span className={`agent-picker-mark agent-picker-mark--${provider}`} aria-hidden="true">{provider === "codex" ? <Code2 size={18} /> : <Sparkles size={18} />}</span>
         <span className="agent-picker-option__copy"><strong>{providerName(provider)}</strong><small title={isAcpProvider(provider) ? runtimes?.[provider]?.error : undefined}>{provider === 'codex' || available(provider) ? t("宿主机项目与会话") : provider === 'claude' ? t(claudeInstalled === false ? '宿主机未安装' : '安装状态未上报') : isAcpProvider(provider) && runtimes?.[provider] ? t(runtimes[provider]?.installed === false ? '宿主机未安装' : runtimes[provider]?.state === 'login_required' ? '需要登录' : '宿主机未就绪') : t('安装状态未上报')}</small></span>
         {!allSelected && value === provider && <Check className="agent-picker-check" size={16} aria-hidden="true" />}
