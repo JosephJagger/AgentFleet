@@ -53,6 +53,7 @@ import { apiSchemas, CODEX_COMPATIBILITY_PROFILE, type AgentToServerMessage, typ
 import { canonicalJson, newId, nowIso, sha256 } from "./crypto.js";
 import { pageLimit, type ListOptions } from "./pagination.js";
 import { MaintenanceService, requiresPlatformAdmin } from "./maintenance.js";
+import { redactDashboardCodexStatus, redactMachineCodexStatus } from "./codex-status-visibility.js";
 import { CredentialRenewalService } from "./credentials.js";
 import { CodexPreferencesService } from "./codex-preferences.js";
 import { PermissionPreferencesService } from "./permission-preferences.js";
@@ -1074,9 +1075,18 @@ export async function buildControlPlane(
 
   const worldWeather = createWorldWeather();
   app.get("/api/world-weather", { preHandler: authenticate }, async () => worldWeather());
-  app.get("/api/dashboard", { preHandler: authenticate }, async (request) => ({ ...registry.dashboard(request.principal as Principal), compatibilityProfile: channelProfile(config.runtimeReleaseDir) }));
-  app.get("/api/machines", { preHandler: authenticate }, async (request) => ({ machines: registry.listMachines(request.principal as Principal) }));
-  app.get("/api/machines/:id", { preHandler: authenticate }, async (request) => registry.getMachine(request.principal as Principal, routeId(request)));
+  app.get("/api/dashboard", { preHandler: authenticate }, async (request) => {
+    const dashboard = { ...registry.dashboard(request.principal as Principal), compatibilityProfile: channelProfile(config.runtimeReleaseDir) };
+    return auth.isPlatformAdmin(request.principal as Principal) ? dashboard : redactDashboardCodexStatus(dashboard);
+  });
+  app.get("/api/machines", { preHandler: authenticate }, async (request) => {
+    const machines = registry.listMachines(request.principal as Principal);
+    return { machines: auth.isPlatformAdmin(request.principal as Principal) ? machines : machines.map(redactMachineCodexStatus) };
+  });
+  app.get("/api/machines/:id", { preHandler: authenticate }, async (request) => {
+    const machine = registry.getMachine(request.principal as Principal, routeId(request));
+    return auth.isPlatformAdmin(request.principal as Principal) ? machine : redactMachineCodexStatus(machine);
+  });
   app.patch("/api/machines/:id", { preHandler: mutate }, async (request) => {
     const id = routeId(request);
     const body = record(request.body);

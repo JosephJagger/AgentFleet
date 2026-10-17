@@ -41,11 +41,13 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
       const row=reported??native;const source=id==='codex'?String(machine.codexProfile?.source??''):id==='claude'?policy?.mode==='host'||!policy?'host':'managed':'host';
       const version=id==='claude'&&policy?.mode!=='host'&&policy?.current?policy.current.version:row?.version;
       const compatibility=id==='codex'?machine.compatibility:reported?.compatibility;
-      const offer=providerUpdateOffer(id,machine,policy,id==='codex'?machine.codexVersion:version);
+      // Codex rollout and validation status belong to the platform administrator; everyone else only sees the version.
+      const codexVisible=id!=='codex'||canConfirmCodex;
+      const offer=codexVisible?providerUpdateOffer(id,machine,policy,id==='codex'?machine.codexVersion:version):undefined;
       const canAct=supported&&!pending&&machine.reachability==='live';
-      return <div className="provider-versions__row" key={id}><div><strong>{PROVIDER_NAMES[id]}</strong><span>{version|| (row?.installed===false?t('未安装'):t('尚未上报'))}</span></div><div><span>{source==='managed'?t('独立托管'):source==='host'?t('宿主机安装'):t('尚未上报')}</span><small>{compatibility==='compatible'?t('已通过兼容验证'):compatibility==='protocol_checked'?t('协议检查通过'):t('待验证')}</small></div>
+      return <div className="provider-versions__row" key={id}><div><strong>{PROVIDER_NAMES[id]}</strong><span>{version|| (row?.installed===false?t('未安装'):t('尚未上报'))}</span></div>{codexVisible&&<div><span>{source==='managed'?t('独立托管'):source==='host'?t('宿主机安装'):t('尚未上报')}</span><small>{compatibility==='compatible'?t('已通过兼容验证'):compatibility==='protocol_checked'?t('协议检查通过'):t('待验证')}</small></div>}
         {offer&&<div className="provider-versions__offer" role="status">
-          {offer.kind==='codex-confirm'?<><span>{t('{0} 已通过验证，确认后才会更新',offer.latest)}</span>{canConfirmCodex?<button className="button button--primary" type="button" disabled={!canAct} onClick={()=>void operate({action:'confirm',provider:'codex',version:offer.latest})}>{t('确认更新到 {0}',offer.latest)}</button>:<small>{t('需平台管理员确认')}</small>}</>
+          {offer.kind==='codex-confirm'?<><span>{t('{0} 已通过验证，确认后才会更新',offer.latest)}</span><button className="button button--primary" type="button" disabled={!canAct} onClick={()=>void operate({action:'confirm',provider:'codex',version:offer.latest})}>{t('确认更新到 {0}',offer.latest)}</button></>
           :offer.kind==='claude-update'?<><span>{t('官方稳定版 {0} 可用',offer.latest)}</span><button className="button button--primary" type="button" disabled={!canAct||!policy} onClick={()=>{if(policy)void operate({action:'update',provider:'claude',expectedRevision:policy.revision});}}>{t('更新到 {0}',offer.latest)}</button></>
           :<span>{t('有新版本 {0}，请用原安装方式更新',offer.latest)}</span>}
         </div>}

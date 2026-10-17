@@ -26,6 +26,7 @@ it('deduplicates manual update requests and stops polling when closed',async()=>
   const dashboard={user:{platformAdmin:true},compatibilityProfile:{managedCodexVersion:'0.162.1',schemaHash:'',validationStatus:'verified'},machines:[{id:'test-host',name:'Synthetic host',identity:'paired',os:'linux',reachability:'live',agentVersion:'1.0.0',codexVersion:'0.162.1',maintenanceCapabilities:['agent.update'],codexProfile:{}}]} as unknown as Dashboard;
   const view=render(<UpdateCenter dashboard={dashboard}/>);
   await act(async()=>{});
+  expect(view.container.querySelector('.update-center__components > div > small')).not.toBeNull();
   const button=screen.getByText('检查并更新');
   fireEvent.click(button);fireEvent.click(button);
   expect(api.hostOperation).toHaveBeenCalledTimes(1);
@@ -40,8 +41,10 @@ it('disables connection-service updates for users who are not the platform admin
   vi.mocked(api.agentReleaseStatus).mockResolvedValue({status:'ready',expectedVersion:'1.0.1',publicVersion:'1.0.1',checkedAt:''});
   vi.mocked(api.hostOperations).mockResolvedValue([]);
   const dashboard={user:{platformAdmin:false},compatibilityProfile:{managedCodexVersion:'0.162.1',schemaHash:'',validationStatus:'verified'},machines:[{id:'test-host',name:'Synthetic host',identity:'paired',os:'linux',reachability:'live',agentVersion:'1.0.0',codexVersion:'0.162.1',maintenanceCapabilities:['agent.update'],codexProfile:{}}]} as unknown as Dashboard;
-  render(<UpdateCenter dashboard={dashboard}/>);
+  const view=render(<UpdateCenter dashboard={dashboard}/>);
   await act(async()=>{});
+  expect(view.container.textContent).toMatch(/Codex\s*\S+/);
+  expect(view.container.querySelector('.update-center__components > div > small')).toBeNull();
   const button=screen.getByText('检查并更新').closest('button') as HTMLButtonElement;
   expect(button.disabled).toBe(true);fireEvent.click(button);
   expect(api.hostOperation).not.toHaveBeenCalled();

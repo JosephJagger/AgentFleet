@@ -3733,6 +3733,5 @@
   "官方清单缺少签名，拒绝使用": "The official manifest has no signature. Refusing to use it",
   "此确认由连接服务更新器处理": "This confirmation is handled by the connection-service updater",
   "已验证，等待你确认更新": "Verified. Waiting for your confirmation",
-  "仅平台管理员可更新连接服务": "Only the platform administrator can update the connection service",
-  "需平台管理员确认": "Requires platform administrator confirmation"
+  "仅平台管理员可更新连接服务": "Only the platform administrator can update the connection service"
 }

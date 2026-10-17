@@ -66,7 +66,7 @@ export function UpdateCenter({ dashboard }: { dashboard: Dashboard }) {
         return <article key={machine.id} className="update-center__host">
           <header><strong>{displayName(machine.name)}</strong><span>{machine.os} · {t(machine.reachability === "live" ? "在线" : "离线")}</span><button type="button" className="button button--quiet" disabled={Boolean(submitting[machine.id]) || pending || machine.reachability !== "live" || !machine.maintenanceCapabilities?.includes("agent.update") || !dashboard.user.platformAdmin} title={dashboard.user.platformAdmin ? undefined : t("仅平台管理员可更新连接服务")} onClick={() => void check(machine.id)}><RefreshCw size={14}/>{pending ? t("等待主机核验") : t("检查并更新")}</button></header>
           <HostUpdateStatus machine={machine} operations={history} release={release} compact/><div className="update-center__components"><details><summary>{t("连接服务")} <strong>{machine.agentVersion}</strong></summary><HostUpdateStatus machine={machine} operations={history} release={release}/></details>
-          <div><p>Codex <strong>{machine.codexVersion || t("尚未上报")}</strong></p><small>{runtime.label}</small>{runtime.error && <p className="catalog-error">{systemText(runtime.error)}</p>}</div></div>
+          <div><p>Codex <strong>{machine.codexVersion || t("尚未上报")}</strong></p>{dashboard.user.platformAdmin && <><small>{runtime.label}</small>{runtime.error && <p className="catalog-error">{systemText(runtime.error)}</p>}</>}</div></div>
         </article>;
       })}
       {!hosts.length && <p>{t("添加主机并连接后，可在这里查看更新进度。")}</p>}

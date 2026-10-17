@@ -45,9 +45,13 @@ it('Claude update carries the policy revision and is disabled on hosts that cann
  expect((await screen.findByText('更新到 2.1.300') as HTMLButtonElement).closest('button')!.disabled).toBe(true);
 });
 
-it('members who are not the platform administrator see Codex awaiting confirmation but cannot confirm it',async()=>{
- vi.mocked(api.hostOperations).mockResolvedValue([]);
- const m={...machine,codexProfile:{source:'managed',runtimeUpdateState:'awaiting_confirmation',runtimeUpdateTarget:'0.163.0'}} as unknown as Machine;
- render(<HostProviderVersions machine={m}/>);
- await screen.findByText('需平台管理员确认');expect(screen.queryByText('确认更新到 0.163.0')).toBeNull();expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
+it('members who are not the platform administrator see only the Codex version, with no status or confirmation',async()=>{
+ vi.mocked(api.hostOperations).mockResolvedValue([report]);
+ const m={...machine,compatibility:'compatible',codexProfile:{source:'managed',runtimeUpdateState:'awaiting_confirmation',runtimeUpdateTarget:'0.163.0'}} as unknown as Machine;
+ const r=render(<HostProviderVersions machine={m}/>);
+ await screen.findByText('2.1.290');expect(screen.getByText('0.162.1')).toBeTruthy();
+ expect(screen.queryByText('确认更新到 0.163.0')).toBeNull();expect(screen.queryByText(/0\.163\.0/)).toBeNull();expect(screen.queryByText('独立托管')).toBeNull();expect(screen.queryByText('已通过兼容验证')).toBeNull();
+ expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
+ r.unmount();render(<HostProviderVersions machine={m} canConfirmCodex/>);
+ await screen.findByText('确认更新到 0.163.0');expect(screen.getByText('独立托管')).toBeTruthy();
 });
