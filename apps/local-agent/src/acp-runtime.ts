@@ -1,8 +1,11 @@
 import {AGENT_VERSION} from "./constants.js";
 import {randomUUID} from 'node:crypto';
+import {setImmediate as yieldToIO} from 'node:timers/promises';
 import {homedir} from 'node:os';
 import {stat} from 'node:fs/promises';
 import {isAbsolute,resolve} from 'node:path';
+import {acpImageInput,acpImageBlocks} from './acp-images.js';
+import {MAX_IMAGES,validImageUrl} from './images.js';
 import {AcpConnection} from './acp-connection.js';
 import {ACP_COMMANDS,detectAcp,assertAcpUnoccupied,type AcpExecutable} from './acp-providers.js';
 import {unavailableCapabilities,type AcpProviderId,type ProviderAvailability} from './provider-catalog.js';
@@ -16,7 +19,7 @@ import type {TurnExtras} from './attachments.js';
 import {inputAnswers,inputQuestions,type InputAnswers,type InputQuestion} from './user-input.js';
 import {acpPlanText,acpToolItem,acpUsage,grokLaunchArgs,grokSessionMeta,mergeConfigOptions,parseConfigOptions,parseGrokSettings,type ConfigOption,type GrokSettings} from './acp-updates.js';
 import type {CodexSettings} from './codex-settings.js';
-interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];published:Map<string,string>;completed:Set<string>;}
+interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];published:Map<string,string>;completed:Set<string>;}
 interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan';questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
 function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)return {text:value,truncated:false};let text=Buffer.from(value).subarray(0,max).toString('utf8');if(text.endsWith('\uFFFD'))text=text.slice(0,-1);return {text,truncated:true};}
 const dependencies={detect:detectAcp,unoccupied:assertAcpUnoccupied,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
@@ -64,7 +67,9 @@ export class AcpRuntime {
       const init=await connection.call('initialize',{protocolVersion:1,clientCapabilities:{},clientInfo:{name:'agentfleets',version:AGENT_VERSION}});
       if(!isRecord(init)||init.protocolVersion!==1||!isRecord(init.agentCapabilities))throw new AgentError('ACP_INCOMPATIBLE','Unsupported native protocol handshake');
       const capabilities=init.agentCapabilities,sessionCapabilities=isRecord(capabilities.sessionCapabilities)?capabilities.sessionCapabilities:{};
-      this.availability={installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),capabilities:{...unavailableCapabilities(),create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
+      const images=acpImageInput(this.provider,this.executable.version,init);
+      if(session)session.imageInput=images;
+      this.availability={installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),capabilities:{...unavailableCapabilities(),images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
       return connection;
     } catch(error) {connection.close();this.markFailure(error);throw error;}
   }
@@ -188,21 +193,23 @@ export class AcpRuntime {
   }
   async startTurn(thread:ManagedThread,project:ProjectRecord,prompt:string,_messageId?:string,settings?:CodexSettings|GrokSettings,images?:string[],extras?:TurnExtras) {
     const grok=this.provider==='grok'?parseGrokSettings(settings):undefined;
-    const blocked=Boolean(images?.length||extras?.attachments?.length||extras?.pluginSkills?.length||extras?.outputSchema||extras?.goal);
+    const blocked=Boolean(extras?.attachments?.length||extras?.pluginSkills?.length||extras?.outputSchema||extras?.goal);
     const settingsRejected=this.provider==='grok'?Boolean(settings)&&!grok:Boolean(settings&&Object.keys(settings).length);
     if(blocked||settingsRejected)throw new AgentError('PROVIDER_INPUT_UNAVAILABLE','This provider currently accepts plain text with native settings only');
+    const imageBlocks=acpImageBlocks(images);
     const desired=grok?.permissionMode??'default';
     const known=this.sessions.get(thread.nativeThreadId);
     if(known&&!known.lost&&known.permissionMode!==desired)await this.unsubscribeThread(known.id);
     await this.deps.unoccupied(this.provider,this.owned);
     const session=await this.open(thread.nativeThreadId,thread.sessionCwd??project.root,false,grok);
+    if(imageBlocks.length&&!session.imageInput)throw new AgentError('AGENT_IMAGE_UNSUPPORTED','当前智能体未提供可用的图片输入能力；图片未发送，请检查原生版本和模型');
     if(this.provider==='grok'&&grok)await this.applyConfig(session,grok);
     if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Native turn is already running');
     const turnId=randomUUID();session.turnId=turnId;session.cancelled=false;
-    const itemId=`${turnId}:user`,item={id:itemId,type:'userMessage',content:[{type:'text',text:prompt}]};
+    const itemId=`${turnId}:user`,item={id:itemId,type:'userMessage',content:[{type:'text',text:prompt},...(images??[]).map(url=>({type:'image',url}))]};
     session.items.push({nativeTurnId:turnId,nativeItemId:itemId,item});
     await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:itemId,payload:{item}},this.appServerEpoch);
-    setImmediate(()=>{void session.connection.call('session/prompt',{sessionId:this.native(session.id),prompt:[{type:'text',text:prompt}]},24*3600000).then(async result=>{
+    setImmediate(()=>{void session.connection.call('session/prompt',{sessionId:this.native(session.id),prompt:[{type:'text',text:prompt},...imageBlocks]},24*3600000).then(async result=>{
       if(session.lost||session.turnId!==turnId)return;
       if(!isRecord(result)||typeof result.stopReason!=='string')throw new AgentError('ACP_RESULT_INVALID','Missing native completion evidence');
       const usage=acpUsage(result);
@@ -228,7 +235,17 @@ export class AcpRuntime {
     const update=params.update,kind=update.sessionUpdate;
     if(kind==='config_option_update'){this.rememberOptions(session,params);return;}
     const turnId=session.turnId??'history';
-    if(['agent_message_chunk','user_message_chunk','agent_thought_chunk'].includes(String(kind))&&isRecord(update.content)&&update.content.type==='text'&&typeof update.content.text==='string') {
+    if(kind==='user_message_chunk'&&isRecord(update.content)&&update.content.type==='image') {
+      const url=typeof update.content.data==='string'&&typeof update.content.mimeType==='string'?`data:${update.content.mimeType};base64,${update.content.data}`:'';
+      let last=session.items.at(-1);
+      if(!last||last.nativeTurnId!==turnId||last.item?.type!=='userMessage') {
+        const id=`${turnId}:${session.items.length}`;last={nativeTurnId:turnId,nativeItemId:id,item:{id,type:'userMessage',content:[{type:'text',text:''}]}};session.items.push(last);
+      }
+      const content=last.item!.content as Array<{type:string;url?:string;text?:string}>;
+      if(validImageUrl(url)) {
+        if(!content.some(c=>c.type==='image'&&c.url===url)&&content.filter(c=>c.type==='image').length<MAX_IMAGES)content.push({type:'image',url});
+      }else content[0]!.text+='[原生历史图片未同步：格式或大小超出面板限制]';
+    } else if(['agent_message_chunk','user_message_chunk','agent_thought_chunk'].includes(String(kind))&&isRecord(update.content)&&update.content.type==='text'&&typeof update.content.text==='string') {
       const type=kind==='user_message_chunk'?'userMessage':kind==='agent_thought_chunk'?'reasoning':'agentMessage';
       let last=session.items.at(-1);
       if(!last||last.nativeTurnId!==turnId||last.item?.type!==type) {
@@ -250,7 +267,18 @@ export class AcpRuntime {
     }
     if(session.items.length>10000||Buffer.byteLength(JSON.stringify(session.items))>16*1024*1024)throw new AgentError('ACP_HISTORY_LIMIT','Native history exceeds supported snapshot limit');
   }
-  private async flush(session:Session,turnId:string) {for(const entry of session.items.filter(i=>i.nativeTurnId===turnId&&i.item?.type!=='userMessage'&&!session.completed.has(i.nativeItemId))){await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:entry.nativeItemId,payload:{item:entry.item}},this.appServerEpoch);session.completed.add(entry.nativeItemId);}}
+  private async flush(session:Session,turnId:string) {
+    const pending=session.items.filter(i=>i.nativeTurnId===turnId&&i.item?.type!=='userMessage'&&!session.completed.has(i.nativeItemId));
+    // One durable transaction per chunk. A resolved await does not let the heartbeat timer run.
+    for(let index=0;index<pending.length;index+=32) {
+      const chunk=pending.slice(index,index+32);
+      const events=chunk.map(entry=>({type:'item.completed',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:entry.nativeItemId,payload:{item:entry.item}}));
+      if(this.callbacks.onEvents) await this.callbacks.onEvents(events,this.appServerEpoch);
+      else for(const event of events) await this.callbacks.onEvent(event,this.appServerEpoch);
+      for(const entry of chunk) session.completed.add(entry.nativeItemId);
+      await yieldToIO();
+    }
+  }
   private async request(session:Session,method:string,params:Record<string,unknown>):Promise<unknown> {
     if(session.loading||session.lost||!session.turnId||(params.sessionId !== undefined ? params.sessionId!==this.native(session.id) : !method.startsWith('cursor/') || this.provider!=='cursor'))return {outcome:{outcome:'cancelled'}};
     const kind=method==='session/request_permission'?'permission':method==='cursor/ask_question'?'question':method==='cursor/create_plan'?'plan':null;

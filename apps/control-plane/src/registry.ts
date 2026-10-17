@@ -1,5 +1,5 @@
 import { parseProviderRuntimeState } from "./provider-runtime-policy.js";
-import { ACP_PROVIDER_IDS, isAcpProvider, isProviderId, parseProviderAvailability, providerName, type ProviderId } from "./provider-catalog.js";
+import { ACP_PROVIDER_IDS, supportsImageInput, isAcpProvider, isProviderId, parseProviderAvailability, providerName, type ProviderId } from "./provider-catalog.js";
 import { parseMaintenance } from "./host-maintenance.js";
 import { parseClaudeMetadata } from "./claude-metadata.js";
 import { supportsClaudeControls } from "./claude-settings.js";
@@ -2880,7 +2880,7 @@ export class RegistryService {
       logicalSessionId: row.logical_session_id,
       recordedTokens: row.recorded_tokens,
       machineId: row.machine_id,
-      imageInputSupported: row.provider === "claude" || row.provider === "codex" && machineCatalog?.imageInput === true,
+      imageInputSupported: supportsImageInput(row.provider, machineCatalog?.imageInput === true, JSON.parse(host?.discovery_json ?? "{}").agentRuntimes?.[row.provider]),
       fileInputSupported: row.provider === "claude" || row.provider === "codex" && machineCatalog?.fileInput === true,
       plugins: row.provider !== "codex" ? [] : machineCatalog?.plugins ?? [],
       pluginSkills: row.provider !== "codex" ? [] : machineCatalog?.pluginSkills ?? [],

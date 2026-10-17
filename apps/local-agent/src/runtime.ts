@@ -969,7 +969,7 @@ export class AgentRuntime {
         if (!['thread.claim','thread.release','turn.start','turn.queue','turn.cancel','approval.decide_once','input.respond'].includes(command.type)) throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Unsupported native operation');
         const grokSettings=project.provider==='grok'?parseGrokSettings(command.payload.settings):undefined;
         const settingsRejected=project.provider==='grok'?command.payload.settings!==undefined&&!grokSettings:command.payload.settings!==undefined;
-        if (settingsRejected || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['images','attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');
+        if (settingsRejected || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');
       }
 
       if (isAcpProvider(project.provider) ? !(this.support.providerHostSupported ?? this.support.writable) || !supportsProviderCommand(this.appServer?.getAgentRuntimes?.()[project.provider],command.type,Boolean(command.precondition.nativeThreadId)) : !this.isWritable()) throw new AgentError("MACHINE_READ_ONLY", this.readOnlyReasons().join("; "));
@@ -1431,6 +1431,7 @@ export class AgentRuntime {
       onAuxiliaryActivity: (id, active) => this.store.setAuxiliaryActivity(id, active),
       findProject: (projectId) => this.store.snapshot().projects.find((project) => project.id === projectId),
       onEvent: (event, epoch) => this.handleAppEvent(event, epoch),
+      onEvents: (events, epoch) => this.handleAppEvents(events, epoch),
       onVolatile: (event, epoch) => this.handleVolatile(event, epoch),
       onVoiceWriter: (id,pid,settings) => this.store.updateManagedThread(id,t=>{t.policyVerified=true;delete t.realtimeSettings;if(settings){t.realtimeSettings=settings;t.observedSettings=settings;}t.realtimeWriterPid=pid;t.realtimeWriterEpoch=this.getAppServerEpoch()!;t.realtimeProducerEpoch=this.producerEpoch;}).then(()=>undefined),
       onApproval: (approval) => this.handleApproval(approval),
@@ -2112,9 +2113,68 @@ export class AgentRuntime {
     }
   }
 
+  private async handleAppEvents(events: AppEvent[], epoch: string): Promise<void> {
+    const batch = 32;
+    for (let index = 0; index < events.length;) {
+      const head = events[index];
+      if (!head) break;
+      const batchable = head.nativeThreadId !== undefined && (head.type === "item.started" || head.type === "item.completed");
+      if (!batchable) {
+        await this.handleAppEvent(head, epoch);
+        index += 1;
+        continue;
+      }
+      let end = index + 1;
+      while (end < events.length && end - index < batch) {
+        const candidate = events[end];
+        if (!candidate || candidate.nativeThreadId !== head.nativeThreadId || (candidate.type !== "item.started" && candidate.type !== "item.completed")) break;
+        end += 1;
+      }
+      await this.persistItemEvents(events.slice(index, end), epoch);
+      index = end;
+      // Awaiting a resolved SQLite write does not let timers or sockets run.
+      await yieldToIO();
+    }
+  }
+
+  private async persistItemEvents(events: AppEvent[], epoch: string): Promise<void> {
+    const first = events[0];
+    const nativeThreadId = first?.nativeThreadId;
+    if (!nativeThreadId) return;
+    const thread = this.store.managedThread(nativeThreadId);
+    if (!thread || thread.appServerEpoch !== epoch || !thread.logicalSessionId || !thread.executionSegmentId) return;
+    const logicalSessionId = thread.logicalSessionId;
+    const executionSegmentId = thread.executionSegmentId;
+    const inputs: EventInput[] = events.map(event => ({
+      type: event.type,
+      payload: event.payload,
+      machineId: this.pairing.machineId,
+      producerEpoch: this.producerEpoch,
+      appServerEpoch: epoch,
+      projectId: thread.projectId,
+      logicalSessionId,
+      executionSegmentId,
+      contentEpoch: thread.contentEpoch ?? 1,
+      nativeThreadId,
+      ...(event.nativeTurnId === undefined ? {} : { nativeTurnId: event.nativeTurnId }),
+      ...(event.nativeItemId === undefined ? {} : { nativeItemId: event.nativeItemId }),
+    }));
+    const completed = events.filter(event => event.type === "item.completed" && event.nativeItemId);
+    const lastId = completed[completed.length - 1]?.nativeItemId;
+    try {
+      const appended = lastId
+        ? await this.store.appendThreadEvents(nativeThreadId, inputs, epoch, { cursor: lastId, count: completed.length })
+        : await this.store.appendThreadEvents(nativeThreadId, inputs, epoch);
+      if (appended.length) this.callbacks.onOutboxChanged();
+    } catch (error) {
+      if (error instanceof AgentError && error.code === "THREAD_EPOCH_CHANGED") return;
+      throw error;
+    }
+  }
+
   private async handleAppEvent(event: AppEvent, epoch: string): Promise<void> {
     if (event.nativeThreadId === undefined) return;
-    const thread = this.store.snapshot().managedThreads[event.nativeThreadId];
+    const thread = this.store.managedThread(event.nativeThreadId);
     if (!thread || thread.appServerEpoch !== epoch) return;
     if (event.type === "thread.usage") {
       await this.store.updateManagedThread(thread.nativeThreadId, candidate => { candidate.usageObservedAt = nowIso(); if (isClaudeThread(thread.nativeThreadId) && isRecord(event.payload.usage)) candidate.nativeUsage={usage:event.payload.usage,occurredAt:candidate.usageObservedAt}; });
@@ -2156,7 +2216,7 @@ export class AgentRuntime {
     // the next queued turn). Failed release preserves the execution connection.
     if (["turn.completed", "turn.failed", "turn.interrupted"].includes(mappedEvent.type)) {
       const server = this.appServer;
-      if (server?.appServerEpoch === epoch && !this.store.snapshot().managedThreads[thread.nativeThreadId]?.realtimeSessionId) {
+      if (server?.appServerEpoch === epoch && !this.store.managedThread(thread.nativeThreadId)?.realtimeSessionId) {
         try {
           await server.unsubscribeThread(thread.nativeThreadId);
           await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => { candidate.subscribed = false; });
@@ -2166,20 +2226,14 @@ export class AgentRuntime {
         }
       }
     }
-    await this.emitForThread(thread, { ...mappedEvent, appServerEpoch: epoch });
+    if (mappedEvent.type === "item.completed" || mappedEvent.type === "item.started") await this.persistItemEvents([mappedEvent], epoch);
+    else await this.emitForThread(thread, { ...mappedEvent, appServerEpoch: epoch });
     if (event.type === "turn.started") this.notifyRegistryChanged();
-    if (mappedEvent.type === "item.completed" && mappedEvent.nativeItemId) {
-      const historyCursor = mappedEvent.nativeItemId;
-      await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => {
-        candidate.historySyncInitialized = true;
-        candidate.historyCursor = historyCursor;
-        candidate.historyItemCount = (candidate.historyItemCount ?? 0) + 1;
-        candidate.lastHistoryUpdatedAt = Math.floor(Date.now() / 1_000);
-      });
-    }
     if (["turn.completed", "turn.failed", "turn.interrupted"].includes(mappedEvent.type)) {
       this.notifyRegistryChanged();
     }
+    // Awaiting a resolved SQLite write does not let timers or sockets run.
+    await yieldToIO();
   }
 
   private handleVolatile(event: VolatileAppEvent, epoch: string): void {

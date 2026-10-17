@@ -1,4 +1,5 @@
 import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process';
+import {setImmediate as yieldToIO} from 'node:timers/promises';
 import {AgentError} from './errors.js';
 import {isRecord} from './util.js';
 
@@ -60,7 +61,7 @@ export class AcpConnection {
           // A permission request must not block the notification queue or cancel handling.
           void this.options.request(m.method,params).then(result=>{if(!this.ended)this.send({jsonrpc:'2.0',id:m.id,result});},()=>{if(!this.ended)this.send({jsonrpc:'2.0',id:m.id,error:{code:-32601,message:'Request unsupported or cancelled'}});}).catch(()=>undefined);
         } else {
-          this.events=this.events.then(()=>this.options.notification(String(m.method),params));
+          this.events=this.events.then(async()=>{await this.options.notification(String(m.method),params);await yieldToIO();});
           void this.events.catch(()=>this.fail(new AgentError('ACP_EVENT_FAILED','Native event could not be persisted')));
         }
       } else if(typeof m.id==='number') {

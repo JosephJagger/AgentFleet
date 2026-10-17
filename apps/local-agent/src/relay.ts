@@ -624,13 +624,18 @@ export class RelayConnection {
     this.flushing = true;
     this.flushAgain = false;
     try {
-      for (const event of this.store.snapshot().outbox) {
+      const events = this.store.pendingOutbox();
+      let sinceYield = 0;
+      for (const event of events) {
         if (socket.readyState !== WebSocket.OPEN) break;
-        if (this.sentEvents.has(event.eventId)) continue;
+        if (this.socket !== socket || this.generation !== generation) break;
+        if (this.sentEvents.has(event.eventId) || !this.store.outboxHas(event.eventId)) continue;
         while (socket.bufferedAmount > MAX_WS_FRAME_BYTES && socket.readyState === WebSocket.OPEN) {
           await delay(10);
         }
         if (this.socket !== socket || this.generation !== generation || socket.readyState !== WebSocket.OPEN) break;
+        // An acknowledgement during the wait removes the event. Do not send it again.
+        if (this.sentEvents.has(event.eventId) || !this.store.outboxHas(event.eventId)) continue;
         const serverProjectId = this.projectMappings.get(event.projectId ?? "");
         if (!serverProjectId) {
           this.logger.warn(`holding event ${event.eventId}: project mapping is unavailable`);
@@ -638,6 +643,11 @@ export class RelayConnection {
         }
         this.send({ type: "event.append", event: { ...event, projectId: serverProjectId } });
         this.sentEvents.add(event.eventId);
+        sinceYield += 1;
+        if (sinceYield >= 16) {
+          sinceYield = 0;
+          await yieldToIO();
+        }
       }
     } finally {
       this.flushing = false;

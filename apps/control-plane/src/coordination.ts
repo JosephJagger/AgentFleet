@@ -1,4 +1,4 @@
-import { isAcpProvider, supportsProviderCommand } from "./provider-catalog.js";
+import { isAcpProvider, supportsImageInput, supportsProviderCommand } from "./provider-catalog.js";
 import { DEFAULT_TAKEOVER_IDLE_DAYS } from "./takeover-policy.js";
 import { directoryTurnConflict } from "./directory-turn-lock.js";
 import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
@@ -564,7 +564,7 @@ export class CoordinationService {
         const raw = this.db.get<{discovery_json:string|null}>("SELECT discovery_json FROM machines WHERE machine_id=?",session.machine_id);
         invariant(supportsProviderCommand(JSON.parse(raw?.discovery_json ?? '{}')?.agentRuntimes?.[session.provider],input.type,Boolean(session.native_thread_id)),409,'AGENT_CAPABILITY_UNAVAILABLE','Official CLI has not reported support for this operation');
         if (session.provider === "grok" && payload.settings !== undefined && !parseGrokSettings(payload.settings)) invariant(false,400,"GROK_SETTINGS_INVALID","Unsupported Grok Build settings");
-        invariant((session.provider === "grok" || payload.settings === undefined) && payload.outputSchema === undefined && payload.goal === undefined && payload.nativeCollaboration === undefined && !['images','attachments','references','plugins','pluginSkills'].some(key => Array.isArray(payload[key]) && (payload[key] as unknown[]).length),400,'AGENT_INPUT_UNSUPPORTED','This provider currently accepts text using its native settings');
+        invariant((session.provider === "grok" || payload.settings === undefined) && payload.outputSchema === undefined && payload.goal === undefined && payload.nativeCollaboration === undefined && !['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(payload[key]) && (payload[key] as unknown[]).length),400,'AGENT_INPUT_UNSUPPORTED','This provider currently accepts text using its native settings');
       }
       invariant(!blocksDuringMaintenance(session.maintenance_json,input.type),409,"MACHINE_DRAINING",MAINTENANCE_MESSAGE);
       if (session.provider === "codex" && (input.type === "turn.start" || input.type === "turn.queue")) {
@@ -660,12 +660,14 @@ export class CoordinationService {
       }
       if (images.length) {
         invariant(["turn.start", "turn.queue", "turn.steer"].includes(input.type), 400, "IMAGES_NOT_ALLOWED", "此操作不能附带图片");
-        const raw = this.db.get<{ codex_catalog_json: string | null }>("SELECT codex_catalog_json FROM machines WHERE machine_id=?", session.machine_id);
+        const raw = this.db.get<{ codex_catalog_json: string | null; discovery_json: string | null }>("SELECT codex_catalog_json,discovery_json FROM machines WHERE machine_id=?", session.machine_id);
         const catalog = parseCodexCatalog(raw?.codex_catalog_json ? JSON.parse(raw.codex_catalog_json) : null);
-        invariant(catalog?.imageInput === true, 409, "AGENT_IMAGE_UNSUPPORTED", "请先更新这台主机的连接服务，当前版本尚不能接收图片；图片不会作为纯文字发送");
-        const selected = payload.settings as { model?: string } | undefined;
-        const model = catalog.models.find(entry => entry.model === selected?.model);
-        invariant(!model?.inputModalities || model.inputModalities.includes("image"), 409, "MODEL_IMAGE_UNSUPPORTED", "当前模型不支持图片，请更换模型");
+        invariant(supportsImageInput(session.provider, catalog?.imageInput === true, JSON.parse(raw?.discovery_json ?? '{}')?.agentRuntimes?.[session.provider]), 409, "AGENT_IMAGE_UNSUPPORTED", "当前智能体未提供可用的图片输入能力；图片未发送，请检查原生版本和模型");
+        if (session.provider === "codex") {
+          const selected = payload.settings as { model?: string } | undefined;
+          const model = catalog?.models.find(entry => entry.model === selected?.model);
+          invariant(!model?.inputModalities || model.inputModalities.includes("image"), 409, "MODEL_IMAGE_UNSUPPORTED", "当前模型不支持图片，请更换模型");
+        }
       }
       const nativeOperation = ["thread.rename", "thread.archive", "thread.unarchive", "thread.fork", "thread.delete.preview", "thread.delete"].includes(input.type);
       if (nativeOperation || ["turn.start", "turn.compact", "turn.review", "thread.release"].includes(input.type)) {
@@ -1400,15 +1402,16 @@ export class CoordinationService {
       if (latest && latest.state !== "delivery_failed_before_claim") return null;
       // A queued command can outlive an Agent upgrade/rollback. Never offer
       // image content to a runtime that would silently ignore the new field.
-      const imageTarget = this.db.get<{ body_json: string; codex_catalog_json: string | null }>(
-        `SELECT cc.body_json,m.codex_catalog_json FROM command_contents cc
+      const imageTarget = this.db.get<{ body_json: string; codex_catalog_json: string | null; discovery_json: string | null; provider: string }>(
+        `SELECT cc.body_json,m.codex_catalog_json,m.discovery_json,p.provider FROM command_contents cc
          JOIN commands c ON c.command_id=cc.command_id
          JOIN logical_sessions s ON s.logical_session_id=c.logical_session_id
+         JOIN projects p ON p.project_id=s.project_id
          JOIN machines m ON m.machine_id=s.machine_id WHERE c.command_id=?`, commandId,
       );
       const imagePayload = imageTarget ? JSON.parse(imageTarget.body_json) as { images?: unknown[] } | null : null;
-      if (imagePayload?.images?.length && parseCodexCatalog(imageTarget?.codex_catalog_json ? JSON.parse(imageTarget.codex_catalog_json) : null)?.imageInput !== true) {
-        this.setCommandState(commandId, "invalidated", { code: "AGENT_IMAGE_UNSUPPORTED", message: "主机图片能力已变化，请更新连接服务后重新发送" });
+      if (imagePayload?.images?.length && !supportsImageInput(imageTarget?.provider, parseCodexCatalog(imageTarget?.codex_catalog_json ? JSON.parse(imageTarget.codex_catalog_json) : null)?.imageInput === true, JSON.parse(imageTarget?.discovery_json ?? "{}").agentRuntimes?.[imageTarget?.provider ?? ""])) {
+        this.setCommandState(commandId, "invalidated", { code: "AGENT_IMAGE_UNSUPPORTED", message: "当前智能体图片能力已变化，图片未发送；请核实原生版本和模型后重新发送" });
         return null;
       }
       const attemptNo = (latest?.attempt_no ?? 0) + 1;

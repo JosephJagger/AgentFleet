@@ -231,3 +231,19 @@ and manual retry; there is no reconnect loop. Automatic welcomes remain off and
 pending events are not replayed. This does not preserve unsaved in-memory chat
 or replay events that arrived while the webpage was absent. Browser microphone,
 local-network, and audio-playback permissions still apply.
+
+### Session composer during routine synchronization
+
+A healthy connection can exchange a fresh registry snapshot without its transport
+closing. The backend's existing `runtimeSyncUntil` identifies that same-connection,
+same-runtime reconciliation window (at most 15 seconds); it is presentation evidence,
+not write permission. The composer now distinguishes this from a disconnected host.
+It performs bounded, non-overlapping read-only refreshes during that window so send
+and append controls recover after authoritative reconciliation, even if no further
+session event arrives. A hanging refresh cannot keep the healthy wording alive past
+the deadline. Switching sessions or returning to live stops these reads.
+
+The draft is retained; no message is queued locally, retried or automatically sent.
+Normal running turns with append/queue controls no longer display the idle-send
+fallback warning to check connectivity. This does not eliminate the backend's write
+fence, repair event gaps, or change the host's update/restart policy.

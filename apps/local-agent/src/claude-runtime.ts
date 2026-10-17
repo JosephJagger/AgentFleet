@@ -358,7 +358,11 @@ export class ClaudeRuntime implements AppServerClient {
         }
         if (msg.type === "stream_event" && msg.event.type === "message_start") writer.textItemId = `${msg.event.message.id}:text`;
         if (msg.type === "stream_event" && msg.event.type === "content_block_delta" && msg.event.delta.type === "text_delta") this.callbacks.onVolatile({ type: "agent_message.delta", payload: { delta: msg.event.delta.text }, nativeThreadId: id, nativeTurnId: turnId, nativeItemId: writer.textItemId ?? `${msg.uuid}:text` }, this.appServerEpoch);
-        if (msg.type === "assistant" || msg.type === "user") for (const entry of messageItems(msg)) await emit("item.completed", { item: entry.item }, entry.nativeItemId);
+        if (msg.type === "assistant" || msg.type === "user") {
+          const entries = messageItems(msg);
+          if (entries.length > 1 && this.callbacks.onEvents) await this.callbacks.onEvents(entries.map(entry => ({ type: "item.completed", payload: { item: entry.item }, nativeThreadId: id, nativeTurnId: turnId, nativeItemId: entry.nativeItemId })), this.appServerEpoch);
+          else for (const entry of entries) await emit("item.completed", { item: entry.item }, entry.nativeItemId);
+        }
         if (msg.type === "result") {
           // A resumed CLI may finish an old background/meta turn before it
           // consumes our queued prompt. Closing on that result loses the send.

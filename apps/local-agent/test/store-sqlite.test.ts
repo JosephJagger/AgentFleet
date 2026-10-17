@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, stat, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -137,6 +137,35 @@ test("two StateStore connections reload the latest SQLite snapshot without lost 
   second.close();
 });
 
+test("a snapshot written before the revision column still reloads another connection", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "agentfleet-sqlite-revision-"));
+  const created = new DatabaseSync(join(directory, "state.sqlite"));
+  created.exec(`
+    CREATE TABLE agent_state (
+      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+      schema_version INTEGER NOT NULL,
+      state_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) STRICT;
+  `);
+  created.prepare(
+    "INSERT INTO agent_state (singleton, schema_version, state_json, updated_at) VALUES (1, 2, ?, ?)",
+  ).run(JSON.stringify(stateFixture()), new Date().toISOString());
+  created.close();
+
+  const first = new StateStore(directory);
+  const second = new StateStore(directory);
+  await Promise.all([first.initialize(), second.initialize()]);
+  const reservations = await Promise.all(
+    Array.from({ length: 40 }, (_, index) => (index % 2 === 0 ? first : second).reserveTransportGeneration()),
+  );
+  assert.deepEqual([...reservations].sort((left, right) => left - right), Array.from({ length: 40 }, (_, index) => index + 1));
+  assert.equal(first.snapshot().lastTransportGeneration, 40);
+  assert.equal(second.snapshot().lastTransportGeneration, 40);
+  first.close();
+  second.close();
+});
+
 test("independent processes serialize BEGIN IMMEDIATE updates", async () => {
   const directory = await mkdtemp(join(tmpdir(), "agentfleet-sqlite-processes-"));
   const seed = new StateStore(directory);
@@ -245,4 +274,34 @@ test("a crashed process owner is reclaimed using PID plus Linux start token", as
   assert.notEqual(replacement.processStartToken, "");
   assert.equal(await store.releaseRuntimeOwnership(replacement), true);
   store.close();
+});
+
+test("a concurrent commit after COMMIT cannot mark a stale cache as current", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "agentfleet-cache-race-"));
+  const first = new StateStore(directory), second = new StateStore(directory);
+  try {
+    await first.initialize(); await second.initialize();
+    const database = (first as unknown as {database: DatabaseSync}).database;
+    const exec = database.exec.bind(database); let injected = false;
+    database.exec = ((sql: string) => {
+      exec(sql);
+      if (sql === 'COMMIT' && !injected) { injected = true; void second.reserveTransportGeneration(); }
+    }) as typeof database.exec;
+    assert.equal(await first.reserveTransportGeneration(), 1);
+    assert.equal(first.snapshot().lastTransportGeneration, 2);
+    assert.equal(await first.reserveTransportGeneration(), 3);
+    assert.equal(second.snapshot().lastTransportGeneration, 3);
+  } finally { first.close(); second.close(); await rm(directory,{recursive:true,force:true}); }
+});
+
+test("legacy writers invalidate the revision cache without knowing the new column", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "agentfleet-legacy-write-"));
+  const store = new StateStore(directory); let legacy: DatabaseSync | undefined;
+  try {
+    await store.initialize(); await store.reserveTransportGeneration();
+    legacy = new DatabaseSync(join(directory, 'state.sqlite'));
+    legacy.prepare("UPDATE agent_state SET state_json=json_set(state_json,'$.lastTransportGeneration',7) WHERE singleton=1").run();
+    assert.equal(store.snapshot().lastTransportGeneration,7);
+    assert.equal(await store.reserveTransportGeneration(),8);
+  } finally {legacy?.close();store.close();await rm(directory,{recursive:true,force:true});}
 });

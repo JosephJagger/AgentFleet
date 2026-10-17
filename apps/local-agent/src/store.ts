@@ -168,6 +168,8 @@ function validateState(value: unknown): AgentState {
 interface StateRow {
   schema_version: number;
   state_json: string;
+  updated_at: string;
+  revision: number | bigint;
 }
 
 interface RuntimeOwnerRow {
@@ -305,6 +307,8 @@ export class StateStore {
   readonly privateKeyPath: string;
   private state: AgentState = emptyState();
   private database: DatabaseSync | undefined;
+  /** Revision of the exact row this process last committed or loaded. */
+  private committedStamp: string | undefined;
 
   constructor(dataDir: string) {
     this.dataDir = dataDir;
@@ -350,7 +354,8 @@ export class StateStore {
           singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
           schema_version INTEGER NOT NULL,
           state_json TEXT NOT NULL,
-          updated_at TEXT NOT NULL
+          updated_at TEXT NOT NULL,
+          revision INTEGER NOT NULL DEFAULT 0
         ) STRICT;
         CREATE TABLE IF NOT EXISTS history_item_receipts (
           native_thread_id TEXT NOT NULL, content_epoch INTEGER NOT NULL, turn_id TEXT NOT NULL, item_id TEXT NOT NULL,
@@ -365,10 +370,11 @@ export class StateStore {
         ) STRICT;
       `);
 
-      const existingBeforeImport = this.readStateRow();
+      const existingBeforeImport = database.prepare("SELECT 1 FROM agent_state WHERE singleton = 1").get();
       const legacy = existingBeforeImport ? undefined : await this.readLegacyState();
       database.exec("BEGIN IMMEDIATE");
       try {
+        this.ensureStateRevisionColumn();
         const row = this.readStateRow();
         if (!row) {
           const initial = legacy?.state ?? emptyState();
@@ -392,8 +398,27 @@ export class StateStore {
   }
 
   snapshot(): AgentState {
-    this.state = this.readCurrentState();
+    if (this.database?.isTransaction) return structuredClone(this.parseStateRow(this.requireStateRow()));
+    this.ensureFresh();
     return structuredClone(this.state);
+  }
+
+  /** One managed thread, without cloning the outbox or the rest of the snapshot. */
+  managedThread(threadId: string): ManagedThread | undefined {
+    this.ensureFresh();
+    const thread = this.state.managedThreads[threadId];
+    return thread ? structuredClone(thread) : undefined;
+  }
+
+  /** Persisted events waiting for acknowledgement, in host sequence order. */
+  pendingOutbox(): DurableAgentEvent[] {
+    this.ensureFresh();
+    return this.state.outbox.slice();
+  }
+
+  outboxHas(eventId: string): boolean {
+    this.ensureFresh();
+    return this.state.outbox.some(event => event.eventId === eventId);
   }
 
   externalProjectActivity(projectId: string, appServerEpoch: string): DiscoveredThread | undefined {
@@ -405,9 +430,14 @@ export class StateStore {
     const database = this.requireDatabase();
     try {
       database.exec("BEGIN IMMEDIATE");
+      let mutated = false;
       try {
-        const draft = structuredClone(this.readCurrentState());
-        const value = mutator(draft);
+        // Another connection increments revision. updated_at and the JSON byte
+        // length can stay the same for a same-sized write in the same millisecond,
+        // so those are not a safe stamp. Skip the full parse only when revision matches.
+        if (this.readStamp() !== this.committedStamp) this.state = this.readCurrentState();
+        mutated = true;
+        const value = mutator(this.state);
         if (isPromiseLike(value)) {
           void Promise.resolve(value).catch(() => undefined);
           throw new AgentError(
@@ -415,16 +445,20 @@ export class StateStore {
             "state update callbacks must be synchronous so the SQLite write transaction cannot span an event-loop turn",
           );
         }
-        const validated = validateState(draft);
+        const validated = validateState(this.state);
         const result = database.prepare(
-          "UPDATE agent_state SET schema_version = ?, state_json = ?, updated_at = ? WHERE singleton = 1",
-        ).run(STATE_SCHEMA_VERSION, JSON.stringify(validated), nowIso());
-        if (Number(result.changes) !== 1) throw new AgentError("STATE_CORRUPT", "SQLite state snapshot is missing");
+          "UPDATE agent_state SET schema_version = ?, state_json = ?, updated_at = ?, revision = revision + 1 WHERE singleton = 1 RETURNING revision",
+        ).get(STATE_SCHEMA_VERSION, JSON.stringify(validated), nowIso()) as { revision: number | bigint } | undefined;
+        if (!result) throw new AgentError("STATE_CORRUPT", "SQLite state snapshot is missing");
         database.exec("COMMIT");
         this.state = validated;
+        this.committedStamp = String(result.revision);
         return Promise.resolve(value);
       } catch (error) {
-        database.exec("ROLLBACK");
+        if (database.isTransaction) database.exec("ROLLBACK");
+        if (mutated) {
+          try { this.state = this.readCurrentState(); } catch { this.committedStamp = undefined; }
+        }
         throw error;
       }
     } catch (error) {
@@ -504,13 +538,41 @@ export class StateStore {
 
   private readStateRow(): StateRow | undefined {
     return this.requireDatabase().prepare(
-      "SELECT schema_version, state_json FROM agent_state WHERE singleton = 1",
+      "SELECT schema_version, state_json, updated_at, revision FROM agent_state WHERE singleton = 1",
     ).get() as StateRow | undefined;
   }
 
-  private readCurrentState(): AgentState {
+  private requireStateRow(): StateRow {
     const row = this.readStateRow();
     if (!row) throw new AgentError("STATE_CORRUPT", "SQLite state snapshot is missing");
+    return row;
+  }
+
+  private ensureStateRevisionColumn(): void {
+    const columns = this.requireDatabase().prepare("PRAGMA table_info(agent_state)").all() as Array<{ name: string }>;
+    if (!columns.some(column => column.name === "revision")) this.requireDatabase().exec("ALTER TABLE agent_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 0");
+    // Older helpers do not know about revision. Their writes must invalidate caches too.
+    this.requireDatabase().exec(`CREATE TRIGGER IF NOT EXISTS agent_state_revision_guard
+      AFTER UPDATE ON agent_state WHEN NEW.revision = OLD.revision BEGIN
+      UPDATE agent_state SET revision = OLD.revision + 1 WHERE singleton = NEW.singleton;
+      END`);
+  }
+
+  /** Monotonic commit counter. It changes on every write, including another connection's. */
+  private readStamp(): string | undefined {
+    const row = this.requireDatabase().prepare(
+      "SELECT revision FROM agent_state WHERE singleton = 1",
+    ).get() as { revision: number | bigint } | undefined;
+    return row ? String(row.revision) : undefined;
+  }
+
+  private ensureFresh(): void {
+    if (this.database?.isTransaction) return;
+    if (this.readStamp() === this.committedStamp) return;
+    this.state = this.readCurrentState();
+  }
+
+  private parseStateRow(row: StateRow): AgentState {
     if (row.schema_version !== STATE_SCHEMA_VERSION) {
       throw new AgentError("STATE_VERSION_UNSUPPORTED", `unsupported SQLite state schema ${row.schema_version}`);
     }
@@ -524,6 +586,13 @@ export class StateStore {
     if (validated.schemaVersion !== row.schema_version) {
       throw new AgentError("STATE_CORRUPT", "SQLite state row and snapshot schema versions disagree");
     }
+    return validated;
+  }
+
+  private readCurrentState(): AgentState {
+    const row = this.requireStateRow();
+    const validated = this.parseStateRow(row);
+    this.committedStamp = String(row.revision);
     return validated;
   }
 
@@ -761,6 +830,41 @@ export class StateStore {
       const event = appendEventToState(state,input);
       if (input.type === "item.completed" && input.nativeThreadId && input.nativeTurnId && input.nativeItemId) this.rememberHistoryItem(input);
       return event;
+    });
+  }
+
+  /**
+   * Persist item events and their history cursor in one transaction.
+   * A failed batch rolls back both the outbox and the cursor.
+   */
+  async appendThreadEvents(threadId: string, inputs: readonly EventInput[], epoch: string, history?: { cursor: string; count: number }): Promise<DurableAgentEvent[]> {
+    if (!inputs.length) return [];
+    return this.update(state => {
+      const thread = state.managedThreads[threadId];
+      if (!thread || thread.appServerEpoch !== epoch) throw new AgentError("THREAD_EPOCH_CHANGED", "managed thread changed before the event batch was saved");
+      if (!thread.logicalSessionId || !thread.executionSegmentId) throw new AgentError("SESSION_BINDING_UNKNOWN", "managed thread lacks a durable session binding");
+      const events: DurableAgentEvent[] = [];
+      for (const input of inputs) {
+        if (input.nativeThreadId !== threadId || input.logicalSessionId !== thread.logicalSessionId || input.executionSegmentId !== thread.executionSegmentId || input.appServerEpoch !== epoch) {
+          throw new AgentError("PRECONDITION_INVALID", "event batch does not match the managed thread");
+        }
+        const event = appendEventToState(state, input);
+        if (input.type === "item.completed" && input.nativeTurnId && input.nativeItemId) this.rememberHistoryItem(input);
+        events.push(event);
+      }
+      if (history && history.count > 0) {
+        thread.historySyncInitialized = true;
+        thread.historyCursor = history.cursor;
+        thread.historyItemCount = (thread.historyItemCount ?? 0) + history.count;
+        thread.lastHistoryUpdatedAt = Math.floor(Date.now() / 1_000);
+        const binding = state.nativeThreadBindings[threadId];
+        if (binding) {
+          binding.contentEpoch = thread.contentEpoch;
+          binding.projectId = thread.projectId;
+          if (thread.sessionCwd !== undefined) binding.sessionCwd = thread.sessionCwd;
+        }
+      }
+      return events;
     });
   }
 

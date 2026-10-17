@@ -40,3 +40,12 @@ export function supportsProviderCommand(value: unknown, command: string, hasNati
   const key = capability[command];
   return Boolean(key && status?.installed && status.state === 'ready' && status.capabilities[key]);
 }
+
+/** Provider-specific input support; never borrow another provider's catalog. */
+export function supportsImageInput(provider:unknown, codexImageInput:boolean, availability:unknown):boolean {
+  if (provider === 'codex') return codexImageInput;
+  if (provider === 'claude') return true;
+  if (!isAcpProvider(provider)) return false;
+  const status=parseProviderAvailability(availability);
+  return status?.installed === true && status.state === 'ready' && status.capabilities.images;
+}

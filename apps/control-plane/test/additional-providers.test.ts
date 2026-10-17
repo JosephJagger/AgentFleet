@@ -117,3 +117,35 @@ test('provider policy heartbeat preserves newest revision without exposing arbit
  assert.deepEqual(discovery.providerRuntimePolicy,{revision:7,mode:'auto',phase:'waiting_idle',stableVersion:'2.1.292'});
  f.registry.updateDiscovery('m',{state:'ready',providerRuntimePolicy:{revision:-1,mode:'evil'}});assert.equal(JSON.parse(f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json).providerRuntimePolicy,undefined);
 });
+
+const imageFixture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
+for(const provider of [...ACP_PROVIDER_IDS,'claude'] as const)test(`${provider}: image-only command uses its own capability at admission and dispatch`,t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ if(provider==='claude'){f.db.run("UPDATE projects SET provider='claude' WHERE project_id='qwen'");f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{claude:{installed:true,version:'2.1.296'}}});}
+ else f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{[provider]:{...ready,capabilities:{...ready.capabilities,images:true}}}});
+ const s=f.registry.createSession(f.principal,'m',provider==='claude'?'qwen':provider,undefined,`image-${provider}`);
+ assert.equal(f.registry.getSession(f.principal,s.logicalSessionId).imageInputSupported,true);
+ const lease=f.coordination.acquireLease(f.principal,s.logicalSessionId);
+ const input={type:'turn.start' as const,controlLeaseId:lease.leaseId,clientMutationId:`image-start-${provider}`,payload:{prompt:'',images:[imageFixture]},precondition:{executionSegmentId:s.executionSegmentId,threadControlVersion:s.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:s.projectLeaseVersion}};
+ const created=f.coordination.createCommand(f.principal,s.logicalSessionId,input);
+ assert.equal(f.coordination.createCommand(f.principal,s.logicalSessionId,input).duplicate,true);
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,1);
+ const commandId=String(created.command.commandId);
+ const target={machineId:'m',transportGeneration:1,producerEpoch:'image-epoch',appServerEpoch:'image-app'};
+ assert.ok(f.coordination.createDispatchAttempt(commandId,target),'Codex image catalog is absent but this provider supports images');
+});
+for(const provider of ACP_PROVIDER_IDS)test(`${provider}: missing images capability refuses input and capability loss invalidates queued delivery`,t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const s=f.registry.createSession(f.principal,'m',provider,undefined,`image-loss-${provider}`);
+ const lease=f.coordination.acquireLease(f.principal,s.logicalSessionId);
+ const input={type:'turn.start' as const,controlLeaseId:lease.leaseId,clientMutationId:`image-loss-${provider}`,payload:{prompt:'Synthetic image',images:[imageFixture]},precondition:{executionSegmentId:s.executionSegmentId,threadControlVersion:s.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:s.projectLeaseVersion}};
+ assert.equal(f.registry.getSession(f.principal,s.logicalSessionId).imageInputSupported,false);
+ assert.throws(()=>f.coordination.createCommand(f.principal,s.logicalSessionId,input),{code:'AGENT_IMAGE_UNSUPPORTED'});
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,0);
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{[provider]:{...ready,capabilities:{...ready.capabilities,images:true}}}});
+ const created=f.coordination.createCommand(f.principal,s.logicalSessionId,input);
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{[provider]:ready}});
+ const commandId=String(created.command.commandId);
+ assert.equal(f.coordination.createDispatchAttempt(commandId,{machineId:'m',transportGeneration:1,producerEpoch:'image-epoch',appServerEpoch:'image-app'}),null);
+ assert.equal(f.coordination.getCommand(f.principal,commandId).state,'invalidated');
+});

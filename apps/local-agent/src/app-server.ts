@@ -129,6 +129,8 @@ export interface AppServerCallbacks {
   findManagedThread(threadId: string): ManagedThread | undefined;
   findProject(projectId: string): ProjectRecord | undefined;
   onEvent(event: AppEvent, appServerEpoch: string): Promise<void>;
+  /** Persist a run of events in order. Implementations must not let a later event pass an unsaved earlier one. */
+  onEvents?(events: AppEvent[], appServerEpoch: string): Promise<void>;
   onVolatile(event: VolatileAppEvent, appServerEpoch: string): void;
   onApproval(approval: ApprovalRecord): Promise<void>;
   onApprovalResolved(nativeRequestId: JsonId, appServerEpoch: string): Promise<void>;
