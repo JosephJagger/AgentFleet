@@ -1,11 +1,18 @@
 /** This request crosses a trust boundary; never accept paths, URLs or shell commands. */
-export type ProviderRuntimeRequest = { action: 'check' } | { action: 'configure'; provider: 'claude'; mode: 'host' | 'pinned' | 'auto'; expectedRevision: number } | { action: 'rollback'; provider: 'claude'; expectedRevision: number };
+export type ProviderRuntimeRequest = { action: 'check' } | { action: 'configure'; provider: 'claude'; mode: 'host' | 'pinned' | 'auto'; expectedRevision: number } | { action: 'rollback'; provider: 'claude'; expectedRevision: number }
+  /** User-confirmed update of an already managed Claude build to the verified official stable release. */
+  | { action: 'update'; provider: 'claude'; expectedRevision: number }
+  /** User confirmation for one specific, already validated Codex managed-runtime upgrade. */
+  | { action: 'confirm'; provider: 'codex'; version: string };
+const STABLE = /^\d+\.\d+\.\d+$/;
 export function parseProviderRuntimeRequest(value: unknown): ProviderRuntimeRequest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid provider runtime request');
   const v = value as Record<string, unknown>;
   if (v.action === 'check' && Object.keys(v).length === 1) return {action:'check'};
+  if (v.action === 'confirm' && Object.keys(v).length === 3 && v.provider === 'codex' && typeof v.version === 'string' && v.version.length <= 40 && STABLE.test(v.version)) return {action:'confirm',provider:'codex',version:v.version};
   if (v.provider !== 'claude' || !Number.isSafeInteger(v.expectedRevision) || Number(v.expectedRevision) < 0) throw new Error('Invalid provider runtime revision');
   if (v.action === 'rollback' && Object.keys(v).length === 3) return {action:'rollback',provider:'claude',expectedRevision:Number(v.expectedRevision)};
+  if (v.action === 'update' && Object.keys(v).length === 3) return {action:'update',provider:'claude',expectedRevision:Number(v.expectedRevision)};
   if (v.action === 'configure' && Object.keys(v).length === 4 && ['host','pinned','auto'].includes(String(v.mode))) return {action:'configure',provider:'claude',mode:v.mode as 'host'|'pinned'|'auto',expectedRevision:Number(v.expectedRevision)};
   throw new Error('Unsupported provider runtime request');
 }
@@ -13,6 +20,8 @@ export interface ManagedProviderRelease {version:string;sha256:string;size:numbe
 export interface ProviderRuntimeState {
   revision:number;mode:'host'|'pinned'|'auto';current?:ManagedProviderRelease;previous?:ManagedProviderRelease;
   hostCompatibility?:{version:string;checkedAt:string;state:'protocol_checked'|'unverified';sdkVersion:string};
+  /** Newest official release per agent, from read-only discovery. Never an instruction to install. */
+  latest?:Record<string,{version:string;checkedAt:string}>;
   checkedAt?:string;stableVersion?:string;phase?:'idle'|'waiting_idle'|'checking'|'ready'|'blocked';error?:string;failedVersion?:string;
 }
 /** Bounded public status; no binary paths, environment or credentials cross the relay. */
@@ -26,6 +35,14 @@ export function parseProviderRuntimeState(value:unknown):ProviderRuntimeState|un
     if(v[key]===undefined)continue;const r=v[key] as ManagedProviderRelease;
     if(!r||typeof r!=='object'||!validVersion(r.version)||typeof r.sha256!=='string'||!/^[a-f0-9]{64}$/.test(r.sha256)||!Number.isSafeInteger(r.size)||r.size<=0||r.size>512*1024*1024||typeof r.platform!=='string'||!/^(linux|darwin|win32)-(x64|arm64)(-musl)?$/.test(r.platform)||typeof r.checkedAt!=='string'||r.checkedAt.length>40||!Number.isFinite(Date.parse(r.checkedAt))||!validVersion(r.sdkVersion))return undefined;
     result[key]={version:r.version,sha256:r.sha256,size:r.size,platform:r.platform,checkedAt:r.checkedAt,sdkVersion:r.sdkVersion};
+  }
+  if(v.latest&&typeof v.latest==='object'&&!Array.isArray(v.latest)) {
+    const latest:Record<string,{version:string;checkedAt:string}>={};
+    for(const id of ['codex','claude','cursor','qwen','kimi','codebuddy','grok']) {
+      const e=(v.latest as Record<string,unknown>)[id] as {version?:unknown;checkedAt?:unknown}|undefined;
+      if(e&&validVersion(e.version)&&typeof e.checkedAt==='string'&&e.checkedAt.length<=40&&Number.isFinite(Date.parse(e.checkedAt)))latest[id]={version:e.version,checkedAt:e.checkedAt};
+    }
+    if(Object.keys(latest).length)result.latest=latest;
   }
   if(typeof v.checkedAt==='string'&&v.checkedAt.length<=40&&Number.isFinite(Date.parse(v.checkedAt)))result.checkedAt=v.checkedAt;
   for(const key of ['stableVersion','failedVersion'] as const)if(typeof v[key]==='string'&&(v[key]===''||validVersion(v[key])))result[key]=v[key];

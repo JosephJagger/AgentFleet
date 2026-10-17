@@ -10,16 +10,17 @@ import {AgentError} from '../src/errors.js';
 import {parseProviderRuntimeRequest} from '../src/provider-runtime-policy.js';
 async function fixture(t:test.TestContext) {
  const dir=await mkdtemp(join(tmpdir(),'provider-runtime-test-'));const store=new StateStore(dir);await store.initialize();t.after(async()=>{store.close();await rm(dir,{recursive:true,force:true});});
- let version='2.1.292',downloads=0,probes=0,activations=0,failProbe=false,failActivate=false,hostVersion='2.1.290 (Claude Code)',clock=Date.now(),stableError:Error|undefined,manifestError:Error|undefined;const files:string[]=[];
+ let version='2.1.292',downloads=0,probes=0,activations=0,failProbe=false,failActivate=false,hostVersion='2.1.290 (Claude Code)',clock=Date.now(),stableError:Error|undefined,manifestError:Error|undefined;const latestVersions:Record<string,string>={};const files:string[]=[];
  const manager=new ProviderRuntimeManager(store,async()=>{activations++;if(failActivate){failActivate=false;throw new Error('activation failed');}}, {
   host:async()=>({installed:true,version:hostVersion,path:'/host/claude'}),acp:async()=>null,
+  latest:async(id)=>latestVersions[id]??null,
   stable:async()=>{if(stableError)throw stableError;return version;},
   manifest:async(v,p)=>{if(manifestError)throw manifestError;return {version:v,platform:p,sha256:createHash('sha256').update(v).digest('hex'),size:v.length,sdkVersion:CLAUDE_SDK_VERSION,checkedAt:new Date().toISOString()};},
   download:async(r,file)=>{downloads++;files.push(file);await mkdir(dirname(file),{recursive:true});await writeFile(file,r.version);},
   probe:async()=>{probes++;if(failProbe)throw new Error('probe failed');}
  },()=>clock);
  const configure=(mode:'host'|'pinned'|'auto')=>manager.operate({action:'configure',provider:'claude',mode,expectedRevision:manager.state().revision},'op-update');
- return {store,manager,configure,files,dir,setVersion:(v:string)=>{version=v;},setHost:(v:string)=>{hostVersion=v;},advance:(ms:number)=>{clock+=ms;},setStableError:(e?:Error)=>{stableError=e;},setManifestError:(e?:Error)=>{manifestError=e;},failProbe:()=>{failProbe=true;},failActivate:()=>{failActivate=true;},counts:()=>({downloads,probes,activations})};
+ return {store,manager,configure,files,dir,setVersion:(v:string)=>{version=v;},setHost:(v:string)=>{hostVersion=v;},advance:(ms:number)=>{clock+=ms;},setLatest:(id:string,v:string)=>{latestVersions[id]=v;},setStableError:(e?:Error)=>{stableError=e;},setManifestError:(e?:Error)=>{manifestError=e;},failProbe:()=>{failProbe=true;},failActivate:()=>{failActivate=true;},counts:()=>({downloads,probes,activations})};
 }
 test('request allowlist excludes shell paths, other providers, versions, unknown keys and missing conflict guard',()=>{
  for(const v of [{action:'check',url:'https://evil'}, {action:'configure',provider:'codex',mode:'auto',expectedRevision:0},{action:'configure',provider:'claude',mode:'auto'}, {action:'configure',provider:'claude',mode:'auto',expectedRevision:0,path:'/tmp/x'}])assert.throws(()=>parseProviderRuntimeRequest(v));
@@ -68,7 +69,7 @@ test('unchanged stable channel does not restart Claude, and persisted policy sur
 test('shutdown aborts a pending release check and never activates or leaves admission fenced',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'provider-shutdown-'));const store=new StateStore(dir);await store.initialize();t.after(async()=>{store.close();await rm(dir,{recursive:true,force:true});});
  let entered!:()=>void;const waiting=new Promise<void>(r=>{entered=r;});let activated=0;
- const manager=new ProviderRuntimeManager(store,async()=>{activated++;},{host:async()=>({installed:false,version:null}),acp:async()=>null,
+ const manager=new ProviderRuntimeManager(store,async()=>{activated++;},{host:async()=>({installed:false,version:null}),acp:async()=>null,latest:async()=>null,
   stable:async signal=>new Promise<string>((_resolve,reject)=>{signal!.addEventListener('abort',()=>reject(signal!.reason),{once:true});entered();}),
   manifest:async()=>{throw new Error('must not fetch');},download:async()=>{throw new Error('must not download');},probe:async()=>{throw new Error('must not probe');}});
  const work=manager.operate({action:'configure',provider:'claude',mode:'auto',expectedRevision:0},'shutdown-test');const rejected=assert.rejects(work);
@@ -105,4 +106,29 @@ test('only the current and previous managed builds are kept; unrelated entries a
  await writeFile(join(root,'notes.txt'),'keep');await mkdir(join(root,`2.1.1-${'b'.repeat(64)}`));
  await f.manager.operate({action:'check'},'check');
  const after=await readdir(root);assert.ok(after.includes('notes.txt'));assert.ok(!after.includes(`2.1.1-${'b'.repeat(64)}`));assert.equal(after.length,3);
+});
+
+test('discovery records the newest official release of every agent without installing anything',async t=>{
+ const f=await fixture(t);f.setLatest('qwen','0.25.2');f.setLatest('grok','1.0.62');f.setVersion('2.1.299');
+ await f.manager.refreshLatest(true);const latest=f.manager.state().latest!;
+ assert.equal(latest.claude!.version,'2.1.299');assert.equal(latest.qwen!.version,'0.25.2');assert.equal(latest.grok!.version,'1.0.62');assert.equal(latest.kimi,undefined);
+ assert.equal(f.counts().downloads,0);assert.equal(f.counts().activations,0);assert.equal(f.manager.state().mode,'host');
+ f.setLatest('qwen','0.26.0');f.setStableError(new TypeError('fetch failed'));f.advance(7*3600_000);
+ await f.manager.refreshLatest();assert.equal(f.manager.state().latest!.qwen!.version,'0.26.0','one source failing keeps others updating');assert.equal(f.manager.state().latest!.claude!.version,'2.1.299','a failed source keeps its last known value');
+ const before=f.manager.state().revision;await f.manager.refreshLatest();assert.equal(f.manager.state().revision,before,'discovery never changes the policy revision');
+});
+test('update action advances only an already managed build, on explicit request, and keeps the chosen mode',async t=>{
+ const f=await fixture(t);
+ await assert.rejects(f.manager.operate({action:'update',provider:'claude',expectedRevision:0},'u0'),/宿主机安装/);
+ await f.configure('pinned');assert.equal(f.manager.state().current?.version,'2.1.292');
+ f.setVersion('2.1.294');await f.configure('pinned');assert.equal(f.manager.state().current?.version,'2.1.292','pinning alone never advances');
+ await f.manager.automatic();assert.equal(f.manager.state().current?.version,'2.1.292','a pinned build is never auto-advanced');
+ await f.manager.operate({action:'update',provider:'claude',expectedRevision:f.manager.state().revision},'u1');
+ assert.equal(f.manager.state().current?.version,'2.1.294');assert.equal(f.manager.state().previous?.version,'2.1.292');assert.equal(f.manager.state().mode,'pinned');
+ await assert.rejects(f.manager.operate({action:'update',provider:'claude',expectedRevision:0},'stale'),/设置已变化/);
+});
+test('Codex confirmation requests are parsed strictly and never reach the Claude manager',async t=>{
+ assert.deepEqual(parseProviderRuntimeRequest({action:'confirm',provider:'codex',version:'0.163.0'}),{action:'confirm',provider:'codex',version:'0.163.0'});
+ for(const bad of [{action:'confirm',provider:'codex'},{action:'confirm',provider:'codex',version:'0.163'},{action:'confirm',provider:'codex',version:'0.163.0',path:'/x'},{action:'confirm',provider:'claude',version:'0.163.0'},{action:'confirm',provider:'codex',version:'latest'},{action:'update',provider:'codex',expectedRevision:0}])assert.throws(()=>parseProviderRuntimeRequest(bad));
+ const f=await fixture(t);await assert.rejects(f.manager.operate({action:'confirm',provider:'codex',version:'0.163.0'},'c'),/更新器/);
 });

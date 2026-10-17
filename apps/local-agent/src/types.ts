@@ -254,6 +254,8 @@ export interface ProjectDiscoveryStatus {
 
 export interface AgentState {
   providerRuntimeState?: import("./provider-runtime-policy.js").ProviderRuntimeState;
+  /** Codex managed-runtime version the user explicitly approved on this host; cleared once it is activated. */
+  confirmedRuntimeVersion?: string;
   extraSkillRoots?: string[];
   panelVoiceRuntime?: {voiceId:string;pid?:number};
   nativeDeletionTombstones: Record<string,string>;

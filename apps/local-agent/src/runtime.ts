@@ -541,6 +541,9 @@ export class AgentRuntime {
   private readonly providerRuntimeManager: ProviderRuntimeManager;
   async manageProviderRuntime(value: unknown, operationId: string): Promise<Record<string, unknown>> {
     await this.providerRuntimeManager.operate(value, operationId);
+    return this.providerInventory();
+  }
+  async providerInventory(): Promise<Record<string, unknown>> {
     const report = await this.providerRuntimeManager.inventory(this.appServer?.getAgentRuntimes?.() ?? {}, {version:this.support.codexVersion, source:this.support.codexProfile?.source, compatibility:this.support.writable ? "compatible" : "unverified"});
     this.notifyRegistryChanged();
     return report;

@@ -69,3 +69,40 @@ test("withdrawn runtime target never activates a prepared candidate", async t =>
   assert.equal(await updater.checkNow(),"deferred");
   assert.equal(store.snapshot().maintenanceDrain,undefined);
 });
+test("forward runtime upgrades wait for user confirmation; repairs and rollbacks do not", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-confirm-")); const store = new StateStore(dir); await store.initialize();
+  t.after(async () => { store.close(); await rm(dir, {recursive:true,force:true}); });
+  const release = target(); const phases: string[] = []; let prepared = 0, activated = 0, staged = 0, body: object = {target: release};
+  const options = {currentVersion:"1.0.0",controlPlaneUrl:"https://fleet.example",dataDir:dir,store,runtimeSource:"managed" as const,currentRuntimeVersion:"0.153.2",canUpdate:()=>true,
+    confirmRuntimeUpgrade:true,onStaged:()=>{staged++;},logger:{info(){},warn(){}},onRuntimePhase:(phase:string)=>{phases.push(phase);},
+    fetchImpl:async (input: string | URL | Request) => new Response(JSON.stringify(String(input).endsWith("manifest.json")?{schemaVersion:1,version:"1.0.0"}:body)),
+    prepareRuntime:async()=>{prepared++;return async()=>{activated++;};}};
+  const updater = new AgentAutoUpdater(options);
+  assert.equal(await updater.checkNow(), "current"); assert.deepEqual([prepared, activated, staged], [0, 0, 0], "nothing is downloaded or switched before approval");
+  assert.equal(phases.at(-1), "awaiting_confirmation");
+  await assert.rejects(updater.confirmRuntime("0.153.3"), /已变化/, "only the offered version can be approved");
+  await assert.rejects(updater.confirmRuntime("latest"), /已变化/);
+  assert.equal(store.snapshot().confirmedRuntimeVersion, undefined);
+  await updater.confirmRuntime("0.153.4");
+  assert.equal(store.snapshot().confirmedRuntimeVersion, "0.153.4");
+  for (let i = 0; i < 100 && !staged; i++) await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual([prepared, activated, staged], [1, 1, 1], "approval applies the verified runtime");
+  assert.equal(store.snapshot().confirmedRuntimeVersion, undefined, "the approval is consumed after activation");
+  // A rollback target and a same-version repair never wait for approval.
+  const rollbackBody = {target: {...target(), rollback: true, version: "0.153.2", artifacts: {"linux-x64": {file: `codex-linux-x64-0.153.2-${"a".repeat(16)}`, sha256: "a".repeat(64), size: 100, format: "raw"}}}};
+  body = rollbackBody; prepared = 0; staged = 0;
+  assert.notEqual(await new AgentAutoUpdater({...options, currentRuntimeVersion: "0.153.4"}).checkNow(), "x");
+  assert.equal(prepared, 1, "rollbacks apply without waiting");
+  body = {target: release}; prepared = 0;
+  assert.equal(await new AgentAutoUpdater({...options, currentRuntimeVersion: "0.153.4", needsRuntimeRepair: () => true}).checkNow() !== undefined, true);
+  assert.equal(prepared, 1, "repairing a broken runtime is not gated");
+});
+test("the confirmation gate is off unless enabled, preserving the previous automatic behaviour", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-auto-")); const store = new StateStore(dir); await store.initialize();
+  t.after(async () => { store.close(); await rm(dir, {recursive:true,force:true}); });
+  let prepared = 0;
+  const updater = new AgentAutoUpdater({currentVersion:"1.0.0",controlPlaneUrl:"https://fleet.example",dataDir:dir,store,runtimeSource:"managed",currentRuntimeVersion:"0.153.2",canUpdate:()=>true,onStaged:()=>{},logger:{info(){},warn(){}},
+    fetchImpl:async input=>new Response(JSON.stringify(String(input).endsWith("manifest.json")?{schemaVersion:1,version:"1.0.0"}:{target:target()})),
+    prepareRuntime:async()=>{prepared++;return async()=>{};}});
+  await updater.checkNow(); assert.equal(prepared, 1);
+});

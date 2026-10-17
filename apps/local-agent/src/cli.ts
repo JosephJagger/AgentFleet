@@ -322,6 +322,7 @@ async function run(args: ParsedArgs): Promise<void> {
           onRuntimeError: message => { if (support.codexProfile) { support.codexProfile.runtimeUpdateState = "failed"; support.codexProfile.runtimeUpdateError = message; } },
           canUpdate: () => store.canSafelyRestart(),
           needsRuntimeRepair: () => runtime!.support.checks?.some(check => check.id === "tools" && check.state === "failed") ?? false,
+          confirmRuntimeUpgrade: process.env.AGENTFLEET_RUNTIME_UPGRADE !== "auto",
           onStaged: (version) => {
             updateStagedVersion = version;
             logger.info(`AgentFleet update staged; restarting the service with verified Agent ${version} and runtime.`);

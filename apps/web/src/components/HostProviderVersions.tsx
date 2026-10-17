@@ -3,6 +3,7 @@ import { Package, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
 import { PROVIDER_NAMES, type ProviderId } from '../lib/provider-catalog';
 import type { ProviderRuntimeRequest, ProviderRuntimeState } from '../lib/provider-runtime-policy';
+import { providerUpdateOffer } from '../lib/provider-updates';
 import type { HostOperation, Machine } from '../lib/types';
 import { t, systemText } from '../i18n';
 import { HostDisclosure } from './HostDisclosure';
@@ -40,7 +41,15 @@ export function HostProviderVersions({machine}:{machine:Machine}) {
       const row=reported??native;const source=id==='codex'?String(machine.codexProfile?.source??''):id==='claude'?policy?.mode==='host'||!policy?'host':'managed':'host';
       const version=id==='claude'&&policy?.mode!=='host'&&policy?.current?policy.current.version:row?.version;
       const compatibility=id==='codex'?machine.compatibility:reported?.compatibility;
-      return <div className="provider-versions__row" key={id}><div><strong>{PROVIDER_NAMES[id]}</strong><span>{version|| (row?.installed===false?t('未安装'):t('尚未上报'))}</span></div><div><span>{source==='managed'?t('独立托管'):source==='host'?t('宿主机安装'):t('尚未上报')}</span><small>{compatibility==='compatible'?t('已通过兼容验证'):compatibility==='protocol_checked'?t('协议检查通过'):t('待验证')}</small></div></div>;
+      const offer=providerUpdateOffer(id,machine,policy,id==='codex'?machine.codexVersion:version);
+      const canAct=supported&&!pending&&machine.reachability==='live';
+      return <div className="provider-versions__row" key={id}><div><strong>{PROVIDER_NAMES[id]}</strong><span>{version|| (row?.installed===false?t('未安装'):t('尚未上报'))}</span></div><div><span>{source==='managed'?t('独立托管'):source==='host'?t('宿主机安装'):t('尚未上报')}</span><small>{compatibility==='compatible'?t('已通过兼容验证'):compatibility==='protocol_checked'?t('协议检查通过'):t('待验证')}</small></div>
+        {offer&&<div className="provider-versions__offer" role="status">
+          {offer.kind==='codex-confirm'?<><span>{t('{0} 已通过验证，确认后才会更新',offer.latest)}</span><button className="button button--primary" type="button" disabled={!canAct} onClick={()=>void operate({action:'confirm',provider:'codex',version:offer.latest})}>{t('确认更新到 {0}',offer.latest)}</button></>
+          :offer.kind==='claude-update'?<><span>{t('官方稳定版 {0} 可用',offer.latest)}</span><button className="button button--primary" type="button" disabled={!canAct||!policy} onClick={()=>{if(policy)void operate({action:'update',provider:'claude',expectedRevision:policy.revision});}}>{t('更新到 {0}',offer.latest)}</button></>
+          :<span>{t('有新版本 {0}，请用原安装方式更新',offer.latest)}</span>}
+        </div>}
+      </div>;
     })}</div>
     <div className="provider-versions__actions"><button className="button button--secondary" disabled={!supported||pending||machine.reachability!=='live'} onClick={()=>void operate({action:'check'})}><RefreshCw size={15}/>{pending?t('正在检查或应用…'):t('检查智能体版本')}</button>{report&&<small>{t('上次检查：{0}',new Date(report.checkedAt).toLocaleString())}</small>}</div>
     {!supported?<p role="status">{t('更新连接服务后可管理智能体版本。')}</p>:<form className="provider-versions__policy" onSubmit={e=>{e.preventDefault();if(policy)void operate({action:'configure',provider:'claude',mode,expectedRevision:policy.revision});}}>
@@ -50,7 +59,7 @@ export function HostProviderVersions({machine}:{machine:Machine}) {
       <div className="provider-versions__actions"><button className="button button--primary" type="submit" disabled={!policy||pending||machine.reachability!=='live'}>{t('应用更新方式')}</button><button className="button button--quiet" type="button" disabled={!policy?.previous||pending||machine.reachability!=='live'} onClick={()=>policy&&void operate({action:'rollback',provider:'claude',expectedRevision:policy.revision})}>{t('回退并固定版本')}</button></div>
       {policy?.phase==='waiting_idle'&&<p role="status">{t('已验证目标，等待任务或通话结束后再应用。')}</p>}
       {policy?.error&&<p role="status">{systemText(policy.error)}</p>}
-      <p className="subtle">{t('Codex 继续使用现有托管机制。其他智能体暂由原安装方式更新，本页不会修改其安装或自动更新设置。')}</p>
+      <p className="subtle">{t('发现新版本只作提示：Codex 与托管的 Claude Code 经你确认后才会更新；其他智能体仍由原安装方式更新，本页不会修改其安装或自动更新设置。')}</p>
     </form>}
     {error&&<p role="alert">{systemText(error)}</p>}
     {operation?.state==='unknown'&&<p role="status">{t('操作结果待核验，请勿重复提交。')}</p>}

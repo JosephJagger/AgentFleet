@@ -31,6 +31,7 @@ export function runtimeRollout(machine: Machine, target?: string, schemaHash?: s
   if (value("runtimeUpdateTarget") === target) {
     const phase = value("runtimeUpdateState");
     if (phase === "failed" || phase === "rolled_back") return { label: phase === "rolled_back" ? t("本机更新失败，已保留回退版本") : t("本机更新未完成，原运行时保留"), error: value("runtimeUpdateError"), failed: true };
+    if (phase === "awaiting_confirmation") return { label: t("已验证，等待你确认更新") };
     if (phase === "waiting_for_idle") return { label: t("等待任务或通话结束") };
     if (phase === "preparing") return { label: t("后台准备新运行时，可继续工作") };
     if (phase === "activating") return { label: t("正在切换已验证的运行时") };

@@ -1,5 +1,5 @@
 .provider-versions__list { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.provider-versions__row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 12px; border-bottom:1px solid var(--line); font-size:13px; }
+.provider-versions__row { flex-wrap:wrap; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 12px; border-bottom:1px solid var(--line); font-size:13px; }
 .provider-versions__row:last-child { border-bottom:0; }
 .provider-versions__row > div { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; min-width:0; }
 .provider-versions__row > div:last-child { justify-content:flex-end; text-align:right; }
@@ -10,3 +10,6 @@
 .provider-versions__policy label { display:flex; gap:12px; flex-wrap:wrap; align-items:center; font-weight:600; }
 .provider-versions__policy select { max-width:100%; min-height:36px; }
 @media (max-width:480px) { .provider-versions__row { align-items:flex-start; } .provider-versions__row > div { flex-direction:column; gap:4px; } }
+
+.provider-versions__offer { flex-basis:100%; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding-top:2px; }
+.provider-versions__offer span { color:var(--text); font-weight:600; }

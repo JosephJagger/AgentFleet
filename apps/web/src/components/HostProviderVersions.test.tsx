@@ -25,3 +25,22 @@ it('unknown mutation result blocks resubmission and newer heartbeat policy wins 
  render(<HostProviderVersions machine={{...machine,discovery:{state:'ready',providerRuntimePolicy:{revision:4,mode:'pinned'}} as Machine['discovery']}}/>);
  await screen.findByText('操作结果待核验，请勿重复提交。');expect((screen.getByLabelText('Claude Code 更新方式') as HTMLSelectElement).value).toBe('pinned');expect((screen.getByText('应用更新方式') as HTMLButtonElement).disabled).toBe(true);
 });
+it('offers explicit confirmations and notices from discovery, and never acts on render',async()=>{
+ vi.mocked(api.hostOperations).mockResolvedValue([]);vi.mocked(api.providerRuntimeOperation).mockResolvedValue({...report,id:'confirmed'});
+ const m={...machine,agentRuntimes:{qwen:{installed:true,version:'0.24.0',state:'ready'}},codexProfile:{source:'managed',runtimeUpdateState:'awaiting_confirmation',runtimeUpdateTarget:'0.163.0'},
+  discovery:{state:'ready',providerRuntimePolicy:{revision:2,mode:'pinned',current:{version:'2.1.292',sha256:'a'.repeat(64),size:1,platform:'linux-x64',checkedAt:'2026-10-17T00:00:00Z',sdkVersion:'0.3.285'},latest:{claude:{version:'2.1.300',checkedAt:'2026-10-17T00:00:00Z'},qwen:{version:'0.25.2',checkedAt:'2026-10-17T00:00:00Z'}}}}} as unknown as Machine;
+ render(<HostProviderVersions machine={m}/>);
+ await screen.findByText('确认更新到 0.163.0');await screen.findByText('更新到 2.1.300');await screen.findByText('有新版本 0.25.2，请用原安装方式更新');
+ expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByText('确认更新到 0.163.0'));
+ await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith('test-host',{action:'confirm',provider:'codex',version:'0.163.0'},expect.any(String)));
+});
+it('Claude update carries the policy revision and is disabled on hosts that cannot manage versions',async()=>{
+ vi.mocked(api.hostOperations).mockResolvedValue([]);vi.mocked(api.providerRuntimeOperation).mockResolvedValue({...report,id:'updated'});
+ const policy={revision:5,mode:'pinned',current:{version:'2.1.292',sha256:'a'.repeat(64),size:1,platform:'linux-x64',checkedAt:'2026-10-17T00:00:00Z',sdkVersion:'0.3.285'},latest:{claude:{version:'2.1.300',checkedAt:'2026-10-17T00:00:00Z'}}};
+ const r=render(<HostProviderVersions machine={{...machine,discovery:{state:'ready',providerRuntimePolicy:policy}} as unknown as Machine}/>);
+ fireEvent.click(await screen.findByText('更新到 2.1.300'));
+ await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith('test-host',{action:'update',provider:'claude',expectedRevision:5},expect.any(String)));
+ r.unmount();render(<HostProviderVersions machine={{...machine,maintenanceCapabilities:[],discovery:{state:'ready',providerRuntimePolicy:policy}} as unknown as Machine}/>);
+ expect((await screen.findByText('更新到 2.1.300') as HTMLButtonElement).closest('button')!.disabled).toBe(true);
+});

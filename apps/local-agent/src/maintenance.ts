@@ -1,4 +1,5 @@
 import { isProviderId } from "./provider-catalog.js";
+import { parseProviderRuntimeRequest } from "./provider-runtime-policy.js";
 import { manageVersions, automaticVersionCleanup } from "./version-cleanup.js";
 import { AGENT_VERSION } from "./constants.js";
 import { AgentError, publicError } from "./errors.js";
@@ -108,7 +109,13 @@ export class AgentMaintenance {
     try {
       let result: Record<string, unknown>;
       if (operationType === "provider.runtime") {
-        result = await this.options.runtime.manageProviderRuntime(operation.recoveryTarget, operationId);
+        const providerRequest = parseProviderRuntimeRequest(operation.recoveryTarget);
+        if (providerRequest.action === "confirm") {
+          // The user approved one specific, already validated Codex upgrade; the updater verifies it is still the pending one.
+          if (!this.options.updater) throw new AgentError("UPDATE_SERVICE_REQUIRED", "automatic updates require an installed AgentFleet service");
+          await this.options.updater.confirmRuntime(providerRequest.version);
+          result = await this.options.runtime.providerInventory();
+        } else result = await this.options.runtime.manageProviderRuntime(operation.recoveryTarget, operationId);
       } else if (operationType === "versions.preview" || operationType === "versions.clean") {
         if (operationType === "versions.clean" && (!versionsMayClean || this.options.store.snapshot().maintenanceDrain)) throw new AgentError("VERSION_HOST_BUSY", "请在任务或通话结束后清理版本");
         if (operationType === "versions.clean") await this.options.store.setMaintenanceDrain(operationId);

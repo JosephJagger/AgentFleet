@@ -18,6 +18,17 @@ const exec = promisify(execFile);
 export const CLAUDE_SDK_VERSION = '0.3.285';
 export const CLAUDE_RELEASE_BASE = 'https://downloads.claude.ai/claude-code-releases';
 const MAX_BINARY = 512 * 1024 * 1024;
+/** Official npm packages used only to *discover* the newest release; nothing is downloaded from them. */
+export const NPM_PACKAGES:Readonly<Record<string,string>>={qwen:'@qwen-code/qwen-code',kimi:'@moonshot-ai/kimi-code',codebuddy:'@tencent-ai/codebuddy-code',grok:'@xai-official/grok'};
+const LATEST_INTERVAL_MS=6*60*60_000;
+async function npmLatest(pkg:string,signal?:AbortSignal):Promise<string> {
+  const r=await fetch(`https://registry.npmjs.org/-/package/${pkg.replace('/','%2F')}/dist-tags`,{redirect:'error',signal:AbortSignal.any([AbortSignal.timeout(15_000),...(signal?[signal]:[])])});
+  if(!r.ok)throw new AgentError('PROVIDER_RELEASE_UNAVAILABLE','无法读取官方版本',{status:r.status});
+  const text=await r.text();if(text.length>65_536)throw new Error('Release response too large');
+  const latest=(JSON.parse(text) as {latest?:unknown}).latest;
+  if(!stableVersion(latest))throw new Error('Invalid latest version');
+  return latest;
+}
 const MAX_ATTEMPTS_PER_VERSION=3,TRANSIENT_RETRY_MS=30*60_000,BLOCKED_RETRY_MS=6*60*60_000;
 /** Outcomes that are not a failure of the target release and must not mark the channel blocked. */
 const PASSIVE_CODES=new Set(['PROVIDER_HOST_BUSY','PROVIDER_POLICY_CONFLICT','PROVIDER_HOST_NEWER','PROVIDER_RETRY_LIMIT']);
@@ -68,7 +79,7 @@ export async function probeClaude(binary:string,expectedVersion:string,signal?:A
     signal?.throwIfAborted();
   } finally {if(timer)clearTimeout(timer);release?.();q?.close();await rm(cwd,{recursive:true,force:true});}
 }
-const defaults={host:detectClaude,acp:detectAcp,stable:async(signal?:AbortSignal)=>{const version=(await limitedText('stable',signal)).trim();if(!stableVersion(version))throw new Error('Invalid stable version');return version;},manifest:async(version:string,platform:string,signal?:AbortSignal)=>reviewedManifest(await signedManifest(version,signal),version,platform),download,probe:probeClaude};
+const defaults={host:detectClaude,acp:detectAcp,stable:async(signal?:AbortSignal)=>{const version=(await limitedText('stable',signal)).trim();if(!stableVersion(version))throw new Error('Invalid stable version');return version;},manifest:async(version:string,platform:string,signal?:AbortSignal)=>reviewedManifest(await signedManifest(version,signal),version,platform),latest:async(id:string,signal?:AbortSignal):Promise<string|null>=>NPM_PACKAGES[id]?npmLatest(NPM_PACKAGES[id]!,signal):null,download,probe:probeClaude};
 export class ProviderRuntimeManager {
   private busy=false;
   private readonly controller=new AbortController();
@@ -79,6 +90,7 @@ export class ProviderRuntimeManager {
   private retryAfter=0;
   private failure?:{version:string;count:number};
   private prunedOnce=false;
+  private latestAt=0;
   constructor(private readonly store:StateStore,private readonly activate:()=>Promise<void>,private readonly deps:typeof defaults=defaults,private readonly now:()=>number=Date.now){}
   state():ProviderRuntimeState {return this.store.snapshot().providerRuntimeState??{revision:0,mode:'host'};}
   private file(r:ManagedProviderRelease){if(!stableVersion(r.version)||! /^[a-f0-9]{64}$/.test(r.sha256)||r.platform!==claudePlatform())throw new Error('Invalid managed runtime identity');return join(this.store.dataDir,'provider-runtimes','claude',`${r.version}-${r.sha256}`,process.platform==='win32'?'claude.exe':'claude');}
@@ -99,7 +111,11 @@ export class ProviderRuntimeManager {
   }
   async operate(value:unknown,operationId:string,origin:'manual'|'automatic'='manual'):Promise<Record<string,unknown>> {
     this.controller.signal.throwIfAborted();
-    const request=parseProviderRuntimeRequest(value);
+    const parsed=parseProviderRuntimeRequest(value);
+    // Codex confirmations belong to the connection-service updater, never to the Claude runtime manager.
+    if(parsed.action==='confirm')throw new AgentError('PROVIDER_REQUEST_UNSUPPORTED','此确认由连接服务更新器处理');
+    let request:Exclude<typeof parsed,{action:'confirm'|'update'}>|{action:'update';provider:'claude';expectedRevision:number}=parsed;
+    let userConfirmedUpdate=false;
     if(this.busy)throw new AgentError('PROVIDER_UPDATE_BUSY','版本检查或更新正在进行');this.busy=true;
     let done!:()=>void;this.completion=new Promise(resolve=>{done=resolve;});
     const signal=this.controller.signal;
@@ -107,6 +123,11 @@ export class ProviderRuntimeManager {
     try {
       let state=this.state();
       if(request.action!=='check'&&request.expectedRevision!==state.revision)throw new AgentError('PROVIDER_POLICY_CONFLICT','版本设置已变化，请重新读取');
+      if(request.action==='update') {
+        // Only an already managed build can be advanced; a host installation is updated by its own installer.
+        if(state.mode==='host'||!state.current)throw new AgentError('PROVIDER_NOT_MANAGED','宿主机安装请用其自带的更新方式；如需由面板管理，请先选择托管版本');
+        request={action:'configure',provider:'claude',mode:state.mode,expectedRevision:request.expectedRevision};userConfirmedUpdate=true;
+      }
       if(request.action==='check') {
         try {const version=await this.deps.stable(signal);await this.save({stableVersion:version,checkedAt:new Date().toISOString()});await this.deps.manifest(version,claudePlatform(),signal);await this.save({error:'',phase:state.mode==='host'?'idle':'ready'});}
 
@@ -117,6 +138,7 @@ export class ProviderRuntimeManager {
           try{await this.deps.manifest(v,claudePlatform(),signal);await this.deps.probe(host.path,v,signal);state='protocol_checked';}catch{/* Keep host-managed installations usable; this is evidence, not a new admission gate. */}
           await this.save({hostCompatibility:{version:v,checkedAt:new Date().toISOString(),state,sdkVersion:CLAUDE_SDK_VERSION}});
         }
+        await this.refreshLatest(true).catch(()=>undefined);
         return {policy:this.state()};
       }
       if(request.action==='configure'&&request.mode==='host') {
@@ -134,7 +156,7 @@ export class ProviderRuntimeManager {
         await this.commit({...state,revision:state.revision+1,mode:'pinned',current:previous,...(state.current?{previous:state.current}:{}),phase:'ready',error:'',failedVersion:''},state);
         return {policy:this.state()};
       }
-      if(request.mode==='pinned' && state.mode!=='host' && state.current) {
+      if(request.mode==='pinned' && state.mode!=='host' && state.current && !userConfirmedUpdate) {
         await this.verify(state.current);
         if(state.current.sdkVersion!==CLAUDE_SDK_VERSION){
           const reviewed=await this.deps.manifest(state.current.version,claudePlatform(),signal);
@@ -189,6 +211,18 @@ export class ProviderRuntimeManager {
     try{await this.activate();}
     catch(e){await this.store.update(s=>{s.providerRuntimeState={...previous,revision:next.revision,mode:previous.mode==='auto'?'pinned':previous.mode,phase:'blocked',error:'启用失败，已回退；自动更新暂停'};});await this.activate().catch(()=>{});throw e;}
   }
+  /** Read-only discovery of the newest official release of each agent. Failures keep the last known value. */
+  async refreshLatest(force=false):Promise<void> {
+    if(this.controller.signal.aborted||(!force&&this.latestAt&&this.now()-this.latestAt<LATEST_INTERVAL_MS))return;
+    this.latestAt=this.now();
+    const previous=this.state().latest??{};const next={...previous};const checkedAt=new Date(this.now()).toISOString();
+    await Promise.all(['claude',...Object.keys(NPM_PACKAGES)].map(async id=>{
+      try {const version=id==='claude'?await this.deps.stable(this.controller.signal):await this.deps.latest(id,this.controller.signal);if(stableVersion(version))next[id]={version,checkedAt};}
+      catch {/* Discovery is advisory; an unreachable registry must never affect running agents. */}
+    }));
+    if(this.controller.signal.aborted)return;
+    if(JSON.stringify(Object.entries(next).map(([k,v])=>[k,v.version]))!==JSON.stringify(Object.entries(previous).map(([k,v])=>[k,v.version]))||Object.keys(previous).length===0)await this.save({latest:next});
+  }
   private noteFailure(e:unknown) {
     const transient=isTransient(e);
     this.retryAfter=this.now()+(transient?TRANSIENT_RETRY_MS:BLOCKED_RETRY_MS);
@@ -210,6 +244,7 @@ export class ProviderRuntimeManager {
       if(entry.endsWith('.partial')&&this.now()-(await stat(join(root,name,entry)).then(f=>f.mtimeMs,()=>this.now()))>3_600_000)await rm(join(root,name,entry),{force:true}).catch(()=>{});
   }
   async automatic():Promise<void> {
+    await this.refreshLatest().catch(()=>undefined);
     if(!this.prunedOnce&&!this.busy){this.prunedOnce=true;this.busy=true;try{await this.prune();}catch{/* best effort */}finally{this.busy=false;}}
     const s=this.state();if(this.busy||s.mode!=='auto'||!this.store.canSafelyRestart()||this.store.snapshot().maintenanceDrain)return;
     if(this.now()<this.retryAfter)return;

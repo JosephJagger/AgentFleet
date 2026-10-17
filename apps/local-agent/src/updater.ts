@@ -216,6 +216,8 @@ export interface AgentAutoUpdaterOptions {
   runtimeSource?: "managed" | "host";
   currentRuntimeVersion?: string;
   needsRuntimeRepair?: () => boolean;
+  /** Forward Codex runtime upgrades wait for an explicit user confirmation (rollbacks and repairs do not). */
+  confirmRuntimeUpgrade?: boolean;
   prepareRuntime?: typeof prepareManagedRuntime;
   onError?: (message: string) => void;
 }
@@ -235,6 +237,7 @@ export class AgentAutoUpdater {
   private preparedVersion: string | undefined;
   private targetVersion = "";
   private checkingRuntime = false;
+  private pendingRuntimeVersion: string | undefined;
   private checkActive: Promise<UpdateCheckResult> | undefined;
 
   constructor(options: AgentAutoUpdaterOptions) {
@@ -270,6 +273,15 @@ export class AgentAutoUpdater {
     this.timer = undefined;
     this.controller?.abort(new AgentError("UPDATE_STOPPED", "automatic updater stopped"));
     await this.active?.catch(() => undefined);
+  }
+
+  /** Approve exactly the upgrade that was offered; a stale or different version is refused. */
+  async confirmRuntime(version: string): Promise<void> {
+    if (!this.options.store) throw new AgentError("UPDATE_SERVICE_REQUIRED", "automatic updates require an installed AgentFleet service");
+    if (!/^\d+\.\d+\.\d+$/.test(version) || this.pendingRuntimeVersion !== version) throw new AgentError("RUNTIME_CONFIRM_STALE", "待确认的版本已变化，请刷新后重新查看");
+    await this.options.store.update((state) => { state.confirmedRuntimeVersion = version; });
+    // Apply promptly instead of waiting for the next poll; failures are reported through the usual callbacks.
+    void this.checkNow().catch(() => undefined);
   }
 
   async checkNow(signal?: AbortSignal): Promise<UpdateCheckResult> {
@@ -412,6 +424,13 @@ export class AgentAutoUpdater {
     }
     const failed = await readUpdateTransaction(this.options.dataDir);
     if (failed && ["rolled_back", "failed"].includes(failed.phase) && failed.targetRuntimeRevision === target.revision) throw new AgentError("RUNTIME_ROLLOUT_PAUSED", "这个托管版本在本机更新失败并已回退，等待新的验证目标");
+    if (this.options.confirmRuntimeUpgrade && !target.rollback && !this.options.needsRuntimeRepair?.() && this.options.store.snapshot().confirmedRuntimeVersion !== target.version) {
+      // Nothing is downloaded or switched until the user approves this exact version.
+      this.pendingRuntimeVersion = target.version;
+      this.options.onRuntimePhase?.("awaiting_confirmation", target.version);
+      return "current";
+    }
+    this.pendingRuntimeVersion = undefined;
     this.options.onRuntimePhase?.("preparing", target.version);
     const activate = await (this.options.prepareRuntime ?? prepareManagedRuntime)({ dataDir: this.options.dataDir, controlPlaneUrl: this.options.controlPlaneUrl, target, ...(signal ? { signal } : {}) });
     if (signal?.aborted) throw signal.reason;
@@ -438,8 +457,11 @@ export class AgentAutoUpdater {
       await writeUpdateTransaction(this.options.dataDir, { ...transaction, phase: "staged" });
     } catch (error) {
       await restoreUpdateTransaction(this.options.dataDir, transaction, error instanceof Error ? error.message : "托管切换失败");
+      // A failed attempt consumes the approval; a later retry must be confirmed again.
+      await this.options.store.update((state) => { delete state.confirmedRuntimeVersion; }).catch(() => undefined);
       throw error;
     }
+    if (this.options.store.snapshot().confirmedRuntimeVersion) await this.options.store.update((state) => { delete state.confirmedRuntimeVersion; });
     this.staged = true;
     this.options.onStaged(this.options.currentVersion);
     return "staged";

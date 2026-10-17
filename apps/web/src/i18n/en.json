@@ -3718,5 +3718,19 @@
   "回退并固定版本": "Roll back and pin",
   "已验证目标，等待任务或通话结束后再应用。": "Target verified. Apply again after tasks or calls end.",
   "Codex 继续使用现有托管机制。其他智能体暂由原安装方式更新，本页不会修改其安装或自动更新设置。": "Codex keeps its existing managed update flow. Other agents use their original installers; this page does not change their installation or automatic update settings.",
-  "操作结果待核验，请勿重复提交。": "Operation outcome is unknown. Do not submit it again."
+  "操作结果待核验，请勿重复提交。": "Operation outcome is unknown. Do not submit it again.",
+  "{0} 已通过验证，确认后才会更新": "{0} is verified and will only be installed after you confirm",
+  "确认更新到 {0}": "Confirm update to {0}",
+  "官方稳定版 {0} 可用": "Official stable {0} is available",
+  "更新到 {0}": "Update to {0}",
+  "有新版本 {0}，请用原安装方式更新": "New version {0} is available. Update it with its original installer",
+  "发现新版本只作提示：Codex 与托管的 Claude Code 经你确认后才会更新；其他智能体仍由原安装方式更新，本页不会修改其安装或自动更新设置。": "New versions are only announced. Codex and managed Claude Code update after you confirm; other agents keep using their original installers, and this page does not change their installation or automatic update settings.",
+  "官方版本服务暂时不可用，将自动重试": "The official release service is temporarily unavailable. Retrying automatically",
+  "该版本多次验证失败，等待新的稳定版本或手动重试": "This release failed verification repeatedly. Waiting for a new stable release or a manual retry",
+  "宿主机 Claude {0} 比官方稳定版 {1} 更新，未切换以避免降级；继续使用宿主机版本": "Host Claude {0} is newer than official stable {1}. Not switched to avoid a downgrade; keeping the host installation",
+  "宿主机安装请用其自带的更新方式；如需由面板管理，请先选择托管版本": "Update a host installation with its own updater. To let the panel manage it, choose a managed version first",
+  "待确认的版本已变化，请刷新后重新查看": "The pending version changed. Refresh and review it again",
+  "官方清单缺少签名，拒绝使用": "The official manifest has no signature. Refusing to use it",
+  "此确认由连接服务更新器处理": "This confirmation is handled by the connection-service updater",
+  "已验证，等待你确认更新": "Verified. Waiting for your confirmation"
 }
