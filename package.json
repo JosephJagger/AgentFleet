@@ -16,6 +16,7 @@
     "test": "npm --prefix apps/control-plane test && npm --prefix apps/local-agent test && npm --prefix apps/web test",
     "container:build": "docker compose build",
     "container:up": "docker compose up -d",
-    "container:logs": "docker compose logs -f control-plane"
+    "container:logs": "docker compose logs -f control-plane",
+    "check:claude-sdk": "node packaging/check-claude-sdk-compat.mjs"
   }
 }

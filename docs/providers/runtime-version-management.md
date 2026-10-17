@@ -15,7 +15,7 @@
 ## 验证分层
 
 1. 官方 `stable` 给出候选版本；固定官方 HTTPS 域名，拒绝重定向、路径、任意版本、URL、包名和 shell 命令输入。
-2. 官方 `manifest.json` 必须精确对应版本和平台，提供受限大小、SHA-256，以及 `sdkCompat.harnessSchema=1` / `testedWrapperVersions` 中的项目 SDK 版本。缺字段、不匹配或源不可达不晋升。
+2. 官方 `manifest.json` 必须带有效的官方 OpenPGP 分离签名（`manifest.json.sig`，2.1.89 起提供）：签名密钥内置并固定为指纹 `31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE`（与[官方文档](https://code.claude.com/docs/en/setup)一致），不从下载源获取密钥；缺签名、签名不符或签名者不是该密钥都拒绝。清单还须精确对应版本和平台，提供受限大小、SHA-256，以及 `sdkCompat.harnessSchema=1` / `testedWrapperVersions` 中的项目 SDK 版本。缺字段、不匹配或源不可达不晋升。
 3. 下载到独立临时文件，核对字节数和摘要，原子移动到版本目录。实际 `--version` 必须匹配。
 4. 使用项目固定的 `@anthropic-ai/claude-agent-sdk` 执行 `supportedModels()` 控制握手，临时空目录、禁用项目设置/工具/MCP、不持久化会话、不发送用户 prompt。此检查**不是认证、写入、审批、取消、历史恢复或真实任务完成测试**，UI 只写「协议检查通过」。
 5. ACP 仅在同一个实际版本已有成功协议协商时显示协议检查证据。未安装、无证据或版本变化不能显示已验证。
@@ -28,7 +28,9 @@ SDK 升级时必须同步版本常量（测试会检查），旧托管文件在�
 - 自动检查在忙时推迟。手动申请遇忙保留已验证下载并报告待空闲，此次不会擅自改策略；用户空闲后重新应用。已启用自动模式的等待项继续在后台检查。
 - 激活只释放空闲 Claude writer 并刷新 Claude 路径，不重启 Codex、连接服务或控制平面。并发旧目录读取不能覆盖新路径。
 - 激活失败恢复旧指针；若此前为自动模式，转为固定版本。协议/下载失败保留实际版本并报告阻塞；相同失败不会被后台反复执行，手动检查/应用可重新核验。
-- 当前与上一托管版本保留。此轮没有自动清理 provider-runtimes 目录，失败下载的 partial 文件会移除；已下载但未采用的完整候选可能继续占磁盘，原有 Codex 清理器不遍历此目录。
+- **只保留当前与上一托管版本。** 每次操作结束和连接服务启动后的首次自动检查都会清理 `provider-runtimes/claude` 中其他版本目录（命名为 `版本-SHA256` 的才会删，其他文件不碰）；等待主机空闲的已验证候选版本会保留以免重复下载；超过一小时的残留 `.partial` 文件会移除。正在使用而无法删除的文件（Windows）留到下次再试。
+- **首次启用托管不会降级。** 若宿主机已安装的 Claude 比官方 `stable` 更新（`stable` 通常落后约一周），选择"托管"会被拒绝并说明原因，继续使用宿主机版本；不会进入阻塞状态。已托管后的自动更新仍只前进、不降级。
+- **自动更新会自愈。** 网络类故障（官方站不可达、超时）只记录提示、不进入阻塞，约 30 分钟后重试；清单未确认 SDK、签名或摘要等验证类失败标为阻塞，约 6 小时后自动重新评估（只取清单，不会重复下载）。同一个稳定版本验证失败累计 3 次后不再自动尝试，等待新的稳定版本、重启服务或手动重试。回退、固定版本或启用失败仍会停止自动更新，需用户重新选择。
 - 托管进程的 `DISABLE_AUTOUPDATER=1` 仅设置在子进程环境，不修改宿主机原生自动更新设置。
 - 策略存于本机 StateStore，默认 host；修订号用于保存冲突，维护操作沿用登录、CSRF、工作区校验、幂等键和审计。中断的写操作标为未确认，不自动重放。
 - 控制平面 schema 62 仅扩展维护操作类型，迁移保留旧操作、索引及外键。发布依旧必须等待通话自然结束并走守护发布器。
@@ -46,3 +48,7 @@ Linux x64 隔离验证：真实官方 Claude 2.1.292 下载/摘要/版本/SDK 0.
 - [官方 2.1.292 清单](https://downloads.claude.ai/claude-code-releases/2.1.292/manifest.json)：平台摘要与 SDK 测试组合。
 - [Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview)
 - [Cursor 安装与更新](https://cursor.com/docs/cli/installation)、[Grok CLI](https://docs.x.ai/build/cli/reference)：独立的更新器不能直接套用 Codex 分发协议。
+
+## SDK 兼容性预警
+
+官方清单的 `testedWrapperVersions` 是滚动列表；项目固定的 SDK 一旦掉出该列表，自动更新会因 `PROVIDER_SDK_UNREVIEWED` 停止。运行 `npm run check:claude-sdk`（不属于 CI 必过项，可放在定时任务）会比对固定 SDK 与当前 `stable` 清单、列出 npm 最新版：不在列表中退出码为 1，位于最旧的 8 项以内给出警告。收到警告后按"SDK 升级必须同步版本常量"的要求升级并发布新的 Agent 版本。

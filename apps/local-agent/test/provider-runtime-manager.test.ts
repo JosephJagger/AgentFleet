@@ -1,24 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm,mkdir,writeFile,readFile} from 'node:fs/promises';
+import {mkdtemp,rm,mkdir,writeFile,readFile,readdir} from 'node:fs/promises';
 import {join,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
 import {StateStore} from '../src/store.js';
 import {ProviderRuntimeManager,reviewedManifest,CLAUDE_SDK_VERSION,claudePlatform,newerVersion} from '../src/provider-runtime-manager.js';
+import {AgentError} from '../src/errors.js';
 import {parseProviderRuntimeRequest} from '../src/provider-runtime-policy.js';
 async function fixture(t:test.TestContext) {
  const dir=await mkdtemp(join(tmpdir(),'provider-runtime-test-'));const store=new StateStore(dir);await store.initialize();t.after(async()=>{store.close();await rm(dir,{recursive:true,force:true});});
- let version='2.1.292',downloads=0,probes=0,activations=0,failProbe=false,failActivate=false;const files:string[]=[];
+ let version='2.1.292',downloads=0,probes=0,activations=0,failProbe=false,failActivate=false,hostVersion='2.1.290 (Claude Code)',clock=Date.now(),stableError:Error|undefined,manifestError:Error|undefined;const files:string[]=[];
  const manager=new ProviderRuntimeManager(store,async()=>{activations++;if(failActivate){failActivate=false;throw new Error('activation failed');}}, {
-  host:async()=>({installed:true,version:'2.1.290 (Claude Code)',path:'/host/claude'}),acp:async()=>null,
-  stable:async()=>version,
-  manifest:async(v,p)=>({version:v,platform:p,sha256:createHash('sha256').update(v).digest('hex'),size:v.length,sdkVersion:CLAUDE_SDK_VERSION,checkedAt:new Date().toISOString()}),
+  host:async()=>({installed:true,version:hostVersion,path:'/host/claude'}),acp:async()=>null,
+  stable:async()=>{if(stableError)throw stableError;return version;},
+  manifest:async(v,p)=>{if(manifestError)throw manifestError;return {version:v,platform:p,sha256:createHash('sha256').update(v).digest('hex'),size:v.length,sdkVersion:CLAUDE_SDK_VERSION,checkedAt:new Date().toISOString()};},
   download:async(r,file)=>{downloads++;files.push(file);await mkdir(dirname(file),{recursive:true});await writeFile(file,r.version);},
   probe:async()=>{probes++;if(failProbe)throw new Error('probe failed');}
- });
+ },()=>clock);
  const configure=(mode:'host'|'pinned'|'auto')=>manager.operate({action:'configure',provider:'claude',mode,expectedRevision:manager.state().revision},'op-update');
- return {store,manager,configure,files,setVersion:(v:string)=>{version=v;},failProbe:()=>{failProbe=true;},failActivate:()=>{failActivate=true;},counts:()=>({downloads,probes,activations})};
+ return {store,manager,configure,files,dir,setVersion:(v:string)=>{version=v;},setHost:(v:string)=>{hostVersion=v;},advance:(ms:number)=>{clock+=ms;},setStableError:(e?:Error)=>{stableError=e;},setManifestError:(e?:Error)=>{manifestError=e;},failProbe:()=>{failProbe=true;},failActivate:()=>{failActivate=true;},counts:()=>({downloads,probes,activations})};
 }
 test('request allowlist excludes shell paths, other providers, versions, unknown keys and missing conflict guard',()=>{
  for(const v of [{action:'check',url:'https://evil'}, {action:'configure',provider:'codex',mode:'auto',expectedRevision:0},{action:'configure',provider:'claude',mode:'auto'}, {action:'configure',provider:'claude',mode:'auto',expectedRevision:0,path:'/tmp/x'}])assert.throws(()=>parseProviderRuntimeRequest(v));
@@ -73,4 +74,35 @@ test('shutdown aborts a pending release check and never activates or leaves admi
  const work=manager.operate({action:'configure',provider:'claude',mode:'auto',expectedRevision:0},'shutdown-test');const rejected=assert.rejects(work);
  await waiting;await manager.stop();await rejected;assert.equal(activated,0);assert.equal(store.snapshot().maintenanceDrain,undefined);assert.equal(manager.state().mode,'host');
  await assert.rejects(manager.operate({action:'check'},'after-stop'));
+});
+
+test('enabling managed mode never downgrades a newer host installation',async t=>{
+ const f=await fixture(t);f.setHost('2.1.296 (Claude Code)');
+ await assert.rejects(f.configure('auto'),/避免降级/);assert.equal(f.manager.state().mode,'host');assert.equal(f.counts().downloads,0);assert.equal(f.counts().activations,0);assert.notEqual(f.manager.state().phase,'blocked');
+ f.setHost('2.1.292 (Claude Code)');await f.configure('auto');assert.equal(f.manager.state().mode,'auto');assert.equal(f.manager.state().current?.version,'2.1.292');
+});
+test('a transient network failure does not block automatic updates and is retried after a delay',async t=>{
+ const f=await fixture(t);await f.configure('auto');f.setVersion('2.1.293');f.advance(7*3600_000);
+ f.setStableError(new TypeError('fetch failed'));await assert.rejects(f.manager.automatic());
+ assert.notEqual(f.manager.state().phase,'blocked');assert.match(f.manager.state().error??'',/暂时不可用/);
+ f.setStableError(undefined);await f.manager.automatic();assert.equal(f.manager.state().current?.version,'2.1.292','still inside the retry delay');
+ f.advance(31*60_000);await f.manager.automatic();assert.equal(f.manager.state().current?.version,'2.1.293');assert.equal(f.manager.state().error,'');assert.equal(f.manager.state().phase,'ready');
+});
+test('a blocked automatic channel heals when the release is fixed, but a bad release is not retried forever',async t=>{
+ const f=await fixture(t);await f.configure('auto');f.setVersion('2.1.293');f.advance(7*3600_000);
+ f.setManifestError(new AgentError('PROVIDER_SDK_UNREVIEWED','官方清单尚未确认当前 Claude SDK 组合，保留现有版本'));
+ await assert.rejects(f.manager.automatic(),/SDK/);assert.equal(f.manager.state().phase,'blocked');assert.equal(f.manager.state().current?.version,'2.1.292');
+ f.advance(3600_000);await f.manager.automatic();assert.equal(f.manager.state().phase,'blocked','not retried inside the blocked delay');
+ f.setManifestError(undefined);f.advance(6*3600_000);await f.manager.automatic();assert.equal(f.manager.state().current?.version,'2.1.293');assert.equal(f.manager.state().phase,'ready');
+ f.setVersion('2.1.294');f.failProbe();let attempts=0;
+ for(let i=0;i<5;i++){f.advance(7*3600_000);const before=f.counts().probes;await f.manager.automatic().catch(()=>undefined);if(f.counts().probes>before)attempts++;}
+ assert.equal(attempts,3,'at most three automatic attempts per stable version');assert.equal(f.manager.state().current?.version,'2.1.293');
+});
+test('only the current and previous managed builds are kept; unrelated entries are untouched',async t=>{
+ const f=await fixture(t);await f.configure('auto');f.setVersion('2.1.293');await f.configure('auto');f.setVersion('2.1.294');await f.configure('auto');
+ const root=join(f.dir,'provider-runtimes','claude');const st=f.manager.state();
+ const names=(await readdir(root)).sort();assert.deepEqual(names,[`${st.current!.version}-${st.current!.sha256}`,`${st.previous!.version}-${st.previous!.sha256}`].sort());
+ await writeFile(join(root,'notes.txt'),'keep');await mkdir(join(root,`2.1.1-${'b'.repeat(64)}`));
+ await f.manager.operate({action:'check'},'check');
+ const after=await readdir(root);assert.ok(after.includes('notes.txt'));assert.ok(!after.includes(`2.1.1-${'b'.repeat(64)}`));assert.equal(after.length,3);
 });
