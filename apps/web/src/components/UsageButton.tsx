@@ -68,7 +68,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
   return <>
     {compactQuota ? <div className="buzhou-session-quota">
       <button type="button" className="buzhou-quota-card" onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>
-        <span><small>{t("周额度")}</small><strong>{failed?t("用量暂不可用"):weekly.length===1?`${weekly[0].w.remainingPercent}%`:t("用量未上报")}</strong></span>
+        <span><small>{weekly.length===1?t("周额度"):t("已记录消耗")}</small><strong>{failed?t("用量暂不可用"):weekly.length===1?`${weekly[0].w.remainingPercent}%`:data?.recorded?short(data.recorded.totalTokens):t("用量未上报")}</strong></span>
         {weekly.length===1&&!failed&&<span className="host-quota-meter" aria-hidden="true"><i style={{width:`${Math.max(0,Math.min(100,weekly[0].w.remainingPercent))}%`}}/></span>}
         <small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>
       </button>

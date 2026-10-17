@@ -2,6 +2,7 @@ import { displayName } from "../lib/display-name";
 import { useEffect, useState } from "react";
 import { BarChart3, RefreshCw } from "lucide-react";
 import { api } from "../lib/api";
+import { PROVIDER_IDS, providerName, type ProviderId } from "../lib/provider-catalog";
 import type { Machine } from "../lib/types";
 import type { UsageBreakdownEntry, UsageSummary } from "../lib/usage";
 import { pageItems } from "../lib/pagination";
@@ -17,16 +18,17 @@ export function UsageView({machines,selectedId,onSelect,onSession}:{machines:Mac
   const [refreshing,setRefreshing]=useState(false);
   const [projectPage,setProjectPage]=useState(1);
   const [sessionPage,setSessionPage]=useState(1);
+  const [provider,setProvider]=useState<ProviderId>("codex");
   const number=(value:number|null|undefined)=>value==null?"—":new Intl.NumberFormat(locale()).format(value);
   const percent=(value:number|null)=>value==null?t("未记录"):t("{0}%",new Intl.NumberFormat(locale(),{maximumFractionDigits:1}).format(value));
   const date=(value:string)=>new Date(value).toLocaleString(locale());
   const creditBalance=(value:string)=>{const parsed=Number(value);return Number.isFinite(parsed)?new Intl.NumberFormat(locale(),{maximumFractionDigits:20}).format(parsed):value;};
   const creditText=(credits:UsageSummary["accounts"][number]["credits"])=>credits?.unlimited?t("不限"):credits?.balance!=null?t("{0} 点",creditBalance(credits.balance)):credits?.hasCredits===false?t("无可用点数"):t("未提供");
-  const load=async(signal?:AbortSignal)=>{if(!machine)return;setLoading(true);try{setData(await api.usage("machine",machine.id,signal));setFailed(false);}catch(error){if(!(error instanceof DOMException&&error.name==="AbortError"))setFailed(true);}finally{if(!signal?.aborted)setLoading(false);}};
-  useEffect(()=>{setData(undefined);setFailed(false);setProjectPage(1);setSessionPage(1);const controller=new AbortController();void load(controller.signal);return()=>controller.abort();},[machine?.id]);
+  const load=async(signal?:AbortSignal)=>{if(!machine)return;setLoading(true);try{setData(await api.usage("machine",machine.id,signal,provider));setFailed(false);}catch(error){if(!(error instanceof DOMException&&error.name==="AbortError"))setFailed(true);}finally{if(!signal?.aborted)setLoading(false);}};
+  useEffect(()=>{setData(undefined);setFailed(false);setProjectPage(1);setSessionPage(1);const controller=new AbortController();void load(controller.signal);return()=>controller.abort();},[machine?.id,provider]);
   async function refresh(){if(!machine)return;setRefreshing(true);try{await api.refreshQuota(machine.id);await load();}finally{setRefreshing(false);}}
   const weeklyRate=cacheRate(data?.quotaCycle?.inputTokens,data?.quotaCycle?.cachedInputTokens);
-  const weekly=data?.accounts.flatMap(account=>account.windows.filter(window=>window.bucket==="codex"&&window.windowMinutes===10080).map(window=>({account,window})))??[];
+  const weekly=data?.accounts.flatMap(account=>account.windows.filter(window=>window.bucket===provider&&window.windowMinutes===10080).map(window=>({account,window})))??[];
   const accountCredits=data?.accounts.length===1?data.accounts[0]?.credits:null;
   const rows=(entries:UsageBreakdownEntry[]|undefined,session=false,page=1,setPage:(page:number)=>void=()=>{})=>{
     const totalPages=Math.max(1,Math.ceil((entries?.length??0)/pageSize));
@@ -44,11 +46,11 @@ export function UsageView({machines,selectedId,onSelect,onSession}:{machines:Mac
   return <section className="wide-view usage-view">
     <div className="wide-view__heading"><div><h1>{t("消耗")}</h1><p>{t("查看本周额度、项目与会话的 token 消耗和缓存效率。")}</p></div><BarChart3 size={30}/></div>
     {!machine?<div className="usage-empty"><h2>{t("暂无主机")}</h2><p>{t("连接主机后，用量会在这里按项目和会话汇总。")}</p></div>:<>
-      <div className="usage-toolbar"><label><span>{t("主机")}</span><select value={machine.id} onChange={event=>onSelect(event.target.value)}>{machines.map(item=><option key={item.id} value={item.id}>{displayName(item.name)}</option>)}</select></label><button className="button button--quiet" type="button" disabled={refreshing||loading} onClick={()=>void refresh()}><RefreshCw className={refreshing?"spin":undefined} size={15}/>{t("刷新消耗")}</button></div>
+      <div className="usage-toolbar"><label><span>{t("主机")}</span><select value={machine.id} onChange={event=>onSelect(event.target.value)}>{machines.map(item=><option key={item.id} value={item.id}>{displayName(item.name)}</option>)}</select></label><label><span>{t("智能体")}</span><select aria-label={t("用量智能体")} value={provider} onChange={event=>setProvider(event.target.value as ProviderId)}>{PROVIDER_IDS.map(id=><option key={id} value={id}>{providerName(id)}</option>)}</select></label><button className="button button--quiet" type="button" disabled={refreshing||loading} onClick={()=>void refresh()}><RefreshCw className={refreshing?"spin":undefined} size={15}/>{t("刷新消耗")}</button></div>
       {failed&&<p className="usage-error" role="status">{t("用量读取失败，请稍后重试。")}</p>}
       <div className="usage-overview-cards">
-        <article><span>{t("官方周额度剩余")}</span><strong>{weekly.length===1?t("{0}%",weekly[0].window.remainingPercent):"—"}</strong><small>{weekly.length===1&&weekly[0].window.resetsAt?t("重置于 {0}",date(new Date(weekly[0].window.resetsAt*1000).toISOString())):t("等待额度上报")}</small></article>
-        <article><span>{t("官方点数余额")}</span><strong>{accountCredits?creditText(accountCredits):"—"}</strong><small>{accountCredits?t("由原生 Codex 上报"):t("等待额度上报")}</small></article>
+        <article><span>{t("官方周额度剩余")}</span><strong>{weekly.length===1?t("{0}%",weekly[0].window.remainingPercent):"—"}</strong><small>{weekly.length===1&&weekly[0].window.resetsAt?t("重置于 {0}",date(new Date(weekly[0].window.resetsAt*1000).toISOString())):provider==="codex"||provider==="claude"?t("等待额度上报"):t("{0} 未上报周额度窗口",providerName(provider))}</small></article>
+        <article><span>{t("官方点数余额")}</span><strong>{provider==="codex"&&accountCredits?creditText(accountCredits):"—"}</strong><small>{provider==="codex"?(accountCredits?t("由原生 Codex 上报"):t("等待额度上报")):t("点数仅由 Codex 上报")}</small></article>
         <article><span>{t("已记录总消耗")}</span><strong>{number(data?.recorded?.totalTokens)}</strong><small>tokens</small></article>
         <article><span>{t("本周消耗")}</span><strong>{number(data?.quotaCycle?.recordedTokens)}</strong><small>tokens{data?.quotaCycle?.boundaryIncomplete?" *":""}</small></article>
         <article><span>{t("周缓存命中率")}</span><strong>{percent(weeklyRate)}</strong><small>{t("缓存输入 ÷ 输入 token")}</small></article>

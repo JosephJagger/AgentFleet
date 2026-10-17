@@ -8,6 +8,7 @@ import {loadConfig} from '../src/config.js';
 import {AuthService} from '../src/auth.js';
 import {RegistryService} from '../src/registry.js';
 import {CoordinationService} from '../src/coordination.js';
+import {GrokPreferencesService} from '../src/grok-preferences.js';
 import {sessionActions} from '../src/capabilities.js';
 import {ACP_PROVIDER_IDS,unavailableCapabilities} from '../src/provider-catalog.js';
 const ready={installed:true,version:'fixture-1.0.0',state:'ready',checkedAt:new Date().toISOString(),capabilities:{...unavailableCapabilities(),create:true,prompt:true,resume:true,history:true,approval:true,input:true,cancel:true}};
@@ -84,10 +85,30 @@ test('schema 61 runtime-operation migration preserves existing receipts and inde
  f.db.run(`INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at,result_json) VALUES('old-operation','m',?,?,'unique-mutation','catalog.refresh','succeeded',?,?,?,?)`,f.principal.workspaceId,f.principal.clientSessionId,at,at,at,JSON.stringify({kept:true}));
  const schema=f.db.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")!.sql;const indexes=f.db.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='machine_operations' AND type='index' AND sql IS NOT NULL");
  f.db.transaction(()=>{f.db.sqlite.exec('ALTER TABLE machine_operations RENAME TO old_ops');f.db.sqlite.exec(schema.replace(",'provider.runtime'",''));f.db.sqlite.exec('INSERT INTO machine_operations SELECT * FROM old_ops; DROP TABLE old_ops');for(const index of indexes)f.db.sqlite.exec(index.sql);f.db.sqlite.exec('PRAGMA user_version=61');});f.db.close();
- const upgraded=new ControlPlaneDatabase(path);t.after(()=>upgraded.close());assert.equal(upgraded.get<{user_version:number}>('PRAGMA user_version')?.user_version,62);
+ const upgraded=new ControlPlaneDatabase(path);t.after(()=>upgraded.close());assert.equal(upgraded.get<{user_version:number}>('PRAGMA user_version')?.user_version,63);
  assert.equal(upgraded.get<{result_json:string}>("SELECT result_json FROM machine_operations WHERE operation_id='old-operation'")?.result_json,JSON.stringify({kept:true}));
  assert.ok(upgraded.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")?.sql.includes("'provider.runtime'"));assert.equal(upgraded.all('PRAGMA foreign_key_check').length,0);
  for(const index of indexes)assert.ok(upgraded.get('SELECT 1 FROM sqlite_master WHERE sql=?',index.sql));
+});
+
+test('saved Grok settings inject only after the host can apply them',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const preferences=new GrokPreferencesService(f.db);
+ const idle=f.registry.createSession(f.principal,'m','grok',undefined,'grok-inactive-session');
+ assert.throws(()=>preferences.write(f.principal,idle.logicalSessionId,{settings:{permissionMode:'default'},revision:0}),{code:'GROK_AGENT_UPDATE_REQUIRED'});
+ f.db.run("UPDATE machines SET agent_version='0.30.115' WHERE machine_id='m'");
+ assert.deepEqual(preferences.write(f.principal,idle.logicalSessionId,{settings:{permissionMode:'default'},revision:0}).settings,{permissionMode:'default'});
+ const lease=f.coordination.acquireLease(f.principal,idle.logicalSessionId);
+ f.coordination.createCommand(f.principal,idle.logicalSessionId,{type:'turn.start',controlLeaseId:lease.leaseId,clientMutationId:'start-grok-off',payload:{prompt:'Inactive settings stay native'},precondition:{executionSegmentId:idle.executionSegmentId,threadControlVersion:idle.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:idle.projectLeaseVersion}});
+ const stored=(mutation:string)=>JSON.parse(f.db.get<{body_json:string}>('SELECT cc.body_json FROM commands c JOIN command_contents cc USING(command_id) WHERE c.client_mutation_id=?',mutation)!.body_json).settings;
+ assert.equal(stored('start-grok-off'),undefined);
+ const at=new Date().toISOString();
+ f.db.run(`INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,created_at,last_reported_at,provider) VALUES('grok-2',?,'m','grok-2','grok-2','/fixture/grok-2','grok-2-hash',?,?,'grok')`,f.principal.workspaceId,at,at);
+ const active=f.registry.createSession(f.principal,'m','grok-2',undefined,'grok-active-session');
+ preferences.write(f.principal,active.logicalSessionId,{settings:{model:'grok-4.6',permissionMode:'always',mode:'plan'},revision:0});
+ const activeLease=f.coordination.acquireLease(f.principal,active.logicalSessionId);
+ f.coordination.createCommand(f.principal,active.logicalSessionId,{type:'turn.start',controlLeaseId:activeLease.leaseId,clientMutationId:'start-grok-on',payload:{prompt:'Apply saved settings'},precondition:{executionSegmentId:active.executionSegmentId,threadControlVersion:active.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:active.projectLeaseVersion}});
+ assert.deepEqual(stored('start-grok-on'),{model:'grok-4.6',permissionMode:'always',mode:'plan'});
 });
 
 test('provider policy heartbeat preserves newest revision without exposing arbitrary host fields',t=>{

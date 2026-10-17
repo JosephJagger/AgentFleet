@@ -70,6 +70,16 @@ it("原生进度更新同一卡片，旧事件和另一轮任务不能覆盖完�
   expect(timelineItems([deleted, running])[0]).toMatchObject({ payloadState: "deleted", body: null });
 });
 
+it("工具结果和推理进入时间线，原始参数和环境不会进入消息", () => {
+  const tool = mapEvent({ eventId: "tool", sessionSeq: 1, type: "item.completed", nativeTurnId: "turn", payload: { item: { id: "tool", type: "mcpToolCall", tool: "Bash", arguments: { command: "npm test", raw: "secret" }, result: { text: "ok" } } } });
+  expect(tool).toMatchObject({ command: "npm test", output: "ok", body: "ok", title: "npm test" });
+  expect(JSON.stringify(tool)).not.toContain("secret");
+  const thought = mapEvent({ eventId: "thought", sessionSeq: 2, type: "item.completed", nativeTurnId: "turn", payload: { item: { id: "thought", type: "reasoning", text: "public thought" } } });
+  expect(thought.body).toBe("public thought");
+  expect(thought.title).toBe("推理摘要");
+  const error = mapEvent({ eventId: "error", sessionSeq: 3, type: "turn.error", nativeTurnId: "turn", payload: { message: "failed" } });
+  expect(error.title).toBe("任务错误");
+});
 it('preserves native file changes for the workbench history fallback',()=>{
  const event=mapEvent({eventId:'file-edit',sessionSeq:1,type:'item.completed',nativeTurnId:'turn',payload:{item:{id:'edit',type:'fileChange',status:'completed',changes:[{path:'src/demo.ts',diff:'+ actual edit'}]}}});
  expect(event.fileChanges).toEqual([{path:'src/demo.ts',diff:'+ actual edit'}]);

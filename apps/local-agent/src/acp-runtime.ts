@@ -11,12 +11,14 @@ import {AgentError} from './errors.js';
 import {isRecord,nowIso,sha256,canonicalJson} from './util.js';
 import type {AppServerCallbacks,ThreadHistorySnapshot,ThreadHistoryItem,DiscoveredThreadSummary,ThreadStartResult,ThreadResumeResult} from './app-server.js';
 import type {ProjectRecord,ManagedThread,ApprovalRecord} from './types.js';
-import type {CodexSettings} from './codex-settings.js';
 import type {PermissionProfile} from './permissions.js';
 import type {TurnExtras} from './attachments.js';
 import {inputAnswers,inputQuestions,type InputAnswers,type InputQuestion} from './user-input.js';
-interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;}
+import {acpPlanText,acpToolItem,acpUsage,grokLaunchArgs,grokSessionMeta,mergeConfigOptions,parseConfigOptions,parseGrokSettings,type ConfigOption,type GrokSettings} from './acp-updates.js';
+import type {CodexSettings} from './codex-settings.js';
+interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];published:Map<string,string>;completed:Set<string>;}
 interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan';questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
+function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)return {text:value,truncated:false};let text=Buffer.from(value).subarray(0,max).toString('utf8');if(text.endsWith('\uFFFD'))text=text.slice(0,-1);return {text,truncated:true};}
 const dependencies={detect:detectAcp,unoccupied:assertAcpUnoccupied,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
 /** New providers have their own processes and cannot fall through to Codex methods. */
 export class AcpRuntime {
@@ -46,11 +48,11 @@ export class AcpRuntime {
   }
   async stop(){if([...this.sessions.values()].some(s=>s.turnId&&!s.lost))throw new AgentError("PROVIDER_TURN_ACTIVE","Finish native work before stopping");this.stopped=true;await Promise.all([...this.sessions.keys()].map(id=>this.unsubscribeThread(id)));for(const connection of this.connections)connection.close();}
   private native(id:string) {const parsed=decodeProviderThread(id);if(!parsed||parsed.provider!==this.provider)throw new AgentError('PROVIDER_ID_MISMATCH','Session belongs to another provider');return parsed.nativeId;}
-  private async connect(cwd:string,session?:Session) {
+  private async connect(cwd:string,session?:Session,launchArgs?:string[]) {
     if(this.stopped)throw new AgentError("ACP_CLOSED","Provider runtime stopped");
     if(!this.executable)await this.start();if(this.stopped)throw new AgentError("ACP_CLOSED","Provider runtime stopped");if(!this.executable)throw new AgentError('PROVIDER_NOT_INSTALLED','Official CLI is not installed');
     let connection:AcpConnection;
-    connection=this.deps.connection({executable:this.executable.executable,args:[...this.executable.prefix,...ACP_COMMANDS[this.provider].args],cwd,
+    connection=this.deps.connection({executable:this.executable.executable,args:launchArgs??[...this.executable.prefix,...ACP_COMMANDS[this.provider].args],cwd,
       notification:async(method,params)=>{if(session)await this.notification(session,method,params);},
       request:async(method,params)=>{if(!session)throw new AgentError('ACP_NO_SESSION','No session is authorized');return this.request(session,method,params);},
       exit:()=>{
@@ -94,32 +96,43 @@ export class AcpRuntime {
       return [...this.catalog.values()];
     }catch(error){if(error instanceof AgentError&&/\(-32000\)/.test(error.message))this.markFailure(error);throw error;}finally{connection.close();}
   }
-  private async open(id:string,cwd:string,fresh=false):Promise<Session> {
-    if(fresh)return this.openOwned(id,cwd,true);
+  private async open(id:string,cwd:string,fresh=false,settings?:GrokSettings):Promise<Session> {
+    if(fresh)return this.openOwned(id,cwd,true,settings);
     const pending=this.opening.get(id);
     if(pending){if(resolve(pending.cwd)!==resolve(cwd))throw new AgentError('PROVIDER_CWD_CHANGED','Session workspace changed');return pending.promise;}
-    const promise=this.openOwned(id,cwd).finally(()=>{this.opening.delete(id);});
+    const promise=this.openOwned(id,cwd,false,settings).finally(()=>{this.opening.delete(id);});
     this.opening.set(id,{cwd,promise});return promise;
   }
-  private async openOwned(id:string,cwd:string,fresh=false):Promise<Session> {
+  private launchArgs(settings?:GrokSettings) {
+    const command=this.provider==='grok'?grokLaunchArgs(ACP_COMMANDS.grok.args,settings):ACP_COMMANDS[this.provider].args;
+    return [...(this.executable?.prefix??[]),...command];
+  }
+  private rememberOptions(session:Session,value:unknown) {
+    if(!isRecord(value))return;
+    const update=isRecord(value.update)?value.update:undefined;
+    const list=parseConfigOptions(value.configOptions??update?.configOptions??update?.options);
+    if(list.length)session.configOptions=mergeConfigOptions(session.configOptions,list);
+  }
+  private async openOwned(id:string,cwd:string,fresh=false,settings?:GrokSettings):Promise<Session> {
     if(!isAbsolute(cwd))throw new AgentError('PROJECT_PATH_INVALID','An absolute workspace is required');
     const existing=this.sessions.get(id);if(existing&&!existing.lost){if(resolve(existing.cwd)!==resolve(cwd))throw new AgentError('PROVIDER_CWD_CHANGED','Session workspace changed');return existing;}
     await this.deps.unoccupied(this.provider,this.owned);
-    const session={id,cwd,items:[],cancelled:false,loading:true,lost:false} as unknown as Session;
-    session.connection=await this.connect(cwd,session);
+    const session={id,cwd,items:[],cancelled:false,loading:true,lost:false,permissionMode:settings?.permissionMode??'default',configOptions:[],published:new Map<string,string>(),completed:new Set<string>()} as unknown as Session;
+    session.connection=await this.connect(cwd,session,this.launchArgs(settings));
     try {
       if(!fresh&&!this.availability.capabilities.resume)throw new AgentError('PROVIDER_RESUME_UNAVAILABLE','Native CLI does not support session restoration');
-      const result=await session.connection.call(fresh?'session/new':'session/load',{cwd,mcpServers:[],...(!fresh?{sessionId:this.native(id)}:{})},60000);
+      const meta=fresh?grokSessionMeta(this.provider==='grok'?settings:undefined):undefined;
+      const result=await session.connection.call(fresh?'session/new':'session/load',{cwd,mcpServers:[],...(!fresh?{sessionId:this.native(id)}:{}),...(meta?{_meta:meta}:{})},60000);
       if(!isRecord(result))throw new AgentError('ACP_SESSION_INVALID','Invalid session response');
       if(fresh){if(typeof result.sessionId!=='string')throw new AgentError('ACP_SESSION_INVALID','Native session ID missing');session.id=encodeProviderThread(this.provider,result.sessionId);}
       else if(typeof result.sessionId==='string'&&result.sessionId!==this.native(id))throw new AgentError('PROVIDER_RESUME_MISMATCH','Native CLI restored a different session');
-      session.loading=false;this.sessions.set(session.id,session);return session;
+      this.rememberOptions(session,result);session.loading=false;this.sessions.set(session.id,session);return session;
     }catch(error){session.lost=true;session.connection.close();if(error instanceof AgentError&&/\(-32000\)/.test(error.message))this.markFailure(error);throw error;}
   }
   async createThread(project:ProjectRecord,_profile?:PermissionProfile,name?:string):Promise<ThreadStartResult> {
     const session=await this.open('',project.root,true);
     this.catalog.set(session.id,{nativeThreadId:session.id,cwd:project.root,title:name??this.provider,titleSource:'name',executionState:'idle',historyMode:'legacy'});
-    return {nativeThreadId:session.id,historyMode:'legacy',policyVerified:true,rawSummary:{provider:this.provider}};
+    return {nativeThreadId:session.id,historyMode:'legacy',policyVerified:true,rawSummary:{provider:this.provider,...(session.configOptions.length?{configOptions:session.configOptions}:{})}};
   }
   async readThread(id:string,metadataOnly=false):Promise<ThreadHistorySnapshot> {
     this.native(id);const managed=this.callbacks.findManagedThread(id),row=this.catalog.get(id);
@@ -138,10 +151,52 @@ export class AcpRuntime {
     session.lost=true;this.resolvePending(session);session.connection.close();this.sessions.delete(id);
   }
   private resolvePending(session:Session) {for(const [id,p] of this.pending)if(p.session===session){clearTimeout(p.timer);this.pending.delete(id);p.resolve({outcome:{outcome:'cancelled'}});void this.callbacks.onApprovalResolved(id,this.appServerEpoch).catch(()=>undefined);}}
-  async startTurn(thread:ManagedThread,project:ProjectRecord,prompt:string,_messageId?:string,settings?:CodexSettings,images?:string[],extras?:TurnExtras) {
-    if(images?.length||extras?.attachments?.length||extras?.pluginSkills?.length||extras?.outputSchema||extras?.goal||settings&&Object.keys(settings).length)throw new AgentError('PROVIDER_INPUT_UNAVAILABLE','This provider currently accepts plain text with native settings only');
+  /** Only options the native session actually returned are written. Missing ids are left alone. */
+  private async applyConfig(session:Session,settings:GrokSettings) {
+    const apply=async(configId:string,value?:string)=>{
+      if(!value)return;
+      const option=session.configOptions.find(item=>item.id===configId);
+      if(!option||(option.values.length>0&&!option.values.includes(value)))return;
+      this.rememberOptions(session,await session.connection.call('session/set_config_option',{sessionId:this.native(session.id),configId,value:{value}}));
+    };
+    await apply('model',settings.model);
+    await apply('reasoning_effort',settings.effort);
+    if(settings.mode){
+      const option=session.configOptions.find(item=>item.id==='plan'||item.id==='mode'||item.id==='task');
+      if(option?.values.includes(settings.mode))await apply(option.id,settings.mode);
+    }
+  }
+  private async publishTool(session:Session,turnId:string,id:string,item:Record<string,unknown>) {
+    if(!session.turnId||session.completed.has(id))return;
+    const output=String(item.aggregatedOutput??'');
+    if(!session.published.has(id)){
+      await this.callbacks.onEvent({type:'item.started',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:id,payload:{item}},this.appServerEpoch);
+      session.published.set(id,'');
+    }
+    if(output&&output!==session.published.get(id)){
+      const previous=session.published.get(id)??'';
+      const replace=previous.length>0&&!output.startsWith(previous);
+      const delta=replace?output:output.slice(previous.length);
+      const clipped=clipUtf8(delta);
+      if(clipped.text)this.callbacks.onVolatile({type:'command_output.delta',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:id,payload:{delta:clipped.text,...(replace?{replace:true}:{}),...(clipped.truncated?{truncated:true}:{})}},this.appServerEpoch);
+      session.published.set(id,output);
+    }
+    if(item.status==='completed'||item.status==='failed'||item.status==='declined'){
+      await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:id,payload:{item}},this.appServerEpoch);
+      session.completed.add(id);
+    }
+  }
+  async startTurn(thread:ManagedThread,project:ProjectRecord,prompt:string,_messageId?:string,settings?:CodexSettings|GrokSettings,images?:string[],extras?:TurnExtras) {
+    const grok=this.provider==='grok'?parseGrokSettings(settings):undefined;
+    const blocked=Boolean(images?.length||extras?.attachments?.length||extras?.pluginSkills?.length||extras?.outputSchema||extras?.goal);
+    const settingsRejected=this.provider==='grok'?Boolean(settings)&&!grok:Boolean(settings&&Object.keys(settings).length);
+    if(blocked||settingsRejected)throw new AgentError('PROVIDER_INPUT_UNAVAILABLE','This provider currently accepts plain text with native settings only');
+    const desired=grok?.permissionMode??'default';
+    const known=this.sessions.get(thread.nativeThreadId);
+    if(known&&!known.lost&&known.permissionMode!==desired)await this.unsubscribeThread(known.id);
     await this.deps.unoccupied(this.provider,this.owned);
-    const session=await this.open(thread.nativeThreadId,thread.sessionCwd??project.root);
+    const session=await this.open(thread.nativeThreadId,thread.sessionCwd??project.root,false,grok);
+    if(this.provider==='grok'&&grok)await this.applyConfig(session,grok);
     if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Native turn is already running');
     const turnId=randomUUID();session.turnId=turnId;session.cancelled=false;
     const itemId=`${turnId}:user`,item={id:itemId,type:'userMessage',content:[{type:'text',text:prompt}]};
@@ -150,8 +205,10 @@ export class AcpRuntime {
     setImmediate(()=>{void session.connection.call('session/prompt',{sessionId:this.native(session.id),prompt:[{type:'text',text:prompt}]},24*3600000).then(async result=>{
       if(session.lost||session.turnId!==turnId)return;
       if(!isRecord(result)||typeof result.stopReason!=='string')throw new AgentError('ACP_RESULT_INVALID','Missing native completion evidence');
+      const usage=acpUsage(result);
+      if(usage)await this.callbacks.onEvent({type:'thread.usage',nativeThreadId:session.id,nativeTurnId:turnId,payload:usage},this.appServerEpoch);
       await this.flush(session,turnId);delete session.turnId;this.resolvePending(session);
-      await this.callbacks.onEvent({type:'turn.completed',nativeThreadId:session.id,nativeTurnId:turnId,payload:{turn:{id:turnId,status:result.stopReason==='end_turn'?'completed':result.stopReason==='cancelled'?'interrupted':'failed'},stopReason:result.stopReason}},this.appServerEpoch);
+      await this.callbacks.onEvent({type:'turn.completed',nativeThreadId:session.id,nativeTurnId:turnId,payload:{turn:{id:turnId,status:result.stopReason==='end_turn'?'completed':result.stopReason==='cancelled'?'interrupted':'failed'},stopReason:result.stopReason,...(session.configOptions.length?{configOptions:session.configOptions}:{})}},this.appServerEpoch);
     }).catch(async()=>{if(!session.lost){session.lost=true;this.resolvePending(session);session.connection.close();await this.callbacks.onThreadExit?.(session.id,this.appServerEpoch,'Native result unknown; request was not replayed');}});});
     return {nativeTurnId:turnId,status:'inProgress'};
   }
@@ -169,6 +226,7 @@ export class AcpRuntime {
     if(session.lost||method!=='session/update'||!isRecord(params.update))return;
     if(session.id&&params.sessionId!==this.native(session.id))throw new AgentError('ACP_SESSION_MISMATCH','Event belongs to a different native session');
     const update=params.update,kind=update.sessionUpdate;
+    if(kind==='config_option_update'){this.rememberOptions(session,params);return;}
     const turnId=session.turnId??'history';
     if(['agent_message_chunk','user_message_chunk','agent_thought_chunk'].includes(String(kind))&&isRecord(update.content)&&update.content.type==='text'&&typeof update.content.text==='string') {
       const type=kind==='user_message_chunk'?'userMessage':kind==='agent_thought_chunk'?'reasoning':'agentMessage';
@@ -181,12 +239,18 @@ export class AcpRuntime {
       if(session.turnId&&type==='agentMessage')this.callbacks.onVolatile({type:'agent_message.delta',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:last.nativeItemId,payload:{delta:update.content.text}},this.appServerEpoch);
     } else if((kind==='tool_call'||kind==='tool_call_update')&&typeof update.toolCallId==='string') {
       const id=`${turnId}:tool:${update.toolCallId}`;let entry=session.items.find(i=>i.nativeItemId===id);
-      if(!entry){entry={nativeTurnId:turnId,nativeItemId:id,item:{id,type:'mcpToolCall',server:this.provider}};session.items.push(entry);}
-      entry.item={...entry.item,tool:update.title??entry.item?.tool??'Tool',status:update.status??entry.item?.status??'inProgress',...(update.rawInput!==undefined?{arguments:update.rawInput}:{}),...(update.rawOutput!==undefined?{result:update.rawOutput}:{})};
+      const item={...acpToolItem(update,entry?.item??undefined),id};
+      if(!entry){entry={nativeTurnId:turnId,nativeItemId:id,item};session.items.push(entry);}else entry.item=item;
+      if(session.turnId)await this.publishTool(session,session.turnId,id,item);
+    } else if(kind==='plan') {
+      const id=`${turnId}:plan`;const item={id,type:'plan',text:acpPlanText(update)};
+      let entry=session.items.find(i=>i.nativeItemId===id);
+      if(!entry){entry={nativeTurnId:turnId,nativeItemId:id,item};session.items.push(entry);}else entry.item={...entry.item,...item};
+      if(session.turnId&&!session.completed.has(id))await this.callbacks.onEvent({type:'item.started',nativeThreadId:session.id,nativeTurnId:session.turnId,nativeItemId:id,payload:{item:entry.item}},this.appServerEpoch);
     }
     if(session.items.length>10000||Buffer.byteLength(JSON.stringify(session.items))>16*1024*1024)throw new AgentError('ACP_HISTORY_LIMIT','Native history exceeds supported snapshot limit');
   }
-  private async flush(session:Session,turnId:string) {for(const entry of session.items.filter(i=>i.nativeTurnId===turnId&&i.item?.type!=='userMessage'))await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:entry.nativeItemId,payload:{item:entry.item}},this.appServerEpoch);}
+  private async flush(session:Session,turnId:string) {for(const entry of session.items.filter(i=>i.nativeTurnId===turnId&&i.item?.type!=='userMessage'&&!session.completed.has(i.nativeItemId))){await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:entry.nativeItemId,payload:{item:entry.item}},this.appServerEpoch);session.completed.add(entry.nativeItemId);}}
   private async request(session:Session,method:string,params:Record<string,unknown>):Promise<unknown> {
     if(session.loading||session.lost||!session.turnId||(params.sessionId !== undefined ? params.sessionId!==this.native(session.id) : !method.startsWith('cursor/') || this.provider!=='cursor'))return {outcome:{outcome:'cancelled'}};
     const kind=method==='session/request_permission'?'permission':method==='cursor/ask_question'?'question':method==='cursor/create_plan'?'plan':null;

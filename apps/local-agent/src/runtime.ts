@@ -8,6 +8,7 @@ import { PanelVoiceRuntime } from "./panel-voice.js";
 import { parseOutputSchema } from "./output-schema.js";
 import { parseHostCodexOperation, parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, parseReviewTarget, parseForkRange } from "./codex-operations.js";
 import { parseClaudeSettings } from "./claude-settings.js";
+import { parseGrokSettings } from "./acp-updates.js";
 import { readNativeSessionCwd, readNativeUsage } from "./native-usage.js";
 import { nativeImageCleanup } from "./native-image-cleanup.js";
 import { homedir } from "node:os";
@@ -40,7 +41,7 @@ import { CatalogSyncScheduler, CodexCatalogWatcher, ClaudeCatalogWatcher, CATALO
 import { detectHostCodex } from "./host-codex.js";
 import { refreshEnvironmentChecks } from "./platform.js";
 import { check } from "./preflight.js";
-import { resolveTurnMode, validateSettings } from "./codex-settings.js";
+import { resolveTurnMode, validateSettings, type CodexSettings } from "./codex-settings.js";
 import { inputAnswers, inputQuestions } from "./user-input.js";
 import type { MachineIdentity } from "./identity.js";
 import { addProjectFromPanel, discoverProjectFromCwd, projectById, verifyProjectIdentity, verifySessionCwd } from "./projects.js";
@@ -966,7 +967,9 @@ export class AgentRuntime {
       await verifyProjectIdentity(project);
       if (isAcpProvider(project.provider)) {
         if (!['thread.claim','thread.release','turn.start','turn.queue','turn.cancel','approval.decide_once','input.respond'].includes(command.type)) throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Unsupported native operation');
-        if (command.payload.settings !== undefined || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['images','attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');
+        const grokSettings=project.provider==='grok'?parseGrokSettings(command.payload.settings):undefined;
+        const settingsRejected=project.provider==='grok'?command.payload.settings!==undefined&&!grokSettings:command.payload.settings!==undefined;
+        if (settingsRejected || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['images','attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');
       }
 
       if (isAcpProvider(project.provider) ? !(this.support.providerHostSupported ?? this.support.writable) || !supportsProviderCommand(this.appServer?.getAgentRuntimes?.()[project.provider],command.type,Boolean(command.precondition.nativeThreadId)) : !this.isWritable()) throw new AgentError("MACHINE_READ_ONLY", this.readOnlyReasons().join("; "));
@@ -1761,7 +1764,9 @@ export class AgentRuntime {
         if (plugins.some(selected => !catalog?.plugins?.some(plugin => plugin.pluginId === selected.pluginId && plugin.pluginName === selected.pluginName))) throw new AgentError("PLUGIN_UNAVAILABLE", "所选插件已变化，请刷新后重选");
         if (pluginSkills.some(selected => !catalog?.pluginSkills?.some(skill => skill.pluginId === selected.pluginId && skill.name === selected.name && skill.path === selected.path))) throw new AgentError("PLUGIN_SKILL_UNAVAILABLE", "所选插件技能已变化，请刷新后重选");
         const prompt = nativeAction ? "" : requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
-        const settings = isClaudeProject(project) ? parseClaudeSettings(command.payload.settings) : isAcpProvider(project.provider) ? undefined : validateSettings(command.payload.settings, server.getCodexCatalog?.());
+        const grokTurn=project.provider==="grok"?parseGrokSettings(command.payload.settings):undefined;
+        if(project.provider==="grok"&&command.payload.settings!==undefined&&!grokTurn)throw new AgentError("AGENT_INPUT_UNSUPPORTED","Only text with native settings is supported");
+        const settings = isClaudeProject(project) ? parseClaudeSettings(command.payload.settings) : project.provider==="grok" ? grokTurn : isAcpProvider(project.provider) ? undefined : validateSettings(command.payload.settings, server.getCodexCatalog?.());
         const profile = permissionProfile(command.payload.permissionProfile);
         if (command.precondition.executionSegmentId !== command.executionSegmentId) {
           throw new AgentError("PRECONDITION_INVALID", "execution segment precondition does not match the command");
@@ -1852,7 +1857,7 @@ export class AgentRuntime {
           await this.syncManagedHistory(thread, resumed.history, false);
         }
         if (thread.activeTurnId !== undefined) throw new AgentError("THREAD_BUSY", "thread still has an active turn");
-        const turnSettings = isClaudeProject(project) || isAcpProvider(project.provider) ? settings : nativeAction ? settings : resolveTurnMode(settings, thread.observedSettings, thread.acceptedSettings, command.payload.resolvedMode, server.getCodexCatalog?.());
+        const turnSettings = isClaudeProject(project) || isAcpProvider(project.provider) || nativeAction ? settings : resolveTurnMode(settings as CodexSettings, thread.observedSettings, thread.acceptedSettings, command.payload.resolvedMode, server.getCodexCatalog?.());
         const clientUserMessageId = optionalString(command.payload.clientUserMessageId, "payload.clientUserMessageId");
         const materialized = nativeAction ? [] : await materializeAttachments(project, command.commandId, rawAttachments);
         const referenced = referenceInputs(prompt, materialized);
@@ -1868,7 +1873,7 @@ export class AgentRuntime {
         const updated = await this.store.updateManagedThread(thread.nativeThreadId, (candidate) => {
           delete candidate.activeTurnSettings;
           if (!isAcpProvider(project.provider)) candidate.acceptedPermissions = { profile, source: typeof command.payload.permissionSource === "string" ? command.payload.permissionSource : "default", acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
-          if (turnSettings) candidate.acceptedSettings = { ...turnSettings, acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
+          if (turnSettings && project.provider !== "grok") candidate.acceptedSettings = { ...(turnSettings as import("./codex-settings.js").CodexSettings), acceptedAt: nowIso(), nativeTurnId: result.nativeTurnId };
           if (
             candidate.lastTurnId === result.nativeTurnId &&
             ["completed", "interrupted", "failed"].includes(candidate.lastTurnStatus ?? "")

@@ -18,8 +18,10 @@ import { NativeVoicePanel } from "./components/NativeVoicePanel";
 import { parseOutputSchema } from "./lib/output-schema";
 import { CodexOutputPanel } from "./components/CodexOutputPanel";
 import { SessionWorkspace } from "./components/SessionWorkspace";
-import { useClaudePreferences } from "./lib/claude-preferences";
+import { useClaudePreferences, type ClaudeSettings } from "./lib/claude-preferences";
+import { grokSettingsActive, useGrokPreferences, type GrokSettings } from "./lib/grok-preferences";
 import { ClaudeControls } from "./components/ClaudeControls";
+import { GrokControls } from "./components/GrokControls";
 import { agentName } from "./lib/agent-provider";
 import { AgentPicker } from "./components/AgentPicker";
 import { AdminView } from "./components/AdminView";
@@ -115,6 +117,7 @@ import { CodexInputCard } from "./components/CodexInputCard";
 import { NativeSessionActions, type NativeOperation } from "./components/NativeSessionActions";
 import { CodexInspectionPanel } from "./components/CodexInspectionPanel";
 import type { CodexSettings } from "./lib/codex-settings";
+type TurnSettings = CodexSettings | ClaudeSettings | GrokSettings;
 import { codexCommands, coverageLabels, initInstructions, parseCodexCommand } from "./lib/codex-commands";
 import { CodexCommandGuide } from "./components/CodexCommandGuide";
 import { sessionPath, useSessionDraft } from "./lib/session-workspace";
@@ -615,14 +618,14 @@ function EventIcon({ event }: { event: TimelineEvent }) {
 }
 
 function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; sessionId: string; provider?: string }) {
-  if (events.length === 0) return <div className="timeline-empty"><Clock3 size={19} />{t(provider === "claude" ? "发送消息后，Claude Code 的回复和操作进度会显示在这里。" : "发送消息后，Codex 的回复和操作进度会显示在这里。")}</div>;
+  if (events.length === 0) return <div className="timeline-empty"><Clock3 size={19} />{t("发送消息后，{0} 的回复和操作进度会显示在这里。", agentName(provider))}</div>;
   return (
     <div className="timeline">
       {events.map((event) => (
         <article className={`timeline-event timeline-event--${event.actor ?? "system"}`} key={event.id} data-scroll-anchor={event.id}>
           <span className="timeline-event__node"><EventIcon event={event} /></span>
           <div className="timeline-event__head">
-            <strong>{displayName((event.title === "Codex" ? agentName(provider) : systemText(event.title?.replace(provider === "claude" ? /^Codex/ : /$^/, "Claude Code"))) || (event.actor === "user" ? t("你") : event.actor === "agent" ? agentName(provider) : event.type))}{event.type === "turn.completed" && <span className="timeline-event__turn-tokens"> · {event.turnTokens == null ? t("本轮 token 未记录") : t("本轮消耗 {0} tokens", new Intl.NumberFormat(locale()).format(event.turnTokens))} · {event.turnCacheHitRate == null ? t("缓存命中率未记录") : t("缓存命中率 {0}%", new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(event.turnCacheHitRate))}</span>}</strong>
+            <strong>{displayName((event.title === "Codex" ? agentName(provider) : systemText(event.title?.replace(/^Codex/, agentName(provider)))) || (event.actor === "user" ? t("你") : event.actor === "agent" ? agentName(provider) : event.type))}{event.type === "turn.completed" && <span className="timeline-event__turn-tokens"> · {event.turnTokens == null ? t("本轮 token 未记录") : t("本轮消耗 {0} tokens", new Intl.NumberFormat(locale()).format(event.turnTokens))} · {event.turnCacheHitRate == null ? t("缓存命中率未记录") : t("缓存命中率 {0}%", new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(event.turnCacheHitRate))}</span>}</strong>
             <time>{new Date(event.occurredAt).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</time>
           </div>
           {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} sessionId={sessionId} /> : event.actor === "user" ? <UserMessage body={event.body} /> : <p>{event.body}</p> : null}
@@ -682,8 +685,8 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   onClaim: () => Promise<void>;
   onContinueManaged: () => Promise<void>;
   onReleaseManagement: () => Promise<void>;
-  onSend: (prompt: string, settings?: CodexSettings, images?: string[], additions?: TurnAdditions) => Promise<void>;
-  onQueue: (prompt: string, settings?: CodexSettings, images?: string[], additions?: TurnAdditions) => Promise<void>;
+  onSend: (prompt: string, settings?: TurnSettings, images?: string[], additions?: TurnAdditions) => Promise<void>;
+  onQueue: (prompt: string, settings?: TurnSettings, images?: string[], additions?: TurnAdditions) => Promise<void>;
   onSteer: (prompt: string, images?: string[], additions?: TurnAdditions) => Promise<void>;
   onCancelQueued: (queueItemId: string) => Promise<void>;
   onCancel: () => Promise<void>;
@@ -802,10 +805,12 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const [configuration, setConfiguration] = useState<ConfigurationRequest>();
   const [runtimeChoice, setRuntimeChoice] = useState<RuntimeChoice>();
   const claudePrefs=useClaudePreferences(detail?.session.provider === "claude" ? detail.session.id : undefined);
+  const grokPrefs=useGrokPreferences(detail?.session.provider === "grok" ? detail.session.id : undefined, detail?.session.sessionSeq);
   const claudeModel=claudePrefs.settings.model;
   const claudeEffort=claudePrefs.settings.effort ?? "";
   const claudePlan=claudePrefs.settings.mode === "plan";
   const [claudeSettingsOpen,setClaudeSettingsOpen]=useState(0);
+  const [grokSettingsOpen,setGrokSettingsOpen]=useState(0);
   const [modeSettingsRevision, setModeSettingsRevision] = useState(0);
   const [runtimeSummary, setRuntimeSummary] = useState<RuntimeSummary>();
   const [commandMessage, setCommandMessage] = useState("");
@@ -849,7 +854,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
     const nextId = detail?.session.id;
     if (!nextId || nextId === lastSessionId.current) return;
     lastSessionId.current = nextId;
-    setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedPlugins([]); setClaudeSettingsOpen(0);
+    setConfiguration(undefined); setReleaseConfirming(false); setRawView(false); setCommandMessage(""); setSelectedPlugins([]); setClaudeSettingsOpen(0); setGrokSettingsOpen(0);
   }, [detail?.session.id, draftOwner]);
   useEffect(() => { setActiveCompletion(0); }, [completionKey, completionPreferences.terms, completionPreferences.suggestions]);
   useEffect(() => { setActiveCompletion(current => Math.min(current, Math.max(0, completions.length - 1))); }, [completions.length]);
@@ -912,8 +917,9 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const sendText = () => prompt.trim();
   const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length);
   const imageBlocked = imageDraft.processing || fileDraft.processing || (imageDraft.images.length > 0 && (!session.imageInputSupported || Boolean(slashCommand))) || (fileDraft.files.length > 0 && (!session.fileInputSupported || Boolean(slashCommand)));
-  const sendSettings = session.provider === "claude" && claudePrefs.ready && session.collaborationModes?.includes("plan") ? claudePrefs.settings : undefined;
-  const modeBlocked = session.provider === "claude" && !claudePrefs.ready;
+  const sendSettings = session.provider === "claude" && claudePrefs.ready && session.collaborationModes?.includes("plan") ? claudePrefs.settings : session.provider === "grok" && grokPrefs.ready && grokSettingsActive(grokPrefs.settings) ? grokPrefs.settings : undefined;
+  const modeBlocked = (session.provider === "claude" && !claudePrefs.ready) || (session.provider === "grok" && !grokPrefs.ready);
+  const modeHint = session.provider === "grok" ? t("请先读取 Grok 会话配置") : t("计划模式需要先确认模型配置");
 
   async function runSlash(name: string, args = "") {
     setCommandMessage("");
@@ -1073,7 +1079,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
       {session.state.unknownFreeze && <div className="freeze-banner"><AlertTriangle size={17} /><div><strong>{t("结果不确定，写入已冻结")}</strong><span>{t("可以点击解除冻结核验主机结果；系统不会自动重发原命令。")}</span><SessionRecovery key={`${draftOwner}:${session.id}`} machineId={session.machineId} sessionId={session.id} online={detail.hostOnline === true} supported={detail.recoverySupported === true} onChanged={onRefresh} /></div></div>}
       <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? rawEvents : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}</ConversationViewport>
       {approval?.status === "pending" && (approval.type === "user_input"
-        ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} onChanged={onRefresh} />
+        ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} agent={agentName(session.provider)} onChanged={onRefresh} />
         : <ApprovalCard approval={approval} provider={session.provider} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
       {buzhouDesktop ? <BuzhoushanActivity key={`activity:${draftOwner}:${session.id}`} detail={detail} conversation={<ConversationViewport events={conversationEvents}><Timeline events={conversationEvents} sessionId={session.id} provider={session.provider}/></ConversationViewport>}/> : (session.provider??"codex")==="codex" && <RuntimeProgress key={`progress:${session.id}:${session.activeTurnId??"none"}`} sessionId={session.id} active={Boolean(session.activeTurnId)||session.state.currentTurn==="in_progress"||session.state.unknownFreeze} initial={detail.progress}/>}
       <OperationReceipts commands={detail.commands ?? []} mode="outstanding" />
@@ -1118,7 +1124,8 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
         {voiceActive && <p className="composer-mode" role="status">{t("通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。")}</p>}
         {hasActiveTurn && <div className="composer-mode"><Activity size={14} />{(session.provider ?? "codex") === "codex" ? t("Codex 正在处理：可补充当前任务，或排到下一轮") : t("{0} 正在处理：可排到下一轮", agentName(session.provider))}</div>}
-        {isAcpProvider(session.provider) && <p className="composer-mode">{t("权限沿用主机上的原生设置；需要确认时在面板处理。")}</p>}
+        {isAcpProvider(session.provider) && session.provider !== "grok" && <p className="composer-mode">{t("权限沿用主机上的原生设置；需要确认时在面板处理。")}</p>}
+        {session.provider === "grok" && <GrokControls key={session.id} options={grokPrefs.options} settings={grokPrefs.settings} ready={grokPrefs.ready} error={grokPrefs.error} onReload={grokPrefs.reload} onSave={grokPrefs.save} disabled={busy} openRequest={grokSettingsOpen}/>}
         {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
 
         {(session.provider ?? "codex") === "codex" && <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>}
@@ -1126,7 +1133,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           {referenceCards.map(card => { const source = card.identity; const candidate = referenceCandidates.find(item => item.id === card.sourceId); const failed = Boolean(card.error); return <article className="session-reference-card" key={card.key}>
             <div className="session-reference-card__head"><strong>{displayName(source?.title ?? candidate?.title ?? card.sourceId)}</strong><button type="button" aria-label={t("删除引用卡片")} onClick={() => removeReference(card.key)}><X size={15} /></button></div>
             <small>{displayName(source ? `${source.host} · ${source.project}` : candidate ? `${candidate.machineName} · ${candidate.projectAlias}` : t("正在读取会话"))}</small>
-            <small>{t(session.provider === "claude" ? "发送后由 Claude Code 按任务查阅可读历史；不预先生成摘要" : "发送后由 Codex 按任务查阅可读历史；不预先生成摘要")}</small>
+            <small>{t("发送后由 {0} 按任务查阅可读历史；不预先生成摘要", agentName(session.provider))}</small>
             {failed ? <p role="alert">{card.error}</p> : source ? <span role="status">{t("引用已就绪")}{source.incomplete ? ` · ${t("部分历史未同步")}` : ""}</span> : <span role="status">{t("正在核验会话")}</span>}
             {failed && <button type="button" className="button button--secondary" onClick={() => retryReference(card.key)}>{t("重试")}</button>}
           </article>; })}
@@ -1228,8 +1235,8 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           }}
         />
         <div className="composer-actions">
-          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(modeBlocked ? t("计划模式需要先确认模型配置") : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
-          <span className="composer-touch-hint">{(modeBlocked ? t("计划模式需要先确认模型配置") : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-keyboard-hint" title={detail.writeBlockedReason || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(modeBlocked ? modeHint : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-touch-hint">{(modeBlocked ? modeHint : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : detail.writeBlockedReason) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
           <div className="composer-button-group">
           <input ref={imageInput} className="composer-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label={t("选择要发送的图片")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void imageDraft.addFiles(files); }} />
           <input ref={fileInput} className="composer-image-input" type="file" accept={ATTACHMENT_ACCEPT} multiple aria-label={t("选择要发送的文件")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />
@@ -1239,9 +1246,10 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
             {(session.provider ?? "codex") === "codex" && session.collaborationModes?.includes("default") && <div className="composer-mode-field"><Lightbulb size={17} aria-hidden="true"/><RuntimeModeSelect sessionId={session.id} summary={runtimeSummary} running={hasActiveTurn} onSaved={() => setModeSettingsRevision(n => n + 1)}/></div>}
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); fileInput.current?.click(); }}><FileUp size={17} /><span><b>{t("文件")}</b><small>{t("支持 PDF、XLSX、UTF-8 文本、源码与配置")}</small></span></button>
             <button type="button" disabled={busy || !session.fileInputSupported || fileDraft.processing} onClick={() => { closeAddMenu(); folderInput.current?.click(); }}><FolderOpen size={17} /><span><b>{t("文件夹")}</b><small>{t("逐个校验支持类型，最多 32 个文件")}</small></span></button>
-            {!isAcpProvider(session.provider) && <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t(session.provider === "claude" ? "添加会话引用，由 Claude Code 按需查阅" : "添加会话引用，由 Codex 按需查阅")}</small></span></button>}
+            {!isAcpProvider(session.provider) && <button type="button" onClick={() => { closeAddMenu(); setReferencePage(1); setReferenceCursors([null]); setReferenceSearch(""); setReferenceLink(""); setReferenceLinkError(""); setReferencePicker(true); }}><Copy size={17} /><span><b>{t("复用会话")}</b><small>{t("添加会话引用，由 {0} 按需查阅", agentName(session.provider))}</small></span></button>}
             <button type="button" disabled={busy || imageDraft.processing || imageDraft.images.length >= 4} onClick={() => { closeAddMenu(); imageInput.current?.click(); }}><ImagePlus size={17} /><span><b>{t("图片")}</b><small>{t("作为多模态图片发送")}</small></span></button>
             {session.provider === "claude" && <button type="button" onClick={()=>{closeAddMenu();setClaudeSettingsOpen(n=>n+1);}}><Code2 size={17}/><span><b>{t("Claude Code 设置")}</b><small>{t("模型 · 思考强度 · 计划模式")}</small></span></button>}
+            {session.provider === "grok" && <button type="button" onClick={()=>{closeAddMenu();setGrokSettingsOpen(n=>n+1);}}><Code2 size={17}/><span><b>{t("Grok Build 设置")}</b><small>{t("模型 · 思考强度 · 工具审批 · 任务模式")}</small></span></button>}
             <label className="composer-add-field"><Target size={17} /><span><b>{t("目标")}</b><small>{t("设置要持续追求的会话目标")}</small><input value={goal} maxLength={2000} placeholder={t("输入目标…")} onChange={event => setGoal(event.target.value)} /></span></label>
             {session.provider === "claude" && session.collaborationModes?.includes("plan") && <button type="button" disabled={hasActiveTurn || !claudePrefs.ready} aria-pressed={claudePlan} onClick={() => { closeAddMenuAfterTouchChoice(); void claudePrefs.save({...claudePrefs.settings,mode:claudePlan?"default":"plan"}).catch(error=>setCommandMessage(errorMessage(error))); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{claudePlan ? t("已开启；下一轮按计划模式运行") : t("先分析并制定计划")}</small></span><i className={claudePlan ? "active" : ""} /></button>}
             {(session.provider ?? "codex") === "codex" && (session.plugins?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.plugins!.map(plugin => { const selected = selectedPlugins.some(item => item.pluginId === plugin.pluginId); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={plugin.pluginId} onClick={() => { setSelectedPlugins(current => selected ? current.filter(item => item.pluginId !== plugin.pluginId) : [...current, plugin]); closeAddMenuAfterTouchChoice(); }}><Puzzle size={17} /><span><b>{plugin.pluginName}</b></span></button>; })}</div></>}
@@ -1622,9 +1630,9 @@ function App() {
         nativeThreadId: current.session.nativeThreadId ?? undefined,
         occurredAt: existing?.occurredAt ?? new Date().toISOString(),
         actor: update.eventType === "agent_message.delta" ? "agent" : "system",
-        title: update.eventType === "agent_message.delta" ? `${agentName(detail?.session.provider)} · ${t("实时")}` : update.eventType === "command_output.delta" ? t("命令输出 · 实时") : t("变更预览 · 实时"),
+        title: update.eventType === "agent_message.delta" ? `${agentName(detailRef.current?.session.provider)} · ${t("实时")}` : update.eventType === "command_output.delta" ? t("命令输出 · 实时") : t("变更预览 · 实时"),
         body: update.eventType === "agent_message.delta" ? bounded(`${existing?.body ?? ""}${delta}`) : update.eventType === "turn_diff.delta" ? t("正在接收最终变更…") : null,
-        output: update.eventType === "command_output.delta" ? bounded(`${existing?.output ?? ""}${delta}`) : null,
+        output: update.eventType === "command_output.delta" ? bounded(`${update.payload.replace === true ? "" : existing?.output ?? ""}${delta}`) : null,
         diff: update.eventType === "turn_diff.delta" ? volatileDiff(diffText) : null,
         payloadState: "present",
       };
@@ -1796,8 +1804,8 @@ function App() {
       throw error;
     }
   }
-  async function sendPrompt(prompt: string, settings?: CodexSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) return; try { await submitCommand({ type: "turn.start", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: null, projectLeaseVersion: detail.session.projectLeaseVersion } }); toast("info", t("消息已提交，等待主机处理")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
-  async function queuePrompt(prompt: string, settings?: CodexSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) throw new Error(t("会话已切换，请在当前会话重试")); try { await submitCommand({ type: "turn.queue", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), expiresInSeconds: 3600, precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: detail.session.activeTurnId ?? null, projectLeaseVersion: detail.session.projectLeaseVersion, queueVersion: detail.session.queueVersion } }); toast("info", t("排队请求已提交，请查看操作进度")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function sendPrompt(prompt: string, settings?: TurnSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) return; try { await submitCommand({ type: "turn.start", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: null, projectLeaseVersion: detail.session.projectLeaseVersion } }); toast("info", t("消息已提交，等待主机处理")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function queuePrompt(prompt: string, settings?: TurnSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) throw new Error(t("会话已切换，请在当前会话重试")); try { await submitCommand({ type: "turn.queue", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), expiresInSeconds: 3600, precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: detail.session.activeTurnId ?? null, projectLeaseVersion: detail.session.projectLeaseVersion, queueVersion: detail.session.queueVersion } }); toast("info", t("排队请求已提交，请查看操作进度")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function steerPrompt(prompt: string, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.steer", payload: { prompt, ...(images?.length ? { images } : {}), ...additions }, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("追加请求已提交，等待主机确认")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function cancelQueuedTurn(queueItemId: string) { if (!detail) return; try { await api.cancelQueuedTurn(detail.session.id, queueItemId); toast("info", t("队列项已取消")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function cancelTurn() { if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.cancel", payload: {}, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("停止请求已提交，等待主机确认")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }

@@ -90,6 +90,13 @@ it('keeps reasoning and command output in the terminal and conversation text in 
  expect(workbenchItems(d).map(e=>e.id)).toEqual(['reason','cmd']);
  expect(workbenchItems(d)[0].output).toBe('public reasoning summary');
 });
+it('keeps the command title when a later live output delta has no command',()=>{
+ const d=detail();
+ d.events=[{id:'start',nativeItemId:'cmd',sessionSeq:1,occurredAt:'2026-01-01',nativeTurnId:'turn-a',type:'item.started',itemType:'commandExecution',command:'npm test',title:'命令执行'},{id:'delta',nativeItemId:'cmd',sessionSeq:2,occurredAt:'2026-01-01',nativeTurnId:'turn-a',type:'command_output.delta',title:'命令输出 · 实时',output:'partial'}];
+ const items=workbenchItems(d);
+ expect(items).toHaveLength(1);
+ expect(items[0]).toMatchObject({id:'cmd',title:'npm test',output:'partial',kind:'commandExecution'});
+});
 it('keeps heartbeat through streaming replies, reasoning, and reply completion',()=>{
  vi.useFakeTimers();const d=detail();
  const view=render(<BuzhoushanHeartbeat detail={d} messages={[]}/>);

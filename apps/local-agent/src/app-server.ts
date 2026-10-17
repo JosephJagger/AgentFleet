@@ -36,6 +36,7 @@ import { codexNetworkEnvironment } from "./system-proxy.js";
 import { verifySessionCwd } from "./projects.js";
 import { requestedPermissions, threadPermissionParams, turnPermissionPolicy, type PermissionProfile } from "./permissions.js";
 import { parseModels, readObservedSettings, turnSettingsParams, type CodexCatalog, type CodexSettings, type CodexObservedSettings } from "./codex-settings.js";
+import type { GrokSettings } from "./acp-updates.js";
 import {
   canonicalJson,
   identifier,
@@ -231,7 +232,7 @@ export interface AppServerClient {
     project: ProjectRecord,
     prompt: string,
     clientUserMessageId?: string,
-    settings?: CodexSettings,
+    settings?: CodexSettings | GrokSettings,
     images?: string[],
     extras?: TurnExtras,
   ): Promise<TurnStartResult>;

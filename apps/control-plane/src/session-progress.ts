@@ -18,6 +18,16 @@ interface Stream {
 }
 const terminalTypes = ["turn.completed", "turn.failed", "turn.interrupted"];
 const text = (value: unknown, limit = 1000) => typeof value === "string" ? value.slice(0, limit) : "";
+function toolResultText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(toolResultText).filter(Boolean).join("\n");
+  if (!value || typeof value !== "object") return "";
+  const row = value as Record<string, unknown>;
+  if (typeof row.text === "string") return row.text;
+  if (typeof row.content === "string") return row.content;
+  if (row.content !== undefined && row.content !== value) return toolResultText(row.content);
+  return "";
+}
 
 /** Read-only projections of native notifications. Never resume a writer or replay a command. */
 export class SessionProgressService {
@@ -28,7 +38,7 @@ export class SessionProgressService {
     while (this.streams.size > 256) this.streams.delete(this.streams.keys().next().value!);
   }
   /** Called only after transport, epoch and thread binding validation. */
-  record(sessionId: string, segmentId: string, turnId: string, itemId: string | undefined, type: string, content: string, truncated: boolean) {
+  record(sessionId: string, segmentId: string, turnId: string, itemId: string | undefined, type: string, content: string, truncated: boolean, replace = false) {
     this.prune();
     const row = this.db.get<{content_epoch:number;sync_content:number}>(`SELECT s.content_epoch,p.sync_content FROM logical_sessions s JOIN projects p ON p.project_id=s.project_id
       JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.execution_segment_id=? AND e.ended_at IS NULL
@@ -36,7 +46,7 @@ export class SessionProgressService {
     if (!row?.sync_content) return;
     const key=JSON.stringify([sessionId,segmentId,row.content_epoch,turnId,itemId??"diff",type]);
     const previous=this.streams.get(key);
-    const combined=type==='turn_diff.delta'?content:(previous?.text??'')+content;
+    const combined=type==='turn_diff.delta'||replace?content:(previous?.text??'')+content;
     this.streams.delete(key);
     this.streams.set(key,{sessionId,segmentId,contentEpoch:row.content_epoch,turnId,itemId:itemId??'diff',type,text:combined.slice(-4000),at:this.now(),truncated:truncated||combined.length>4000||Boolean(previous?.truncated)});
     this.prune();
@@ -69,14 +79,19 @@ export class SessionProgressService {
       const id=row.native_item_id??text(item.id);if(!id||hidden.has(id))continue;
       if(completed.has(id)&&row.type==='item.started')continue;
       const status=row.type==='item.completed'?(item.status==='failed'||item.status==='declined'?item.status:'completed'):'running';
-      let title='',output='';
+      let title='',output='',kind=String(item.type??'');
       if(item.type==='commandExecution'){title=text(item.command);output=text(item.aggregatedOutput,4000);}
       else if(item.type==='fileChange'){
         const changes=Array.isArray(item.changes)?item.changes:[];
         title=changes.slice(0,4).map((change:{path?:unknown})=>text(change.path,200)).join(', ');
         output=changes.slice(0,2).map((change:{diff?:unknown})=>text(change.diff,2000)).join('\n');
       } else if(item.type==='agentMessage'||item.type==='plan')title=text(item.text);
-      else continue; // never expose raw reasoning or arbitrary tool arguments
+      else if(item.type==='mcpToolCall'){
+        const args=item.arguments&&typeof item.arguments==='object'&&!Array.isArray(item.arguments)?item.arguments as Record<string,unknown>:{};
+        title=(typeof args.command==='string'?args.command:'')||text(item.tool,200)||'Tool';
+        output=text(typeof item.result==='string'?item.result:toolResultText(item.result),4000);
+        kind='commandExecution';
+      } else continue; // never expose raw reasoning or arbitrary tool arguments
       const snapshot=item.source==='workspace_snapshot';
       if(snapshot){
         title=(item.changes??[]).map((change:{path?:unknown})=>text(change.path,200)).join(', ').slice(0,1000);
@@ -84,7 +99,7 @@ export class SessionProgressService {
         limited ||= Boolean(item.limited)||full.length>16000;
       }
       if(row.type==='item.completed')completed.add(id);
-      items.delete(id);items.set(id,{id,kind:item.type,status,title,...(snapshot?{source:"workspace_snapshot",limited:Boolean(item.limited)||(item.changes??[]).map((x:{diff?:string})=>x.diff??"").join("\n").length>16000,supported:item.supported===true}:{}), ...(output?{output}:{}),updatedAt:row.received_at});
+      items.delete(id);items.set(id,{id,kind,status,title,...(snapshot?{source:"workspace_snapshot",limited:Boolean(item.limited)||(item.changes??[]).map((x:{diff?:string})=>x.diff??"").join("\n").length>16000,supported:item.supported===true}:{}), ...(output?{output}:{}),updatedAt:row.received_at});
     }
     if(policy?.sync_content && !end && turnId===session.activeTurnId) for(const stream of this.streams.values()) {
       if(stream.sessionId!==sessionId||stream.segmentId!==session.executionSegmentId||stream.contentEpoch!==session.contentEpoch||stream.turnId!==turnId||hidden.has(stream.itemId)||completed.has(stream.itemId))continue;

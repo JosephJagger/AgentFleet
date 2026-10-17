@@ -17,6 +17,7 @@ import { VoicePreferencesService } from "./voice-preferences.js";
 import { PanelVoiceService } from "./panel-voice.js";
 import { NativeVoiceService, validVoiceOffer, VOICE_CONTROL_TTL_SECONDS, type VoiceBinding } from "./native-voice.js";
 import {ClaudePreferencesService} from "./claude-preferences.js";
+import {GrokPreferencesService} from "./grok-preferences.js";
 import { AdministrationService } from "./administration.js";
 import { createWorldWeather } from "./world-weather.js";
 import { createHash, type Hash } from "node:crypto";
@@ -1542,6 +1543,10 @@ export async function buildControlPlane(
     new ClaudePreferencesService(db).read(request.principal as Principal,routeId(request)));
   app.put("/api/sessions/:id/claude-settings", {preHandler:mutate}, async request =>
     new ClaudePreferencesService(db).write(request.principal as Principal,routeId(request),record(request.body)));
+  app.get("/api/sessions/:id/grok-settings", {preHandler:authenticate}, async request =>
+    new GrokPreferencesService(db).read(request.principal as Principal,routeId(request)));
+  app.put("/api/sessions/:id/grok-settings", {preHandler:mutate}, async request =>
+    new GrokPreferencesService(db).write(request.principal as Principal,routeId(request),record(request.body)));
   app.get("/api/settings/codex/voice", { preHandler: authenticate }, async request => new VoicePreferencesService(db).read(request.principal as Principal));
   app.put("/api/settings/codex/voice", { preHandler: mutate }, async request => new VoicePreferencesService(db).write(request.principal as Principal, record(request.body)));
   app.get("/api/settings/codex", { preHandler: authenticate }, async request =>
@@ -2160,14 +2165,14 @@ export async function buildControlPlane(
             const content = requiredString(payload[field], field, 64_000);
             invariant(Buffer.byteLength(content, "utf8") <= 32_000, 413, "VOLATILE_TOO_LARGE", "Volatile content exceeds 32 KB");
             if (!binding.sync_content) return;
-            sessionProgress.record(logicalSessionId,executionSegmentId,nativeTurnId,typeof message.nativeItemId==="string"?message.nativeItemId:undefined,message.eventType,content,payload.truncated===true);
+            sessionProgress.record(logicalSessionId,executionSegmentId,nativeTurnId,typeof message.nativeItemId==="string"?message.nativeItemId:undefined,message.eventType,content,payload.truncated===true,payload.replace===true);
             broadcastSession(logicalSessionId, {
               type: "volatile",
               eventType: message.eventType,
               logicalSessionId,
               nativeTurnId,
               ...(typeof message.nativeItemId === "string" ? { nativeItemId: message.nativeItemId.slice(0, 300) } : {}),
-              payload: { [field]: content, truncated: payload.truncated === true },
+              payload: { [field]: content, truncated: payload.truncated === true, ...(payload.replace === true ? { replace: true } : {}) },
             });
           } else if (message.type === "command.ack") {
             invariant(state.producerEpoch, 409, "AGENT_HELLO_REQUIRED", "Agent must send hello first");

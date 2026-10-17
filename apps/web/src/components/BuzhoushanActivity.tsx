@@ -19,9 +19,18 @@ export function workbenchItems(detail: SessionDetail, progress?: SessionProgress
   for (const event of timelineItems(detail.events)) {
     const id = event.nativeItemId || event.id;
     if (hidden.has(id) || (turn && event.nativeTurnId && event.nativeTurnId !== turn) || isConversationEvent(event) || event.itemType === "fileChange" || event.diff || event.fileChanges?.length) continue;
-    items.set(id,{id,kind:event.command?"commandExecution":event.itemType || "process",status:event.status || (event.type==="item.completed"?"completed":"unknown"),
-      title:event.command || event.title || event.type,
-      output:event.output || event.body || undefined,updatedAt:event.occurredAt});
+    const previous=items.get(id);
+    const liveTitle=!event.command && /实时/.test(event.title ?? "");
+    let title=event.command || event.title || event.type;
+    let output=event.output || event.body || undefined;
+    if(previous){
+      title=liveTitle && previous.title ? previous.title : title || previous.title;
+      const nextOutput=output ?? "";
+      const prevOutput=previous.output ?? "";
+      output=nextOutput.length>=prevOutput.length ? (nextOutput || prevOutput) : prevOutput;
+    }
+    items.set(id,{id,kind:event.command?"commandExecution":event.itemType || previous?.kind || "process",status:event.status || (event.type==="item.completed"?"completed":previous?.status || "unknown"),
+      title,output,updatedAt:event.occurredAt});
   }
   for (const item of matching?.items ?? []) if (!hidden.has(item.id) && item.kind === "commandExecution") items.set(item.id,item);
   return [...items.values()].slice(-60);

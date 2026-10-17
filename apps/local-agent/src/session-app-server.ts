@@ -3,6 +3,7 @@ import { CodexAppServer, type AppServerCallbacks, type AppServerClient, type Thr
 import { AgentError } from "./errors.js";
 import type { ApprovalRecord, ManagedThread, ProjectRecord } from "./types.js";
 import type { CodexSettings } from "./codex-settings.js";
+import type { GrokSettings } from "./acp-updates.js";
 import type { InputAnswers } from "./user-input.js";
 import type { TurnExtras } from "./attachments.js";
 
@@ -261,7 +262,7 @@ export class SessionAppServer implements AppServerClient {
       // It makes no assertion about another CLI/desktop process's ownership.
     });
   }
-  startTurn(thread: ManagedThread, project: ProjectRecord, prompt: string, messageId?: string, settings?: CodexSettings, images?: string[], extras?: TurnExtras) {
+  startTurn(thread: ManagedThread, project: ProjectRecord, prompt: string, messageId?: string, settings?: CodexSettings | GrokSettings, images?: string[], extras?: TurnExtras) {
     return this.serial(thread.nativeThreadId, async () => {
       const current = this.callbacks.findManagedThread(thread.nativeThreadId);
       if (current?.activeTurnId) throw new AgentError("THREAD_BUSY", "A native task started before the message could be sent; append to it or retry");

@@ -7,6 +7,8 @@ import { parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, saniti
 import {ClaudePreferencesService} from "./claude-preferences.js";
 import {parseClaudeMetadata} from "./claude-metadata.js";
 import { parseClaudeSettings, supportsClaudeControls } from "./claude-settings.js";
+import { GrokPreferencesService } from "./grok-preferences.js";
+import { grokSettingsActive, parseGrokSettings, supportsGrokControls } from "./grok-settings.js";
 import { UsageService } from "./usage.js";
 import type { ControlPlaneConfig } from "./config.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
@@ -561,7 +563,8 @@ export class CoordinationService {
       if (isAcpProvider(session.provider)) {
         const raw = this.db.get<{discovery_json:string|null}>("SELECT discovery_json FROM machines WHERE machine_id=?",session.machine_id);
         invariant(supportsProviderCommand(JSON.parse(raw?.discovery_json ?? '{}')?.agentRuntimes?.[session.provider],input.type,Boolean(session.native_thread_id)),409,'AGENT_CAPABILITY_UNAVAILABLE','Official CLI has not reported support for this operation');
-        invariant(payload.settings === undefined && payload.outputSchema === undefined && payload.goal === undefined && payload.nativeCollaboration === undefined && !['images','attachments','references','plugins','pluginSkills'].some(key => Array.isArray(payload[key]) && (payload[key] as unknown[]).length),400,'AGENT_INPUT_UNSUPPORTED','This provider currently accepts text using its native settings');
+        if (session.provider === "grok" && payload.settings !== undefined && !parseGrokSettings(payload.settings)) invariant(false,400,"GROK_SETTINGS_INVALID","Unsupported Grok Build settings");
+        invariant((session.provider === "grok" || payload.settings === undefined) && payload.outputSchema === undefined && payload.goal === undefined && payload.nativeCollaboration === undefined && !['images','attachments','references','plugins','pluginSkills'].some(key => Array.isArray(payload[key]) && (payload[key] as unknown[]).length),400,'AGENT_INPUT_UNSUPPORTED','This provider currently accepts text using its native settings');
       }
       invariant(!blocksDuringMaintenance(session.maintenance_json,input.type),409,"MACHINE_DRAINING",MAINTENANCE_MESSAGE);
       if (session.provider === "codex" && (input.type === "turn.start" || input.type === "turn.queue")) {
@@ -577,11 +580,20 @@ export class CoordinationService {
         const saved=new ClaudePreferencesService(this.db).read(principal,logicalSessionId);
         if(saved.settings)payload.settings=saved.settings;
       }
+      if(session.provider === "grok" && (input.type === "turn.start" || input.type === "turn.queue") && payload.settings === undefined){
+        const saved=new GrokPreferencesService(this.db).read(principal,logicalSessionId);
+        if(saved.settings && grokSettingsActive(saved.settings)){
+          const version=this.db.get<{agent_version:string}>("SELECT agent_version FROM machines WHERE machine_id=?",session.machine_id);
+          invariant(supportsGrokControls(version?.agent_version),409,"GROK_AGENT_UPDATE_REQUIRED","Update the host Agent before configuring Grok Build");
+          payload.settings=saved.settings;
+        }
+      }
       if (payload.settings !== undefined) {
 
         invariant(input.type === "turn.start" || input.type === "turn.queue", 400, "CODEX_SETTINGS_ACTION_DENIED", "Settings can only apply when starting a new turn");
         const machine = this.db.get<{ codex_catalog_json: string | null; agent_version:string;discovery_json:string|null }>("SELECT codex_catalog_json,agent_version,discovery_json FROM machines WHERE machine_id=?", session.machine_id);
         if(session.provider === "claude") { invariant(supportsClaudeControls(machine?.agent_version),409,"CLAUDE_AGENT_UPDATE_REQUIRED","Claude Code 原生控制需要 Agent 0.30.57 或更新版本"); try {parseClaudeSettings(payload.settings);} catch {invariant(false,400,"CLAUDE_SETTINGS_INVALID","Unsupported Claude Code settings");} }
+        else if(session.provider === "grok") { invariant(supportsGrokControls(machine?.agent_version),409,"GROK_AGENT_UPDATE_REQUIRED","Update the host Agent before configuring Grok Build"); invariant(parseGrokSettings(payload.settings),400,"GROK_SETTINGS_INVALID","Unsupported Grok Build settings"); }
         else validateCodexSettings(payload.settings, machine?.codex_catalog_json ? parseCodexCatalog(JSON.parse(machine.codex_catalog_json)) : null);
         if(session.provider === "claude") {
           const selected=parseClaudeSettings(payload.settings)?.permissionMode;

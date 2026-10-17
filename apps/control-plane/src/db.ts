@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 62) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 63) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1556,6 +1556,14 @@ export class ControlPlaneDatabase {
       }
       if(this.all("PRAGMA foreign_key_check").length)throw new Error('Provider runtime migration foreign-key violation');
       this.sqlite.exec("PRAGMA user_version=62");
+    });
+    if (version < 63) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS grok_preferences (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        logical_session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id) ON DELETE CASCADE,
+        settings_json TEXT NOT NULL, revision INTEGER NOT NULL, updated_at TEXT NOT NULL,
+        PRIMARY KEY(workspace_id,logical_session_id)
+      ) STRICT; PRAGMA user_version=63`);
     });
   }
 

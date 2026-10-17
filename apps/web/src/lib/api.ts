@@ -1,5 +1,6 @@
 import { parseProviderRuntimeState } from "./provider-runtime-policy";
 import { isProviderId, type ProviderId } from "./provider-catalog";
+import { agentName } from "./agent-provider";
 export type VoiceDirectoryPage={generatedAt:string;hostTotal:number;hostsTruncated:boolean;hosts:{id:string;name:string;heartbeatAt:string|null}[];total:number;nextCursor:string|null;sessions:{id:string;title:string;provider:string;host:string;project:string;managed:boolean;executionState:string;freshness:string;hostHeartbeatAt:string|null;sessionUpdatedAt:string}[]};
 export type LongTermPreference={id:string;body:string;conditions:string;enabled:boolean;expiresAt:string|null;revision:number};
 export type LongTermPreferenceList={revision:number;items:LongTermPreference[];bytes:number;budget:number};
@@ -344,6 +345,16 @@ function mapHostOperation(value: unknown): HostOperation {
   return { id: string(raw.operationId), type: string(raw.type) as MaintenanceType, state: string(raw.state, "unknown") as HostOperation["state"], createdAt: string(raw.createdAt), updatedAt: string(raw.updatedAt), expiresAt: string(raw.expiresAt) || undefined, result: raw.result ? record(raw.result) : null, error: raw.error ? { code: string(record(raw.error).code), message: string(record(raw.error).message) } : null };
 }
 
+function toolResultText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(toolResultText).filter(Boolean).join("\n");
+  const row = record(value);
+  if (typeof row.text === "string") return row.text;
+  if (typeof row.content === "string") return row.content;
+  if (row.content !== undefined && row.content !== value) return toolResultText(row.content);
+  return "";
+}
+
 function eventBody(item: JsonObject, payload: JsonObject): string | null {
   if (item.type === "userMessage") {
     const body = list(item.content)
@@ -353,7 +364,8 @@ function eventBody(item: JsonObject, payload: JsonObject): string | null {
     return body || null;
   }
   if (item.type === "agentMessage" || item.type === "plan") return string(item.text) || null;
-  if (item.type === "reasoning") return list(item.summary).map((entry) => string(entry)).filter(Boolean).join("\n") || null;
+  if (item.type === "reasoning") return list(item.summary).map((entry) => string(entry)).filter(Boolean).join("\n") || string(item.text) || null;
+  if (item.type === "mcpToolCall") return toolResultText(item.result) || null;
   if (typeof payload.message === "string") return payload.message;
   return null;
 }
@@ -364,6 +376,7 @@ function eventTitle(type: string, item: JsonObject): string {
   if (item.type === "plan") return t("计划");
   if (item.type === "reasoning") return t("推理摘要");
   if (item.type === "commandExecution") return t("命令执行");
+  if (item.type === "mcpToolCall") return string(record(item.arguments).command) || string(item.tool) || t("工具调用");
   if (item.type === "fileChange") return t("文件变更");
   const titles: Record<string, string> = {
     "thread.started": t("受管 Thread 已创建"),
@@ -371,7 +384,7 @@ function eventTitle(type: string, item: JsonObject): string {
     "turn.completed": t("Turn 完成"),
     "turn.failed": t("Turn 失败"),
     "turn.interrupted": t("Turn 已取消"),
-    "turn.error": t("Codex 错误"),
+    "turn.error": t("任务错误"),
     "turn.diff.final": t("最终变更"),
     "approval.requested": t("等待一次性审批"),
     "approval.resolved": t("审批请求已结束"),
@@ -443,8 +456,8 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     body: eventBody(item, payload),
     payloadState: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? raw.payloadState : "present",
     status: string(item.status, string(record(payload.turn).status)) || null,
-    command: itemType === "commandExecution" ? string(item.command) || null : null,
-    output: itemType === "commandExecution" ? string(item.aggregatedOutput) || null : null,
+    command: itemType === "commandExecution" ? string(item.command) || null : itemType === "mcpToolCall" ? string(record(item.arguments).command) || string(item.tool) || null : null,
+    output: itemType === "commandExecution" ? string(item.aggregatedOutput) || null : itemType === "mcpToolCall" ? toolResultText(item.result) || null : null,
     diff: diffSummary(diffText),
     fileChanges: itemType === "fileChange" ? list(item.changes).map(record).map(change=>({path:string(change.path),diff:string(change.diff)})) : undefined,
     nativeUsage,
@@ -502,7 +515,7 @@ function mapApproval(rawValue: unknown, sessions: FleetSession[], machines: Mach
     machineName: machine?.name ?? session?.machineName ?? t("未知主机"),
     projectAlias: project?.alias ?? session?.projectAlias ?? t("未知项目"),
     cwd: string(action.cwd, project?.pathHint ?? t("路径未上报")),
-    summary: action.kind === "user_input" ? t("Codex 等待你的回答") : string(action.reason, command ? t("执行命令需要确认") : paths.length ? t("写入文件需要确认") : t("操作需要确认")),
+    summary: action.kind === "user_input" ? t("{0} 等待你的回答", agentName(session?.provider)) : string(action.reason, command ? t("执行命令需要确认") : paths.length ? t("写入文件需要确认") : t("操作需要确认")),
     command,
     paths,
     risk,
@@ -697,6 +710,8 @@ export const api = {
   saveMachineCodexPreferences: (id: string, input: { settings: import("./codex-settings").CodexSettings | null; revision: number }) => request<import("./codex-settings").CodexPreferences>(`/api/machines/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
   claudePreferences: (id:string,signal?:AbortSignal)=>request<import("./claude-preferences").ClaudePreferences>(`/api/sessions/${encodeURIComponent(id)}/claude-settings`,{signal}),
   saveClaudePreferences: (id:string,input:{settings:import("./claude-preferences").ClaudeSettings;revision:number})=>request<import("./claude-preferences").ClaudePreferences>(`/api/sessions/${encodeURIComponent(id)}/claude-settings`,{method:"PUT",body:JSON.stringify(input)}),
+  grokPreferences: (id:string,signal?:AbortSignal)=>request<import("./grok-preferences").GrokPreferences>(`/api/sessions/${encodeURIComponent(id)}/grok-settings`,{signal}),
+  saveGrokPreferences: (id:string,input:{settings:import("./grok-preferences").GrokSettings;revision:number})=>request<import("./grok-preferences").GrokPreferences>(`/api/sessions/${encodeURIComponent(id)}/grok-settings`,{method:"PUT",body:JSON.stringify(input)}),
   saveCodexPreferences: (id: string, input: { scope: string; settings: import("./codex-settings").CodexSettings | null; revision: number }) => request<import("./codex-settings").CodexPreferences>(`/api/sessions/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
   requestLoginCode: (email: string, locale: "zh" | "en") => request<{ challengeId: string; expiresIn: number; resendAfter: number }>(
     "/api/auth/request-code", { method: "POST", body: JSON.stringify({ email, locale }) }),

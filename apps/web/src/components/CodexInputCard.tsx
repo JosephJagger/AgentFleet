@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { Approval } from "../lib/types";
 
-export function CodexInputCard({ request, onChanged }: { request: Approval; onChanged: () => void }) {
+export function CodexInputCard({ request, onChanged, agent = "Codex" }: { request: Approval; onChanged: () => void; agent?: string }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -24,8 +24,8 @@ export function CodexInputCard({ request, onChanged }: { request: Approval; onCh
     } catch (e) { setError(e instanceof Error ? e.message : t("回答发送失败")); }
     finally { setBusy(false); }
   }
-  return <section className="codex-input-card" aria-label={t("Codex 问答")}>
-    <strong>{sent ? t("回答已提交，等待主机处理") : expired ? t("这个问题已过期") : t("Codex 等待你的回答")}</strong>
+  return <section className="codex-input-card" aria-label={t("{0} 问答", agent)}>
+    <strong>{sent ? t("回答已提交，等待主机处理") : expired ? t("这个问题已过期") : t("{0} 等待你的回答", agent)}</strong>
     <p>{t("回答会传给当前会话的原问题，不会启动新任务。请勿填写密码或密钥。")}</p>
     {questions.map((q) => <fieldset key={q.id} disabled={busy || sent || expired}>
       <legend>{q.header} · {q.question}</legend>

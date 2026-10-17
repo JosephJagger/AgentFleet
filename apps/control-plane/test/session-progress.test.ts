@@ -33,9 +33,16 @@ test('native item starts and partial command output are available before turn co
  f.event('item.started',{item:{id:'cmd',type:'commandExecution',command:'npm test',status:'inProgress'}});
  f.event('item.started',{item:{id:'patch',type:'fileChange',status:'inProgress',changes:[{path:'src/example.ts',diff:'+ corrected'}]}});
  f.event('item.started',{item:{id:'thought',type:'reasoning',summary:['private reasoning']}});
+ f.event('item.completed',{item:{id:'tool',type:'mcpToolCall',tool:'Bash',arguments:{command:'npm test',env:'secret'},result:{text:'tool ok'}}});
  f.stream('cmd','First test passed\n');f.stream('cmd','Second test running');
  const value=f.read();assert.equal(value.state,'running');assert.equal(value.freshness,'live');
  assert.equal(value.items.find(i=>i.id==='cmd')?.output,'First test passed\nSecond test running');
+ assert.equal(value.items.find(i=>i.id==='tool')?.title,'npm test');
+ assert.equal(value.items.find(i=>i.id==='tool')?.output,'tool ok');
+ assert.equal(value.items.find(i=>i.id==='tool')?.kind,'commandExecution');
+ assert.equal(JSON.stringify(value.items).includes('secret'),false);
+ f.progress.record(f.session.logicalSessionId,f.session.executionSegmentId,'turn-current','cmd','command_output.delta','replaced output',false,true);
+ assert.equal(f.read().items.find(i=>i.id==='cmd')?.output,'replaced output');
  assert.equal(value.items.find(i=>i.id==='patch')?.title,'src/example.ts');assert.equal(value.items.some(i=>i.id==='old'||i.id==='thought'),false);
  assert.equal(f.db.get<{n:number}>("SELECT count(*) AS n FROM durable_events WHERE type='turn.completed'")?.n,0);
  assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,0);
