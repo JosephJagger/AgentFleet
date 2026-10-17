@@ -10,7 +10,8 @@ import {GrokPreferencesService} from "../src/grok-preferences.js";
 import {grokSettingsActive,parseGrokSettings,supportsGrokControls} from "../src/grok-settings.js";
 import type {Principal} from "../src/auth.js";
 test("Grok settings persist after reopening and only accept reported model ids",t=>{
- assert.equal(supportsGrokControls("0.30.115"),true);
+ assert.equal(supportsGrokControls("0.30.117"),true);
+ assert.equal(supportsGrokControls("0.30.116"),false);
  assert.equal(supportsGrokControls("0.30.114"),false);
  assert.equal(supportsGrokControls("0.31.0"),true);
  assert.equal(supportsGrokControls("1.0.0"),true);
@@ -26,7 +27,7 @@ test("Grok settings persist after reopening and only accept reported model ids",
  const {workspaceId}=db.bootstrap(cfg);const at=new Date().toISOString();
  const user=db.get<{user_id:string}>("SELECT user_id FROM users LIMIT 1")!;
  const principal={workspaceId,userId:user.user_id} as Principal;
- db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,agent_version,identity_state,security_state,reachability,compatibility,capacity,created_at,updated_at) VALUES('m',?,'key','fingerprint','host','linux','24','x64','0.30.115','active','normal','online','compatible','idle',?,?)`,workspaceId,at,at);
+ db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,agent_version,identity_state,security_state,reachability,compatibility,capacity,created_at,updated_at) VALUES('m',?,'key','fingerprint','host','linux','24','x64','0.30.117','active','normal','online','compatible','idle',?,?)`,workspaceId,at,at);
  db.run(`INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,provider,created_at,last_reported_at) VALUES('p',?,'m','p','project','/work','hash','grok',?,?)`,workspaceId,at,at);
  for(const id of ["s1","s2"])db.run(`INSERT INTO logical_sessions(logical_session_id,workspace_id,machine_id,project_id,title,managed,execution_state,reachability,created_at,updated_at) VALUES(?,?,'m','p','session',1,'idle','live',?,?)`,id,workspaceId,at,at);
  db.run(`INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,created_at) VALUES('seg','s1','m','p',?)`,at);
@@ -52,12 +53,18 @@ test("Grok settings persist after reopening and only accept reported model ids",
  assert.throws(()=>service.write(principal,"s1",{settings:{...saved,model:"grok-missing"},revision:3}),{code:"GROK_OPTION_UNAVAILABLE"});
  assert.deepEqual(service.read(principal,"s2"),{settings:null,revision:0,options:[]});
  assert.throws(()=>service.read({...principal,workspaceId:"other"},"s1"),{code:"SESSION_NOT_FOUND"});
+
+ db.run("UPDATE machines SET discovery_json=? WHERE machine_id='m'",JSON.stringify({agentRuntimes:{grok:{models:[{id:'grok-current',name:'Native model',efforts:['low']}]}}}));
+ assert.deepEqual(service.read(principal,"s2").options.find(o=>o.id==='model')?.values,['grok-current']);
+ assert.deepEqual(service.write(principal,"s2",{revision:0,settings:{model:'grok-current',effort:'low'}}).settings,{model:'grok-current',effort:'low'});
+ assert.throws(()=>service.write(principal,"s2",{revision:1,settings:{model:'grok-current',effort:'xhigh'}}),{code:'GROK_OPTION_UNAVAILABLE'});
+ db.run("UPDATE machines SET discovery_json=NULL WHERE machine_id='m'");
  db.close();db=new ControlPlaneDatabase(path);service=new GrokPreferencesService(db);
  assert.equal(service.read(principal,"s1").settings?.model,"grok-4.6");
  assert.equal(service.read(principal,"s1").revision,3);
  db.run("UPDATE machines SET agent_version='0.30.114' WHERE machine_id='m'");
  assert.throws(()=>service.write(principal,"s1",{settings:saved,revision:3}),{code:"GROK_AGENT_UPDATE_REQUIRED"});
- db.run("UPDATE machines SET agent_version='0.30.115' WHERE machine_id='m'");
+ db.run("UPDATE machines SET agent_version='0.30.117' WHERE machine_id='m'");
  db.run("UPDATE projects SET provider='codex' WHERE project_id='p'");
  assert.throws(()=>service.write(principal,"s1",{settings:saved,revision:3}),{code:"GROK_SESSION_REQUIRED"});
 });

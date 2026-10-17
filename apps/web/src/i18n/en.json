@@ -3763,6 +3763,8 @@
   "Grok Build 思考强度": "Grok Build reasoning effort",
   "任务模式": "Task mode",
   "Grok Build 任务模式": "Grok Build task mode",
+  "仅用于该会话，下一轮任务生效。可选项来自主机上的 Grok。": "Applies to this session on the next turn. Options come from Grok on the host.",
+  "主机尚未返回模型列表，请更新连接服务后重新读取。": "The host has not reported its models. Update the connection service and reload settings.",
   "模型列表将在本轮结束后从原生配置读取。": "Available models will be read from native settings after this turn ends.",
   "Grok Build 会话权限": "Grok Build session permissions",
   "始终允许": "Always allow",

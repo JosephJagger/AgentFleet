@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, Settings2, X } from "lucide-react";
-import type { GrokConfigOption, GrokSettings } from "../lib/grok-preferences";
+import type { GrokModel, GrokConfigOption, GrokSettings } from "../lib/grok-preferences";
 import { t } from "../i18n";
 
-export function GrokControls({options,settings,ready,error,onReload,onSave,disabled,openRequest=0}:{options:GrokConfigOption[];settings:GrokSettings;ready:boolean;error:string;onReload:()=>void;onSave:(settings:GrokSettings)=>Promise<void>;disabled:boolean;openRequest?:number}) {
+export function GrokControls({options,models=[],settings,ready,error,onReload,onSave,disabled,openRequest=0}:{models?:GrokModel[];options:GrokConfigOption[];settings:GrokSettings;ready:boolean;error:string;onReload:()=>void;onSave:(settings:GrokSettings)=>Promise<void>;disabled:boolean;openRequest?:number}) {
   const [draft,setDraft]=useState(settings);
   const [open,setOpen]=useState(false);
   const [saving,setSaving]=useState(false);
@@ -40,6 +40,9 @@ export function GrokControls({options,settings,ready,error,onReload,onSave,disab
     setOpen(false);
   }
   function discard(){window.clearTimeout(timer.current);dirty.current=false;setDraft(settings);draftRef.current=settings;setOpen(false);}
+  useEffect(()=>()=>window.clearTimeout(timer.current),[]);
+  const selectedModel=models.find(item=>item.id===(model||modelOption?.current));
+  const effortValues=selectedModel?.efforts??effortOption?.values??[];
   const permissionLabel=(value:string)=>t(value==="always"?"始终允许":value==="auto"?"自动审核":"逐项确认");
   const choices=(current:string,values:string[])=>current&&!values.includes(current)?[current,...values]:values;
   const summary=!ready?t(error||"正在读取会话配置…"):`Grok Build · ${settings.model||t("沿用原生")} · ${settings.effort||t("沿用原生")} · ${permissionLabel(settings.permissionMode??"default")}${settings.mode==="plan"?` · ${t("计划模式")}`:""}`;
@@ -47,13 +50,13 @@ export function GrokControls({options,settings,ready,error,onReload,onSave,disab
   return <>
     <div className="runtime-settings-bar"><button type="button" className="runtime-settings-shortcut" aria-label={t("Grok Build 设置")} aria-haspopup="dialog" onClick={()=>setOpen(true)}><Settings2 size={13}/><span className="runtime-settings-lines"><span className="runtime-settings-line"><small>{t("发送使用")}</small><span>{summary}</span></span></span><ChevronRight size={13}/></button></div>
     {open&&createPortal(<dialog ref={dialog} className="claude-settings-dialog" aria-label={t("Grok Build 设置")} onCancel={event=>{event.preventDefault();closeDialog();}} onClose={()=>setOpen(false)} onClick={event=>{if(event.target===event.currentTarget)closeDialog();}}>
-      <div className="claude-settings-header"><div><h2>{t("Grok Build 设置")}</h2><p>{t("保存到该会话。模型与思考强度在原生会话报告对应选项后，于下一轮生效。")}</p></div><button type="button" className="button button--quiet" aria-label={t("关闭")} onClick={closeDialog}><X size={20}/></button></div>
+      <div className="claude-settings-header"><div><h2>{t("Grok Build 设置")}</h2><p>{t("仅用于该会话，下一轮任务生效。可选项来自主机上的 Grok。")}</p></div><button type="button" className="button button--quiet" aria-label={t("关闭")} onClick={closeDialog}><X size={20}/></button></div>
       <div className="claude-settings-fields">
-        <label>{t("模型")}<select aria-label={t("Grok Build 模型")} value={model} disabled={disabled} onChange={event=>edit({model:event.target.value||undefined})}><option value="">{t("沿用原生")}</option>{choices(model,modelOption?.values??[]).map(value=><option key={value} value={value}>{value}</option>)}</select></label>
-        <label>{t("思考强度")}<select aria-label={t("Grok Build 思考强度")} value={effort} disabled={disabled} onChange={event=>edit({effort:event.target.value||undefined})}><option value="">{t("沿用原生")}</option>{choices(effort,effortOption?.values??[]).map(value=><option key={value} value={value}>{value}</option>)}</select></label>
+        <label>{t("模型")}<select aria-label={t("Grok Build 模型")} value={model} disabled={disabled} onChange={event=>{const model=event.target.value||undefined;const available=models.find(item=>item.id===model)?.efforts;edit({model,...(available&&draft.effort&&!available.includes(draft.effort)?{effort:undefined}:{})});}}><option value="">{t("沿用原生")}</option>{choices(model,modelOption?.values??[]).map(value=><option key={value} value={value}>{models.find(item=>item.id===value)?.name??value}</option>)}</select></label>
+        <label>{t("思考强度")}<select aria-label={t("Grok Build 思考强度")} value={effort} disabled={disabled} onChange={event=>edit({effort:event.target.value||undefined})}><option value="">{t("沿用原生")}</option>{choices(effort,effortValues).map(value=><option key={value} value={value}>{value}</option>)}</select></label>
         <label>{t("任务模式")}<select aria-label={t("Grok Build 任务模式")} value={mode} disabled={disabled} onChange={event=>edit({mode:event.target.value==="plan"?"plan":"default"})}><option value="default">{t("默认模式")}</option><option value="plan">{t("计划模式")}</option></select></label>
       </div>
-      {!modelOption&&<p role="status">{t("模型列表将在本轮结束后从原生配置读取。")}</p>}
+      {!modelOption?.values.length&&<p role="status">{t("主机尚未返回模型列表，请更新连接服务后重新读取。")} <button type="button" className="button button--quiet" onClick={onReload}>{t("重新读取")}</button></p>}
       <div className="claude-settings-fields"><label>{t("会话权限")}<select aria-label={t("Grok Build 会话权限")} value={permission} disabled={disabled} onChange={event=>edit({permissionMode:event.target.value as GrokSettings["permissionMode"]})}><option value="default">{t("逐项确认")}</option><option value="always">{t("始终允许")}</option><option value="auto">{t("自动审核")}</option></select></label>
         <small>{t("这里控制工具审批，不是文件夹沙箱。始终允许会在下一轮重连进程并放行工具。自动审核只在新建原生会话时生效。")}{mode==="plan"&&!modeOption?.values.includes("plan")?` ${t("计划模式已保存；当前原生会话没有对应选项时不会下发。")}`:""}</small>
       </div>

@@ -2,12 +2,12 @@ import type {ControlPlaneDatabase} from "./db.js";
 import type {Principal} from "./auth.js";
 import {invariant} from "./errors.js";
 import {nowIso} from "./crypto.js";
-import {mergeConfigOptions,parseConfigOptions,parseGrokSettings,supportsGrokControls,type ConfigOption,type GrokSettings} from "./grok-settings.js";
+import {parseGrokModels,grokModelOptions,mergeConfigOptions,parseConfigOptions,parseGrokSettings,supportsGrokControls,type ConfigOption,type GrokSettings} from "./grok-settings.js";
 
 export class GrokPreferencesService {
   constructor(private readonly db:ControlPlaneDatabase){}
   private host(principal:Principal,id:string){
-    const row=this.db.get<{provider:string;agent_version:string}>(`SELECT p.provider,m.agent_version FROM logical_sessions s JOIN projects p USING(project_id) JOIN machines m ON m.machine_id=s.machine_id WHERE s.logical_session_id=? AND s.workspace_id=? AND s.deleted_at IS NULL AND m.identity_state='active'`,id,principal.workspaceId);
+    const row=this.db.get<{provider:string;agent_version:string;discovery_json:string|null}>(`SELECT p.provider,m.agent_version,m.discovery_json FROM logical_sessions s JOIN projects p USING(project_id) JOIN machines m ON m.machine_id=s.machine_id WHERE s.logical_session_id=? AND s.workspace_id=? AND s.deleted_at IS NULL AND m.identity_state='active'`,id,principal.workspaceId);
     invariant(row,404,"SESSION_NOT_FOUND","Session was not found");
     invariant(row.provider==="grok",400,"GROK_SESSION_REQUIRED","Settings belong to a Grok Build session");
     return row;
@@ -32,9 +32,10 @@ export class GrokPreferencesService {
     return options;
   }
   read(principal:Principal,id:string){
-    this.host(principal,id);
+    const host=this.host(principal,id);
+    const models=parseGrokModels(JSON.parse(host.discovery_json??"{}").agentRuntimes?.grok?.models);
     const row=this.db.get<{settings_json:string;revision:number}>("SELECT settings_json,revision FROM grok_preferences WHERE workspace_id=? AND logical_session_id=?",principal.workspaceId,id);
-    return {settings:row?parseGrokSettings(JSON.parse(row.settings_json))??null:null,revision:row?.revision??0,options:this.options(principal,id)};
+    return {settings:row?parseGrokSettings(JSON.parse(row.settings_json))??null:null,revision:row?.revision??0,options:mergeConfigOptions(this.options(principal,id),grokModelOptions(models)),...(models.length?{models}:{})};
   }
   write(principal:Principal,id:string,input:Record<string,unknown>){
     return this.db.transaction(()=>{
@@ -52,7 +53,11 @@ export class GrokPreferencesService {
         invariant(option.values.includes(value)||value===stored,409,"GROK_OPTION_UNAVAILABLE","Select a value reported by the native session");
       };
       allow(settings.model,"model",current.settings?.model);
-      allow(settings.effort,"reasoning_effort",current.settings?.effort);
+      if(settings.model&&current.models?.length) {
+        const model=current.models.find(model=>model.id===settings.model);
+        invariant(model,409,"GROK_OPTION_UNAVAILABLE","Select a model reported by the host");
+        invariant(!settings.effort||model.efforts.includes(settings.effort),409,"GROK_OPTION_UNAVAILABLE","Native model does not support this effort");
+      } else allow(settings.effort,"reasoning_effort",current.settings?.effort);
       this.db.run(`INSERT INTO grok_preferences(workspace_id,logical_session_id,settings_json,revision,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(workspace_id,logical_session_id) DO UPDATE SET settings_json=excluded.settings_json,revision=excluded.revision,updated_at=excluded.updated_at`,principal.workspaceId,id,JSON.stringify(settings),current.revision+1,nowIso());
       this.db.audit({workspaceId:principal.workspaceId,actorUserId:principal.userId,action:"grok.preferences.save",metadata:{sessionId:id,revision:current.revision+1}});
       return this.read(principal,id);

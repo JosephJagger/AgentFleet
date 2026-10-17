@@ -17,15 +17,15 @@ import type {ProjectRecord,ManagedThread,ApprovalRecord} from './types.js';
 import type {PermissionProfile} from './permissions.js';
 import type {TurnExtras} from './attachments.js';
 import {inputAnswers,inputQuestions,type InputAnswers,type InputQuestion} from './user-input.js';
-import {acpPlanText,acpToolItem,acpUsage,grokLaunchArgs,grokSessionMeta,mergeConfigOptions,parseConfigOptions,parseGrokSettings,type ConfigOption,type GrokSettings} from './acp-updates.js';
+import {grokModelOptions,parseGrokModels,acpPlanText,acpToolItem,acpUsage,grokLaunchArgs,grokSessionMeta,mergeConfigOptions,parseConfigOptions,parseGrokSettings,type ConfigOption,type GrokSettings} from './acp-updates.js';
 import type {CodexSettings} from './codex-settings.js';
-interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];published:Map<string,string>;completed:Set<string>;}
+interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];published:Map<string,string>;completed:Set<string>;itemSizes:Map<string,number>;historyBytes:number;textPublishedAt:number;}
 interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan';questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
 function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)return {text:value,truncated:false};let text=Buffer.from(value).subarray(0,max).toString('utf8');if(text.endsWith('\uFFFD'))text=text.slice(0,-1);return {text,truncated:true};}
 const dependencies={detect:detectAcp,unoccupied:assertAcpUnoccupied,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
 /** New providers have their own processes and cannot fall through to Codex methods. */
 export class AcpRuntime {
-  availability:ProviderAvailability={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
+  availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[]}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
   private executable:AcpExecutable|null=null;
   private executableStamp=-1;
   private readonly sessions=new Map<string,Session>();
@@ -67,9 +67,13 @@ export class AcpRuntime {
       const init=await connection.call('initialize',{protocolVersion:1,clientCapabilities:{},clientInfo:{name:'agentfleets',version:AGENT_VERSION}});
       if(!isRecord(init)||init.protocolVersion!==1||!isRecord(init.agentCapabilities))throw new AgentError('ACP_INCOMPATIBLE','Unsupported native protocol handshake');
       const capabilities=init.agentCapabilities,sessionCapabilities=isRecord(capabilities.sessionCapabilities)?capabilities.sessionCapabilities:{};
+      const meta=isRecord(init._meta)?init._meta:{};
+      const modelState=isRecord(meta.modelState)?meta.modelState:{};
+      const models=this.provider==='grok'?parseGrokModels(modelState.availableModels):[];
+      if(session&&models.length)session.configOptions=grokModelOptions(models,typeof modelState.currentModelId==='string'?modelState.currentModelId:undefined);
       const images=acpImageInput(this.provider,this.executable.version,init);
       if(session)session.imageInput=images;
-      this.availability={installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),capabilities:{...unavailableCapabilities(),images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
+      this.availability={installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),models:models.length>0,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
       return connection;
     } catch(error) {connection.close();this.markFailure(error);throw error;}
   }
@@ -122,7 +126,7 @@ export class AcpRuntime {
     if(!isAbsolute(cwd))throw new AgentError('PROJECT_PATH_INVALID','An absolute workspace is required');
     const existing=this.sessions.get(id);if(existing&&!existing.lost){if(resolve(existing.cwd)!==resolve(cwd))throw new AgentError('PROVIDER_CWD_CHANGED','Session workspace changed');return existing;}
     await this.deps.unoccupied(this.provider,this.owned);
-    const session={id,cwd,items:[],cancelled:false,loading:true,lost:false,permissionMode:settings?.permissionMode??'default',configOptions:[],published:new Map<string,string>(),completed:new Set<string>()} as unknown as Session;
+    const session={id,cwd,items:[],cancelled:false,loading:true,lost:false,permissionMode:settings?.permissionMode??'default',configOptions:[],published:new Map<string,string>(),completed:new Set<string>(),itemSizes:new Map<string,number>(),historyBytes:0,textPublishedAt:0} as unknown as Session;
     session.connection=await this.connect(cwd,session,this.launchArgs(settings));
     try {
       if(!fresh&&!this.availability.capabilities.resume)throw new AgentError('PROVIDER_RESUME_UNAVAILABLE','Native CLI does not support session restoration');
@@ -148,7 +152,7 @@ export class AcpRuntime {
     return {nativeThreadId:id,cwd,historyMode:'legacy',executionState:session?.turnId?'running':session&&!session.lost?'idle':'unknown',updatedAt:null,items:metadataOnly?[]:session?.items??[]};
   }
   async resumeThread(id:string,project:ProjectRecord,sessionCwd?:string,_profile?:PermissionProfile):Promise<ThreadResumeResult> {
-    await this.open(id,sessionCwd??project.root);return {nativeThreadId:id,policyVerified:true,rawSummary:{provider:this.provider},history:await this.readThread(id)};
+    const session=await this.open(id,sessionCwd??project.root);return {nativeThreadId:id,policyVerified:true,rawSummary:{provider:this.provider,configOptions:session.configOptions},history:await this.readThread(id)};
   }
   async unsubscribeThread(id:string) {
     const session=this.sessions.get(id);if(!session)return;
@@ -161,8 +165,8 @@ export class AcpRuntime {
     const apply=async(configId:string,value?:string)=>{
       if(!value)return;
       const option=session.configOptions.find(item=>item.id===configId);
-      if(!option||(option.values.length>0&&!option.values.includes(value)))return;
-      this.rememberOptions(session,await session.connection.call('session/set_config_option',{sessionId:this.native(session.id),configId,value:{value}}));
+      if(!option||!option.values.includes(value))throw new AgentError('GROK_OPTION_UNAVAILABLE','Native session does not support the selected option; reload settings');
+      this.rememberOptions(session,await session.connection.call('session/set_config_option',{sessionId:this.native(session.id),configId,value}));
     };
     await apply('model',settings.model);
     await apply('reasoning_effort',settings.effort);
@@ -203,11 +207,11 @@ export class AcpRuntime {
     await this.deps.unoccupied(this.provider,this.owned);
     const session=await this.open(thread.nativeThreadId,thread.sessionCwd??project.root,false,grok);
     if(imageBlocks.length&&!session.imageInput)throw new AgentError('AGENT_IMAGE_UNSUPPORTED','当前智能体未提供可用的图片输入能力；图片未发送，请检查原生版本和模型');
-    if(this.provider==='grok'&&grok)await this.applyConfig(session,grok);
     if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Native turn is already running');
+    if(this.provider==='grok'&&grok)await this.applyConfig(session,grok);
     const turnId=randomUUID();session.turnId=turnId;session.cancelled=false;
     const itemId=`${turnId}:user`,item={id:itemId,type:'userMessage',content:[{type:'text',text:prompt},...(images??[]).map(url=>({type:'image',url}))]};
-    session.items.push({nativeTurnId:turnId,nativeItemId:itemId,item});
+    session.items.push({nativeTurnId:turnId,nativeItemId:itemId,item});this.accountItem(session,session.items.at(-1)!);
     await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:itemId,payload:{item}},this.appServerEpoch);
     setImmediate(()=>{void session.connection.call('session/prompt',{sessionId:this.native(session.id),prompt:[{type:'text',text:prompt},...imageBlocks]},24*3600000).then(async result=>{
       if(session.lost||session.turnId!==turnId)return;
@@ -229,18 +233,34 @@ export class AcpRuntime {
     const session=this.sessions.get(id);if(!session||session.lost||session.turnId!==turnId)throw new AgentError('PROVIDER_TURN_CHANGED','Native turn is no longer current');
     session.cancelled=true;session.connection.notify('session/cancel',{sessionId:this.native(id)});this.resolvePending(session);return {requested:true};
   }
+  private accountItem(session:Session,entry:ThreadHistoryItem) {
+    const size=Buffer.byteLength(JSON.stringify(entry));
+    session.historyBytes+=size-(session.itemSizes.get(entry.nativeItemId)??0);
+    session.itemSizes.set(entry.nativeItemId,size);
+    if(session.items.length>10000||session.historyBytes>16*1024*1024)throw new AgentError('ACP_HISTORY_LIMIT','Native history exceeds supported snapshot limit');
+  }
+  private async finishText(session:Session,nextType?:string) {
+    const last=session.items.at(-1);
+    if(!session.turnId||!last||last.nativeTurnId!==session.turnId||!['agentMessage','reasoning'].includes(String(last.item?.type))||last.item?.type===nextType||session.completed.has(last.nativeItemId))return;
+    await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:session.turnId,nativeItemId:last.nativeItemId,payload:{item:last.item}},this.appServerEpoch);
+    session.completed.add(last.nativeItemId);
+  }
   private async notification(session:Session,method:string,params:Record<string,unknown>) {
     if(session.lost||method!=='session/update'||!isRecord(params.update))return;
     if(session.id&&params.sessionId!==this.native(session.id))throw new AgentError('ACP_SESSION_MISMATCH','Event belongs to a different native session');
     const update=params.update,kind=update.sessionUpdate;
     if(kind==='config_option_update'){this.rememberOptions(session,params);return;}
     const turnId=session.turnId??'history';
+    const textType=kind==='agent_message_chunk'?'agentMessage':kind==='agent_thought_chunk'?'reasoning':undefined;
+    if(['agent_message_chunk','agent_thought_chunk','user_message_chunk','tool_call','tool_call_update','plan'].includes(String(kind)))await this.finishText(session,textType);
+    let changed:ThreadHistoryItem|undefined;
     if(kind==='user_message_chunk'&&isRecord(update.content)&&update.content.type==='image') {
       const url=typeof update.content.data==='string'&&typeof update.content.mimeType==='string'?`data:${update.content.mimeType};base64,${update.content.data}`:'';
       let last=session.items.at(-1);
       if(!last||last.nativeTurnId!==turnId||last.item?.type!=='userMessage') {
         const id=`${turnId}:${session.items.length}`;last={nativeTurnId:turnId,nativeItemId:id,item:{id,type:'userMessage',content:[{type:'text',text:''}]}};session.items.push(last);
       }
+      changed=last;
       const content=last.item!.content as Array<{type:string;url?:string;text?:string}>;
       if(validImageUrl(url)) {
         if(!content.some(c=>c.type==='image'&&c.url===url)&&content.filter(c=>c.type==='image').length<MAX_IMAGES)content.push({type:'image',url});
@@ -248,24 +268,31 @@ export class AcpRuntime {
     } else if(['agent_message_chunk','user_message_chunk','agent_thought_chunk'].includes(String(kind))&&isRecord(update.content)&&update.content.type==='text'&&typeof update.content.text==='string') {
       const type=kind==='user_message_chunk'?'userMessage':kind==='agent_thought_chunk'?'reasoning':'agentMessage';
       let last=session.items.at(-1);
-      if(!last||last.nativeTurnId!==turnId||last.item?.type!==type) {
+      if(!last||last.nativeTurnId!==turnId||last.item?.type!==type||session.completed.has(last.nativeItemId)) {
         const id=`${turnId}:${session.items.length}`;last={nativeTurnId:turnId,nativeItemId:id,item:{id,type,...(type==='userMessage'?{content:[{type:'text',text:''}]}:{text:''})}};session.items.push(last);
       }
+      changed=last;
       const item=last.item!;
       if(type==='userMessage'){const content=item.content as Array<{text:string}>;content[0]!.text+=update.content.text;}else item.text=String(item.text)+update.content.text;
+      if(session.turnId&&type==='reasoning'&&(Date.now()-session.textPublishedAt>=250)){
+        session.textPublishedAt=Date.now();
+        await this.callbacks.onEvent({type:'item.started',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:last.nativeItemId,payload:{item}},this.appServerEpoch);
+      }
       if(session.turnId&&type==='agentMessage')this.callbacks.onVolatile({type:'agent_message.delta',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:last.nativeItemId,payload:{delta:update.content.text}},this.appServerEpoch);
     } else if((kind==='tool_call'||kind==='tool_call_update')&&typeof update.toolCallId==='string') {
       const id=`${turnId}:tool:${update.toolCallId}`;let entry=session.items.find(i=>i.nativeItemId===id);
-      const item={...acpToolItem(update,entry?.item??undefined),id};
+      const item={...acpToolItem(update,entry?.item??undefined),cwd:session.cwd,id};
       if(!entry){entry={nativeTurnId:turnId,nativeItemId:id,item};session.items.push(entry);}else entry.item=item;
+      changed=entry;
       if(session.turnId)await this.publishTool(session,session.turnId,id,item);
     } else if(kind==='plan') {
       const id=`${turnId}:plan`;const item={id,type:'plan',text:acpPlanText(update)};
       let entry=session.items.find(i=>i.nativeItemId===id);
       if(!entry){entry={nativeTurnId:turnId,nativeItemId:id,item};session.items.push(entry);}else entry.item={...entry.item,...item};
+      changed=entry;
       if(session.turnId&&!session.completed.has(id))await this.callbacks.onEvent({type:'item.started',nativeThreadId:session.id,nativeTurnId:session.turnId,nativeItemId:id,payload:{item:entry.item}},this.appServerEpoch);
     }
-    if(session.items.length>10000||Buffer.byteLength(JSON.stringify(session.items))>16*1024*1024)throw new AgentError('ACP_HISTORY_LIMIT','Native history exceeds supported snapshot limit');
+    if(changed)this.accountItem(session,changed);
   }
   private async flush(session:Session,turnId:string) {
     const pending=session.items.filter(i=>i.nativeTurnId===turnId&&i.item?.type!=='userMessage'&&!session.completed.has(i.nativeItemId));

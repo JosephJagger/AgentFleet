@@ -96,8 +96,17 @@ export function acpToolItem(update:Record<string,unknown>,previous?:Record<strin
   const command=(rawInput&&typeof rawInput.command==='string'&&rawInput.command.trim()?rawInput.command:typeof update.title==='string'&&update.title.trim()?update.title:typeof previous?.command==='string'?previous.command:'Tool').slice(0,2000);
   const statusRaw=typeof update.status==='string'?update.status:typeof previous?.status==='string'?previous.status:'inProgress';
   const status=statusRaw==='completed'||statusRaw==='failed'||statusRaw==='declined'?statusRaw:'inProgress';
-  const output=acpText(update.rawOutput??update.content??update.output??previous?.aggregatedOutput).slice(0,4000);
-  return {type:'commandExecution',command,status,tool:(typeof update.title==='string'?update.title:typeof previous?.tool==='string'?previous.tool:'Tool').slice(0,200),...(output?{aggregatedOutput:output}:{})};
+  const changes=(Array.isArray(update.content)?update.content:[]).flatMap(block=>{
+    if(!isRecord(block)||block.type!=='diff'||typeof block.path!=='string')return [];
+    const oldText=typeof block.oldText==='string'?block.oldText:'';
+    const newText=typeof block.newText==='string'?block.newText:'';
+    const diff=typeof block.diff==='string'?block.diff:`--- ${block.path}\n+++ ${block.path}\n${oldText.split('\n').map(line=>'-'+line).join('\n')}\n${newText.split('\n').map(line=>'+'+line).join('\n')}`;
+    return [{path:block.path.slice(0,2000),diff:diff.slice(0,64000)}];
+  }).slice(0,32);
+  if(changes.length||previous?.type==='fileChange')return {type:'fileChange',status,changes:changes.length?changes:previous?.changes};
+  const fullOutput=acpText(update.rawOutput??update.content??update.output??previous?.aggregatedOutput);
+  const output=fullOutput.slice(0,64000);
+  return {type:'commandExecution',command,status,tool:(typeof update.title==='string'?update.title:typeof previous?.tool==='string'?previous.tool:'Tool').slice(0,200),...(output?{aggregatedOutput:output,outputTruncated:fullOutput.length>64000}:{})};
 }
 function finite(value:unknown):number|undefined {return Number.isSafeInteger(value)&&Number(value)>=0?Number(value):undefined;}
 function tokenCounts(value:Record<string,unknown>):TokenCounts|undefined {
@@ -130,4 +139,26 @@ export function acpUsage(result:Record<string,unknown>):{usage:{total:TokenCount
     if(flat&&flat.totalTokens>0)return {usage:{total:flat,last:flat}};
   }
   return undefined;
+}
+
+export interface GrokModel {id:string;name:string;efforts:string[];}
+/** Keep only displayable catalog fields; never forward initialize metadata wholesale. */
+export function parseGrokModels(value:unknown):GrokModel[] {
+  if(!Array.isArray(value))return [];
+  const models:GrokModel[]=[];
+  for(const entry of value.slice(0,64)) {
+    if(!isRecord(entry))continue;
+    const id=optionValue(entry.modelId??entry.id);
+    if(!id||models.some(model=>model.id===id))continue;
+    const meta=isRecord(entry._meta)?entry._meta:{};
+    const raw=Array.isArray(entry.efforts)?entry.efforts:Array.isArray(meta.reasoningEfforts)?meta.reasoningEfforts:[];
+    const efforts=meta.supportsReasoningEffort===false?[]:[...new Set(raw.slice(0,32).map(optionValue).filter((v):v is string=>Boolean(v)))];
+    models.push({id,name:typeof entry.name==='string'?entry.name.slice(0,120):id,efforts});
+  }
+  return models;
+}
+export function grokModelOptions(models:GrokModel[],current?:string):ConfigOption[] {
+  if(!models.length)return [];
+  return [{id:'model',values:models.map(m=>m.id),...(current?{current}:{})},
+    {id:'reasoning_effort',values:models.find(m=>m.id===current)?.efforts??[...new Set(models.flatMap(m=>m.efforts))]}];
 }

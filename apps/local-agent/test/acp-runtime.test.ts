@@ -19,12 +19,12 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line);
  if(m.id===991 && !m.method) { send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:JSON.stringify(m.result)}}}});send({id:promptId,result:{stopReason:'end_turn'}});return; }
  switch(m.method) {
- case 'initialize':send({id:m.id,result:{protocolVersion:1,agentCapabilities:{loadSession:true,promptCapabilities:{image:process.env.ACP_TEST_IMAGES==='yes'},sessionCapabilities:{list:{}}}}});break;
+ case 'initialize':send({id:m.id,result:{_meta:{modelState:{currentModelId:'grok-4',availableModels:[{modelId:'grok-4',name:'Grok test',_meta:{reasoningEfforts:[{value:'low'},{value:'high'}]}}]}},protocolVersion:1,agentCapabilities:{loadSession:true,promptCapabilities:{image:process.env.ACP_TEST_IMAGES==='yes'},sessionCapabilities:{list:{}}}}});break;
  case 'session/list':send({id:m.id,result:{sessions:[{sessionId,cwd:process.cwd(),title:'Synthetic'}]}});break;
  case 'session/new':send({id:m.id,result:{sessionId,configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'}]}});break;
  case 'session/load':if(process.env.ACP_TEST_IMAGES==='yes')send({method:'session/update',params:{sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='}}}});send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Retained history'}}}});send({id:m.id,result:{configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'}]}});break;
  case 'session/set_config_option':
-   if(!['model','reasoning_effort','mode'].includes(m.params.configId)){process.exit(9);return;}
+   if(typeof m.params.value!=='string'||!['model','reasoning_effort','mode'].includes(m.params.configId)){process.exit(9);return;}
    send({id:m.id,result:{configOptions:[{id:m.params.configId,currentValue:m.params.value,options:[m.params.value]}]}});break;
  case 'session/prompt':
    promptId=m.id;requestKind=m.params.prompt[0].text;
@@ -36,6 +36,12 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
    if(requestKind==='burst'){
      for(let i=0;i<200;i++) send({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call',toolCallId:'t'+i,title:'T'+i,kind:'execute',status:'in_progress',rawInput:{command:'echo '+i}}}});
      send({id:m.id,result:{stopReason:'end_turn'}});return;
+   }
+   if(requestKind==='progress'){
+     send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'before tool'}}}});
+     send({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call',toolCallId:'edit',title:'Edit',status:'completed',content:[{type:'diff',path:'sample.ts',oldText:'const a=1;',newText:'const a=2;'}]}}});
+     send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_thought_chunk',content:{type:'text',text:'working'}}}});
+     return;
    }
    if(requestKind==='tools'){
      send({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call',toolCallId:'bash',title:'Bash',kind:'execute',status:'in_progress',rawInput:{command:'npm test'}}}});
@@ -207,4 +213,25 @@ test('native image history remains visible after releasing and restoring a sessi
  const restored=await f.runtime.resumeThread(f.thread.nativeThreadId,f.project);
  const user=restored.history.items.find(i=>i.item?.type==='userMessage');
  assert.deepEqual(user?.item?.content,[{type:'text',text:''},{type:'image',url:png}]);
+});
+
+test('Grok catalog is available before a prompt, unsupported config is rejected before sending',async t=>{
+ const f=await fixture(t,'grok');
+ assert.deepEqual(f.runtime.availability.models,[{id:'grok-4',name:'Grok test',efforts:['low','high']}]);
+ assert.equal(f.runtime.availability.capabilities.models,true);
+ await assert.rejects(f.runtime.startTurn(f.thread,f.project,'do not send',undefined,{model:'missing'}),{code:'GROK_OPTION_UNAVAILABLE'});
+ assert.equal(f.events.length,0);
+});
+test('intermediate replies, reasoning and code changes appear before a long-running prompt completes',async t=>{
+ const f=await fixture(t,'grok');
+ const turn=await f.runtime.startTurn(f.thread,f.project,'progress');
+ await until(()=>f.events.some(e=>e.type==='item.started'&&(e.payload.item as {text?:string})?.text==='working'));
+ assert.ok(f.events.some(e=>e.type==='item.completed'&&(e.payload.item as {text?:string})?.text==='before tool'));
+ const change=f.events.find(e=>e.type==='item.completed'&&(e.payload.item as {type?:string})?.type==='fileChange');
+ assert.ok(JSON.stringify(change?.payload).includes('+const a=2;'));
+ assert.equal(f.events.some(e=>e.type==='turn.completed'),false);
+ await assert.rejects(f.runtime.startTurn(f.thread,f.project,'not sent',undefined,{model:'missing'}),{code:'PROVIDER_TURN_ACTIVE'});
+ await f.runtime.interruptTurn(f.thread.nativeThreadId,turn.nativeTurnId);
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.equal(f.events.filter(e=>e.type==='item.completed'&&(e.payload.item as {text?:string})?.text==='before tool').length,1);
 });

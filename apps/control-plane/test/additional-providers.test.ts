@@ -96,7 +96,7 @@ test('saved Grok settings inject only after the host can apply them',t=>{
  const preferences=new GrokPreferencesService(f.db);
  const idle=f.registry.createSession(f.principal,'m','grok',undefined,'grok-inactive-session');
  assert.throws(()=>preferences.write(f.principal,idle.logicalSessionId,{settings:{permissionMode:'default'},revision:0}),{code:'GROK_AGENT_UPDATE_REQUIRED'});
- f.db.run("UPDATE machines SET agent_version='0.30.115' WHERE machine_id='m'");
+ f.db.run("UPDATE machines SET agent_version='0.30.117' WHERE machine_id='m'");
  assert.deepEqual(preferences.write(f.principal,idle.logicalSessionId,{settings:{permissionMode:'default'},revision:0}).settings,{permissionMode:'default'});
  const lease=f.coordination.acquireLease(f.principal,idle.logicalSessionId);
  f.coordination.createCommand(f.principal,idle.logicalSessionId,{type:'turn.start',controlLeaseId:lease.leaseId,clientMutationId:'start-grok-off',payload:{prompt:'Inactive settings stay native'},precondition:{executionSegmentId:idle.executionSegmentId,threadControlVersion:idle.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:idle.projectLeaseVersion}});
@@ -148,4 +148,15 @@ for(const provider of ACP_PROVIDER_IDS)test(`${provider}: missing images capabil
  const commandId=String(created.command.commandId);
  assert.equal(f.coordination.createDispatchAttempt(commandId,{machineId:'m',transportGeneration:1,producerEpoch:'image-epoch',appServerEpoch:'image-app'}),null);
  assert.equal(f.coordination.getCommand(f.principal,commandId).state,'invalidated');
+});
+
+test('Grok discovery supplies a bounded native catalog to an empty session without exposing metadata',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{grok:{...ready,models:[{id:'grok-native',name:'Native',efforts:['low','high'],secret:'must not travel'},{id:'invalid model',efforts:['low']}]}}});
+ const s=f.registry.createSession(f.principal,'m','grok',undefined,'catalog-draft');
+ const prefs=new GrokPreferencesService(f.db).read(f.principal,s.logicalSessionId);
+ assert.deepEqual(prefs.models,[{id:'grok-native',name:'Native',efforts:['low','high']}]);
+ assert.deepEqual(prefs.options.find(o=>o.id==='model')?.values,['grok-native']);
+ assert.equal(f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json.includes('must not travel'),false);
+ assert.equal(f.db.get<{n:number}>("SELECT count(*) AS n FROM commands")!.n,0);
 });

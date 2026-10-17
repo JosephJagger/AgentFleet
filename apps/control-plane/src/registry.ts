@@ -1,3 +1,4 @@
+import {parseGrokModels} from "./grok-settings.js";
 import { parseProviderRuntimeState } from "./provider-runtime-policy.js";
 import { ACP_PROVIDER_IDS, supportsImageInput, isAcpProvider, isProviderId, parseProviderAvailability, providerName, type ProviderId } from "./provider-catalog.js";
 import { parseMaintenance } from "./host-maintenance.js";
@@ -2579,7 +2580,7 @@ export class RegistryService {
       const runtimes = discovery.agentRuntimes as Record<string, unknown>;
       const claude = runtimes.claude as Record<string, unknown> | undefined;
       safe.agentRuntimes = { claude: { installed: claude?.installed === true, version: typeof claude?.version === "string" ? claude.version.slice(0, 100) : null, ...parseClaudeMetadata(claude) } };
-      for (const provider of ACP_PROVIDER_IDS) { const status = parseProviderAvailability(runtimes[provider]); if (status) (safe.agentRuntimes as Record<string,unknown>)[provider] = status; }
+      for (const provider of ACP_PROVIDER_IDS) { const status = parseProviderAvailability(runtimes[provider]); if (status) (safe.agentRuntimes as Record<string,unknown>)[provider] = {...status,...(provider === "grok" ? {models:parseGrokModels((runtimes[provider] as Record<string,unknown>)?.models)} : {})}; }
     }
     if (discovery.syncMode !== undefined) {
       invariant(discovery.syncMode === "events" || discovery.syncMode === "fallback",400,"INVALID_DISCOVERY","Invalid syncMode");
