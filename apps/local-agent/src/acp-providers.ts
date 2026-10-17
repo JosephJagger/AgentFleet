@@ -13,7 +13,7 @@ export const ACP_COMMANDS:Record<AcpProviderId,{command:string;args:string[];npm
   kimi:{command:'kimi',args:['acp'],npm:['@moonshot-ai/kimi-code']},
   cursor:{command:'agent',args:['acp'],npm:[],aliases:['cursor-agent'],identify:/cursor/i},
   codebuddy:{command:'codebuddy',args:['--acp'],npm:['@tencent-ai/codebuddy-code']},
-  grok:{command:'grok',args:['--no-auto-update','agent','stdio'],npm:[],dirs:[['.grok','bin']]},
+  grok:{command:'grok',args:['--no-auto-update','agent','stdio'],npm:['@xai-official/grok'],dirs:[['.grok','bin']]},
 };
 /** Install locations of common version managers; the service PATH is usually minimal. */
 const COMMON_HOME_DIRS=[['.local','bin'],['.npm-global','bin'],['.bun','bin'],['.volta','bin'],['.cargo','bin'],['.yarn','bin'],['.local','share','pnpm'],['.codebuddy','bin']];

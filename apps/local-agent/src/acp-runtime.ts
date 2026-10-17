@@ -1,6 +1,7 @@
 import {AGENT_VERSION} from "./constants.js";
 import {randomUUID} from 'node:crypto';
 import {homedir} from 'node:os';
+import {stat} from 'node:fs/promises';
 import {isAbsolute,resolve} from 'node:path';
 import {AcpConnection} from './acp-connection.js';
 import {ACP_COMMANDS,detectAcp,assertAcpUnoccupied,type AcpExecutable} from './acp-providers.js';
@@ -21,6 +22,7 @@ const dependencies={detect:detectAcp,unoccupied:assertAcpUnoccupied,connection:(
 export class AcpRuntime {
   availability:ProviderAvailability={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
   private executable:AcpExecutable|null=null;
+  private executableStamp=-1;
   private readonly sessions=new Map<string,Session>();
   private readonly opening=new Map<string,{cwd:string;promise:Promise<Session>}>();
   private readonly catalog=new Map<string,DiscoveredThreadSummary>();
@@ -34,7 +36,11 @@ export class AcpRuntime {
   async start() {
     if(this.refreshing)return this.refreshing;
     this.refreshing=(async()=>{
-      try {this.executable=await this.deps.detect(this.provider);this.availability={...this.availability,installed:Boolean(this.executable),version:this.executable?.version??null,state:this.executable?(this.availability.version===this.executable.version?this.availability.state==='missing'?'checking':this.availability.state:'checking'):'missing',checkedAt:nowIso()};}
+      try {
+        // Re-spawning `--version` every catalog scan is wasteful; a found CLI is only re-detected when its file changes or disappears.
+        const stamp=this.executable?await stat(this.executable.executable).then(f=>f.mtimeMs,()=>-1):-1;
+        if(this.executable&&stamp===this.executableStamp&&stamp>=0)return;
+        this.executable=await this.deps.detect(this.provider);this.executableStamp=this.executable?await stat(this.executable.executable).then(f=>f.mtimeMs,()=>-1):-1;this.availability={...this.availability,installed:Boolean(this.executable),version:this.executable?.version??null,state:this.executable?(this.availability.version===this.executable.version?this.availability.state==='missing'?'checking':this.availability.state:'checking'):'missing',checkedAt:nowIso()};}
       catch {this.availability.state='error';this.availability.error='Unable to inspect official CLI';}
     })().finally(()=>{this.refreshing=undefined;});return this.refreshing;
   }
@@ -64,6 +70,8 @@ export class AcpRuntime {
   private markFailure(error:unknown) {
     const login=error instanceof AgentError&&/\(-32000\)/.test(error.message);
     this.availability.state=login?'login_required':'unverified';this.availability.capabilities=unavailableCapabilities();
+    // Only the stable error code is surfaced, never native output that could contain credentials.
+    if(error instanceof AgentError)this.availability.error=error.code;else delete this.availability.error;
   }
   async listThreads():Promise<DiscoveredThreadSummary[]> {
     await this.start();if(!this.executable)return [];

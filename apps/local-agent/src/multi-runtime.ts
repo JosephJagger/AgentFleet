@@ -16,14 +16,19 @@ export function createMultiRuntime(callbacks: AppServerCallbacks, options: {code
   let lastAdditionalCatalog: Awaited<ReturnType<AcpRuntime['listThreads']>> = [];
   let additionalScan: Promise<void> | undefined;
   let nextAdditionalScan = 0;
+  const schedule = new Map<string, {next: number; delay: number}>();
   let stopped = false;
   // Slow or unavailable optional CLIs must not delay Codex/Claude discovery.
   const additionalCatalog = async () => {
     if(!stopped && !additionalScan && Date.now() >= nextAdditionalScan) {
       nextAdditionalScan = Date.now() + 60_000;
       additionalScan = Promise.all([...additional.values()].map(async runtime => {
-        try { return await runtime.listThreads(); }
-        catch { return lastAdditionalCatalog.filter(row => decodeProviderThread(row.nativeThreadId)?.provider === runtime.provider).map(row => ({...row,executionState:'unknown' as const})); }
+        const known = () => lastAdditionalCatalog.filter(row => decodeProviderThread(row.nativeThreadId)?.provider === runtime.provider);
+        const slot = schedule.get(runtime.provider) ?? {next: 0, delay: 60_000};
+        // A failing CLI (not logged in, incompatible) must not be cold-started every minute.
+        if (Date.now() < slot.next) return known();
+        try { const rows = await runtime.listThreads(); schedule.set(runtime.provider, {next: 0, delay: 60_000}); return rows; }
+        catch { const delay = Math.min(slot.delay * 2, 600_000); schedule.set(runtime.provider, {next: Date.now() + delay, delay}); return known().map(row => ({...row,executionState:'unknown' as const})); }
       })).then(rows => {
         const next=rows.flat();const changed=JSON.stringify(next)!==JSON.stringify(lastAdditionalCatalog);
         lastAdditionalCatalog=next;
