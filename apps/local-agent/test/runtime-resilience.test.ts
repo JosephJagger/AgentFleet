@@ -1283,7 +1283,7 @@ test("Steer targets only the exact active turn and emits an auditable result", a
   await runtime.shutdown();
 });
 
-for (const code of ["PROVIDER_NATIVE_BUSY", "PROVIDER_OWNERSHIP_UNKNOWN"]) {
+for (const code of ["PROVIDER_NATIVE_BUSY", "PROVIDER_OWNERSHIP_UNKNOWN", "PROVIDER_RELEASE_PENDING"]) {
   for (const phase of ["create", "prompt"] as const) {
     test(`ACP ${code} before ${phase} releases the reservation without replaying the request`, async (t) => {
       const { store, projects } = await fixture();

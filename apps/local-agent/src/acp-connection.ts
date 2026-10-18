@@ -8,6 +8,7 @@ export interface AcpConnectionOptions {
   notification(method:string,params:Record<string,unknown>): Promise<void> | void;
   request(method:string,params:Record<string,unknown>): Promise<unknown>;
   exit(error:Error): void;
+  processExited?(): void;
 }
 /** One owned stdio connection. No shell, network listener, or credential persistence. */
 export class AcpConnection {
@@ -15,10 +16,13 @@ export class AcpConnection {
   private sequence = 0;
   private buffered = Buffer.alloc(0);
   private ended = false;
+  private processClosed = false;
+  private readonly closed = Promise.withResolvers<void>();
   private events = Promise.resolve();
   private readonly pending = new Map<number,{resolve:(v:unknown)=>void;reject:(e:Error)=>void;timer:NodeJS.Timeout}>();
   constructor(private readonly options: AcpConnectionOptions) {}
   get pid() { return this.child?.pid; }
+  get closing() { return this.ended && !this.processClosed; }
   start() {
     if (this.child || this.ended) throw new AgentError('ACP_CONNECTION_STATE','Connection cannot be started twice');
     this.child = spawn(this.options.executable,this.options.args,{cwd:this.options.cwd,env:this.options.env??process.env,stdio:['pipe','pipe','pipe'],shell:false,windowsHide:true});
@@ -26,7 +30,11 @@ export class AcpConnection {
     this.child.stdout.on('data',(chunk:Buffer)=>this.consume(chunk));
     this.child.stderr.on('data',()=>{/* Native stderr can contain credentials; drain without persisting. */});
     this.child.on('error',()=>this.fail(new AgentError('ACP_START_FAILED','Official CLI could not be started')));
-    this.child.once('close',()=>this.fail(new AgentError('ACP_DISCONNECTED','Native agent disconnected; task outcome must be reconciled')));
+    this.child.once('close',()=>{
+      this.processClosed=true;
+      this.fail(new AgentError('ACP_DISCONNECTED','Native agent disconnected; task outcome must be reconciled'));
+      this.options.processExited?.();this.closed.resolve();
+    });
   }
   private send(value:unknown) {
     if (this.ended || !this.child?.stdin.writable) throw new AgentError('ACP_DISCONNECTED','Native agent is not connected');
@@ -83,4 +91,14 @@ export class AcpConnection {
     this.child?.stdin.destroy();this.child?.kill();this.options.exit(error);
   }
   close() { this.fail(new AgentError('ACP_CLOSED','Connection released')); }
+  async closeAndWait(timeoutMs=10000) {
+    this.close();
+    if(!this.child||this.processClosed)return;
+    let timer:NodeJS.Timeout|undefined;
+    try {
+      await Promise.race([this.closed.promise,new Promise<never>((_,reject)=>{
+        timer=setTimeout(()=>reject(new AgentError('PROVIDER_RELEASE_PENDING','Native process is still closing; no replacement task was sent. Retry after it exits.')),timeoutMs);
+      })]);
+    } finally {if(timer)clearTimeout(timer);}
+  }
 }

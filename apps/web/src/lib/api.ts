@@ -418,7 +418,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
   const ownershipFailure = commandFailure && ["THREAD_WRITER_BUSY", "PROVIDER_NATIVE_BUSY", "PROVIDER_OWNERSHIP_UNKNOWN"].includes(String(commandError.code));
   const commandFailureBody = ownershipFailure
     ? `${t("任务未启动")}：${commandError.code === "THREAD_WRITER_BUSY"
-      ? t("此会话被原生 Codex 或其他客户端占用，请先在占用端退出该会话，再重新发送。")
+      ? t("原生 Codex 后台或其他客户端仍持有此会话的写入权。关闭窗口不一定释放占用，请在占用端结束使用并等待后台释放后重新发送。")
       : commandError.code === "PROVIDER_NATIVE_BUSY"
         ? t("主机检测到该智能体的其他原生进程，请先确认并释放占用，再重新发送。")
         : t("无法确认主机上的原生进程归属，本次未发送任务，请检查主机后重试。")} (${commandError.code})`

@@ -1258,7 +1258,7 @@ export class CodexAppServer implements AppServerClient {
     if (isRecord(message.error)) {
       const detail = typeof message.error.message === "string" ? message.error.message : "unknown app-server error";
       if (pending.method === "thread/resume" && detail.includes("already has an active writer")) {
-        pending.reject(new AgentError("THREAD_WRITER_BUSY", "会话正在被本机 Codex 或其他客户端占用，请退出该会话后重试（active writer）"));
+        pending.reject(new AgentError("THREAD_WRITER_BUSY", "任务未启动：原生 Codex 后台或其他客户端仍持有此会话的写入权。关闭窗口不一定释放占用，请在占用端结束使用并等待后台释放后重新发送（active writer）"));
         return;
       }
       pending.reject(new AgentError("APP_SERVER_RPC_ERROR", `${pending.method}: ${redact(detail).slice(0, 2000)}`));

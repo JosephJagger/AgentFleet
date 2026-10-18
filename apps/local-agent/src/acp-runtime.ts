@@ -53,7 +53,7 @@ export class AcpRuntime {
       catch {this.availability.state='error';this.availability.error='Unable to inspect official CLI';}
     })().finally(()=>{this.refreshing=undefined;});return this.refreshing;
   }
-  async stop(){if([...this.sessions.values()].some(s=>s.turnId&&!s.lost))throw new AgentError("PROVIDER_TURN_ACTIVE","Finish native work before stopping");this.stopped=true;await Promise.all([...this.sessions.keys()].map(id=>this.unsubscribeThread(id)));for(const connection of this.connections)connection.close();}
+  async stop(){if([...this.sessions.values()].some(s=>s.turnId&&!s.lost))throw new AgentError("PROVIDER_TURN_ACTIVE","Finish native work before stopping");this.stopped=true;await Promise.all([...this.sessions.keys()].map(id=>this.unsubscribeThread(id)));await Promise.all([...this.connections].map(connection=>connection.closeAndWait()));}
   private native(id:string) {const parsed=decodeProviderThread(id);if(!parsed||parsed.provider!==this.provider)throw new AgentError('PROVIDER_ID_MISMATCH','Session belongs to another provider');return parsed.nativeId;}
   private async connect(cwd:string,session?:Session,launchArgs?:string[]) {
     if(this.stopped)throw new AgentError("ACP_CLOSED","Provider runtime stopped");
@@ -62,8 +62,10 @@ export class AcpRuntime {
     connection=this.deps.connection({executable:this.executable.executable,args:launchArgs??[...this.executable.prefix,...ACP_COMMANDS[this.provider].args],cwd,
       notification:async(method,params)=>{if(session)await this.notification(session,method,params);},
       request:async(method,params)=>{if(!session)throw new AgentError('ACP_NO_SESSION','No session is authorized');return this.request(session,method,params);},
-      exit:()=>{
+      processExited:()=>{
         this.connections.delete(connection);if(connection.pid)this.owned.delete(connection.pid);
+      },
+      exit:()=>{
         if(session&&!session.lost){session.lost=true;this.resolvePending(session);if(session.turnId)void this.callbacks.onThreadExit?.(session.id,this.appServerEpoch,'Native connection lost; task outcome is unknown');}
       }});
     this.connections.add(connection);connection.start();if(connection.pid)this.owned.add(connection.pid);
@@ -143,6 +145,9 @@ export class AcpRuntime {
   private async openOwned(id:string,cwd:string,fresh=false,settings?:GrokSettings):Promise<Session> {
     if(!isAbsolute(cwd))throw new AgentError('PROJECT_PATH_INVALID','An absolute workspace is required');
     const existing=this.sessions.get(id);if(existing&&!existing.lost){if(resolve(existing.cwd)!==resolve(cwd))throw new AgentError('PROVIDER_CWD_CHANGED','Session workspace changed');return existing;}
+    // A protocol disconnect is not proof that the OS writer has exited. Keep
+    // closing children owned, and confirm their exit before opening a replacement.
+    await Promise.all([...this.connections].filter(connection=>connection.closing).map(connection=>connection.closeAndWait()));
     await this.deps.unoccupied(this.provider,this.owned);
     const session={id,cwd,items:[],cancelled:false,loading:true,lost:false,permissionMode:settings?.permissionMode??'default',configOptions:[],published:new Map<string,string>(),completed:new Set<string>(),itemSizes:new Map<string,number>(),historyBytes:0,textPublishedAt:0} as unknown as Session;
     session.connection=await this.connect(cwd,session,this.launchArgs(settings));
@@ -175,7 +180,8 @@ export class AcpRuntime {
   async unsubscribeThread(id:string) {
     const session=this.sessions.get(id);if(!session)return;
     if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Cancel or finish the turn before releasing its writer');
-    session.lost=true;this.resolvePending(session);session.connection.close();this.sessions.delete(id);
+    session.lost=true;this.resolvePending(session);await session.connection.closeAndWait();
+    if(this.sessions.get(id)===session)this.sessions.delete(id);
   }
   private resolvePending(session:Session) {for(const [id,p] of this.pending)if(p.session===session){clearTimeout(p.timer);this.pending.delete(id);p.resolve({outcome:{outcome:'cancelled'}});void this.callbacks.onApprovalResolved(id,this.appServerEpoch).catch(()=>undefined);}}
   /** Only options the native session actually returned are written. Missing ids are left alone. */

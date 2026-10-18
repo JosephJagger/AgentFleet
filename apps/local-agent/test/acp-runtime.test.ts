@@ -15,6 +15,10 @@ import type {ApprovalRecord,ManagedThread,ProjectRecord} from '../src/types.js';
 const peer=String.raw`
 const readline=require('node:readline');
 const send=v=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',...v})+'\n');
+if(Number(process.env.ACP_TEST_EXIT_DELAY)>0){
+ const keepAlive=setInterval(()=>{},1000);
+ process.on('SIGTERM',()=>setTimeout(()=>{clearInterval(keepAlive);process.exit(0);},Number(process.env.ACP_TEST_EXIT_DELAY)));
+}
 let promptId, sessionId='synthetic-session', requestKind;
 readline.createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line);
@@ -68,7 +72,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  case 'session/cancel':send({id:promptId,result:{stopReason:'cancelled'}});break;
  }
 });`;
-async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]='qwen',images=false) {
+async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]='qwen',images=false,exitDelay=0) {
  const dir=await mkdtemp(join(tmpdir(),'acp-test-'));const file=join(dir,'peer.cjs');await writeFile(file,peer);
  const events:AppEvent[]=[];const batches:AppEvent[][]=[];const volatiles:VolatileAppEvent[]=[];const approvals:ApprovalRecord[]=[];const exits:string[]=[];const launches:string[][]=[];const batchWatchers:Array<()=>void>=[];
  const project:ProjectRecord={id:'project-test',alias:'synthetic',provider,root:dir,device:'test',inode:'test',identityVersion:1,addedAt:new Date().toISOString()};
@@ -76,12 +80,47 @@ async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]=
  const callbacks:AppServerCallbacks={findManagedThread:id=>thread?.nativeThreadId===id?thread:undefined,findProject:()=>project,onEvent:async e=>{events.push(e);},onEvents:async batch=>{batches.push(batch);events.push(...batch);for(const watch of batchWatchers)watch();},onVolatile:e=>{volatiles.push(e);},onApproval:async a=>{approvals.push(a);},onApprovalResolved:async()=>{},onExit:async()=>{},onThreadExit:async id=>{exits.push(id);}};
  const counts={connections:0};
  let ownershipFailure:AgentError|undefined;
- const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{readGrokUsage:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async()=>{if(ownershipFailure)throw ownershipFailure;},connection:options=>{counts.connections++;launches.push(options.args);return new AcpConnection({...options,env:{...process.env,ACP_TEST_IMAGES:images?'yes':'no'}});}});
+ const children:AcpConnection[]=[];
+ const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{readGrokUsage:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async(_provider,owned)=>{
+   if(ownershipFailure)throw ownershipFailure;
+   // Model the actual OS process scan, including children still exiting.
+   for(const connection of children)if(connection.pid&&!owned.has(connection.pid)){
+     let alive=false;try{process.kill(connection.pid,0);alive=true;}catch{}
+     if(alive)throw new AgentError('PROVIDER_NATIVE_BUSY','Owned child was forgotten before process exit');
+   }
+ },connection:options=>{counts.connections++;launches.push(options.args);const child=new AcpConnection({...options,env:{...process.env,ACP_TEST_IMAGES:images?'yes':'no',ACP_TEST_EXIT_DELAY:String(exitDelay)}});children.push(child);return child;}});
  t.after(async()=>{await runtime.stop();await rm(dir,{recursive:true,force:true});});
  await runtime.start();const created=await runtime.createThread(project);
  thread={nativeThreadId:created.nativeThreadId,projectId:project.id,appServerEpoch:'epoch-test',policyVersion:'remote-restricted-v1',policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),historyMode:'legacy'} as ManagedThread;
- return {runtime,thread,project,events,batches,batchWatchers,volatiles,approvals,exits,counts,launches,setOwnershipFailure:(error:AgentError|undefined)=>{ownershipFailure=error;}};
+ return {runtime,thread,project,events,batches,batchWatchers,volatiles,approvals,exits,counts,launches,children,setOwnershipFailure:(error:AgentError|undefined)=>{ownershipFailure=error;}};
 }
+test('closing catalog children stay owned and cannot cause a false external-writer refusal',{skip:process.platform==='win32'},async t=>{
+ const f=await fixture(t,'grok',false,250);
+ await f.runtime.listThreads();
+ assert.equal(f.children[1]?.closing,true);
+ await f.runtime.startTurn(f.thread,f.project,'hello');
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.equal(f.events.filter(e=>e.type==='turn.completed').length,1);
+});
+test('writer release and concurrent resume wait for confirmed process exit',{skip:process.platform==='win32'},async t=>{
+ const f=await fixture(t,'grok',false,250);const old=f.children[0]!;
+ let released=false;
+ const release=f.runtime.unsubscribeThread(f.thread.nativeThreadId).then(()=>{released=true;});
+ const resume=f.runtime.resumeThread(f.thread.nativeThreadId,f.project);
+ await new Promise(r=>setTimeout(r,40));
+ assert.equal(released,false);assert.equal(f.counts.connections,1);assert.equal(old.closing,true);
+ await Promise.all([release,resume]);
+ assert.equal(old.closing,false);assert.equal(f.counts.connections,2);
+ assert.equal(f.events.some(e=>e.type==='turn.completed'),false,'Resume never replays a task');
+});
+test('release timeout retains the closing process until exit and can be safely awaited again',{skip:process.platform==='win32'},async t=>{
+ const f=await fixture(t,'grok',false,250);const connection=f.children[0]!;
+ await assert.rejects(connection.closeAndWait(5),{code:'PROVIDER_RELEASE_PENDING'});
+ assert.equal(connection.closing,true);
+ await f.runtime.resumeThread(f.thread.nativeThreadId,f.project);
+ assert.equal(connection.closing,false);assert.equal(f.counts.connections,2);
+ assert.equal(f.events.length,0,'No prompt is replayed after waiting for exit');
+});
 for(const provider of ACP_PROVIDER_IDS)for(const code of ['PROVIDER_NATIVE_BUSY','PROVIDER_OWNERSHIP_UNKNOWN'])test(`${provider}: ${code} rejects even an open session before dispatch`,async t=>{
  const f=await fixture(t,provider);const before=f.counts.connections;
  f.setOwnershipFailure(new AgentError(code,'Ownership preflight refused'));
