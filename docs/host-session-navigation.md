@@ -27,3 +27,17 @@ The picker uses theme palette variables. Provider columns stack in narrow panes;
 mobile conversation navigation wraps both the picker and inspector in the same
 viewport so the switching entry stays accessible. Selecting a session only
 navigates; it does not claim, rerun or dispatch work.
+
+## Agent filter above the conversation
+
+The top Agent picker (including All) only sets the current host's session-picker
+filter. It does not navigate, change the project catalog's provider, or replace
+an open conversation. A Codex conversation can remain open while the picker is
+filtered to Claude. Opening “切换会话” shows matching candidates; selecting a
+candidate is the action that navigates. Drafts, attachments and history scroll
+state stay with the existing inspector until that explicit selection.
+
+The filter lives in page state per host and defaults to All after reload. The
+separate Agent selector beside the host name retains its catalog navigation role.
+This behavior is shared by mobile and desktop themes. Regression coverage uses
+the full App, not just a mocked HostSessions callback.

@@ -1,3 +1,4 @@
+import { parseImages } from "./images.js";
 import { type ClaudeSettings } from "./claude-settings.js";
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
@@ -25,7 +26,12 @@ export const isClaudeThread = (id: string) => id.startsWith(CLAUDE_PREFIX);
 export const isClaudeProject = (project: ProjectRecord) => project.provider === "claude";
 const nativeId = (id: string) => id.slice(CLAUDE_PREFIX.length);
 const execFileAsync = promisify(execFile);
-export interface ClaudeAvailability { managed?: boolean; installed: boolean; version: string | null; error?: string; models?: ClaudeModel[]; quota?: ClaudeQuota; permissionModes?: string[]; }
+function supportsClaudeSteering(version: string | null): boolean {
+  const v = /(?:^|\s)v?(\d+)\.(\d+)\.(\d+)/.exec(version ?? "");
+  return Boolean(v && (Number(v[1]) > 2 || Number(v[1]) === 2 && (Number(v[2]) > 1 || Number(v[2]) === 1 && Number(v[3]) >= 265)));
+}
+
+export interface ClaudeAvailability { steerSupported?: boolean; managed?: boolean; installed: boolean; version: string | null; error?: string; models?: ClaudeModel[]; quota?: ClaudeQuota; permissionModes?: string[]; }
 
 export async function detectClaude(): Promise<ClaudeAvailability & { path?: string }> {
   const names = process.platform === "win32" ? ["claude.exe", "claude.cmd"] : ["claude"];
@@ -131,7 +137,7 @@ export class ClaudeRuntime implements AppServerClient {
       if (generation !== this.discoveryGeneration) return;
       if(this.binary!==path)this.metadataAt=0;
       this.binary = path;
-      this.availability = path ? {...this.availability,...availability,managed:availability.managed===true} : availability;
+      this.availability = path ? {...this.availability,...availability,managed:availability.managed===true,steerSupported:supportsClaudeSteering(availability.version)} : availability;
       void this.refreshMetadata();
     } catch {
       if(generation!==this.discoveryGeneration)return;
@@ -369,9 +375,9 @@ export class ClaudeRuntime implements AppServerClient {
           // Match all consumed UUIDs because the CLI can merge prompt batches.
           const ids = [...(msg.user_message_uuids ?? []), ...(msg.user_message_uuid ? [msg.user_message_uuid] : [])];
           const matches = ids.some(uuid => writer.promptIds.has(uuid));
-          const version = /(?:^|\s)v?(\d+)\.(\d+)\.(\d+)/.exec(this.availability.version ?? "");
-          const attributesPrompts = Boolean(version && (Number(version[1]) > 2 || (Number(version[1]) === 2 && (Number(version[2]) > 1 || (Number(version[2]) === 1 && Number(version[3]) >= 265)))));
+          const attributesPrompts = supportsClaudeSteering(this.availability.version);
           if (!matches && (ids.length > 0 || (!msg.is_error && !writer.interrupted && (attributesPrompts || (msg.queued_turn_count ?? 0) > 0 || msg.num_turns === 0)))) continue;
+          for (const uuid of ids) writer.promptIds.delete(uuid);
           // Unattributed fatal startup errors and interrupt results still end
           // the attempt; older CLIs without attribution retain legacy behavior.
           // Native modelUsage is conversation-cumulative; usage is this query's consumption.
@@ -383,6 +389,9 @@ export class ClaudeRuntime implements AppServerClient {
           const last={inputTokens:lastInput,outputTokens:msg.usage.output_tokens,cachedInputTokens:msg.usage.cache_read_input_tokens ?? 0,reasoningOutputTokens:msg.usage.output_tokens_details?.thinking_tokens ?? 0,totalTokens:lastInput+msg.usage.output_tokens};
           await emit("thread.usage", { usage: { total, last } });
           if (msg.is_error) await emit("turn.error", { message: "errors" in msg ? msg.errors.join("\n") : "Claude 执行失败" });
+          // A later native result may cover an input accepted near the end of this one.
+          // Keep reading the SAME query until all accepted inputs are accounted for.
+          if (!msg.is_error && !writer.interrupted && attributesPrompts && writer.promptIds.size > 0) continue;
           delete writer.turnId;
           await emit("turn.completed", { turn: { id: turnId, status: writer.interrupted ? "interrupted" : msg.is_error ? "failed" : "completed" } });
           break;
@@ -398,10 +407,20 @@ export class ClaudeRuntime implements AppServerClient {
       if (this.writers.get(id) === writer) this.loseNativeTaskObservation(id);
     }
   }
-  async steerTurn(thread: ManagedThread, turnId: string, prompt: string, _clientUserMessageId?: string) {
-    const writer = this.writers.get(thread.nativeThreadId); if (!writer || writer.turnId !== turnId) throw new AgentError("THREAD_BUSY", "Claude 没有正在运行的任务");
-    const promptId = randomUUID(); writer.promptIds.add(promptId);
-    writer.input.push({ type: "user", uuid: promptId, session_id: nativeId(thread.nativeThreadId), parent_tool_use_id: null, message: { role: "user", content: prompt } }); writer.wake?.();
+  async steerTurn(thread: ManagedThread, turnId: string, prompt: string, clientUserMessageId?: string, images?: string[], extras?: TurnExtras) {
+    if (!this.availability.steerSupported) throw new AgentError("AGENT_CAPABILITY_UNAVAILABLE", "当前 Claude 版本尚未验证原生追加能力，请加入队列");
+    const writer = this.writers.get(thread.nativeThreadId);
+    if (!writer || writer.closed || writer.interrupted || writer.turnId !== turnId) throw new AgentError("TURN_PRECONDITION_FAILED", "Claude 原任务已经变化，补充消息未发送");
+    if (extras?.pluginSkills?.length || extras?.outputSchema) throw new AgentError("AGENT_INPUT_UNSUPPORTED", "原生追加不支持这些输入，消息未发送");
+    const content: SDKUserMessage["message"]["content"] = [{type:"text",text:prompt + (extras?.goal ? `\n\n会话目标：${extras.goal}` : "") + (extras?.attachments?.length ? `\n\n附件路径：\n${extras.attachments.map(f=>f.path).join("\n")}` : "")}];
+    for (const url of parseImages(images)) {
+      const comma=url.indexOf(',');
+      content.push({type:"image",source:{type:"base64",media_type:url.slice(5,url.indexOf(';')) as "image/png",data:url.slice(comma+1)}});
+    }
+    const promptId = clientUserMessageId && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(clientUserMessageId) ? clientUserMessageId as ReturnType<typeof randomUUID> : randomUUID();
+    if (writer.promptIds.has(promptId)) return {nativeTurnId:turnId,status:"inProgress"};
+    writer.promptIds.add(promptId);
+    writer.input.push({ type: "user", uuid: promptId, session_id: nativeId(thread.nativeThreadId), parent_tool_use_id: null, message: { role: "user", content } }); writer.wake?.();
     return { nativeTurnId: turnId, status: "inProgress" };
   }
   async interruptTurn(id: string, turnId: string) { const writer = this.writers.get(id); if (!writer || writer.turnId !== turnId) throw new AgentError("TURN_PRECONDITION_FAILED", "任务已经变化"); writer.interrupted = true; await writer.query.interrupt(); return {}; }

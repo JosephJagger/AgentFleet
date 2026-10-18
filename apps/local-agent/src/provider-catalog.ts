@@ -36,7 +36,7 @@ export function parseProviderAvailability(value: unknown): ProviderAvailability 
 
 export function supportsProviderCommand(value: unknown, command: string, hasNativeSession = true): boolean {
   const status = parseProviderAvailability(value);
-  const capability: Record<string, keyof ProviderCapabilities> = {'thread.claim':'resume','thread.release':'resume','turn.start':hasNativeSession?'prompt':'create','turn.queue':'prompt','turn.cancel':'cancel','approval.decide_once':'approval','input.respond':'input'};
+  const capability: Record<string, keyof ProviderCapabilities> = {'thread.claim':'resume','thread.release':'resume','turn.start':hasNativeSession?'prompt':'create','turn.queue':'prompt','turn.steer':'steer','turn.cancel':'cancel','approval.decide_once':'approval','input.respond':'input'};
   const key = capability[command];
   return Boolean(key && status?.installed && status.state === 'ready' && status.capabilities[key]);
 }

@@ -25,6 +25,13 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  if(m.id===991 && !m.method) { send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:JSON.stringify(m.result)}}}});send({id:promptId,result:{stopReason:'end_turn'}});return; }
  switch(m.method) {
  case 'initialize':send({id:m.id,result:{_meta:{modelState:{currentModelId:'grok-4',availableModels:[{modelId:'grok-4',name:'Grok test',_meta:{reasoningEfforts:[{value:'low'},{value:'high'}]}}]}},protocolVersion:1,agentCapabilities:{loadSession:true,promptCapabilities:{image:process.env.ACP_TEST_IMAGES==='yes'},sessionCapabilities:{list:{}}}}});break;
+ case '_x.ai/interject':
+   if(!m.params.sessionId){send({id:m.id,error:{code:-32602,message:'sessionId required'}});return;}
+   if(m.params.text==='reject'){send({id:m.id,error:{code:-32601,message:'unsupported'}});return;}
+   send({id:m.id,result:{result:{status:'queued'}}});
+   send({method:'session/update',params:{sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:m.params.text}}}});
+   if(m.params.text==='finish'){send({id:promptId,result:{stopReason:'end_turn'}});}
+   return;
  case '_x.ai/billing':{const at=Date.now();send({id:m.id,result:{config:{creditUsagePercent:25,currentPeriod:{start:new Date(at-86400000).toISOString(),end:new Date(at+6*86400000).toISOString()}}}});break;}
  case 'session/list':send({id:m.id,result:{sessions:[{sessionId,cwd:process.cwd(),title:'Synthetic'}]}});break;
  case 'session/new':send({id:m.id,result:{sessionId,configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'}]}});break;
@@ -308,4 +315,26 @@ test('Grok native nested output and extension progress remain visible without fa
  await f.runtime.interruptTurn(f.thread.nativeThreadId,turn.nativeTurnId);
  await until(()=>f.events.some(e=>e.type==='turn.completed'));
  assert.equal(f.events.filter(e=>e.type==='item.completed'&&(e.payload.item as {type?:string})?.type==='commandExecution').length,1);
+});
+
+
+test('Grok native interject targets the existing turn, rejects stale input and preserves its writer',async t=>{
+ const f=await fixture(t,'grok');
+ assert.equal(f.runtime.availability.capabilities.steer,true);
+ const turn=await f.runtime.startTurn(f.thread,f.project,'wait');
+ // Give the asynchronous original session/prompt a chance to reach the native fixture.
+ await new Promise(r=>setTimeout(r,30));
+ const count=f.counts.connections;
+ await assert.rejects(f.runtime.steerTurn(f.thread,'stale','finish'),/changed/);
+ await assert.rejects(f.runtime.steerTurn(f.thread,turn.nativeTurnId,'reject'),{code:'AGENT_CAPABILITY_UNAVAILABLE'});
+ const receipt=await f.runtime.steerTurn(f.thread,turn.nativeTurnId,'finish','unique-input');
+ assert.equal(receipt.status,'queued');assert.equal(receipt.nativeTurnId,turn.nativeTurnId);
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.equal(f.events.filter(e=>e.type==='turn.completed').length,1);
+ assert.equal(f.counts.connections,count);
+ await assert.rejects(f.runtime.steerTurn(f.thread,turn.nativeTurnId,'late'),/changed/);
+});
+test('other ACP providers cannot borrow Grok native steering',async t=>{
+ const f=await fixture(t,'qwen');assert.equal(f.runtime.availability.capabilities.steer,false);
+ await assert.rejects(f.runtime.steerTurn(f.thread,'turn','hello'),/unavailable/);
 });

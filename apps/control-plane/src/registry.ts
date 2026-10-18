@@ -2580,7 +2580,7 @@ export class RegistryService {
     if (discovery.agentRuntimes && typeof discovery.agentRuntimes === "object" && !Array.isArray(discovery.agentRuntimes)) {
       const runtimes = discovery.agentRuntimes as Record<string, unknown>;
       const claude = runtimes.claude as Record<string, unknown> | undefined;
-      safe.agentRuntimes = { claude: { installed: claude?.installed === true, version: typeof claude?.version === "string" ? claude.version.slice(0, 100) : null, ...parseClaudeMetadata(claude) } };
+      safe.agentRuntimes = { claude: { installed: claude?.installed === true, steerSupported: claude?.installed === true && claude?.steerSupported === true, version: typeof claude?.version === "string" ? claude.version.slice(0, 100) : null, ...parseClaudeMetadata(claude) } };
       for (const provider of ACP_PROVIDER_IDS) { const status = parseProviderAvailability(runtimes[provider]); if (status) (safe.agentRuntimes as Record<string,unknown>)[provider] = {...status,...(provider === "grok" ? {models:parseGrokModels((runtimes[provider] as Record<string,unknown>)?.models),quota:parseGrokQuota((runtimes[provider] as Record<string,unknown>)?.quota)} : {})}; }
     }
     if (discovery.syncMode !== undefined) {

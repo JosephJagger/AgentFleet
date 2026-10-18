@@ -303,3 +303,33 @@ test('damaged optional Claude runtime is reported without failing shared runtime
  const runtime=new ClaudeRuntime({} as AppServerCallbacks,'epoch',{detectClaude:async()=>{throw new Error('checksum mismatch');}});
  await runtime.start();assert.equal(runtime.availability.installed,false);assert.match(runtime.availability.error??'',/其他智能体不受影响/);
 });
+
+
+for(const merged of [true,false])test(`Claude steering retains native stream until all accepted UUIDs complete (merged=${merged})`,async()=>{
+ const id="claude_12345678-1234-1234-1234-123456789012";
+ const thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;
+ const events:Array<{type:string;nativeTurnId?:string}>=[];
+ const gate=Promise.withResolvers<void>(),started=Promise.withResolvers<void>(),finished=Promise.withResolvers<void>();
+ let queries=0,turnId:string;
+ const runtime=new ClaudeRuntime({findManagedThread:()=>thread,findProject:()=>project,onVolatile:()=>{},onExit:async()=>{},onApprovalResolved:async()=>{},onApproval:async()=>{},onEvent:async e=>{events.push(e);if(e.type==='turn.completed')finished.resolve();}} as AppServerCallbacks,'epoch',{
+  detectClaude:async()=>({installed:true,version:'2.1.296 (Claude Code)',path:'/bin/claude'}),nativeClaudeRunning:async()=>false,
+  query:({prompt})=>{queries++;return {close(){},async *[Symbol.asyncIterator](){
+   const input=(prompt as AsyncIterable<{uuid:string;message:{content:Array<{type:string}>}}>)[Symbol.asyncIterator]();
+   const first=await input.next();started.resolve();await gate.promise;
+   const second=await input.next();assert.equal(second.value!.message.content[1]?.type,'image');
+   const result={type:'result',is_error:false,num_turns:1,modelUsage:{},usage:{input_tokens:1,output_tokens:1}};
+   if(!merged){yield {...result,user_message_uuids:[first.value!.uuid]};assert.equal(events.filter(e=>e.type==='turn.completed').length,0);}
+   yield {...result,user_message_uuids:merged?[first.value!.uuid,second.value!.uuid]:[second.value!.uuid]};
+  }} as unknown as Query;}
+ });
+ await runtime.start();assert.equal(runtime.availability.steerSupported,true);
+ const turn=await runtime.startTurn(thread,project,'original');turnId=turn.nativeTurnId!;await started.promise;
+ await assert.rejects(runtime.steerTurn(thread,'stale','not sent'),/变化/);
+ const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
+ await runtime.steerTurn(thread,turnId,'additional','11111111-1111-4111-8111-111111111111',[image]);
+ await runtime.steerTurn(thread,turnId,'additional','11111111-1111-4111-8111-111111111111',[image]);
+ gate.resolve();await finished.promise;
+ assert.equal(queries,1);assert.equal(events.filter(e=>e.type==='turn.completed').length,1);
+ assert.ok(events.every(e=>e.nativeTurnId===turnId));
+ await assert.rejects(runtime.steerTurn(thread,turnId,'late'),/变化/);await runtime.stop();
+});

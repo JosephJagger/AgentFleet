@@ -230,6 +230,7 @@ const KNOWN_FAILED_INVOCATION_CODES = new Set([
   "PROVIDER_RELEASE_PENDING",
   "THREAD_CLAIM_ABORTED",
   "CODEX_TARGET_CHANGED", "CODEX_OPERATION_INVALID", "HOST_BUSY", "AGENT_CAPABILITY_UNAVAILABLE", "NO_ACTIVE_TURN", "CODEX_CONFIG_UNAVAILABLE", "MCP_FORM_UNSUPPORTED",
+  "AGENT_INPUT_UNSUPPORTED", "AGENT_IMAGE_UNSUPPORTED",
   "INPUT_ANSWERS_INVALID", "INPUT_QUESTIONS_INVALID", "INPUT_RESPONSE_REQUIRED",
   "CODEX_SETTINGS_INVALID", "CODEX_MODEL_UNAVAILABLE", "CODEX_EFFORT_UNAVAILABLE", "CODEX_MODE_UNAVAILABLE",
   "APP_SERVER_RPC_ERROR",
@@ -972,7 +973,7 @@ export class AgentRuntime {
       if(Object.values(this.store.snapshot().managedThreads).some(t=>t.realtimeSessionId && (t.projectId===project.id || command.type==="codex.manage") && !(command.type==="turn.start" && t.logicalSessionId===command.logicalSessionId)) && !["turn.cancel","turn.steer","approval.decide_once","input.respond"].includes(command.type)) throw new AgentError("VOICE_PROJECT_BUSY", "请先结束项目的实时语音，再执行此操作");
       await verifyProjectIdentity(project);
       if (isAcpProvider(project.provider)) {
-        if (!['thread.claim','thread.release','turn.start','turn.queue','turn.cancel','approval.decide_once','input.respond'].includes(command.type)) throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Unsupported native operation');
+        if (!['thread.claim','thread.release','turn.start','turn.queue','turn.steer','turn.cancel','approval.decide_once','input.respond'].includes(command.type)) throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Unsupported native operation');
         const grokSettings=project.provider==='grok'?parseGrokSettings(command.payload.settings):undefined;
         const settingsRejected=project.provider==='grok'?command.payload.settings!==undefined&&!grokSettings:command.payload.settings!==undefined;
         if (settingsRejected || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');

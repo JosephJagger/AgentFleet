@@ -614,7 +614,11 @@ export class CoordinationService {
       invariant(isAcpProvider(session.provider) || session.compatibility === "compatible", 409, "MACHINE_INCOMPATIBLE", "Machine is not P0a-compatible");
       invariant(session.machine_reachability === "online", 409, "MACHINE_OFFLINE", "Machine must be online when accepting a command");
       invariant(isAcpProvider(session.provider) || !session.runtime_read_only, 409, "MACHINE_READ_ONLY", "Agent runtime currently supports read-only access");
-      invariant(session.provider !== "claude" || ["thread.claim", "thread.release", "turn.start", "turn.queue", "turn.cancel", "approval.decide_once", "input.respond"].includes(input.type),409,"AGENT_CAPABILITY_UNAVAILABLE","Claude Code does not support this operation");
+      invariant(session.provider !== "claude" || ["thread.claim", "thread.release", "turn.start", "turn.queue", "turn.steer", "turn.cancel", "approval.decide_once", "input.respond"].includes(input.type),409,"AGENT_CAPABILITY_UNAVAILABLE","Claude Code does not support this operation");
+      if(session.provider === "claude" && input.type === "turn.steer") {
+        const host=this.db.get<{discovery_json:string|null}>("SELECT discovery_json FROM machines WHERE machine_id=?",session.machine_id);
+        invariant(JSON.parse(host?.discovery_json??'{}')?.agentRuntimes?.claude?.steerSupported === true,409,"AGENT_CAPABILITY_UNAVAILABLE","Claude Code 尚未上报原生追加支持，请更新连接服务或加入队列");
+      }
       invariant(supportsCommand(session.command_types_json, input.type), 409, "AGENT_CAPABILITY_UNAVAILABLE", "Agent has not reported support for this operation; update the connection service");
       if (["turn.start", "turn.queue", "turn.compact", "turn.review", "thread.claim"].includes(input.type)) {
         invariant(!this.pendingCodexMutation(session.machine_id), 409, "CODEX_OPERATION_PENDING", "Wait for Codex environment changes to be confirmed before starting tasks");
@@ -1394,6 +1398,7 @@ export class CoordinationService {
         return null;
       }
       const runtimeTarget = this.db.get<{provider:string;discovery_json:string|null;type:string;native_thread_id:string|null}>(`SELECT p.provider,m.discovery_json,c.type,e.native_thread_id FROM commands c JOIN logical_sessions s ON s.logical_session_id=c.logical_session_id JOIN projects p ON p.project_id=s.project_id JOIN machines m ON m.machine_id=s.machine_id JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL WHERE c.command_id=?`,commandId);
+      if(runtimeTarget?.provider==='claude' && runtimeTarget.type==='turn.steer' && JSON.parse(runtimeTarget.discovery_json??'{}')?.agentRuntimes?.claude?.steerSupported!==true)return null;
       if(runtimeTarget && isAcpProvider(runtimeTarget.provider) && !supportsProviderCommand(JSON.parse(runtimeTarget.discovery_json??'{}')?.agentRuntimes?.[runtimeTarget.provider],runtimeTarget.type,Boolean(runtimeTarget.native_thread_id)))return null;
       invariant(command.machine_id === target.machineId, 409, "DISPATCH_TARGET_MISMATCH", "Command targets another Machine");
       invariant(command.identity_state === "active" && command.security_state === "normal", 409, "MACHINE_READ_ONLY", "Machine cannot accept commands");

@@ -77,9 +77,14 @@ export class AcpRuntime {
       const modelState=isRecord(meta.modelState)?meta.modelState:{};
       const models=this.provider==='grok'?parseGrokModels(modelState.availableModels):[];
       if(session&&models.length)session.configOptions=grokModelOptions(models,typeof modelState.currentModelId==='string'?modelState.currentModelId:undefined);
+      // Invalid params cannot target a session. Only a registered native handler
+      // returning InvalidParams proves this extension exists; never infer from brand.
+      let steer=false;
+      if(this.provider==='grok')try {await connection.call('_x.ai/interject',{},3000);}
+      catch(error){steer=error instanceof AgentError && error.code==='ACP_REMOTE_ERROR' && error.message.includes('(-32602)');}
       const images=acpImageInput(this.provider,this.executable.version,init);
       if(session)session.imageInput=images;
-      this.availability={...(this.availability.quota?{quota:this.availability.quota}:{}),installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),models:models.length>0,usage:this.provider==='grok'&&this.availability.capabilities.usage,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
+      this.availability={...(this.availability.quota?{quota:this.availability.quota}:{}),installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),steer,models:models.length>0,usage:this.provider==='grok'&&this.availability.capabilities.usage,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
       return connection;
     } catch(error) {connection.close();this.markFailure(error);throw error;}
   }
@@ -255,7 +260,28 @@ export class AcpRuntime {
     const session=this.sessions.get(id);
     return session?.turnId===turnId&&!session.lost ? {cwd:session.cwd,status:'inProgress'} : null;
   }
-  async steerTurn(){throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Running-turn steering has not been verified for this provider');}
+  async steerTurn(thread:ManagedThread,turnId:string,prompt:string,messageId?:string,images?:string[],extras?:TurnExtras) {
+    this.native(thread.nativeThreadId);
+    if(this.provider!=='grok'||!this.availability.capabilities.steer)throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Native running-turn input is unavailable; use the queue');
+    const session=this.sessions.get(thread.nativeThreadId);
+    if(!session||session.lost||session.cancelled||session.turnId!==turnId)throw new AgentError('TURN_PRECONDITION_FAILED','Native turn changed; additional input was not sent');
+    if(extras?.attachments?.length||extras?.pluginSkills?.length||extras?.outputSchema||extras?.goal)throw new AgentError('AGENT_INPUT_UNSUPPORTED','Native interjection does not support these inputs');
+    const blocks=acpImageBlocks(images);
+    // Image prompt support alone does not prove image interjection support.
+    if(blocks.length&&(!session.imageInput||!/^grok 1\.0\.62(?:\s|$)/.test(this.executable?.version??'')))throw new AgentError('AGENT_IMAGE_UNSUPPORTED','当前原生版本尚未验证追加图片，请将文字和图片一起加入队列');
+    let response:unknown;
+    try {
+      response=await session.connection.call('_x.ai/interject',{sessionId:this.native(session.id),text:prompt,interjectionId:messageId??randomUUID(),...(blocks.length?{content:[{type:'text',text:prompt},...blocks]}:{})},10000);
+    } catch(error) {
+      // A missing handler proves no input was accepted. Transport/timeouts remain unknown.
+      if(error instanceof AgentError && error.code==='ACP_REMOTE_ERROR' && error.message.includes('(-32601)'))throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Native interjection rejected: method unavailable; use the queue');
+      throw error;
+    }
+    const receipt=isRecord(response)&&isRecord(response.result)?response.result:response;
+    if(!isRecord(receipt)||receipt.status!=='queued')throw new AgentError('ACP_RESULT_INVALID','Native interjection outcome is unknown; do not resend automatically');
+    // "queued" means accepted into the active native turn, not another Fleet turn.
+    return {nativeTurnId:turnId,status:'queued'};
+  }
   async interruptTurn(id:string,turnId:string) {
     const session=this.sessions.get(id);if(!session||session.lost||session.turnId!==turnId)throw new AgentError('PROVIDER_TURN_CHANGED','Native turn is no longer current');
     session.cancelled=true;session.connection.notify('session/cancel',{sessionId:this.native(id)});this.resolvePending(session);return {requested:true};

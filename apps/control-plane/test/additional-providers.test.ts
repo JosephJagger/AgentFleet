@@ -169,3 +169,22 @@ test('Grok discovery retains only validated quota fields and drops raw billing d
  assert.equal(JSON.parse(json).agentRuntimes.grok.quota.windows[0].remainingPercent,96);
  assert.equal(json.includes('never-store'),false);
 });
+
+
+for(const provider of ['grok','claude'] as const)test(`${provider} append requires explicit support, exact active turn and deduplicates commands`,t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ if(provider==='claude'){f.db.run("UPDATE projects SET provider='claude' WHERE project_id='grok'");f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{claude:{installed:true,version:'2.1.296'}}});}
+ const s=f.registry.createSession(f.principal,'m','grok','Native append test','steer-test');
+ const nativeId=provider==='claude'?'claude_original':'acp_grok_original';
+ f.db.run("UPDATE logical_sessions SET active_turn_id='active-turn',execution_state='running' WHERE logical_session_id=?",s.logicalSessionId);
+ f.db.run("UPDATE execution_segments SET native_thread_id=? WHERE logical_session_id=?",nativeId,s.logicalSessionId);
+ const input={type:'turn.steer' as const,clientMutationId:'append-once',payload:{prompt:'Supplement the current task'},precondition:{nativeTurnId:'active-turn',turnControlVersion:s.turnControlVersion}};
+ assert.equal(sessionActions(f.db,s.logicalSessionId,f.principal.clientSessionId).steer.allowed,false);
+ assert.throws(()=>f.coordination.createCommand(f.principal,s.logicalSessionId,input),{code:'AGENT_CAPABILITY_UNAVAILABLE'});
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{[provider]:provider==='claude'?{installed:true,version:'2.1.296',steerSupported:true}:{...ready,capabilities:{...ready.capabilities,steer:true}}}});
+ assert.equal(sessionActions(f.db,s.logicalSessionId,f.principal.clientSessionId).steer.allowed,true);
+ assert.throws(()=>f.coordination.createCommand(f.principal,s.logicalSessionId,{...input,clientMutationId:'stale-append-request',precondition:{...input.precondition,nativeTurnId:'old'}}),{code:'ACTIVE_TURN_CONFLICT'});
+ f.coordination.createCommand(f.principal,s.logicalSessionId,input);
+ assert.equal(f.coordination.createCommand(f.principal,s.logicalSessionId,input).duplicate,true);
+ assert.equal(f.db.get<{n:number}>("SELECT count(*) n FROM commands WHERE type='turn.steer'")?.n,1);
+});

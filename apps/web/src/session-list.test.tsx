@@ -541,3 +541,19 @@ describe("Claude Code 原生输入能力",()=>{
   expect(screen.getByRole("button",{name:"Claude Code 设置"}).textContent).toContain("high");
  });
 });
+
+
+for(const provider of ['claude','grok','qwen'] as const)it(`${provider} exposes native append only when the server allows it`,async()=>{
+ vi.spyOn(api,'claudePreferences').mockResolvedValue({settings:null,revision:0});
+ vi.spyOn(api,'grokPreferences').mockResolvedValue({settings:null,revision:0,options:[],models:[]} as never);
+ const base=session('native-'+provider,'project','Native task',new Date().toISOString());
+ const item={...base,provider,activeTurnId:'running',state:{...base.state,ownership:'agentfleet_owned',threadRuntime:'active',currentTurn:'in_progress'},actions:{steer:{allowed:provider!=='qwen'},queue:{allowed:true}}} as FleetSession;
+ const detail={session:item,events:[],approval:null,writable:true,queue:[]} as SessionDetail;
+ const steer=vi.fn(async()=>{}),queue=vi.fn(async()=>{});
+ render(<SessionInspector detail={detail} loading={false} onRefresh={()=>{}} onClaim={async()=>{}} onContinueManaged={async()=>{}} onReleaseManagement={async()=>{}} onSend={async()=>{}} onQueue={queue} onSteer={steer} onCancelQueued={async()=>{}} onCancel={async()=>{}} onApproval={async()=>{}}/>);
+ const button=screen.queryByRole('button',{name:'追加本轮'});
+ if(provider==='qwen'){expect(button).toBeNull();return;}
+ expect(button).toBeTruthy();
+ fireEvent.change(screen.getByRole('textbox',{name:`发送给 ${provider==='claude'?'Claude Code':'Grok Build'} 的消息`}),{target:{value:'补充要求'}});
+ fireEvent.click(button!);await waitFor(()=>expect(steer).toHaveBeenCalledWith('补充要求',undefined));expect(queue).not.toHaveBeenCalled();
+});

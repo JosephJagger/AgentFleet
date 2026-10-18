@@ -69,7 +69,8 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     let availability = allowed;
     if (!row) availability = blocked("SESSION_NOT_FOUND", "会话不存在");
     else if (isAcpProvider(row.provider) && !supportsProviderCommand(JSON.parse(row.discovery_json ?? '{}')?.agentRuntimes?.[row.provider],command,Boolean(row.native_thread_id))) availability = blocked('AGENT_CAPABILITY_UNAVAILABLE','原生智能体尚未报告支持此操作');
-    else if (row.provider === "claude" && ["deletePreview", "delete", "rename", "archive", "unarchive", "fork", "compact", "review", "inspect", "manage", "stop", "steer"].includes(action)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "Claude Code 尚不支持此操作");
+    else if (row.provider === "claude" && ["deletePreview", "delete", "rename", "archive", "unarchive", "fork", "compact", "review", "inspect", "manage", "stop"].includes(action)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "Claude Code 尚不支持此操作");
+    else if (row.provider === "claude" && action === "steer" && !(row.discovery_json && JSON.parse(row.discovery_json)?.agentRuntimes?.claude?.steerSupported === true)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "Claude Code 尚未上报原生追加支持，请更新连接服务或加入队列");
     else if (row.provider === "claude" && !(row.discovery_json && JSON.parse(row.discovery_json)?.agentRuntimes?.claude?.installed === true)) availability = blocked("CLAUDE_NOT_INSTALLED", "宿主机未安装 Claude Code");
     else if (!supportsCommand(row.command_types_json, command)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "主机尚未报告支持此操作，请更新连接服务");
     else if (row.identity_state !== "active") availability = blocked("MACHINE_REVOKED", "主机连接已移除");

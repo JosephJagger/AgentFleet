@@ -12,7 +12,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { grokPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -140,6 +140,7 @@ it("移动端选择插件或计划模式后立即收起添加菜单", () => {
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
 
 beforeEach(() => {
+  vi.mocked(api.claudePreferences).mockResolvedValue({settings:null,revision:0});
   vi.mocked(api.grokPreferences).mockResolvedValue({settings:null,revision:0,options:[]});
   const defaults={terms:true,suggestions:true,nlp:true,learning:true};
   const overrides:Record<string,Partial<typeof defaults>>={};
@@ -166,6 +167,41 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 
 describe("会话工作区", () => {
+  it("顶部智能体仅筛选切换列表，保留会话、草稿和滚动位置，点选会话才跳转", async () => {
+    const claude = {...session("C", "1"), provider: "claude" as const};
+    const data = dashboard();
+    data.machines[0].agentRuntimes = {claude: {installed: true, version: "2.1.296"}};
+    data.sessions = [...data.sessions, claude];
+    vi.mocked(api.dashboard).mockResolvedValue(data);
+    vi.mocked(api.session).mockImplementation(async id => id === "C" ? {...detail("A"), session: claude} : detail(id));
+    history.replaceState(null, "", "/sessions/A");
+    render(<App/>);
+    const input = await screen.findByRole("textbox", {name: "发送给 Codex 的消息"});
+    fireEvent.change(input, {target: {value: "不要丢失的草稿"}});
+    const toolbar = document.querySelector<HTMLElement>(".host-agent-toolbar")!;
+    const choose = (name: RegExp) => {
+      fireEvent.click(within(toolbar).getByRole("button", {name: "选择 Agent"}));
+      fireEvent.click(screen.getByRole("menuitemradio", {name}));
+    };
+    const historyPane = screen.getByRole("region", {name: "会话记录"});
+    historyPane.scrollTop = 120;
+    choose(/^Claude Code/);
+    expect(location.pathname).toBe("/sessions/A");
+    expect(screen.getByRole("textbox", {name: "发送给 Codex 的消息"})).toBe(input);
+    expect((input as HTMLTextAreaElement).value).toBe("不要丢失的草稿");
+    expect(historyPane.scrollTop).toBe(120);
+    fireEvent.click(within(toolbar).getByRole("button", {name: "切换会话"}));
+    const picker = document.getElementById("buzhou-session-picker")!;
+    expect(within(picker).queryByRole("heading", {name: "Codex"})).toBeNull();
+    expect(within(picker).getByRole("heading", {name: "Claude Code"})).toBeTruthy();
+    choose(/^全部/);
+    expect(location.pathname).toBe("/sessions/A");
+    expect(within(picker).getByRole("heading", {name: "Codex"})).toBeTruthy();
+    expect((input as HTMLTextAreaElement).value).toBe("不要丢失的草稿");
+    fireEvent.click(within(picker).getByRole("button", {name: /会话C/}));
+    await waitFor(() => expect(location.pathname).toBe("/sessions/C"));
+  });
+
   it("历史请求未完成时回执仍可结束等待，晚到的旧详情不会恢复转圈", async () => {
     history.replaceState(null, "", "/sessions/A");
     const pending = { id: "send-1", type: "turn.start", state: "accepted", outcome: "pending", createdAt: "2026-09-07T17:48:44Z", updatedAt: "2026-09-07T17:48:44Z" };
