@@ -71,3 +71,24 @@
  flex-shrink:1;
  min-height:0;
 }
+
+/* Mobile starts with the host quota and catalog, not expanded agent empty states. */
+.host-session-mobile-toggle { display:none; }
+@media (max-width:900px) {
+ :root .host-session-mobile-toggle { display:flex; }
+ :root .host-session-mobile-toggle button { min-height:44px; gap:6px; }
+ :root .host-session-editor.buzhou-editor > .inspector.inspector--empty { display:none; }
+ :root .host-session-editor:has(> .inspector--empty):not(.host-session-editor--picker-open) > .buzhou-session-switcher { display:none; }
+ :root .host-session-editor:has(> .inspector--empty) > .buzhou-session-switcher { max-height:36dvh; flex:none; overflow:auto; }
+ :root .host-session-editor--picker-open .host-session-mobile-toggle button > svg:last-child { transform:rotate(90deg); }
+ /* Keep text and actions in separate flow rows: sticky actions covered the caret. */
+ :root .composer .composer-actions { position:static; flex:none; }
+ :root .composer textarea { font-size:16px; }
+ html[data-keyboard-open] .host-agent-toolbar { display:none; }
+ html[data-keyboard-open] .composer { flex:0 1 auto; min-height:0; max-height:50%; padding:4px 10px 6px; }
+ html[data-keyboard-open] .composer-input { display:flex; flex-direction:column; }
+ html[data-keyboard-open] .composer textarea { flex:0 0 auto; min-height:44px; max-height:72px; overflow-y:auto; }
+ html[data-keyboard-open] .composer .message-images { flex-wrap:nowrap; overflow-x:auto; padding:4px 8px; gap:6px; }
+ html[data-keyboard-open] .composer .message-image { flex:0 0 52px; width:52px; height:44px; }
+ html[data-keyboard-open] .composer .image-draft-notice:not([role]) { display:none; }
+}

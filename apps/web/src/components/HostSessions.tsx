@@ -58,9 +58,10 @@ export function HostSessions({machine,sessions,selectedId,detail,onSelect,onBrow
   const orderedProviders = [...PROVIDER_DISPLAY_ORDER].sort((a,b)=>Number(managedProviders.has(b))-Number(managedProviders.has(a)));
   const showSwitcher=!selectedId || expandedFor===scope;
   const select=(id:string)=>{setPicked({machineId:machine?.id,id});setExpandedFor(undefined);onSelect(id);};
-  return <div className="host-session-editor buzhou-editor">
+  return <div className={`host-session-editor buzhou-editor${expandedFor===scope ? " host-session-editor--picker-open" : ""}`}>
     <div className="host-agent-toolbar">
       {onProviderChange && <AgentPicker value={provider && provider !== 'all' ? provider : 'codex'} allSelected={!provider || provider === 'all'} onAll={()=>onProviderChange('all')} claudeInstalled={machine?.agentRuntimes?.claude?.installed} runtimes={machine?.agentRuntimes} onChange={onProviderChange}/>}
+      {!selectedId && <div className="buzhou-session-toggle host-session-mobile-toggle"><button type="button" aria-controls="buzhou-session-picker" aria-expanded={expandedFor===scope} onClick={()=>setExpandedFor(expandedFor===scope?undefined:scope)}><Layers3 size={14}/>{t("正在运行")} {groups.running.length} · {t("已接管")} {groups.managed.length}<ChevronRight size={14}/></button></div>}
       {selectedId && <div className="buzhou-session-toggle"><button type="button" aria-controls="buzhou-session-picker" aria-expanded={showSwitcher} onClick={()=>setExpandedFor(showSwitcher?undefined:scope)}><Layers3 size={13}/>{showSwitcher?t('收起会话选择'):t('切换会话')}</button></div>}
     </div>
     {showSwitcher && <div id="buzhou-session-picker" className="buzhou-session-switcher" aria-label={t('当前主机会话切换')}>
