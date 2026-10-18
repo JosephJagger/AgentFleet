@@ -73,6 +73,7 @@ cp "$(command -v node)" "$STAGE/agentfleet/runtime/node"
 cp -R "$AGENT_DIR/dist" "$STAGE/agentfleet/lib/dist"
 mkdir -p "$STAGE/agentfleet/lib/node_modules/@anthropic-ai"
 cp -R "$AGENT_DIR/node_modules/@anthropic-ai/claude-agent-sdk" "$STAGE/agentfleet/lib/node_modules/@anthropic-ai/claude-agent-sdk"
+cp -R "$AGENT_DIR/node_modules/ws" "$STAGE/agentfleet/lib/node_modules/ws"
 cp "$AGENT_DIR/package.json" "$STAGE/agentfleet/lib/package.json"
 cp "$SCRIPT_DIR/portable-launcher.sh" "$STAGE/agentfleet/agentfleet"
 chmod 755 "$STAGE/agentfleet/agentfleet" "$STAGE/agentfleet/runtime/node"
@@ -87,7 +88,7 @@ for STAGING_PATH in "$STAGED_ARTIFACT" "$STAGED_CHECKSUM" "$STAGED_MANIFEST"; do
   fi
 done
 tar -czf "$STAGED_ARTIFACT" -C "$STAGE" agentfleet
-PORTABLE_VERSION=$($STAGE/agentfleet/agentfleet --version 2> "$SCRIPT_DIR/build/portable-version.stderr")
+PORTABLE_VERSION=$($STAGE/agentfleet/agentfleet --version 2> "$SCRIPT_DIR/build/portable-version.stderr") || { cat "$SCRIPT_DIR/build/portable-version.stderr" >&2; exit 1; }
 if [ "$PORTABLE_VERSION" != "$VERSION" ] || [ -s "$SCRIPT_DIR/build/portable-version.stderr" ]; then
   echo "portable version smoke test failed or wrote to stderr" >&2
   cat "$SCRIPT_DIR/build/portable-version.stderr" >&2
