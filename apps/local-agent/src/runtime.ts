@@ -222,6 +222,11 @@ function parseCommand(value: unknown): FleetCommand {
 }
 
 const KNOWN_FAILED_INVOCATION_CODES = new Set([
+  // ACP ownership checks reject before session creation/loading or prompt dispatch.
+  // Unknown ownership is not an unknown command outcome: keep refusing the writer,
+  // but do not freeze the entire project behind a request that was never sent.
+  "PROVIDER_NATIVE_BUSY",
+  "PROVIDER_OWNERSHIP_UNKNOWN",
   "THREAD_CLAIM_ABORTED",
   "CODEX_TARGET_CHANGED", "CODEX_OPERATION_INVALID", "HOST_BUSY", "AGENT_CAPABILITY_UNAVAILABLE", "NO_ACTIVE_TURN", "CODEX_CONFIG_UNAVAILABLE", "MCP_FORM_UNSUPPORTED",
   "INPUT_ANSWERS_INVALID", "INPUT_QUESTIONS_INVALID", "INPUT_RESPONSE_REQUIRED",

@@ -1283,6 +1283,48 @@ test("Steer targets only the exact active turn and emits an auditable result", a
   await runtime.shutdown();
 });
 
+for (const code of ["PROVIDER_NATIVE_BUSY", "PROVIDER_OWNERSHIP_UNKNOWN"]) {
+  for (const phase of ["create", "prompt"] as const) {
+    test(`ACP ${code} before ${phase} releases the reservation without replaying the request`, async (t) => {
+      const { store, projects } = await fixture();
+      const project = projects[0] as ProjectRecord;
+      let server!: FakeAppServer;
+      const runtime = new AgentRuntime({
+        store, identity, pairing, support,
+        appServerFactory: callbacks => (server = new FakeAppServer("epoch-preflight", callbacks)),
+      });
+      t.after(async () => { await runtime.shutdown(); store.close(); });
+      runtime.setTransportGeneration(1);
+      const { acks } = captureCallbacks(runtime);
+      await runtime.initialize();
+      const fail = async (): Promise<never> => { throw new AgentError(code, "Native ownership preflight refused"); };
+      if (phase === "create") server.createThreadHook = fail;
+      else server.startTurnHook = fail;
+      const first = command(project, "attempt-refused", "command-refused", "session-refused", "epoch-preflight");
+      await runtime.handleCommand(first, 1);
+      assert.equal(store.snapshot().commandJournal[first.commandId]?.state, "applied");
+      assert.equal(store.snapshot().commandJournal[first.commandId]?.error?.code, code);
+      assert.equal(store.snapshot().projectReservations[project.id], undefined);
+      assert.equal(store.snapshot().outbox.some(e => e.type === "turn.started"), false);
+      assert.deepEqual(ackStates(acks, first.attemptId), ["claimed", "invoking", "responded", "applied"]);
+      const counts = [server.createThreadCount, server.startTurnCount];
+      server.createThreadHook = undefined;
+      server.startTurnHook = undefined;
+      const retry = { ...first, attemptId: "attempt-replay" };
+      await runtime.handleCommand(retry, 1);
+      assert.deepEqual([server.createThreadCount, server.startTurnCount], counts);
+      assert.deepEqual(acks.find(a => a.dispatchAttemptId === retry.attemptId && a.state === "applied")?.detail,
+        { ok: false, error: { code, message: "Native ownership preflight refused" } });
+      // A separately authorized request in the same directory can now proceed.
+      const next = command(project, "attempt-next", "command-next", "session-next", "epoch-preflight");
+      await runtime.handleCommand(next, 1);
+      assert.equal(store.snapshot().commandJournal[next.commandId]?.state, "applied");
+      assert.equal(store.snapshot().commandJournal[next.commandId]?.error, undefined);
+      assert.equal(server.startTurnCount, counts[1]! + 1);
+    });
+  }
+}
+
 test("uncertain invocation remains fenced across retry and App Server restart", async () => {
   const { store, projects } = await fixture();
   const project = projects[0] as ProjectRecord;

@@ -6,6 +6,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {AcpRuntime} from '../src/acp-runtime.js';
 import {AcpConnection} from '../src/acp-connection.js';
+import {AgentError} from '../src/errors.js';
 import {ACP_PROVIDER_IDS} from '../src/provider-catalog.js';
 import type {AppServerCallbacks,AppEvent,VolatileAppEvent} from '../src/app-server.js';
 import type {ApprovalRecord,ManagedThread,ProjectRecord} from '../src/types.js';
@@ -74,12 +75,22 @@ async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]=
  let thread:ManagedThread|undefined;
  const callbacks:AppServerCallbacks={findManagedThread:id=>thread?.nativeThreadId===id?thread:undefined,findProject:()=>project,onEvent:async e=>{events.push(e);},onEvents:async batch=>{batches.push(batch);events.push(...batch);for(const watch of batchWatchers)watch();},onVolatile:e=>{volatiles.push(e);},onApproval:async a=>{approvals.push(a);},onApprovalResolved:async()=>{},onExit:async()=>{},onThreadExit:async id=>{exits.push(id);}};
  const counts={connections:0};
- const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{readGrokUsage:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async()=>{},connection:options=>{counts.connections++;launches.push(options.args);return new AcpConnection({...options,env:{...process.env,ACP_TEST_IMAGES:images?'yes':'no'}});}});
+ let ownershipFailure:AgentError|undefined;
+ const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{readGrokUsage:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async()=>{if(ownershipFailure)throw ownershipFailure;},connection:options=>{counts.connections++;launches.push(options.args);return new AcpConnection({...options,env:{...process.env,ACP_TEST_IMAGES:images?'yes':'no'}});}});
  t.after(async()=>{await runtime.stop();await rm(dir,{recursive:true,force:true});});
  await runtime.start();const created=await runtime.createThread(project);
  thread={nativeThreadId:created.nativeThreadId,projectId:project.id,appServerEpoch:'epoch-test',policyVersion:'remote-restricted-v1',policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),historyMode:'legacy'} as ManagedThread;
- return {runtime,thread,project,events,batches,batchWatchers,volatiles,approvals,exits,counts,launches};
+ return {runtime,thread,project,events,batches,batchWatchers,volatiles,approvals,exits,counts,launches,setOwnershipFailure:(error:AgentError|undefined)=>{ownershipFailure=error;}};
 }
+for(const provider of ACP_PROVIDER_IDS)for(const code of ['PROVIDER_NATIVE_BUSY','PROVIDER_OWNERSHIP_UNKNOWN'])test(`${provider}: ${code} rejects even an open session before dispatch`,async t=>{
+ const f=await fixture(t,provider);const before=f.counts.connections;
+ f.setOwnershipFailure(new AgentError(code,'Ownership preflight refused'));
+ await assert.rejects(f.runtime.startTurn(f.thread,f.project,'hello'),{code});
+ assert.equal(f.counts.connections,before);assert.equal(f.events.length,0);
+ f.setOwnershipFailure(undefined);
+ await f.runtime.startTurn(f.thread,f.project,'hello');await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.equal(f.events.filter(e=>e.type==='turn.completed').length,1);
+});
 async function until(predicate:()=>boolean){const end=Date.now()+10000;while(!predicate()){if(Date.now()>end)throw new Error('Synthetic protocol timed out');await new Promise(r=>setTimeout(r,5));}}
 for(const provider of ACP_PROVIDER_IDS)test(`${provider}: native ID, streamed text, completion and history round trip`,async t=>{
  const f=await fixture(t,provider);const catalog=await f.runtime.listThreads();assert.equal(catalog[0]?.nativeThreadId,f.thread.nativeThreadId);
