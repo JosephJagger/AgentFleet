@@ -2,9 +2,26 @@
 import { expect, it } from "vitest";
 import { mapEvent } from "./lib/api";
 import { timelineItems } from "./lib/timeline-items";
+import { isBuzhoushanChatEvent } from "./lib/buzhoushan-events";
 import type { TimelineEvent } from "./lib/types";
 const start: TimelineEvent = { id: "start", type: "item.started", sessionSeq: 304, occurredAt: "2026-09-07T11:29:07Z", nativeThreadId: "thread", nativeTurnId: "turn", nativeItemId: "item", actor: "user", body: "这是什么图片", payloadState: "present", images: ["image"] };
 const done: TimelineEvent = { ...start, id: "done", type: "item.completed", sessionSeq: 305 };
+
+it.each(['THREAD_WRITER_BUSY','PROVIDER_NATIVE_BUSY','PROVIDER_OWNERSHIP_UNKNOWN'])("shows preflight refusal %s in chat, including Buzhoushan",code=>{
+  const event=mapEvent({type:'command.result',payload:{state:'applied',commandType:'turn.start',detail:{code,message:'native refusal',private:'not for display'}}});
+  expect(event).toMatchObject({title:'请求未执行成功',status:'failed'});
+  expect(event.body).toContain('任务未启动');expect(event.body).toContain(code);
+  expect(JSON.stringify(event)).not.toContain('not for display');
+  expect(isBuzhoushanChatEvent(event)).toBe(true);
+});
+it('keeps uncertain command outcomes distinct from known refusal and successful receipts',()=>{
+  const event=mapEvent({type:'command.result',payload:{state:'unknown',detail:{error:{code:'APP_SERVER_TIMEOUT',message:'Outcome unknown'}}}});
+  expect(event).toMatchObject({status:'unknown',body:'Outcome unknown (APP_SERVER_TIMEOUT)'});
+  expect(event.body).not.toContain('任务未启动');expect(isBuzhoushanChatEvent(event)).toBe(true);
+  const success=mapEvent({type:'command.result',payload:{state:'applied',detail:{nativeTurnId:'turn'}}});
+  expect(success).toMatchObject({title:'远端命令结果',status:null,body:null});
+  expect(isBuzhoushanChatEvent(success)).toBe(false);
+});
 
 it("同一原生消息的开始、完成和重复导入仅显示一次，使用稳定滚动锚点", () => {
   const result = timelineItems([start, done, { ...done, id: "imported", sessionSeq: 310 }]);

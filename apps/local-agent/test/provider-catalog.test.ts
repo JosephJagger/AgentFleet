@@ -1,8 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {readFile,mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {encodeProviderThread,decodeProviderThread,threadProvider} from '../src/provider-identity.js';
 import {PROVIDER_IDS,isProviderId,unavailableCapabilities} from '../src/provider-catalog.js';
+test('Cursor discovery rejects Grok agent alias and continues to the actual Cursor CLI', {skip:process.platform==='win32'},async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'provider-vendor-'));
+  const oldPath=process.env.PATH;
+  t.after(async()=>{if(oldPath===undefined)delete process.env.PATH;else process.env.PATH=oldPath;await rm(dir,{recursive:true,force:true});});
+  await writeFile(join(dir,'agent'),'#!/bin/sh\nprintf "grok 1.0.62 [stable]\\n"\n',{mode:0o755});
+  await writeFile(join(dir,'cursor-agent'),'#!/bin/sh\nprintf "Cursor Agent 1.2.3\\n"\n',{mode:0o755});
+  process.env.PATH=dir;
+  const {detectAcp}=await import('../src/acp-providers.js');
+  const found=await detectAcp('cursor');
+  assert.equal(found?.executable,join(dir,'cursor-agent'));
+  assert.equal(found?.version,'Cursor Agent 1.2.3');
+});
 test('provider registration is identical across services and excludes deferred providers',async()=>{
   const root=new URL('../../../../',import.meta.url);
   const texts=await Promise.all(['apps/local-agent/src/provider-catalog.ts','apps/control-plane/src/provider-catalog.ts','apps/web/src/lib/provider-catalog.ts'].map(p=>readFile(new URL(p,root),'utf8')));

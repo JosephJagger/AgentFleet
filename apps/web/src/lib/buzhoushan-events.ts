@@ -7,7 +7,8 @@ export function isConversationEvent(event: TimelineEvent): boolean {
 
 /** Keep the turn outcome in chat as well as the activity record. */
 export function isBuzhoushanChatEvent(event: TimelineEvent): boolean {
-  return isConversationEvent(event) || ['turn.completed','turn.failed','turn.interrupted','turn.cancelled'].includes(event.type);
+  return isConversationEvent(event) || ['turn.completed','turn.failed','turn.interrupted','turn.cancelled'].includes(event.type)
+    || (event.type === 'command.result' && ['failed','unknown'].includes(event.status ?? ''));
 }
 
 /** A reply/item completion is not the end of a turn. */

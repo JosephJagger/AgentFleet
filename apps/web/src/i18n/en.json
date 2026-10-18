@@ -3779,5 +3779,9 @@
   "任务错误": "Task error",
   "Grok 未返回账号额度；请确认主机已登录 Grok，并使用支持额度查询的版本。": "Grok has not reported account quota. Check that the host is signed in to Grok and uses a version supporting quota queries.",
   "由宿主机 Grok 原生查询，后台定期刷新。": "Queried from native Grok on the host and refreshed periodically in the background.",
-  "Grok 用量取自原生持久记录；接入前的历史不回填，缓存和推理已包含在总量中。": "Grok usage comes from its persisted native ledger. Earlier history is not backfilled; cached and reasoning tokens are already included in totals."
+  "Grok 用量取自原生持久记录；接入前的历史不回填，缓存和推理已包含在总量中。": "Grok usage comes from its persisted native ledger. Earlier history is not backfilled; cached and reasoning tokens are already included in totals.",
+  "请求未执行成功": "Request failed",
+  "此会话被原生 Codex 或其他客户端占用，请先在占用端退出该会话，再重新发送。": "Native Codex or another client owns this session. Exit the session in that client before sending again.",
+  "主机检测到该智能体的其他原生进程，请先确认并释放占用，再重新发送。": "Another native process for this agent was detected. Check and release its ownership before sending again.",
+  "无法确认主机上的原生进程归属，本次未发送任务，请检查主机后重试。": "Native process ownership could not be verified. The task was not sent; check the host before trying again."
 }

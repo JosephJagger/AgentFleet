@@ -410,6 +410,19 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
   const payload = record(raw.payload);
   const item = record(payload.item);
   const type = string(raw.type, "unknown");
+  const commandDetail = record(payload.detail);
+  const commandError = type === "command.result"
+    ? record(commandDetail.error ?? (typeof commandDetail.code === "string" ? commandDetail : undefined))
+    : {};
+  const commandFailure = typeof commandError.code === "string" && typeof commandError.message === "string";
+  const ownershipFailure = commandFailure && ["THREAD_WRITER_BUSY", "PROVIDER_NATIVE_BUSY", "PROVIDER_OWNERSHIP_UNKNOWN"].includes(String(commandError.code));
+  const commandFailureBody = ownershipFailure
+    ? `${t("任务未启动")}：${commandError.code === "THREAD_WRITER_BUSY"
+      ? t("此会话被原生 Codex 或其他客户端占用，请先在占用端退出该会话，再重新发送。")
+      : commandError.code === "PROVIDER_NATIVE_BUSY"
+        ? t("主机检测到该智能体的其他原生进程，请先确认并释放占用，再重新发送。")
+        : t("无法确认主机上的原生进程归属，本次未发送任务，请检查主机后重试。")} (${commandError.code})`
+    : commandFailure ? `${commandError.message} (${commandError.code})` : null;
   const itemType = string(item.type);
   const actor = itemType === "userMessage"
     ? "user"
@@ -450,12 +463,12 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     actor,
     itemType: itemType || undefined,
     ...(item.source === "workspace_snapshot" ? {changeSource:"workspace_snapshot",changeLimited:item.limited===true,changeSupported:item.supported===true}:{}),
-    title: eventTitle(type, item),
+    title: commandFailure ? t("请求未执行成功") : eventTitle(type, item),
     ...(type === "thread.history.order" ? {historyOrder:list(payload.items).map(record).filter(x=>typeof x.itemId === "string" && Number.isSafeInteger(x.index)).map(x=>({itemId:String(x.itemId),index:Number(x.index),...(typeof x.occurredAt === "string" ? {occurredAt:x.occurredAt} : {})}))} : {}),
     images: list(item.content).map(record).filter(entry => entry.type === "image" && isInlineImage(entry.url)).slice(0, 4).map(entry => entry.url as string),
-    body: eventBody(item, payload),
+    body: commandFailureBody ?? eventBody(item, payload),
     payloadState: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? raw.payloadState : "present",
-    status: string(item.status, string(record(payload.turn).status)) || null,
+    status: commandFailure ? (payload.state === "unknown" ? "unknown" : "failed") : string(item.status, string(record(payload.turn).status)) || null,
     command: itemType === "commandExecution" ? string(item.command) || null : itemType === "mcpToolCall" ? string(record(item.arguments).command) || string(item.tool) || null : null,
     output: itemType === "commandExecution" ? string(item.aggregatedOutput) || null : itemType === "mcpToolCall" ? toolResultText(item.result) || null : null,
     diff: diffSummary(diffText),

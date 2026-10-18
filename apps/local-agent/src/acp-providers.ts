@@ -46,6 +46,9 @@ export async function detectAcp(provider:AcpProviderId):Promise<AcpExecutable|nu
       await access(candidate.executable);
       const result=await exec(candidate.executable,[...candidate.prefix,'--version'],{timeout:5000,maxBuffer:8192,windowsHide:true});
       const version=result.stdout.trim();if(!/\d+\.\d+\.\d+/.test(version)||version.length>200)continue;
+      // `agent` is also installed by Grok. A generic executable name is not
+      // evidence of Cursor: verify the vendor before starting its ACP process.
+      if(config.identify&&!config.identify.test(version))continue;
       return {...candidate,version};
     }catch{/* Not installed or not runnable. */}
   }
