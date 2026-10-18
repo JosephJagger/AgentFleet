@@ -285,3 +285,11 @@ it('keeps activity updates at two seconds while the broadcast window is hidden',
  await act(async()=>{await vi.advanceTimersByTimeAsync(2000);});expect(api.sessionProgress).toHaveBeenCalledTimes(2);
  view.unmount();await act(async()=>{await vi.advanceTimersByTimeAsync(10000);});expect(api.sessionProgress).toHaveBeenCalledTimes(2);visibility.mockRestore();
 });
+
+it('does not show empty reasoning placeholders in the Buzhoushan activity dock', () => {
+ const d=detail();
+ const base={sessionSeq:1,occurredAt:'2026-01-01',nativeTurnId:'turn-a',type:'item.completed',itemType:'reasoning',actor:'agent' as const};
+ d.events=[{...base,id:'empty',body:null},{...base,id:'public',body:'Public summary'}];
+ expect(workbenchItems(d).map(e=>e.id)).toEqual(['public']);
+ expect(workbenchItems(d)[0].output).toBe('Public summary');
+});

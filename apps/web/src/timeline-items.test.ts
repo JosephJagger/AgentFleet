@@ -150,3 +150,30 @@ it('preserves native file changes for the workbench history fallback',()=>{
  const event=mapEvent({eventId:'file-edit',sessionSeq:1,type:'item.completed',nativeTurnId:'turn',payload:{item:{id:'edit',type:'fileChange',status:'completed',changes:[{path:'src/demo.ts',diff:'+ actual edit'}]}}});
  expect(event.fileChanges).toEqual([{path:'src/demo.ts',diff:'+ actual edit'}]);
 });
+
+const reasoning = (seq: number, summary: string[], type = 'item.started') => mapEvent({
+  eventId: `summary-${seq}`, sessionSeq: seq, type, nativeThreadId: 'thread', nativeTurnId: 'turn', nativeItemId: 'summary', payloadState: 'present',
+  payload: { item: { id: 'summary', type: 'reasoning', summary } },
+});
+it('hides empty public reasoning items but keeps messages and real summaries', () => {
+  expect(timelineItems([reasoning(1, []), reasoning(2, ['  '], 'item.completed')])).toEqual([]);
+  expect(timelineItems([reasoning(1, []), reasoning(2, ['Public explanation'])])).toHaveLength(1);
+  expect(timelineItems([start])).toHaveLength(1);
+});
+it('summary snapshots update one card, survive empty completion and history reimport', () => {
+  const events = [reasoning(1, []), reasoning(2, ['First']), reasoning(3, ['First part', 'Second']), reasoning(4, [], 'item.completed'), reasoning(5, [], 'item.completed')];
+  const result = timelineItems(events);
+  expect(result).toHaveLength(1);
+  expect(result[0]).toMatchObject({ type: 'item.completed', body: 'First part\nSecond' });
+  expect(result[0].id).toBe(timelineItems(events.slice(0, 2))[0].id);
+  expect(timelineItems([reasoning(6, ['Authoritative'], 'item.completed'), ...events])[0].body).toBe('Authoritative');
+});
+it('deleted or suppressed public summaries cannot be resurrected by old snapshots', () => {
+  const old = reasoning(1, ['Public explanation']);
+  for (const payloadState of ['deleted', 'suppressed'] as const) {
+    const removed = { ...reasoning(2, [], 'item.completed'), payloadState };
+    expect(timelineItems([old, removed])).toEqual([]);
+    expect(timelineItems([removed, old])).toEqual([]);
+    expect(timelineItems([reasoning(1, ['Finished'], 'item.completed'), { ...removed, type: 'item.started' }])).toEqual([]);
+  }
+});

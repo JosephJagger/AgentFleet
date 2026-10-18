@@ -84,14 +84,22 @@ export function timelineItems(events: TimelineEvent[]): TimelineEvent[] {
     const previous = result[position]!;
     // Never resurrect deleted content from an earlier lifecycle event.
     const selected = previous.payloadState === "deleted" ? previous : event.payloadState === "deleted" ? event
+      : (previous.itemType === "reasoning" || event.itemType === "reasoning") && previous.payloadState === "suppressed" ? previous
+      : (previous.itemType === "reasoning" || event.itemType === "reasoning") && event.payloadState === "suppressed" ? event
       : previous.type === "item.completed" && event.type === "item.started" ? previous
       : event.type === "item.completed" && previous.type === "item.started" ? event
       : event.sessionSeq >= previous.sessionSeq ? event : previous;
-    result[position] = { ...selected, id: key };
+    const body = selected.itemType === "reasoning" && !selected.body?.trim()
+      && selected.payloadState !== "deleted" && selected.payloadState !== "suppressed"
+      && previous.payloadState !== "deleted" && previous.payloadState !== "suppressed"
+      && event.payloadState !== "deleted" && event.payloadState !== "suppressed"
+      ? (previous.body?.trim() ? previous.body : event.body) : selected.body;
+    result[position] = { ...selected, body, id: key };
   }
   // Reorder conversation slots using the native chain, leaving operational events in place.
   const slots=result.map((event,index)=>({event,index})).filter(({event})=>event.nativeThreadId?.startsWith("claude_") && historyOrder.has(JSON.stringify([event.nativeThreadId,event.nativeItemId])));
   const ordered=slots.map(x=>x.event).sort((a,b)=>historyOrder.get(JSON.stringify([a.nativeThreadId,a.nativeItemId]))!.index-historyOrder.get(JSON.stringify([b.nativeThreadId,b.nativeItemId]))!.index);
   slots.forEach((slot,index)=>{result[slot.index]=ordered[index]!;});
-  return result;
+  return result.filter(event => event.itemType !== "reasoning" ||
+    (event.payloadState !== "deleted" && event.payloadState !== "suppressed" && Boolean(event.body?.trim())));
 }

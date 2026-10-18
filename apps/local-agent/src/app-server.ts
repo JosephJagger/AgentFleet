@@ -1,4 +1,5 @@
 import {preferenceInstructions} from './voice-preference-rules.js';
+import { ReasoningSummaries } from './reasoning-summary.js';
 import {discoverCodexDaemon, CodexDaemonTransport} from './daemon-transport.js';
 import { serializePanelToolResult } from "./panel-voice-tools.js";
 import { readConversation, type ConversationPage } from "./conversation-history.js";
@@ -457,6 +458,7 @@ export class CodexAppServer implements AppServerClient {
   private finalDiffs = new Map<string, string>();
   private compactStarts = new Map<string, { resolve: (turn: TurnStartResult) => void; reject: (error: Error) => void }>();
   private exitHandled = false;
+  private readonly reasoningSummaries: ReasoningSummaries;
   private readonly voiceIds = new Map<string, string>();
   private voiceNotifications: Promise<void> = Promise.resolve();
   private readonly voiceClosures = new Map<string,{resolve:()=>void,reject:(error:Error)=>void}>();
@@ -464,6 +466,7 @@ export class CodexAppServer implements AppServerClient {
   constructor(callbacks: AppServerCallbacks, epoch: string = randomUUID(), private readonly environment: NodeJS.ProcessEnv = process.env, private readonly connectionOptions: {daemonThreadId?:string} = {}) {
     this.callbacks = callbacks;
     this.appServerEpoch = epoch;
+    this.reasoningSummaries = new ReasoningSummaries(event => this.callbacks.onEvent(event, this.appServerEpoch));
   }
 
   getProcessId() { return this.child?.pid; }
@@ -594,6 +597,7 @@ export class CodexAppServer implements AppServerClient {
 
   async stop(): Promise<void> {
     this.stopping = true;
+    await this.reasoningSummaries.close();
     for (const timer of this.approvalTimers.values()) clearTimeout(timer);
     this.approvalTimers.clear();
     this.requestApprovals.clear();
@@ -1519,6 +1523,10 @@ export class CodexAppServer implements AppServerClient {
     }
     const threadId = threadIdFromParams(params);
     if (threadId && threadId !== this.panelThreadId && !this.callbacks.findManagedThread(threadId)) return;
+    if (method === "item/reasoning/summaryTextDelta") {
+      if (threadId && this.callbacks.findManagedThread(threadId)) await this.reasoningSummaries.append(params);
+      return;
+    }
     if (threadId && method.startsWith("thread/realtime/")) {
       const voiceId=this.voiceIds.get(threadId);
       if(voiceId && ["thread/realtime/transcript/delta","thread/realtime/transcript/done"].includes(method) && ["user","assistant"].includes(String(params.role))) {
@@ -1631,6 +1639,9 @@ export class CodexAppServer implements AppServerClient {
       const item = sanitizeThreadItem(params.item);
       if (item && typeof params.threadId === "string" && typeof params.turnId === "string") {
         const nativeItemId = typeof params.item.id === "string" ? params.item.id : undefined;
+        if (method === "item/completed" && item.type === "reasoning" && nativeItemId) {
+          item.summary = await this.reasoningSummaries.complete(params.threadId, params.turnId, nativeItemId, item.summary as string[]);
+        }
         event = {
           type: method === "item/started" ? "item.started" : "item.completed",
           nativeThreadId: params.threadId,
@@ -1642,6 +1653,7 @@ export class CodexAppServer implements AppServerClient {
     } else if (method === "turn/completed" && typeof params.threadId === "string") {
       const turn = summarizeTurn(params.turn);
       if (turn && typeof turn.id === "string") {
+        await this.reasoningSummaries.finishTurn(params.threadId, turn.id);
         if (this.referenceTurns.get(params.threadId) === turn.id) { this.referenceTurns.delete(params.threadId); this.turnReferences.delete(params.threadId); }
         for (const key of this.activityTimes.keys()) if (key.startsWith(`${params.threadId}\0${turn.id}\0`)) this.activityTimes.delete(key);
         const finalDiff = this.finalDiffs.get(`${params.threadId}\0${turn.id}`);
@@ -1673,6 +1685,7 @@ export class CodexAppServer implements AppServerClient {
   private handleExit(detail: string): void {
     if (this.exitHandled) return;
     this.exitHandled = true;
+    const summariesFlushed = this.reasoningSummaries.close();
     this.child = undefined;
     this.daemon = undefined;
     this.daemonRequests=[];this.daemonTurns.clear();
@@ -1690,6 +1703,6 @@ export class CodexAppServer implements AppServerClient {
     for (const timer of this.approvalTimers.values()) clearTimeout(timer);
     this.approvalTimers.clear();
     this.requestApprovals.clear();
-    if (!this.stopping) void this.callbacks.onExit(this.appServerEpoch, redact(errorMessage(detail)));
+    if (!this.stopping) void summariesFlushed.then(() => this.callbacks.onExit(this.appServerEpoch, redact(errorMessage(detail))));
   }
 }
