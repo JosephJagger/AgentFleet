@@ -160,3 +160,12 @@ test('Grok discovery supplies a bounded native catalog to an empty session witho
  assert.equal(f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json.includes('must not travel'),false);
  assert.equal(f.db.get<{n:number}>("SELECT count(*) AS n FROM commands")!.n,0);
 });
+
+test('Grok discovery retains only validated quota fields and drops raw billing data',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const quota={observedAt:new Date().toISOString(),windows:[{bucket:'grok',window:'primary',usedPercent:4,remainingPercent:96,windowMinutes:10080,resetsAt:Math.floor(Date.now()/1000)+86400}],accessToken:'never-store',history:['never-store']};
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{grok:{...ready,quota,billing:{token:'never-store'}}}});
+ const json=f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json;
+ assert.equal(JSON.parse(json).agentRuntimes.grok.quota.windows[0].remainingPercent,96);
+ assert.equal(json.includes('never-store'),false);
+});

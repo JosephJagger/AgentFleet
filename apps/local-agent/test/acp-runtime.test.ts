@@ -20,6 +20,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  if(m.id===991 && !m.method) { send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:JSON.stringify(m.result)}}}});send({id:promptId,result:{stopReason:'end_turn'}});return; }
  switch(m.method) {
  case 'initialize':send({id:m.id,result:{_meta:{modelState:{currentModelId:'grok-4',availableModels:[{modelId:'grok-4',name:'Grok test',_meta:{reasoningEfforts:[{value:'low'},{value:'high'}]}}]}},protocolVersion:1,agentCapabilities:{loadSession:true,promptCapabilities:{image:process.env.ACP_TEST_IMAGES==='yes'},sessionCapabilities:{list:{}}}}});break;
+ case '_x.ai/billing':{const at=Date.now();send({id:m.id,result:{config:{creditUsagePercent:25,currentPeriod:{start:new Date(at-86400000).toISOString(),end:new Date(at+6*86400000).toISOString()}}}});break;}
  case 'session/list':send({id:m.id,result:{sessions:[{sessionId,cwd:process.cwd(),title:'Synthetic'}]}});break;
  case 'session/new':send({id:m.id,result:{sessionId,configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'}]}});break;
  case 'session/load':if(process.env.ACP_TEST_IMAGES==='yes')send({method:'session/update',params:{sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='}}}});send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Retained history'}}}});send({id:m.id,result:{configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'}]}});break;
@@ -36,6 +37,13 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
    if(requestKind==='burst'){
      for(let i=0;i<200;i++) send({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call',toolCallId:'t'+i,title:'T'+i,kind:'execute',status:'in_progress',rawInput:{command:'echo '+i}}}});
      send({id:m.id,result:{stopReason:'end_turn'}});return;
+   }
+   if(requestKind==='grok-native'){
+     send({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call',toolCallId:'read',title:'read_file',rawInput:{target_file:'sample.txt'}}}});
+     send({method:'session/update',params:{sessionId,update:{sessionUpdate:'tool_call_update',toolCallId:'read',status:'completed',rawOutput:{type:'ReadFile',FileContent:{content:'synthetic'}},content:[{type:'content',content:{type:'text',text:'synthetic file contents'}}]}}});
+     send({method:'_x.ai/session_notification',params:{sessionId,update:{sessionUpdate:'retry_state',type:'retrying',attempt:1,max_retries:3,reason:'secret native error must not be forwarded'}}});
+     send({method:'_x.ai/session_notification',params:{sessionId,update:{sessionUpdate:'turn_completed',stop_reason:'end_turn'}}});
+     return;
    }
    if(requestKind==='progress'){
      send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'before tool'}}}});
@@ -66,7 +74,7 @@ async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]=
  let thread:ManagedThread|undefined;
  const callbacks:AppServerCallbacks={findManagedThread:id=>thread?.nativeThreadId===id?thread:undefined,findProject:()=>project,onEvent:async e=>{events.push(e);},onEvents:async batch=>{batches.push(batch);events.push(...batch);for(const watch of batchWatchers)watch();},onVolatile:e=>{volatiles.push(e);},onApproval:async a=>{approvals.push(a);},onApprovalResolved:async()=>{},onExit:async()=>{},onThreadExit:async id=>{exits.push(id);}};
  const counts={connections:0};
- const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async()=>{},connection:options=>{counts.connections++;launches.push(options.args);return new AcpConnection({...options,env:{...process.env,ACP_TEST_IMAGES:images?'yes':'no'}});}});
+ const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{readGrokUsage:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async()=>{},connection:options=>{counts.connections++;launches.push(options.args);return new AcpConnection({...options,env:{...process.env,ACP_TEST_IMAGES:images?'yes':'no'}});}});
  t.after(async()=>{await runtime.stop();await rm(dir,{recursive:true,force:true});});
  await runtime.start();const created=await runtime.createThread(project);
  thread={nativeThreadId:created.nativeThreadId,projectId:project.id,appServerEpoch:'epoch-test',policyVersion:'remote-restricted-v1',policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),historyMode:'legacy'} as ManagedThread;
@@ -234,4 +242,20 @@ test('intermediate replies, reasoning and code changes appear before a long-runn
  await f.runtime.interruptTurn(f.thread.nativeThreadId,turn.nativeTurnId);
  await until(()=>f.events.some(e=>e.type==='turn.completed'));
  assert.equal(f.events.filter(e=>e.type==='item.completed'&&(e.payload.item as {text?:string})?.text==='before tool').length,1);
+});
+
+test('Grok native nested output and extension progress remain visible without falsely completing',async t=>{
+ const f=await fixture(t,'grok');
+ await f.runtime.listThreads();
+ assert.equal(f.runtime.availability.quota?.windows[0]?.remainingPercent,75);
+ const turn=await f.runtime.startTurn(f.thread,f.project,'grok-native');
+ await until(()=>f.events.some(e=>(e.payload.item as {text?:string})?.text?.includes('正在重试')));
+ const tool=f.events.find(e=>e.type==='item.completed'&&(e.payload.item as {type?:string})?.type==='commandExecution');
+ assert.equal((tool?.payload.item as {aggregatedOutput?:string}).aggregatedOutput,'synthetic file contents');
+ assert.equal(f.events.some(e=>e.type==='turn.completed'),false);
+ assert.ok(!JSON.stringify(f.events).includes('secret native error'));
+ assert.equal((await f.runtime.readTurnOutcome(f.thread.nativeThreadId,turn.nativeTurnId))?.status,'inProgress');
+ await f.runtime.interruptTurn(f.thread.nativeThreadId,turn.nativeTurnId);
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.equal(f.events.filter(e=>e.type==='item.completed'&&(e.payload.item as {type?:string})?.type==='commandExecution').length,1);
 });

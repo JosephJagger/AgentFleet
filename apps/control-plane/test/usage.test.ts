@@ -285,3 +285,16 @@ test("Claude permission modes are allowlisted host capabilities and settings",as
  assert.equal(parseClaudeSettings({model:"host",permissionMode:"auto"})?.permissionMode,"auto");assert.throws(()=>parseClaudeSettings({model:"host",permissionMode:"bypassPermissions"}));
  db.run("UPDATE machines SET agent_version='0.30.58' WHERE machine_id='a'");assert.deepEqual(registry.getSession(principal,"a1").claudePermissionModes,[]);
 });
+
+test('Grok usage survives smaller subsequent turns and native process reconnect; quota stays provider-scoped',t=>{
+ const {db,workspaceId,service}=fixture();t.after(()=>db.close());
+ db.run("UPDATE projects SET provider='grok' WHERE project_id='p-a'");
+ const at=new Date().toISOString(),reset=Math.floor(Date.now()/1000)+86400;
+ db.run("UPDATE machines SET discovery_json=? WHERE machine_id='a'",JSON.stringify({agentRuntimes:{grok:{quota:{observedAt:at,windows:[{bucket:'grok',window:'primary',usedPercent:4,remainingPercent:96,windowMinutes:10080,resetsAt:reset}]}}}}));
+ service.record(event('a1',100,5));service.record(event('a1',102,2));service.record(event('a1',102,2,'reconnected'));
+ const grok=service.read(workspaceId,'session','a1');
+ assert.equal(grok.recorded?.totalTokens,70);assert.equal(grok.last.totalTokens,20);
+ assert.equal(grok.accounts[0]?.windows[0].remainingPercent,96);assert.equal(grok.accounts[0]?.identityKnown,false);
+ assert.equal(service.read(workspaceId,'machine','a','codex').accounts.length,0);
+ assert.equal(service.read(workspaceId,'session','b1').accounts.length,0);
+});

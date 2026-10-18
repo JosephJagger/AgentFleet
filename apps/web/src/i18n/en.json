@@ -3776,5 +3776,8 @@
   "{0} 未上报周额度窗口": "{0} has not reported a weekly quota window",
   "点数仅由 Codex 上报": "Credits are reported only by Codex",
   "工具调用": "Tool call",
-  "任务错误": "Task error"
+  "任务错误": "Task error",
+  "Grok 未返回账号额度；请确认主机已登录 Grok，并使用支持额度查询的版本。": "Grok has not reported account quota. Check that the host is signed in to Grok and uses a version supporting quota queries.",
+  "由宿主机 Grok 原生查询，后台定期刷新。": "Queried from native Grok on the host and refreshed periodically in the background.",
+  "Grok 用量取自原生持久记录；接入前的历史不回填，缓存和推理已包含在总量中。": "Grok usage comes from its persisted native ledger. Earlier history is not backfilled; cached and reasoning tokens are already included in totals."
 }

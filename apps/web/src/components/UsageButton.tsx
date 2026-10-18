@@ -43,6 +43,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
     catch { setRefreshNotice(t("暂时无法请求刷新，请确认主机在线且没有其他维护操作。")); }
     finally { setRefreshing(false); }
   }
+  const grok=provider === "grok";
   const claude=provider === "claude";
   const codex=provider === "codex";
   const number=(n:number)=>new Intl.NumberFormat(locale(),{maximumFractionDigits:0}).format(n);
@@ -113,10 +114,11 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
         <section><h3>{t("账号额度（共享）")}</h3>
           {scope==="machine"&&codex&&<button type="button" className="button button--quiet" disabled={refreshing} onClick={()=>void refreshHost()}>{t("刷新额度")}</button>}
           {refreshNotice&&<p role="status">{refreshNotice}</p>}
-          {!data?.accounts.length&&<p>{t(claude ? "Claude Code 未返回订阅额度；请确认宿主机已登录，且原生版本支持额度查询。" : "账号额度未上报；需要支持额度查询的 Codex 认证。")}</p>}
+          {!data?.accounts.length&&<p>{t(claude ? "Claude Code 未返回订阅额度；请确认宿主机已登录，且原生版本支持额度查询。" : grok ? "Grok 未返回账号额度；请确认主机已登录 Grok，并使用支持额度查询的版本。" : "账号额度未上报；需要支持额度查询的 Codex 认证。")}</p>}
           {data?.accounts.map((account,i)=><div className="usage-account" key={i}>
             <p>{account.sourceMachine} · {t("更新于 {0}",date(account.observedAt))}{(account.stale||Date.now()-Date.parse(account.observedAt)>180_000)&&<strong> · {t("数据已过期")}</strong>}</p>
             {claude&&<p>{account.subscriptionType ? `${account.subscriptionType.toUpperCase()} · ` : ""}{t("由宿主机 Claude Code 原生查询")}</p>}
+            {grok&&<p>{t("由宿主机 Grok 原生查询，后台定期刷新。")}</p>}
             {codex&&<div className="usage-credit"><strong>{t("点数余额")}</strong><span>{creditText(account.credits)}</span></div>}
             {!account.windows.length&&<p>{t("当前认证未返回额度窗口。")}</p>}
             {account.windows.map(w=><div className="usage-window" key={`${w.bucket}:${w.window}`}><div><strong>{w.windowMinutes===10080?t("周额度"):w.windowMinutes===300?t("5 小时额度"):t("{0} 分钟额度",w.windowMinutes)} · {w.bucket === "claude" ? "Claude Code" : w.bucket}</strong><span>{t("已用 {0}% · 剩余 {1}%",w.usedPercent,w.remainingPercent)}</span></div><progress max={100} value={w.usedPercent} aria-label={t("额度已用比例")}/><small>{w.resetsAt?t("重置于 {0}",date(new Date(w.resetsAt*1000).toISOString())):t("重置时间未上报")}</small></div>)}
@@ -135,7 +137,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
           <p>{t("已获取 {0} / {1} 个会话",data.observedSessions,data.totalSessions)}</p><p>{t("开始记录：{0}",data.firstObservedAt?date(data.firstObservedAt):"—")}<br/>{t("最近上报：{0}",data.lastObservedAt?date(data.lastObservedAt):"—")}</p></>:<p>{t("尚无用量数据。升级 Agent 后，新产生的原生用量通知会开始记录；未获取不代表零消耗。")}</p>}
           {data?.quotaCycle?<p>{t("当前周额度周期：{0} 至 {1}",date(data.quotaCycle.startsAt),date(data.quotaCycle.resetsAt))}{data.quotaCycle.boundaryIncomplete&&<><br/>{t("跨越重置时刻且无法精确拆分的用量未计入本轮。")}</>}</p>:codex&&<p>{t("尚未获取有效的下次周额度重置时间，暂不计算本轮用量。")}</p>}
           {!!data?.discontinuities&&<p>{t("检测到计数不连续，缺失区间未估算。")}</p>}
-          <p className="usage-note">{t(claude ? "仅统计当前 Claude Code 项目或会话已上报的 token，不代表账号额度；未同步的历史消耗未估算。" : "本轮按下次周额度重置时间倒推 7 天计算，仅包含已记录用量，不等于账号官方额度消耗。缓存和推理明细不能再次加到总量。")}</p>
+          <p className="usage-note">{t(claude ? "仅统计当前 Claude Code 项目或会话已上报的 token，不代表账号额度；未同步的历史消耗未估算。" : grok ? "Grok 用量取自原生持久记录；接入前的历史不回填，缓存和推理已包含在总量中。" : "本轮按下次周额度重置时间倒推 7 天计算，仅包含已记录用量，不等于账号官方额度消耗。缓存和推理明细不能再次加到总量。")}</p>
           {data?.last&&<details><summary>{t("最近请求与原生累计")}</summary><p>{t("最近请求：{0} tokens",number(data.last.totalTokens))}</p><p>{t("原生累计：{0} tokens",number(data.nativeTotal?.totalTokens??0))}</p><p>{t("原生累计可能包含接入前或分支继承的历史，不计入项目已记录总量。")}</p></details>}
         </section>
         {scope==="machine"&&!!data?.topProjects?.length&&<section><h3>{t("项目总消耗排名（前 10）")}</h3><ol className="usage-ranking">{data.topProjects.map(p=><li key={p.id}>{displayName(p.title)}<strong>{number(p.totalTokens)} tokens</strong></li>)}</ol></section>}

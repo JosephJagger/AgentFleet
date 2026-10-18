@@ -1,3 +1,4 @@
+import {parseGrokQuota} from './grok-quota.js';
 import { isProviderId, type ProviderId } from "./provider-catalog.js";
 import { parseClaudeMetadata } from "./claude-metadata.js";
 import type { ControlPlaneDatabase } from "./db.js";
@@ -92,6 +93,14 @@ export class UsageService {
       return [{sourceMachine:machine.name,identityKnown:false,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180_000,subscriptionType:quota.subscriptionType,windows:quota.windows,credits:null,resetCardsAvailable:null}];
     });
     if(provider === "claude")accounts.push(...claudeAccounts);
+    if(provider==='grok') {
+      const machines=this.db.all<{machine_id:string;name:string;discovery_json:string|null}>("SELECT machine_id,name,discovery_json FROM machines WHERE workspace_id=? AND identity_state='active'",workspaceId);
+      for(const machine of machines) {
+        if(!machineIds.has(machine.machine_id))continue;
+        const quota=parseGrokQuota(JSON.parse(machine.discovery_json??'{}').agentRuntimes?.grok?.quota);
+        if(quota)accounts.push({sourceMachine:machine.name,identityKnown:false,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180000||quota.windows.some(w=>w.resetsAt*1000<=Date.now()),windows:quota.windows,credits:null,resetCardsAvailable:null});
+      }
+    }
     const weekly = accounts.flatMap(account => account.windows.filter((w: { bucket: string; windowMinutes: number; resetsAt: number | null }) =>
       w.bucket === provider && w.windowMinutes === 10080 && w.resetsAt !== null && w.resetsAt * 1000 > Date.now() && w.resetsAt * 1000 - 10080 * 60_000 <= Date.now()));
     let quotaCycle: { startsAt: string; resetsAt: string; recordedTokens: number | null; inputTokens: number | null; cachedInputTokens: number | null; boundaryIncomplete: boolean } | null = null;

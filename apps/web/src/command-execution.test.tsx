@@ -40,3 +40,17 @@ it("支持空记录、单独输出、安全高亮及终端转义清理",()=>{
  expect(container.querySelector('.hljs-string')).not.toBeNull();
  expect(container.querySelector('.output-block')?.textContent).toBe('PASS');
 });
+
+it('Grok durable process output remains visible after timeline projection and reload',async()=>{
+ const {mapEvent}=await import('./lib/api');const {timelineItems}=await import('./lib/timeline-items');
+ const base={nativeThreadId:'grok:synthetic',nativeTurnId:'turn',nativeItemId:'tool',occurredAt:new Date().toISOString()};
+ const item={id:'tool',type:'commandExecution',command:'Read sample.ts',status:'completed',aggregatedOutput:'const answer = 42;'};
+ const events=timelineItems([{...base,eventId:'start',sessionSeq:1,type:'item.started',payload:{item:{...item,status:'inProgress',aggregatedOutput:undefined}}},{...base,eventId:'done',sessionSeq:2,type:'item.completed',payload:{item}}].map(mapEvent));
+ expect(events).toHaveLength(1);
+ const view=render(<CommandExecution command={events[0].command} output={events[0].output}/>);
+ expect(screen.getByRole('region',{name:'命令与输出内容'}).textContent).toContain('const answer = 42;');
+ view.unmount();
+ const reloaded=mapEvent({...base,eventId:'done',sessionSeq:2,type:'item.completed',payload:{item}});
+ render(<CommandExecution command={reloaded.command} output={reloaded.output}/>);
+ expect(screen.getByRole('region',{name:'命令与输出内容'}).textContent).toContain('const answer = 42;');
+});

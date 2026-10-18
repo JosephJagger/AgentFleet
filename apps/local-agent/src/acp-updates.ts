@@ -9,7 +9,7 @@ export interface GrokSettings {
 export interface ConfigOption {id:string;name?:string;current?:string;values:string[];}
 const idText=(value:string)=>/^[A-Za-z0-9._:-]{1,120}$/.test(value);
 const keys=['inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens','totalTokens'] as const;
-type TokenCounts=Record<(typeof keys)[number],number>;
+export type TokenCounts=Record<(typeof keys)[number],number>;
 
 /** Undefined input stays absent. An invalid object stays undefined so the caller can reject it. */
 export function parseGrokSettings(value:unknown):GrokSettings|undefined {
@@ -104,7 +104,7 @@ export function acpToolItem(update:Record<string,unknown>,previous?:Record<strin
     return [{path:block.path.slice(0,2000),diff:diff.slice(0,64000)}];
   }).slice(0,32);
   if(changes.length||previous?.type==='fileChange')return {type:'fileChange',status,changes:changes.length?changes:previous?.changes};
-  const fullOutput=acpText(update.rawOutput??update.content??update.output??previous?.aggregatedOutput);
+  const fullOutput=acpText(update.rawOutput)||acpText(update.content)||acpText(update.output)||acpText(previous?.aggregatedOutput);
   const output=fullOutput.slice(0,64000);
   return {type:'commandExecution',command,status,tool:(typeof update.title==='string'?update.title:typeof previous?.tool==='string'?previous.tool:'Tool').slice(0,200),...(output?{aggregatedOutput:output,outputTruncated:fullOutput.length>64000}:{})};
 }
@@ -115,11 +115,11 @@ function tokenCounts(value:Record<string,unknown>):TokenCounts|undefined {
   if(counts.cachedInputTokens>counts.inputTokens||counts.reasoningOutputTokens>counts.outputTokens)return;
   return counts;
 }
-function flatUsage(source:Record<string,unknown>):TokenCounts|undefined {
+export function flatUsage(source:Record<string,unknown>):TokenCounts|undefined {
   const input=finite(source.inputTokens??source.input_tokens);
   const output=finite(source.outputTokens??source.output_tokens);
   if(input===undefined||output===undefined)return;
-  const cached=finite(source.cachedInputTokens??source.cacheReadInputTokens??source.cache_read_input_tokens)??0;
+  const cached=finite(source.cachedInputTokens??source.cachedReadTokens??source.cacheReadInputTokens??source.cache_read_input_tokens)??0;
   const reasoning=finite(source.reasoningOutputTokens??source.reasoningTokens??source.reasoning_tokens)??0;
   const camelInput=finite(source.inputTokens);
   const inputTokens=camelInput===undefined&&cached>input?input+cached:input;
@@ -161,4 +161,19 @@ export function grokModelOptions(models:GrokModel[],current?:string):ConfigOptio
   if(!models.length)return [];
   return [{id:'model',values:models.map(m=>m.id),...(current?{current}:{})},
     {id:'reasoning_effort',values:models.find(m=>m.id===current)?.efforts??[...new Set(models.flatMap(m=>m.efforts))]}];
+}
+
+/** Progress only: these notifications cannot finish a task or authorize another action. */
+export function grokProgressText(update:Record<string,unknown>):string|undefined {
+  switch(update.sessionUpdate) {
+    case 'retry_state':
+      if(update.type==='retrying')return `Grok 正在重试${Number.isSafeInteger(update.attempt)?`（第 ${update.attempt} 次）`:''}`;
+      if(update.type==='exhausted'||update.type==='failed')return 'Grok 请求遇到错误，等待原生任务结果';
+      return;
+    case 'auto_recovery_started':return 'Grok 正在尝试恢复，等待原生任务结果';
+    case 'auto_recovery_exhausted':return 'Grok 自动恢复已用尽，等待原生任务结果';
+    case 'auto_compact_started':return 'Grok 正在整理上下文';
+    case 'auto_compact_completed':return 'Grok 已整理上下文';
+    case 'auto_compact_failed':return 'Grok 整理上下文失败，等待原生任务结果';
+  }
 }

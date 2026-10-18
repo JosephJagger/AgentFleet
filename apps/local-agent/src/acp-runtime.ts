@@ -1,3 +1,5 @@
+import {readGrokUsage} from './grok-usage.js';
+import {grokBillingQuota,type GrokQuota} from './grok-quota.js';
 import {AGENT_VERSION} from "./constants.js";
 import {randomUUID} from 'node:crypto';
 import {setImmediate as yieldToIO} from 'node:timers/promises';
@@ -17,15 +19,15 @@ import type {ProjectRecord,ManagedThread,ApprovalRecord} from './types.js';
 import type {PermissionProfile} from './permissions.js';
 import type {TurnExtras} from './attachments.js';
 import {inputAnswers,inputQuestions,type InputAnswers,type InputQuestion} from './user-input.js';
-import {grokModelOptions,parseGrokModels,acpPlanText,acpToolItem,acpUsage,grokLaunchArgs,grokSessionMeta,mergeConfigOptions,parseConfigOptions,parseGrokSettings,type ConfigOption,type GrokSettings} from './acp-updates.js';
+import {grokProgressText,grokModelOptions,parseGrokModels,acpPlanText,acpToolItem,acpUsage,grokLaunchArgs,grokSessionMeta,mergeConfigOptions,parseConfigOptions,parseGrokSettings,type ConfigOption,type GrokSettings} from './acp-updates.js';
 import type {CodexSettings} from './codex-settings.js';
 interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];published:Map<string,string>;completed:Set<string>;itemSizes:Map<string,number>;historyBytes:number;textPublishedAt:number;}
 interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan';questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
 function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)return {text:value,truncated:false};let text=Buffer.from(value).subarray(0,max).toString('utf8');if(text.endsWith('\uFFFD'))text=text.slice(0,-1);return {text,truncated:true};}
-const dependencies={detect:detectAcp,unoccupied:assertAcpUnoccupied,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
+const dependencies={detect:detectAcp,unoccupied:assertAcpUnoccupied,readGrokUsage,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
 /** New providers have their own processes and cannot fall through to Codex methods. */
 export class AcpRuntime {
-  availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[]}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
+  availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[];quota?:GrokQuota}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
   private executable:AcpExecutable|null=null;
   private executableStamp=-1;
   private readonly sessions=new Map<string,Session>();
@@ -36,6 +38,8 @@ export class AcpRuntime {
   private readonly deps:typeof dependencies;
   private refreshing:Promise<void>|undefined;
   private stopped=false;
+  private quotaCheckedAt=0;
+  private quotaReading:Promise<void>|undefined;
   private readonly connections=new Set<AcpConnection>();
   constructor(readonly provider:AcpProviderId,private readonly callbacks:AppServerCallbacks,readonly appServerEpoch:string,overrides:Partial<typeof dependencies>={}) {this.deps={...dependencies,...overrides};}
   async start() {
@@ -73,7 +77,7 @@ export class AcpRuntime {
       if(session&&models.length)session.configOptions=grokModelOptions(models,typeof modelState.currentModelId==='string'?modelState.currentModelId:undefined);
       const images=acpImageInput(this.provider,this.executable.version,init);
       if(session)session.imageInput=images;
-      this.availability={installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),models:models.length>0,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
+      this.availability={...(this.availability.quota?{quota:this.availability.quota}:{}),installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),models:models.length>0,usage:this.provider==='grok'&&this.availability.capabilities.usage,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
       return connection;
     } catch(error) {connection.close();this.markFailure(error);throw error;}
   }
@@ -88,6 +92,7 @@ export class AcpRuntime {
     await this.start();if(!this.executable)return [];
     const connection=await this.connect(homedir());
     try {
+      if(this.provider==='grok')await this.refreshGrokQuota(connection);
       if(!this.availability.capabilities.discover)return [...this.catalog.values()];
       let unoccupied=false;try {await this.deps.unoccupied(this.provider,this.owned);unoccupied=true;}catch{/* Unknown ownership is never idle. */}
       const seen=new Set<string>();const observed=new Set<string>();let cursor:string|undefined;let complete=false;
@@ -104,6 +109,19 @@ export class AcpRuntime {
       for(const id of this.catalog.keys())if(!observed.has(id)&&!this.sessions.has(id))this.catalog.delete(id);
       return [...this.catalog.values()];
     }catch(error){if(error instanceof AgentError&&/\(-32000\)/.test(error.message))this.markFailure(error);throw error;}finally{connection.close();}
+  }
+  private async refreshGrokQuota(connection:AcpConnection) {
+    if(this.quotaReading)return this.quotaReading;
+    if(Date.now()-this.quotaCheckedAt<120000)return;
+    this.quotaCheckedAt=Date.now();
+    this.quotaReading=(async()=>{
+      try {
+        // ACP extension methods carry an underscore on the JSON-RPC wire.
+        const quota=grokBillingQuota(await connection.call('_x.ai/billing',{},3000));
+        if(quota)this.availability.quota=quota;
+      }catch{/* Keep the timestamped prior observation; failure is never zero quota. */}
+    })().finally(()=>{this.quotaReading=undefined;});
+    return this.quotaReading;
   }
   private async open(id:string,cwd:string,fresh=false,settings?:GrokSettings):Promise<Session> {
     if(fresh)return this.openOwned(id,cwd,true,settings);
@@ -209,6 +227,7 @@ export class AcpRuntime {
     if(imageBlocks.length&&!session.imageInput)throw new AgentError('AGENT_IMAGE_UNSUPPORTED','当前智能体未提供可用的图片输入能力；图片未发送，请检查原生版本和模型');
     if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Native turn is already running');
     if(this.provider==='grok'&&grok)await this.applyConfig(session,grok);
+    const startedAt=Date.now();
     const turnId=randomUUID();session.turnId=turnId;session.cancelled=false;
     const itemId=`${turnId}:user`,item={id:itemId,type:'userMessage',content:[{type:'text',text:prompt},...(images??[]).map(url=>({type:'image',url}))]};
     session.items.push({nativeTurnId:turnId,nativeItemId:itemId,item});this.accountItem(session,session.items.at(-1)!);
@@ -216,7 +235,9 @@ export class AcpRuntime {
     setImmediate(()=>{void session.connection.call('session/prompt',{sessionId:this.native(session.id),prompt:[{type:'text',text:prompt},...imageBlocks]},24*3600000).then(async result=>{
       if(session.lost||session.turnId!==turnId)return;
       if(!isRecord(result)||typeof result.stopReason!=='string')throw new AgentError('ACP_RESULT_INVALID','Missing native completion evidence');
-      const usage=acpUsage(result);
+      const usage=this.provider==='grok'&&this.executable?await this.deps.readGrokUsage(this.executable,this.native(session.id),startedAt):acpUsage(result);
+      if(session.lost||session.turnId!==turnId)return;
+      if(usage&&this.provider==='grok')this.availability.capabilities.usage=true;
       if(usage)await this.callbacks.onEvent({type:'thread.usage',nativeThreadId:session.id,nativeTurnId:turnId,payload:usage},this.appServerEpoch);
       await this.flush(session,turnId);delete session.turnId;this.resolvePending(session);
       await this.callbacks.onEvent({type:'turn.completed',nativeThreadId:session.id,nativeTurnId:turnId,payload:{turn:{id:turnId,status:result.stopReason==='end_turn'?'completed':result.stopReason==='cancelled'?'interrupted':'failed'},stopReason:result.stopReason,...(session.configOptions.length?{configOptions:session.configOptions}:{})}},this.appServerEpoch);
@@ -246,9 +267,23 @@ export class AcpRuntime {
     session.completed.add(last.nativeItemId);
   }
   private async notification(session:Session,method:string,params:Record<string,unknown>) {
-    if(session.lost||method!=='session/update'||!isRecord(params.update))return;
+    if(session.lost||!isRecord(params.update))return;
+    const extension=this.provider==='grok'&&method==='_x.ai/session_notification';
+    if(method!=='session/update'&&!extension)return;
     if(session.id&&params.sessionId!==this.native(session.id))throw new AgentError('ACP_SESSION_MISMATCH','Event belongs to a different native session');
     const update=params.update,kind=update.sessionUpdate;
+    if(extension){
+      if(!session.turnId||session.loading)return;
+      const text=grokProgressText(update);
+      if(!text)return;
+      await this.finishText(session);
+      const id=`${session.turnId}:notice:${session.items.length}`;
+      const item={id,type:'reasoning',text};
+      const entry={nativeTurnId:session.turnId,nativeItemId:id,item};
+      session.items.push(entry);this.accountItem(session,entry);
+      await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:session.turnId,nativeItemId:id,payload:{item}},this.appServerEpoch);
+      session.completed.add(id);return;
+    }
     if(kind==='config_option_update'){this.rememberOptions(session,params);return;}
     const turnId=session.turnId??'history';
     const textType=kind==='agent_message_chunk'?'agentMessage':kind==='agent_thought_chunk'?'reasoning':undefined;

@@ -214,3 +214,14 @@ it("compact session-header quota uses its host and opens the independent reset t
  expect(screen.queryByRole("button",{name:/临时重置预测/})).toBeNull();
  expect(screen.queryByText("38%")).toBeNull();
 });
+
+it("shows Grok native quota and tokens without Codex authentication or refresh actions",async()=>{
+ vi.mocked(api.usage).mockResolvedValue({...data,provider:'grok',scope:'machine',accounts:[{...data.accounts[0],identityKnown:false,credits:null,windows:[{...data.accounts[0].windows[0],bucket:'grok',usedPercent:4,remainingPercent:96}]}]});
+ render(<UsageButton scope="machine" id="grok-host" provider="grok"/>);
+ fireEvent.click(await screen.findByRole('button',{name:/周额度\s*96%/}));
+ expect(await screen.findByText('已用 4% · 剩余 96%')).toBeTruthy();
+ expect(screen.getByText('由宿主机 Grok 原生查询，后台定期刷新。')).toBeTruthy();
+ expect(screen.queryByRole('button',{name:'刷新额度'})).toBeNull();
+ expect(screen.queryByText(/Codex 认证/)).toBeNull();
+ expect(screen.queryByText('点数余额')).toBeNull();
+});
