@@ -208,6 +208,8 @@ export interface CommandReceipt {
 }
 
 export interface TimelineEvent {
+  /** Logical request identity shared by its command.result lifecycle events. */
+  commandId?: string;
   itemType?: string;
   changeSource?:string; changeLimited?:boolean; changeSupported?:boolean;
   fileChanges?: Array<{path:string;diff:string}>;

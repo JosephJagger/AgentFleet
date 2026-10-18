@@ -453,6 +453,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     : undefined;
   return {
     id: string(raw.eventId, `${integer(raw.sessionSeq)}-${type}`),
+    commandId: type === "command.result" ? string(payload.commandId) || undefined : undefined,
     nativeThreadId: string(raw.nativeThreadId) || undefined,
     nativeTurnId: string(raw.nativeTurnId) || undefined,
     nativeItemId: string(raw.nativeItemId, string(item.id)) || undefined,

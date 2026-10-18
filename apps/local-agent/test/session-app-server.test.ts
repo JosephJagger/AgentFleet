@@ -3,27 +3,33 @@ import test from "node:test";
 import { SessionAppServer } from "../src/session-app-server.js";
 import type { AppServerCallbacks, AppServerClient } from "../src/app-server.js";
 import type { ApprovalRecord, ManagedThread, ProjectRecord } from "../src/types.js";
+import { AgentError } from "../src/errors.js";
 
-function fixture() {
-  const clients: { callbacks: AppServerCallbacks; stopped: number; released: number; failRelease: boolean; resumes: number; quotaReads: number; modelReads: number; answers: unknown[] }[] = [];
+type FixtureClient = { callbacks: AppServerCallbacks; options?: { daemonThreadId?: string } | undefined; stopped: number; released: number; failRelease: boolean; resumes: number; turns: number; quotaReads: number; modelReads: number; answers: unknown[]; policyVerified?: boolean; resumeError?: Error; startError?: Error };
+function fixture(configure?: (client: FixtureClient, index: number) => void) {
+  const clients: FixtureClient[] = [];
   const approvals: ApprovalRecord[] = []; const events: unknown[] = []; const exits: string[] = [];
   const callbacks: AppServerCallbacks = {
-    findManagedThread: id => ({ nativeThreadId: id } as ManagedThread), findProject: () => undefined,
+    findManagedThread: id => ({ nativeThreadId: id } as ManagedThread), findProject: () => project,
     onEvent: async event => { events.push(event); }, onVolatile: event => { events.push(event); },
     onApproval: async approval => { approvals.push(approval); }, onApprovalResolved: async id => { events.push(id); },
     onExit: async () => { exits.push("global"); }, onThreadExit: async id => { exits.push(id); },
   };
-  const server = new SessionAppServer(callbacks, (cb, epoch) => {
-    const c = { callbacks: cb, stopped: 0, released: 0, failRelease: false, resumes: 0, quotaReads: 0, modelReads: 0, answers: [] as unknown[] };
+  const server = new SessionAppServer(callbacks, (cb, epoch, options?: { daemonThreadId?: string }) => {
+    const c: FixtureClient = { callbacks: cb, options, stopped: 0, released: 0, failRelease: false, resumes: 0, turns: 0, quotaReads: 0, modelReads: 0, answers: [] };
+    configure?.(c, clients.length);
     clients.push(c);
-    return { appServerEpoch: epoch, start: async () => undefined, stop: async () => { c.stopped++; },
+    const resume = async (id: string) => { c.resumes++; if (c.resumeError) throw c.resumeError; return { nativeThreadId: id, policyVerified: c.policyVerified ?? true }; };
+    return { appServerEpoch: epoch, start: async () => { if (c.startError) throw c.startError; }, stop: async () => { c.stopped++; },
       refreshCodexCatalog: async () => { c.modelReads++; },
       refreshQuota: async () => { c.quotaReads++; }, getQuotaSnapshot: () => ({observedAt:"2026-09-10T00:00:00Z",windows:[]}),
       releaseWriter: async () => { if (c.failRelease) throw new Error("still active"); c.released++; },
-      resumeThread: async (id: string) => { c.resumes++; return { nativeThreadId: id }; },
+      resumeThread: resume,
       createThread: async () => ({ nativeThreadId: `created-${clients.length}` }),
       readThread: async (id: string) => ({ nativeThreadId: id }), listThreads: async () => [],
-      startTurn: async () => ({ nativeTurnId: "turn", status: "inProgress" }),
+      startTurn: async () => { c.turns++; return { nativeTurnId: "turn", status: "inProgress" }; },
+      deleteThread: async (thread: ManagedThread) => { await resume(thread.nativeThreadId); },
+      manageCodex: async () => ({}), stopVoice: async () => undefined,
       respondApproval: async (a: ApprovalRecord) => { c.answers.push(a.nativeRequestId); },
     } as unknown as AppServerClient;
   });
@@ -59,6 +65,95 @@ test("failed release retains writer and does not report handoff success; retry s
 test("concurrent resume for one session is serialized and uses one writer", async () => {
   const f = fixture(); await Promise.all([f.server.resumeThread("a", project), f.server.resumeThread("a", project)]);
   assert.equal(f.clients.length, 2); assert.equal(f.clients[1]!.resumes, 2); await f.server.stop();
+});
+
+test("only an explicit native writer refusal attaches to the same daemon thread without sending a task", async () => {
+  const f = fixture((client, index) => { if (index === 1) client.resumeError = new AgentError("THREAD_WRITER_BUSY", "active writer"); });
+  try {
+    const restored = await f.server.resumeThread("native-a", project);
+    assert.equal(restored.nativeThreadId, "native-a");
+    assert.equal(f.clients.length, 3);
+    assert.equal(f.clients[1]!.released, 1);
+    assert.equal(f.clients[1]!.stopped, 0, "a verified release does not kill the old writer");
+    assert.equal(f.clients[2]!.options?.daemonThreadId, "native-a");
+    assert.equal(f.clients.reduce((sum, client) => sum + client.turns, 0), 0, "resuming never replays a prompt");
+    await f.clients[1]!.callbacks.onExit(f.server.appServerEpoch, "late old exit");
+    assert.deepEqual(f.exits, []);
+    await f.server.startTurn({ nativeThreadId: "native-a" } as ManagedThread, project, "newly authorized prompt");
+    assert.equal(f.clients[1]!.turns, 0);
+    assert.equal(f.clients[2]!.turns, 1);
+  } finally { await f.server.stop(); }
+});
+
+test("concurrent resumes after a writer refusal reuse one daemon attachment", async () => {
+  const f = fixture((client, index) => { if (index === 1) client.resumeError = new AgentError("THREAD_WRITER_BUSY", "active writer"); });
+  try {
+    await Promise.all([f.server.resumeThread("native-a", project), f.server.resumeThread("native-a", project)]);
+    assert.equal(f.clients.length, 3);
+    assert.equal(f.clients[1]!.resumes, 1);
+    assert.equal(f.clients[2]!.resumes, 2);
+    assert.equal(f.clients[2]!.options?.daemonThreadId, "native-a");
+    assert.equal(f.clients.reduce((sum, client) => sum + client.turns, 0), 0);
+  } finally { await f.server.stop(); }
+});
+
+test("resume failures other than native writer refusal never attempt daemon attachment", async () => {
+  for (const error of [new AgentError("APP_SERVER_TIMEOUT", "unknown resume outcome"), new AgentError("THREAD_BUSY", "active task"), new Error("already has an active writer")]) {
+    const f = fixture((client, index) => { if (index === 1) client.resumeError = error; });
+    try {
+      await assert.rejects(f.server.resumeThread("native-a", project), candidate => candidate === error);
+      assert.equal(f.clients.length, 2);
+      assert.equal(f.clients[1]!.released, 1);
+      assert.equal(f.clients[1]!.turns, 0);
+    } finally { await f.server.stop(); }
+  }
+});
+
+test("an unconfirmed old writer release prevents daemon attachment and retains the writer", async () => {
+  const f = fixture((client, index) => { if (index === 1) { client.resumeError = new AgentError("THREAD_WRITER_BUSY", "active writer"); client.failRelease = true; } });
+  try {
+    await assert.rejects(f.server.resumeThread("native-a", project));
+    assert.equal(f.clients.length, 2);
+    assert.equal(f.clients[1]!.stopped, 0);
+    assert.equal(f.clients[1]!.released, 0);
+    f.clients[1]!.failRelease = false;
+    delete f.clients[1]!.resumeError;
+    await f.server.resumeThread("native-a", project);
+    assert.equal(f.clients.length, 2, "failed handoff keeps tracking the original writer");
+  } finally { await f.server.stop(); }
+});
+
+test("daemon attachment startup and resume failures do not retry or send a prompt", async () => {
+  for (const failure of ["startup", "policy", "busy"] as const) {
+    const error = new AgentError(failure === "policy" ? "POLICY_NOT_PROVEN" : failure === "busy" ? "THREAD_WRITER_BUSY" : "APP_SERVER_UNAVAILABLE", failure);
+    const f = fixture((client, index) => {
+      if (index === 1) client.resumeError = new AgentError("THREAD_WRITER_BUSY", "active writer");
+      if (index === 2) { if (failure === "startup") client.startError = error; else client.resumeError = error; }
+    });
+    try {
+      await assert.rejects(f.server.resumeThread("native-a", project), candidate => candidate === error);
+      assert.equal(f.clients.length, 3, "fallback is bounded to one new connection");
+      assert.equal(f.clients[2]!.options?.daemonThreadId, "native-a");
+      assert.equal(failure === "startup" ? f.clients[2]!.stopped : f.clients[2]!.released, 1);
+      assert.equal(f.clients.reduce((sum, client) => sum + client.turns, 0), 0);
+    } finally { await f.server.stop(); }
+  }
+});
+
+test("voice, management and deletion do not activate the ordinary resume fallback", async () => {
+  const thread = { nativeThreadId: "native-a", projectId: "project" } as ManagedThread;
+  for (const operation of ["voice", "management", "deletion"] as const) {
+    const f = fixture((client, index) => { if (index === 1) client.resumeError = new AgentError("THREAD_WRITER_BUSY", "active writer"); });
+    try {
+      const request = operation === "voice" ? f.server.startVoice(thread, "sdp")
+        : operation === "management" ? f.server.manageCodex(thread, { operation: "goal.read" }, "mutation")
+          : f.server.deleteThread(thread, project, {} as import("../src/native-deletion.js").DeletionPreview);
+      await assert.rejects(request, { code: "THREAD_WRITER_BUSY" });
+      assert.equal(f.clients.length, 2);
+      assert.equal(f.clients[1]!.options?.daemonThreadId, undefined);
+      assert.equal(f.clients[1]!.turns, 0);
+    } finally { await f.server.stop(); }
+  }
 });
 
 test("identical native approval IDs in different writers are scoped and replies route to original process", async () => {
@@ -164,4 +259,18 @@ test("repair releases idle writers but retains an unproven writer and preserves 
   assert.equal(f.clients[2]!.released, 1);
   assert.equal(f.clients[0]!.stopped, 0);
   await f.server.stop();
+});
+
+
+test("a failed shared policy check releases its idle subscription without sending work", async () => {
+  const f = fixture((client, index) => {
+    if (index === 1) client.resumeError = new AgentError("THREAD_WRITER_BUSY", "active writer");
+    if (index === 2) client.policyVerified = false;
+  });
+  try {
+    assert.equal((await f.server.resumeThread("native-a", project)).policyVerified, false);
+    assert.equal(f.clients[2]!.released, 1);
+    assert.equal(f.clients.reduce((sum, client) => sum + client.turns, 0), 0);
+    await assert.rejects(f.server.startTurn({ nativeThreadId: "native-a" } as ManagedThread, project, "no grant"), { code: "THREAD_READ_ONLY" });
+  } finally { await f.server.stop(); }
 });

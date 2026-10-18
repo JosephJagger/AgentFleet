@@ -7,8 +7,8 @@ import type { GrokSettings } from "./acp-updates.js";
 import type { InputAnswers } from "./user-input.js";
 import type { TurnExtras } from "./attachments.js";
 
-type Writer = { client: AppServerClient; token: string; threadId?: string; live: boolean; verified?: boolean };
-type Factory = (callbacks: AppServerCallbacks, epoch: string) => AppServerClient;
+type Writer = { client: AppServerClient; token: string; threadId?: string; live: boolean; sharedDaemon?: boolean; verified?: boolean };
+type Factory = (callbacks: AppServerCallbacks, epoch: string, options?: {daemonThreadId?:string}) => AppServerClient;
 
 /** One read-only catalog connection and disposable, isolated session writers.
  * The public epoch fences the facade; writer tokens additionally fence delayed
@@ -26,7 +26,7 @@ export class SessionAppServer implements AppServerClient {
   private quotaRead: Promise<void> | undefined;
   private quotaAttempt = 0;
 
-  constructor(private readonly callbacks: AppServerCallbacks, private readonly factory: Factory = (cb, epoch) => new CodexAppServer(cb, epoch)) {
+  constructor(private readonly callbacks: AppServerCallbacks, private readonly factory: Factory = (cb, epoch, options) => new CodexAppServer(cb, epoch, process.env, options)) {
     this.catalog = factory({ ...callbacks,
       onQuotaChanged: () => this.queueQuotaRefresh(),
       findManagedThread: () => undefined,
@@ -137,11 +137,11 @@ export class SessionAppServer implements AppServerClient {
     return next;
   }
 
-  private async newWriter(threadId?: string): Promise<Writer> {
+  private async newWriter(threadId?: string, sharedDaemon=false): Promise<Writer> {
     if (this.stopped) throw new AgentError("APP_SERVER_UNAVAILABLE", "Session service is stopping");
     // Bound private processes, including pending startups and failed handoffs.
     if (this.allWriters.size >= 16) throw new AgentError("PROJECT_BUSY", "Too many active session writers; finish or release an existing session first");
-    const writer = { token: randomUUID(), live: true, ...(threadId ? { threadId } : {}) } as Writer;
+    const writer = { token: randomUUID(), live: true, sharedDaemon, ...(threadId ? { threadId } : {}) } as Writer;
     const current = () => writer.live && !this.stopped;
     const scope = (id: string | number) => `${writer.token}:${JSON.stringify(id)}`;
     writer.client = this.factory({
@@ -165,7 +165,7 @@ export class SessionAppServer implements AppServerClient {
         this.forget(writer);
         if (writer.threadId) await this.callbacks.onThreadExit?.(writer.threadId, epoch, detail);
       },
-    }, this.appServerEpoch);
+    }, this.appServerEpoch, sharedDaemon && threadId ? {daemonThreadId:threadId} : undefined);
     this.allWriters.add(writer);
     if (threadId) this.writers.set(threadId, writer);
     try { await writer.client.start(); return writer; }
@@ -208,8 +208,25 @@ export class SessionAppServer implements AppServerClient {
   }
   resumeThread(id: string, project: ProjectRecord, cwd?: string, profile?: import("./permissions.js").PermissionProfile) {
     return this.serial(id, async () => {
-      const writer = this.writers.get(id) ?? await this.newWriter(id);
-      try { return await writer.client.resumeThread(id, project, cwd, profile); }
+      let writer = this.writers.get(id) ?? await this.newWriter(id);
+      const resume = async () => {
+        const result = await writer.client.resumeThread(id, project, cwd, profile);
+        // A rejected shared policy must not keep a native session subscribed.
+        // Retain active/unknown work if release cannot prove the target idle.
+        if (writer.sharedDaemon && result.policyVerified !== true) await this.release(writer);
+        return result;
+      };
+      try {
+        try { return await resume(); }
+        catch (error) {
+          // Only an explicit pre-prompt writer refusal permits another transport.
+          // A timeout may have taken effect and must never trigger a retry.
+          if (!(error instanceof AgentError) || error.code !== "THREAD_WRITER_BUSY") throw error;
+          await this.release(writer);
+          writer = await this.newWriter(id, true);
+          return await resume();
+        }
+      }
       catch (error) { await this.release(writer).catch(() => undefined); throw error; }
     });
   }

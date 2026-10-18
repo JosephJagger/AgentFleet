@@ -23,6 +23,55 @@ it('keeps uncertain command outcomes distinct from known refusal and successful 
   expect(isBuzhoushanChatEvent(success)).toBe(false);
 });
 
+const receipt = (commandId: string | undefined, sessionSeq: number, state: string, code?: string) => mapEvent({
+  eventId: `receipt-${sessionSeq}`, type: "command.result", sessionSeq,
+  occurredAt: `2026-10-18T01:15:${String(sessionSeq).padStart(2, "0")}Z`,
+  payload: { commandId, state, commandType: "turn.start", ...(code ? { detail: { code, message: "native refusal" } } : {}) },
+});
+
+it("同一请求的 claimed、invoking、responded、applied 仅显示一条最终回执", () => {
+  const claimed = receipt("cmd-one", 1, "claimed");
+  const invoking = receipt("cmd-one", 2, "invoking");
+  const responded = receipt("cmd-one", 3, "responded", "THREAD_WRITER_BUSY");
+  const applied = receipt("cmd-one", 4, "applied", "THREAD_WRITER_BUSY");
+  const events = [claimed, invoking, responded, applied];
+  expect(applied.commandId).toBe("cmd-one");
+  expect(timelineItems(events)).toEqual([{ ...applied, id: "command-result:cmd-one" }]);
+  expect(timelineItems([...events].reverse())).toEqual(timelineItems(events));
+  expect(timelineItems([claimed])[0].id).toBe(timelineItems(events)[0].id);
+  expect(timelineItems(events).filter(isBuzhoushanChatEvent)).toHaveLength(1);
+});
+
+it("相同错误的不同请求与缺失请求身份的回执不会误合并", () => {
+  const events = [
+    receipt("cmd-one", 1, "applied", "THREAD_WRITER_BUSY"),
+    receipt("cmd-two", 2, "applied", "THREAD_WRITER_BUSY"),
+    receipt(undefined, 3, "applied", "THREAD_WRITER_BUSY"),
+    receipt(undefined, 4, "applied", "THREAD_WRITER_BUSY"),
+  ];
+  expect(timelineItems(events)).toHaveLength(4);
+  expect(new Set(timelineItems(events).map(event => event.id)).size).toBe(4);
+});
+
+it("请求回执旧状态不会覆盖未知结果，仅更新的明确结果才能解除未知", () => {
+  const old = receipt("cmd-one", 1, "responded", "THREAD_WRITER_BUSY");
+  const unknown = receipt("cmd-one", 2, "unknown", "APP_SERVER_TIMEOUT");
+  const applied = receipt("cmd-one", 3, "applied");
+  expect(timelineItems([unknown, old])).toEqual([{ ...unknown, id: "command-result:cmd-one" }]);
+  expect(timelineItems([applied, unknown, old])).toEqual([{ ...applied, id: "command-result:cmd-one" }]);
+});
+
+it("请求回执正文删除后不会从其他生命周期事件恢复，原事件不被修改", () => {
+  const old = receipt("cmd-one", 1, "responded", "THREAD_WRITER_BUSY");
+  const deleted = { ...old, payloadState: "deleted" as const, body: null, images: [] };
+  const recent = receipt("cmd-one", 2, "applied", "THREAD_WRITER_BUSY");
+  for (const events of [[deleted, recent], [recent, deleted]]) {
+    expect(timelineItems(events)).toEqual([{ ...deleted, id: "command-result:cmd-one" }]);
+  }
+  expect(recent.id).toBe("receipt-2");
+  expect(recent.body).toContain("THREAD_WRITER_BUSY");
+});
+
 it("同一原生消息的开始、完成和重复导入仅显示一次，使用稳定滚动锚点", () => {
   const result = timelineItems([start, done, { ...done, id: "imported", sessionSeq: 310 }]);
   expect(result).toHaveLength(1);

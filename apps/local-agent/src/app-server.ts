@@ -1,4 +1,5 @@
 import {preferenceInstructions} from './voice-preference-rules.js';
+import {discoverCodexDaemon, CodexDaemonTransport} from './daemon-transport.js';
 import { serializePanelToolResult } from "./panel-voice-tools.js";
 import { readConversation, type ConversationPage } from "./conversation-history.js";
 import { WorkspaceTerminals } from "./workspace-terminals.js";
@@ -438,6 +439,11 @@ export class CodexAppServer implements AppServerClient {
   readonly appServerEpoch: string;
   private readonly callbacks: AppServerCallbacks;
   private child: ChildProcessWithoutNullStreams | undefined;
+  private daemon: CodexDaemonTransport | undefined;
+  private daemonSubscribed = false;
+  private daemonPendingTurn = false;
+  private readonly daemonTurns = new Set<string>();
+  private daemonRequests: Array<{line:string;turnId:string}> = [];
   private nextRequestId = 1;
   private initialized = false;
   private codexCatalog: CodexCatalog = { models: [], modes: [], fetchedAt: nowIso(), error: "尚未读取模型列表" };
@@ -455,7 +461,7 @@ export class CodexAppServer implements AppServerClient {
   private voiceNotifications: Promise<void> = Promise.resolve();
   private readonly voiceClosures = new Map<string,{resolve:()=>void,reject:(error:Error)=>void}>();
 
-  constructor(callbacks: AppServerCallbacks, epoch: string = randomUUID(), private readonly environment: NodeJS.ProcessEnv = process.env) {
+  constructor(callbacks: AppServerCallbacks, epoch: string = randomUUID(), private readonly environment: NodeJS.ProcessEnv = process.env, private readonly connectionOptions: {daemonThreadId?:string} = {}) {
     this.callbacks = callbacks;
     this.appServerEpoch = epoch;
   }
@@ -479,8 +485,16 @@ export class CodexAppServer implements AppServerClient {
   }
 
   async start(): Promise<void> {
-    if (this.child) return;
+    if (this.child || this.daemon) return;
     this.stopping = false;
+    if (this.connectionOptions.daemonThreadId) {
+      const endpoint=await discoverCodexDaemon(this.connectionOptions.daemonThreadId,this.environment);
+      if(!endpoint)throw new AgentError("THREAD_WRITER_BUSY","未找到可安全连接的同账户 Codex 后台；未发送任务，原生会话保持不变");
+      this.daemon=await CodexDaemonTransport.connect(endpoint,{
+        onMessage:line=>{void this.handleLine(line).catch(()=>this.daemon?.close());},
+        onClose:()=>this.handleExit("native daemon connection closed"),
+      });
+    } else {
     const childEnvironment = await codexNetworkEnvironment(this.environment);
     const codexExecutable = await resolveCodexExecutable(undefined, childEnvironment);
     const child = spawn(
@@ -497,6 +511,7 @@ export class CodexAppServer implements AppServerClient {
     child.stderr.on("data", () => undefined);
     child.once("error", (error) => this.handleExit(`spawn failed: ${error.message}`));
     child.once("exit", (code, signal) => this.handleExit(`exited (${code ?? "null"}, ${signal ?? "no-signal"})`));
+    }
     const initialized = resultObject(
       await this.request("initialize", {
         clientInfo: { name: "agentfleet-local", title: "AgentFleet Local Agent", version: AGENT_VERSION },
@@ -522,7 +537,7 @@ export class CodexAppServer implements AppServerClient {
     await this.writeLine({ method: "initialized" });
     this.initialized = true;
     const extraRoots = this.callbacks.getExtraSkillRoots?.() ?? [];
-    if (extraRoots.length) await this.request("skills/extraRoots/set", { extraRoots });
+    if (extraRoots.length && !this.daemon) await this.request("skills/extraRoots/set", { extraRoots });
     await this.refreshCodexCatalog();
   }
 
@@ -582,6 +597,7 @@ export class CodexAppServer implements AppServerClient {
     for (const timer of this.approvalTimers.values()) clearTimeout(timer);
     this.approvalTimers.clear();
     this.requestApprovals.clear();
+    if(this.daemon){await this.daemon.close();this.handleExit("shared client closed");return;}
     if (!this.child) return;
     const child = this.child;
     this.child = undefined;
@@ -959,6 +975,7 @@ export class CodexAppServer implements AppServerClient {
 
   async resumeThread(threadId: string, project: ProjectRecord, sessionCwd?: string, profile: PermissionProfile = "project", metadataOnly = false, realtime = false): Promise<ThreadResumeResult> {
     this.assertInitialized();
+    if(this.daemon && (threadId!==this.connectionOptions.daemonThreadId || realtime))throw new AgentError("THREAD_READ_ONLY","共享原生连接仅用于指定会话消息，不用于语音或其他会话");
     const before = await this.readThread(threadId, true);
     const cwd = await verifySessionCwd(project, sessionCwd ?? before.cwd);
     if (before.cwd !== cwd) {
@@ -983,6 +1000,7 @@ export class CodexAppServer implements AppServerClient {
       throw new AgentError("THREAD_RESUME_MISMATCH", "resumed thread identity, cwd, or history mode changed");
     }
     const verified = verifyEffectiveThreadPolicy(raw, project.root, cwd, profile);
+    if(this.daemon)this.daemonSubscribed=true;
     return {
       nativeThreadId: history.nativeThreadId,
       historyMode: history.historyMode,
@@ -1003,13 +1021,30 @@ export class CodexAppServer implements AppServerClient {
     await this.request("thread/unsubscribe", { threadId });
   }
 
-  /** Only used for a dedicated writer process, never the catalog connection.
-   * Unsubscribe is NOT an unload acknowledgement. Prove all loaded work idle,
-   * close stdin, and wait for actual process exit before confirming handoff.
-   * Do not kill a process on timeout or clean user background terminals here.
+  /** Release only this session's connection, never the catalog connection.
+   * Private writers prove all loaded work idle and wait for process exit.
+   * Shared writers prove their target idle and detach only their subscription.
+   * Neither path kills a process on timeout or cleans user background terminals.
    */
   async releaseWriter(): Promise<void> {
     if (this.exitHandled) return;
+    if(this.daemon){
+      // Disconnect only this subscriber. The daemon and every other client live on.
+      const daemon=this.daemon;
+      if (this.daemonSubscribed) {
+        const target = this.connectionOptions.daemonThreadId!;
+        const raw = resultObject(await this.request("thread/read", { threadId: target, includeTurns: false }), "thread/read");
+        const thread = resultObject(raw.thread, "thread");
+        const status = resultObject(thread.status, "thread.status");
+        if (thread.id !== target || !["idle", "notLoaded"].includes(String(status.type))) {
+          throw new AgentError("THREAD_RELEASE_PENDING", "当前会话仍在运行或状态未确认，暂不释放面板连接");
+        }
+      }
+      this.stopping=true;
+      try {if(this.daemonSubscribed)await this.request("thread/unsubscribe",{threadId:this.connectionOptions.daemonThreadId});}
+      finally {await daemon.close();this.handleExit("shared client released");}
+      return;
+    }
     if (!this.stopping) await this.verifyWriterIdle();
     const child = this.child;
     if (!child) throw new AgentError("THREAD_RELEASE_PENDING", "Writer exit has not been confirmed");
@@ -1061,6 +1096,12 @@ export class CodexAppServer implements AppServerClient {
       throw new AgentError("THREAD_READ_ONLY", "thread policy or app-server ownership cannot be proven");
     }
     const cwd = await verifySessionCwd(project, thread.sessionCwd ?? project.root);
+    if(this.daemon){
+      const current=await this.readThread(thread.nativeThreadId,true);
+      if(current.cwd!==cwd || current.executionState!=="idle")throw new AgentError("THREAD_BUSY","原生会话已有任务运行或状态未确认，本次未发送，请等待当前任务结束");
+      this.daemonPendingTurn=true;
+    }
+    try {
     this.referenceTurns.delete(thread.nativeThreadId);
     this.turnReferences.set(thread.nativeThreadId, extras?.referenceFiles ?? []);
     if (extras?.goal) await this.request("thread/goal/set", { threadId: thread.nativeThreadId, objective: extras.goal });
@@ -1083,10 +1124,18 @@ export class CodexAppServer implements AppServerClient {
       "turn/start",
     );
     const turn = resultObject(result.turn, "turn/start turn");
+    const nativeTurnId=requireString(turn.id,"turn.id",{maxLength:256});
+    if(this.daemon){
+      this.daemonTurns.add(nativeTurnId);
+      while(this.daemonTurns.size>32)this.daemonTurns.delete(this.daemonTurns.values().next().value!);
+      const requests=this.daemonRequests;this.daemonRequests=[];
+      for(const request of requests)if(request.turnId===nativeTurnId)await this.handleLine(request.line);
+    }
     return {
-      nativeTurnId: requireString(turn.id, "turn.id", { maxLength: 256 }),
+      nativeTurnId,
       status: typeof turn.status === "string" ? turn.status : "inProgress",
     };
+    } finally {this.daemonPendingTurn=false;this.daemonRequests=[];}
   }
 
   async steerTurn(
@@ -1098,6 +1147,7 @@ export class CodexAppServer implements AppServerClient {
     extras?: TurnExtras,
   ): Promise<TurnStartResult> {
     this.assertInitialized();
+    if(this.daemon&&!this.daemonTurns.has(turnId))throw new AgentError("THREAD_READ_ONLY","此轮任务由原生端启动，请在原生端追加；面板仅追加自己启动的任务");
     if (thread.activeTurnId !== turnId) {
       throw new AgentError("TURN_PRECONDITION_FAILED", "the expected active turn is no longer current");
     }
@@ -1122,6 +1172,7 @@ export class CodexAppServer implements AppServerClient {
 
   async interruptTurn(threadId: string, turnId: string): Promise<Record<string, unknown>> {
     this.assertInitialized();
+    if(this.daemon&&!this.daemonTurns.has(turnId))throw new AgentError("THREAD_READ_ONLY","此轮任务由原生端启动，请在原生端停止；面板仅停止自己启动的任务");
     const result = await this.request("turn/interrupt", { threadId, turnId });
     return isRecord(result) ? result : {};
   }
@@ -1155,7 +1206,7 @@ export class CodexAppServer implements AppServerClient {
 
   private assertInitialized(): void {
     if (this.stopping) throw new AgentError("THREAD_RELEASE_PENDING", "会话执行连接正在释放，请等待交接完成后重试");
-    if (!this.child || !this.initialized) throw new AgentError("APP_SERVER_UNAVAILABLE", "codex app-server is not initialized");
+    if ((!this.child && !this.daemon) || !this.initialized) throw new AgentError("APP_SERVER_UNAVAILABLE", "codex app-server is not initialized");
   }
 
   private readonly referenceTurns = new Map<string, string>();
@@ -1164,6 +1215,12 @@ export class CodexAppServer implements AppServerClient {
 
   private async request(method: string, params: Record<string, unknown> | null): Promise<unknown> {
     if (!APP_SERVER_METHODS.has(method)) throw new AgentError("RPC_FORBIDDEN", `app-server RPC '${method}' is not allowed`);
+    if(this.daemon){
+      const reads=["initialize","model/list","collaborationMode/list","plugin/list","plugin/read","account/read","account/rateLimits/read","thread/read","thread/items/list","thread/turns/list"];
+      const writes=["thread/resume","thread/unsubscribe","turn/start","turn/steer","turn/interrupt","thread/goal/set"];
+      if(!reads.includes(method)&&!writes.includes(method))throw new AgentError("THREAD_READ_ONLY","共享原生连接仅支持会话消息；此操作请在原生端进行");
+      if(writes.includes(method)&&params?.threadId!==this.connectionOptions.daemonThreadId)throw new AgentError("THREAD_READ_ONLY","共享连接的会话身份不匹配");
+    }
     const id = this.nextRequestId++;
     const promise = new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -1184,6 +1241,7 @@ export class CodexAppServer implements AppServerClient {
   }
 
   private async writeLine(message: Record<string, unknown>): Promise<void> {
+    if(this.daemon){await this.daemon.send(JSON.stringify(message));return;}
     const child = this.child;
     if (!child || child.stdin.destroyed || !child.stdin.writable) {
       throw new AgentError("APP_SERVER_UNAVAILABLE", "app-server stdin is unavailable");
@@ -1210,6 +1268,18 @@ export class CodexAppServer implements AppServerClient {
     }
     if (typeof message.method !== "string") return;
     const params = isRecord(message.params) ? message.params : {};
+    if(this.daemon){
+      const threadId=threadIdFromParams(params);
+      if(!threadId || threadId!==this.connectionOptions.daemonThreadId)return;
+      if(message.id!==undefined){
+        const turnId=turnIdFromParams(params)??this.callbacks.findManagedThread(threadId)?.activeTurnId;
+        if(!turnId||!this.daemonTurns.has(turnId)){
+          if(turnId&&this.daemonPendingTurn&&this.daemonRequests.length<32&&Buffer.byteLength(line)<1_000_000)this.daemonRequests.push({line,turnId});
+          // Never decline or answer another client's permission/tool request.
+          return;
+        }
+      }
+    }
     if (message.id !== undefined) {
       const requestId = readId(message.id, "server request id");
       if (message.method === "currentTime/read") {
@@ -1604,6 +1674,8 @@ export class CodexAppServer implements AppServerClient {
     if (this.exitHandled) return;
     this.exitHandled = true;
     this.child = undefined;
+    this.daemon = undefined;
+    this.daemonRequests=[];this.daemonTurns.clear();
     this.initialized = false;
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);

@@ -9,7 +9,7 @@ const subtractUsage = (current: TokenCounts, previous: TokenCounts): TokenCounts
   usageKeys.map((key) => [key, current[key] - previous[key]]),
 ) as unknown as TokenCounts;
 
-/** Project native item lifecycle events into one visible item, without changing the event log. */
+/** Project request and native item lifecycle events without changing the event log. */
 export function timelineItems(events: TimelineEvent[]): TimelineEvent[] {
   const result: TimelineEvent[] = [];
   const historyOrder=new Map<string,{index:number;occurredAt?:string}>();
@@ -37,6 +37,23 @@ export function timelineItems(events: TimelineEvent[]): TimelineEvent[] {
     const metadata=historyOrder.get(JSON.stringify([original.nativeThreadId,original.nativeItemId]));
     const event=metadata?.occurredAt ? {...original,occurredAt:metadata.occurredAt} : original;
     const scope = event.nativeThreadId || event.executionSegmentId;
+    if (event.type === "command.result" && event.commandId) {
+      const key = `command-result:${event.commandId}`;
+      const position = positions.get(key);
+      if (position === undefined) {
+        positions.set(key, result.length);
+        result.push({ ...event, id: key });
+      } else {
+        const previous = result[position]!;
+        // Receipts may arrive out of order. Only newer evidence can resolve an
+        // unknown outcome; deleted content must never return via an older state.
+        const selected = previous.payloadState === "deleted" ? previous
+          : event.payloadState === "deleted" ? event
+          : event.sessionSeq >= previous.sessionSeq ? event : previous;
+        result[position] = { ...selected, id: key };
+      }
+      continue;
+    }
     if (event.type === "turn.completed") {
       const usage = scope && event.nativeTurnId ? usageByTurn.get(JSON.stringify([scope, event.nativeTurnId])) : undefined;
       result.push({
