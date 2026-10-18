@@ -365,7 +365,6 @@ function eventBody(item: JsonObject, payload: JsonObject): string | null {
   }
   if (item.type === "agentMessage" || item.type === "plan") return string(item.text) || null;
   if (item.type === "reasoning") return list(item.summary).map((entry) => string(entry)).filter(Boolean).join("\n") || string(item.text) || null;
-  if (item.type === "mcpToolCall") return toolResultText(item.result) || null;
   if (typeof payload.message === "string") return payload.message;
   return null;
 }
@@ -376,7 +375,7 @@ function eventTitle(type: string, item: JsonObject): string {
   if (item.type === "plan") return t("计划");
   if (item.type === "reasoning") return t("推理摘要");
   if (item.type === "commandExecution") return t("命令执行");
-  if (item.type === "mcpToolCall") return string(record(item.arguments).command) || string(item.tool) || t("工具调用");
+  if (item.type === "mcpToolCall") return string(record(item.arguments).command) || (item.tool === "tool result" ? t("工具输出") : string(item.tool)) || t("工具调用");
   if (item.type === "fileChange") return t("文件变更");
   const titles: Record<string, string> = {
     "thread.started": t("受管 Thread 已创建"),
@@ -470,7 +469,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     body: commandFailureBody ?? eventBody(item, payload),
     payloadState: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? raw.payloadState : "present",
     status: commandFailure ? (payload.state === "unknown" ? "unknown" : "failed") : string(item.status, string(record(payload.turn).status)) || null,
-    command: itemType === "commandExecution" ? string(item.command) || null : itemType === "mcpToolCall" ? string(record(item.arguments).command) || string(item.tool) || null : null,
+    command: itemType === "commandExecution" ? string(item.command) || null : itemType === "mcpToolCall" ? string(record(item.arguments).command) || (item.tool === "tool result" ? null : string(item.tool)) || null : null,
     output: itemType === "commandExecution" ? string(item.aggregatedOutput) || null : itemType === "mcpToolCall" ? toolResultText(item.result) || null : null,
     diff: diffSummary(diffText),
     fileChanges: itemType === "fileChange" ? list(item.changes).map(record).map(change=>({path:string(change.path),diff:string(change.diff)})) : undefined,
