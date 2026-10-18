@@ -36,6 +36,8 @@ it('an older background response cannot overwrite a successfully saved model',as
 it('native model choices are usable before a first turn; incompatible effort is cleared on model change',async()=>{
  const onSave=vi.fn().mockResolvedValue(undefined);
  render(<GrokControls options={catalog.options} models={catalog.models} settings={{model:'grok-full',effort:'high'}} ready error="" onReload={()=>{}} onSave={onSave} disabled={false}/>);
+ expect(screen.getByRole('button',{name:'Grok Build 设置'}).textContent).toContain('grok-full · high · 逐项确认');
+ expect(screen.getByRole('button',{name:'Grok Build 设置'}).textContent).not.toContain('Grok Build ·');
  fireEvent.click(screen.getByRole('button',{name:'Grok Build 设置'}));
  const select=screen.getByLabelText('Grok Build 模型') as HTMLSelectElement;
  expect(select.disabled).toBe(false);

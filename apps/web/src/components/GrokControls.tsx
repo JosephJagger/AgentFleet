@@ -45,7 +45,7 @@ export function GrokControls({options,models=[],settings,ready,error,onReload,on
   const effortValues=selectedModel?.efforts??effortOption?.values??[];
   const permissionLabel=(value:string)=>t(value==="always"?"始终允许":value==="auto"?"自动审核":"逐项确认");
   const choices=(current:string,values:string[])=>current&&!values.includes(current)?[current,...values]:values;
-  const summary=!ready?t(error||"正在读取会话配置…"):`Grok Build · ${settings.model||t("沿用原生")} · ${settings.effort||t("沿用原生")} · ${permissionLabel(settings.permissionMode??"default")}${settings.mode==="plan"?` · ${t("计划模式")}`:""}`;
+  const summary=!ready?t(error||"正在读取会话配置…"):`${settings.model||t("沿用原生")} · ${settings.effort||t("沿用原生")} · ${permissionLabel(settings.permissionMode??"default")}${settings.mode==="plan"?` · ${t("计划模式")}`:""}`;
   disabled=disabled||!ready||saving;
   return <>
     <div className="runtime-settings-bar"><button type="button" className="runtime-settings-shortcut" aria-label={t("Grok Build 设置")} aria-haspopup="dialog" onClick={()=>setOpen(true)}><Settings2 size={13}/><span className="runtime-settings-lines"><span className="runtime-settings-line"><small>{t("发送使用")}</small><span>{summary}</span></span></span><ChevronRight size={13}/></button></div>
