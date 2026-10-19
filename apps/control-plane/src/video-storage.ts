@@ -83,7 +83,7 @@ export class VideoStorage {
       400, "VIDEO_STORAGE_DELETE_INVALID", "请先核对文件信息并确认删除");
     return this.run(principal, async (client, config) => {
       const head = await client.send(new HeadObjectCommand({ Bucket: config.bucket, Key: key }));
-      invariant(head.ETag === input.etag && head.ContentLength === input.bytes && head.LastModified?.toISOString() === input.modifiedAt,
+      invariant(head.ETag === input.etag && head.ContentLength === input.bytes && head.LastModified && Math.floor(head.LastModified.getTime() / 1000) === Math.floor(Date.parse(input.modifiedAt as string) / 1000),
         409, "VIDEO_STORAGE_CHANGED", "文件已变化，请刷新后重新确认");
       invariant(head.LastModified && this.now() - head.LastModified.getTime() >= 60_000,
         409, "VIDEO_STORAGE_RECENT", "文件刚写入，请一分钟后刷新再删除");

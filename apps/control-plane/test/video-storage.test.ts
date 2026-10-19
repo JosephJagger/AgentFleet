@@ -43,7 +43,7 @@ test("deletion rejects other workspaces, prefixes, stale snapshots, unconfirmed 
 });
 test("deletes only the confirmed exact key and audits request and completion", async () => {
   const { service, calls, audit } = fixture(name => name === "HeadObjectCommand" ? { ETag: item.etag, ContentLength: 42, LastModified: date } : {});
-  assert.deepEqual(await service.remove(principal, item), { deleted: true });
+  assert.deepEqual(await service.remove(principal, { ...item, modifiedAt: "2026-10-19T00:00:00.123Z" }), { deleted: true });
   assert.deepEqual(calls.map(x => x.name), ["HeadObjectCommand", "DeleteObjectCommand"]);
   assert.equal(calls[1]!.input.Key, item.key); assert.equal(audit.length, 2);
 });
