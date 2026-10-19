@@ -7,6 +7,9 @@ import {homedir} from 'node:os';
 import type {AcpProviderId} from './provider-catalog.js';
 import {AgentError} from './errors.js';
 const exec=promisify(execFile);
+// Read-only detection is also used by the host version inventory, outside the ACP
+// runtime. Track exact child lifetimes; never exempt a process merely by its flags.
+const detectionProcesses=new Map<AcpProviderId,Set<number>>();
 /** `aliases` are legacy binary names; `identify` guards generic names such as Cursor's `agent`; `dirs` are default install locations outside PATH. */
 export const ACP_COMMANDS:Record<AcpProviderId,{command:string;args:string[];npm:string[];aliases?:string[];identify?:RegExp;dirs?:string[][]}>={
   qwen:{command:'qwen',args:['--acp'],npm:['@qwen-code/qwen-code']},
@@ -25,6 +28,12 @@ const commandNames=(config:{command:string;aliases?:string[]|undefined})=>[confi
 export interface AcpExecutable { executable:string;prefix:string[];version:string; }
 export async function detectAcp(provider:AcpProviderId):Promise<AcpExecutable|null> {
   const config=ACP_COMMANDS[provider];
+  const probe=(file:string,args:string[],maxBuffer:number)=>{
+    const pending=exec(file,args,{timeout:5000,maxBuffer,windowsHide:true});
+    const pid=pending.child.pid;
+    if(pid){let roots=detectionProcesses.get(provider);if(!roots){roots=new Set();detectionProcesses.set(provider,roots);}roots.add(pid);pending.child.once('close',()=>roots!.delete(pid));}
+    return pending;
+  };
   const dirs=[...new Set([...(process.env.PATH??'').split(delimiter).filter(isAbsolute),...COMMON_HOME_DIRS.map(d=>join(homedir(),...d)),...(config.dirs??[]).map(d=>join(homedir(),...d)),...(process.platform==='win32'?[join(homedir(),'AppData','Roaming','npm'),join(homedir(),'.grok','bin')]:['/usr/local/bin','/opt/homebrew/bin',...await nvmDirs()])])];
   let nodeExecutable:string|undefined=isSea()?undefined:process.execPath;
   if(process.platform==='win32'&&!nodeExecutable)for(const dir of dirs){
@@ -44,7 +53,7 @@ export async function detectAcp(provider:AcpProviderId):Promise<AcpExecutable|nu
     }
     for(const candidate of candidates)try {
       await access(candidate.executable);
-      const result=await exec(candidate.executable,[...candidate.prefix,'--version'],{timeout:5000,maxBuffer:8192,windowsHide:true});
+      const result=await probe(candidate.executable,[...candidate.prefix,'--version'],8192);
       const version=result.stdout.trim();if(!/\d+\.\d+\.\d+/.test(version)||version.length>200)continue;
       // `agent` is also installed by Grok. A generic executable name is not
       // evidence of Cursor: verify the vendor before starting its ACP process.
@@ -53,7 +62,7 @@ export async function detectAcp(provider:AcpProviderId):Promise<AcpExecutable|nu
         // vendor name. Verify their read-only ACP help; neither PATH order nor
         // the ambiguous `agent` filename alone establishes provider identity.
         if(provider!=='cursor'||!/^\d{4}\.\d{2}\.\d{2}-[a-f0-9]{7,40}$/i.test(version))continue;
-        const help=await exec(candidate.executable,[...candidate.prefix,'acp','--help'],{timeout:5000,maxBuffer:32768,windowsHide:true});
+        const help=await probe(candidate.executable,[...candidate.prefix,'acp','--help'],32768);
         if(!/^Start the Cursor Agent as an ACP \(Agent Client Protocol\) server\s*$/m.test(help.stdout))continue;
       }
       return {...candidate,version};
@@ -75,6 +84,7 @@ export function isCursorNativeCommand(args:string) {
 export async function assertAcpUnoccupied(provider:AcpProviderId,owned:Set<number>):Promise<void> {
   const config=ACP_COMMANDS[provider];
   const ownedAtScan=new Set(owned);
+  const probesAtScan=new Set(detectionProcesses.get(provider));
   let rows:Array<{pid:number;ppid:number;exe:string;args:string}>;
   try {
     if(process.platform==='win32') {
@@ -86,7 +96,8 @@ export async function assertAcpUnoccupied(provider:AcpProviderId,owned:Set<numbe
       rows=result.stdout.split('\n').flatMap(line=>{const m=/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);return m?[{pid:Number(m[1]),ppid:Number(m[2]),exe:m[3]!,args:m[4]!}]:[];});
     }
   }catch{throw new AgentError('PROVIDER_OWNERSHIP_UNKNOWN','Unable to verify native process ownership; write access remains disabled');}
-  const ownedTree=provider==='cursor'?ownedProcessTree(rows,new Set([...ownedAtScan,...owned])):owned;
+  const probes=ownedProcessTree(rows,new Set([...probesAtScan,...(detectionProcesses.get(provider)??[])]));
+  const ownedTree=provider==='cursor'?ownedProcessTree(rows,new Set([...ownedAtScan,...owned,...probes])):new Set([...owned,...probes]);
   for(const row of rows) {
     if(ownedTree.has(row.pid)||row.pid===process.pid)continue;
     const base=row.exe.replaceAll('\\','/').split('/').pop()?.toLowerCase();
