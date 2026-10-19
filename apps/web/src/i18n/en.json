@@ -3812,5 +3812,6 @@
   "由宿主机 Cursor 账号接口查询，后台定期刷新。": "Queried from the host's Cursor account service; refreshed in the background.",
   "Cursor 未返回账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。": "Cursor returned no account allowance. Confirm the host is logged in with a Cursor account (no custom API key or endpoint).",
   "账号额度 · 来源：Cursor 账号接口。": "Account allowance · Source: Cursor account service.",
-  "未读取到 Cursor 账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。": "Cursor account allowance unavailable. Confirm the host is logged in with a Cursor account (no custom API key or endpoint)."
+  "未读取到 Cursor 账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。": "Cursor account allowance unavailable. Confirm the host is logged in with a Cursor account (no custom API key or endpoint).",
+  "快速模式": "Fast mode"
 }

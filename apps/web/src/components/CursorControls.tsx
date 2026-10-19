@@ -3,6 +3,7 @@ import type {CursorSettings,CursorOption,CursorModel} from '../lib/cursor-settin
 import type {UsageSummary} from '../lib/usage';
 import {api} from '../lib/api';
 import {t,locale} from '../i18n';
+import {cursorOptionLabel,cursorValueLabel} from '../lib/cursor-labels';
 import {formatQuotaPercent} from '../lib/usage';
 
 export function CursorControls({sessionId,settings,options,models,ready,supported,error,disabled,visible,observedAt,onReload,onSave}:{sessionId:string;settings:CursorSettings;options:CursorOption[];models:CursorModel[];ready:boolean;supported:boolean;error:string;disabled:boolean;visible:boolean;observedAt:string|null;onReload:()=>void;onSave:(s:CursorSettings)=>Promise<void>}){
@@ -34,12 +35,12 @@ export function CursorControls({sessionId,settings,options,models,ready,supporte
       {!supported&&ready&&<p role="status">{t('请将此主机连接服务更新到 0.30.127 或更新版本。')}</p>}
       {!ready&&<p role="status">{t(error||'正在读取会话配置…')}</p>}
       <div className="claude-settings-fields codex-settings-fields">
-        {orderedOptions.map(option=><label key={option.id}>{option.id==='model'?t('模型'):option.id==='mode'?t('任务模式'):option.name}<select aria-label={option.id==='model'?t('Cursor 模型'):option.id==='mode'?t('Cursor 任务模式'):option.name} value={draft.options?.[option.id]??''} disabled={locked} onChange={event=>change(option.id,event.target.value)}>
-          <option value="">{t('沿用原生')}{option.current?` · ${option.values.find(v=>v.value===option.current)?.name??option.current}`:''}</option>
+        {orderedOptions.map(option=><label key={option.id}>{cursorOptionLabel(option)}<select aria-label={`Cursor ${cursorOptionLabel(option)}`} value={draft.options?.[option.id]??''} disabled={locked} onChange={event=>change(option.id,event.target.value)}>
+          <option value="">{t('沿用原生')}{option.current?` · ${cursorValueLabel(option,option.current)}`:''}</option>
           {draft.options?.[option.id]&&!option.values.some(v=>v.value===draft.options?.[option.id])&&<option value={draft.options[option.id]}>{draft.options[option.id]} · {t('需重新选择')}</option>}
-          {option.values.map(v=><option key={v.value} value={v.value}>{v.name}</option>)}
+          {option.values.map(v=><option key={v.value} value={v.value}>{cursorValueLabel(option,v.value)}</option>)}
         </select></label>)}
-        <label>{t('会话权限')}<select aria-label={t('Cursor 会话权限')} value={draft.permissionMode??'default'} disabled={locked} onChange={event=>{generation.current++;setDraft({...draft,permissionMode:event.target.value as CursorSettings['permissionMode']});setDirty(true);setMessage('');}}><option value="default">{t('原生审批，面板确认')}</option><option value="always">{t('允许本会话工具请求')}</option></select></label>
+        <label>{t('会话权限')}<select aria-label={t('Cursor 会话权限')} value={draft.permissionMode??'default'} disabled={locked} onChange={event=>{generation.current++;setDraft({...draft,permissionMode:event.target.value as CursorSettings['permissionMode']});setDirty(true);setMessage('');}}><option value="default">{t('逐项确认')}</option><option value="always">{t('始终允许')}</option></select></label>
       </div>
       <p>{t('沿用 Cursor 主机上的权限规则与沙箱；本会话允许模式仅放行原生发到面板的工具审批，不修改全局允许列表。提问与计划仍需确认。')}</p>
       <small>{t('Cursor 原生切换也会记住主机端的默认模型；其他面板会话仍优先使用各自保存的模型。')}</small>

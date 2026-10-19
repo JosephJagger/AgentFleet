@@ -1,3 +1,4 @@
+import {CursorSettingsShortcut} from './components/CursorSettingsShortcut';
 import {CursorControls} from "./components/CursorControls";
 import {useCursorPreferences} from "./lib/cursor-preferences";
 import {sessionConnectionHint,useSessionSyncRefresh} from "./lib/session-connectivity";
@@ -1134,7 +1135,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         {voiceActive && <p className="composer-mode" role="status">{t("通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。")}</p>}
         {hasActiveTurn && <div className="composer-mode"><Activity size={14} />{supportsSteer ? t("{0} 正在处理：可补充当前任务，或排到下一轮", agentName(session.provider)) : t("{0} 正在处理：可排到下一轮", agentName(session.provider))}</div>}
         {isAcpProvider(session.provider) && session.provider !== "grok" && session.provider !== "cursor" && <p className="composer-mode">{t("权限沿用主机上的原生设置；需要确认时在面板处理。")}</p>}
-        {session.provider === "cursor" && <div className="runtime-settings-bar"><button type="button" className="runtime-settings-shortcut" onClick={()=>setConfiguration({section:"settings",nonce:Date.now()})}><Settings2 size={13}/><span>{t("Cursor 会话配置")} · {cursorPrefs.settings.options?.model??t("沿用原生")}</span><ChevronRight size={13}/></button></div>}
+        {session.provider === "cursor" && <CursorSettingsShortcut settings={cursorPrefs.settings} options={cursorPrefs.options} models={cursorPrefs.models} ready={cursorPrefs.ready} error={cursorPrefs.error} onOpen={()=>setConfiguration({section:"settings",nonce:Date.now()})}/>}
         {session.provider === "grok" && <GrokControls key={session.id} options={grokPrefs.options} models={grokPrefs.models} settings={grokPrefs.settings} ready={grokPrefs.ready} error={grokPrefs.error} onReload={grokPrefs.reload} onSave={grokPrefs.save} disabled={busy} openRequest={grokSettingsOpen}/>}
         {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
 
