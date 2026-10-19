@@ -12,7 +12,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -140,6 +140,7 @@ it("移动端选择插件或计划模式后立即收起添加菜单", () => {
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
 
 beforeEach(() => {
+  vi.mocked(api.cursorPreferences).mockResolvedValue({settings:null,revision:0,options:[],models:[],observedAt:null,supported:true});
   vi.mocked(api.claudePreferences).mockResolvedValue({settings:null,revision:0});
   vi.mocked(api.grokPreferences).mockResolvedValue({settings:null,revision:0,options:[]});
   const defaults={terms:true,suggestions:true,nlp:true,learning:true};

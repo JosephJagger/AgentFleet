@@ -1,3 +1,4 @@
+import type {CursorSettings} from "./cursor-settings.js";
 import {preferenceInstructions} from './voice-preference-rules.js';
 import { ReasoningSummaries } from './reasoning-summary.js';
 import {discoverCodexDaemon, CodexDaemonTransport} from './daemon-transport.js';
@@ -236,7 +237,7 @@ export interface AppServerClient {
     project: ProjectRecord,
     prompt: string,
     clientUserMessageId?: string,
-    settings?: CodexSettings | GrokSettings,
+    settings?: CodexSettings | GrokSettings | CursorSettings,
     images?: string[],
     extras?: TurnExtras,
   ): Promise<TurnStartResult>;

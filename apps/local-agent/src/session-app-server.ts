@@ -1,3 +1,4 @@
+import type {CursorSettings} from "./cursor-settings.js";
 import { randomUUID } from "node:crypto";
 import { CodexAppServer, type AppServerCallbacks, type AppServerClient, type ThreadStartResult } from "./app-server.js";
 import { AgentError } from "./errors.js";
@@ -279,7 +280,7 @@ export class SessionAppServer implements AppServerClient {
       // It makes no assertion about another CLI/desktop process's ownership.
     });
   }
-  startTurn(thread: ManagedThread, project: ProjectRecord, prompt: string, messageId?: string, settings?: CodexSettings | GrokSettings, images?: string[], extras?: TurnExtras) {
+  startTurn(thread: ManagedThread, project: ProjectRecord, prompt: string, messageId?: string, settings?: CodexSettings | GrokSettings | CursorSettings, images?: string[], extras?: TurnExtras) {
     return this.serial(thread.nativeThreadId, async () => {
       const current = this.callbacks.findManagedThread(thread.nativeThreadId);
       if (current?.activeTurnId) throw new AgentError("THREAD_BUSY", "A native task started before the message could be sent; append to it or retry");

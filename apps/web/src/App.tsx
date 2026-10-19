@@ -1,3 +1,5 @@
+import {CursorControls} from "./components/CursorControls";
+import {useCursorPreferences} from "./lib/cursor-preferences";
 import {sessionConnectionHint,useSessionSyncRefresh} from "./lib/session-connectivity";
 import { isAcpProvider, type ProviderId } from "./lib/provider-catalog";
 import { matchesRuntimeTarget, runtimeRollout } from "./lib/runtime-rollout";
@@ -808,6 +810,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const [runtimeChoice, setRuntimeChoice] = useState<RuntimeChoice>();
   const claudePrefs=useClaudePreferences(detail?.session.provider === "claude" ? detail.session.id : undefined);
   const grokPrefs=useGrokPreferences(detail?.session.provider === "grok" ? detail.session.id : undefined, detail?.session.sessionSeq);
+  const cursorPrefs=useCursorPreferences(detail?.session.provider === "cursor" ? detail.session.id : undefined,detail?.session.sessionSeq);
   const claudeModel=claudePrefs.settings.model;
   const claudeEffort=claudePrefs.settings.effort ?? "";
   const claudePlan=claudePrefs.settings.mode === "plan";
@@ -1114,6 +1117,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
         {(session.provider ?? "codex") === "codex" && <CodexSettingsPanel key={`${draftOwner}:${session.id}:${modeSettingsRevision}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />}
         {(session.provider ?? "codex") === "codex" && <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />}
+        {session.provider === "cursor" && <CursorControls key={session.id} sessionId={session.id} options={cursorPrefs.options} models={cursorPrefs.models} settings={cursorPrefs.settings} ready={cursorPrefs.ready} supported={cursorPrefs.supported} error={cursorPrefs.error} onReload={cursorPrefs.reload} onSave={cursorPrefs.save} disabled={busy} visible={!!configuration} observedAt={cursorPrefs.observedAt}/>}
         <SessionWritingPreferencesPanel key={`writing:${draftOwner}:${session.id}`} settings={writingSettings} />
         {(session.provider ?? "codex") === "codex" && <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
@@ -1129,7 +1133,8 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
         {voiceActive && <p className="composer-mode" role="status">{t("通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。")}</p>}
         {hasActiveTurn && <div className="composer-mode"><Activity size={14} />{supportsSteer ? t("{0} 正在处理：可补充当前任务，或排到下一轮", agentName(session.provider)) : t("{0} 正在处理：可排到下一轮", agentName(session.provider))}</div>}
-        {isAcpProvider(session.provider) && session.provider !== "grok" && <p className="composer-mode">{t("权限沿用主机上的原生设置；需要确认时在面板处理。")}</p>}
+        {isAcpProvider(session.provider) && session.provider !== "grok" && session.provider !== "cursor" && <p className="composer-mode">{t("权限沿用主机上的原生设置；需要确认时在面板处理。")}</p>}
+        {session.provider === "cursor" && <div className="runtime-settings-bar"><button type="button" className="runtime-settings-shortcut" onClick={()=>setConfiguration({section:"settings",nonce:Date.now()})}><Settings2 size={13}/><span>{t("Cursor 会话配置")} · {cursorPrefs.settings.options?.model??t("沿用原生")}</span><ChevronRight size={13}/></button></div>}
         {session.provider === "grok" && <GrokControls key={session.id} options={grokPrefs.options} models={grokPrefs.models} settings={grokPrefs.settings} ready={grokPrefs.ready} error={grokPrefs.error} onReload={grokPrefs.reload} onSave={grokPrefs.save} disabled={busy} openRequest={grokSettingsOpen}/>}
         {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
 

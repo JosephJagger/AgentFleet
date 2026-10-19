@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 64) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 65) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1569,6 +1569,21 @@ export class ControlPlaneDatabase {
       this.sqlite.exec(`CREATE INDEX IF NOT EXISTS durable_events_turn_idx
         ON durable_events(logical_session_id,native_turn_id,session_seq);
         PRAGMA user_version=64`);
+    });
+    if(version<65)this.transaction(()=>{
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS cursor_preferences (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        logical_session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id) ON DELETE CASCADE,
+        settings_json TEXT NOT NULL,revision INTEGER NOT NULL,updated_at TEXT NOT NULL,
+        PRIMARY KEY(workspace_id,logical_session_id)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS cursor_native_options (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        logical_session_id TEXT NOT NULL REFERENCES logical_sessions(logical_session_id) ON DELETE CASCADE,
+        options_json TEXT NOT NULL,observed_at TEXT NOT NULL,
+        PRIMARY KEY(workspace_id,logical_session_id)
+      ) STRICT;
+      PRAGMA user_version=65`);
     });
   }
 

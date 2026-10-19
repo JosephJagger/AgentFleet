@@ -114,7 +114,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
         <section><h3>{t("账号额度（共享）")}</h3>
           {scope==="machine"&&codex&&<button type="button" className="button button--quiet" disabled={refreshing} onClick={()=>void refreshHost()}>{t("刷新额度")}</button>}
           {refreshNotice&&<p role="status">{refreshNotice}</p>}
-          {!data?.accounts.length&&<p>{t(claude ? "Claude Code 未返回订阅额度；请确认宿主机已登录，且原生版本支持额度查询。" : grok ? "Grok 未返回账号额度；请确认主机已登录 Grok，并使用支持额度查询的版本。" : "账号额度未上报；需要支持额度查询的 Codex 认证。")}</p>}
+          {!data?.accounts.length&&<p>{t(claude ? "Claude Code 未返回订阅额度；请确认宿主机已登录，且原生版本支持额度查询。" : grok ? "Grok 未返回账号额度；请确认主机已登录 Grok，并使用支持额度查询的版本。" : provider === "cursor" ? "当前 Cursor ACP 未提供账号额度查询，无法显示剩余数量。" : "账号额度未上报；需要支持额度查询的 Codex 认证。")}</p>}
           {data?.accounts.map((account,i)=><div className="usage-account" key={i}>
             <p>{account.sourceMachine} · {t("更新于 {0}",date(account.observedAt))}{(account.stale||Date.now()-Date.parse(account.observedAt)>180_000)&&<strong> · {t("数据已过期")}</strong>}</p>
             {claude&&<p>{account.subscriptionType ? `${account.subscriptionType.toUpperCase()} · ` : ""}{t("由宿主机 Claude Code 原生查询")}</p>}

@@ -1,3 +1,4 @@
+import {parseCursorOptions,parseCursorModels,parseCursorSettings,type CursorOption,type CursorModel,type CursorSettings} from './cursor-settings.js';
 import {listCursorTerminalSessions,prepareCursorTerminalSession} from './cursor-sessions.js';
 import {readGrokUsage} from './grok-usage.js';
 import {grokBillingQuota,type GrokQuota} from './grok-quota.js';
@@ -22,13 +23,13 @@ import type {TurnExtras} from './attachments.js';
 import {inputAnswers,inputQuestions,type InputAnswers,type InputQuestion} from './user-input.js';
 import {grokProgressText,grokModelOptions,parseGrokModels,acpPlanText,acpToolItem,acpUsage,grokLaunchArgs,grokSessionMeta,mergeConfigOptions,parseConfigOptions,parseGrokSettings,type ConfigOption,type GrokSettings} from './acp-updates.js';
 import type {CodexSettings} from './codex-settings.js';
-interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];published:Map<string,string>;completed:Set<string>;itemSizes:Map<string,number>;historyBytes:number;textPublishedAt:number;}
+interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];cursorOptions:CursorOption[];published:Map<string,string>;completed:Set<string>;itemSizes:Map<string,number>;historyBytes:number;textPublishedAt:number;usageTotals?:import('./acp-updates.js').TokenCounts;}
 interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan';questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
 function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)return {text:value,truncated:false};let text=Buffer.from(value).subarray(0,max).toString('utf8');if(text.endsWith('\uFFFD'))text=text.slice(0,-1);return {text,truncated:true};}
 const dependencies={cursorSessions:listCursorTerminalSessions,prepareCursor:prepareCursorTerminalSession,detect:detectAcp,unoccupied:assertAcpUnoccupied,readGrokUsage,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
 /** New providers have their own processes and cannot fall through to Codex methods. */
 export class AcpRuntime {
-  availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[];quota?:GrokQuota}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
+  availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[];quota?:GrokQuota;cursorModels?:CursorModel[]}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
   private executable:AcpExecutable|null=null;
   private executableStamp=-1;
   private readonly sessions=new Map<string,Session>();
@@ -71,7 +72,7 @@ export class AcpRuntime {
       }});
     this.connections.add(connection);connection.start();if(connection.pid)this.owned.add(connection.pid);
     try {
-      const init=await connection.call('initialize',{protocolVersion:1,clientCapabilities:{},clientInfo:{name:'agentfleets',version:AGENT_VERSION}});
+      const init=await connection.call('initialize',{protocolVersion:1,clientCapabilities:this.provider==='cursor'?{_meta:{parameterizedModelPicker:true}}:{},clientInfo:{name:'agentfleets',version:AGENT_VERSION}});
       if(!isRecord(init)||init.protocolVersion!==1||!isRecord(init.agentCapabilities))throw new AgentError('ACP_INCOMPATIBLE','Unsupported native protocol handshake');
       const capabilities=init.agentCapabilities,sessionCapabilities=isRecord(capabilities.sessionCapabilities)?capabilities.sessionCapabilities:{};
       const meta=isRecord(init._meta)?init._meta:{};
@@ -85,7 +86,7 @@ export class AcpRuntime {
       catch(error){steer=error instanceof AgentError && error.code==='ACP_REMOTE_ERROR' && error.message.includes('(-32602)');}
       const images=acpImageInput(this.provider,this.executable.version,init);
       if(session)session.imageInput=images;
-      this.availability={...(this.availability.quota?{quota:this.availability.quota}:{}),installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),steer,models:models.length>0,usage:this.provider==='grok'&&this.availability.capabilities.usage,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
+      this.availability={...(this.availability.quota?{quota:this.availability.quota}:{}),...(this.provider==='cursor'&&this.availability.cursorModels?{cursorModels:this.availability.cursorModels}:{}),installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),steer,models:models.length>0||this.provider==='cursor'&&!!this.availability.cursorModels?.length,usage:(this.provider==='grok'||this.provider==='cursor')&&this.availability.capabilities.usage,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
       return connection;
     } catch(error) {connection.close();this.markFailure(error);throw error;}
   }
@@ -101,6 +102,10 @@ export class AcpRuntime {
     const connection=await this.connect(homedir());
     try {
       if(this.provider==='grok')await this.refreshGrokQuota(connection);
+      if(this.provider==='cursor'&&Date.now()-this.quotaCheckedAt>=120000){
+        this.quotaCheckedAt=Date.now();
+        try {const result=await connection.call('cursor/list_available_models',{},15000);const models=parseCursorModels(isRecord(result)?result.models:undefined);if(models.length){this.availability.cursorModels=models;this.availability.capabilities.models=true;}}catch{/* Optional extension: leave settings unavailable, never borrow Grok models. */}
+      }
       if(!this.availability.capabilities.discover)return [...this.catalog.values()];
       let unoccupied=false;try {await this.deps.unoccupied(this.provider,this.owned);unoccupied=true;}catch{/* Unknown ownership is never idle. */}
       const seen=new Set<string>();const observed=new Set<string>();let cursor:string|undefined;let complete=false;
@@ -150,6 +155,7 @@ export class AcpRuntime {
   private rememberOptions(session:Session,value:unknown) {
     if(!isRecord(value))return;
     const update=isRecord(value.update)?value.update:undefined;
+    if(this.provider==='cursor'){const raw=value.configOptions??update?.configOptions;if(Array.isArray(raw))session.cursorOptions=parseCursorOptions(raw);return;}
     const list=parseConfigOptions(value.configOptions??update?.configOptions??update?.options);
     if(list.length)session.configOptions=mergeConfigOptions(session.configOptions,list);
   }
@@ -160,7 +166,7 @@ export class AcpRuntime {
     // closing children owned, and confirm their exit before opening a replacement.
     await Promise.all([...this.connections].filter(connection=>connection.closing).map(connection=>connection.closeAndWait()));
     await this.deps.unoccupied(this.provider,this.owned);
-    const session={id,cwd,items:[],cancelled:false,loading:true,lost:false,permissionMode:settings?.permissionMode??'default',configOptions:[],published:new Map<string,string>(),completed:new Set<string>(),itemSizes:new Map<string,number>(),historyBytes:0,textPublishedAt:0} as unknown as Session;
+    const session={id,cwd,items:[],cancelled:false,loading:true,lost:false,permissionMode:settings?.permissionMode??'default',configOptions:[],cursorOptions:[],published:new Map<string,string>(),completed:new Set<string>(),itemSizes:new Map<string,number>(),historyBytes:0,textPublishedAt:0} as unknown as Session;
     let env:NodeJS.ProcessEnv|undefined;
     if(this.provider==='cursor'&&!fresh) {
       const row=(await this.deps.cursorSessions()).find(row=>row.id===this.native(id));
@@ -185,7 +191,7 @@ export class AcpRuntime {
   async createThread(project:ProjectRecord,_profile?:PermissionProfile,name?:string):Promise<ThreadStartResult> {
     const session=await this.open('',project.root,true);
     this.catalog.set(session.id,{nativeThreadId:session.id,cwd:project.root,title:name??this.provider,titleSource:'name',executionState:'idle',historyMode:'legacy'});
-    return {nativeThreadId:session.id,historyMode:'legacy',policyVerified:true,rawSummary:{provider:this.provider,...(session.configOptions.length?{configOptions:session.configOptions}:{})}};
+    return {nativeThreadId:session.id,historyMode:'legacy',policyVerified:true,rawSummary:{provider:this.provider,...(session.configOptions.length?{configOptions:session.configOptions}:{}),...(this.provider==='cursor'?{cursorOptions:session.cursorOptions}:{})}};
   }
   async readThread(id:string,metadataOnly=false):Promise<ThreadHistorySnapshot> {
     this.native(id);const managed=this.callbacks.findManagedThread(id),row=this.catalog.get(id);
@@ -196,7 +202,7 @@ export class AcpRuntime {
     return {nativeThreadId:id,cwd,historyMode:'legacy',executionState:session?.turnId?'running':session&&!session.lost?'idle':'unknown',updatedAt:null,items:metadataOnly?[]:session?.items??[]};
   }
   async resumeThread(id:string,project:ProjectRecord,sessionCwd?:string,_profile?:PermissionProfile):Promise<ThreadResumeResult> {
-    const session=await this.open(id,sessionCwd??project.root);return {nativeThreadId:id,policyVerified:true,rawSummary:{provider:this.provider,configOptions:session.configOptions},history:await this.readThread(id)};
+    const session=await this.open(id,sessionCwd??project.root);return {nativeThreadId:id,policyVerified:true,rawSummary:{provider:this.provider,configOptions:session.configOptions,...(this.provider==='cursor'?{cursorOptions:session.cursorOptions}:{})},history:await this.readThread(id)};
   }
   async unsubscribeThread(id:string) {
     const session=this.sessions.get(id);if(!session)return;
@@ -220,6 +226,17 @@ export class AcpRuntime {
       if(option?.values.includes(settings.mode))await apply(option.id,settings.mode);
     }
   }
+  private async applyCursorConfig(session:Session,settings:CursorSettings){
+    const entries=Object.entries(settings.options??{}).sort(([a],[b])=>Number(b==='model')-Number(a==='model'));
+    for(const [configId,value] of entries){
+      const option=session.cursorOptions.find(o=>o.id===configId);
+      if(!option?.values.some(o=>o.value===value))throw new AgentError('CURSOR_OPTION_UNAVAILABLE','Cursor 原生选项已变化，请重新读取会话配置');
+      const result=await session.connection.call('session/set_config_option',{sessionId:this.native(session.id),configId,value});
+      this.rememberOptions(session,result);
+      if(session.cursorOptions.find(o=>o.id===configId)?.current!==value)throw new AgentError('CURSOR_CONFIG_UNCONFIRMED','Cursor 未确认配置生效，任务未发送');
+    }
+    if(entries.some(([id,value])=>session.cursorOptions.find(o=>o.id===id)?.current!==value))throw new AgentError('CURSOR_CONFIG_UNCONFIRMED','Cursor 原生参数互相影响，请重新选择后发送');
+  }
   private async publishTool(session:Session,turnId:string,id:string,item:Record<string,unknown>) {
     if(!session.turnId||session.completed.has(id))return;
     const output=String(item.aggregatedOutput??'');
@@ -240,20 +257,26 @@ export class AcpRuntime {
       session.completed.add(id);
     }
   }
-  async startTurn(thread:ManagedThread,project:ProjectRecord,prompt:string,_messageId?:string,settings?:CodexSettings|GrokSettings,images?:string[],extras?:TurnExtras) {
+  async startTurn(thread:ManagedThread,project:ProjectRecord,prompt:string,_messageId?:string,settings?:CodexSettings|GrokSettings|CursorSettings,images?:string[],extras?:TurnExtras) {
     const grok=this.provider==='grok'?parseGrokSettings(settings):undefined;
+    const cursor=this.provider==='cursor'&&settings!==undefined?parseCursorSettings(settings):undefined;
     const blocked=Boolean(extras?.attachments?.length||extras?.pluginSkills?.length||extras?.outputSchema||extras?.goal);
-    const settingsRejected=this.provider==='grok'?Boolean(settings)&&!grok:Boolean(settings&&Object.keys(settings).length);
+    const settingsRejected=this.provider==='grok'?Boolean(settings)&&!grok:this.provider==='cursor'?settings!==undefined&&!cursor:Boolean(settings&&Object.keys(settings).length);
     if(blocked||settingsRejected)throw new AgentError('PROVIDER_INPUT_UNAVAILABLE','This provider currently accepts plain text with native settings only');
     const imageBlocks=acpImageBlocks(images);
     const desired=grok?.permissionMode??'default';
     const known=this.sessions.get(thread.nativeThreadId);
-    if(known&&!known.lost&&known.permissionMode!==desired)await this.unsubscribeThread(known.id);
+    if(this.provider==='grok'&&known&&!known.lost&&known.permissionMode!==desired)await this.unsubscribeThread(known.id);
     await this.deps.unoccupied(this.provider,this.owned);
     const session=await this.open(thread.nativeThreadId,thread.sessionCwd??project.root,false,grok);
     if(imageBlocks.length&&!session.imageInput)throw new AgentError('AGENT_IMAGE_UNSUPPORTED','当前智能体未提供可用的图片输入能力；图片未发送，请检查原生版本和模型');
     if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Native turn is already running');
     if(this.provider==='grok'&&grok)await this.applyConfig(session,grok);
+    if(this.provider==='cursor'){
+      if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Native turn is already running');
+      if(cursor)await this.applyCursorConfig(session,cursor);
+      session.permissionMode=cursor?.permissionMode??'default';
+    }
     const startedAt=Date.now();
     const turnId=randomUUID();session.turnId=turnId;session.cancelled=false;
     const itemId=`${turnId}:user`,item={id:itemId,type:'userMessage',content:[{type:'text',text:prompt},...(images??[]).map(url=>({type:'image',url}))]};
@@ -262,12 +285,22 @@ export class AcpRuntime {
     setImmediate(()=>{void session.connection.call('session/prompt',{sessionId:this.native(session.id),prompt:[{type:'text',text:prompt},...imageBlocks]},24*3600000).then(async result=>{
       if(session.lost||session.turnId!==turnId)return;
       if(!isRecord(result)||typeof result.stopReason!=='string')throw new AgentError('ACP_RESULT_INVALID','Missing native completion evidence');
-      const usage=this.provider==='grok'&&this.executable?await this.deps.readGrokUsage(this.executable,this.native(session.id),startedAt):acpUsage(result);
+      let usage=this.provider==='grok'&&this.executable?await this.deps.readGrokUsage(this.executable,this.native(session.id),startedAt):acpUsage(result);
       if(session.lost||session.turnId!==turnId)return;
-      if(usage&&this.provider==='grok')this.availability.capabilities.usage=true;
+      if(usage&&this.provider==='cursor'){
+        const meta=isRecord(result._meta)?result._meta:{};
+        const raw=isRecord(result.usage)?result.usage:isRecord(meta.usage)?meta.usage:{};
+        if(!isRecord(raw.total)){
+          const total={...usage.usage.last};
+          for(const key of Object.keys(total) as Array<keyof typeof total>)total[key]+=session.usageTotals?.[key]??0;
+          usage=Object.values(total).every(Number.isSafeInteger)?{usage:{total,last:usage.usage.last}}:undefined;
+        }
+        if(usage)session.usageTotals=usage.usage.total;
+      }
+      if(usage&&(this.provider==='grok'||this.provider==='cursor'))this.availability.capabilities.usage=true;
       if(usage)await this.callbacks.onEvent({type:'thread.usage',nativeThreadId:session.id,nativeTurnId:turnId,payload:usage},this.appServerEpoch);
       await this.flush(session,turnId);delete session.turnId;this.resolvePending(session);
-      await this.callbacks.onEvent({type:'turn.completed',nativeThreadId:session.id,nativeTurnId:turnId,payload:{turn:{id:turnId,status:result.stopReason==='end_turn'?'completed':result.stopReason==='cancelled'?'interrupted':'failed'},stopReason:result.stopReason,...(session.configOptions.length?{configOptions:session.configOptions}:{})}},this.appServerEpoch);
+      await this.callbacks.onEvent({type:'turn.completed',nativeThreadId:session.id,nativeTurnId:turnId,payload:{turn:{id:turnId,status:result.stopReason==='end_turn'?'completed':result.stopReason==='cancelled'?'interrupted':'failed'},stopReason:result.stopReason,...(session.configOptions.length?{configOptions:session.configOptions}:{}),...(this.provider==='cursor'?{cursorOptions:session.cursorOptions}:{})}},this.appServerEpoch);
     }).catch(async()=>{if(!session.lost){session.lost=true;this.resolvePending(session);session.connection.close();await this.callbacks.onThreadExit?.(session.id,this.appServerEpoch,'Native result unknown; request was not replayed');}});});
     return {nativeTurnId:turnId,status:'inProgress'};
   }
@@ -395,6 +428,10 @@ export class AcpRuntime {
     if(!kind)throw new AgentError('ACP_METHOD_UNAVAILABLE','Native client request is unsupported');
     const thread=this.callbacks.findManagedThread(session.id);if(!thread)throw new AgentError('ACP_UNMANAGED','Session no longer managed');
     const options=Array.isArray(params.options)?params.options.filter(isRecord):[];
+    if(this.provider==='cursor'&&kind==='permission'&&session.permissionMode==='always'){
+      const once=options.find(o=>o.kind==='allow_once'&&typeof o.optionId==='string');
+      if(once)return {outcome:{outcome:'selected',optionId:once.optionId}};
+    }
     let questions:InputQuestion[]|undefined;
     let nativeQuestions:Array<Record<string,unknown>>|undefined;
     if(kind==='question') {

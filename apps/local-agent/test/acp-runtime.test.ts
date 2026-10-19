@@ -19,7 +19,7 @@ if(Number(process.env.ACP_TEST_EXIT_DELAY)>0){
  const keepAlive=setInterval(()=>{},1000);
  process.on('SIGTERM',()=>setTimeout(()=>{clearInterval(keepAlive);process.exit(0);},Number(process.env.ACP_TEST_EXIT_DELAY)));
 }
-let promptId, sessionId='synthetic-session', requestKind;
+let promptId, sessionId='synthetic-session', requestKind, cursorModel='grok-4', cursorMode='agent';
 readline.createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line);
  if(m.id===991 && !m.method) { send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:JSON.stringify(m.result)}}}});send({id:promptId,result:{stopReason:'end_turn'}});return; }
@@ -34,13 +34,16 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
    return;
  case '_x.ai/billing':{const at=Date.now();send({id:m.id,result:{config:{creditUsagePercent:25,currentPeriod:{start:new Date(at-86400000).toISOString(),end:new Date(at+6*86400000).toISOString()}}}});break;}
  case 'session/list':send({id:m.id,result:{sessions:[{sessionId,cwd:process.env.ACP_TEST_CWD??process.cwd(),title:'Synthetic'}]}});break;
- case 'session/new':send({id:m.id,result:{sessionId,configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'}]}});break;
- case 'session/load':if(process.env.ACP_TEST_IMAGES==='yes')send({method:'session/update',params:{sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='}}}});send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Retained history'}}}});send({id:m.id,result:{configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'}]}});break;
+ case 'session/new':send({id:m.id,result:{sessionId,configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'},...(process.env.ACP_TEST_PROVIDER==='cursor'?[{id:'mode',options:['agent','plan','ask'],currentValue:'agent'}]:[])]}});break;
+ case 'session/load':if(process.env.ACP_TEST_IMAGES==='yes')send({method:'session/update',params:{sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='}}}});send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Retained history'}}}});send({id:m.id,result:{configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'},...(process.env.ACP_TEST_PROVIDER==='cursor'?[{id:'mode',options:['agent','plan','ask'],currentValue:'agent'}]:[])]}});break;
+ case 'cursor/list_available_models':send({id:m.id,result:{models:[{value:'grok-4',name:'Cursor test model',configOptions:[]}]}});break;
  case 'session/set_config_option':
    if(typeof m.params.value!=='string'||!['model','reasoning_effort','mode'].includes(m.params.configId)){process.exit(9);return;}
+   if(process.env.ACP_TEST_PROVIDER==='cursor'){if(m.params.configId==='model')cursorModel=m.params.value;if(m.params.configId==='mode')cursorMode=m.params.value;send({id:m.id,result:{configOptions:[{id:'model',currentValue:cursorModel,options:['grok-4','grok-4.6']},{id:'mode',currentValue:cursorMode,options:['agent','plan','ask']}]}});break;}
    send({id:m.id,result:{configOptions:[{id:m.params.configId,currentValue:m.params.value,options:[m.params.value]}]}});break;
  case 'session/prompt':
    promptId=m.id;requestKind=m.params.prompt[0].text;
+   if(requestKind==='cursor-settings'){send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'configured'}}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
    if(requestKind==='images'||requestKind===''){send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:JSON.stringify(m.params.prompt)}}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
    if(requestKind==='disconnect'){process.exit(7);return;}
    if(requestKind==='wait')return;
@@ -96,7 +99,7 @@ async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]=
      let alive=false;try{process.kill(connection.pid,0);alive=true;}catch{}
      if(alive)throw new AgentError('PROVIDER_NATIVE_BUSY','Owned child was forgotten before process exit');
    }
- },connection:options=>{environments.push(options.env);counts.connections++;launches.push(options.args);const child=new AcpConnection({...options,env:{...process.env,ACP_TEST_CWD:project.root,ACP_TEST_IMAGES:images?'yes':'no',ACP_TEST_EXIT_DELAY:String(exitDelay)}});children.push(child);return child;}});
+ },connection:options=>{environments.push(options.env);counts.connections++;launches.push(options.args);const child=new AcpConnection({...options,env:{...process.env,ACP_TEST_PROVIDER:provider,ACP_TEST_CWD:project.root,ACP_TEST_IMAGES:images?'yes':'no',ACP_TEST_EXIT_DELAY:String(exitDelay)}});children.push(child);return child;}});
  t.after(async()=>{await runtime.stop();await rm(dir,{recursive:true,force:true});});
  await runtime.start();const created=await runtime.createThread(project);
  thread={nativeThreadId:created.nativeThreadId,projectId:project.id,appServerEpoch:'epoch-test',policyVersion:'remote-restricted-v1',policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),historyMode:'legacy'} as ManagedThread;
@@ -353,4 +356,45 @@ test('Cursor terminal discovery, takeover and continuation keep provider, native
  assert.equal(f.environments.at(-1)?.CURSOR_CONFIG_DIR,f.project.root);assert.deepEqual(f.prepared,['synthetic-session']);
  await f.runtime.startTurn(f.thread,f.project,'hello');await until(()=>f.events.some(e=>e.type==='turn.completed'));
  assert.ok(f.events.every(e=>e.nativeThreadId===f.thread.nativeThreadId));
+});
+
+
+test('Cursor native config survives resume, applies before prompt, and never borrows Grok settings',async t=>{
+ const f=await fixture(t,'cursor');
+ await f.runtime.listThreads();
+ assert.equal(f.runtime.availability.cursorModels?.[0]?.name,'Cursor test model');
+ const resumed=await f.runtime.resumeThread(f.thread.nativeThreadId,f.project);
+ assert.ok((resumed.rawSummary?.cursorOptions as unknown[])?.length);
+ await assert.rejects(f.runtime.startTurn(f.thread,f.project,'cursor-settings',undefined,{options:{model:'unknown'}}),{code:'CURSOR_OPTION_UNAVAILABLE'});
+ assert.equal(f.events.some(e=>e.type==='item.completed'&&(e.payload.item as {type?:string})?.type==='userMessage'),false);
+ await f.runtime.startTurn(f.thread,f.project,'cursor-settings',undefined,{options:{model:'grok-4',mode:'plan'}});
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ const options=f.events.find(e=>e.type==='turn.completed')?.payload.cursorOptions as Array<{id:string;current:string}>;
+ assert.equal(options.find(o=>o.id==='mode')?.current,'plan');
+ assert.equal(f.events.some(e=>e.type==='thread.usage'),false);
+});
+
+test('Cursor per-session allow uses one-time native permissions; resets on next turn',async t=>{
+ const f=await fixture(t,'cursor');
+ await f.runtime.startTurn(f.thread,f.project,'permission',undefined,{permissionMode:'always'});
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.equal(f.approvals.length,0);
+ assert.ok(f.events.some(e=>String((e.payload.item as {text?:string})?.text).includes('"optionId":"one"')));
+ assert.ok(!f.events.some(e=>String((e.payload.item as {text?:string})?.text).includes('"optionId":"all"')));
+ await f.runtime.startTurn(f.thread,f.project,'permission');
+ await until(()=>f.approvals.length===1);
+ await f.runtime.respondApproval(f.approvals[0]!,'decline');
+ await until(()=>f.events.filter(e=>e.type==='turn.completed').length===2);
+});
+
+
+test('Cursor flat per-turn usage accumulates actual counts instead of losing equal consecutive turns',async t=>{
+ const f=await fixture(t,'cursor');
+ for(let i=1;i<=2;i++){
+  await f.runtime.startTurn(f.thread,f.project,'tools');
+  await until(()=>f.events.filter(e=>e.type==='turn.completed').length===i);
+ }
+ const usage=f.events.filter(e=>e.type==='thread.usage').map(e=>e.payload.usage as {total:{totalTokens:number};last:{totalTokens:number}});
+ assert.deepEqual(usage.map(u=>u.total.totalTokens),[5,10]);
+ assert.deepEqual(usage.map(u=>u.last.totalTokens),[5,5]);
 });

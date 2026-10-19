@@ -17,6 +17,7 @@ import { VoicePreferencesService } from "./voice-preferences.js";
 import { PanelVoiceService } from "./panel-voice.js";
 import { NativeVoiceService, validVoiceOffer, VOICE_CONTROL_TTL_SECONDS, type VoiceBinding } from "./native-voice.js";
 import {ClaudePreferencesService} from "./claude-preferences.js";
+import {CursorPreferencesService} from "./cursor-preferences.js";
 import {GrokPreferencesService} from "./grok-preferences.js";
 import { AdministrationService } from "./administration.js";
 import { createWorldWeather } from "./world-weather.js";
@@ -1543,6 +1544,10 @@ export async function buildControlPlane(
     new ClaudePreferencesService(db).read(request.principal as Principal,routeId(request)));
   app.put("/api/sessions/:id/claude-settings", {preHandler:mutate}, async request =>
     new ClaudePreferencesService(db).write(request.principal as Principal,routeId(request),record(request.body)));
+  app.get("/api/sessions/:id/cursor-settings", {preHandler:authenticate}, async request =>
+    new CursorPreferencesService(db).read(request.principal as Principal,routeId(request)));
+  app.put("/api/sessions/:id/cursor-settings", {preHandler:mutate}, async request =>
+    new CursorPreferencesService(db).write(request.principal as Principal,routeId(request),record(request.body)));
   app.get("/api/sessions/:id/grok-settings", {preHandler:authenticate}, async request =>
     new GrokPreferencesService(db).read(request.principal as Principal,routeId(request)));
   app.put("/api/sessions/:id/grok-settings", {preHandler:mutate}, async request =>

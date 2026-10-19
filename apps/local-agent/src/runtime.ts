@@ -8,6 +8,7 @@ import { PanelVoiceRuntime } from "./panel-voice.js";
 import { parseOutputSchema } from "./output-schema.js";
 import { parseHostCodexOperation, parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, parseReviewTarget, parseForkRange } from "./codex-operations.js";
 import { parseClaudeSettings } from "./claude-settings.js";
+import {parseCursorSettings} from "./cursor-settings.js";
 import { parseGrokSettings } from "./acp-updates.js";
 import { readNativeSessionCwd, readNativeUsage } from "./native-usage.js";
 import { nativeImageCleanup } from "./native-image-cleanup.js";
@@ -975,7 +976,7 @@ export class AgentRuntime {
       if (isAcpProvider(project.provider)) {
         if (!['thread.claim','thread.release','turn.start','turn.queue','turn.steer','turn.cancel','approval.decide_once','input.respond'].includes(command.type)) throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Unsupported native operation');
         const grokSettings=project.provider==='grok'?parseGrokSettings(command.payload.settings):undefined;
-        const settingsRejected=project.provider==='grok'?command.payload.settings!==undefined&&!grokSettings:command.payload.settings!==undefined;
+        const settingsRejected=project.provider==='grok'?command.payload.settings!==undefined&&!grokSettings:project.provider==='cursor'?command.payload.settings!==undefined&&!parseCursorSettings(command.payload.settings):command.payload.settings!==undefined;
         if (settingsRejected || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');
       }
 
@@ -1701,6 +1702,7 @@ export class AgentRuntime {
             managementRevision: thread.managementRevision,
             codexProfileId: thread.codexProfileId,
             sessionCwd,
+            ...(project.provider==="cursor"?{effectivePolicy:resumed.rawSummary}:{}),
           },
         });
         const importedItems = await this.syncManagedHistory(thread, resumed.history, true);
@@ -1774,7 +1776,7 @@ export class AgentRuntime {
         const prompt = nativeAction ? "" : requireString(command.payload.prompt, "payload.prompt", { allowEmpty: images.length > 0 || rawAttachments.length > 0 || plugins.length > 0 || pluginSkills.length > 0, maxLength: 200_000 });
         const grokTurn=project.provider==="grok"?parseGrokSettings(command.payload.settings):undefined;
         if(project.provider==="grok"&&command.payload.settings!==undefined&&!grokTurn)throw new AgentError("AGENT_INPUT_UNSUPPORTED","Only text with native settings is supported");
-        const settings = isClaudeProject(project) ? parseClaudeSettings(command.payload.settings) : project.provider==="grok" ? grokTurn : isAcpProvider(project.provider) ? undefined : validateSettings(command.payload.settings, server.getCodexCatalog?.());
+        const settings = isClaudeProject(project) ? parseClaudeSettings(command.payload.settings) : project.provider==="grok" ? grokTurn : project.provider==="cursor" ? parseCursorSettings(command.payload.settings) : isAcpProvider(project.provider) ? undefined : validateSettings(command.payload.settings, server.getCodexCatalog?.());
         const profile = permissionProfile(command.payload.permissionProfile);
         if (command.precondition.executionSegmentId !== command.executionSegmentId) {
           throw new AgentError("PRECONDITION_INVALID", "execution segment precondition does not match the command");

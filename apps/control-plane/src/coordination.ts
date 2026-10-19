@@ -7,6 +7,8 @@ import { parseCodexOperation, readOnlyCodexOperation, liveCodexOperation, saniti
 import {ClaudePreferencesService} from "./claude-preferences.js";
 import {parseClaudeMetadata} from "./claude-metadata.js";
 import { parseClaudeSettings, supportsClaudeControls } from "./claude-settings.js";
+import {CursorPreferencesService} from "./cursor-preferences.js";
+import {parseCursorSettings} from "./cursor-settings.js";
 import { GrokPreferencesService } from "./grok-preferences.js";
 import { grokSettingsActive, parseGrokSettings, supportsGrokControls } from "./grok-settings.js";
 import { UsageService } from "./usage.js";
@@ -564,7 +566,7 @@ export class CoordinationService {
         const raw = this.db.get<{discovery_json:string|null}>("SELECT discovery_json FROM machines WHERE machine_id=?",session.machine_id);
         invariant(supportsProviderCommand(JSON.parse(raw?.discovery_json ?? '{}')?.agentRuntimes?.[session.provider],input.type,Boolean(session.native_thread_id)),409,'AGENT_CAPABILITY_UNAVAILABLE','Official CLI has not reported support for this operation');
         if (session.provider === "grok" && payload.settings !== undefined && !parseGrokSettings(payload.settings)) invariant(false,400,"GROK_SETTINGS_INVALID","Unsupported Grok Build settings");
-        invariant((session.provider === "grok" || payload.settings === undefined) && payload.outputSchema === undefined && payload.goal === undefined && payload.nativeCollaboration === undefined && !['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(payload[key]) && (payload[key] as unknown[]).length),400,'AGENT_INPUT_UNSUPPORTED','This provider currently accepts text using its native settings');
+        invariant((session.provider === "grok" || session.provider === "cursor" || payload.settings === undefined) && payload.outputSchema === undefined && payload.goal === undefined && payload.nativeCollaboration === undefined && !['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(payload[key]) && (payload[key] as unknown[]).length),400,'AGENT_INPUT_UNSUPPORTED','This provider currently accepts text using its native settings');
       }
       invariant(!blocksDuringMaintenance(session.maintenance_json,input.type),409,"MACHINE_DRAINING",MAINTENANCE_MESSAGE);
       if (session.provider === "codex" && (input.type === "turn.start" || input.type === "turn.queue")) {
@@ -588,12 +590,17 @@ export class CoordinationService {
           payload.settings=saved.settings;
         }
       }
+      if(session.provider==='cursor'&&(input.type==='turn.start'||input.type==='turn.queue')&&payload.settings===undefined){
+        const saved=new CursorPreferencesService(this.db).read(principal,logicalSessionId);
+        if(saved.settings&&(Object.keys(saved.settings.options??{}).length||saved.settings.permissionMode==='always'))payload.settings=saved.settings;
+      }
       if (payload.settings !== undefined) {
 
         invariant(input.type === "turn.start" || input.type === "turn.queue", 400, "CODEX_SETTINGS_ACTION_DENIED", "Settings can only apply when starting a new turn");
         const machine = this.db.get<{ codex_catalog_json: string | null; agent_version:string;discovery_json:string|null }>("SELECT codex_catalog_json,agent_version,discovery_json FROM machines WHERE machine_id=?", session.machine_id);
         if(session.provider === "claude") { invariant(supportsClaudeControls(machine?.agent_version),409,"CLAUDE_AGENT_UPDATE_REQUIRED","Claude Code 原生控制需要 Agent 0.30.57 或更新版本"); try {parseClaudeSettings(payload.settings);} catch {invariant(false,400,"CLAUDE_SETTINGS_INVALID","Unsupported Claude Code settings");} }
         else if(session.provider === "grok") { invariant(supportsGrokControls(machine?.agent_version),409,"GROK_AGENT_UPDATE_REQUIRED","Update the host Agent before configuring Grok Build"); invariant(parseGrokSettings(payload.settings),400,"GROK_SETTINGS_INVALID","Unsupported Grok Build settings"); }
+        else if(session.provider==='cursor') { invariant(parseCursorSettings(payload.settings),400,'CURSOR_SETTINGS_INVALID','Unsupported Cursor settings');new CursorPreferencesService(this.db).validate(principal,logicalSessionId,payload.settings); }
         else validateCodexSettings(payload.settings, machine?.codex_catalog_json ? parseCodexCatalog(JSON.parse(machine.codex_catalog_json)) : null);
         if(session.provider === "claude") {
           const selected=parseClaudeSettings(payload.settings)?.permissionMode;
@@ -2674,6 +2681,9 @@ export class CoordinationService {
       }
       if (recognized && event.type === "thread.usage" && !staleContentEpoch && !staleAppServerEpoch && !tombstoneAtIngress && session.sync_content === 1 && requestedPayloadState === "present") {
         new UsageService(this.db).record(event);
+      }
+      if(recognized&&!staleContentEpoch&&!staleAppServerEpoch&&!tombstoneAtIngress&&['thread.started','thread.claimed','turn.completed'].includes(event.type)){
+        new CursorPreferencesService(this.db).record(event.logicalSessionId,event.payload,event.occurredAt);
       }
       const record = this.getEventRecord(event.eventId);
       return {

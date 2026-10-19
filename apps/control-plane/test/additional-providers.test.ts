@@ -8,6 +8,7 @@ import {loadConfig} from '../src/config.js';
 import {AuthService} from '../src/auth.js';
 import {RegistryService} from '../src/registry.js';
 import {CoordinationService} from '../src/coordination.js';
+import {CursorPreferencesService} from '../src/cursor-preferences.js';
 import {GrokPreferencesService} from '../src/grok-preferences.js';
 import {sessionActions} from '../src/capabilities.js';
 import {ACP_PROVIDER_IDS,unavailableCapabilities} from '../src/provider-catalog.js';
@@ -85,7 +86,7 @@ test('schema 61 runtime-operation migration preserves existing receipts and inde
  f.db.run(`INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at,result_json) VALUES('old-operation','m',?,?,'unique-mutation','catalog.refresh','succeeded',?,?,?,?)`,f.principal.workspaceId,f.principal.clientSessionId,at,at,at,JSON.stringify({kept:true}));
  const schema=f.db.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")!.sql;const indexes=f.db.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='machine_operations' AND type='index' AND sql IS NOT NULL");
  f.db.transaction(()=>{f.db.sqlite.exec('ALTER TABLE machine_operations RENAME TO old_ops');f.db.sqlite.exec(schema.replace(",'provider.runtime'",''));f.db.sqlite.exec('INSERT INTO machine_operations SELECT * FROM old_ops; DROP TABLE old_ops');for(const index of indexes)f.db.sqlite.exec(index.sql);f.db.sqlite.exec('PRAGMA user_version=61');});f.db.close();
- const upgraded=new ControlPlaneDatabase(path);t.after(()=>upgraded.close());assert.equal(upgraded.get<{user_version:number}>('PRAGMA user_version')?.user_version,64);
+ const upgraded=new ControlPlaneDatabase(path);t.after(()=>upgraded.close());assert.equal(upgraded.get<{user_version:number}>('PRAGMA user_version')?.user_version,65);
  assert.equal(upgraded.get<{result_json:string}>("SELECT result_json FROM machine_operations WHERE operation_id='old-operation'")?.result_json,JSON.stringify({kept:true}));
  assert.ok(upgraded.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")?.sql.includes("'provider.runtime'"));assert.equal(upgraded.all('PRAGMA foreign_key_check').length,0);
  for(const index of indexes)assert.ok(upgraded.get('SELECT 1 FROM sqlite_master WHERE sql=?',index.sql));
@@ -187,4 +188,21 @@ for(const provider of ['grok','claude'] as const)test(`${provider} append requir
  f.coordination.createCommand(f.principal,s.logicalSessionId,input);
  assert.equal(f.coordination.createCommand(f.principal,s.logicalSessionId,input).duplicate,true);
  assert.equal(f.db.get<{n:number}>("SELECT count(*) n FROM commands WHERE type='turn.steer'")?.n,1);
+});
+
+
+test('Cursor saved native options enter start commands without changing other providers',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.db.run("UPDATE machines SET agent_version='0.30.127'");
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{cursor:{...ready,cursorModels:[{value:'cursor-native',name:'Native Cursor',configOptions:[]}],grokSecret:'never-forward'}}});
+ const stored=JSON.parse(f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json);
+ assert.equal(stored.agentRuntimes.cursor.cursorModels[0].value,'cursor-native');assert.equal(stored.agentRuntimes.cursor.grokSecret,undefined);
+ const s=f.registry.createSession(f.principal,'m','cursor',undefined,'cursor-prefs');
+ const prefs=new CursorPreferencesService(f.db);
+ prefs.write(f.principal,s.logicalSessionId,{revision:0,settings:{options:{model:'cursor-native'},permissionMode:'always'}});
+ const lease=f.coordination.acquireLease(f.principal,s.logicalSessionId);
+ f.coordination.createCommand(f.principal,s.logicalSessionId,{type:'turn.start',controlLeaseId:lease.leaseId,clientMutationId:'cursor-start',payload:{prompt:'synthetic'},precondition:{executionSegmentId:s.executionSegmentId,threadControlVersion:s.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:s.projectLeaseVersion}});
+ const command=f.db.get<{payload_json:string}>("SELECT cc.body_json AS payload_json FROM commands c JOIN command_contents cc USING(command_id) WHERE client_mutation_id='cursor-start'")!;
+ assert.deepEqual(JSON.parse(command.payload_json).settings,{options:{model:'cursor-native'},permissionMode:'always'});
+ assert.equal(f.db.all('PRAGMA foreign_key_check').length,0);
 });
