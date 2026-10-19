@@ -33,7 +33,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
    if(m.params.text==='finish'){send({id:promptId,result:{stopReason:'end_turn'}});}
    return;
  case '_x.ai/billing':{const at=Date.now();send({id:m.id,result:{config:{creditUsagePercent:25,currentPeriod:{start:new Date(at-86400000).toISOString(),end:new Date(at+6*86400000).toISOString()}}}});break;}
- case 'session/list':send({id:m.id,result:{sessions:[{sessionId,cwd:process.cwd(),title:'Synthetic'}]}});break;
+ case 'session/list':send({id:m.id,result:{sessions:[{sessionId,cwd:process.env.ACP_TEST_CWD??process.cwd(),title:'Synthetic'}]}});break;
  case 'session/new':send({id:m.id,result:{sessionId,configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'}]}});break;
  case 'session/load':if(process.env.ACP_TEST_IMAGES==='yes')send({method:'session/update',params:{sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='}}}});send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Retained history'}}}});send({id:m.id,result:{configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'}]}});break;
  case 'session/set_config_option':
@@ -86,20 +86,21 @@ async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]=
  let thread:ManagedThread|undefined;
  const callbacks:AppServerCallbacks={findManagedThread:id=>thread?.nativeThreadId===id?thread:undefined,findProject:()=>project,onEvent:async e=>{events.push(e);},onEvents:async batch=>{batches.push(batch);events.push(...batch);for(const watch of batchWatchers)watch();},onVolatile:e=>{volatiles.push(e);},onApproval:async a=>{approvals.push(a);},onApprovalResolved:async()=>{},onExit:async()=>{},onThreadExit:async id=>{exits.push(id);}};
  const counts={connections:0};
+ let terminalRows:import('../src/cursor-sessions.js').CursorTerminalSession[]=[];const prepared:string[]=[];const environments:Array<NodeJS.ProcessEnv|undefined>=[];
  let ownershipFailure:AgentError|undefined;
  const children:AcpConnection[]=[];
- const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{readGrokUsage:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async(_provider,owned)=>{
+ const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{cursorSessions:async()=>terminalRows,prepareCursor:async row=>{prepared.push(row.id);},readGrokUsage:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async(_provider,owned)=>{
    if(ownershipFailure)throw ownershipFailure;
    // Model the actual OS process scan, including children still exiting.
    for(const connection of children)if(connection.pid&&!owned.has(connection.pid)){
      let alive=false;try{process.kill(connection.pid,0);alive=true;}catch{}
      if(alive)throw new AgentError('PROVIDER_NATIVE_BUSY','Owned child was forgotten before process exit');
    }
- },connection:options=>{counts.connections++;launches.push(options.args);const child=new AcpConnection({...options,env:{...process.env,ACP_TEST_IMAGES:images?'yes':'no',ACP_TEST_EXIT_DELAY:String(exitDelay)}});children.push(child);return child;}});
+ },connection:options=>{environments.push(options.env);counts.connections++;launches.push(options.args);const child=new AcpConnection({...options,env:{...process.env,ACP_TEST_CWD:project.root,ACP_TEST_IMAGES:images?'yes':'no',ACP_TEST_EXIT_DELAY:String(exitDelay)}});children.push(child);return child;}});
  t.after(async()=>{await runtime.stop();await rm(dir,{recursive:true,force:true});});
  await runtime.start();const created=await runtime.createThread(project);
  thread={nativeThreadId:created.nativeThreadId,projectId:project.id,appServerEpoch:'epoch-test',policyVersion:'remote-restricted-v1',policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),historyMode:'legacy'} as ManagedThread;
- return {runtime,thread,project,events,batches,batchWatchers,volatiles,approvals,exits,counts,launches,children,setOwnershipFailure:(error:AgentError|undefined)=>{ownershipFailure=error;}};
+ return {runtime,thread,project,prepared,environments,setTerminalRows:(rows:typeof terminalRows)=>{terminalRows=rows;},events,batches,batchWatchers,volatiles,approvals,exits,counts,launches,children,setOwnershipFailure:(error:AgentError|undefined)=>{ownershipFailure=error;}};
 }
 test('closing catalog children stay owned and cannot cause a false external-writer refusal',{skip:process.platform==='win32'},async t=>{
  const f=await fixture(t,'grok',false,250);
@@ -337,4 +338,19 @@ test('Grok native interject targets the existing turn, rejects stale input and p
 test('other ACP providers cannot borrow Grok native steering',async t=>{
  const f=await fixture(t,'qwen');assert.equal(f.runtime.availability.capabilities.steer,false);
  await assert.rejects(f.runtime.steerTurn(f.thread,'turn','hello'),/unavailable/);
+});
+
+test('Cursor terminal discovery, takeover and continuation keep provider, native ID and config root',async t=>{
+ const f=await fixture(t,'cursor');await f.runtime.unsubscribeThread(f.thread.nativeThreadId);
+ f.setTerminalRows([{id:'synthetic-session',cwd:f.project.root,title:'Terminal Cursor session',root:f.project.root,directory:f.project.root,database:join(f.project.root,'native.db'),updatedAt:1}]);
+ const rows=await f.runtime.listThreads();assert.equal(rows.find(r=>r.nativeThreadId===f.thread.nativeThreadId)?.title,'Terminal Cursor session');
+ assert.equal(f.prepared.length,0,'Discovery is read-only');
+ f.setOwnershipFailure(new AgentError('PROVIDER_NATIVE_BUSY','Native terminal still open'));
+ await assert.rejects(f.runtime.resumeThread(f.thread.nativeThreadId,f.project),{code:'PROVIDER_NATIVE_BUSY'});assert.equal(f.prepared.length,0);
+ f.setOwnershipFailure(undefined);
+ const resumed=await f.runtime.resumeThread(f.thread.nativeThreadId,f.project);
+ assert.equal(resumed.nativeThreadId,f.thread.nativeThreadId);assert.ok(JSON.stringify(resumed.history.items).includes('Retained history'));
+ assert.equal(f.environments.at(-1)?.CURSOR_CONFIG_DIR,f.project.root);assert.deepEqual(f.prepared,['synthetic-session']);
+ await f.runtime.startTurn(f.thread,f.project,'hello');await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.ok(f.events.every(e=>e.nativeThreadId===f.thread.nativeThreadId));
 });

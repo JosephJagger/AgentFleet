@@ -61,29 +61,43 @@ export async function detectAcp(provider:AcpProviderId):Promise<AcpExecutable|nu
   }
   return null;
 }
+/** A live owned Cursor ACP process may spawn its own Node worker. Those are not external writers. */
+export function ownedProcessTree(rows:Array<{pid:number;ppid:number}>,owned:ReadonlySet<number>) {
+  const tree=new Set(owned);let changed=true;
+  while(changed){changed=false;for(const row of rows)if(row.ppid>0&&tree.has(row.ppid)&&!tree.has(row.pid)){tree.add(row.pid);changed=true;}}
+  return tree;
+}
+export function isCursorNativeCommand(args:string) {
+  const tokens=args.match(/"[^"]*"|'[^']*'|\S+/g)??[];
+  return tokens.slice(0,2).some(token=>/(?:^|\/)cursor-agent(?:\/versions\/[^/]+\/(?:node|index\.js|cursor-agent(?:-sea)?)|(?:-sea)?)$/i.test(token.replace(/^['"]|['"]$/g,'').replaceAll('\\','/')));
+}
 /** Conservative across the host when native per-session ownership cannot be established. */
 export async function assertAcpUnoccupied(provider:AcpProviderId,owned:Set<number>):Promise<void> {
   const config=ACP_COMMANDS[provider];
-  let rows:Array<{pid:number;exe:string;args:string}>;
+  const ownedAtScan=new Set(owned);
+  let rows:Array<{pid:number;ppid:number;exe:string;args:string}>;
   try {
     if(process.platform==='win32') {
-      const script='Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress';
+      const script='Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress';
       const result=await exec('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{timeout:15000,maxBuffer:8*1024*1024,windowsHide:true});
-      const data=JSON.parse(result.stdout);rows=(Array.isArray(data)?data:[data]).map(r=>({pid:Number(r.ProcessId),exe:String(r.ExecutablePath??''),args:String(r.CommandLine??'')}));
+      const data=JSON.parse(result.stdout);rows=(Array.isArray(data)?data:[data]).map(r=>({pid:Number(r.ProcessId),ppid:Number(r.ParentProcessId),exe:String(r.ExecutablePath??''),args:String(r.CommandLine??'')}));
     } else {
-      const result=await exec('ps',['-axo','pid=,comm=,args='],{timeout:10000,maxBuffer:8*1024*1024});
-      rows=result.stdout.split('\n').flatMap(line=>{const m=/^\s*(\d+)\s+(\S+)\s+(.*)$/.exec(line);return m?[{pid:Number(m[1]),exe:m[2]!,args:m[3]!}]:[];});
+      const result=await exec('ps',['-axo','pid=,ppid=,comm=,args='],{timeout:10000,maxBuffer:8*1024*1024});
+      rows=result.stdout.split('\n').flatMap(line=>{const m=/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);return m?[{pid:Number(m[1]),ppid:Number(m[2]),exe:m[3]!,args:m[4]!}]:[];});
     }
   }catch{throw new AgentError('PROVIDER_OWNERSHIP_UNKNOWN','Unable to verify native process ownership; write access remains disabled');}
+  const ownedTree=provider==='cursor'?ownedProcessTree(rows,new Set([...ownedAtScan,...owned])):owned;
   for(const row of rows) {
-    if(owned.has(row.pid)||row.pid===process.pid)continue;
+    if(ownedTree.has(row.pid)||row.pid===process.pid)continue;
     const base=row.exe.replaceAll('\\','/').split('/').pop()?.toLowerCase();
     const args=row.args.replaceAll('\\','/'),tokens=args.split(/\s+/).slice(0,3).map(t=>t.split('/').pop()?.toLowerCase().replace(/\.exe$/,''));
     const names=commandNames(config).map(n=>n.toLowerCase());
     const generic=Boolean(config.identify);
     const named=names.some(n=>base===n||base===`${n}.exe`||tokens[0]===n||(['node','node.exe','python','python3','bun','deno'].includes(base??'')&&tokens.slice(0,3).includes(n)));
     // Generic names only count when the command line also shows the vendor.
-    const native=(named&&(!generic||config.identify!.test(args)))||((base==='node'||base==='node.exe')&&config.npm.some(pkg=>args.includes(pkg+'/')));
+    const cursorBinary=provider==='cursor'&&isCursorNativeCommand(args);
+    const native=cursorBinary||(named&&(!generic||config.identify!.test(args)))||((base==='node'||base==='node.exe')&&config.npm.some(pkg=>args.includes(pkg+'/')));
+    if(native&&provider==='cursor')try{process.kill(row.pid,0);}catch(e){if((e as NodeJS.ErrnoException).code==='ESRCH')continue;}
     if(native)throw new AgentError('PROVIDER_NATIVE_BUSY','A native CLI may still own this session. Close that CLI before continuing in the panel.');
   }
 }

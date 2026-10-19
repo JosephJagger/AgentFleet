@@ -1,3 +1,4 @@
+import {listCursorTerminalSessions,prepareCursorTerminalSession} from './cursor-sessions.js';
 import {readGrokUsage} from './grok-usage.js';
 import {grokBillingQuota,type GrokQuota} from './grok-quota.js';
 import {AGENT_VERSION} from "./constants.js";
@@ -24,7 +25,7 @@ import type {CodexSettings} from './codex-settings.js';
 interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];published:Map<string,string>;completed:Set<string>;itemSizes:Map<string,number>;historyBytes:number;textPublishedAt:number;}
 interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan';questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
 function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)return {text:value,truncated:false};let text=Buffer.from(value).subarray(0,max).toString('utf8');if(text.endsWith('\uFFFD'))text=text.slice(0,-1);return {text,truncated:true};}
-const dependencies={detect:detectAcp,unoccupied:assertAcpUnoccupied,readGrokUsage,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
+const dependencies={cursorSessions:listCursorTerminalSessions,prepareCursor:prepareCursorTerminalSession,detect:detectAcp,unoccupied:assertAcpUnoccupied,readGrokUsage,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
 /** New providers have their own processes and cannot fall through to Codex methods. */
 export class AcpRuntime {
   availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[];quota?:GrokQuota}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
@@ -55,11 +56,11 @@ export class AcpRuntime {
   }
   async stop(){if([...this.sessions.values()].some(s=>s.turnId&&!s.lost))throw new AgentError("PROVIDER_TURN_ACTIVE","Finish native work before stopping");this.stopped=true;await Promise.all([...this.sessions.keys()].map(id=>this.unsubscribeThread(id)));await Promise.all([...this.connections].map(connection=>connection.closeAndWait()));}
   private native(id:string) {const parsed=decodeProviderThread(id);if(!parsed||parsed.provider!==this.provider)throw new AgentError('PROVIDER_ID_MISMATCH','Session belongs to another provider');return parsed.nativeId;}
-  private async connect(cwd:string,session?:Session,launchArgs?:string[]) {
+  private async connect(cwd:string,session?:Session,launchArgs?:string[],env?:NodeJS.ProcessEnv) {
     if(this.stopped)throw new AgentError("ACP_CLOSED","Provider runtime stopped");
     if(!this.executable)await this.start();if(this.stopped)throw new AgentError("ACP_CLOSED","Provider runtime stopped");if(!this.executable)throw new AgentError('PROVIDER_NOT_INSTALLED','Official CLI is not installed');
     let connection:AcpConnection;
-    connection=this.deps.connection({executable:this.executable.executable,args:launchArgs??[...this.executable.prefix,...ACP_COMMANDS[this.provider].args],cwd,
+    connection=this.deps.connection({executable:this.executable.executable,args:launchArgs??[...this.executable.prefix,...ACP_COMMANDS[this.provider].args],cwd,...(env?{env}:{}),
       notification:async(method,params)=>{if(session)await this.notification(session,method,params);},
       request:async(method,params)=>{if(!session)throw new AgentError('ACP_NO_SESSION','No session is authorized');return this.request(session,method,params);},
       processExited:()=>{
@@ -113,6 +114,11 @@ export class AcpRuntime {
         if(seen.has(result.nextCursor))throw new AgentError('ACP_CURSOR_REPEATED','Native session cursor repeated');seen.add(result.nextCursor);cursor=result.nextCursor;
       }
       if(!complete)throw new AgentError('ACP_CATALOG_LIMIT','Native catalog exceeds supported page limit');
+      if(this.provider==='cursor')for(const row of await this.deps.cursorSessions()) {
+        const id=encodeProviderThread('cursor',row.id),prior=this.catalog.get(id);
+        if(observed.has(id)&&prior&&resolve(prior.cwd)!==row.cwd)throw new AgentError('CURSOR_SESSION_CONFLICT','Cursor 原生目录存在冲突的会话工作区');
+        observed.add(id);this.catalog.set(id,{nativeThreadId:id,cwd:row.cwd,title:row.title,titleSource:'name',executionState:this.sessions.get(id)?.turnId?'running':unoccupied?'idle':'unknown',historyMode:'legacy'});
+      }
       for(const id of this.catalog.keys())if(!observed.has(id)&&!this.sessions.has(id))this.catalog.delete(id);
       return [...this.catalog.values()];
     }catch(error){if(error instanceof AgentError&&/\(-32000\)/.test(error.message))this.markFailure(error);throw error;}finally{connection.close();}
@@ -155,7 +161,17 @@ export class AcpRuntime {
     await Promise.all([...this.connections].filter(connection=>connection.closing).map(connection=>connection.closeAndWait()));
     await this.deps.unoccupied(this.provider,this.owned);
     const session={id,cwd,items:[],cancelled:false,loading:true,lost:false,permissionMode:settings?.permissionMode??'default',configOptions:[],published:new Map<string,string>(),completed:new Set<string>(),itemSizes:new Map<string,number>(),historyBytes:0,textPublishedAt:0} as unknown as Session;
-    session.connection=await this.connect(cwd,session,this.launchArgs(settings));
+    let env:NodeJS.ProcessEnv|undefined;
+    if(this.provider==='cursor'&&!fresh) {
+      const row=(await this.deps.cursorSessions()).find(row=>row.id===this.native(id));
+      if(row) {
+        if(row.cwd!==resolve(cwd))throw new AgentError('PROVIDER_CWD_CHANGED','Cursor 会话工作区已变化');
+        await this.start();
+        await this.deps.prepareCursor(row,this.executable?.version??'');
+        env={...process.env,CURSOR_CONFIG_DIR:row.root};
+      }
+    }
+    session.connection=await this.connect(cwd,session,this.launchArgs(settings),env);
     try {
       if(!fresh&&!this.availability.capabilities.resume)throw new AgentError('PROVIDER_RESUME_UNAVAILABLE','Native CLI does not support session restoration');
       const meta=fresh?grokSessionMeta(this.provider==='grok'?settings:undefined):undefined;
