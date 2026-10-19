@@ -1,9 +1,16 @@
 # Grok video output on B52H
 
-Grok Build supports user-managed S3 output with ZDR enabled. Native settings live in
-`$GROK_HOME/managed_config.toml` under `tools.zdr_video_output_s3`, with `bucket`,
-`endpoint`, `region`, `key_prefix`, `expires_secs`, and `read_write` / `read_only`
-credentials. Never commit credentials. Existing Grok processes must naturally end
+Grok Build supports user-managed S3 output with ZDR enabled. Native settings live under
+`tools.zdr_video_output_s3`, with `bucket`, `endpoint`, `region`, `key_prefix`,
+`expires_secs`, and `read_write` / `read_only` credentials.
+
+**Put this table in `$GROK_HOME/config.toml` (mode 0600), not in `managed_config.toml`.**
+xAI's page names `managed_config.toml`, but on a signed-in host Grok maintains that file
+itself from the account's synced managed settings (`settings_cache.json`, `grok setup`),
+and it was observed removed within the hour, after which video tools were again refused
+as ZDR. The config reference lists the key as user-settable, and `config.toml` is not
+rewritten by the sync. `grok inspect` does not show this table, so the only real check is
+the next native video task. A new Grok process is required to pick the change up. Never commit credentials. Existing Grok processes must naturally end
 and reopen to pick up configuration; do not kill active tasks or the shared leader.
 This does not enable data-sharing/training opt-in.
 
