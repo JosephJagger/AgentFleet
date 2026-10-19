@@ -204,7 +204,9 @@ export class AcpRuntime {
     if(!cwd)throw new AgentError('PROVIDER_SESSION_MISSING','Native session is not in the known catalog');
     let session=this.sessions.get(id);
     if(!metadataOnly&&(!session||session.lost))session=await this.open(id,cwd);
-    return {nativeThreadId:id,cwd,historyMode:'legacy',executionState:session?.turnId?'running':session&&!session.lost?'idle':'unknown',updatedAt:null,items:metadataOnly?[]:session?.items??[]};
+    // ACP replays chunks without durable turn/item IDs. Our `history:<index>`
+    // IDs differ from live turn UUIDs after each load, even if nothing changed.
+    return {nativeThreadId:id,cwd,historyMode:'legacy',itemIdStability:'snapshot',executionState:session?.turnId?'running':session&&!session.lost?'idle':'unknown',updatedAt:null,items:metadataOnly?[]:session?.items??[]};
   }
   async resumeThread(id:string,project:ProjectRecord,sessionCwd?:string,_profile?:PermissionProfile):Promise<ThreadResumeResult> {
     const session=await this.open(id,sessionCwd??project.root);return {nativeThreadId:id,policyVerified:true,rawSummary:{provider:this.provider,configOptions:session.configOptions,...(this.provider==='cursor'?{cursorOptions:session.cursorOptions}:{})},history:await this.readThread(id)};

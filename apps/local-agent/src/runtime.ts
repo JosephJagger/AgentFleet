@@ -1225,7 +1225,10 @@ export class AgentRuntime {
       const cursorIndex = snapshot.items.findIndex((entry) => entry.nativeItemId === current.historyCursor);
       if (cursorIndex >= 0) {
         startIndex = cursorIndex + 1;
-      } else if (snapshot.items.length > 0) {
+      } else if (snapshot.items.length > 0 && snapshot.itemIdStability !== "snapshot") {
+        // ACP replay IDs are synthesized afresh, so a missing live cursor is
+        // expected. Retain the conservative rebase (do not re-import history),
+        // but only diagnose a rewrite when the source supplies stable IDs.
         await this.emitForThread(current, {
           type: "agent.warning",
           nativeThreadId: current.nativeThreadId,

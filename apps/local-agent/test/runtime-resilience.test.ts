@@ -816,6 +816,43 @@ test("large claim imports release the writer first, yield to IO, and atomically 
   assert.equal(store.snapshot().managedThreads[nativeThreadId]?.historyCursor, "item-256");
 });
 
+for (const snapshotIds of [true, false]) test(`${snapshotIds ? "ACP replay" : "stable native"} history distinguishes routine ID remapping from a missing cursor`, async t => {
+  const { store, projects } = await fixture();
+  const project = projects[0]!;
+  const nativeThreadId = "history-identity-test";
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({store, identity, pairing, support, appServerFactory: callbacks => {
+    server = new FakeAppServer("epoch-history-identity", callbacks);
+    return server;
+  }});
+  t.after(async () => { await runtime.shutdown(); store.close(); });
+  await runtime.initialize();
+  await store.setManagedThread({nativeThreadId, projectId:project.id, logicalSessionId:"history-session",
+    executionSegmentId:"history-segment", appServerEpoch:server.appServerEpoch, policyVersion:"remote-restricted-v1",
+    policyVerified:true, contentEpoch:1, createdAt:new Date().toISOString()});
+  const snapshot: ThreadHistorySnapshot = {nativeThreadId, cwd:project.root, historyMode:"legacy", executionState:"idle",
+    updatedAt:null, ...(snapshotIds ? {itemIdStability:"snapshot" as const} : {}),
+    items:[{nativeTurnId:"history", nativeItemId:"history:0", item:{id:"history:0", type:"agentMessage", text:"Existing reply"}}]};
+  const sync = () => (runtime as unknown as {syncManagedHistory(thread:ManagedThread, snapshot:ThreadHistorySnapshot, importExisting:boolean):Promise<number>})
+    .syncManagedHistory(store.managedThread(nativeThreadId)!, snapshot, true);
+  assert.equal(await sync(), 1, "first claim still imports available history");
+  for (let round = 1; round <= 3; round++) {
+    const liveId = `live-turn-${round}:reply`;
+    await server.callbacks.onEvent({type:"item.completed", nativeThreadId, nativeTurnId:`live-turn-${round}`, nativeItemId:liveId,
+      payload:{item:{id:liveId, type:"agentMessage", text:`Reply ${round}`}}}, server.appServerEpoch);
+    assert.equal(store.managedThread(nativeThreadId)?.historyCursor, liveId);
+    snapshot.items.push({nativeTurnId:"history", nativeItemId:`history:${round}`, item:{id:`history:${round}`, type:"agentMessage", text:`Reply ${round}`}});
+    assert.equal(await sync(), 0, "restoration never imports the already delivered turn again");
+    assert.equal(store.managedThread(nativeThreadId)?.historyCursor, `history:${round}`);
+  }
+  const warnings = store.snapshot().outbox.filter(e => e.type === "agent.warning" && e.payload.code === "HISTORY_CURSOR_REBASED");
+  assert.equal(warnings.length, snapshotIds ? 0 : 3, "stable native IDs must retain the real missing-cursor warning");
+  snapshot.items.push({nativeTurnId:"history", nativeItemId:"history:4", item:{id:"history:4", type:"agentMessage", text:"New native reply"}});
+  assert.equal(await sync(), 1, "a matching checkpoint still imports new native history");
+  assert.equal(await sync(), 0, "repeated sync remains idempotent");
+  assert.equal(store.snapshot().outbox.filter(e => e.type === "item.completed").length, 5);
+});
+
 test("validated read-only discovery stays available without enabling writes", async () => {
   const { store, projects } = await fixture();
   const project = projects[0]!;

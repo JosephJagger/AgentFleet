@@ -185,6 +185,8 @@ export interface ThreadHistoryPage { items: ThreadHistoryItem[]; nextCursor: str
 export interface ThreadHistorySnapshot {
   rolloutPath?: string;
   paged?: boolean;
+  /** Snapshot-local IDs cannot prove that a missing live cursor means native history was rewritten. */
+  itemIdStability?: "snapshot";
   nativeThreadId: string;
   cwd: string;
   historyMode: "legacy" | "paginated";

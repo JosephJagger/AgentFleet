@@ -355,7 +355,7 @@ function toolResultText(value: unknown): string {
   return "";
 }
 
-function eventBody(item: JsonObject, payload: JsonObject): string | null {
+function eventBody(type: string, item: JsonObject, payload: JsonObject): string | null {
   if (item.type === "userMessage") {
     const body = list(item.content)
       .map((entry) => string(record(entry).text))
@@ -366,6 +366,7 @@ function eventBody(item: JsonObject, payload: JsonObject): string | null {
   if (item.type === "agentMessage" || item.type === "plan") return string(item.text) || null;
   if (item.type === "reasoning") return list(item.summary).map((entry) => string(entry)).filter(Boolean).join("\n") || string(item.text) || null;
   if (typeof payload.message === "string") return payload.message;
+  if (type === "agent.warning" && typeof payload.detail === "string") return payload.detail || null;
   return null;
 }
 
@@ -466,7 +467,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     title: commandFailure ? t("请求未执行成功") : eventTitle(type, item),
     ...(type === "thread.history.order" ? {historyOrder:list(payload.items).map(record).filter(x=>typeof x.itemId === "string" && Number.isSafeInteger(x.index)).map(x=>({itemId:String(x.itemId),index:Number(x.index),...(typeof x.occurredAt === "string" ? {occurredAt:x.occurredAt} : {})}))} : {}),
     images: list(item.content).map(record).filter(entry => entry.type === "image" && isInlineImage(entry.url)).slice(0, 4).map(entry => entry.url as string),
-    body: commandFailureBody ?? eventBody(item, payload),
+    body: commandFailureBody ?? eventBody(type, item, payload),
     payloadState: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? raw.payloadState : "present",
     status: commandFailure ? (payload.state === "unknown" ? "unknown" : "failed") : string(item.status, string(record(payload.turn).status)) || null,
     command: itemType === "commandExecution" ? string(item.command) || null : itemType === "mcpToolCall" ? string(record(item.arguments).command) || (item.tool === "tool result" ? null : string(item.tool)) || null : null,

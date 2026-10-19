@@ -150,6 +150,7 @@ for(const provider of ACP_PROVIDER_IDS)test(`${provider}: native ID, streamed te
  assert.equal(f.events.at(-1)?.nativeTurnId,turn.nativeTurnId);
  await f.runtime.unsubscribeThread(f.thread.nativeThreadId);
  const resumed=await f.runtime.resumeThread(f.thread.nativeThreadId,f.project);assert.equal(resumed.history.items[0]?.item?.text,'Retained history');
+ assert.equal(resumed.history.itemIdStability,'snapshot','ACP replay must not advertise stable native item IDs');
 });
 test('native permission accepts once, rejects stale replies and never selects allow-always',async t=>{
  const f=await fixture(t);await f.runtime.startTurn(f.thread,f.project,'permission');await until(()=>f.approvals.length===1);

@@ -7,6 +7,17 @@ import type { TimelineEvent } from "./lib/types";
 const start: TimelineEvent = { id: "start", type: "item.started", sessionSeq: 304, occurredAt: "2026-09-07T11:29:07Z", nativeThreadId: "thread", nativeTurnId: "turn", nativeItemId: "item", actor: "user", body: "这是什么图片", payloadState: "present", images: ["image"] };
 const done: TimelineEvent = { ...start, id: "done", type: "item.completed", sessionSeq: 305 };
 
+it("displays agent warning details without exposing structured metadata or unrelated command details", () => {
+  const detail = "宿主机历史发生压缩或重写；已重新建立同步游标，旧内容不会重复导入";
+  const warning = mapEvent({ type: "agent.warning", payload: { code: "HISTORY_CURSOR_REBASED", detail, invalidatedApprovalIds: ["internal-id"] } });
+  expect(warning).toMatchObject({ title: "Agent 警告", actor: "system", body: detail });
+  expect(timelineItems([warning])[0].body).toBe(detail);
+  expect(JSON.stringify(warning)).not.toContain("internal-id");
+  expect(mapEvent({ type: "agent.warning", payload: { message: "Public warning", detail } }).body).toBe("Public warning");
+  expect(mapEvent({ type: "agent.warning", payload: { detail: { internal: "not for display" } } }).body).toBeNull();
+  expect(mapEvent({ type: "command.result", payload: { detail: "internal command detail" } }).body).toBeNull();
+});
+
 it.each(['THREAD_WRITER_BUSY','PROVIDER_NATIVE_BUSY','PROVIDER_OWNERSHIP_UNKNOWN'])("shows preflight refusal %s in chat, including Buzhoushan",code=>{
   const event=mapEvent({type:'command.result',payload:{state:'applied',commandType:'turn.start',detail:{code,message:'native refusal',private:'not for display'}}});
   expect(event).toMatchObject({title:'请求未执行成功',status:'failed'});
