@@ -1,4 +1,5 @@
 import {parseGrokQuota} from './grok-quota.js';
+import {parseCursorQuota} from './cursor-quota.js';
 import { isProviderId, type ProviderId } from "./provider-catalog.js";
 import { parseClaudeMetadata } from "./claude-metadata.js";
 import type { ControlPlaneDatabase } from "./db.js";
@@ -97,8 +98,9 @@ export class UsageService {
       const machines=this.db.all<{machine_id:string;name:string;discovery_json:string|null}>("SELECT machine_id,name,discovery_json FROM machines WHERE workspace_id=? AND identity_state='active'",workspaceId);
       for(const machine of machines) {
         if(!machineIds.has(machine.machine_id))continue;
-        const quota=parseGrokQuota(JSON.parse(machine.discovery_json??'{}').agentRuntimes?.grok?.quota);
-        if(quota&&(provider==='grok'||quota.sharedSubscription))accounts.push({...(quota.sharedSubscription?{sharedSubscription:quota.sharedSubscription}:{}),sourceMachine:machine.name,identityKnown:!!quota.sharedSubscription,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180000||quota.windows.some(w=>w.resetsAt*1000<=Date.now()),windows:quota.windows,credits:null,resetCardsAvailable:null});
+        const runtimes=JSON.parse(machine.discovery_json??'{}').agentRuntimes;
+        const quota=provider==='grok'?parseGrokQuota(runtimes?.grok?.quota):parseCursorQuota(runtimes?.cursor?.cursorQuota);
+        if(quota)accounts.push({sourceMachine:machine.name,identityKnown:false,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180000||quota.windows.some(w=>w.resetsAt*1000<=Date.now()),...('planName' in quota&&quota.planName?{subscriptionType:quota.planName}:{}),windows:quota.windows,credits:null,resetCardsAvailable:null});
       }
     }
     const weekly = accounts.flatMap(account => account.windows.filter((w: { bucket: string; windowMinutes: number; resetsAt: number | null }) =>

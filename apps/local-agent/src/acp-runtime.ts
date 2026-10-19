@@ -1,6 +1,6 @@
 import {parseCursorOptions,parseCursorModels,parseCursorSettings,type CursorOption,type CursorModel,type CursorSettings} from './cursor-settings.js';
 import {listCursorTerminalSessions,prepareCursorTerminalSession} from './cursor-sessions.js';
-import {verifySharedSubscription,grokCredentialStamp} from './shared-subscription.js';
+import {readCursorQuota,type CursorQuota} from './cursor-quota.js';
 import {readGrokUsage} from './grok-usage.js';
 import {grokBillingQuota,type GrokQuota} from './grok-quota.js';
 import {AGENT_VERSION} from "./constants.js";
@@ -30,7 +30,7 @@ function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)retur
 const dependencies={cursorSessions:listCursorTerminalSessions,prepareCursor:prepareCursorTerminalSession,detect:detectAcp,unoccupied:assertAcpUnoccupied,readGrokUsage,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
 /** New providers have their own processes and cannot fall through to Codex methods. */
 export class AcpRuntime {
-  availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[];quota?:GrokQuota;cursorModels?:CursorModel[]}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
+  availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[];quota?:GrokQuota;cursorQuota?:CursorQuota;cursorModels?:CursorModel[]}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
   private executable:AcpExecutable|null=null;
   private executableStamp=-1;
   private readonly sessions=new Map<string,Session>();
@@ -87,7 +87,7 @@ export class AcpRuntime {
       catch(error){steer=error instanceof AgentError && error.code==='ACP_REMOTE_ERROR' && error.message.includes('(-32602)');}
       const images=acpImageInput(this.provider,this.executable.version,init);
       if(session)session.imageInput=images;
-      this.availability={...(this.availability.quota?{quota:this.availability.quota}:{}),...(this.provider==='cursor'&&this.availability.cursorModels?{cursorModels:this.availability.cursorModels}:{}),installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),steer,models:models.length>0||this.provider==='cursor'&&!!this.availability.cursorModels?.length,usage:(this.provider==='grok'||this.provider==='cursor')&&this.availability.capabilities.usage,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
+      this.availability={...(this.availability.quota?{quota:this.availability.quota}:{}),...(this.provider==='cursor'&&this.availability.cursorQuota?{cursorQuota:this.availability.cursorQuota}:{}),...(this.provider==='cursor'&&this.availability.cursorModels?{cursorModels:this.availability.cursorModels}:{}),installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),steer,models:models.length>0||this.provider==='cursor'&&!!this.availability.cursorModels?.length,usage:(this.provider==='grok'||this.provider==='cursor')&&this.availability.capabilities.usage,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
       return connection;
     } catch(error) {connection.close();this.markFailure(error);throw error;}
   }
@@ -100,12 +100,13 @@ export class AcpRuntime {
   }
   async listThreads():Promise<DiscoveredThreadSummary[]> {
     await this.start();if(!this.executable)return [];
-    const credentialStamp=this.provider==='grok'?await grokCredentialStamp():undefined;
     const connection=await this.connect(homedir());
     try {
-      if(this.provider==='grok')await this.refreshGrokQuota(connection,credentialStamp);
+      if(this.provider==='grok')await this.refreshGrokQuota(connection);
       if(this.provider==='cursor'&&Date.now()-this.quotaCheckedAt>=120000){
         this.quotaCheckedAt=Date.now();
+        // Account allowance is not an ACP method; Cursor's own account service reports it for the logged-in principal.
+        try {const quota=await readCursorQuota();if(quota)this.availability.cursorQuota=quota;else delete this.availability.cursorQuota;}catch{/* Keep the timestamped prior observation; failure is never zero quota. */}
         try {const result=await connection.call('cursor/list_available_models',{},15000);const models=parseCursorModels(isRecord(result)?result.models:undefined);if(models.length){this.availability.cursorModels=models;this.availability.capabilities.models=true;}}catch{/* Optional extension: leave settings unavailable, never borrow Grok models. */}
       }
       if(!this.availability.capabilities.discover)return [...this.catalog.values()];
@@ -130,20 +131,16 @@ export class AcpRuntime {
       return [...this.catalog.values()];
     }catch(error){if(error instanceof AgentError&&/\(-32000\)/.test(error.message))this.markFailure(error);throw error;}finally{connection.close();}
   }
-  private async refreshGrokQuota(connection:AcpConnection,credentialStamp?:string) {
+  private async refreshGrokQuota(connection:AcpConnection) {
     if(this.quotaReading)return this.quotaReading;
     if(Date.now()-this.quotaCheckedAt<120000)return;
     this.quotaCheckedAt=Date.now();
     this.quotaReading=(async()=>{
       try {
         // ACP extension methods carry an underscore on the JSON-RPC wire.
-        const billing=await connection.call('_x.ai/billing',{},3000);
-        const quota=grokBillingQuota(billing);
-        if(quota){
-          if(isRecord(billing)&&isRecord(billing.config)&&billing.config.isUnifiedBillingUser===true&&credentialStamp){const shared=await verifySharedSubscription({expectedGrokStamp:credentialStamp});if(shared)quota.sharedSubscription=shared;}
-          this.availability.quota=quota;
-        }else if(this.availability.quota)delete this.availability.quota.sharedSubscription;
-      }catch{if(this.availability.quota)delete this.availability.quota.sharedSubscription;/* Never retain a cross-provider association after failure. */}
+        const quota=grokBillingQuota(await connection.call('_x.ai/billing',{},3000));
+        if(quota)this.availability.quota=quota;
+      }catch{/* Keep the timestamped prior observation; failure is never zero quota. */}
     })().finally(()=>{this.quotaReading=undefined;});
     return this.quotaReading;
   }

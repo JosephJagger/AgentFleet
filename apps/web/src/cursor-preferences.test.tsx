@@ -29,7 +29,7 @@ it('changing the Cursor model clears incompatible parameters and requires explic
  fireEvent.change(screen.getByLabelText('Cursor 会话权限'),{target:{value:'always'}});
  fireEvent.click(screen.getByRole('button',{name:'保存'}));
  await waitFor(()=>expect(onSave).toHaveBeenCalledWith({options:{model:'small'},permissionMode:'always'}));
- await waitFor(()=>expect(screen.getByText(/未确认 Cursor 与 Grok 属于同一共享订阅账号/)).toBeTruthy());
+ await waitFor(()=>expect(screen.getByText(/未读取到 Cursor 账号额度/)).toBeTruthy());
  expect(screen.getByText(/已记录消耗.*原生未上报/)).toBeTruthy();
 });
 it('old hosts show the upgrade condition and cannot save configuration',()=>{
@@ -37,19 +37,23 @@ it('old hosts show the upgrade condition and cannot save configuration',()=>{
  expect((screen.getByLabelText('Cursor 模型') as HTMLSelectElement).disabled).toBe(true);
  expect(api.usage).not.toHaveBeenCalled();
 });
-it('shows verified shared quota without borrowing Grok token totals',async()=>{
+it('shows Cursor account quota from its own account service without any Grok association',async()=>{
  const at=new Date().toISOString();
- vi.mocked(api.usage).mockResolvedValue({recorded:null,last:null,accounts:[{sourceMachine:'B52H',identityKnown:true,observedAt:at,stale:false,sharedSubscription:{source:'grok-native',verifiedAt:at,expiresAt:new Date(Date.now()+180000).toISOString()},windows:[{bucket:'grok',window:'primary',usedPercent:4,remainingPercent:96,windowMinutes:10080,resetsAt:Math.floor(Date.now()/1000)+86400}]}]} as never);
+ vi.mocked(api.usage).mockResolvedValue({recorded:null,last:null,accounts:[{sourceMachine:'B52H',identityKnown:false,subscriptionType:'Super',observedAt:at,stale:false,windows:[{bucket:'cursor',window:'primary',usedPercent:4.6,remainingPercent:95.4,windowMinutes:10080,resetsAt:Math.floor(Date.now()/1000)+86400}]}]} as never);
  render(<CursorControls sessionId="s" {...catalog} settings={{}} ready error="" disabled={false} visible onReload={()=>{}} onSave={vi.fn()}/>);
- await waitFor(()=>expect(screen.getByText('已用 4% · 剩余 96%')).toBeTruthy());
+ await waitFor(()=>expect(screen.getByText('已用 4.6% · 剩余 95.4%')).toBeTruthy());
+ expect(screen.getByText(/Super · 账号额度/)).toBeTruthy();
  expect(screen.getByText(/已记录消耗.*原生未上报/)).toBeTruthy();
- expect(screen.getByText(/来源：Grok 原生账单/)).toBeTruthy();
+ expect(screen.queryByText(/Grok/)).toBeNull();
  expect(api.usage).toHaveBeenCalledWith('session','s',expect.any(AbortSignal),'cursor');
 });
-it('removes shared quota when its identity proof expires even without a new response',async()=>{
- vi.useFakeTimers();const at=new Date().toISOString();
- vi.mocked(api.usage).mockResolvedValue({recorded:null,last:null,accounts:[{sourceMachine:'B52H',identityKnown:true,observedAt:at,stale:false,sharedSubscription:{source:'grok-native',verifiedAt:at,expiresAt:new Date(Date.now()+1000).toISOString()},windows:[{bucket:'grok',window:'primary',usedPercent:4,remainingPercent:96,windowMinutes:10080,resetsAt:Math.floor(Date.now()/1000)+86400}]}]} as never);
+it('marks stale Cursor quota and explains a missing one',async()=>{
+ const at=new Date(Date.now()-600000).toISOString();
+ vi.mocked(api.usage).mockResolvedValue({recorded:null,last:null,accounts:[{sourceMachine:'B52H',identityKnown:false,observedAt:at,stale:true,windows:[{bucket:'cursor',window:'primary',usedPercent:4,remainingPercent:96,windowMinutes:10080,resetsAt:Math.floor(Date.now()/1000)+86400}]}]} as never);
+ const view=render(<CursorControls sessionId="s" {...catalog} settings={{}} ready error="" disabled={false} visible onReload={()=>{}} onSave={vi.fn()}/>);
+ await waitFor(()=>expect(screen.getByText(/数据已过期/)).toBeTruthy());
+ view.unmount();
+ vi.mocked(api.usage).mockResolvedValue({recorded:null,last:null,accounts:[]} as never);
  render(<CursorControls sessionId="s" {...catalog} settings={{}} ready error="" disabled={false} visible onReload={()=>{}} onSave={vi.fn()}/>);
- await act(async()=>{await vi.advanceTimersByTimeAsync(1);});expect(screen.getByText('已用 4% · 剩余 96%')).toBeTruthy();
- await act(async()=>{await vi.advanceTimersByTimeAsync(1001);});expect(screen.queryByText('已用 4% · 剩余 96%')).toBeNull();expect(screen.getByText(/未确认 Cursor 与 Grok/)).toBeTruthy();
+ await waitFor(()=>expect(screen.getByText(/未读取到 Cursor 账号额度/)).toBeTruthy());
 });

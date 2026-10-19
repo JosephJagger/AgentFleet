@@ -10,9 +10,6 @@ import { locale, t } from "../i18n";
 const cacheRate=(input:number|null|undefined,cached:number|null|undefined)=>input&&cached!=null?cached/input*100:null;
 export function UsageButton({scope,id,onSession,provider="codex",compactQuota=false}:{compactQuota?:boolean;provider?:ProviderId;scope:"session"|"project"|"machine";id:string;onSession?:(id:string)=>void}) {
   const [data,setData]=useState<UsageSummary>();const [failed,setFailed]=useState(false);const [open,setOpen]=useState(false);
-  useEffect(()=>{const times=data?.accounts?.flatMap(a=>a.sharedSubscription?[Date.parse(a.sharedSubscription.expiresAt)]:[])??[];if(!times.length)return;
-    const timer=window.setTimeout(()=>setData(d=>d?{...d,accounts:d.accounts.flatMap(a=>{if(!a.sharedSubscription||Date.parse(a.sharedSubscription.expiresAt)>Date.now())return [a];if(provider==='cursor')return [];const {sharedSubscription,...rest}=a;return [{...rest,identityKnown:false}];})}:d),Math.max(0,Math.min(...times)-Date.now())+1);return()=>window.clearTimeout(timer);
-  },[data,provider]);
   const [refreshing,setRefreshing]=useState(false);const [refreshNotice,setRefreshNotice]=useState("");
   const dialog=useRef<HTMLDialogElement>(null);
   const [mobile,setMobile]=useState(()=>window.matchMedia?.("(max-width: 900px)").matches??false);
@@ -54,7 +51,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
   const date=(s:string)=>new Date(s).toLocaleString(locale());
   const creditBalance=(value:string)=>{const parsed=Number(value);return Number.isFinite(parsed)?new Intl.NumberFormat(locale(),{maximumFractionDigits:20}).format(parsed):value;};
   const creditText=(credits:UsageSummary["accounts"][number]["credits"])=>credits?.unlimited?t("不限"):credits?.balance!=null?t("{0} 点",creditBalance(credits.balance)):credits?.hasCredits===false?t("无可用点数"):t("未提供");
-  const weekly=data?.accounts.flatMap(a=>a.windows.filter(w=>w.windowMinutes===10080 && (w.bucket===provider || provider==="cursor"&&!!a.sharedSubscription)).map(w=>({w,a})))??[];
+  const weekly=data?.accounts.flatMap(a=>a.windows.filter(w=>w.windowMinutes===10080 && (w.bucket===provider)).map(w=>({w,a})))??[];
   const fiveHour=data?.accounts.flatMap(a=>a.windows.filter(w=>w.windowMinutes===300&&w.bucket===provider))??[];
   const accountCredits=data?.accounts.length===1?data.accounts[0]?.credits:null;
   const showCreditBalance=Boolean(accountCredits?.unlimited || (accountCredits?.balance!=null && Number(accountCredits.balance)>0));
@@ -117,12 +114,12 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
         <section><h3>{t("账号额度（共享）")}</h3>
           {scope==="machine"&&codex&&<button type="button" className="button button--quiet" disabled={refreshing} onClick={()=>void refreshHost()}>{t("刷新额度")}</button>}
           {refreshNotice&&<p role="status">{refreshNotice}</p>}
-          {!data?.accounts.length&&<p>{t(claude ? "Claude Code 未返回订阅额度；请确认宿主机已登录，且原生版本支持额度查询。" : grok ? "Grok 未返回账号额度；请确认主机已登录 Grok，并使用支持额度查询的版本。" : provider === "cursor" ? "未确认 Cursor 与 Grok 属于同一共享订阅账号，暂不显示共享额度。" : "账号额度未上报；需要支持额度查询的 Codex 认证。")}</p>}
+          {!data?.accounts.length&&<p>{t(claude ? "Claude Code 未返回订阅额度；请确认宿主机已登录，且原生版本支持额度查询。" : grok ? "Grok 未返回账号额度；请确认主机已登录 Grok，并使用支持额度查询的版本。" : provider === "cursor" ? "Cursor 未返回账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。" : "账号额度未上报；需要支持额度查询的 Codex 认证。")}</p>}
           {data?.accounts.map((account,i)=><div className="usage-account" key={i}>
             <p>{account.sourceMachine} · {t("更新于 {0}",date(account.observedAt))}{(account.stale||Date.now()-Date.parse(account.observedAt)>180_000)&&<strong> · {t("数据已过期")}</strong>}</p>
             {claude&&<p>{account.subscriptionType ? `${account.subscriptionType.toUpperCase()} · ` : ""}{t("由宿主机 Claude Code 原生查询")}</p>}
-            {account.sharedSubscription&&<p>{t("共享订阅额度 · 来源：Grok 原生账单，已核对 Cursor 与 Grok 账号。")}</p>}
-            {grok&&!account.sharedSubscription&&<p>{t("由宿主机 Grok 原生查询，后台定期刷新。")}</p>}
+            {grok&&<p>{t("由宿主机 Grok 原生查询，后台定期刷新。")}</p>}
+            {provider==="cursor"&&<p>{account.subscriptionType?`${account.subscriptionType} · `:""}{t("由宿主机 Cursor 账号接口查询，后台定期刷新。")}</p>}
             {codex&&<div className="usage-credit"><strong>{t("点数余额")}</strong><span>{creditText(account.credits)}</span></div>}
             {!account.windows.length&&<p>{t("当前认证未返回额度窗口。")}</p>}
             {account.windows.map(w=><div className="usage-window" key={`${w.bucket}:${w.window}`}><div><strong>{w.windowMinutes===10080?t("周额度"):w.windowMinutes===300?t("5 小时额度"):t("{0} 分钟额度",w.windowMinutes)} · {w.bucket === "claude" ? "Claude Code" : w.bucket}</strong><span>{t("已用 {0}% · 剩余 {1}%",w.usedPercent,w.remainingPercent)}</span></div><progress max={100} value={w.usedPercent} aria-label={t("额度已用比例")}/><small>{w.resetsAt?t("重置于 {0}",date(new Date(w.resetsAt*1000).toISOString())):t("重置时间未上报")}</small></div>)}

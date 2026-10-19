@@ -3804,12 +3804,13 @@
   "用量读取失败，请重新打开会话配置。": "Unable to read usage. Reopen session settings to retry.",
   "最近一轮消耗": "Latest turn usage",
   "账号剩余额度": "Remaining account quota",
-  "当前 Cursor ACP 未提供账号额度查询，无法显示剩余数量。": "Current Cursor ACP does not provide account quota queries, so remaining quota is unavailable.",
   "用量更新于 {0}": "Usage observed at {0}",
   "用量只统计实际收到的原生数据，不估算未上报的历史，也不将上下文占用视为计费消耗。额度是账号共享数据，不能在会话中修改。": "Usage includes native reports received here. Unreported history is not estimated, and context occupancy is not billed usage. Account quota is shared and cannot be changed in a session.",
   "原生未上报": "Not reported by native agent",
   "已保存，下一轮任务生效。": "Saved. Applies to the next turn.",
   "Cursor 原生切换也会记住主机端的默认模型；其他面板会话仍优先使用各自保存的模型。": "Cursor also remembers the selection as the host’s native default. Other panel sessions still use their own saved models first.",
-  "共享订阅额度 · 来源：Grok 原生账单，已核对 Cursor 与 Grok 账号。": "Shared subscription allowance · Source: Grok native billing; Cursor and Grok account identities verified.",
-  "未确认 Cursor 与 Grok 属于同一共享订阅账号，暂不显示共享额度。": "Cursor and Grok have not been verified as the same shared subscription account. Shared allowance is unavailable."
+  "由宿主机 Cursor 账号接口查询，后台定期刷新。": "Queried from the host's Cursor account service; refreshed in the background.",
+  "Cursor 未返回账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。": "Cursor returned no account allowance. Confirm the host is logged in with a Cursor account (no custom API key or endpoint).",
+  "账号额度 · 来源：Cursor 账号接口。": "Account allowance · Source: Cursor account service.",
+  "未读取到 Cursor 账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。": "Cursor account allowance unavailable. Confirm the host is logged in with a Cursor account (no custom API key or endpoint)."
 }

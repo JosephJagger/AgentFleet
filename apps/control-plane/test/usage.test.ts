@@ -299,18 +299,21 @@ test('Grok usage survives smaller subsequent turns and native process reconnect;
  assert.equal(service.read(workspaceId,'session','b1').accounts.length,0);
 });
 
-test('verified subscription quota is shared with Cursor, never Grok session tokens; expired proof fails closed',t=>{
+test('Cursor quota comes from its own account report, never from Grok; malformed reports are ignored',t=>{
  const {db,workspaceId,service}=fixture();t.after(()=>db.close());
- db.run("UPDATE projects SET provider='grok' WHERE project_id='p-a'");
- service.record(event('a1',100,5));
  const at=new Date().toISOString(),reset=Math.floor(Date.now()/1000)+86400;
- const quota={observedAt:at,sharedSubscription:{source:'grok-native',verifiedAt:at,expiresAt:new Date(Date.now()+180000).toISOString()},windows:[{bucket:'grok',window:'primary',usedPercent:4,remainingPercent:96,windowMinutes:10080,resetsAt:reset}]};
- const set=()=>db.run("UPDATE machines SET discovery_json=? WHERE machine_id='a'",JSON.stringify({agentRuntimes:{grok:{quota}}}));set();
- const cursor=service.read(workspaceId,'machine','a','cursor');
- assert.equal(cursor.accounts[0]?.windows[0].remainingPercent,96);assert.equal(cursor.recorded,null);
- assert.equal(cursor.accounts[0]?.identityKnown,true);
- assert.equal(service.read(workspaceId,'machine','b','cursor').accounts.length,0);
- quota.sharedSubscription.expiresAt=new Date(Date.now()-1).toISOString();set();
+ const grok={observedAt:at,windows:[{bucket:'grok',window:'primary',usedPercent:40,remainingPercent:60,windowMinutes:10080,resetsAt:reset}]};
+ const cursorQuota={observedAt:at,planName:'Super',windows:[{bucket:'cursor',window:'primary',usedPercent:4.6,remainingPercent:95.4,windowMinutes:10080,resetsAt:reset}]};
+ const set=(runtimes:unknown)=>db.run("UPDATE machines SET discovery_json=? WHERE machine_id='a'",JSON.stringify({agentRuntimes:runtimes}));
+ set({grok:{quota:grok}});
  assert.equal(service.read(workspaceId,'machine','a','cursor').accounts.length,0);
- assert.equal(service.read(workspaceId,'machine','a','grok').accounts.length,1);
+ set({grok:{quota:grok},cursor:{cursorQuota}});
+ const cursor=service.read(workspaceId,'machine','a','cursor').accounts as Array<{windows:Array<{remainingPercent:number}>;subscriptionType?:string;identityKnown:boolean}>;
+ assert.equal(cursor.length,1);assert.equal(cursor[0]?.windows[0]?.remainingPercent,95.4);assert.equal(cursor[0]?.subscriptionType,'Super');assert.equal(cursor[0]?.identityKnown,false);
+ assert.equal(service.read(workspaceId,'machine','a','grok').accounts[0]?.windows[0]?.remainingPercent,60);
+ assert.equal(service.read(workspaceId,'machine','b','cursor').accounts.length,0);
+ set({cursor:{cursorQuota:{...cursorQuota,windows:[{...cursorQuota.windows[0],usedPercent:140}]}}});
+ assert.equal(service.read(workspaceId,'machine','a','cursor').accounts.length,0);
+ set({cursor:{cursorQuota:{...cursorQuota,windows:[{...cursorQuota.windows[0],bucket:'grok'}]}}});
+ assert.equal(service.read(workspaceId,'machine','a','cursor').accounts.length,0);
 });
