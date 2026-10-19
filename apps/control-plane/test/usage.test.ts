@@ -312,6 +312,7 @@ test('Cursor quota comes from its own account report, never from Grok; malformed
  assert.equal(cursor.length,1);assert.equal(cursor[0]?.windows[0]?.remainingPercent,95.4);assert.equal(cursor[0]?.subscriptionType,'Super');assert.equal(cursor[0]?.identityKnown,false);
  assert.equal(service.read(workspaceId,'machine','a','grok').accounts[0]?.windows[0]?.remainingPercent,60);
  assert.equal(service.read(workspaceId,'machine','b','cursor').accounts.length,0);
+ for(const state of ['login_required','missing','error','unverified']){set({cursor:{state,cursorQuota}});assert.equal(service.read(workspaceId,'machine','a','cursor').accounts.length,0);}
  set({cursor:{cursorQuota:{...cursorQuota,windows:[{...cursorQuota.windows[0],usedPercent:140}]}}});
  assert.equal(service.read(workspaceId,'machine','a','cursor').accounts.length,0);
  set({cursor:{cursorQuota:{...cursorQuota,windows:[{...cursorQuota.windows[0],bucket:'grok'}]}}});

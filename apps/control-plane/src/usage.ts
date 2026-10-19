@@ -99,6 +99,7 @@ export class UsageService {
       for(const machine of machines) {
         if(!machineIds.has(machine.machine_id))continue;
         const runtimes=JSON.parse(machine.discovery_json??'{}').agentRuntimes;
+        if(provider==='cursor'&&['login_required','missing','error','unverified'].includes(runtimes?.cursor?.state))continue;
         const quota=provider==='grok'?parseGrokQuota(runtimes?.grok?.quota):parseCursorQuota(runtimes?.cursor?.cursorQuota);
         if(quota)accounts.push({sourceMachine:machine.name,identityKnown:false,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180000||quota.windows.some(w=>w.resetsAt*1000<=Date.now()),...('planName' in quota&&quota.planName?{subscriptionType:quota.planName}:{}),windows:quota.windows,credits:null,resetCardsAvailable:null});
       }

@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {homedir,platform} from 'node:os';
 import {join} from 'node:path';
@@ -26,22 +27,32 @@ export function cursorUsageQuota(usage:unknown,plan:unknown,observedAt=new Date(
   return {observedAt,...(name?{planName:name}:{}),windows:[{bucket:'cursor',window:'primary',usedPercent:used,remainingPercent:100-used,windowMinutes:minutes,resetsAt:Math.floor(resets/1000)}]};
 }
 /** undefined: no verifiable native login (logged out, custom credentials). Throws on transient failures so callers keep the prior timestamped observation. */
-export async function readCursorQuota(options:{read?:typeof readFile;fetch?:typeof fetch;env?:NodeJS.ProcessEnv;home?:string}={}):Promise<CursorQuota|undefined> {
+export async function readCursorQuota(options:{read?:typeof readFile;fetch?:typeof fetch;env?:NodeJS.ProcessEnv;home?:string;onIdentity?:(key:string|undefined)=>void}={}):Promise<CursorQuota|undefined> {
   const env=options.env??process.env,read=options.read??readFile,request=options.fetch??fetch;
-  if(OVERRIDES.some(key=>env[key]))return;
+  if(OVERRIDES.some(key=>env[key])){options.onIdentity?.(undefined);return;}
   const path=cursorAuthPath(options.home??homedir(),env);
-  let auth:unknown;try{auth=JSON.parse(String(await read(path,'utf8')));}catch{return;}
-  if(!isRecord(auth)||auth.apiKey||typeof auth.accessToken!=='string'||!auth.accessToken)return;
-  const headers={Authorization:`Bearer ${auth.accessToken}`,'Content-Type':'application/json','Connect-Protocol-Version':'1'};
+  const readAuth=async()=>{try{const value:unknown=JSON.parse(String(await read(path,'utf8')));return isRecord(value)&&!value.apiKey&&typeof value.accessToken==='string'&&value.accessToken?value.accessToken:undefined;}catch{return undefined;}};
+  const token=await readAuth();
+  // This credential-generation fingerprint is process-local, never reported as account identity.
+  const key=token?createHash('sha256').update(token).digest('hex'):undefined;
+  options.onIdentity?.(key);
+  if(!token)return;
+  const headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json','Connect-Protocol-Version':'1'};
   const signal=AbortSignal.timeout(5000);
   const call=(method:string)=>request(`${SERVICE}/${method}`,{method:'POST',headers,body:'{}',signal,redirect:'error'});
-  const [usage,plan]=await Promise.all([call('GetCurrentPeriodUsage'),call('GetPlanInfo')]);
-  if(usage.status===401||usage.status===403)return;
-  if(!usage.ok)throw new Error(`Cursor usage HTTP ${usage.status}`);
-  const [usageBody,planBody]:unknown[]=await Promise.all([usage.json(),plan.ok?plan.json():undefined]);
-  // A login switch while the request was in flight would attribute the numbers to the wrong account.
-  try{const after=JSON.parse(String(await read(path,'utf8')));if(!isRecord(after)||after.accessToken!==auth.accessToken)return;}catch{return;}
-  const quota=cursorUsageQuota(usageBody,planBody);
-  if(!quota)throw new Error('Cursor usage response not recognised');
-  return quota;
+  try {
+    // Plan metadata is optional. Its network/JSON failure cannot override usage authentication.
+    const planResult=call('GetPlanInfo').then(async r=>r.ok?await r.json():undefined).catch(()=>undefined);
+    const usage=await call('GetCurrentPeriodUsage');
+    if(usage.status===401||usage.status===403){options.onIdentity?.(undefined);return;}
+    if(!usage.ok)throw new Error(`Cursor usage HTTP ${usage.status}`);
+    const usageBody:unknown=await usage.json(),planBody:unknown=await planResult;
+    if(await readAuth()!==token){options.onIdentity?.(undefined);return;}
+    const quota=cursorUsageQuota(usageBody,planBody);
+    if(!quota)throw new Error('Cursor usage response not recognised');
+    return quota;
+  } finally {
+    // Also revoke a retained observation if logout/account switch happens during a failed request.
+    if(OVERRIDES.some(k=>env[k])||await readAuth()!==token){options.onIdentity?.(undefined);return;}
+  }
 }

@@ -19,3 +19,6 @@ export interface UsageSummary {
   resetRadar?:{state:"unconfigured"|"pending"|"ready"|"error";checkedAt:string|null;nextCheckAt:string|null;timeline:{id:string;publishedAt:string;summary:string;signal:string;condition?:string;sourceUrl:string}[]};
   resetPrediction?:ResetPrediction|null;
 }
+
+/** Display precision only; raw native percentages remain unchanged for calculations. */
+export const formatQuotaPercent=(value:number,language?:string)=>new Intl.NumberFormat(language,{maximumFractionDigits:1}).format(value);

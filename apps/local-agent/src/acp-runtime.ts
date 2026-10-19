@@ -27,7 +27,7 @@ import type {CodexSettings} from './codex-settings.js';
 interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];cursorOptions:CursorOption[];published:Map<string,string>;completed:Set<string>;itemSizes:Map<string,number>;historyBytes:number;textPublishedAt:number;usageTotals?:import('./acp-updates.js').TokenCounts;}
 interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan';questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
 function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)return {text:value,truncated:false};let text=Buffer.from(value).subarray(0,max).toString('utf8');if(text.endsWith('\uFFFD'))text=text.slice(0,-1);return {text,truncated:true};}
-const dependencies={cursorSessions:listCursorTerminalSessions,prepareCursor:prepareCursorTerminalSession,detect:detectAcp,unoccupied:assertAcpUnoccupied,readGrokUsage,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
+const dependencies={cursorSessions:listCursorTerminalSessions,prepareCursor:prepareCursorTerminalSession,detect:detectAcp,unoccupied:assertAcpUnoccupied,readGrokUsage,readCursorQuota,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
 /** New providers have their own processes and cannot fall through to Codex methods. */
 export class AcpRuntime {
   availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[];quota?:GrokQuota;cursorQuota?:CursorQuota;cursorModels?:CursorModel[]}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
@@ -41,6 +41,7 @@ export class AcpRuntime {
   private readonly deps:typeof dependencies;
   private refreshing:Promise<void>|undefined;
   private stopped=false;
+  private cursorQuotaIdentity:string|undefined;
   private quotaCheckedAt=0;
   private quotaReading:Promise<void>|undefined;
   private readonly connections=new Set<AcpConnection>();
@@ -94,19 +95,20 @@ export class AcpRuntime {
   /** ACP reports missing credentials as JSON-RPC -32000 (auth_required). */
   private markFailure(error:unknown) {
     const login=error instanceof AgentError&&/\(-32000\)/.test(error.message);
+    if(this.provider==='cursor'){delete this.availability.cursorQuota;this.cursorQuotaIdentity=undefined;this.quotaCheckedAt=0;}
     this.availability.state=login?'login_required':'unverified';this.availability.capabilities=unavailableCapabilities();
     // Only the stable error code is surfaced, never native output that could contain credentials.
     if(error instanceof AgentError)this.availability.error=error.code;else delete this.availability.error;
   }
   async listThreads():Promise<DiscoveredThreadSummary[]> {
-    await this.start();if(!this.executable)return [];
+    await this.start();if(!this.executable){if(this.provider==='cursor')delete this.availability.cursorQuota;return [];}
     const connection=await this.connect(homedir());
     try {
       if(this.provider==='grok')await this.refreshGrokQuota(connection);
       if(this.provider==='cursor'&&Date.now()-this.quotaCheckedAt>=120000){
         this.quotaCheckedAt=Date.now();
         // Account allowance is not an ACP method; Cursor's own account service reports it for the logged-in principal.
-        try {const quota=await readCursorQuota();if(quota)this.availability.cursorQuota=quota;else delete this.availability.cursorQuota;}catch{/* Keep the timestamped prior observation; failure is never zero quota. */}
+        try {const quota=await this.deps.readCursorQuota({onIdentity:key=>{if(!key||key!==this.cursorQuotaIdentity)delete this.availability.cursorQuota;this.cursorQuotaIdentity=key;}});if(quota)this.availability.cursorQuota=quota;else delete this.availability.cursorQuota;}catch{/* Keep the timestamped prior observation; failure is never zero quota. */}
         try {const result=await connection.call('cursor/list_available_models',{},15000);const models=parseCursorModels(isRecord(result)?result.models:undefined);if(models.length){this.availability.cursorModels=models;this.availability.capabilities.models=true;}}catch{/* Optional extension: leave settings unavailable, never borrow Grok models. */}
       }
       if(!this.availability.capabilities.discover)return [...this.catalog.values()];

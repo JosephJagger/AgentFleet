@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { BarChart3, X } from "lucide-react";
 import { agentName } from "../lib/agent-provider";
 import { api } from "../lib/api";
+import {formatQuotaPercent} from "../lib/usage";
 import type { UsageSummary } from "../lib/usage";
 import { locale, t } from "../i18n";
 const cacheRate=(input:number|null|undefined,cached:number|null|undefined)=>input&&cached!=null?cached/input*100:null;
@@ -55,7 +56,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
   const fiveHour=data?.accounts.flatMap(a=>a.windows.filter(w=>w.windowMinutes===300&&w.bucket===provider))??[];
   const accountCredits=data?.accounts.length===1?data.accounts[0]?.credits:null;
   const showCreditBalance=Boolean(accountCredits?.unlimited || (accountCredits?.balance!=null && Number(accountCredits.balance)>0));
-  const label=scope!=="machine"?t("总消耗 {0} tokens",data?.recorded?short(data.recorded.totalTokens):"—"):scope==="machine"&&weekly.length===1?t("周额度剩余 {0}%",weekly[0].w.remainingPercent):scope==="machine"&&!!data?.accounts.some(a=>a.windows.length)?t("用量与剩余额度"):data?.recorded?t("总消耗 {0} tokens",short(data.recorded.totalTokens)):t("用量未上报");
+  const label=scope!=="machine"?t("总消耗 {0} tokens",data?.recorded?short(data.recorded.totalTokens):"—"):scope==="machine"&&weekly.length===1?t("周额度剩余 {0}%",formatQuotaPercent(weekly[0].w.remainingPercent,locale())):scope==="machine"&&!!data?.accounts.some(a=>a.windows.length)?t("用量与剩余额度"):data?.recorded?t("总消耗 {0} tokens",short(data.recorded.totalTokens)):t("用量未上报");
   const showWeeklyReset=scope==="machine"&&weekly.length===1&&!failed;
   const resetAt=showWeeklyReset?weekly[0].w.resetsAt:null;
   const richMachineSummary=scope==="machine"&&!failed&&data?.accounts.length===1&&(weekly.length===1||fiveHour.length===1||accountCredits||data.resetPrediction);
@@ -69,7 +70,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
   return <>
     {compactQuota ? <div className="buzhou-session-quota">
       <button type="button" className="buzhou-quota-card" onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>
-        <span><small>{weekly.length===1?t("周额度"):t("已记录消耗")}</small><strong>{failed?t("用量暂不可用"):weekly.length===1?`${weekly[0].w.remainingPercent}%`:data?.recorded?short(data.recorded.totalTokens):t("用量未上报")}</strong></span>
+        <span><small>{weekly.length===1?t("周额度"):t("已记录消耗")}</small><strong>{failed?t("用量暂不可用"):weekly.length===1?`${formatQuotaPercent(weekly[0].w.remainingPercent,locale())}%`:data?.recorded?short(data.recorded.totalTokens):t("用量未上报")}</strong></span>
         {weekly.length===1&&!failed&&<span className="host-quota-meter" aria-hidden="true"><i style={{width:`${Math.max(0,Math.min(100,weekly[0].w.remainingPercent))}%`}}/></span>}
         <small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>
       </button>
@@ -82,14 +83,14 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
         <span className="host-quota-icon" aria-hidden="true"><BarChart3 size={18}/></span>
         <span className="host-quota-summary">
           <span className="host-quota-metrics">
-            {weekly.length===1&&<span className="host-quota-metric host-quota-metric--weekly"><small>{t("周额度")}</small><strong>{weekly[0].w.remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${weekly[0].w.remainingPercent}%`}}/></span><em>{weekly[0].w.resetsAt?t("下次重置：{0}",date(new Date(weekly[0].w.resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
-            {fiveHour.length===1&&<span className="host-quota-metric host-quota-metric--five-hour"><small>{t("5 小时额度")}</small><strong>{fiveHour[0].remainingPercent}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${fiveHour[0].remainingPercent}%`}}/></span><em>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
+            {weekly.length===1&&<span className="host-quota-metric host-quota-metric--weekly"><small>{t("周额度")}</small><strong>{formatQuotaPercent(weekly[0].w.remainingPercent,locale())}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${weekly[0].w.remainingPercent}%`}}/></span><em>{weekly[0].w.resetsAt?t("下次重置：{0}",date(new Date(weekly[0].w.resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
+            {fiveHour.length===1&&<span className="host-quota-metric host-quota-metric--five-hour"><small>{t("5 小时额度")}</small><strong>{formatQuotaPercent(fiveHour[0].remainingPercent,locale())}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${fiveHour[0].remainingPercent}%`}}/></span><em>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
             {showCreditBalance?<span className="host-quota-metric host-quota-metric--credits"><small>{t("点数余额")}</small><strong>{accountCredits?.balance!=null&&!accountCredits.unlimited?<>{creditBalance(accountCredits.balance)} <b>{t("点")}</b></>:creditText(accountCredits)}</strong><em>{t("由原生 Codex 上报")}</em></span>
             :codex?<span className="host-quota-metric host-quota-metric--forecast" onClick={event=>{event.stopPropagation();setRadarOpen(true);}}><small>{t("临时重置预测")}</small><strong>{radarLabel}</strong><em>{t("公告仅供参考，额度与日期以原生最新数据为准")}</em></span>:null}
           </span>
           {updatedAt&&<span className="host-quota-updated"><i aria-hidden="true"/>{t("更新于 {0}",date(updatedAt))}<b aria-hidden="true">→</b></span>}
         </span>
-      </>:<><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&codex&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope!=="machine"&&!failed&&codex&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",fiveHour[0].remainingPercent)}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
+      </>:<><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&codex&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope!=="machine"&&!failed&&codex&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",formatQuotaPercent(fiveHour[0].remainingPercent,locale()))}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
     </button>}
     {scope==="machine"&&createPortal(<dialog ref={radarDialog} className="modal usage-dialog radar-dialog" aria-label={t("重置消息时间轴")} onClick={event=>{if(event.target===event.currentTarget){const r=event.currentTarget.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)setRadarOpen(false);}}} onCancel={()=>setRadarOpen(false)} onClose={()=>setRadarOpen(false)}>
       <header className="modal-head"><div><h2>{t("重置消息时间轴")}</h2><p>{t("最近 7 天 · 最新在上")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setRadarOpen(false)}><X size={18}/></button></header>
@@ -122,7 +123,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
             {provider==="cursor"&&<p>{account.subscriptionType?`${account.subscriptionType} · `:""}{t("由宿主机 Cursor 账号接口查询，后台定期刷新。")}</p>}
             {codex&&<div className="usage-credit"><strong>{t("点数余额")}</strong><span>{creditText(account.credits)}</span></div>}
             {!account.windows.length&&<p>{t("当前认证未返回额度窗口。")}</p>}
-            {account.windows.map(w=><div className="usage-window" key={`${w.bucket}:${w.window}`}><div><strong>{w.windowMinutes===10080?t("周额度"):w.windowMinutes===300?t("5 小时额度"):t("{0} 分钟额度",w.windowMinutes)} · {w.bucket === "claude" ? "Claude Code" : w.bucket}</strong><span>{t("已用 {0}% · 剩余 {1}%",w.usedPercent,w.remainingPercent)}</span></div><progress max={100} value={w.usedPercent} aria-label={t("额度已用比例")}/><small>{w.resetsAt?t("重置于 {0}",date(new Date(w.resetsAt*1000).toISOString())):t("重置时间未上报")}</small></div>)}
+            {account.windows.map(w=><div className="usage-window" key={`${w.bucket}:${w.window}`}><div><strong>{w.windowMinutes===10080?t("周额度"):w.windowMinutes===300?t("5 小时额度"):t("{0} 分钟额度",w.windowMinutes)} · {w.bucket === "claude" ? "Claude Code" : w.bucket}</strong><span>{t("已用 {0}% · 剩余 {1}%",formatQuotaPercent(w.usedPercent,locale()),formatQuotaPercent(w.remainingPercent,locale()))}</span></div><progress max={100} value={w.usedPercent} aria-label={t("额度已用比例")}/><small>{w.resetsAt?t("重置于 {0}",date(new Date(w.resetsAt*1000).toISOString())):t("重置时间未上报")}</small></div>)}
             {!account.identityKnown&&<small>{t("账号身份未上报，此处仅展示来源主机快照，不与其他主机相加。")}</small>}
           </div>)}
           <p className="usage-note">{t("账号额度由同账号的多个设备和会话共享，不能按 token 比例归属到某个项目。")}</p>

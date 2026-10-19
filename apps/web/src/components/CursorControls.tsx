@@ -2,7 +2,8 @@ import {useEffect,useRef,useState} from 'react';
 import type {CursorSettings,CursorOption,CursorModel} from '../lib/cursor-settings';
 import type {UsageSummary} from '../lib/usage';
 import {api} from '../lib/api';
-import {t} from '../i18n';
+import {t,locale} from '../i18n';
+import {formatQuotaPercent} from '../lib/usage';
 
 export function CursorControls({sessionId,settings,options,models,ready,supported,error,disabled,visible,observedAt,onReload,onSave}:{sessionId:string;settings:CursorSettings;options:CursorOption[];models:CursorModel[];ready:boolean;supported:boolean;error:string;disabled:boolean;visible:boolean;observedAt:string|null;onReload:()=>void;onSave:(s:CursorSettings)=>Promise<void>}){
   const [draft,setDraft]=useState(settings),[dirty,setDirty]=useState(false),[saving,setSaving]=useState(false),[message,setMessage]=useState('');
@@ -54,7 +55,7 @@ export function CursorControls({sessionId,settings,options,models,ready,supporte
         {usage.last&&<p>{t('最近一轮消耗')}：{usage.last.totalTokens.toLocaleString()} tokens</p>}
         {usage.accounts?.map((a,i)=><div className="usage-account" key={i}>
           <p>{a.subscriptionType?`${a.subscriptionType} · `:''}{t('账号额度 · 来源：Cursor 账号接口。')}</p>
-          {a.windows.map(w=><div key={w.window}><p>{t('已用 {0}% · 剩余 {1}%',w.usedPercent,w.remainingPercent)}</p><progress max={100} value={w.usedPercent} aria-label={t('额度已用比例')}/><p>{w.resetsAt?t('重置于 {0}',new Date(w.resetsAt*1000).toLocaleString()):t('重置时间未上报')}</p></div>)}
+          {a.windows.map(w=><div key={w.window}><p>{t('已用 {0}% · 剩余 {1}%',formatQuotaPercent(w.usedPercent,locale()),formatQuotaPercent(w.remainingPercent,locale()))}</p><progress max={100} value={w.usedPercent} aria-label={t('额度已用比例')}/><p>{w.resetsAt?t('重置于 {0}',new Date(w.resetsAt*1000).toLocaleString()):t('重置时间未上报')}</p></div>)}
           <small>{a.sourceMachine} · {t('更新于 {0}',new Date(a.observedAt).toLocaleString())}{a.stale&&<strong> · {t('数据已过期')}</strong>}</small>
         </div>)}
         {!usage.accounts?.length&&<p>{t('账号剩余额度')}：{t('未读取到 Cursor 账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。')}</p>}

@@ -92,7 +92,7 @@ async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]=
  let terminalRows:import('../src/cursor-sessions.js').CursorTerminalSession[]=[];const prepared:string[]=[];const environments:Array<NodeJS.ProcessEnv|undefined>=[];
  let ownershipFailure:AgentError|undefined;
  const children:AcpConnection[]=[];
- const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{cursorSessions:async()=>terminalRows,prepareCursor:async row=>{prepared.push(row.id);},readGrokUsage:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async(_provider,owned)=>{
+ const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{cursorSessions:async()=>terminalRows,prepareCursor:async row=>{prepared.push(row.id);},readGrokUsage:async()=>undefined,readCursorQuota:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async(_provider,owned)=>{
    if(ownershipFailure)throw ownershipFailure;
    // Model the actual OS process scan, including children still exiting.
    for(const connection of children)if(connection.pid&&!owned.has(connection.pid)){
@@ -397,4 +397,19 @@ test('Cursor flat per-turn usage accumulates actual counts instead of losing equ
  const usage=f.events.filter(e=>e.type==='thread.usage').map(e=>e.payload.usage as {total:{totalTokens:number};last:{totalTokens:number}});
  assert.deepEqual(usage.map(u=>u.total.totalTokens),[5,10]);
  assert.deepEqual(usage.map(u=>u.last.totalTokens),[5,5]);
+});
+
+test('Cursor quota cache survives only same-credential account-query outages and clears on native auth failure',async()=>{
+ let identity='a',outage=false,authFailure=false;
+ const quota={observedAt:new Date().toISOString(),windows:[]};
+ const runtime=new AcpRuntime('cursor',{} as AppServerCallbacks,'quota-audit',{
+  detect:async()=>({executable:process.execPath,prefix:[],version:'mock'}),
+  readCursorQuota:async options=>{options?.onIdentity?.(identity);if(outage)throw Error('offline');return quota;},
+  connection:()=>({start(){},close(){},call:async(method:string)=>{if(authFailure)throw new AgentError('ACP_REMOTE_ERROR','Native request rejected (-32000)');return method==='initialize'?{protocolVersion:1,agentCapabilities:{}}:{models:[]};}} as unknown as AcpConnection)
+ });
+ await runtime.listThreads();assert.equal(runtime.availability.cursorQuota,quota);
+ outage=true;Reflect.set(runtime,'quotaCheckedAt',0);await runtime.listThreads();assert.equal(runtime.availability.cursorQuota,quota);
+ identity='b';Reflect.set(runtime,'quotaCheckedAt',0);await runtime.listThreads();assert.equal(runtime.availability.cursorQuota,undefined);
+ outage=false;Reflect.set(runtime,'quotaCheckedAt',0);await runtime.listThreads();assert.equal(runtime.availability.cursorQuota,quota);
+ authFailure=true;await assert.rejects(runtime.listThreads());assert.equal(runtime.availability.state,'login_required');assert.equal(runtime.availability.cursorQuota,undefined);
 });

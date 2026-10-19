@@ -47,3 +47,26 @@ test('native auth storage path is separate from Cursor session configuration',()
  assert.equal(cursorAuthPath('/home/test',{},'darwin'),join('/home/test','.cursor','auth.json'));
  assert.equal(cursorAuthPath('/home/test',{APPDATA:'/roaming'},'win32'),join('/roaming','Cursor','auth.json'));
 });
+test('plan network and invalid JSON failures never discard valid usage or mask 401',async()=>{
+ for(const fail of [()=>Promise.reject(Error('offline')),()=>Promise.resolve(new Response('bad json'))]){
+  const fetch=(async(url:unknown)=>String(url).endsWith('GetPlanInfo')?fail():json(usage)) as typeof globalThis.fetch;
+  assert.equal((await readCursorQuota(fixture({fetch})))?.windows[0]?.usedPercent,4.598);
+  const identities:Array<string|undefined>=[];
+  assert.equal(await readCursorQuota({...fixture({fetch:(async(url:unknown)=>String(url).endsWith('GetPlanInfo')?fail():json({},401)) as typeof globalThis.fetch}),onIdentity:k=>identities.push(k)}),undefined);
+  assert.equal(identities.at(-1),undefined);
+ }
+});
+test('credential generation is private and changes invalidate cached quota even on network failure',async()=>{
+ const keys:Array<string|undefined>=[];
+ for(const token of ['first','second']){
+  await assert.rejects(readCursorQuota({...fixture({token:()=>token,fetch:async()=>{throw Error('offline');}}),onIdentity:k=>keys.push(k)}));
+ }
+ assert.ok(keys[0]&&keys[1]&&keys[0]!==keys[1]);assert.equal(keys[0]?.includes('first'),false);
+ let reads=0;const switched:Array<string|undefined>=[];
+ assert.equal(await readCursorQuota({...fixture({token:()=>++reads===1?'first':'second',fetch:async()=>{throw Error('offline');}}),onIdentity:k=>switched.push(k)}),undefined);
+ assert.equal(switched.at(-1),undefined);
+});
+
+test('a switch in the final credential check cannot return the previous account result',async()=>{
+ let reads=0;assert.equal(await readCursorQuota({...fixture(),read:(async()=>JSON.stringify({accessToken:++reads<3?'tok':'other'})) as never}),undefined);
+});

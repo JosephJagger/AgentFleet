@@ -39,7 +39,7 @@ it('old hosts show the upgrade condition and cannot save configuration',()=>{
 });
 it('shows Cursor account quota from its own account service without any Grok association',async()=>{
  const at=new Date().toISOString();
- vi.mocked(api.usage).mockResolvedValue({recorded:null,last:null,accounts:[{sourceMachine:'B52H',identityKnown:false,subscriptionType:'Super',observedAt:at,stale:false,windows:[{bucket:'cursor',window:'primary',usedPercent:4.6,remainingPercent:95.4,windowMinutes:10080,resetsAt:Math.floor(Date.now()/1000)+86400}]}]} as never);
+ vi.mocked(api.usage).mockResolvedValue({recorded:null,last:null,accounts:[{sourceMachine:'B52H',identityKnown:false,subscriptionType:'Super',observedAt:at,stale:false,windows:[{bucket:'cursor',window:'primary',usedPercent:4.598056810446191,remainingPercent:95.4019431895538,windowMinutes:10080,resetsAt:Math.floor(Date.now()/1000)+86400}]}]} as never);
  render(<CursorControls sessionId="s" {...catalog} settings={{}} ready error="" disabled={false} visible onReload={()=>{}} onSave={vi.fn()}/>);
  await waitFor(()=>expect(screen.getByText('已用 4.6% · 剩余 95.4%')).toBeTruthy());
  expect(screen.getByText(/Super · 账号额度/)).toBeTruthy();
