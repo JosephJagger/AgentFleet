@@ -18,8 +18,9 @@ async function fixture(t:import('node:test').TestContext){
  return {root,dir,meta};
 }
 test('Cursor roots follow explicit override, XDG and terminal default without changing PATH',()=>{
- assert.deepEqual(cursorConfigRoots({CURSOR_CONFIG_DIR:'/custom',XDG_CONFIG_HOME:'/xdg'},'/home/test'),['/custom']);
- assert.deepEqual(cursorConfigRoots({XDG_CONFIG_HOME:'/xdg'},'/home/test'),['/xdg/cursor','/home/test/.cursor']);
+ const home=join(tmpdir(),'home'),custom=join(tmpdir(),'custom'),xdg=join(tmpdir(),'xdg');
+ assert.deepEqual(cursorConfigRoots({CURSOR_CONFIG_DIR:custom,XDG_CONFIG_HOME:xdg},home),[custom]);
+ assert.deepEqual(cursorConfigRoots({XDG_CONFIG_HOME:xdg},home),[join(xdg,'cursor'),join(home,'.cursor')]);
 });
 test('discovers actual cwd and excludes empty, malformed, subagent and symlink sidecars',async t=>{
  const f=await fixture(t);let rows=await listCursorTerminalSessions([f.root]);assert.equal(rows.length,1);assert.equal(rows[0]!.cwd,f.root);
