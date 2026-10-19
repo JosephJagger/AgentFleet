@@ -7,6 +7,9 @@ import {t} from '../i18n';
 export function CursorControls({sessionId,settings,options,models,ready,supported,error,disabled,visible,observedAt,onReload,onSave}:{sessionId:string;settings:CursorSettings;options:CursorOption[];models:CursorModel[];ready:boolean;supported:boolean;error:string;disabled:boolean;visible:boolean;observedAt:string|null;onReload:()=>void;onSave:(s:CursorSettings)=>Promise<void>}){
   const [draft,setDraft]=useState(settings),[dirty,setDirty]=useState(false),[saving,setSaving]=useState(false),[message,setMessage]=useState('');
   const [usage,setUsage]=useState<UsageSummary>(),[usageError,setUsageError]=useState(false);
+  useEffect(()=>{const times=usage?.accounts?.flatMap(a=>a.sharedSubscription?[Date.parse(a.sharedSubscription.expiresAt)]:[])??[];if(!times.length)return;
+    const timer=window.setTimeout(()=>setUsage(u=>u?{...u,accounts:u.accounts.filter(a=>!a.sharedSubscription||Date.parse(a.sharedSubscription.expiresAt)>Date.now())}:u),Math.max(0,Math.min(...times)-Date.now())+1);return()=>window.clearTimeout(timer);
+  },[usage]);
   const generation=useRef(0);
   useEffect(()=>{if(!dirty)setDraft(settings);},[settings,dirty]);
   useEffect(()=>{if(!visible)return;const controller=new AbortController();let pending=false;
@@ -52,7 +55,12 @@ export function CursorControls({sessionId,settings,options,models,ready,supporte
       {usageError?<p role="alert">{t('用量读取失败，请重新打开会话配置。')}</p>:!usage?<p>{t('正在读取用量…')}</p>:<>
         <p>{t('已记录消耗')}：{usage.recorded?`${usage.recorded.totalTokens.toLocaleString()} tokens`:t('原生未上报')}</p>
         {usage.last&&<p>{t('最近一轮消耗')}：{usage.last.totalTokens.toLocaleString()} tokens</p>}
-        <p>{t('账号剩余额度')}：{t('当前 Cursor ACP 未提供账号额度查询，无法显示剩余数量。')}</p>
+        {usage.accounts?.filter(a=>a.sharedSubscription&&Date.parse(a.sharedSubscription.expiresAt)>Date.now()).map((a,i)=><div className="usage-account" key={i}>
+          <p>{t('共享订阅额度 · 来源：Grok 原生账单，已核对 Cursor 与 Grok 账号。')}</p>
+          {a.windows.map(w=><div key={w.window}><p>{t('已用 {0}% · 剩余 {1}%',w.usedPercent,w.remainingPercent)}</p><progress max={100} value={w.usedPercent} aria-label={t('额度已用比例')}/><p>{w.resetsAt?t('重置于 {0}',new Date(w.resetsAt*1000).toLocaleString()):t('重置时间未上报')}</p></div>)}
+          <small>{a.sourceMachine} · {t('更新于 {0}',new Date(a.observedAt).toLocaleString())}</small>
+        </div>)}
+        {!usage.accounts?.some(a=>a.sharedSubscription&&Date.parse(a.sharedSubscription.expiresAt)>Date.now())&&<p>{t('未确认 Cursor 与 Grok 属于同一共享订阅账号，暂不显示共享额度。')}</p>}
         {usage.lastObservedAt&&<small>{t('用量更新于 {0}',new Date(usage.lastObservedAt).toLocaleString())}</small>}
         <p>{t('用量只统计实际收到的原生数据，不估算未上报的历史，也不将上下文占用视为计费消耗。额度是账号共享数据，不能在会话中修改。')}</p>
       </>}

@@ -9,7 +9,7 @@ export interface UsageSummary {
   scope:"session"|"project"|"machine";recorded:TokenCounts|null;quotaCycle:{startsAt:string;resetsAt:string;recordedTokens:number|null;inputTokens?:number|null;cachedInputTokens?:number|null;boundaryIncomplete:boolean}|null;
   observedSessions:number;totalSessions:number;firstObservedAt:string|null;lastObservedAt:string|null;coverage:"observed-only";discontinuities:number;
   last:TokenCounts|null;nativeTotal:TokenCounts|null;modelContextWindow:number|null;
-  accounts:{subscriptionType?:string|null;sourceMachine:string;identityKnown:boolean;observedAt:string;stale:boolean;credits?:UsageCredits|null;resetCardsAvailable?:number|null;windows:{bucket:string;window:string;usedPercent:number;remainingPercent:number;windowMinutes:number;resetsAt:number|null}[]}[];
+  accounts:{sharedSubscription?:{source:'grok-native';verifiedAt:string;expiresAt:string};subscriptionType?:string|null;sourceMachine:string;identityKnown:boolean;observedAt:string;stale:boolean;credits?:UsageCredits|null;resetCardsAvailable?:number|null;windows:{bucket:string;window:string;usedPercent:number;remainingPercent:number;windowMinutes:number;resetsAt:number|null}[]}[];
   topWeeklyProjects:WeeklyUsageEntry[]|null;
   topWeeklySessions:WeeklyUsageEntry[]|null;
   topProjects:{id:string;title:string;totalTokens:number}[];

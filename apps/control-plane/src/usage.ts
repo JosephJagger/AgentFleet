@@ -93,12 +93,12 @@ export class UsageService {
       return [{sourceMachine:machine.name,identityKnown:false,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180_000,subscriptionType:quota.subscriptionType,windows:quota.windows,credits:null,resetCardsAvailable:null}];
     });
     if(provider === "claude")accounts.push(...claudeAccounts);
-    if(provider==='grok') {
+    if(provider==='grok'||provider==='cursor') {
       const machines=this.db.all<{machine_id:string;name:string;discovery_json:string|null}>("SELECT machine_id,name,discovery_json FROM machines WHERE workspace_id=? AND identity_state='active'",workspaceId);
       for(const machine of machines) {
         if(!machineIds.has(machine.machine_id))continue;
         const quota=parseGrokQuota(JSON.parse(machine.discovery_json??'{}').agentRuntimes?.grok?.quota);
-        if(quota)accounts.push({sourceMachine:machine.name,identityKnown:false,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180000||quota.windows.some(w=>w.resetsAt*1000<=Date.now()),windows:quota.windows,credits:null,resetCardsAvailable:null});
+        if(quota&&(provider==='grok'||quota.sharedSubscription))accounts.push({...(quota.sharedSubscription?{sharedSubscription:quota.sharedSubscription}:{}),sourceMachine:machine.name,identityKnown:!!quota.sharedSubscription,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180000||quota.windows.some(w=>w.resetsAt*1000<=Date.now()),windows:quota.windows,credits:null,resetCardsAvailable:null});
       }
     }
     const weekly = accounts.flatMap(account => account.windows.filter((w: { bucket: string; windowMinutes: number; resetsAt: number | null }) =>

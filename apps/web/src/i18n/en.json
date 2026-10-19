@@ -3809,5 +3809,7 @@
   "用量只统计实际收到的原生数据，不估算未上报的历史，也不将上下文占用视为计费消耗。额度是账号共享数据，不能在会话中修改。": "Usage includes native reports received here. Unreported history is not estimated, and context occupancy is not billed usage. Account quota is shared and cannot be changed in a session.",
   "原生未上报": "Not reported by native agent",
   "已保存，下一轮任务生效。": "Saved. Applies to the next turn.",
-  "Cursor 原生切换也会记住主机端的默认模型；其他面板会话仍优先使用各自保存的模型。": "Cursor also remembers the selection as the host’s native default. Other panel sessions still use their own saved models first."
+  "Cursor 原生切换也会记住主机端的默认模型；其他面板会话仍优先使用各自保存的模型。": "Cursor also remembers the selection as the host’s native default. Other panel sessions still use their own saved models first.",
+  "共享订阅额度 · 来源：Grok 原生账单，已核对 Cursor 与 Grok 账号。": "Shared subscription allowance · Source: Grok native billing; Cursor and Grok account identities verified.",
+  "未确认 Cursor 与 Grok 属于同一共享订阅账号，暂不显示共享额度。": "Cursor and Grok have not been verified as the same shared subscription account. Shared allowance is unavailable."
 }

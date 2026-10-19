@@ -1,5 +1,6 @@
 import {parseCursorOptions,parseCursorModels,parseCursorSettings,type CursorOption,type CursorModel,type CursorSettings} from './cursor-settings.js';
 import {listCursorTerminalSessions,prepareCursorTerminalSession} from './cursor-sessions.js';
+import {verifySharedSubscription,grokCredentialStamp} from './shared-subscription.js';
 import {readGrokUsage} from './grok-usage.js';
 import {grokBillingQuota,type GrokQuota} from './grok-quota.js';
 import {AGENT_VERSION} from "./constants.js";
@@ -99,9 +100,10 @@ export class AcpRuntime {
   }
   async listThreads():Promise<DiscoveredThreadSummary[]> {
     await this.start();if(!this.executable)return [];
+    const credentialStamp=this.provider==='grok'?await grokCredentialStamp():undefined;
     const connection=await this.connect(homedir());
     try {
-      if(this.provider==='grok')await this.refreshGrokQuota(connection);
+      if(this.provider==='grok')await this.refreshGrokQuota(connection,credentialStamp);
       if(this.provider==='cursor'&&Date.now()-this.quotaCheckedAt>=120000){
         this.quotaCheckedAt=Date.now();
         try {const result=await connection.call('cursor/list_available_models',{},15000);const models=parseCursorModels(isRecord(result)?result.models:undefined);if(models.length){this.availability.cursorModels=models;this.availability.capabilities.models=true;}}catch{/* Optional extension: leave settings unavailable, never borrow Grok models. */}
@@ -128,16 +130,20 @@ export class AcpRuntime {
       return [...this.catalog.values()];
     }catch(error){if(error instanceof AgentError&&/\(-32000\)/.test(error.message))this.markFailure(error);throw error;}finally{connection.close();}
   }
-  private async refreshGrokQuota(connection:AcpConnection) {
+  private async refreshGrokQuota(connection:AcpConnection,credentialStamp?:string) {
     if(this.quotaReading)return this.quotaReading;
     if(Date.now()-this.quotaCheckedAt<120000)return;
     this.quotaCheckedAt=Date.now();
     this.quotaReading=(async()=>{
       try {
         // ACP extension methods carry an underscore on the JSON-RPC wire.
-        const quota=grokBillingQuota(await connection.call('_x.ai/billing',{},3000));
-        if(quota)this.availability.quota=quota;
-      }catch{/* Keep the timestamped prior observation; failure is never zero quota. */}
+        const billing=await connection.call('_x.ai/billing',{},3000);
+        const quota=grokBillingQuota(billing);
+        if(quota){
+          if(isRecord(billing)&&isRecord(billing.config)&&billing.config.isUnifiedBillingUser===true&&credentialStamp){const shared=await verifySharedSubscription({expectedGrokStamp:credentialStamp});if(shared)quota.sharedSubscription=shared;}
+          this.availability.quota=quota;
+        }else if(this.availability.quota)delete this.availability.quota.sharedSubscription;
+      }catch{if(this.availability.quota)delete this.availability.quota.sharedSubscription;/* Never retain a cross-provider association after failure. */}
     })().finally(()=>{this.quotaReading=undefined;});
     return this.quotaReading;
   }
