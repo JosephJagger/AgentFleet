@@ -12,7 +12,7 @@ import {isAbsolute,resolve} from 'node:path';
 import {acpImageInput,acpImageBlocks} from './acp-images.js';
 import {MAX_IMAGES,validImageUrl} from './images.js';
 import {AcpConnection} from './acp-connection.js';
-import {ACP_COMMANDS,detectAcp,assertAcpUnoccupied,type AcpExecutable} from './acp-providers.js';
+import {ACP_COMMANDS,detectAcp,assertAcpUnoccupied,retainReleasedCursorWorkers,type AcpExecutable} from './acp-providers.js';
 import {unavailableCapabilities,type AcpProviderId,type ProviderAvailability} from './provider-catalog.js';
 import {decodeProviderThread,encodeProviderThread} from './provider-identity.js';
 import {AgentError} from './errors.js';
@@ -212,6 +212,7 @@ export class AcpRuntime {
   async unsubscribeThread(id:string) {
     const session=this.sessions.get(id);if(!session)return;
     if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Cancel or finish the turn before releasing its writer');
+    if(this.provider==='cursor'&&!session.turnId&&session.connection.pid)await retainReleasedCursorWorkers(this.owned,session.connection.pid);
     session.lost=true;this.resolvePending(session);await session.connection.closeAndWait();
     if(this.sessions.get(id)===session)this.sessions.delete(id);
   }

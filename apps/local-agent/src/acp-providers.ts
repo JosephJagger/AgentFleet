@@ -5,6 +5,7 @@ import {promisify} from 'node:util';
 import {delimiter,join,isAbsolute,resolve,relative} from 'node:path';
 import {homedir} from 'node:os';
 import type {AcpProviderId} from './provider-catalog.js';
+import {platformProcessStartToken} from './store.js';
 import {AgentError} from './errors.js';
 const exec=promisify(execFile);
 // Read-only detection is also used by the host version inventory, outside the ACP
@@ -80,11 +81,8 @@ export function isCursorNativeCommand(args:string) {
   const tokens=args.match(/"[^"]*"|'[^']*'|\S+/g)??[];
   return tokens.slice(0,2).some(token=>/(?:^|\/)cursor-agent(?:\/versions\/[^/]+\/(?:node|index\.js|cursor-agent(?:-sea)?)|(?:-sea)?)$/i.test(token.replace(/^['"]|['"]$/g,'').replaceAll('\\','/')));
 }
-/** Conservative across the host when native per-session ownership cannot be established. */
-export async function assertAcpUnoccupied(provider:AcpProviderId,owned:Set<number>):Promise<void> {
-  const config=ACP_COMMANDS[provider];
-  const ownedAtScan=new Set(owned);
-  const probesAtScan=new Set(detectionProcesses.get(provider));
+type ProcessRow={pid:number;ppid:number;exe:string;args:string};
+async function acpProcessRows():Promise<ProcessRow[]> {
   let rows:Array<{pid:number;ppid:number;exe:string;args:string}>;
   try {
     if(process.platform==='win32') {
@@ -96,8 +94,36 @@ export async function assertAcpUnoccupied(provider:AcpProviderId,owned:Set<numbe
       rows=result.stdout.split('\n').flatMap(line=>{const m=/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);return m?[{pid:Number(m[1]),ppid:Number(m[2]),exe:m[3]!,args:m[4]!}]:[];});
     }
   }catch{throw new AgentError('PROVIDER_OWNERSHIP_UNKNOWN','Unable to verify native process ownership; write access remains disabled');}
+  return rows;
+}
+const releasedCursorWorkers=new WeakMap<Set<number>,Map<number,{token:string;args:string}>>();
+const isCursorWorker=(row:ProcessRow)=>isCursorNativeCommand(row.args)&&/\sworker-server\s*$/.test(row.args);
+/** Record proven helper descendants before a completed session's parent exits.
+ * These native tool servers outlive ACP and are reparented to PID 1. No signal is
+ * sent, and neither unknown processes nor reused PIDs gain an exemption. */
+export async function retainReleasedCursorWorkers(owned:Set<number>,parentPid:number):Promise<void> {
+  if(!owned.has(parentPid))return;
+  const rows=await acpProcessRows(),tree=ownedProcessTree(rows,new Set([parentPid]));
+  const records=releasedCursorWorkers.get(owned)??new Map<number,{token:string;args:string}>();
+  for(const row of rows)if(tree.has(row.pid)&&row.pid!==parentPid&&isCursorWorker(row)){
+    const token=await platformProcessStartToken(row.pid);if(token)records.set(row.pid,{token,args:row.args});
+  }
+  releasedCursorWorkers.set(owned,records);
+}
+/** Conservative across the host when native per-session ownership cannot be established. */
+export async function assertAcpUnoccupied(provider:AcpProviderId,owned:Set<number>):Promise<void> {
+  const config=ACP_COMMANDS[provider];
+  const ownedAtScan=new Set(owned);
+  const probesAtScan=new Set(detectionProcesses.get(provider));
+  const rows=await acpProcessRows();
   const probes=ownedProcessTree(rows,new Set([...probesAtScan,...(detectionProcesses.get(provider)??[])]));
   const ownedTree=provider==='cursor'?ownedProcessTree(rows,new Set([...ownedAtScan,...owned,...probes])):new Set([...owned,...probes]);
+  const retained=releasedCursorWorkers.get(owned);
+  if(retained)for(const [pid,record] of retained){
+    const row=rows.find(r=>r.pid===pid);
+    if(row&&isCursorWorker(row)&&row.args===record.args&&await platformProcessStartToken(pid)===record.token)ownedTree.add(pid);
+    else retained.delete(pid);
+  }
   for(const row of rows) {
     if(ownedTree.has(row.pid)||row.pid===process.pid)continue;
     const base=row.exe.replaceAll('\\','/').split('/').pop()?.toLowerCase();
