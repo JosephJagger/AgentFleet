@@ -1562,3 +1562,13 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .runtime-progress-disclosure__body .runtime-progress { margin: 0; border: 0; background: transparent; }
 .composer .composer-actions { position: sticky; bottom: 0; z-index: 4; background: var(--paper-solid); }
 .composer-input { overflow: clip; }
+
+.video-storage-panel > header, .video-storage-list > li { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+.video-storage-list { list-style:none; padding:0; margin:1rem 0; }
+.video-storage-list > li { padding:1rem 0; border-bottom:1px solid var(--border, #a89a8160); flex-wrap:wrap; }
+.video-storage-list > li > div:first-child { min-width:0; flex:1 1 16rem; }
+.video-storage-list strong, .video-storage-list small { display:block; overflow-wrap:anywhere; }
+.video-storage-list small { margin-top:.3rem; opacity:.75; }
+.video-storage-actions { display:flex; align-items:center; flex-wrap:wrap; gap:.6rem; }
+.video-storage-confirm { border:1px solid var(--border, #a89a81); border-radius:12px; padding:1rem; margin-top:1rem; }
+.video-storage-key { overflow-wrap:anywhere; }

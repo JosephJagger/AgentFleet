@@ -1,0 +1,19 @@
+# Install configuration and credentials first; see docs/grok-video-storage.md.
+# This standalone service is deliberately outside the panel deployment lifecycle.
+services:
+  video-storage:
+    image: dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020
+    container_name: agentfleet-video-storage
+    restart: unless-stopped
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    env_file: [/var/lib/agentfleet-video/bootstrap.env]
+    ports: ["127.0.0.1:3900:3900"]
+    volumes:
+      - /var/lib/agentfleet-video/garage.toml:/etc/garage.toml:ro
+      - /var/lib/agentfleet-video/data:/storage
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128

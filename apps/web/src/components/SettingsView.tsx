@@ -1,3 +1,4 @@
+import { VideoStoragePanel } from "./VideoStoragePanel";
 import { TakeoverPolicyCard } from "./TakeoverPolicyCard";
 import { UpdateCenter } from "./UpdateCenter";
 import { displayName } from "../lib/display-name";
@@ -43,7 +44,7 @@ function HistoryPolicy({ project, onSaved, onToast }: { project: Project; onSave
 }
 
 export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }: { initialMachineId?: string; dashboard: Dashboard; onUpdated: () => Promise<void>; onToast: Notice }) {
-  const [category, setCategory] = useState<"memory" | "codex" | "writing" | "appearance" | "history" | "security" | "updates">("codex");
+  const [category, setCategory] = useState<"memory" | "codex" | "writing" | "appearance" | "history" | "security" | "updates" | "videos">("codex");
   useEffect(() => { if (initialMachineId) setCategory("codex"); }, [initialMachineId]);
   const [sessions, setSessions] = useState<ClientSessionInfo[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
@@ -106,10 +107,12 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
       {id:"memory",label:t("长期偏好"),icon:<MessageSquare size={19}/>,description:t("语音规则与跨通话恢复")},
       {id:"writing",label:t("输入辅助"),icon:<MessageSquare size={19}/>,description:t("补全与提示词优化")},
       {id:"appearance",label:t("界面外观"),icon:<Palette size={19}/>,description:t("主题与阅读体验")},
+      {id:"videos",label:t("视频存储"),icon:<Database size={19}/>,description:t("查看、下载与删除视频")},
       {id:"history",label:t("云端历史"),icon:<Database size={19}/>,description:t("内容同步与保留时长")},
       {id:"security",label:t("登录安全"),icon:<ShieldCheck size={19}/>,description:t("管理已登录浏览器")},
     ]}/>
     <div className="settings-layout settings-layout--grouped">
+      {category==="videos"&&<VideoStoragePanel/>}
       {category==="updates"&&<UpdateCenter dashboard={dashboard}/>}
       {category==="memory"&&<LongTermPreferencesPanel key={dashboard.user.id}/>}
       <div className="settings-category" hidden={category !== "codex"}>

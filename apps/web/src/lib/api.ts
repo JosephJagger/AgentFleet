@@ -1,3 +1,5 @@
+export type VideoObject = { key:string; bytes:number; etag:string; modifiedAt:string|null; canDelete:boolean };
+export type VideoStoragePage = { configured:boolean; label?:string; quotaBytes?:number; items:VideoObject[]; nextCursor:string|null };
 import { parseProviderRuntimeState } from "./provider-runtime-policy";
 import { isProviderId, type ProviderId } from "./provider-catalog";
 import { agentName } from "./agent-provider";
@@ -656,6 +658,9 @@ export interface RuntimeReleaseStatus {
 }
 
 export const api = {
+  videoStorage: (cursor?: string, signal?: AbortSignal) => request<VideoStoragePage>(`/api/settings/video-storage${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, {signal}),
+  downloadVideo: (key:string) => request<{url:string;expiresIn:number}>("/api/settings/video-storage/download", {method:"POST",body:JSON.stringify({key})}),
+  deleteVideo: (item:VideoObject) => request<{deleted:boolean}>("/api/settings/video-storage/delete", {method:"POST",body:JSON.stringify({key:item.key,etag:item.etag,bytes:item.bytes,modifiedAt:item.modifiedAt,confirm:true})}),
   storeLiveChat:(messages:import('./live-interactions').LiveEvent[],signal:AbortSignal)=>request('/api/live-chat',{method:'POST',body:JSON.stringify({messages}),signal:timeoutSignal(signal,10000)}),
   voiceDirectory:(filters:Record<string,string>,signal?:AbortSignal)=>request<VoiceDirectoryPage>('/api/voice-directory?'+new URLSearchParams(Object.entries(filters).filter(([,v])=>v)),{signal}),
   voiceTranscriptSettings:()=>request<{enabled:boolean;revision:number;retentionDays:number}>('/api/voice-transcript-settings'),

@@ -1,3 +1,4 @@
+import { VideoStorage, readVideoStorageConfig } from "./video-storage.js";
 import { isProviderId, isAcpProvider } from "./provider-catalog.js";
 import { TakeoverPolicy } from "./takeover-policy.js";
 import {LiveChatStore} from './live-chat.js';
@@ -1142,6 +1143,13 @@ export async function buildControlPlane(
     if(agent?.reconciliationReady) for(const offer of machineMaintenance.offers(machineId)) sendJson(agent.socket,offer);
     reply.code(202);return {operation};
   });
+  const videoStorage = () => new VideoStorage(db, readVideoStorageConfig(config.databasePath === ":memory:" ? undefined : resolve(config.databasePath, "..", "video-storage.json")));
+  app.get("/api/settings/video-storage", { preHandler: authenticate }, async request =>
+    videoStorage().list(request.principal!, record(request.query).cursor));
+  app.post("/api/settings/video-storage/download", { preHandler: mutate }, async request =>
+    videoStorage().download(request.principal!, record(request.body)));
+  app.post("/api/settings/video-storage/delete", { preHandler: mutate }, async request =>
+    videoStorage().remove(request.principal!, record(request.body)));
   app.get("/api/settings/takeover-policy", { preHandler: authenticate }, async request =>
     new TakeoverPolicy(db).read(request.principal!.workspaceId));
   app.put("/api/settings/takeover-policy", { preHandler: mutate }, async request =>
