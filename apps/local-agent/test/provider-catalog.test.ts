@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile,mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {readFile,mkdtemp,writeFile,rm,mkdir,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,delimiter} from 'node:path';
 import {encodeProviderThread,decodeProviderThread,threadProvider} from '../src/provider-identity.js';
 import {PROVIDER_IDS,isProviderId,unavailableCapabilities} from '../src/provider-catalog.js';
 test('Cursor discovery rejects Grok agent alias and continues to the actual Cursor CLI', {skip:process.platform==='win32'},async t=>{
@@ -16,6 +16,37 @@ test('Cursor discovery rejects Grok agent alias and continues to the actual Curs
   const found=await detectAcp('cursor');
   assert.equal(found?.executable,join(dir,'cursor-agent'));
   assert.equal(found?.version,'Cursor Agent 1.2.3');
+});
+for(const scenario of ['grok-first','unbranded-impostor','failed-help','missing-vendor-help'] as const)test(`Cursor calendar version is verified independently of PATH: ${scenario}`,{skip:process.platform==='win32'},async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'provider-calendar-'));
+  const oldPath=process.env.PATH;
+  t.after(async()=>{if(oldPath===undefined)delete process.env.PATH;else process.env.PATH=oldPath;await rm(dir,{recursive:true,force:true});});
+  const wrongVersion=scenario==='grok-first'?'grok 1.0.62 [stable]':'2026.10.16-e3cb207';
+  const wrongHelp=scenario==='failed-help'?'exit 1':scenario==='missing-vendor-help'?'printf "Usage: agent acp [options]\\n"':'printf "Start the Grok Agent\\n"';
+  await writeFile(join(dir,'agent'),`#!/bin/sh
+if [ "$1" = "--version" ]; then printf '${wrongVersion}\\n'; else ${wrongHelp}; fi
+`,{mode:0o755});
+  await writeFile(join(dir,'cursor-agent'),'#!/bin/sh\nif [ "$1" = "--version" ]; then printf "2026.10.16-e3cb207\\n"; elif [ "$1" = "acp" ] && [ "$2" = "--help" ]; then printf "Usage: agent acp [options]\\n\\nStart the Cursor Agent as an ACP (Agent Client Protocol) server\\n"; else exit 1; fi\n',{mode:0o755});
+  process.env.PATH=dir;
+  const {detectAcp}=await import('../src/acp-providers.js');
+  const found=await detectAcp('cursor');
+  assert.equal(found?.executable,join(dir,'cursor-agent'));
+  assert.equal(found?.version,'2026.10.16-e3cb207');
+});
+test('Cursor symlink in a later PATH directory is not shadowed by the Grok agent binary',{skip:process.platform==='win32'},async t=>{
+  const root=await mkdtemp(join(tmpdir(),'provider-path-'));
+  const oldPath=process.env.PATH;
+  t.after(async()=>{if(oldPath===undefined)delete process.env.PATH;else process.env.PATH=oldPath;await rm(root,{recursive:true,force:true});});
+  const grok=join(root,'grok-bin'),cursor=join(root,'local-bin'),versions=join(root,'cursor-versions');
+  await Promise.all([grok,cursor,versions].map(p=>mkdir(p)));
+  await writeFile(join(grok,'agent'),'#!/bin/sh\nprintf "grok 1.0.62 [stable]\\n"\n',{mode:0o755});
+  const target=join(versions,'cursor-agent');
+  await writeFile(target,'#!/bin/sh\nif [ "$1" = "--version" ]; then printf "2026.10.16-e3cb207\\n"; elif [ "$1" = "acp" ] && [ "$2" = "--help" ]; then printf "Start the Cursor Agent as an ACP (Agent Client Protocol) server\\n"; else exit 1; fi\n',{mode:0o755});
+  await symlink(target,join(cursor,'agent'));await symlink(target,join(cursor,'cursor-agent'));
+  process.env.PATH=[grok,cursor].join(delimiter);
+  const {detectAcp}=await import('../src/acp-providers.js');
+  const found=await detectAcp('cursor');
+  assert.equal(found?.executable,join(cursor,'agent'));assert.equal(found?.version,'2026.10.16-e3cb207');
 });
 test('provider registration is identical across services and excludes deferred providers',async()=>{
   const root=new URL('../../../../',import.meta.url);

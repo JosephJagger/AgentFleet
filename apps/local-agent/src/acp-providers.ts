@@ -48,7 +48,14 @@ export async function detectAcp(provider:AcpProviderId):Promise<AcpExecutable|nu
       const version=result.stdout.trim();if(!/\d+\.\d+\.\d+/.test(version)||version.length>200)continue;
       // `agent` is also installed by Grok. A generic executable name is not
       // evidence of Cursor: verify the vendor before starting its ACP process.
-      if(config.identify&&!config.identify.test(version))continue;
+      if(config.identify&&!config.identify.test(version)) {
+        // Official Cursor builds report only YYYY.MM.DD-<commit>, without a
+        // vendor name. Verify their read-only ACP help; neither PATH order nor
+        // the ambiguous `agent` filename alone establishes provider identity.
+        if(provider!=='cursor'||!/^\d{4}\.\d{2}\.\d{2}-[a-f0-9]{7,40}$/i.test(version))continue;
+        const help=await exec(candidate.executable,[...candidate.prefix,'acp','--help'],{timeout:5000,maxBuffer:32768,windowsHide:true});
+        if(!/^Start the Cursor Agent as an ACP \(Agent Client Protocol\) server\s*$/m.test(help.stdout))continue;
+      }
       return {...candidate,version};
     }catch{/* Not installed or not runnable. */}
   }
