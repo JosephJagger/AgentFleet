@@ -28,5 +28,34 @@ test("Claude settings persist after reopening, isolate sessions and reject stale
  assert.deepEqual(service.read(principal,"s2"),{settings:null,revision:0});
  db.close();db=new ControlPlaneDatabase(path);service=new ClaudePreferencesService(db);
  assert.deepEqual(service.read(principal,"s1"),{settings,revision:1});
+ db.run(`INSERT INTO client_sessions(client_session_id,workspace_id,user_id,token_hash,csrf_hash,created_at,last_seen_at,expires_at)
+ VALUES('browser',?,?,'token','csrf',?,?,'2099-01-01')`,workspaceId,principal.userId,at,at);
+ db.run(`INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,created_at)
+ VALUES('segment','s1','m','p',?)`,at);
+ db.run(`INSERT INTO commands(command_id,client_mutation_id,payload_hash,workspace_id,actor_user_id,actor_client_session_id,logical_session_id,execution_segment_id,type,precondition_json,payload_json,created_at,expires_at)
+ VALUES('exit','exit','hash',?,?,'browser','s1','segment','approval.decide_once','{}','{}',?,'2099-01-01')`,workspaceId,principal.userId,at);
+ db.run("INSERT INTO command_projection VALUES('exit','dispatching',?)",at);
+ db.run(`INSERT INTO approvals(approval_id,logical_session_id,execution_segment_id,action_hash,app_server_epoch,version,context_json,state,decision_command_id,decided_at,created_at)
+ VALUES('plan','s1','segment','hash','epoch',2,?,'approved','exit','2026-02-01',?)`,JSON.stringify({action:{toolName:"ExitPlanMode"}}),at);
+ db.run("UPDATE claude_preferences SET updated_at='2026-01-01' WHERE logical_session_id='s1'");
+ assert.equal(service.completePlanExit("exit"),false,"an optimistic approval must not clear plan mode");
+ db.run("UPDATE command_projection SET state='applied' WHERE command_id='exit'");
+ assert.equal(service.completePlanExit("exit"),false,"an applied state alone is not a successful delivery receipt");
+ db.run("INSERT INTO command_lifecycle(command_id,state,detail_json,created_at) VALUES('exit','applied',?,?)",JSON.stringify({response:{approvalId:"plan",decision:"approve",delivered:true}}),at);
+ db.run("UPDATE approvals SET state='rejected' WHERE approval_id='plan'");
+ assert.equal(service.completePlanExit("exit"),false);
+ db.run("UPDATE approvals SET state='approved',context_json=? WHERE approval_id='plan'",JSON.stringify({action:{toolName:"Bash"}}));
+ assert.equal(service.completePlanExit("exit"),false,"ordinary tool approval cannot reset planning");
+ db.run("UPDATE approvals SET context_json=? WHERE approval_id='plan'",JSON.stringify({action:{toolName:"ExitPlanMode"}}));
+ db.run("UPDATE claude_preferences SET updated_at='2026-03-01' WHERE logical_session_id='s1'");
+ assert.equal(service.completePlanExit("exit"),false,"later explicit settings must survive an old plan receipt");
+ db.run("UPDATE claude_preferences SET updated_at='2026-01-01' WHERE logical_session_id='s1'");
+ assert.equal(service.completePlanExit("exit"),true);
+ assert.deepEqual(service.read(principal,"s1"),{settings:{...settings,mode:"default"},revision:2});
+ assert.equal(service.completePlanExit("exit"),false,"duplicate receipts are idempotent");
+ assert.equal(db.get<{n:number}>("SELECT count(*) n FROM audit_entries WHERE action='claude.preferences.plan_completed'")?.n,1);
+ assert.throws(()=>service.write(principal,"s1",{settings,revision:1}),/changed in another browser/);
+ service.write(principal,"s1",{settings,revision:2});
+ assert.equal(service.completePlanExit("exit"),false,"re-enabling plan survives replay");
  db.run("UPDATE projects SET provider='codex' WHERE project_id='p'");assert.throws(()=>service.write(principal,"s1",{settings,revision:1}),/Claude Code session/);
 });

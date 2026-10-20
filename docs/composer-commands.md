@@ -50,6 +50,15 @@ adopt configuration edits made during the turn. Native permission checks still
 apply. The execution permission remains visible as “After plan approval” while
 the saved configuration selects plan mode.
 
+After the host confirms delivery of an approved plan exit, the server clears the
+saved plan flag, increments its revision and audits the change. Settings saved
+after the approval decision are preserved. Failed, rejected, unrelated and
+duplicate receipts cannot clear a newer choice. The web refreshes changed session
+preferences every five seconds, with a thirty-second fallback; stale responses
+cannot replace newer saves. A retained plan flag is labelled “Next send · Plan
+mode”, not presented as the native task's current execution state. Historical
+settings without sufficient evidence are not bulk-rewritten.
+
 This host fix requires an updated Agent package; deploying web assets alone only
 clarifies consent and does not repair an already running native process. Follow
 the existing idle-update protections rather than restarting an active session.

@@ -1,4 +1,5 @@
 {
+  "下次发送 · 计划模式": "Next send · Plan mode",
   "是否结束计划并开始执行？": "Finish planning and start execution?",
   "退出计划阶段，允许按计划修改文件和执行命令": "Leave planning and allow file changes and commands according to the plan",
   "选择计划模式不会直接授权开发。仅在你批准下方计划后，才进入执行阶段；自动审核也不会代替这次确认。": "Selecting plan mode does not authorize implementation. Execution starts only after you approve the plan below; auto review does not replace this confirmation.",

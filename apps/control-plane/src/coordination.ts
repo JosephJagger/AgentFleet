@@ -1850,6 +1850,9 @@ export class CoordinationService {
     if (state === "applied" && detail?.ok !== false && detail?.response && typeof detail.response === "object") {
       this.applyNativeDeletion(commandId,detail.response as Record<string,unknown>);
     }
+    if (state === "applied" && detail?.ok !== false) {
+      new ClaudePreferencesService(this.db).completePlanExit(commandId);
+    }
     if (state === "dispatching") {
       this.db.run(
         `UPDATE project_turn_reservations SET state='dispatching',version=version+1,updated_at=?

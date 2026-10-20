@@ -814,7 +814,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
 
   const [configuration, setConfiguration] = useState<ConfigurationRequest>();
   const [runtimeChoice, setRuntimeChoice] = useState<RuntimeChoice>();
-  const claudePrefs=useClaudePreferences(detail?.session.provider === "claude" ? detail.session.id : undefined);
+  const claudePrefs=useClaudePreferences(detail?.session.provider === "claude" ? detail.session.id : undefined,detail?.session.sessionSeq);
   const grokPrefs=useGrokPreferences(detail?.session.provider === "grok" ? detail.session.id : undefined, detail?.session.sessionSeq);
   const cursorPrefs=useCursorPreferences(detail?.session.provider === "cursor" ? detail.session.id : undefined,detail?.session.sessionSeq);
   const claudePlan=claudePrefs.settings.mode === "plan";
