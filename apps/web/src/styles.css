@@ -169,12 +169,7 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .host-default-settings > .codex-settings-save { margin-top: 18px; gap: 12px; }
 .host-default-settings > .catalog-more { width: auto; margin-top: 12px; background: transparent; padding-left: 0; }
 @media (max-width: 700px) { .host-default-settings.codex-settings-panel { padding: 18px; } .host-default-settings__heading { align-items: flex-start; flex-direction: column; gap: 4px; margin-bottom: 12px; } .host-default-settings.codex-settings-panel > .codex-settings-fields { grid-template-columns: 1fr; } }
-.codex-command-menu { max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
-.codex-command-menu p, .codex-command-message { font-size: var(--text-caption); color: var(--muted); padding: 5px; }
-.codex-command-menu button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; padding: 8px; background: transparent; color: var(--ink); text-align: left; font-size: var(--text-caption); }
-.codex-command-menu button:not(:disabled):hover { background: var(--cobalt-soft); }
-.codex-command-menu button:disabled { opacity: .5; }
-.codex-command-menu code { min-width: 78px; }
+.codex-command-message { font-size: var(--text-caption); color: var(--muted); padding: 5px; }
 .codex-command-guide ul { list-style: none; padding: 0; margin: 8px 0; }
 .codex-command-guide li { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .codex-command-guide strong { display: flex; justify-content: space-between; gap: 8px; font-size: var(--text-caption); }

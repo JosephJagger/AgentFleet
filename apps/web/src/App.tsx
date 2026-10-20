@@ -1,4 +1,5 @@
 import {GrokNativePanel} from "./components/GrokNativePanel";
+import {CodexCommandSuggestions,GrokCommandSuggestions} from "./components/SlashCommandSuggestions";
 import {CursorSettingsShortcut} from './components/CursorSettingsShortcut';
 import {CursorControls} from "./components/CursorControls";
 import {useCursorPreferences} from "./lib/cursor-preferences";
@@ -1131,7 +1132,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         <details className="session-sync-details session-config-section"><summary><span>{t("同步详情")}<small>{t("查看会话同步状态的排查信息")}</small></span></summary><p className="mono">seq {session.sessionSeq} · epoch {session.contentEpoch}</p></details>
       </SessionConfiguration>
       <form className="composer" onSubmit={event => { void submit(event); }}>
-        {(session.provider ?? "codex") === "codex" && prompt.trimStart().startsWith("/") && <div className="codex-command-menu" role="group" aria-label={t("Codex 命令")}><p>{t("面板命令 · 点击待接入项可查看原因，不会发送给模型")}</p>{codexCommands.filter((item) => item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map((item) => <button type="button" key={item.name} onClick={() => void runSlash(item.name, slashCommand?.args)}><code>/{displayName(item.name)}</code><span>{item.label} · {coverageLabels[item.coverage]}</span></button>)}</div>}
+        {(session.provider ?? "codex") === "codex" && <CodexCommandSuggestions anchor={textArea} prompt={prompt} onSelect={name=>void runSlash(name,slashCommand?.args)}/>}
         {!configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
         {voiceActive && <p className="composer-mode" role="status">{t("通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。")}</p>}
@@ -1160,7 +1161,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div>}
         <div className="composer-input">
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
-        {session.provider==="grok"&&prompt.startsWith("/")&&!prompt.includes(" ")&&<div className="prompt-completions" role="group" aria-label={t("Grok 原生命令")}>{grokPrefs.commands.filter(c=>c.name.startsWith(prompt.slice(1))).map(c=><button type="button" key={c.name} onMouseDown={e=>e.preventDefault()} onClick={()=>{setPrompt("/"+c.name+" ");textArea.current?.focus();}}><code>/{c.name}</code><span>{c.description}</span>{c.hint&&<small>{c.hint}</small>}</button>)}</div>}
+        {session.provider==="grok"&&<GrokCommandSuggestions anchor={textArea} prompt={prompt} commands={grokPrefs.commands} onSelect={setPrompt}/>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
         {imageDraft.images.length > 0 && <MessageImages images={imageDraft.images} onRemove={imageDraft.remove} disabled={busy || imageDraft.processing} />}
         {(fileDraft.files.length > 0 || selectedPlugins.length > 0) && <div className="attachment-drafts" aria-label={t("待发送附件")}>
