@@ -931,6 +931,9 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const sendSettings = session.provider === "claude" && claudePrefs.ready && session.collaborationModes?.includes("plan") ? claudePrefs.settings : session.provider === "grok" && grokPrefs.ready && grokSettingsActive(grokPrefs.settings) ? grokPrefs.settings : undefined;
   const modeBlocked = (session.provider === "claude" && !claudePrefs.ready) || (session.provider === "grok" && !grokPrefs.ready);
   const modeHint = session.provider === "grok" ? t("请先读取 Grok 会话配置") : t("计划模式需要先确认模型配置");
+  const inputStatusHint = modeBlocked ? modeHint : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : composerHint;
+  const keyboardHint = inputStatusHint || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : canQueueOrSteer ? (supportsSteer ? t("任务执行中，可追加本轮或加入队列") : t("任务执行中，可加入队列")) : t("请先检查会话连接与执行状态"));
+  const touchHint = inputStatusHint || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"));
 
   async function runSlash(name: string, args = "") {
     setCommandMessage("");
@@ -1251,8 +1254,8 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           }}
         />
         <div className="composer-actions">
-          <span className="composer-keyboard-hint" title={composerHint || t("可直接粘贴截图，最多 4 张；Tab 补全，Enter 发送，Ctrl / ⌘ + Enter 换行")}>{(modeBlocked ? modeHint : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : composerHint) || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : canQueueOrSteer ? (supportsSteer ? t("任务执行中，可追加本轮或加入队列") : t("任务执行中，可加入队列")) : t("请先检查会话连接与执行状态"))}</span>
-          <span className="composer-touch-hint">{(modeBlocked ? modeHint : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : composerHint) || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"))}</span>
+          <span className="composer-keyboard-hint" title={keyboardHint}>{keyboardHint}</span>
+          <span className="composer-touch-hint" title={touchHint}>{touchHint}</span>
           <div className="composer-button-group">
           <input ref={imageInput} className="composer-image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label={t("选择要发送的图片")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void imageDraft.addFiles(files); }} />
           <input ref={fileInput} className="composer-image-input" type="file" accept={ATTACHMENT_ACCEPT} multiple aria-label={t("选择要发送的文件")} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void fileDraft.add(files); }} />

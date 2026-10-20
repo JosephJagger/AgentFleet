@@ -92,3 +92,28 @@
  html[data-keyboard-open] .composer .message-image { flex:0 0 52px; width:52px; height:44px; }
  html[data-keyboard-open] .composer .image-draft-notice:not([role]) { display:none; }
 }
+
+/* Hints use the space left by actions, never force a separate toolbar row. */
+:root .composer .composer-actions { flex-wrap:nowrap; }
+:root .composer-actions > :is(.composer-keyboard-hint,.composer-touch-hint) {
+ flex:1 1 0;
+ min-width:0;
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
+}
+:root .composer .composer-button-group { flex:0 0 auto; flex-wrap:nowrap; }
+:root .composer-actions .active-turn-actions { flex-wrap:nowrap; }
+/* A narrow session pane also needs compact actions on a wide desktop screen. */
+@container session-pane (max-width:720px) {
+ :root .composer-action-label--full { display:none; }
+ :root .composer-action-label--compact { display:inline; }
+}
+@container session-pane (max-width:440px) {
+ :root .composer-ai-button .composer-action-label { display:none; }
+ :root .composer-ai-button { width:40px; padding-inline:0; justify-content:center; }
+}
+@container session-pane (max-width:360px) {
+ :root .composer-actions .active-turn-actions .composer-action-label { display:none; }
+ :root .composer-actions .active-turn-actions .button { width:40px; padding-inline:0; justify-content:center; }
+}
