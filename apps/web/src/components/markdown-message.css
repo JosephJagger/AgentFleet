@@ -59,3 +59,9 @@
 .markdown-file__error, .markdown-file__notice { display: block; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: var(--text-small); overflow-wrap: anywhere; }
 .markdown-file__error button { display: block; margin-top: 8px; padding: 8px 12px; min-height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper-solid); color: var(--ink); cursor: pointer; }
 .markdown-file__actions a[aria-disabled="true"] { opacity: .5; cursor: wait; }
+
+.inline-media { display: inline-flex; flex-direction: column; max-width: 100%; gap: .5rem; }
+.inline-media img, .inline-media video { display: block; max-width: 100%; max-height: 28rem; border-radius: .5rem; object-fit: contain; }
+
+.grok-native-result { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto; }
+.grok-task-entries { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }

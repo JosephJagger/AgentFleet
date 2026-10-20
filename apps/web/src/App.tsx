@@ -1,3 +1,4 @@
+import {GrokNativePanel} from "./components/GrokNativePanel";
 import {CursorSettingsShortcut} from './components/CursorSettingsShortcut';
 import {CursorControls} from "./components/CursorControls";
 import {useCursorPreferences} from "./lib/cursor-preferences";
@@ -1116,6 +1117,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
       <SessionConfiguration key={`config:${draftOwner}:${session.id}`} request={configuration} title={displayName(session.title)} onClose={() => setConfiguration(undefined)}>
         {configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
+        {session.provider==="grok"&&<GrokNativePanel key={session.id} session={session} commands={detail.commands??[]} supported={grokPrefs.nativeManagement} onChanged={onRefresh} onCompose={draft=>{setPrompt(prompt.trim()?`${prompt}\n\n${draft}`:draft);setConfiguration(undefined);requestAnimationFrame(()=>textArea.current?.focus());}}/>}
         {(session.provider ?? "codex") === "codex" && <CodexSettingsPanel key={`${draftOwner}:${session.id}:${modeSettingsRevision}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />}
         {(session.provider ?? "codex") === "codex" && <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />}
         {session.provider === "cursor" && <CursorControls key={session.id} sessionId={session.id} options={cursorPrefs.options} models={cursorPrefs.models} settings={cursorPrefs.settings} ready={cursorPrefs.ready} supported={cursorPrefs.supported} error={cursorPrefs.error} onReload={cursorPrefs.reload} onSave={cursorPrefs.save} disabled={busy} visible={!!configuration} observedAt={cursorPrefs.observedAt}/>}
@@ -1136,7 +1138,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         {hasActiveTurn && <div className="composer-mode"><Activity size={14} />{supportsSteer ? t("{0} 正在处理：可补充当前任务，或排到下一轮", agentName(session.provider)) : t("{0} 正在处理：可排到下一轮", agentName(session.provider))}</div>}
         {isAcpProvider(session.provider) && session.provider !== "grok" && session.provider !== "cursor" && <p className="composer-mode">{t("权限沿用主机上的原生设置；需要确认时在面板处理。")}</p>}
         {session.provider === "cursor" && <CursorSettingsShortcut settings={cursorPrefs.settings} options={cursorPrefs.options} models={cursorPrefs.models} ready={cursorPrefs.ready} error={cursorPrefs.error} onOpen={()=>setConfiguration({section:"settings",nonce:Date.now()})}/>}
-        {session.provider === "grok" && <GrokControls key={session.id} options={grokPrefs.options} models={grokPrefs.models} settings={grokPrefs.settings} ready={grokPrefs.ready} error={grokPrefs.error} onReload={grokPrefs.reload} onSave={grokPrefs.save} disabled={busy} openRequest={grokSettingsOpen}/>}
+        {session.provider === "grok" && <GrokControls xSearchSupported={grokPrefs.xSearchSupported} allowStartup={grokPrefs.canConfigureStartup} key={session.id} options={grokPrefs.options} models={grokPrefs.models} settings={grokPrefs.settings} ready={grokPrefs.ready} error={grokPrefs.error} onReload={grokPrefs.reload} onSave={grokPrefs.save} disabled={busy} openRequest={grokSettingsOpen}/>}
         {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
 
         {(session.provider ?? "codex") === "codex" && <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>}
@@ -1158,6 +1160,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div>}
         <div className="composer-input">
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
+        {session.provider==="grok"&&prompt.startsWith("/")&&!prompt.includes(" ")&&<div className="prompt-completions" role="group" aria-label={t("Grok 原生命令")}>{grokPrefs.commands.filter(c=>c.name.startsWith(prompt.slice(1))).map(c=><button type="button" key={c.name} onMouseDown={e=>e.preventDefault()} onClick={()=>{setPrompt("/"+c.name+" ");textArea.current?.focus();}}><code>/{c.name}</code><span>{c.description}</span>{c.hint&&<small>{c.hint}</small>}</button>)}</div>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
         {imageDraft.images.length > 0 && <MessageImages images={imageDraft.images} onRemove={imageDraft.remove} disabled={busy || imageDraft.processing} />}
         {(fileDraft.files.length > 0 || selectedPlugins.length > 0) && <div className="attachment-drafts" aria-label={t("待发送附件")}>

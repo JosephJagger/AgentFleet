@@ -66,3 +66,13 @@ test("video endpoints enforce existing authentication and CSRF", async t => {
   assert.equal((await app.inject({ method: "POST", url: base + "/download", headers: { cookie, origin }, payload: {key:item.key} })).statusCode, 403);
   assert.equal((await app.inject({ method: "GET", url: base, headers: { cookie } })).json().configured, false);
 });
+
+test('inline previews accept only configured workspace objects and bounded safe media',async()=>{
+ const {service,calls}=fixture(name=>name==='HeadObjectCommand'?{ContentLength:4,ETag:'"v1"'}:{Body:{transformToByteArray:async()=>new Uint8Array([1,2,3,4])}});
+ for(const source of ['https://other.example/video-output/grok-videos/a.mp4','https://storage.example/other/grok-videos/a.mp4','https://storage.example/video-output/other/a.mp4','https://storage.example/video-output/grok-videos/a.html'])await assert.rejects(service.preview(principal,source));
+ assert.equal(calls.length,0);
+ await assert.rejects(service.preview({...principal,workspaceId:'other'},'https://storage.example/video-output/grok-videos/a.mp4'));
+ const result=await service.preview(principal,'https://storage.example/video-output/grok-videos/a.mp4');
+ assert.equal(result.mime,'video/mp4');assert.equal(result.bytes.length,4);assert.equal(calls[1]!.input.IfMatch,'"v1"');assert.equal(calls[1]!.input.Range,'bytes=0-3');
+ const large=fixture(()=>({ContentLength:26*1024*1024,ETag:'"v1"'}));await assert.rejects(large.service.preview(principal,'https://storage.example/video-output/grok-videos/a.mp4'),{code:'VIDEO_PREVIEW_LIMIT'});assert.equal(large.calls.length,1);
+});

@@ -1,3 +1,6 @@
+import {grokForm,grokFormAnswer,type GrokForm} from './grok-elicitation.js';
+import {blake3} from '@noble/hashes/blake3.js';
+import {grokOperations,parseGrokOperation,grokLiveOperation,grokResult,type GrokOperationResult} from './grok-operations.js';
 import {parseCursorOptions,parseCursorModels,parseCursorSettings,type CursorOption,type CursorModel,type CursorSettings} from './cursor-settings.js';
 import {listCursorTerminalSessions,prepareCursorTerminalSession} from './cursor-sessions.js';
 import {readCursorQuota,type CursorQuota} from './cursor-quota.js';
@@ -7,7 +10,7 @@ import {AGENT_VERSION} from "./constants.js";
 import {randomUUID} from 'node:crypto';
 import {setImmediate as yieldToIO} from 'node:timers/promises';
 import {homedir} from 'node:os';
-import {stat} from 'node:fs/promises';
+import {stat,realpath} from 'node:fs/promises';
 import {isAbsolute,resolve} from 'node:path';
 import {acpImageInput,acpImageBlocks} from './acp-images.js';
 import {MAX_IMAGES,validImageUrl} from './images.js';
@@ -25,12 +28,12 @@ import {inputAnswers,inputQuestions,type InputAnswers,type InputQuestion} from '
 import {grokProgressText,grokModelOptions,parseGrokModels,acpPlanText,acpToolItem,acpUsage,grokLaunchArgs,grokSessionMeta,mergeConfigOptions,parseConfigOptions,parseGrokSettings,type ConfigOption,type GrokSettings} from './acp-updates.js';
 import type {CodexSettings} from './codex-settings.js';
 interface Session {id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];cursorOptions:CursorOption[];published:Map<string,string>;completed:Set<string>;itemSizes:Map<string,number>;historyBytes:number;textPublishedAt:number;usageTotals?:import('./acp-updates.js').TokenCounts;}
-interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan';questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
+interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan'|'grokForm';form?:GrokForm;questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
 function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)return {text:value,truncated:false};let text=Buffer.from(value).subarray(0,max).toString('utf8');if(text.endsWith('\uFFFD'))text=text.slice(0,-1);return {text,truncated:true};}
 const dependencies={cursorSessions:listCursorTerminalSessions,prepareCursor:prepareCursorTerminalSession,detect:detectAcp,unoccupied:assertAcpUnoccupied,readGrokUsage,readCursorQuota,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
 /** New providers have their own processes and cannot fall through to Codex methods. */
 export class AcpRuntime {
-  availability:ProviderAvailability & {models?:import("./acp-updates.js").GrokModel[];quota?:GrokQuota;cursorQuota?:CursorQuota;cursorModels?:CursorModel[]}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
+  availability:ProviderAvailability & {nativeManagement?:boolean;grokTools?:string[];commands?:{name:string;description:string;hint?:string}[];models?:import("./acp-updates.js").GrokModel[];quota?:GrokQuota;cursorQuota?:CursorQuota;cursorModels?:CursorModel[]}={installed:false,version:null,state:'missing',checkedAt:nowIso(),capabilities:unavailableCapabilities()};
   private executable:AcpExecutable|null=null;
   private executableStamp=-1;
   private readonly sessions=new Map<string,Session>();
@@ -76,7 +79,11 @@ export class AcpRuntime {
     try {
       const init=await connection.call('initialize',{protocolVersion:1,clientCapabilities:this.provider==='cursor'?{_meta:{parameterizedModelPicker:true}}:{},clientInfo:{name:'agentfleets',version:AGENT_VERSION}});
       if(!isRecord(init)||init.protocolVersion!==1||!isRecord(init.agentCapabilities))throw new AgentError('ACP_INCOMPATIBLE','Unsupported native protocol handshake');
-      const capabilities=init.agentCapabilities,sessionCapabilities=isRecord(capabilities.sessionCapabilities)?capabilities.sessionCapabilities:{};
+      const capabilities=init.agentCapabilities;
+      const extensionMeta=isRecord(capabilities._meta)?capabilities._meta:{};
+      const grokCapabilities=isRecord(extensionMeta['x.ai/capabilities'])?extensionMeta['x.ai/capabilities']:{};
+      const toolOverrides=isRecord(grokCapabilities.toolOverrides)?grokCapabilities.toolOverrides:{};
+      const sessionCapabilities=isRecord(capabilities.sessionCapabilities)?capabilities.sessionCapabilities:{};
       const meta=isRecord(init._meta)?init._meta:{};
       const modelState=isRecord(meta.modelState)?meta.modelState:{};
       const models=this.provider==='grok'?parseGrokModels(modelState.availableModels):[];
@@ -88,7 +95,7 @@ export class AcpRuntime {
       catch(error){steer=error instanceof AgentError && error.code==='ACP_REMOTE_ERROR' && error.message.includes('(-32602)');}
       const images=acpImageInput(this.provider,this.executable.version,init);
       if(session)session.imageInput=images;
-      this.availability={...(this.availability.quota?{quota:this.availability.quota}:{}),...(this.provider==='cursor'&&this.availability.cursorQuota?{cursorQuota:this.availability.cursorQuota}:{}),...(this.provider==='cursor'&&this.availability.cursorModels?{cursorModels:this.availability.cursorModels}:{}),installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),steer,models:models.length>0||this.provider==='cursor'&&!!this.availability.cursorModels?.length,usage:(this.provider==='grok'||this.provider==='cursor')&&this.availability.capabilities.usage,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
+      this.availability={...(this.availability.quota?{quota:this.availability.quota}:{}),...(this.provider==='cursor'&&this.availability.cursorQuota?{cursorQuota:this.availability.cursorQuota}:{}),...(this.provider==='cursor'&&this.availability.cursorModels?{cursorModels:this.availability.cursorModels}:{}),...(this.provider==='grok'?{nativeManagement:true,grokTools:['x_keyword_search','x_semantic_search'].filter(k=>toolOverrides[k]===true),commands:Array.isArray(meta.availableCommands)?meta.availableCommands.filter(isRecord).filter(c=>typeof c.name==='string'&&/^[a-z0-9-]{1,80}$/.test(c.name)&&typeof c.description==='string').slice(0,80).map(c=>({name:String(c.name),description:String(c.description).slice(0,500),...(isRecord(c.input)&&typeof c.input.hint==='string'?{hint:c.input.hint.slice(0,200)}:{})})):[]}:{}),installed:true,version:this.executable.version,state:'ready',checkedAt:nowIso(),...(models.length?{models}:{}),capabilities:{...unavailableCapabilities(),steer,models:models.length>0||this.provider==='cursor'&&!!this.availability.cursorModels?.length,usage:(this.provider==='grok'||this.provider==='cursor')&&this.availability.capabilities.usage,images,create:true,prompt:true,cancel:true,approval:true,input:this.provider==='cursor'||this.provider==='grok',resume:capabilities.loadSession===true,history:capabilities.loadSession===true,discover:isRecord(sessionCapabilities.list)}};
       return connection;
     } catch(error) {connection.close();this.markFailure(error);throw error;}
   }
@@ -193,8 +200,8 @@ export class AcpRuntime {
       this.rememberOptions(session,result);session.loading=false;this.sessions.set(session.id,session);return session;
     }catch(error){session.lost=true;session.connection.close();if(error instanceof AgentError&&/\(-32000\)/.test(error.message))this.markFailure(error);throw error;}
   }
-  async createThread(project:ProjectRecord,_profile?:PermissionProfile,name?:string):Promise<ThreadStartResult> {
-    const session=await this.open('',project.root,true);
+  async createThread(project:ProjectRecord,_profile?:PermissionProfile,name?:string,settings?:GrokSettings):Promise<ThreadStartResult> {
+    const session=await this.open('',project.root,true,this.provider==='grok'?settings:undefined);
     this.catalog.set(session.id,{nativeThreadId:session.id,cwd:project.root,title:name??this.provider,titleSource:'name',executionState:'idle',historyMode:'legacy'});
     return {nativeThreadId:session.id,historyMode:'legacy',policyVerified:true,rawSummary:{provider:this.provider,...(session.configOptions.length?{configOptions:session.configOptions}:{}),...(this.provider==='cursor'?{cursorOptions:session.cursorOptions}:{})}};
   }
@@ -218,7 +225,7 @@ export class AcpRuntime {
     session.lost=true;this.resolvePending(session);await session.connection.closeAndWait();
     if(this.sessions.get(id)===session)this.sessions.delete(id);
   }
-  private resolvePending(session:Session) {for(const [id,p] of this.pending)if(p.session===session){clearTimeout(p.timer);this.pending.delete(id);p.resolve({outcome:{outcome:'cancelled'}});void this.callbacks.onApprovalResolved(id,this.appServerEpoch).catch(()=>undefined);}}
+  private resolvePending(session:Session) {for(const [id,p] of this.pending)if(p.session===session){clearTimeout(p.timer);this.pending.delete(id);p.resolve(p.kind==='grokForm'?{outcome:'cancel'}:{outcome:{outcome:'cancelled'}});void this.callbacks.onApprovalResolved(id,this.appServerEpoch).catch(()=>undefined);}}
   /** Only options the native session actually returned are written. Missing ids are left alone. */
   private async applyConfig(session:Session,settings:GrokSettings) {
     const apply=async(configId:string,value?:string)=>{
@@ -229,6 +236,11 @@ export class AcpRuntime {
     };
     await apply('model',settings.model);
     await apply('reasoning_effort',settings.effort);
+    if(settings.contextWindow){
+      const model=settings.model??session.configOptions.find(o=>o.id==='model')?.current;
+      if(!model||!this.availability.models?.find(m=>m.id===model)?.contextWindows?.includes(settings.contextWindow))throw new AgentError('GROK_OPTION_UNAVAILABLE','Native model does not support the selected context window');
+      await session.connection.call('session/set_model',{sessionId:this.native(session.id),modelId:model,_meta:{contextWindow:settings.contextWindow}});
+    }
     if(settings.mode){
       const option=session.configOptions.find(item=>item.id==='plan'||item.id==='mode'||item.id==='task');
       if(option?.values.includes(settings.mode))await apply(option.id,settings.mode);
@@ -268,7 +280,7 @@ export class AcpRuntime {
   async startTurn(thread:ManagedThread,project:ProjectRecord,prompt:string,_messageId?:string,settings?:CodexSettings|GrokSettings|CursorSettings,images?:string[],extras?:TurnExtras) {
     const grok=this.provider==='grok'?parseGrokSettings(settings):undefined;
     const cursor=this.provider==='cursor'&&settings!==undefined?parseCursorSettings(settings):undefined;
-    const blocked=Boolean(extras?.attachments?.length||extras?.pluginSkills?.length||extras?.outputSchema||extras?.goal);
+    const blocked=Boolean(extras?.attachments?.length||extras?.pluginSkills?.length||extras?.outputSchema||(extras?.goal&&this.provider!=='grok'));
     const settingsRejected=this.provider==='grok'?Boolean(settings)&&!grok:this.provider==='cursor'?settings!==undefined&&!cursor:Boolean(settings&&Object.keys(settings).length);
     if(blocked||settingsRejected)throw new AgentError('PROVIDER_INPUT_UNAVAILABLE','This provider currently accepts plain text with native settings only');
     const imageBlocks=acpImageBlocks(images);
@@ -277,8 +289,10 @@ export class AcpRuntime {
     if(this.provider==='grok'&&known&&!known.lost&&known.permissionMode!==desired)await this.unsubscribeThread(known.id);
     await this.deps.unoccupied(this.provider,this.owned);
     const session=await this.open(thread.nativeThreadId,thread.sessionCwd??project.root,false,grok);
+    if(extras?.goal&&this.provider==='grok'){if(!this.availability.commands?.some(c=>c.name==='goal'))throw new AgentError('GROK_OPTION_UNAVAILABLE','Native goal command is unavailable');prompt='/goal '+extras.goal.trim()+'\n'+prompt;}
     if(imageBlocks.length&&!session.imageInput)throw new AgentError('AGENT_IMAGE_UNSUPPORTED','当前智能体未提供可用的图片输入能力；图片未发送，请检查原生版本和模型');
     if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Native turn is already running');
+    if(this.provider==='grok'&&grok?.xSearch!==undefined&&!['x_keyword_search','x_semantic_search'].every(k=>this.availability.grokTools?.includes(k)))throw new AgentError('GROK_OPTION_UNAVAILABLE','Native X search filters are unavailable');
     if(this.provider==='grok'&&grok)await this.applyConfig(session,grok);
     if(this.provider==='cursor'){
       if(session.turnId&&!session.lost)throw new AgentError('PROVIDER_TURN_ACTIVE','Native turn is already running');
@@ -291,7 +305,7 @@ export class AcpRuntime {
     session.items.push({nativeTurnId:turnId,nativeItemId:itemId,item});this.accountItem(session,session.items.at(-1)!);
     await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:itemId,payload:{item}},this.appServerEpoch);
     session.completed.add(itemId);
-    setImmediate(()=>{void session.connection.call('session/prompt',{sessionId:this.native(session.id),prompt:[{type:'text',text:prompt},...imageBlocks]},24*3600000).then(async result=>{
+    setImmediate(()=>{void session.connection.call('session/prompt',{sessionId:this.native(session.id),prompt:[{type:'text',text:prompt},...imageBlocks],...(this.provider==='grok'&&grok?.xSearch!==undefined?{_meta:{toolOverrides:{xSearch:grok?.xSearch?{dateBound:grok.xSearch}:null}}}:{})},24*3600000).then(async result=>{
       if(session.lost||session.turnId!==turnId)return;
       if(!isRecord(result)||typeof result.stopReason!=='string')throw new AgentError('ACP_RESULT_INVALID','Missing native completion evidence');
       let usage=this.provider==='grok'&&this.executable?await this.deps.readGrokUsage(this.executable,this.native(session.id),startedAt):acpUsage(result);
@@ -340,6 +354,101 @@ export class AcpRuntime {
     // "queued" means accepted into the active native turn, not another Fleet turn.
     return {nativeTurnId:turnId,status:'queued'};
   }
+  private readonly grokMemoryPreviews=new Map<string,{hash:string;expires:number}>();
+  async manageGrok(thread:ManagedThread,project:ProjectRecord,value:unknown):Promise<GrokOperationResult> {
+    if(this.provider!=='grok')throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Grok native operations require Grok');
+    const request=parseGrokOperation(value),spec=grokOperations[request.operation];
+    await this.deps.unoccupied(this.provider,this.owned);
+    const session=await this.open(thread.nativeThreadId,thread.sessionCwd??project.root);
+    if(session.lost||session.cwd!==(thread.sessionCwd??project.root))throw new AgentError('GROK_TARGET_CHANGED','Native session changed');
+    if(session.turnId&&spec.write&&!grokLiveOperation(request.operation))throw new AgentError('THREAD_BUSY','Wait for the native turn before changing state');
+    const sessionId=this.native(session.id);
+    const call=async(method:string,args:Record<string,unknown>)=>{
+      try{return await session.connection.call('_x.ai/'+method,args,spec.write?120000:30000);}
+      catch(error){
+        if(error instanceof AgentError&&error.code==='ACP_REMOTE_ERROR'&&/\(-3260[12]\)/.test(error.message))throw new AgentError('GROK_OPERATION_REJECTED','Installed Grok does not support this method or parameter format; no retry was sent');
+        if(!spec.write||method!==spec.method)throw new AgentError('GROK_READ_UNAVAILABLE','Native inspection failed before sending any mutation; retry the read when the host is available');
+        throw error;
+      }
+    };
+    const unwrap=(v:unknown)=>isRecord(v)&&'result' in v?v.result:v;
+    if(spec.write&&!grokLiveOperation(request.operation)){
+      const tasks=unwrap(await call('task/list',{sessionId}));
+      const children=unwrap(await call('subagent/list_running',{sessionId}));
+      if(!isRecord(tasks)||!Array.isArray(tasks.tasks)||!isRecord(children)||!Array.isArray(children.subagents))throw new AgentError('GROK_READ_UNAVAILABLE','Cannot confirm native background activity');
+      if(tasks.tasks.some(task=>!isRecord(task)||task.completed!==true)||children.subagents.length)throw new AgentError('HOST_BUSY','Native background tasks or subagents are still active; no change was sent');
+    }
+    const args:Record<string,unknown>={sessionId,...request.arguments};
+    if(request.operation==='worktrees.list'){delete args.sessionId;args.repo=session.cwd;args.include_all=false;}
+    if(request.operation==='commands.list'||request.operation==='skills.list')args.cwd=session.cwd;
+    if(request.operation==='history.list'){delete args.sessionId;args.cwd=session.cwd;args.filter_session_id=sessionId;}
+    if(request.operation==='memory.flush'||request.operation==='memory.dream'){delete args.sessionId;args.session_id=sessionId;}
+    if(request.operation==='mcp.list')args.cache=true;
+    if(request.operation==='mcp.authStatus'){delete args.sessionId;args.session_id=sessionId;}
+    if(request.operation==='subagent.get'){
+      const data=unwrap(await call(spec.method,{subagentId:args.subagentId,block:false,timeoutMs:0}));
+      if(!isRecord(data)||!isRecord(data.snapshot)||data.snapshot.parentSessionId!==sessionId||data.snapshot.subagentId!==args.subagentId)throw new AgentError('GROK_TARGET_CHANGED','Subagent is not owned by this parent');
+      return grokResult(request.operation,data);
+    }
+    if(request.operation==='git.commit'){args.amend=false;args.push=false;args.sync=false;args.signoff=false;}
+    if(request.operation==='worktrees.diff'||request.operation==='worktrees.apply'){
+      const records=unwrap(await call('git/worktree/list',{repo:project.root,include_all:false}));
+      const row=Array.isArray(records)?records.find(r=>isRecord(r)&&r.path===args.worktreePath&&r.session_id===sessionId):undefined;
+      if(!isRecord(row)||typeof row.source_repo!=='string')throw new AgentError('GROK_TARGET_CHANGED','Worktree is not registered to this session');
+      const canonical=await Promise.all([realpath(project.root),realpath(row.source_repo),realpath(String(args.worktreePath))]).catch(()=>undefined);
+      if(!canonical||canonical[1]!==canonical[0]||canonical[2]===canonical[0]||canonical[2]!==args.worktreePath)throw new AgentError('GROK_TARGET_CHANGED','Worktree source or path changed');
+      if(request.operation==='worktrees.apply')args.mode='merge';
+      else {args.gitRoot=canonical[2];delete args.worktreePath;}
+    }
+    if(request.operation==='git.status'){args.includeUntracked=true;args.includeStats=true;args.includePatches=false;}
+    if(request.operation==='git.diff'||request.operation==='worktrees.diff'){args.from='HEAD';args.to='working';args.includePatch=true;args.includeContent=false;args.maxPatchBytes=20000;args.maxPatchLines=300;}
+    if(request.operation==='search.content'){args.cwd=session.cwd;args.isRegex=false;args.respectGitignore=true;args.maxFiles=30;args.maxMatches=100;}
+
+    if(request.operation==='session.rename')args.cwd=session.cwd;
+    if(request.operation==='worktrees.create'){args.sourcePath=session.cwd;args.worktreeType='git';args.copyMode='clean';}
+    if(request.operation==='session.fork'){delete args.sessionId;args.sourceSessionId=sessionId;args.sourceCwd=session.cwd;args.newCwd=session.cwd;}
+    if(request.operation==='memory.enable'||request.operation==='memory.disable')args.enabled=request.operation==='memory.enable';
+    if(request.operation.startsWith('plugins.')&&spec.write){
+      if(args.pluginId){const list=unwrap(await call('plugins/list',{sessionId}));if(!isRecord(list)||!Array.isArray(list.plugins)||!list.plugins.some(p=>isRecord(p)&&p.id===args.pluginId))throw new AgentError('GROK_TARGET_CHANGED','Plugin is no longer listed');}
+      args.action={type:request.operation.split('.')[1],...(args.pluginId?{plugin_id:args.pluginId}:{}),...(args.source?{source:args.source}:{}),...(request.operation==='plugins.uninstall'?{confirmed:false}:{})};delete args.pluginId;delete args.source;
+    }
+    if(request.operation.startsWith('hooks.')&&spec.write){
+      if(args.hookName){const list=unwrap(await call('hooks/list',{sessionId}));if(!isRecord(list)||!Array.isArray(list.hooks)||!list.hooks.some(p=>isRecord(p)&&p.name===args.hookName&&p.pinned!==true))throw new AgentError('GROK_TARGET_CHANGED','Hook is no longer listed or is pinned by native policy');}
+      args.action={type:request.operation.split('.')[1],...(args.hookName?{hook_name:args.hookName}:{})};delete args.hookName;
+    }
+    if(request.operation==='task.stop'||request.operation==='subagent.stop'){
+      const children=request.operation==='subagent.stop';
+      const listing=unwrap(await call(children?'subagent/list_running':'task/list',{sessionId}));
+      const entries=isRecord(listing)?listing[children?'subagents':'tasks']:undefined;
+      const target=request.arguments[children?'subagentId':'taskId'];
+      if(!Array.isArray(entries)||!entries.some(v=>isRecord(v)&&(v.subagentId??v.task_id??v.taskId??v.id)===target&&(!children||v.parentSessionId===sessionId)))throw new AgentError('GROK_TARGET_CHANGED','Task is no longer listed for this parent');
+      if(children)delete args.sessionId;
+    }
+    if(request.operation==='memory.forget'||request.operation==='memory.preview'){
+      const listing=unwrap(await call('memory/list',{sessionId}));
+      if(!isRecord(listing)||!Array.isArray(listing.files)||!listing.files.some(v=>isRecord(v)&&v.path===args.path&&(request.operation==='memory.preview'||v.generated!==true)))throw new AgentError('GROK_TARGET_CHANGED','Memory note is no longer listed for this session');
+    }
+    if(request.operation==='memory.preview'){
+      const preview=unwrap(await call('fs/read_file',{sessionId,path:args.path,maxBytes:4000}));
+      if(!isRecord(preview)||typeof preview.content!=='string'||preview.contentBase64||typeof preview.size!=='number'||Buffer.byteLength(preview.content)!==preview.size||preview.size>4000)throw new AgentError('GROK_MEMORY_PREVIEW_LIMIT','Only complete UTF-8 notes up to 4000 bytes can be previewed and deleted here');
+      const hash=Buffer.from(blake3(Buffer.from(preview.content))).toString('hex');
+      if(this.grokMemoryPreviews.size>=32)this.grokMemoryPreviews.clear();
+      this.grokMemoryPreviews.set(session.id+'\0'+args.path,{hash,expires:Date.now()+300000});
+      return grokResult(request.operation,{path:args.path,content:preview.content,expectedContentHash:hash});
+    }
+    if(request.operation==='memory.forget'){
+      const preview=this.grokMemoryPreviews.get(session.id+'\0'+args.path);
+      if(!preview||preview.expires<Date.now()||preview.hash!==args.expectedContentHash)throw new AgentError('GROK_MEMORY_PREVIEW_REQUIRED','Preview this exact note again before deleting');
+      this.grokMemoryPreviews.delete(session.id+'\0'+args.path);
+    }
+    if(request.operation==='rewind.execute'){
+      const points=unwrap(await call('rewind/points',{sessionId}));
+      if(!isRecord(points)||!Array.isArray(points.rewind_points)||!points.rewind_points.some(p=>isRecord(p)&&p.prompt_index===args.targetPromptIndex&&(args.mode==='conversation_only'||p.has_file_changes===true)))throw new AgentError('GROK_TARGET_CHANGED','Checkpoint is unavailable for the selected rewind mode');
+      args.force=false;
+    }
+    try {return grokResult(request.operation,await call(spec.method,args));}
+    catch(error){if(error instanceof AgentError&&error.code==='ACP_REMOTE_ERROR'&&error.message.includes('(-32601)'))throw new AgentError('GROK_OPERATION_UNAVAILABLE','Installed Grok does not expose this native operation');throw error;}
+  }
   async interruptTurn(id:string,turnId:string) {
     const session=this.sessions.get(id);if(!session||session.lost||session.turnId!==turnId)throw new AgentError('PROVIDER_TURN_CHANGED','Native turn is no longer current');
     session.cancelled=true;session.connection.notify('session/cancel',{sessionId:this.native(id)});this.resolvePending(session);return {requested:true};
@@ -363,9 +472,11 @@ export class AcpRuntime {
     if(session.id&&params.sessionId!==this.native(session.id))throw new AgentError('ACP_SESSION_MISMATCH','Event belongs to a different native session');
     const update=params.update,kind=update.sessionUpdate;
     if(extension){
-      if(!session.turnId||session.loading)return;
+      if(session.loading)return;
       const text=grokProgressText(update);
       if(!text)return;
+      if(kind==='goal_updated'){if(session.published.get('native-goal')===text)return;session.published.set('native-goal',text);}
+      if(!session.turnId){const id=randomUUID();await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeItemId:id,payload:{item:{id,type:'reasoning',text}}},this.appServerEpoch);return;}
       await this.finishText(session);
       const id=`${session.turnId}:notice:${session.items.length}`;
       const item={id,type:'reasoning',text};
@@ -432,8 +543,8 @@ export class AcpRuntime {
     }
   }
   private async request(session:Session,method:string,params:Record<string,unknown>):Promise<unknown> {
-    if(session.loading||session.lost||!session.turnId||(params.sessionId !== undefined ? params.sessionId!==this.native(session.id) : !method.startsWith('cursor/') || this.provider!=='cursor'))return {outcome:{outcome:'cancelled'}};
-    const kind=method==='session/request_permission'?'permission':method==='cursor/ask_question'?'question':method==='cursor/create_plan'?'plan':null;
+    if(session.loading||session.lost||!session.turnId||(params.sessionId !== undefined ? params.sessionId!==this.native(session.id) : !method.startsWith('cursor/') || this.provider!=='cursor'))return method==='_x.ai/mcp/elicit'?{outcome:'cancel'}:{outcome:{outcome:'cancelled'}};
+    const kind=method==='session/request_permission'?'permission':method==='cursor/ask_question'?'question':method==='cursor/create_plan'?'plan':this.provider==='grok'&&method==='_x.ai/mcp/elicit'?'grokForm':null;
     if(!kind)throw new AgentError('ACP_METHOD_UNAVAILABLE','Native client request is unsupported');
     const thread=this.callbacks.findManagedThread(session.id);if(!thread)throw new AgentError('ACP_UNMANAGED','Session no longer managed');
     const options=Array.isArray(params.options)?params.options.filter(isRecord):[];
@@ -443,6 +554,8 @@ export class AcpRuntime {
     }
     let questions:InputQuestion[]|undefined;
     let nativeQuestions:Array<Record<string,unknown>>|undefined;
+    const form=kind==='grokForm'?grokForm(params):undefined;
+    if(form)questions=form.questions;
     if(kind==='question') {
       if(this.provider!=='cursor'||!Array.isArray(params.questions)||!params.questions.every(isRecord)) throw new AgentError('ACP_QUESTION_INVALID','Unsupported native question');
       nativeQuestions=params.questions;
@@ -450,13 +563,14 @@ export class AcpRuntime {
       questions=inputQuestions(nativeQuestions.map(q=>({id:q.id,header:typeof params.title==='string'?params.title:'Cursor',question:q.prompt,isOther:false,options:(q.options as Array<Record<string,unknown>>).map(o=>({label:o.label,description:''}))})));
     }
     const id=randomUUID();const timestamp=nowIso();
-    const approval:ApprovalRecord={approvalId:id,nativeRequestId:id,appServerEpoch:this.appServerEpoch,nativeThreadId:session.id,nativeTurnId:session.turnId,projectId:thread.projectId,method:kind==='question'?'item/tool/requestUserInput':'item/commandExecution/requestApproval',actionHash:sha256(canonicalJson(params)),params:kind==='question'?{kind:'user_input',isBlocking:true,questions}:{reason:JSON.stringify(kind==='plan'?params:params.toolCall??{}).slice(0,10000)},state:'pending',createdAt:timestamp,updatedAt:timestamp,expiresAt:new Date(Date.now()+600000).toISOString()};
-    return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.pending.delete(id);resolve({outcome:{outcome:'cancelled'}});void this.callbacks.onApprovalResolved(id,this.appServerEpoch).catch(()=>undefined);},600000);timer.unref();this.pending.set(id,{session,request:approval,options,resolve,timer,kind,questions,nativeQuestions});void this.callbacks.onApproval(approval).catch(error=>{clearTimeout(timer);this.pending.delete(id);reject(error);});});
+    const approval:ApprovalRecord={approvalId:id,nativeRequestId:id,appServerEpoch:this.appServerEpoch,nativeThreadId:session.id,nativeTurnId:session.turnId,projectId:thread.projectId,method:(kind==='question'||kind==='grokForm')?'item/tool/requestUserInput':'item/commandExecution/requestApproval',actionHash:sha256(canonicalJson(params)),params:(kind==='question'||kind==='grokForm')?{kind:'user_input',isBlocking:true,questions}:{reason:JSON.stringify(kind==='plan'?params:params.toolCall??{}).slice(0,10000)},state:'pending',createdAt:timestamp,updatedAt:timestamp,expiresAt:new Date(Date.now()+600000).toISOString()};
+    return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.pending.delete(id);resolve(kind==='grokForm'?{outcome:'cancel'}:{outcome:{outcome:'cancelled'}});void this.callbacks.onApprovalResolved(id,this.appServerEpoch).catch(()=>undefined);},600000);timer.unref();this.pending.set(id,{session,request:approval,options,resolve,timer,kind,questions,nativeQuestions,...(form?{form}:{})});void this.callbacks.onApproval(approval).catch(error=>{clearTimeout(timer);this.pending.delete(id);reject(error);});});
   }
   async respondApproval(approval:ApprovalRecord,decision:'accept'|'decline'|'cancel') {
     const p=this.pending.get(String(approval.nativeRequestId));if(!p||p.request.actionHash!==approval.actionHash||p.session.turnId!==approval.nativeTurnId||approval.appServerEpoch!==this.appServerEpoch)throw new AgentError('APPROVAL_STALE','Native approval is no longer current');
     let result:unknown={outcome:{outcome:'cancelled'}};
-    if(p.kind==='plan')result={outcome:{outcome:decision==='accept'?'accepted':decision==='decline'?'rejected':'cancelled'}};
+    if(p.kind==='grokForm'){if(decision==='accept')throw new AgentError('INPUT_REQUIRED','MCP questions require explicit answers');result={outcome:decision==='decline'?'decline':'cancel'};}
+    else if(p.kind==='plan')result={outcome:{outcome:decision==='accept'?'accepted':decision==='decline'?'rejected':'cancelled'}};
     else if(p.kind==='permission'&&decision!=='cancel') {
       const option=p.options.find(o=>o.kind===(decision==='accept'?'allow_once':'reject_once'));
       if(option&&typeof option.optionId==='string')result={outcome:{outcome:'selected',optionId:option.optionId}};
@@ -466,6 +580,10 @@ export class AcpRuntime {
   }
   async respondInput(approval:ApprovalRecord,answers:InputAnswers){
     const p=this.pending.get(String(approval.nativeRequestId));
+    if(p?.kind==='grokForm'&&p.form){
+      if(p.session.lost||p.session.turnId!==approval.nativeTurnId||p.request.actionHash!==approval.actionHash||approval.appServerEpoch!==this.appServerEpoch)throw new AgentError('APPROVAL_STALE','MCP form is no longer current');
+      const content=grokFormAnswer(p.form,answers);clearTimeout(p.timer);this.pending.delete(String(approval.nativeRequestId));p.resolve({outcome:'accept',content});await this.callbacks.onApprovalResolved(approval.nativeRequestId,this.appServerEpoch);return;
+    }
     if(!p||p.kind!=='question'||!p.questions||!p.nativeQuestions||p.session.lost||p.session.turnId!==approval.nativeTurnId||p.request.actionHash!==approval.actionHash||approval.appServerEpoch!==this.appServerEpoch)throw new AgentError('APPROVAL_STALE','Native question is no longer current');
     const validated=inputAnswers(answers,p.questions);
     const selected=p.nativeQuestions.map(q=>{

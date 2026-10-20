@@ -47,3 +47,13 @@ it('native model choices are usable before a first turn; incompatible effort is 
  fireEvent.click(screen.getByRole('button',{name:'保存'}));
  await waitFor(()=>expect(onSave).toHaveBeenCalledWith({model:'grok-small',effort:undefined}));
 });
+
+it('context windows remain native numeric values and startup fields lock on an existing session',async()=>{
+ const onSave=vi.fn().mockResolvedValue(undefined);
+ render(<GrokControls options={catalog.options} models={[{...catalog.models![0]!,contextWindows:[256000,500000]}]} settings={{model:'grok-full'}} ready error="" onReload={()=>{}} onSave={onSave} disabled={false} allowStartup={false} xSearchSupported/>);
+ fireEvent.click(screen.getByRole('button',{name:'Grok Build 设置'}));
+ fireEvent.change(screen.getByLabelText('上下文窗口'),{target:{value:'500000'}});
+ expect((screen.getByLabelText('附加规则') as HTMLTextAreaElement).disabled).toBe(true);
+ fireEvent.click(screen.getByRole('button',{name:'保存'}));
+ await waitFor(()=>expect(onSave).toHaveBeenCalledWith({model:'grok-full',contextWindow:500000}));
+});

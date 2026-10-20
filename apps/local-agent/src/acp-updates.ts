@@ -2,6 +2,11 @@ import {isRecord} from './util.js';
 
 export interface GrokSettings {
   model?: string;
+  contextWindow?: number;
+  xSearch?:{fromDate?:string;toDate?:string}|null;
+  rules?:string;
+  systemPromptOverride?:string;
+  agentProfile?:string;
   effort?: string;
   permissionMode?: 'default' | 'always' | 'auto';
   mode?: 'default' | 'plan';
@@ -15,8 +20,20 @@ export type TokenCounts=Record<(typeof keys)[number],number>;
 export function parseGrokSettings(value:unknown):GrokSettings|undefined {
   if(value===undefined)return undefined;
   if(!isRecord(value))return undefined;
-  if(Object.keys(value).some(key=>!['model','effort','permissionMode','mode'].includes(key)))return undefined;
+  if(Object.keys(value).some(key=>!['model','effort','permissionMode','mode','contextWindow','rules','systemPromptOverride','agentProfile','xSearch'].includes(key)))return undefined;
   const settings:GrokSettings={};
+  for(const key of ['rules','systemPromptOverride','agentProfile'] as const){const text=value[key];if(text!==undefined){if(typeof text!=='string'||!text.trim()||text.length>(key==='agentProfile'?120:8000)||text.includes('\0')||key==='agentProfile'&&!idText(text))return undefined;settings[key]=text;}}
+  if(settings.rules&&settings.systemPromptOverride)return undefined;
+  if(value.xSearch===null)settings.xSearch=null;
+  else if(value.xSearch!==undefined){
+    const x=value.xSearch;if(!isRecord(x)||Object.keys(x).some(k=>!['fromDate','toDate'].includes(k)))return undefined;
+    const bounds:{fromDate?:string;toDate?:string}={};
+    for(const key of ['fromDate','toDate'] as const){const d=x[key];if(d!==undefined){if(typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d)||d.startsWith('0000')||!Number.isFinite(Date.parse(d))||new Date(d).toISOString().slice(0,10)!==d)return undefined;bounds[key]=d;}}
+    if(bounds.fromDate&&bounds.toDate&&bounds.fromDate>bounds.toDate)return undefined;
+    if(!bounds.fromDate&&!bounds.toDate)return undefined;settings.xSearch=bounds;
+  }
+  if(value.contextWindow!==undefined){if(!Number.isSafeInteger(value.contextWindow)||Number(value.contextWindow)<1||Number(value.contextWindow)>10_000_000)return undefined;settings.contextWindow=Number(value.contextWindow);}
+
   if(value.model!==undefined){if(typeof value.model!=='string'||!idText(value.model))return undefined;settings.model=value.model;}
   if(value.effort!==undefined){if(typeof value.effort!=='string'||!idText(value.effort))return undefined;settings.effort=value.effort;}
   if(value.permissionMode!==undefined){if(value.permissionMode!=='default'&&value.permissionMode!=='always'&&value.permissionMode!=='auto')return undefined;settings.permissionMode=value.permissionMode;}
@@ -24,7 +41,7 @@ export function parseGrokSettings(value:unknown):GrokSettings|undefined {
   return settings;
 }
 export function grokSettingsActive(settings?:GrokSettings):boolean {
-  return Boolean(settings&&(settings.model||settings.effort||(settings.permissionMode&&settings.permissionMode!=='default')||settings.mode==='plan'));
+  return Boolean(settings&&(settings.xSearch!==undefined||settings.rules||settings.systemPromptOverride||settings.agentProfile||settings.model||settings.effort||settings.contextWindow||(settings.permissionMode&&settings.permissionMode!=='default')||settings.mode==='plan'));
 }
 /** Flags belong after `agent` and before `stdio`. Only documented model and always-approve flags are added. */
 export function grokLaunchArgs(base:string[],settings?:GrokSettings):string[] {
@@ -37,10 +54,12 @@ export function grokLaunchArgs(base:string[],settings?:GrokSettings):string[] {
   return args;
 }
 /** `_meta` is documented on session/new, not on session/load. */
-export function grokSessionMeta(settings?:GrokSettings):Record<string,boolean>|undefined {
-  if(settings?.permissionMode==='always')return {yoloMode:true};
-  if(settings?.permissionMode==='auto')return {autoMode:true};
-  return undefined;
+export function grokSessionMeta(settings?:GrokSettings):Record<string,unknown>|undefined {
+  const meta:Record<string,unknown>={};
+  if(settings?.permissionMode==='always')meta.yoloMode=true;
+  else if(settings?.permissionMode==='auto')meta.autoMode=true;
+  for(const key of ['rules','systemPromptOverride','agentProfile'] as const)if(settings?.[key])meta[key]=settings[key];
+  return Object.keys(meta).length?meta:undefined;
 }
 function optionValue(value:unknown):string|undefined {
   if(typeof value==='string'&&idText(value))return value;
@@ -141,7 +160,7 @@ export function acpUsage(result:Record<string,unknown>):{usage:{total:TokenCount
   return undefined;
 }
 
-export interface GrokModel {id:string;name:string;efforts:string[];}
+export interface GrokModel {id:string;name:string;efforts:string[];contextWindows?:number[];}
 /** Keep only displayable catalog fields; never forward initialize metadata wholesale. */
 export function parseGrokModels(value:unknown):GrokModel[] {
   if(!Array.isArray(value))return [];
@@ -153,7 +172,9 @@ export function parseGrokModels(value:unknown):GrokModel[] {
     const meta=isRecord(entry._meta)?entry._meta:{};
     const raw=Array.isArray(entry.efforts)?entry.efforts:Array.isArray(meta.reasoningEfforts)?meta.reasoningEfforts:[];
     const efforts=meta.supportsReasoningEffort===false?[]:[...new Set(raw.slice(0,32).map(optionValue).filter((v):v is string=>Boolean(v)))];
-    models.push({id,name:typeof entry.name==='string'?entry.name.slice(0,120):id,efforts});
+    const rawWindows=meta.contextWindows??entry.contextWindows;
+    const contextWindows=Array.isArray(rawWindows)?[...new Set(rawWindows)].filter((n):n is number=>typeof n==='number'&&Number.isSafeInteger(n)&&n>0&&n<=10_000_000).slice(0,16):[];
+    models.push({id,...(contextWindows.length?{contextWindows}:{}),name:typeof entry.name==='string'?entry.name.slice(0,120):id,efforts});
   }
   return models;
 }
@@ -166,6 +187,11 @@ export function grokModelOptions(models:GrokModel[],current?:string):ConfigOptio
 /** Progress only: these notifications cannot finish a task or authorize another action. */
 export function grokProgressText(update:Record<string,unknown>):string|undefined {
   switch(update.sessionUpdate) {
+    case 'goal_updated':return `Grok 原生目标 · ${String(update.status??'unknown').slice(0,80)} · ${String(update.phase??'').slice(0,80)}`;
+    case 'subagent_spawned':return `Grok 子智能体已启动 · ${String(update.subagent_id??'').slice(0,120)} · ${String(update.description??update.subagent_type??'').slice(0,500)}`;
+    case 'subagent_finished':return `Grok 子智能体状态 · ${String(update.subagent_id??'').slice(0,120)} · ${String(update.status??'unknown').slice(0,80)}`;
+    case 'task_backgrounded':return `Grok 后台任务已启动 · ${String(update.task_id??'').slice(0,120)} · ${String(update.description??update.monitor_description??'').slice(0,500)}`;
+    case 'scheduled_task_created':case 'scheduled_task_fired':case 'scheduled_task_deleted':return `Grok 原生定时任务 · ${String(update.task_id??'').slice(0,120)} · ${String(update.sessionUpdate).slice(0,80)} · ${String(update.human_schedule??'').slice(0,300)}${typeof update.next_fire_at==='string'?' · '+update.next_fire_at.slice(0,80):''}`;
     case 'retry_state':
       if(update.type==='retrying')return `Grok 正在重试${Number.isSafeInteger(update.attempt)?`（第 ${update.attempt} 次）`:''}`;
       if(update.type==='exhausted'||update.type==='failed')return 'Grok 请求遇到错误，等待原生任务结果';

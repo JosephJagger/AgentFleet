@@ -1,3 +1,4 @@
+import {parseGrokOperation,grokOperations,grokLiveOperation,sanitizeGrokResult} from './grok-operations.js';
 import { isAcpProvider, supportsImageInput, supportsProviderCommand } from "./provider-catalog.js";
 import { DEFAULT_TAKEOVER_IDLE_DAYS } from "./takeover-policy.js";
 import { directoryTurnConflict } from "./directory-turn-lock.js";
@@ -566,7 +567,7 @@ export class CoordinationService {
         const raw = this.db.get<{discovery_json:string|null}>("SELECT discovery_json FROM machines WHERE machine_id=?",session.machine_id);
         invariant(supportsProviderCommand(JSON.parse(raw?.discovery_json ?? '{}')?.agentRuntimes?.[session.provider],input.type,Boolean(session.native_thread_id)),409,'AGENT_CAPABILITY_UNAVAILABLE','Official CLI has not reported support for this operation');
         if (session.provider === "grok" && payload.settings !== undefined && !parseGrokSettings(payload.settings)) invariant(false,400,"GROK_SETTINGS_INVALID","Unsupported Grok Build settings");
-        invariant((session.provider === "grok" || session.provider === "cursor" || payload.settings === undefined) && payload.outputSchema === undefined && payload.goal === undefined && payload.nativeCollaboration === undefined && !['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(payload[key]) && (payload[key] as unknown[]).length),400,'AGENT_INPUT_UNSUPPORTED','This provider currently accepts text using its native settings');
+        invariant((session.provider === "grok" || session.provider === "cursor" || payload.settings === undefined) && payload.outputSchema === undefined && (payload.goal === undefined || session.provider === "grok") && payload.nativeCollaboration === undefined && !['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(payload[key]) && (payload[key] as unknown[]).length),400,'AGENT_INPUT_UNSUPPORTED','This provider currently accepts text using its native settings');
       }
       invariant(!blocksDuringMaintenance(session.maintenance_json,input.type),409,"MACHINE_DRAINING",MAINTENANCE_MESSAGE);
       if (session.provider === "codex" && (input.type === "turn.start" || input.type === "turn.queue")) {
@@ -628,6 +629,7 @@ export class CoordinationService {
       }
       invariant(supportsCommand(session.command_types_json, input.type), 409, "AGENT_CAPABILITY_UNAVAILABLE", "Agent has not reported support for this operation; update the connection service");
       if (["turn.start", "turn.queue", "turn.compact", "turn.review", "thread.claim"].includes(input.type)) {
+        invariant(!this.pendingGrokMutation(session.machine_id),409,'GROK_OPERATION_PENDING','Wait for native Grok changes to be confirmed');
         invariant(!this.pendingCodexMutation(session.machine_id), 409, "CODEX_OPERATION_PENDING", "Wait for Codex environment changes to be confirmed before starting tasks");
       }
       const references = parseReferences(payload.references);
@@ -734,6 +736,16 @@ export class CoordinationService {
         invariant(Object.keys(payload).length === 0, 400, "INVALID_NATIVE_PAYLOAD", "Stopping background terminals takes no payload");
         invariant(session.native_thread_id && precondition.nativeThreadId === session.native_thread_id && precondition.executionSegmentId === executionSegmentId, 409, "THREAD_VERSION_CONFLICT", "Terminal target changed");
         invariant(precondition.threadControlVersion === session.thread_control_version && precondition.projectLeaseVersion === session.project_lease_version && precondition.expectedActiveTurnId === session.active_turn_id, 409, "THREAD_VERSION_CONFLICT", "Refresh the exact terminal target before stopping");
+      } else if (input.type === "grok.manage") {
+        invariant(session.provider==='grok',400,'GROK_SESSION_REQUIRED','Native management requires a Grok session');
+        this.requireLease(principal,logicalSessionId,input.controlLeaseId);
+        let request;try{request=parseGrokOperation(payload);}catch{throw new AppError(400,'GROK_OPERATION_INVALID','Invalid or unconfirmed native operation');}
+        invariant(session.managed&&session.native_thread_id&&precondition.nativeThreadId===session.native_thread_id&&precondition.executionSegmentId===executionSegmentId&&precondition.threadControlVersion===session.thread_control_version&&precondition.projectLeaseVersion===session.project_lease_version&&precondition.expectedActiveTurnId===session.active_turn_id,409,'GROK_TARGET_CHANGED','Refresh the exact Grok session');
+        invariant(session.sync_content===1,409,'CONTENT_SYNC_DISABLED','Enable project content sync before reading native data');
+        invariant(!this.db.get("SELECT 1 FROM commands c JOIN command_projection cp USING(command_id) JOIN logical_sessions s USING(logical_session_id) WHERE s.machine_id=? AND c.type='grok.manage' AND cp.state IN ('accepted','dispatching','unknown') LIMIT 1",session.machine_id),409,'GROK_OPERATION_PENDING','Wait for the prior native operation');
+        if(grokOperations[request.operation].write&&!grokLiveOperation(request.operation))invariant(!this.db.get("SELECT 1 FROM voice_sessions WHERE machine_id=? AND state<>'closed' LIMIT 1",session.machine_id)&&!this.db.get("SELECT 1 FROM panel_voice_calls WHERE machine_id=? AND state<>'closed' LIMIT 1",session.machine_id),409,'HOST_BUSY','Finish host voice calls before changing native state');
+        if(grokOperations[request.operation].write&&!grokLiveOperation(request.operation))invariant(!this.db.get("SELECT 1 FROM approvals a JOIN logical_sessions s USING(logical_session_id) WHERE s.machine_id=? AND a.state='pending' LIMIT 1",session.machine_id)&&!this.db.get("SELECT 1 FROM turn_queue q JOIN logical_sessions s USING(logical_session_id) WHERE s.machine_id=? AND q.state IN ('queued','dispatching','unknown') LIMIT 1",session.machine_id),409,'SESSION_HAS_PENDING_WORK','Resolve pending approvals and queued work first');
+        if(grokOperations[request.operation].write&&!grokLiveOperation(request.operation))invariant(!this.db.get("SELECT 1 FROM logical_sessions WHERE machine_id=? AND active_turn_id IS NOT NULL LIMIT 1",session.machine_id)&&!this.db.get("SELECT 1 FROM project_turn_reservations r JOIN projects p USING(project_id) WHERE p.machine_id=? LIMIT 1",session.machine_id),409,'HOST_BUSY','Finish host work before changing native state');
       } else if (input.type === "codex.manage") {
         this.requireLease(principal, logicalSessionId, input.controlLeaseId);
         let request;
@@ -1095,6 +1107,7 @@ export class CoordinationService {
     const result = Object.fromEntries(["nativeThreadId", "nativeTurnId", "status", "claimed", "released", "writerReleased", "hostThreadPreserved", "importedItems", "title", "archived", "forkedNativeThreadId", "backgroundTerminalsStopped"]
       .filter((key) => ["string", "number", "boolean"].includes(typeof resultValue[key])).map((key) => [key, resultValue[key]]));
     if (row.type === "thread.delete.preview" && resultValue.deletionPreview && typeof resultValue.deletionPreview === "object" && JSON.stringify(resultValue.deletionPreview).length <= 32_000) result.deletionPreview = resultValue.deletionPreview;
+    if(row.type==='grok.manage')result.grokResult=sanitizeGrokResult(resultValue.grokResult);
     if (row.type === "codex.manage") result.codexResult = sanitizeCodexResult(resultValue.codexResult);
     if (row.type === "codex.inspect" && resultValue.inspection && typeof resultValue.inspection === "object" && JSON.stringify(resultValue.inspection).length <= 32_000) result.inspection = sanitizeInspection(resultValue.inspection);
     return {
@@ -1276,6 +1289,11 @@ export class CoordinationService {
   }
 
   /** Promote exactly one queue head after a terminal turn; no Attempt exists before this point. */
+  private pendingGrokMutation(machineId:string):boolean {
+    const pending=this.db.all<{body:string}>(`SELECT COALESCE(cc.body_json,c.payload_json) AS body FROM commands c JOIN command_projection cp USING(command_id) JOIN logical_sessions s USING(logical_session_id) LEFT JOIN command_contents cc ON cc.command_id=c.command_id AND cc.deleted_at IS NULL WHERE s.machine_id=? AND c.type='grok.manage' AND cp.state IN ('accepted','dispatching','unknown')`,machineId);
+    return pending.some(row=>{try{const r=parseGrokOperation(JSON.parse(row.body));return grokOperations[r.operation].write&&!grokLiveOperation(r.operation);}catch{return true;}});
+  }
+
   private pendingCodexMutation(machineId: string): boolean {
     const pending = this.db.all<{ body: string }>(
       `SELECT COALESCE(cc.body_json,c.payload_json) AS body FROM commands c
@@ -1308,7 +1326,7 @@ export class CoordinationService {
         if(!supportsProviderCommand(JSON.parse(raw?.discovery_json??'{}')?.agentRuntimes?.[session.provider],'turn.start',Boolean(session.native_thread_id)))return null;
       }
       if (directoryTurnConflict(this.db, session.project_id, logicalSessionId)) return null;
-      if (this.pendingCodexMutation(session.machine_id) || this.db.get("SELECT 1 FROM voice_sessions WHERE project_id=? AND state<>'closed'",session.project_id)) return null;
+      if (this.pendingGrokMutation(session.machine_id) || this.pendingCodexMutation(session.machine_id) || this.db.get("SELECT 1 FROM voice_sessions WHERE project_id=? AND state<>'closed'",session.project_id)) return null;
       if (this.db.get("SELECT 1 FROM turn_queue WHERE logical_session_id=? AND state='unknown'", logicalSessionId)) return null;
 
       const timestamp = nowIso();
@@ -1869,7 +1887,7 @@ export class CoordinationService {
       const rows = this.db.all<{ command_id: string }>(
         `SELECT c.command_id FROM commands c
          JOIN command_projection cp ON cp.command_id=c.command_id
-         WHERE c.type IN ('turn.start','turn.queue','turn.compact','turn.review','thread.rename','thread.archive','thread.unarchive','thread.fork','thread.delete.preview','thread.delete','thread.terminals.stop','codex.inspect','codex.manage','input.respond') AND cp.state='accepted' AND c.expires_at<=?
+         WHERE c.type IN ('turn.start','turn.queue','turn.compact','turn.review','thread.rename','thread.archive','thread.unarchive','thread.fork','thread.delete.preview','thread.delete','thread.terminals.stop','codex.inspect','codex.manage','grok.manage','input.respond') AND cp.state='accepted' AND c.expires_at<=?
            AND NOT EXISTS (
              SELECT 1 FROM dispatch_attempts a JOIN dispatch_attempt_projection p ON p.dispatch_attempt_id=a.dispatch_attempt_id
              WHERE a.command_id=c.command_id AND p.state<>'delivery_failed_before_claim'

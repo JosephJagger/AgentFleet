@@ -37,7 +37,7 @@ export function createMultiRuntime(callbacks: AppServerCallbacks, options: {code
     }
     return lastAdditionalCatalog;
   };
-  const routed = new Set(["createThread", "readThread", "readHistoryPage", "readConversation", "readNativeSubagents", "readTurnOutcome", "resumeThread", "unsubscribeThread", "startTurn", "steerTurn", "interruptTurn", "respondApproval", "respondInput", "threadAction", "startNativeTurn", "inspectEnvironment", "previewDeletion", "deleteThread", "stopBackgroundTerminals"]);
+  const routed = new Set(["manageGrok", "createThread", "readThread", "readHistoryPage", "readConversation", "readNativeSubagents", "readTurnOutcome", "resumeThread", "unsubscribeThread", "startTurn", "steerTurn", "interruptTurn", "respondApproval", "respondInput", "threadAction", "startNativeTurn", "inspectEnvironment", "previewDeletion", "deleteThread", "stopBackgroundTerminals"]);
   let lastClaudeCatalog: Awaited<ReturnType<ClaudeRuntime["listThreads"]>> = [];
   const claudeCatalog = async () => { try { lastClaudeCatalog = await claude.listThreads(); delete claude.availability.error; } catch { claude.availability.error = "Claude 会话扫描失败，将自动重试"; } return lastClaudeCatalog; };
   const status = () => { if(codexReadable) void claude.refreshMetadata(); return { codex: { installed: codexReadable }, claude: claude.availability, ...Object.fromEntries([...additional].map(([id,runtime]) => [id,runtime.availability])) }; };

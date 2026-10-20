@@ -76,6 +76,27 @@ export class VideoStorage {
       return { url, expiresIn: 300 };
     });
   }
+  async preview(principal: Principal, source: unknown) {
+    const config = this.scope(principal);
+    invariant(typeof source === "string" && source.length <= 4096, 400, "VIDEO_PREVIEW_INVALID", "预览地址无效");
+    let url: URL;
+    try { url = new URL(source); } catch { throw new AppError(400, "VIDEO_PREVIEW_INVALID", "预览地址无效"); }
+    const endpoint = new URL(config.endpoint), base = endpoint.pathname.replace(/\/$/, "") + "/" + config.bucket + "/";
+    invariant(url.origin === endpoint.origin && !url.username && !url.password && url.pathname.startsWith(base), 400, "VIDEO_PREVIEW_INVALID", "仅支持当前工作区配置的存储地址");
+    let path: string; try { path = decodeURIComponent(url.pathname.slice(base.length)); } catch { throw new AppError(400, "VIDEO_PREVIEW_INVALID", "预览地址无效"); }
+    const key = this.key(principal, path);
+    const mime = ({mp4:"video/mp4",webm:"video/webm",png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",webp:"image/webp",gif:"image/gif"} as Record<string,string>)[key.split(".").at(-1)?.toLowerCase() ?? ""];
+    invariant(mime, 400, "VIDEO_PREVIEW_INVALID", "此格式不支持内联预览");
+    return this.run(principal, async client => {
+      const head = await client.send(new HeadObjectCommand({Bucket:config.bucket,Key:key}));
+      const size = head.ContentLength;
+      invariant(typeof size === "number" && size > 0 && size <= 25*1024*1024 && head.ETag, 413, "VIDEO_PREVIEW_LIMIT", "预览限 25 MiB，较大文件请在视频存储中下载");
+      const object = await client.send(new GetObjectCommand({Bucket:config.bucket,Key:key,IfMatch:head.ETag,Range:`bytes=0-${size-1}`}));
+      const bytes = await object.Body?.transformToByteArray();
+      invariant(bytes && bytes.length === size, 502, "VIDEO_PREVIEW_INCOMPLETE", "文件预览传输不完整");
+      return {bytes:Buffer.from(bytes),mime};
+    });
+  }
   async remove(principal: Principal, input: Record<string, unknown>) {
     const key = this.key(principal, input.key);
     invariant(typeof input.etag === "string" && input.etag.length > 0 && input.etag.length <= 200 && typeof input.modifiedAt === "string" &&

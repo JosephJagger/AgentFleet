@@ -1148,6 +1148,10 @@ export async function buildControlPlane(
     videoStorage().list(request.principal!, record(request.query).cursor));
   app.post("/api/settings/video-storage/download", { preHandler: mutate }, async request =>
     videoStorage().download(request.principal!, record(request.body)));
+  app.get("/api/settings/video-storage/preview", { preHandler: authenticate }, async (request,reply) => {
+    const result=await videoStorage().preview(request.principal!,record(request.query).source);
+    return reply.header("cache-control","private, no-store").header("x-content-type-options","nosniff").type(result.mime).send(result.bytes);
+  });
   app.post("/api/settings/video-storage/delete", { preHandler: mutate }, async request =>
     videoStorage().remove(request.principal!, record(request.body)));
   app.get("/api/settings/takeover-policy", { preHandler: authenticate }, async request =>

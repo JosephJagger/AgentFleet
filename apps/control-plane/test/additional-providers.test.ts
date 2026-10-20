@@ -86,7 +86,7 @@ test('schema 61 runtime-operation migration preserves existing receipts and inde
  f.db.run(`INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at,result_json) VALUES('old-operation','m',?,?,'unique-mutation','catalog.refresh','succeeded',?,?,?,?)`,f.principal.workspaceId,f.principal.clientSessionId,at,at,at,JSON.stringify({kept:true}));
  const schema=f.db.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")!.sql;const indexes=f.db.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='machine_operations' AND type='index' AND sql IS NOT NULL");
  f.db.transaction(()=>{f.db.sqlite.exec('ALTER TABLE machine_operations RENAME TO old_ops');f.db.sqlite.exec(schema.replace(",'provider.runtime'",''));f.db.sqlite.exec('INSERT INTO machine_operations SELECT * FROM old_ops; DROP TABLE old_ops');for(const index of indexes)f.db.sqlite.exec(index.sql);f.db.sqlite.exec('PRAGMA user_version=61');});f.db.close();
- const upgraded=new ControlPlaneDatabase(path);t.after(()=>upgraded.close());assert.equal(upgraded.get<{user_version:number}>('PRAGMA user_version')?.user_version,65);
+ const upgraded=new ControlPlaneDatabase(path);t.after(()=>upgraded.close());assert.equal(upgraded.get<{user_version:number}>('PRAGMA user_version')?.user_version,66);
  assert.equal(upgraded.get<{result_json:string}>("SELECT result_json FROM machine_operations WHERE operation_id='old-operation'")?.result_json,JSON.stringify({kept:true}));
  assert.ok(upgraded.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")?.sql.includes("'provider.runtime'"));assert.equal(upgraded.all('PRAGMA foreign_key_check').length,0);
  for(const index of indexes)assert.ok(upgraded.get('SELECT 1 FROM sqlite_master WHERE sql=?',index.sql));
@@ -205,4 +205,72 @@ test('Cursor saved native options enter start commands without changing other pr
  const command=f.db.get<{payload_json:string}>("SELECT cc.body_json AS payload_json FROM commands c JOIN command_contents cc USING(command_id) WHERE client_mutation_id='cursor-start'")!;
  assert.deepEqual(JSON.parse(command.payload_json).settings,{options:{model:'cursor-native'},permissionMode:'always'});
  assert.equal(f.db.all('PRAGMA foreign_key_check').length,0);
+});
+
+test('Grok native management survives discovery sanitization and enforces exact managed target',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.db.run("UPDATE machines SET command_types_json='[\"grok.manage\",\"turn.start\"]'");
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{grok:{...ready,nativeManagement:true,commands:[{name:'goal',description:'Native goal',secret:'must-not-leak'}]}}});
+ const discovery=f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json;
+ assert.equal(JSON.parse(discovery).agentRuntimes.grok.nativeManagement,true);assert.equal(discovery.includes('must-not-leak'),false);
+ const s=f.registry.createSession(f.principal,'m','grok',undefined,'manage-test');
+ f.db.run("UPDATE execution_segments SET native_thread_id='acp_grok_original' WHERE logical_session_id=?",s.logicalSessionId);
+ const lease=f.coordination.acquireLease(f.principal,s.logicalSessionId);
+ const input={type:'grok.manage' as const,controlLeaseId:lease.leaseId,clientMutationId:'manage-read',payload:{operation:'tasks.list',arguments:{}},precondition:{nativeThreadId:'acp_grok_original',executionSegmentId:s.executionSegmentId,threadControlVersion:s.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:s.projectLeaseVersion}};
+ assert.throws(()=>f.coordination.createCommand(f.principal,s.logicalSessionId,{...input,clientMutationId:'unconfirmed',payload:{operation:'session.fork',arguments:{}}}),{code:'GROK_OPERATION_INVALID'});
+ assert.throws(()=>f.coordination.createCommand(f.principal,s.logicalSessionId,{...input,clientMutationId:'wrong-target',precondition:{...input.precondition,nativeThreadId:'other'}}),{code:'GROK_TARGET_CHANGED'});
+ f.db.run("INSERT INTO panel_voice_calls(voice_id,workspace_id,user_id,owner_id,machine_id,binding_json,state,created_at) VALUES('synthetic-voice',?,?,?,'m','{}','active',?)",f.principal.workspaceId,f.principal.userId,f.principal.clientSessionId,new Date().toISOString());
+ assert.throws(()=>f.coordination.createCommand(f.principal,s.logicalSessionId,{...input,clientMutationId:'during-voice',payload:{operation:'memory.flush',arguments:{},confirmed:true}}),{code:'HOST_BUSY'});
+ f.coordination.createCommand(f.principal,s.logicalSessionId,input);
+ assert.equal(f.coordination.createCommand(f.principal,s.logicalSessionId,input).duplicate,true);
+ assert.throws(()=>f.coordination.createCommand(f.principal,s.logicalSessionId,{...input,clientMutationId:'concurrent'}),{code:'GROK_OPERATION_PENDING'});
+});
+
+test('schema 65 upgrade preserves commands, contents, projection and indexes',t=>{
+ const dir=mkdtempSync(join(tmpdir(),'grok-schema-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'db.sqlite');const f=fixture(path);
+ const s=f.registry.createSession(f.principal,'m','grok',undefined,'migration-session'),lease=f.coordination.acquireLease(f.principal,s.logicalSessionId);
+ f.coordination.createCommand(f.principal,s.logicalSessionId,{type:'turn.start',controlLeaseId:lease.leaseId,clientMutationId:'migration-command',payload:{prompt:'retain this'},precondition:{executionSegmentId:s.executionSegmentId,threadControlVersion:s.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:s.projectLeaseVersion}});
+ const before=f.db.all('SELECT * FROM commands'),contents=f.db.all('SELECT * FROM command_contents'),projection=f.db.all('SELECT * FROM command_projection');
+ const schema=f.db.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='commands'")!.sql;
+ const indexes=f.db.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='commands' AND type IN ('index','trigger') AND sql IS NOT NULL");
+ f.db.sqlite.exec('PRAGMA foreign_keys=OFF');f.db.transaction(()=>{
+  f.db.sqlite.exec(schema.replace(/CREATE TABLE ["`]?commands["`]?/i,'CREATE TABLE commands_old_fixture').replace(",'grok.manage'",''));
+  f.db.sqlite.exec('INSERT INTO commands_old_fixture SELECT * FROM commands; DROP TABLE commands; ALTER TABLE commands_old_fixture RENAME TO commands');
+  for(const i of indexes)f.db.sqlite.exec(i.sql);f.db.sqlite.exec('PRAGMA user_version=65');
+ });f.db.close();
+ for(let reopen=0;reopen<2;reopen++){
+  const db=new ControlPlaneDatabase(path);
+  assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,66);
+  assert.deepEqual(db.all('SELECT * FROM commands'),before);assert.deepEqual(db.all('SELECT * FROM command_contents'),contents);assert.deepEqual(db.all('SELECT * FROM command_projection'),projection);
+  for(const i of indexes)assert.ok(db.get('SELECT 1 FROM sqlite_master WHERE sql=?',i.sql));assert.deepEqual(db.all('PRAGMA foreign_key_check'),[]);db.close();
+ }
+});
+
+test('pending Grok reads allow unrelated provider starts; native mutations fence them',t=>{
+ for(const write of [false,true]){
+  const f=fixture();t.after(()=>f.db.close());f.db.run("UPDATE machines SET command_types_json='[\"grok.manage\",\"turn.start\"]'");
+  f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{grok:{...ready,nativeManagement:true},qwen:ready}});
+  const s=f.registry.createSession(f.principal,'m','grok',undefined,'read-fence'),lease=f.coordination.acquireLease(f.principal,s.logicalSessionId);
+  f.db.run("UPDATE execution_segments SET native_thread_id='acp_grok_original' WHERE logical_session_id=?",s.logicalSessionId);
+  f.coordination.createCommand(f.principal,s.logicalSessionId,{type:'grok.manage',controlLeaseId:lease.leaseId,clientMutationId:'read-or-write',payload:{operation:write?'memory.flush':'tasks.list',arguments:{},...(write?{confirmed:true}:{})},precondition:{nativeThreadId:'acp_grok_original',executionSegmentId:s.executionSegmentId,threadControlVersion:s.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:s.projectLeaseVersion}});
+  const q=f.registry.createSession(f.principal,'m','qwen',undefined,'other-provider'),ql=f.coordination.acquireLease(f.principal,q.logicalSessionId);
+  const start=()=>f.coordination.createCommand(f.principal,q.logicalSessionId,{type:'turn.start',controlLeaseId:ql.leaseId,clientMutationId:'other-start',payload:{prompt:'Synthetic task'},precondition:{executionSegmentId:q.executionSegmentId,threadControlVersion:q.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:q.projectLeaseVersion}});
+  if(write)assert.throws(start,{code:'GROK_OPERATION_PENDING'});else assert.doesNotThrow(start);
+ }
+});
+
+test('extended Grok settings follow live capabilities and startup options lock after native creation',t=>{
+ const f=fixture();t.after(()=>f.db.close());f.db.run("UPDATE machines SET agent_version='0.30.135'");
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{grok:{...ready,nativeManagement:true,grokTools:['x_keyword_search','x_semantic_search'],models:[{id:'grok',name:'Grok',efforts:['high'],contextWindows:[256000,500000]}]}}});
+ const s=f.registry.createSession(f.principal,'m','grok',undefined,'extended-settings'),prefs=new GrokPreferencesService(f.db);
+ assert.equal(prefs.read(f.principal,s.logicalSessionId).canConfigureStartup,true);
+ const settings={model:'grok',contextWindow:500000,rules:'Project rule',agentProfile:'reviewer',xSearch:{fromDate:'2026-10-01',toDate:'2026-10-20'}};
+ assert.equal(prefs.write(f.principal,s.logicalSessionId,{revision:0,settings}).revision,1);
+ assert.throws(()=>prefs.write(f.principal,s.logicalSessionId,{revision:1,settings:{...settings,contextWindow:123}}),{code:'GROK_OPTION_UNAVAILABLE'});
+ assert.throws(()=>prefs.write(f.principal,s.logicalSessionId,{revision:1,settings:{...settings,xSearch:{fromDate:'2026-02-31'}}}),{code:'GROK_SETTINGS_INVALID'});
+ f.db.run("UPDATE execution_segments SET native_thread_id='acp_grok_existing' WHERE logical_session_id=?",s.logicalSessionId);
+ assert.equal(prefs.read(f.principal,s.logicalSessionId).canConfigureStartup,false);
+ assert.throws(()=>prefs.write(f.principal,s.logicalSessionId,{revision:1,settings:{...settings,rules:'Replace previous'}}),{code:'GROK_STARTUP_LOCKED'});
+ assert.equal(prefs.write(f.principal,s.logicalSessionId,{revision:1,settings:{...settings,contextWindow:256000}}).revision,2);
+ assert.throws(()=>prefs.write(f.principal,s.logicalSessionId,{revision:1,settings}),{code:'SETTINGS_REVISION_CONFLICT'});
 });

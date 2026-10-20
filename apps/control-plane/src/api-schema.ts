@@ -25,6 +25,7 @@ export const COMMAND_TYPES = [
   "input.respond",
   "codex.inspect",
   "codex.manage",
+  "grok.manage",
   "thread.terminals.stop",
 ] as const;
 export type CommandType = (typeof COMMAND_TYPES)[number];

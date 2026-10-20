@@ -1,3 +1,4 @@
+import {grokNativeDiscovery} from "./grok-operations.js";
 import {parseCursorModels} from './cursor-settings.js';
 import {parseGrokQuota} from './grok-quota.js';
 import {parseCursorQuota} from './cursor-quota.js';
@@ -2583,7 +2584,7 @@ export class RegistryService {
       const runtimes = discovery.agentRuntimes as Record<string, unknown>;
       const claude = runtimes.claude as Record<string, unknown> | undefined;
       safe.agentRuntimes = { claude: { installed: claude?.installed === true, steerSupported: claude?.installed === true && claude?.steerSupported === true, version: typeof claude?.version === "string" ? claude.version.slice(0, 100) : null, ...parseClaudeMetadata(claude) } };
-      for (const provider of ACP_PROVIDER_IDS) { const status = parseProviderAvailability(runtimes[provider]); if (status) (safe.agentRuntimes as Record<string,unknown>)[provider] = {...status,...(provider === "cursor" ? {cursorModels:parseCursorModels((runtimes[provider] as Record<string,unknown>)?.cursorModels),cursorQuota:parseCursorQuota((runtimes[provider] as Record<string,unknown>)?.cursorQuota)} : {}),...(provider === "grok" ? {models:parseGrokModels((runtimes[provider] as Record<string,unknown>)?.models),quota:parseGrokQuota((runtimes[provider] as Record<string,unknown>)?.quota)} : {})}; }
+      for (const provider of ACP_PROVIDER_IDS) { const status = parseProviderAvailability(runtimes[provider]); if (status) (safe.agentRuntimes as Record<string,unknown>)[provider] = {...status,...(provider === "cursor" ? {cursorModels:parseCursorModels((runtimes[provider] as Record<string,unknown>)?.cursorModels),cursorQuota:parseCursorQuota((runtimes[provider] as Record<string,unknown>)?.cursorQuota)} : {}),...(provider === "grok" ? {...grokNativeDiscovery(runtimes[provider]),models:parseGrokModels((runtimes[provider] as Record<string,unknown>)?.models),quota:parseGrokQuota((runtimes[provider] as Record<string,unknown>)?.quota)} : {})}; }
     }
     if (discovery.syncMode !== undefined) {
       invariant(discovery.syncMode === "events" || discovery.syncMode === "fallback",400,"INVALID_DISCOVERY","Invalid syncMode");

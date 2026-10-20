@@ -1,3 +1,4 @@
+import {InlineMedia} from "./InlineMedia";
 import { api } from "../lib/api";
 import { Children, isValidElement, memo, useMemo, useState, type ReactNode } from "react";
 import Markdown, { defaultUrlTransform, type Components } from "react-markdown";
@@ -214,10 +215,16 @@ export const MarkdownMessage = memo(function MarkdownMessage({ body, sessionId }
     table: ({ children }) => <div className="markdown-table" role="region" aria-label={t("表格")} tabIndex={0}><table>{children}</table></div>,
     a: ({ node: _node, href, children, ...props }) => {
       const path = href ? hostFilePath(href) : undefined;
+      if (path && sessionId && /\.(png|jpe?g|webp|gif|mp4|webm|mov)$/i.test(path)) return <><InlineMedia key={path} url={fileUrl(sessionId,path)} label={path.split("/").at(-1)??path}/><LocalFileLink sessionId={sessionId} path={path}>{children}</LocalFileLink></>;
+      if (href && /^https:\/\//.test(href) && /\.(mp4|webm)(?:[?#]|$)/i.test(href)){
+        let source:URL|undefined;
+        try{source=new URL(href);}catch{/* An incomplete streamed URL remains an ordinary link. */}
+        if(source&&!source.username&&!source.password){source.search="";source.hash="";return <><InlineMedia key={source.href} url={"/api/settings/video-storage/preview?source="+encodeURIComponent(source.href)} label={String(children??t("视频"))}/><a {...props} href={href} target="_blank" rel="noopener noreferrer">{children}</a></>;}
+      }
       if (path && sessionId) return <LocalFileLink sessionId={sessionId} path={path}>{children}</LocalFileLink>;
       return href ? <a {...props} href={href} target={href.startsWith("#") ? undefined : "_blank"} rel="noopener noreferrer">{children}</a> : <span>{children}</span>;
     },
-    img: ({ src, alt }) => src ? <a href={src} target="_blank" rel="noopener noreferrer">{alt || t("查看图片")}</a> : <span>{alt}</span>,
+    img: ({ src, alt }) => src && sessionId && hostFilePath(src) ? <InlineMedia key={src} url={fileUrl(sessionId,hostFilePath(src)!)} label={alt||t("图片")}/> : src ? <a href={src} target="_blank" rel="noopener noreferrer">{alt || t("查看图片")}</a> : <span>{alt}</span>,
   }), [activeLocale, sessionId]);
   return <div className="message-markdown">
     <div className="message-markdown__body"><Markdown remarkPlugins={[remarkGfm, remarkFileCitations, ...(sessionId ? [remarkHostFilePaths] : [])]} components={components} urlTransform={(url) => hostFilePath(url) ? url : defaultUrlTransform(url)} skipHtml>{body}</Markdown></div>

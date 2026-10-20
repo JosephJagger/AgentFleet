@@ -1,12 +1,12 @@
 import {useEffect,useRef,useState} from "react";
 import {api} from "./api";
-export interface GrokSettings {model?:string;effort?:string;permissionMode?:"default"|"always"|"auto";mode?:"default"|"plan";}
+export interface GrokSettings {model?:string;contextWindow?:number;xSearch?:{fromDate?:string;toDate?:string}|null;rules?:string;systemPromptOverride?:string;agentProfile?:string;effort?:string;permissionMode?:"default"|"always"|"auto";mode?:"default"|"plan";}
 export interface GrokConfigOption {id:string;name?:string;current?:string;values:string[];}
-export interface GrokModel {id:string;name:string;efforts:string[];}
-export interface GrokPreferences {models?:GrokModel[];settings:GrokSettings|null;revision:number;options:GrokConfigOption[];}
+export interface GrokModel {id:string;name:string;efforts:string[];contextWindows?:number[];}
+export interface GrokPreferences {nativeManagement?:boolean;canConfigureStartup?:boolean;xSearchSupported?:boolean;commands?:{name:string;description:string;hint?:string}[];models?:GrokModel[];settings:GrokSettings|null;revision:number;options:GrokConfigOption[];}
 const empty:GrokPreferences={settings:null,revision:0,options:[]};
 export function grokSettingsActive(settings?:GrokSettings|null){
-  return Boolean(settings&&(settings.model||settings.effort||(settings.permissionMode&&settings.permissionMode!=="default")||settings.mode==="plan"));
+  return Boolean(settings&&(settings.xSearch!==undefined||settings.rules||settings.systemPromptOverride||settings.agentProfile||settings.model||settings.effort||settings.contextWindow||(settings.permissionMode&&settings.permissionMode!=="default")||settings.mode==="plan"));
 }
 export function useGrokPreferences(sessionId:string|undefined,sessionSeq?:number){
   const [state,setState]=useState<{id:string|undefined;data:GrokPreferences;ready:boolean;error:string}>({id:undefined,data:empty,ready:false,error:""});
@@ -52,5 +52,5 @@ export function useGrokPreferences(sessionId:string|undefined,sessionSeq?:number
     chain.current=run.then(()=>undefined,()=>undefined);
     await run;
   }
-  return {settings:current?.data.settings??{},options:current?.data.options??[],models:current?.data.models??[],ready:current?.ready===true,error:current?.error??"",save,reload:()=>setRetry(n=>n+1)};
+  return {xSearchSupported:current?.data.xSearchSupported===true,canConfigureStartup:current?.data.canConfigureStartup===true,nativeManagement:current?.data.nativeManagement===true,commands:current?.data.commands??[],settings:current?.data.settings??{},options:current?.data.options??[],models:current?.data.models??[],ready:current?.ready===true,error:current?.error??"",save,reload:()=>setRetry(n=>n+1)};
 }

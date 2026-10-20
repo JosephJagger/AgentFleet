@@ -192,6 +192,7 @@ export interface FleetSession {
 }
 
 export interface CommandReceipt {
+  grokResult?: import("./grok-operations").GrokOperationResult;
   codexResult?: { operation: string; status: string; rows: { name: string; detail: string; status: string }[]; url?: string; nextCursor?: string };
   deletionPreview?: {nativeThreadId:string;fingerprint:string;expiresAt:string;threads:{id:string;title:string;cwd:string}[]};
   clientMutationId?: string;

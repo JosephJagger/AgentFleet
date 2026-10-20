@@ -7,7 +7,7 @@ import {parseGrokModels,grokModelOptions,mergeConfigOptions,parseConfigOptions,p
 export class GrokPreferencesService {
   constructor(private readonly db:ControlPlaneDatabase){}
   private host(principal:Principal,id:string){
-    const row=this.db.get<{provider:string;agent_version:string;discovery_json:string|null}>(`SELECT p.provider,m.agent_version,m.discovery_json FROM logical_sessions s JOIN projects p USING(project_id) JOIN machines m ON m.machine_id=s.machine_id WHERE s.logical_session_id=? AND s.workspace_id=? AND s.deleted_at IS NULL AND m.identity_state='active'`,id,principal.workspaceId);
+    const row=this.db.get<{has_native:number;provider:string;agent_version:string;discovery_json:string|null}>(`SELECT p.provider,m.agent_version,m.discovery_json,EXISTS(SELECT 1 FROM execution_segments e WHERE e.logical_session_id=s.logical_session_id AND e.native_thread_id IS NOT NULL) AS has_native FROM logical_sessions s JOIN projects p USING(project_id) JOIN machines m ON m.machine_id=s.machine_id WHERE s.logical_session_id=? AND s.workspace_id=? AND s.deleted_at IS NULL AND m.identity_state='active'`,id,principal.workspaceId);
     invariant(row,404,"SESSION_NOT_FOUND","Session was not found");
     invariant(row.provider==="grok",400,"GROK_SESSION_REQUIRED","Settings belong to a Grok Build session");
     return row;
@@ -33,9 +33,11 @@ export class GrokPreferencesService {
   }
   read(principal:Principal,id:string){
     const host=this.host(principal,id);
-    const models=parseGrokModels(JSON.parse(host.discovery_json??"{}").agentRuntimes?.grok?.models);
+    const native=JSON.parse(host.discovery_json??"{}").agentRuntimes?.grok;
+    const models=parseGrokModels(native?.models);
+    const commands=Array.isArray(native?.commands)?native.commands.filter((c:unknown):c is {name:string;description:string;hint?:string}=>!!c&&typeof c==='object'&&typeof (c as {name:unknown}).name==='string'&&/^[a-z0-9-]{1,80}$/.test((c as {name:string}).name)).slice(0,80).map((c:{name:string;description:string;hint?:string})=>({name:c.name,description:String(c.description??'').slice(0,500),hint:String(c.hint??'').slice(0,200)})):[];
     const row=this.db.get<{settings_json:string;revision:number}>("SELECT settings_json,revision FROM grok_preferences WHERE workspace_id=? AND logical_session_id=?",principal.workspaceId,id);
-    return {settings:row?parseGrokSettings(JSON.parse(row.settings_json))??null:null,revision:row?.revision??0,options:mergeConfigOptions(this.options(principal,id),grokModelOptions(models)),...(models.length?{models}:{})};
+    return {...(native?.nativeManagement===true?{nativeManagement:true,commands,xSearchSupported:Array.isArray(native?.grokTools)&&['x_keyword_search','x_semantic_search'].every(k=>native.grokTools.includes(k)),canConfigureStartup:!host.has_native}:{}),settings:row?parseGrokSettings(JSON.parse(row.settings_json))??null:null,revision:row?.revision??0,options:mergeConfigOptions(this.options(principal,id),grokModelOptions(models)),...(models.length?{models}:{})};
   }
   write(principal:Principal,id:string,input:Record<string,unknown>){
     return this.db.transaction(()=>{
@@ -53,6 +55,16 @@ export class GrokPreferencesService {
         invariant(option.values.includes(value)||value===stored,409,"GROK_OPTION_UNAVAILABLE","Select a value reported by the native session");
       };
       allow(settings.model,"model",current.settings?.model);
+      for(const key of ['rules','systemPromptOverride','agentProfile'] as const){
+        if(settings[key])invariant(current.nativeManagement,409,'GROK_AGENT_UPDATE_REQUIRED','Update the host before using native startup settings');
+        if(host.has_native)invariant(settings[key]===current.settings?.[key],409,'GROK_STARTUP_LOCKED','Startup settings can only be changed before creating the native session');
+      }
+      if(settings.xSearch!==undefined)invariant(current.xSearchSupported,409,'GROK_OPTION_UNAVAILABLE','Native X search filters are unavailable');
+      if(settings.contextWindow){
+        const model=settings.model??current.options.find(o=>o.id==='model')?.current;
+        invariant(current.models?.find(m=>m.id===model)?.contextWindows?.includes(settings.contextWindow),409,'GROK_OPTION_UNAVAILABLE','Select a context window reported for this model');
+        invariant(current.nativeManagement,409,'GROK_AGENT_UPDATE_REQUIRED','Update the host to apply extended Grok settings');
+      }
       if(settings.model&&current.models?.length) {
         const model=current.models.find(model=>model.id===settings.model);
         invariant(model,409,"GROK_OPTION_UNAVAILABLE","Select a model reported by the host");

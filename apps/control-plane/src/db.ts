@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 65) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 66) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1585,6 +1585,23 @@ export class ControlPlaneDatabase {
       ) STRICT;
       PRAGMA user_version=65`);
     });
+    if (version < 66) {
+      // Expand the command vocabulary without rewriting referencing foreign keys.
+      this.sqlite.exec("PRAGMA foreign_keys=OFF");
+      try { this.transaction(() => {
+        const original = this.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE type='table' AND name='commands'")!.sql;
+        if (!original.includes("'grok.manage'")) {
+          const revised = original.replace(/CREATE TABLE ["`]?commands["`]?/i, 'CREATE TABLE commands_v66').replace("'codex.manage'", "'codex.manage','grok.manage'");
+          if (!revised.includes("'grok.manage'")) throw new Error('Unexpected commands schema');
+          const indexes = this.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='commands' AND type IN ('index','trigger') AND sql IS NOT NULL");
+          this.sqlite.exec(revised);
+          this.sqlite.exec("INSERT INTO commands_v66 SELECT * FROM commands; DROP TABLE commands; ALTER TABLE commands_v66 RENAME TO commands");
+          for (const index of indexes) this.sqlite.exec(index.sql);
+        }
+        if (this.all("PRAGMA foreign_key_check").length) throw new Error('Grok command migration foreign-key violation');
+        this.sqlite.exec("PRAGMA user_version=66");
+      }); } finally { this.sqlite.exec("PRAGMA foreign_keys=ON"); }
+    }
   }
 
   transaction<T>(operation: () => T): T {

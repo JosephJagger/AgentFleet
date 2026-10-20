@@ -1,5 +1,10 @@
 export interface GrokSettings {
   model?: string;
+  contextWindow?: number;
+  xSearch?:{fromDate?:string;toDate?:string}|null;
+  rules?:string;
+  systemPromptOverride?:string;
+  agentProfile?:string;
   effort?: string;
   permissionMode?: "default" | "always" | "auto";
   mode?: "default" | "plan";
@@ -12,8 +17,20 @@ const isRecord=(value:unknown):value is Record<string,unknown>=>Boolean(value)&&
 export function parseGrokSettings(value:unknown):GrokSettings|undefined {
   if(value===undefined)return undefined;
   if(!isRecord(value))return undefined;
-  if(Object.keys(value).some(key=>!["model","effort","permissionMode","mode"].includes(key)))return undefined;
+  if(Object.keys(value).some(key=>!["model","effort","permissionMode","mode","contextWindow","rules","systemPromptOverride","agentProfile","xSearch"].includes(key)))return undefined;
   const settings:GrokSettings={};
+  for(const key of ['rules','systemPromptOverride','agentProfile'] as const){const text=value[key];if(text!==undefined){if(typeof text!=='string'||!text.trim()||text.length>(key==='agentProfile'?120:8000)||text.includes('\0')||key==='agentProfile'&&!idText(text))return undefined;settings[key]=text;}}
+  if(settings.rules&&settings.systemPromptOverride)return undefined;
+  if(value.xSearch===null)settings.xSearch=null;
+  else if(value.xSearch!==undefined){
+    const x=value.xSearch;if(!isRecord(x)||Object.keys(x).some(k=>!['fromDate','toDate'].includes(k)))return undefined;
+    const bounds:{fromDate?:string;toDate?:string}={};
+    for(const key of ['fromDate','toDate'] as const){const d=x[key];if(d!==undefined){if(typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d)||d.startsWith('0000')||!Number.isFinite(Date.parse(d))||new Date(d).toISOString().slice(0,10)!==d)return undefined;bounds[key]=d;}}
+    if(bounds.fromDate&&bounds.toDate&&bounds.fromDate>bounds.toDate)return undefined;
+    if(!bounds.fromDate&&!bounds.toDate)return undefined;settings.xSearch=bounds;
+  }
+  if(value.contextWindow!==undefined){if(!Number.isSafeInteger(value.contextWindow)||Number(value.contextWindow)<1||Number(value.contextWindow)>10_000_000)return undefined;settings.contextWindow=Number(value.contextWindow);}
+
   if(value.model!==undefined){if(typeof value.model!=="string"||!idText(value.model))return undefined;settings.model=value.model;}
   if(value.effort!==undefined){if(typeof value.effort!=="string"||!idText(value.effort))return undefined;settings.effort=value.effort;}
   if(value.permissionMode!==undefined){if(value.permissionMode!=="default"&&value.permissionMode!=="always"&&value.permissionMode!=="auto")return undefined;settings.permissionMode=value.permissionMode;}
@@ -21,7 +38,7 @@ export function parseGrokSettings(value:unknown):GrokSettings|undefined {
   return settings;
 }
 export function grokSettingsActive(settings?:GrokSettings|null):boolean {
-  return Boolean(settings&&(settings.model||settings.effort||(settings.permissionMode&&settings.permissionMode!=="default")||settings.mode==="plan"));
+  return Boolean(settings&&(settings.xSearch!==undefined||settings.rules||settings.systemPromptOverride||settings.agentProfile||settings.model||settings.effort||settings.contextWindow||(settings.permissionMode&&settings.permissionMode!=="default")||settings.mode==="plan"));
 }
 export function supportsGrokControls(version?:string):boolean {
   const match=/^(\d+)\.(\d+)\.(\d+)$/.exec(version??"");
@@ -54,7 +71,7 @@ export function mergeConfigOptions(previous:ConfigOption[],next:ConfigOption[]):
   return [...map.values()].slice(0,32);
 }
 
-export interface GrokModel {id:string;name:string;efforts:string[];}
+export interface GrokModel {id:string;name:string;efforts:string[];contextWindows?:number[];}
 /** Keep only displayable catalog fields; never forward initialize metadata wholesale. */
 export function parseGrokModels(value:unknown):GrokModel[] {
   if(!Array.isArray(value))return [];
@@ -66,7 +83,9 @@ export function parseGrokModels(value:unknown):GrokModel[] {
     const meta=isRecord(entry._meta)?entry._meta:{};
     const raw=Array.isArray(entry.efforts)?entry.efforts:Array.isArray(meta.reasoningEfforts)?meta.reasoningEfforts:[];
     const efforts=meta.supportsReasoningEffort===false?[]:[...new Set(raw.slice(0,32).map(optionValue).filter((v):v is string=>Boolean(v)))];
-    models.push({id,name:typeof entry.name==='string'?entry.name.slice(0,120):id,efforts});
+    const rawWindows=meta.contextWindows??entry.contextWindows;
+    const contextWindows=Array.isArray(rawWindows)?[...new Set(rawWindows)].filter((n):n is number=>typeof n==='number'&&Number.isSafeInteger(n)&&n>0&&n<=10_000_000).slice(0,16):[];
+    models.push({id,...(contextWindows.length?{contextWindows}:{}),name:typeof entry.name==='string'?entry.name.slice(0,120):id,efforts});
   }
   return models;
 }

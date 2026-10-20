@@ -1,3 +1,4 @@
+import {parseGrokOperation,grokOperations,grokLiveOperation} from './grok-operations.js';
 import { ProviderRuntimeManager } from "./provider-runtime-manager.js";
 import { threadProvider } from "./provider-identity.js";
 import { isAcpProvider, supportsProviderCommand, type ProviderId } from "./provider-catalog.js";
@@ -226,6 +227,7 @@ const KNOWN_FAILED_INVOCATION_CODES = new Set([
   // ACP ownership checks reject before session creation/loading or prompt dispatch.
   // Unknown ownership is not an unknown command outcome: keep refusing the writer,
   // but do not freeze the entire project behind a request that was never sent.
+  "GROK_TARGET_CHANGED", "GROK_OPERATION_INVALID", "GROK_OPERATION_UNAVAILABLE", "GROK_OPERATION_REJECTED", "GROK_MEMORY_PREVIEW_LIMIT", "GROK_MEMORY_PREVIEW_REQUIRED", "GROK_READ_UNAVAILABLE",
   "PROVIDER_NATIVE_BUSY",
   "PROVIDER_OWNERSHIP_UNKNOWN",
   "PROVIDER_RELEASE_PENDING",
@@ -967,17 +969,17 @@ export class AgentRuntime {
     let reservationOwner: Omit<ProjectCommandReservation, "state" | "createdAt" | "updatedAt"> | undefined;
     try {
       this.validateCommandEnvelope(command, deliveryGeneration);
-      if (this.store.snapshot().maintenanceDrain && ["thread.claim", "thread.rename", "thread.archive", "thread.unarchive", "thread.fork", "thread.delete.preview", "thread.delete", "turn.start", "turn.compact", "turn.review", "turn.queue", "turn.steer", "codex.manage"].includes(command.type)) {
+      if (this.store.snapshot().maintenanceDrain && ["thread.claim", "thread.rename", "thread.archive", "thread.unarchive", "thread.fork", "thread.delete.preview", "thread.delete", "turn.start", "turn.compact", "turn.review", "turn.queue", "turn.steer", "codex.manage", "grok.manage"].includes(command.type)) {
         throw new AgentError("MACHINE_DRAINING", "the agent is waiting for a safe maintenance restart");
       }
       const project = projectById(this.store, command.projectId);
       if(Object.values(this.store.snapshot().managedThreads).some(t=>t.realtimeSessionId && (t.projectId===project.id || command.type==="codex.manage") && !(command.type==="turn.start" && t.logicalSessionId===command.logicalSessionId)) && !["turn.cancel","turn.steer","approval.decide_once","input.respond"].includes(command.type)) throw new AgentError("VOICE_PROJECT_BUSY", "请先结束项目的实时语音，再执行此操作");
       await verifyProjectIdentity(project);
       if (isAcpProvider(project.provider)) {
-        if (!['thread.claim','thread.release','turn.start','turn.queue','turn.steer','turn.cancel','approval.decide_once','input.respond'].includes(command.type)) throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Unsupported native operation');
+        if (!['grok.manage','thread.claim','thread.release','turn.start','turn.queue','turn.steer','turn.cancel','approval.decide_once','input.respond'].includes(command.type)) throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Unsupported native operation');
         const grokSettings=project.provider==='grok'?parseGrokSettings(command.payload.settings):undefined;
         const settingsRejected=project.provider==='grok'?command.payload.settings!==undefined&&!grokSettings:project.provider==='cursor'?command.payload.settings!==undefined&&!parseCursorSettings(command.payload.settings):command.payload.settings!==undefined;
-        if (settingsRejected || command.payload.goal !== undefined || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');
+        if (settingsRejected || (command.payload.goal !== undefined && project.provider !== "grok") || command.payload.outputSchema !== undefined || command.payload.nativeCollaboration !== undefined || ['attachments','references','plugins','pluginSkills'].some(key => Array.isArray(command.payload[key]) && (command.payload[key] as unknown[]).length)) throw new AgentError('AGENT_INPUT_UNSUPPORTED','Only text with native settings is supported');
       }
 
       if (isAcpProvider(project.provider) ? !(this.support.providerHostSupported ?? this.support.writable) || !supportsProviderCommand(this.appServer?.getAgentRuntimes?.()[project.provider],command.type,Boolean(command.precondition.nativeThreadId)) : !this.isWritable()) throw new AgentError("MACHINE_READ_ONLY", this.readOnlyReasons().join("; "));
@@ -1002,7 +1004,7 @@ export class AgentRuntime {
         envelopeHash: immutableHash,
         appServerEpoch: server.appServerEpoch,
       };
-      await this.store.reserveProjectCommand(owner, ["turn.start", "turn.compact", "turn.review", "turn.queue", "thread.rename", "thread.archive", "thread.unarchive", "thread.fork", "thread.delete.preview", "thread.delete"].includes(command.type) || command.type === "codex.manage" && !readOnlyCodexOperation(parseCodexOperation(command.payload).operation) && !liveCodexOperation(parseCodexOperation(command.payload).operation));
+      await this.store.reserveProjectCommand(owner, ["turn.start", "turn.compact", "turn.review", "turn.queue", "thread.rename", "thread.archive", "thread.unarchive", "thread.fork", "thread.delete.preview", "thread.delete"].includes(command.type) || command.type === "codex.manage" && !readOnlyCodexOperation(parseCodexOperation(command.payload).operation) && !liveCodexOperation(parseCodexOperation(command.payload).operation) || command.type === "grok.manage" && grokOperations[parseGrokOperation(command.payload).operation].write && !grokLiveOperation(parseGrokOperation(command.payload).operation));
       reservationOwner = owner;
       await this.store.transitionCommand(command.attemptId, "claimed", "invoking");
       await this.emitCommandState(command, "invoking");
@@ -1557,6 +1559,14 @@ export class AgentRuntime {
         await server.stopBackgroundTerminals(boundThread, project);
         return { nativeThreadId: boundThread.nativeThreadId, backgroundTerminalsStopped: true };
       }
+      case "grok.manage": {
+        if(project.provider!=='grok'||!boundThread||boundThread.projectId!==project.id||boundThread.nativeThreadId!==command.precondition.nativeThreadId||boundThread.executionSegmentId!==command.executionSegmentId||command.precondition.projectLeaseVersion!==project.identityVersion||command.precondition.expectedActiveTurnId!==(boundThread.activeTurnId??null))throw new AgentError('GROK_TARGET_CHANGED','Refresh the exact Grok session before operating');
+        if(!boundThread.policyVerified||boundThread.appServerEpoch!==server.appServerEpoch)throw new AgentError('GROK_TARGET_CHANGED','Native session execution connection changed');
+        if(!server.manageGrok||this.store.snapshot().projectContentPolicies[project.id]?.syncContent===false)throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Native Grok management or content sync is unavailable');
+        const request=parseGrokOperation(command.payload);
+        if(grokOperations[request.operation].write&&!grokLiveOperation(request.operation)&&(this.store.snapshot().panelVoiceRuntime||Object.values(this.store.snapshot().managedThreads).some(t=>t.activeTurnId||t.realtimeSessionId)))throw new AgentError('HOST_BUSY','Finish active host work before changing native state');
+        return {grokResult:await server.manageGrok(boundThread,project,request)};
+      }
       case "codex.manage": {
         if (project.provider && project.provider !== "codex") throw new AgentError("AGENT_CAPABILITY_UNAVAILABLE", "Codex operations require a Codex project");
         if (!boundThread || boundThread.projectId !== project.id || boundThread.nativeThreadId !== command.precondition.nativeThreadId || boundThread.executionSegmentId !== command.executionSegmentId || command.precondition.projectLeaseVersion !== project.identityVersion || command.precondition.expectedActiveTurnId !== (boundThread.activeTurnId ?? null)) throw new AgentError("CODEX_TARGET_CHANGED", "Codex operation target changed");
@@ -1804,7 +1814,7 @@ export class AgentRuntime {
         );
         if (!thread) {
           const name = command.payload.sessionTitle === undefined ? undefined : requireString(command.payload.sessionTitle, "sessionTitle", { maxLength: 200 });
-          const created = await server.createThread(project, profile, name);
+          const created = await server.createThread(project, profile, name, grokTurn);
           thread = {
             nativeThreadId: created.nativeThreadId,
             projectId: project.id,

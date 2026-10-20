@@ -206,6 +206,7 @@ export interface AppServerClient {
   updateVoicePreferences?(threadId:string,preferences:string,requestId:string):Promise<void>;
   stopVoice?(threadId: string): Promise<void>;
   manageHostCodex?(request: unknown, mutationId: string): Promise<CodexOperationResult>;
+  manageGrok?(thread: ManagedThread, project: ProjectRecord, request: unknown): Promise<import("./grok-operations.js").GrokOperationResult>;
   manageCodex?(thread: ManagedThread, request: unknown, mutationId: string): Promise<CodexOperationResult>;
   refreshManagedClaude?(): Promise<void>;
   getAgentRuntimes?(): Record<string, unknown>;
@@ -222,7 +223,7 @@ export interface AppServerClient {
   readonly appServerEpoch: string;
   start(): Promise<void>;
   stop(): Promise<void>;
-  createThread(project: ProjectRecord, profile?: PermissionProfile, name?: string): Promise<ThreadStartResult>;
+  createThread(project: ProjectRecord, profile?: PermissionProfile, name?: string, settings?:import("./acp-updates.js").GrokSettings): Promise<ThreadStartResult>;
   listThreads(): Promise<DiscoveredThreadSummary[]>;
   listThreadPage?(cursor: string | null, options?: { useStateDbOnly: boolean }): Promise<ThreadListPage>;
   readThread(threadId: string, metadataOnly?: boolean): Promise<ThreadHistorySnapshot>;

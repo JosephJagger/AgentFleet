@@ -7,6 +7,11 @@ import { MarkdownMessage } from "./components/MarkdownMessage";
 afterEach(cleanup);
 
 describe("assistant Markdown", () => {
+  it("keeps malformed streamed video URLs from crashing the conversation", () => {
+    render(<MarkdownMessage body={'[视频](https://%zz/movie.mp4)\n\n其他内容仍然可见。'} />);
+    expect(screen.getByText("其他内容仍然可见。")).toBeTruthy();
+    expect(screen.queryByRole("button", {name:/展开图片或视频/})).toBeNull();
+  });
   it("renders headings, nested lists, GFM tables, tasks and links", () => {
     const { container } = render(<MarkdownMessage body={'## 检查结果\n\n**完成** `npm test`\n\n1. 主机\n   - 项目\n\n- [x] 已检查\n\n| 项目 | 状态 |\n| --- | --- |\n| UI | 完成 |\n\n> 引用说明\n\n[文档](https://example.com)'} />);
     expect(screen.getByRole("heading", {name:"检查结果", level:2})).toBeTruthy();
