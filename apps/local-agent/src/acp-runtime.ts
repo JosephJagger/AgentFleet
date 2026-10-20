@@ -290,6 +290,7 @@ export class AcpRuntime {
     const itemId=`${turnId}:user`,item={id:itemId,type:'userMessage',content:[{type:'text',text:prompt},...(images??[]).map(url=>({type:'image',url}))]};
     session.items.push({nativeTurnId:turnId,nativeItemId:itemId,item});this.accountItem(session,session.items.at(-1)!);
     await this.callbacks.onEvent({type:'item.completed',nativeThreadId:session.id,nativeTurnId:turnId,nativeItemId:itemId,payload:{item}},this.appServerEpoch);
+    session.completed.add(itemId);
     setImmediate(()=>{void session.connection.call('session/prompt',{sessionId:this.native(session.id),prompt:[{type:'text',text:prompt},...imageBlocks]},24*3600000).then(async result=>{
       if(session.lost||session.turnId!==turnId)return;
       if(!isRecord(result)||typeof result.stopReason!=='string')throw new AgentError('ACP_RESULT_INVALID','Missing native completion evidence');
@@ -381,7 +382,7 @@ export class AcpRuntime {
     if(kind==='user_message_chunk'&&isRecord(update.content)&&update.content.type==='image') {
       const url=typeof update.content.data==='string'&&typeof update.content.mimeType==='string'?`data:${update.content.mimeType};base64,${update.content.data}`:'';
       let last=session.items.at(-1);
-      if(!last||last.nativeTurnId!==turnId||last.item?.type!=='userMessage') {
+      if(!last||last.nativeTurnId!==turnId||last.item?.type!=='userMessage'||session.completed.has(last.nativeItemId)) {
         const id=`${turnId}:${session.items.length}`;last={nativeTurnId:turnId,nativeItemId:id,item:{id,type:'userMessage',content:[{type:'text',text:''}]}};session.items.push(last);
       }
       changed=last;
@@ -419,7 +420,7 @@ export class AcpRuntime {
     if(changed)this.accountItem(session,changed);
   }
   private async flush(session:Session,turnId:string) {
-    const pending=session.items.filter(i=>i.nativeTurnId===turnId&&i.item?.type!=='userMessage'&&!session.completed.has(i.nativeItemId));
+    const pending=session.items.filter(i=>i.nativeTurnId===turnId&&!session.completed.has(i.nativeItemId));
     // One durable transaction per chunk. A resolved await does not let the heartbeat timer run.
     for(let index=0;index<pending.length;index+=32) {
       const chunk=pending.slice(index,index+32);

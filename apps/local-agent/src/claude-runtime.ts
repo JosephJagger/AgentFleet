@@ -92,11 +92,20 @@ function messageItems(value: unknown): Array<{ nativeTurnId: string; nativeItemI
   const blocks = typeof content === "string" ? [{ type: "text", text: content }] : Array.isArray(content) ? content.filter(isRecord) : [];
   const result: ReturnType<typeof messageItems> = [];
   const text = blocks.filter(b => b.type === "text").map(b => String(b.text ?? "")).join("");
-  let textAdded = false;
+  const userContent: Record<string, unknown>[] = text ? [{type:"text",text}] : [];
+  if (value.type === "user") {
+    for (const block of blocks) {
+      const source = block.source;
+      if (block.type === "image" && isRecord(source) && source.type === "base64" &&
+          typeof source.media_type === "string" && /^image\/(png|jpeg|gif|webp)$/.test(source.media_type) && typeof source.data === "string") {
+        userContent.push({type:"image",url:`data:${source.media_type};base64,${source.data}`});
+      }
+    }
+    if (userContent.length) result.push({nativeTurnId:id,nativeItemId:`${id}:text`,item:{id:`${id}:text`,type:"userMessage",content:userContent}});
+  }
+  let textAdded = value.type === "user";
   for (const block of blocks) {
-    if (block.type === "text" && text && !textAdded) { textAdded = true; result.push({ nativeTurnId: id, nativeItemId: `${id}:text`, item: value.type === "user"
-    ? { id: `${id}:text`, type: "userMessage", content: [{ type: "text", text }] }
-    : { id: `${id}:text`, type: "agentMessage", text } }); }
+    if (block.type === "text" && text && !textAdded) { textAdded = true; result.push({ nativeTurnId: id, nativeItemId: `${id}:text`, item: { id: `${id}:text`, type: "agentMessage", text } }); }
     if (block.type === "thinking") result.push({ nativeTurnId: id, nativeItemId: `${id}:thinking`, item: { id: `${id}:thinking`, type: "reasoning", text: block.thinking, summary: [block.thinking] } });
     if (block.type === "tool_use") result.push({ nativeTurnId: id, nativeItemId: String(block.id), item: { id: block.id, type: "mcpToolCall", server: "Claude Code", tool: block.name, arguments: block.input, status: "inProgress" } });
     if (block.type === "tool_result") result.push({ nativeTurnId: id, nativeItemId: String(block.tool_use_id), item: { id: block.tool_use_id, type: "mcpToolCall", server: "Claude Code", tool: "tool result", result: block.content, status: block.is_error ? "failed" : "completed" } });
@@ -303,7 +312,20 @@ export class ClaudeRuntime implements AppServerClient {
     const id = thread.nativeThreadId;
     const turnId = randomUUID();
     const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), promptIds: new Set<string>(), turnId } as unknown as Writer;
-    const input = async function* () { while (!writer.closed) { const message = writer.input.shift(); if (message) yield message; else await new Promise<void>(resolve => { writer.wake = resolve; }); } };
+    const callbacks = this.callbacks, epoch = this.appServerEpoch;
+    // The SDK need not echo submitted user messages. Record each consumed input
+    // with its native UUID, also used by history/echo deduplication.
+    const input = async function* () {
+      while (!writer.closed) {
+        const message = writer.input.shift();
+        if (message) {
+          for (const entry of messageItems(message)) {
+            await callbacks.onEvent({type:"item.completed",nativeThreadId:id,nativeTurnId:turnId,nativeItemId:entry.nativeItemId,payload:{item:entry.item}},epoch);
+          }
+          yield message;
+        } else await new Promise<void>(resolve => { writer.wake = resolve; });
+      }
+    };
     const options: Options = {
       cwd: thread.sessionCwd ?? project.root, pathToClaudeCodeExecutable: this.binary!,
       ...(this.availability.managed ? {env:{...process.env,DISABLE_AUTOUPDATER:"1"}} : {}),

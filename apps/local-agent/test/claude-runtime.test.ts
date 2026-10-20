@@ -43,7 +43,9 @@ test("Claude starts the first streaming prompt, resumes the original identity an
   assert.deepEqual(options.settingSources, ["user","project","local"]);
   assert.equal(options.permissionMode,"plan");
   assert.equal(options.model,"sonnet");assert.equal(options.effort,"low");
-  assert.deepEqual(events.map(e=>e.type),["item.completed","thread.usage","turn.completed"]);
+  assert.deepEqual(events.map(e=>e.type),["item.completed","item.completed","thread.usage","turn.completed"]);
+  assert.equal((events[0]!.payload!.item as {type:string}).type,"userMessage");
+  assert.deepEqual((events[0]!.payload!.item as {content:unknown}).content,[{type:"text",text:"Continue original context"}]);
   const usage=events.find(e=>e.type==="thread.usage")!.payload!.usage as {total:{totalTokens:number};last:{totalTokens:number}};
   assert.equal(usage.total.totalTokens,15);assert.equal(usage.last.totalTokens,5);
   await runtime.stop(); assert.equal(closed,true);
@@ -147,7 +149,7 @@ test("resumed background results cannot complete or discard a newly submitted Cl
  }
  assert.equal(calls,2);assert.equal(closed,2);
  assert.equal(events.filter(e=>e.type==="thread.usage").length,2);
- assert.equal(events.filter(e=>e.type==="item.completed").length,2);
+ assert.equal(events.filter(e=>e.type==="item.completed").length,4);
  assert.equal(events.some(e=>e.type==="turn.error"),false);
  await runtime.stop();
 });
@@ -231,7 +233,7 @@ test("Claude child stream and result cannot become parent reply or complete pare
         yield { type: "stream_event", parent_tool_use_id: "child-tool", event: { type: "content_block_delta", delta: { type: "text_delta", text: "Child delta" } } };
         yield { type: "assistant", parent_tool_use_id: "child-tool", message: { id: "child-reply", content: [{ type: "text", text: "Child answer" }] } };
         yield { ...result, parent_tool_use_id: "child-tool" };
-        assert.equal(events.length, 0, "a child result must not finish or pollute the parent");
+        assert.equal(events.length, 1, "only the submitted parent user message is recorded");
         yield { type: "system", subtype: "task_notification", session_id: "parent", task_id: "child", status: "completed", summary: "Review done" };
         yield { type: "stream_event", parent_tool_use_id: null, event: { type: "content_block_delta", delta: { type: "text_delta", text: "Parent delta" } } };
         yield { type: "assistant", parent_tool_use_id: null, message: { id: "parent-reply", content: [{ type: "text", text: "Parent synthesis" }] } };
@@ -308,7 +310,7 @@ test('damaged optional Claude runtime is reported without failing shared runtime
 for(const merged of [true,false])test(`Claude steering retains native stream until all accepted UUIDs complete (merged=${merged})`,async()=>{
  const id="claude_12345678-1234-1234-1234-123456789012";
  const thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;
- const events:Array<{type:string;nativeTurnId?:string}>=[];
+ const events:Array<{type:string;nativeTurnId?:string;payload?:Record<string,unknown>}>=[];
  const gate=Promise.withResolvers<void>(),started=Promise.withResolvers<void>(),finished=Promise.withResolvers<void>();
  let queries=0,turnId:string;
  const runtime=new ClaudeRuntime({findManagedThread:()=>thread,findProject:()=>project,onVolatile:()=>{},onExit:async()=>{},onApprovalResolved:async()=>{},onApproval:async()=>{},onEvent:async e=>{events.push(e);if(e.type==='turn.completed')finished.resolve();}} as AppServerCallbacks,'epoch',{
@@ -330,6 +332,22 @@ for(const merged of [true,false])test(`Claude steering retains native stream unt
  await runtime.steerTurn(thread,turnId,'additional','11111111-1111-4111-8111-111111111111',[image]);
  gate.resolve();await finished.promise;
  assert.equal(queries,1);assert.equal(events.filter(e=>e.type==='turn.completed').length,1);
+ const users=events.filter(e=>e.type==='item.completed').map(e=>e.payload!.item as {type:string;content:unknown[]});
+ assert.equal(users.length,2,"accepted original and additional prompts appear once");
+ assert.ok(users.every(item=>item.type==='userMessage'));
+ assert.deepEqual(users[1]!.content,[{type:'text',text:'additional'},{type:'image',url:image}]);
  assert.ok(events.every(e=>e.nativeTurnId===turnId));
  await assert.rejects(runtime.steerTurn(thread,turnId,'late'),/变化/);await runtime.stop();
+});
+
+test("Claude image-only history remains a user message with the same native identity",async()=>{
+ const runtime=new ClaudeRuntime({} as AppServerCallbacks,"epoch",{
+   getSessionInfo:async()=>({sessionId:"original",summary:"",cwd:"/tmp",lastModified:0}),
+   getSessionMessages:async()=>[
+     {type:"user",uuid:"image-user",session_id:"original",parent_tool_use_id:null,parent_agent_id:null,
+      message:{content:[{type:"image",source:{type:"base64",media_type:"image/png",data:"aGVsbG8="}}]}},
+   ],
+ });
+ const page=await runtime.readHistoryPage("claude_original",null);
+ assert.deepEqual(page.items[0]?.item,{id:"image-user:text",type:"userMessage",content:[{type:"image",url:"data:image/png;base64,aGVsbG8="}]});
 });

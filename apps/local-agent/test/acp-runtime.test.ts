@@ -335,6 +335,9 @@ test('Grok native interject targets the existing turn, rejects stale input and p
  const receipt=await f.runtime.steerTurn(f.thread,turn.nativeTurnId,'finish','unique-input');
  assert.equal(receipt.status,'queued');assert.equal(receipt.nativeTurnId,turn.nativeTurnId);
  await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ const users=f.events.filter(e=>e.type==='item.completed'&&(e.payload.item as {type?:string})?.type==='userMessage');
+ assert.deepEqual(users.map(e=>(e.payload.item as {content:Array<{text:string}>}).content[0]?.text),['wait','finish']);
+
  assert.equal(f.events.filter(e=>e.type==='turn.completed').length,1);
  assert.equal(f.counts.connections,count);
  await assert.rejects(f.runtime.steerTurn(f.thread,turn.nativeTurnId,'late'),/changed/);

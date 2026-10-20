@@ -188,3 +188,18 @@ it('deleted or suppressed public summaries cannot be resurrected by old snapshot
     expect(timelineItems([reasoning(1, ['Finished'], 'item.completed'), { ...removed, type: 'item.started' }])).toEqual([]);
   }
 });
+
+it.each(["codex", "claude", "grok", "cursor", "qwen", "kimi", "codebuddy", "gemini", "trae", "antigravity"])(
+  "%s user questions retain the You label and body in the timeline",
+  provider => {
+    const event = mapEvent({
+      eventId: "question", type: "item.completed", sessionSeq: 1,
+      nativeThreadId: provider + "_thread", nativeTurnId: "turn", nativeItemId: "question:text",
+      payloadState: "present",
+      payload: {item: {id: "question:text", type: "userMessage", content: [{type: "text", text: "测试提问"}]}},
+    });
+    expect(timelineItems([event])).toHaveLength(1);
+    expect(timelineItems([event])[0]).toMatchObject({actor: "user", title: "你", body: "测试提问"});
+    expect(isBuzhoushanChatEvent(event)).toBe(true);
+  },
+);
