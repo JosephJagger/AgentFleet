@@ -24,6 +24,8 @@ Agent 0.30.57 起，「＋」保留图片、文件、文件夹、会话引用与
 
 Agent 0.30.58 使用 `supportedModels()` 读取宿主机原生模型目录及每个模型的 effort 支持；选择列表展示原生版本名称，并发送 resolvedModel 完整 ID。Claude Code 设置入口打开模型、思考强度和计划模式对话框，应用于下一轮消息。
 
+网页输入 `/` 会显示已接入的 `/model`、`/effort`、`/plan`、`/help`，支持前缀筛选。命令菜单使用输入区上方的限高浮层，不占用输入框高度；点击仅填入草稿，发送后仍走上述既有处理和版本检查。它不是宿主机完整原生命令或 skills 目录。
+
 移动端输入建议与桌面共用浮层，定位在输入区与模型快捷入口上方，不占 composer 高度。监听 visualViewport 的缩放和滚动，避免键盘出现或建议切换时撑高输入框。Claude 模型快捷入口采用与 Codex 相同的小字样式，配置在独立弹窗中完成。
 
 Agent 0.30.59 起支持 Claude 原生 default / auto / acceptEdits / dontAsk 权限模式。可选值来自宿主机 CLI --help，auto 选项还按原生模型 supportsAutoMode 判断。SDK permissionMode 在新轮次生效，plan 始终优先；原生 canUseTool 和 AskUserQuestion 继续处理仍需响应的操作。模型、effort、权限和计划模式在弹窗点击“保存”后按工作区和会话保存在控制面数据库；切换、刷新和换设备均重新读取。取消不改变已保存配置，版本冲突要求重新读取，读取失败不会回退继承并发送。未选择权限时保持 default。尚未更新的 Agent 不允许收到权限字段。

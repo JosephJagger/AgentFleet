@@ -1,5 +1,5 @@
 import {GrokNativePanel} from "./components/GrokNativePanel";
-import {CodexCommandSuggestions,GrokCommandSuggestions} from "./components/SlashCommandSuggestions";
+import {ClaudeCommandSuggestions,CodexCommandSuggestions,GrokCommandSuggestions} from "./components/SlashCommandSuggestions";
 import {CursorSettingsShortcut} from './components/CursorSettingsShortcut';
 import {CursorControls} from "./components/CursorControls";
 import {useCursorPreferences} from "./lib/cursor-preferences";
@@ -1161,6 +1161,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div>}
         <div className="composer-input">
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
+        {session.provider === "claude" && <ClaudeCommandSuggestions anchor={textArea} prompt={prompt} supported={session.collaborationModes?.includes("plan")===true} onSelect={setPrompt}/>}
         {session.provider==="grok"&&<GrokCommandSuggestions anchor={textArea} prompt={prompt} commands={grokPrefs.commands} onSelect={setPrompt}/>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
         {imageDraft.images.length > 0 && <MessageImages images={imageDraft.images} onRemove={imageDraft.remove} disabled={busy || imageDraft.processing} />}

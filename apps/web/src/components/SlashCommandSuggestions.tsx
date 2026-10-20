@@ -49,3 +49,18 @@ export function CodexCommandSuggestions({anchor,prompt,onSelect}:{
   const matches=prompt.trimStart().startsWith("/")?codexCommands.filter(item=>item.name.includes(prompt.trim().slice(1).split(/\s/)[0].toLowerCase())).map(item=>({name:item.name,description:`${item.label} · ${coverageLabels[item.coverage]}`})):[];
   return <SlashCommandSuggestions anchor={anchor} prompt={prompt} commands={matches} label={t("Codex 命令")} note={t("面板命令 · 点击待接入项可查看原因，不会发送给模型")} onSelect={onSelect}/>;
 }
+
+/** These are panel-mapped controls, not a claim to expose every native CLI command. */
+export function ClaudeCommandSuggestions({anchor,prompt,onSelect,supported}:{
+  anchor:RefObject<HTMLTextAreaElement|null>; prompt:string; onSelect:(value:string)=>void; supported:boolean;
+}){
+  const commands:NativeCommand[]=[
+    {name:"model",description:t("模型"),hint:"[host|sonnet|opus|haiku|claude-…]"},
+    {name:"effort",description:t("思考强度"),hint:"[low|medium|high|xhigh|max]"},
+    {name:"plan",description:t("计划模式")},
+    {name:"help",description:t("命令清单与支持范围")},
+  ];
+  const text=prompt.trimStart();
+  const matches=text.startsWith("/")&&!/\s/.test(text)?commands.filter(command=>command.name.startsWith(text.slice(1))):[];
+  return <SlashCommandSuggestions anchor={anchor} prompt={prompt} commands={matches} label={t("Claude Code 命令")} note={supported?t("面板已接入的命令；点击填入，发送后执行。其他终端命令请在宿主机使用。"):t("Claude Code 原生控制需要 Agent 0.30.57 或更新版本")} onSelect={name=>onSelect(`/${name} `)}/>;
+}

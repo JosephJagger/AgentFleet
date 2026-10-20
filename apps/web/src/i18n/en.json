@@ -1,4 +1,5 @@
 {
+  "面板已接入的命令；点击填入，发送后执行。其他终端命令请在宿主机使用。": "Commands supported by the panel. Click to fill, then send to run. Use other terminal commands on the host.",
   "{0} 正在处理：可补充当前任务，或排到下一轮": "{0} is working: add to this turn or queue the next one",
   "状态": "Status",
   "全部": "All",

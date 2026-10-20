@@ -1151,3 +1151,39 @@ it('运行中可追加时不误报连接错误；同步期间保留草稿和写�
  expect(screen.queryByText('主机连接正常，正在同步会话状态；同步后恢复发送')).toBeNull();
  expect(onQueue).not.toHaveBeenCalled();expect(onSteer).not.toHaveBeenCalled();
 });
+
+it("Claude 输入 / 显示浮层，选择只填草稿，发送 help 不调用模型", async()=>{
+  const props=inspectorProps("A"),send=vi.fn(noop);
+  props.detail={...props.detail,session:{...props.detail.session,provider:"claude",collaborationModes:["default","plan"]}};
+  render(<SessionInspector {...props} onSend={send}/>);
+  const input=screen.getByRole("textbox",{name:"发送给 Claude Code 的消息"}) as HTMLTextAreaElement;
+  fireEvent.change(input,{target:{value:"/"}});
+  const menu=screen.getByRole("group",{name:"Claude Code 命令"});
+  expect(menu.closest(".completion-floating")?.parentElement).toBe(document.body);
+  expect(input.closest(".composer")?.contains(menu)).toBe(false);
+  for(const command of ["model","effort","plan","help"])expect(within(menu).getByText(`/${command}`)).toBeTruthy();
+  expect(send).not.toHaveBeenCalled();
+  fireEvent.change(input,{target:{value:"/he"}});
+  expect(screen.queryByText("/model")).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:/^\/help/}));
+  expect(input.value).toBe("/help ");expect(screen.queryByRole("group",{name:"Claude Code 命令"})).toBeNull();
+  expect(document.activeElement).toBe(input);expect(send).not.toHaveBeenCalled();
+  await waitFor(()=>expect((screen.getByRole("button",{name:"发送"}) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button",{name:"发送"}));
+  await waitFor(()=>expect(screen.getByText(/Claude Code：\/model、\/effort、\/plan/)).toBeTruthy());
+  expect(input.value).toBe("");expect(send).not.toHaveBeenCalled();
+  fireEvent.change(input,{target:{value:"/logout"}});fireEvent.click(screen.getByRole("button",{name:"发送"}));
+  expect(screen.getByText(/此 Claude Code 终端命令尚未接入面板/)).toBeTruthy();expect(send).not.toHaveBeenCalled();
+});
+it("旧主机的 Claude 命令菜单显示版本要求，不能绕过原有检查",async()=>{
+  const props=inspectorProps("A"),send=vi.fn(noop);
+  props.detail={...props.detail,session:{...props.detail.session,provider:"claude",collaborationModes:[]}};
+  render(<SessionInspector {...props} onSend={send}/>);
+  const input=screen.getByRole("textbox",{name:"发送给 Claude Code 的消息"}) as HTMLTextAreaElement;
+  fireEvent.change(input,{target:{value:"/"}});
+  expect(within(screen.getByRole("group",{name:"Claude Code 命令"})).getByText(/需要 Agent 0.30.57/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button",{name:/^\/plan/}));
+  await waitFor(()=>expect((screen.getByRole("button",{name:"发送"}) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button",{name:"发送"}));
+  expect(screen.getByText(/需要 Agent 0.30.57/)).toBeTruthy();expect(send).not.toHaveBeenCalled();expect(input.value).toBe("/plan ");
+});
