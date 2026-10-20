@@ -4,7 +4,7 @@ import { ChevronRight, Settings2, X } from "lucide-react";
 import type { GrokModel, GrokConfigOption, GrokSettings } from "../lib/grok-preferences";
 import { t } from "../i18n";
 
-export function GrokControls({options,models=[],settings,ready,error,onReload,onSave,disabled,allowStartup=false,xSearchSupported=false,openRequest=0}:{models?:GrokModel[];options:GrokConfigOption[];settings:GrokSettings;ready:boolean;error:string;onReload:()=>void;onSave:(settings:GrokSettings)=>Promise<void>;disabled:boolean;allowStartup?:boolean;xSearchSupported?:boolean;openRequest?:number}) {
+export function GrokControls({options,models=[],settings,ready,error,onReload,onSave,onEditingChange,disabled,allowStartup=false,xSearchSupported=false,openRequest=0}:{models?:GrokModel[];options:GrokConfigOption[];settings:GrokSettings;ready:boolean;error:string;onReload:()=>void;onSave:(settings:GrokSettings)=>Promise<void>;onEditingChange?:(editing:boolean)=>void;disabled:boolean;allowStartup?:boolean;xSearchSupported?:boolean;openRequest?:number}) {
   const [draft,setDraft]=useState(settings);
   const [open,setOpen]=useState(false);
   const [saving,setSaving]=useState(false);
@@ -14,6 +14,8 @@ export function GrokControls({options,models=[],settings,ready,error,onReload,on
   const generation=useRef(0);
   const timer=useRef<number | undefined>(undefined);
   const draftRef=useRef(settings);
+  useEffect(()=>{onEditingChange?.(dirty.current||saving);},[draft,saving,open,onEditingChange]);
+  useEffect(()=>()=>{window.clearTimeout(timer.current);onEditingChange?.(false);},[onEditingChange]);
   draftRef.current=draft;
   const modelOption=options.find(option=>option.id==="model");
   const effortOption=options.find(option=>option.id==="reasoning_effort");

@@ -1,3 +1,4 @@
+import {cursorCommandOptions} from "../lib/composer-commands";
 import {useEffect,useRef,useState} from 'react';
 import type {CursorSettings,CursorOption,CursorModel} from '../lib/cursor-settings';
 import type {UsageSummary} from '../lib/usage';
@@ -6,20 +7,19 @@ import {t,locale} from '../i18n';
 import {cursorOptionLabel,cursorValueLabel} from '../lib/cursor-labels';
 import {formatQuotaPercent} from '../lib/usage';
 
-export function CursorControls({sessionId,settings,options,models,ready,supported,error,disabled,visible,observedAt,onReload,onSave}:{sessionId:string;settings:CursorSettings;options:CursorOption[];models:CursorModel[];ready:boolean;supported:boolean;error:string;disabled:boolean;visible:boolean;observedAt:string|null;onReload:()=>void;onSave:(s:CursorSettings)=>Promise<void>}){
+export function CursorControls({sessionId,settings,options,models,ready,supported,error,disabled,visible,observedAt,onReload,onSave,onEditingChange}:{sessionId:string;settings:CursorSettings;options:CursorOption[];models:CursorModel[];ready:boolean;supported:boolean;error:string;disabled:boolean;visible:boolean;observedAt:string|null;onEditingChange?:(editing:boolean)=>void;onReload:()=>void;onSave:(s:CursorSettings)=>Promise<void>}){
   const [draft,setDraft]=useState(settings),[dirty,setDirty]=useState(false),[saving,setSaving]=useState(false),[message,setMessage]=useState('');
   const [usage,setUsage]=useState<UsageSummary>(),[usageError,setUsageError]=useState(false);
   const generation=useRef(0);
+  useEffect(()=>{onEditingChange?.(dirty||saving);},[dirty,saving,onEditingChange]);
+  useEffect(()=>()=>onEditingChange?.(false),[onEditingChange]);
   useEffect(()=>{if(!dirty)setDraft(settings);},[settings,dirty]);
   useEffect(()=>{if(!visible)return;const controller=new AbortController();let pending=false;
     const read=async()=>{if(pending)return;pending=true;try{const u=await api.usage('session',sessionId,controller.signal,'cursor');if(!controller.signal.aborted){setUsage(u);setUsageError(false);}}catch{if(!controller.signal.aborted)setUsageError(true);}finally{pending=false;}};
     void read();const timer=window.setInterval(()=>{if(!document.hidden)void read();},30000);
     return()=>{controller.abort();window.clearInterval(timer);};
   },[sessionId,visible]);
-  const model=draft.options?.model??options.find(o=>o.id==='model')?.current;
-  const selected=models.find(m=>m.value===model);
-  const different=model&&model!==options.find(o=>o.id==='model')?.current;
-  const displayOptions=different?options.filter(o=>o.id==='mode'||o.id==='model').concat(selected?.configOptions??[]):options;
+  const displayOptions=cursorCommandOptions(draft,options,models);
   const orderedOptions=[...displayOptions].sort((a,b)=>Number(b.id==='model')-Number(a.id==='model'));
   function change(id:string,value:string){
     let next={...draft.options};

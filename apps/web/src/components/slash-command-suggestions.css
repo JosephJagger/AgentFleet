@@ -37,3 +37,9 @@
 .slash-command-list small { color: var(--muted); font-size: var(--text-micro); }
 
 .slash-command-suggestions__note { flex: 0 0 auto; margin: 0; padding: 0 10px 4px; color: var(--muted); font-size: var(--text-micro); line-height: 1.4; }
+.slash-command-list > button[aria-selected="true"] { background: var(--cobalt-soft); }
+.slash-command-list > button:disabled { opacity: .6; cursor: default; }
+.slash-command-list > button span svg { margin-inline-start: 8px; vertical-align: middle; }
+.slash-command-confirm { padding: 8px; font-size: var(--text-caption); overflow-wrap: anywhere; }
+.slash-command-confirm p { margin: 0 0 8px; }
+.slash-command-confirm button { padding: 8px 16px; margin-inline-end: 8px; border: 1px solid var(--line-strong); border-radius: 8px; color: inherit; background: var(--paper); cursor: pointer; }

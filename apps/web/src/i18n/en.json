@@ -3929,5 +3929,15 @@
   "请生成视频。内容、时长、画幅与参考素材：": "Please generate a video. Content, duration, aspect ratio and reference material:",
   "请使用原生子智能体完成以下任务，并汇总结果。任务与分工：": "Please use native subagents for the following work and summarize the results. Tasks and responsibilities:",
   "请设置原生循环任务。执行内容、间隔与停止条件：": "Please set up a native recurring task. Work to perform, interval and stop condition:",
-  "请审查以下改动，报告有证据的问题与影响。审查范围：": "Please review these changes and report evidence-backed issues and their impact. Review scope:"
+  "请审查以下改动，报告有证据的问题与影响。审查范围：": "Please review these changes and report evidence-backed issues and their impact. Review scope:",
+  "当前主机尚未提供此配置能力": "This host has not reported support for this setting",
+  "此设置会改变后续任务的工具审批方式；当前任务保持不变。": "This changes tool approvals for future tasks. The current task keeps its settings.",
+  "请选择列出的有效选项；未发送聊天消息。": "Choose a valid listed option. No chat message was sent.",
+  "没有匹配的选项": "No matching options",
+  "仅此会话 · 与“发送使用”同步 · 下次提交生效": "This session · Shared with send settings · Applies to the next submission",
+  "↑ ↓ 选择 · Tab / Enter 确认 · Esc 收起": "↑ ↓ Select · Tab / Enter Accept · Esc Dismiss",
+  "请先保存或取消会话配置中的修改": "Save or discard your session settings changes first",
+  "{0} 命令": "{0} commands",
+  "会话配置尚未读取，请重试。": "Session settings are not loaded. Please try again.",
+  "选择选项后保存，仅用于此会话": "Choose an option to save for this session"
 }

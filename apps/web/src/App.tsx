@@ -1,5 +1,6 @@
 import {GrokNativePanel} from "./components/GrokNativePanel";
-import {ClaudeCommandSuggestions,CodexCommandSuggestions,GrokCommandSuggestions} from "./components/SlashCommandSuggestions";
+import {ComposerCommandPalette,type CommandPaletteHandle} from "./components/ComposerCommandPalette";
+import {claudeComposerCommands,grokComposerCommands,cursorComposerCommands,parseComposerCommand,type ComposerCommand} from "./lib/composer-commands";
 import {CursorSettingsShortcut} from './components/CursorSettingsShortcut';
 import {CursorControls} from "./components/CursorControls";
 import {useCursorPreferences} from "./lib/cursor-preferences";
@@ -814,8 +815,6 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const claudePrefs=useClaudePreferences(detail?.session.provider === "claude" ? detail.session.id : undefined);
   const grokPrefs=useGrokPreferences(detail?.session.provider === "grok" ? detail.session.id : undefined, detail?.session.sessionSeq);
   const cursorPrefs=useCursorPreferences(detail?.session.provider === "cursor" ? detail.session.id : undefined,detail?.session.sessionSeq);
-  const claudeModel=claudePrefs.settings.model;
-  const claudeEffort=claudePrefs.settings.effort ?? "";
   const claudePlan=claudePrefs.settings.mode === "plan";
   const [claudeSettingsOpen,setClaudeSettingsOpen]=useState(0);
   const [grokSettingsOpen,setGrokSettingsOpen]=useState(0);
@@ -826,9 +825,14 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const [nativeRequest, setNativeRequest] = useState<{ sessionId: string; action: NativeOperation; args: string; nonce: number }>();
   const [inspectionRequest, setInspectionRequest] = useState<{ sessionId: string; section: string; nonce: number }>();
   const settings = runtimeChoice?.sessionId === detail?.session.id ? runtimeChoice?.settings : undefined;
-  const [busy, setBusy] = useState(false);
+  const [taskBusy, setBusy] = useState(false);
+  const [commandSaving,setCommandSaving]=useState(false);
+  const busy=taskBusy||commandSaving;
+  const [settingsEditing,setSettingsEditing]=useState(false);
   const [releaseConfirming, setReleaseConfirming] = useState(false);
   const textArea = useRef<HTMLTextAreaElement>(null);
+  const commandPalette=useRef<CommandPaletteHandle>(null);
+  const [codexQuick,setCodexQuick]=useState<{sessionId:string;commands:ComposerCommand[]}>();
   const imageInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
@@ -932,8 +936,6 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
   const modeBlocked = (session.provider === "claude" && !claudePrefs.ready) || (session.provider === "grok" && !grokPrefs.ready);
   const modeHint = session.provider === "grok" ? t("请先读取 Grok 会话配置") : t("计划模式需要先确认模型配置");
   const inputStatusHint = modeBlocked ? modeHint : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : composerHint;
-  const keyboardHint = inputStatusHint || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : canQueueOrSteer ? (supportsSteer ? t("任务执行中，可追加本轮或加入队列") : t("任务执行中，可加入队列")) : t("请先检查会话连接与执行状态"));
-  const touchHint = inputStatusHint || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"));
 
   async function runSlash(name: string, args = "") {
     setCommandMessage("");
@@ -982,23 +984,24 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
     setPrompt(args);
   }
 
+  const quickCommands=session.provider==="claude"?claudeComposerCommands({settings:claudePrefs.settings,models:session.claudeModels??[],permissionModes:session.claudePermissionModes??[],ready:claudePrefs.ready,supported:!!session.collaborationModes?.includes("plan"),save:claudePrefs.save})
+    :session.provider==="grok"?grokComposerCommands({settings:grokPrefs.settings,models:grokPrefs.models,options:grokPrefs.options,ready:grokPrefs.ready,save:grokPrefs.save})
+    :session.provider==="cursor"?cursorComposerCommands({settings:cursorPrefs.settings,models:cursorPrefs.models,options:cursorPrefs.options,ready:cursorPrefs.ready,supported:cursorPrefs.supported,save:cursorPrefs.save})
+    :(session.provider??"codex")==="codex"?(codexQuick?.sessionId===session.id?codexQuick.commands:["model","effort","plan","fast","personality","summary"].map(name=>({name,description:name,choices:[],unavailable:t("会话配置尚未读取，请重试。")}))):[];
+  const nativeCommands:ComposerCommand[]=session.provider==="grok"?grokPrefs.commands:(session.provider??"codex")==="codex"?codexCommands.map(c=>({name:c.name,description:`${c.label} · ${coverageLabels[c.coverage]}`,hint:c.note})):[];
+  const composerCommands=[...quickCommands.map(c=>settingsEditing?{...c,unavailable:t("请先保存或取消会话配置中的修改")}:c),...nativeCommands.filter(c=>!quickCommands.some(q=>q.name===c.name)&&c.name!=="help"),...(["codex","claude","grok","cursor"].includes(session.provider??"codex")?[{name:"help",description:t("命令清单与支持范围")}]:[])];
+  const parsedQuick=parseComposerCommand(prompt);
+  const isLocalCommand=!!parsedQuick&&!!composerCommands.find(c=>c.name===parsedQuick.name&&(c.choices||c.name==="help"));
+  const paletteActive=!!parsedQuick&&!!composerCommands.length;
+  const keyboardHint = paletteActive ? t("↑ ↓ 选择 · Tab / Enter 确认 · Esc 收起") : inputStatusHint || (canSend ? t("Tab 补全 · Enter 发送 · Ctrl / ⌘ + Enter 换行") : canQueueOrSteer ? (supportsSteer ? t("任务执行中，可追加本轮或加入队列") : t("任务执行中，可加入队列")) : t("请先检查会话连接与执行状态"));
+  const touchHint = isLocalCommand ? t("选择选项后保存，仅用于此会话") : inputStatusHint || (canSend || canQueueOrSteer ? t("回车换行") : t("请先检查会话连接与执行状态"));
+
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (commandPalette.current?.submit()) return;
     if (imageBlocked || busy || referencesBlocked || modeBlocked || outputSchemaError) return;
     if (prompt.trim() === "/") return;
-    if (session.provider === "claude" && /^\/[a-z]+(?:\s|$)/i.test(prompt.trim())) {
-      if (!session.collaborationModes?.includes("plan")) {setCommandMessage(t("Claude Code 原生控制需要 Agent 0.30.57 或更新版本"));return;}
-      const [name,...args]=prompt.trim().slice(1).split(/\s+/);const arg=args.join(" ");
-      try {
-      if (name === "plan") {await claudePrefs.save({...claudePrefs.settings,mode:claudePlan?"default":"plan"});setCommandMessage(t("Claude Code 计划模式将在下一轮生效"));}
-      else if (name === "model" && (!arg || /^(host|sonnet|opus|haiku|claude-[a-zA-Z0-9.-]{1,120})$/.test(arg))) {if(arg)await claudePrefs.save({...claudePrefs.settings,model:session.claudeModels?.find(m=>m.model===arg || m.model.startsWith(`claude-${arg}-`))?.model ?? arg,effort:undefined,permissionMode:claudePrefs.settings.permissionMode === "auto" ? "default" : claudePrefs.settings.permissionMode});else setClaudeSettingsOpen(n=>n+1);setCommandMessage(t("Claude Code 模型：{0}",arg||claudeModel));}
-      else if (name === "effort" && (!arg || ["low","medium","high","xhigh","max"].includes(arg))) {if(arg)await claudePrefs.save({...claudePrefs.settings,effort:arg});else setClaudeSettingsOpen(n=>n+1);setCommandMessage(t("Claude Code 思考强度：{0}",arg||claudeEffort||t("继承宿主机")));}
-      else if (name === "help") setCommandMessage(t("Claude Code：/model、/effort、/plan；文件、图片和会话引用可从 + 添加。宿主机 skills 和 MCP 由原生配置加载。"));
-      else {setCommandMessage(t("此 Claude Code 终端命令尚未接入面板，请在宿主机使用；未作为聊天消息发送。"));return;}
-      setPrompt("");
-      } catch(error) {setCommandMessage(errorMessage(error));}
-      return;
-    }
+    if (session.provider === "claude" && prompt.trim().startsWith("/")) {setCommandMessage(t("此 Claude Code 终端命令尚未接入面板，请在宿主机使用；未作为聊天消息发送。"));return;}
     if ((session.provider ?? "codex") === "codex" && slashCommand) { await runSlash(slashCommand.name, slashCommand.args); return; }
     if (!hasInput || !canSend) return;
     setBusy(true);
@@ -1017,7 +1020,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
     }
   }
 
-  const aiOptimizeButton = completionPreferences.suggestions && <button type="button" className="button button--secondary composer-ai-button" aria-label={aiBusy ? t("正在优化…") : t("优化表达")} title={t("保留原意，让描述更清晰、专业")} disabled={aiBusy || busy || !prompt.trim() || Boolean(slashCommand)} onClick={async()=>{
+  const aiOptimizeButton = completionPreferences.suggestions && <button type="button" className="button button--secondary composer-ai-button" aria-label={aiBusy ? t("正在优化…") : t("优化表达")} title={t("保留原意，让描述更清晰、专业")} disabled={aiBusy || busy || !prompt.trim() || prompt.trimStart().startsWith("/")} onClick={async()=>{
             const controller = new AbortController(); aiRequest.current?.abort(); aiRequest.current=controller; setAIBusy(true); setAIMessage("");
             try {
               const settings = await api.writingAI();
@@ -1122,9 +1125,9 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         {configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         <OperationReceipts commands={detail.commands ?? []} mode="recent" />
         {session.provider==="grok"&&<GrokNativePanel key={session.id} session={session} commands={detail.commands??[]} supported={grokPrefs.nativeManagement} onChanged={onRefresh} onCompose={draft=>{setPrompt(prompt.trim()?`${prompt}\n\n${draft}`:draft);setConfiguration(undefined);requestAnimationFrame(()=>textArea.current?.focus());}}/>}
-        {(session.provider ?? "codex") === "codex" && <CodexSettingsPanel key={`${draftOwner}:${session.id}:${modeSettingsRevision}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} />}
+        {(session.provider ?? "codex") === "codex" && <CodexSettingsPanel key={`${draftOwner}:${session.id}:${modeSettingsRevision}`} sessionId={session.id} observed={session.runtimeSettings} onChange={setRuntimeChoice} onSummary={setRuntimeSummary} onCommands={setCodexQuick} />}
         {(session.provider ?? "codex") === "codex" && <PermissionPanel key={`permissions:${session.id}`} sessionId={session.id} observed={session.runtimeSettings} />}
-        {session.provider === "cursor" && <CursorControls key={session.id} sessionId={session.id} options={cursorPrefs.options} models={cursorPrefs.models} settings={cursorPrefs.settings} ready={cursorPrefs.ready} supported={cursorPrefs.supported} error={cursorPrefs.error} onReload={cursorPrefs.reload} onSave={cursorPrefs.save} disabled={busy} visible={!!configuration} observedAt={cursorPrefs.observedAt}/>}
+        {session.provider === "cursor" && <CursorControls key={session.id} sessionId={session.id} options={cursorPrefs.options} models={cursorPrefs.models} settings={cursorPrefs.settings} ready={cursorPrefs.ready} supported={cursorPrefs.supported} error={cursorPrefs.error} onReload={cursorPrefs.reload} onSave={cursorPrefs.save} onEditingChange={setSettingsEditing} disabled={busy} visible={!!configuration} observedAt={cursorPrefs.observedAt}/>}
         <SessionWritingPreferencesPanel key={`writing:${draftOwner}:${session.id}`} settings={writingSettings} />
         {(session.provider ?? "codex") === "codex" && <details className="composer-tools session-config-section" key={`tools:${draftOwner}:${session.id}`}><summary><span>{t("更多工具与命令")}<small>{t("原生会话操作、环境查询与命令说明")}</small></span></summary><p>{t("重命名、归档、环境查询和 / 命令。日常对话直接在下方发送消息即可。")}</p>
           <NativeSessionActions key={`native:${draftOwner}:${session.id}`} session={session} request={nativeRequest?.sessionId === session.id ? nativeRequest : undefined} pending={pendingCommand} onChanged={onRefresh} />
@@ -1135,15 +1138,14 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         <details className="session-sync-details session-config-section"><summary><span>{t("同步详情")}<small>{t("查看会话同步状态的排查信息")}</small></span></summary><p className="mono">seq {session.sessionSeq} · epoch {session.contentEpoch}</p></details>
       </SessionConfiguration>
       <form className="composer" onSubmit={event => { void submit(event); }}>
-        {(session.provider ?? "codex") === "codex" && <CodexCommandSuggestions anchor={textArea} prompt={prompt} onSelect={name=>void runSlash(name,slashCommand?.args)}/>}
         {!configuration && commandMessage && <p className="codex-command-message" role="status">{systemText(commandMessage)}</p>}
         {(!managed || (lease && !lease.isMine && !canQueueOrSteer)) && <div className="composer-lock"><LockKeyhole size={14} />{!managed ? systemText(detail.writeBlockedReason) : t("其他窗口正在控制，草稿会保存在当前会话")}</div>}
         {voiceActive && <p className="composer-mode" role="status">{t("通话中可直接发送文字和图片；任务执行中可追加本轮，或排队稍后执行。")}</p>}
         {hasActiveTurn && <div className="composer-mode"><Activity size={14} />{supportsSteer ? t("{0} 正在处理：可补充当前任务，或排到下一轮", agentName(session.provider)) : t("{0} 正在处理：可排到下一轮", agentName(session.provider))}</div>}
         {isAcpProvider(session.provider) && session.provider !== "grok" && session.provider !== "cursor" && <p className="composer-mode">{t("权限沿用主机上的原生设置；需要确认时在面板处理。")}</p>}
         {session.provider === "cursor" && <CursorSettingsShortcut settings={cursorPrefs.settings} options={cursorPrefs.options} models={cursorPrefs.models} ready={cursorPrefs.ready} error={cursorPrefs.error} onOpen={()=>setConfiguration({section:"settings",nonce:Date.now()})}/>}
-        {session.provider === "grok" && <GrokControls xSearchSupported={grokPrefs.xSearchSupported} allowStartup={grokPrefs.canConfigureStartup} key={session.id} options={grokPrefs.options} models={grokPrefs.models} settings={grokPrefs.settings} ready={grokPrefs.ready} error={grokPrefs.error} onReload={grokPrefs.reload} onSave={grokPrefs.save} disabled={busy} openRequest={grokSettingsOpen}/>}
-        {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
+        {session.provider === "grok" && <GrokControls xSearchSupported={grokPrefs.xSearchSupported} allowStartup={grokPrefs.canConfigureStartup} key={session.id} options={grokPrefs.options} models={grokPrefs.models} settings={grokPrefs.settings} ready={grokPrefs.ready} error={grokPrefs.error} onReload={grokPrefs.reload} onSave={grokPrefs.save} onEditingChange={setSettingsEditing} disabled={busy} openRequest={grokSettingsOpen}/>}
+        {session.provider === "claude" && <ClaudeControls key={session.id} permissionModes={session.claudePermissionModes ?? []} models={session.claudeModels ?? []} settings={claudePrefs.settings} ready={claudePrefs.ready} error={claudePrefs.error} onReload={claudePrefs.reload} onSave={claudePrefs.save} onEditingChange={setSettingsEditing} disabled={busy || !session.collaborationModes?.includes("plan")} openRequest={claudeSettingsOpen}/>}
 
         {(session.provider ?? "codex") === "codex" && <RuntimeSettingsShortcut sessionId={session.id} summary={runtimeSummary} observed={session.runtimeSettings} running={session.state.currentTurn === "in_progress" && Boolean(session.activeTurnId)} activeTurnId={session.activeTurnId} goal={goal.trim() || undefined} onClearGoal={() => setGoal("")} onOpen={() => setConfiguration({ section: "settings", nonce: Date.now() })}/>}
         {referenceCards.length > 0 && <div className="session-reference-cards" aria-label={t("复用的会话")}>
@@ -1164,8 +1166,6 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
         </div>}
         <div className="composer-input">
         {aiMessage && <p className="image-draft-notice" role="status">{aiMessage}</p>}
-        {session.provider === "claude" && <ClaudeCommandSuggestions anchor={textArea} prompt={prompt} supported={session.collaborationModes?.includes("plan")===true} onSelect={setPrompt}/>}
-        {session.provider==="grok"&&<GrokCommandSuggestions anchor={textArea} prompt={prompt} commands={grokPrefs.commands} onSelect={setPrompt}/>}
         {aiResult?.session === session.id && aiResult.draft === prompt && <div className="writing-ai-results prompt-completions" role="group" aria-label={t("AI 表达建议")}>{aiResult.suggestions.map(suggestion=><button type="button" data-kind="rewrite" key={suggestion} onMouseDown={event=>event.preventDefault()} onClick={()=>{setPrompt(suggestion);setAIResult(undefined);textArea.current?.focus();}}><span className="prompt-completion__kind">{t("表达优化")} · AI</span><code>{suggestion}</code><small>{t("点击采用")}</small></button>)}</div>}
         {imageDraft.images.length > 0 && <MessageImages images={imageDraft.images} onRemove={imageDraft.remove} disabled={busy || imageDraft.processing} />}
         {(fileDraft.files.length > 0 || selectedPlugins.length > 0) && <div className="attachment-drafts" aria-label={t("待发送附件")}>
@@ -1194,6 +1194,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
             onMouseEnter={() => setActiveCompletion(index)}
           ><span className="prompt-completion__kind">{completion.kind === "plugin" ? t("插件") : completion.kind === "term" ? t("术语") : completion.kind === "rewrite" ? t("表达优化") : t("提示语")}</span><code>{completion.label}</code><small>{t(completion.detail)}</small></button>)}
         </div><button type="button" className="prompt-completions-dismiss" aria-label={t("收起补全建议")} title={t("收起补全建议")} onMouseDown={event => event.preventDefault()} onClick={() => { setDismissedCompletion(completionKey); textArea.current?.focus(); }}><X size={16} aria-hidden="true" /></button></div></CompletionSurface>}
+        <ComposerCommandPalette key={`${draftOwner}:${session.id}`} ref={commandPalette} anchor={textArea} prompt={prompt} commands={composerCommands} onPrompt={setPrompt} onApplied={()=>setCommandMessage("")} label={t("{0} 命令",agentName(session.provider))} disabled={taskBusy} onBusy={setCommandSaving}/>
         <textarea
           ref={textArea}
           aria-label={t("发送给 {0} 的消息", agentName(session.provider))}
@@ -1213,6 +1214,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
           rows={1}
           onKeyDown={(event) => {
             if (composingPrompt || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+            if (commandPalette.current?.keydown(event)) return;
             if (completions.length > 0) {
               if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                 event.preventDefault();
@@ -1273,17 +1275,17 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
             {session.provider === "claude" && session.collaborationModes?.includes("plan") && <button type="button" disabled={hasActiveTurn || !claudePrefs.ready} aria-pressed={claudePlan} onClick={() => { closeAddMenuAfterTouchChoice(); void claudePrefs.save({...claudePrefs.settings,mode:claudePlan?"default":"plan"}).catch(error=>setCommandMessage(errorMessage(error))); }}><Lightbulb size={17} /><span><b>{t("计划模式")}</b><small>{claudePlan ? t("已开启；下一轮按计划模式运行") : t("先分析并制定计划")}</small></span><i className={claudePlan ? "active" : ""} /></button>}
             {(session.provider ?? "codex") === "codex" && (session.plugins?.length ?? 0) > 0 && <><strong className="composer-add-section">{t("插件")}</strong><div className="composer-plugin-list">{session.plugins!.map(plugin => { const selected = selectedPlugins.some(item => item.pluginId === plugin.pluginId); return <button type="button" aria-pressed={selected} className={selected ? "selected" : ""} key={plugin.pluginId} onClick={() => { setSelectedPlugins(current => selected ? current.filter(item => item.pluginId !== plugin.pluginId) : [...current, plugin]); closeAddMenuAfterTouchChoice(); }}><Puzzle size={17} /><span><b>{plugin.pluginName}</b></span></button>; })}</div></>}
           </div></details>
-          {hasActiveTurn ? (
+          {isLocalCommand ? <button className="button button--primary" type="submit" disabled={busy}>{t("确认")}</button> : hasActiveTurn ? (
             <div className="active-turn-actions">
               <div className="composer-primary-pair">{aiOptimizeButton}
               {canCancel && <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>}
-              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={!(canQueueOrSteer || voiceActive && canSend) || Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setCommandMessage(""); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
-              {supportsSteer && hasActiveTurn && <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={!canQueueOrSteer || Boolean(slashCommand) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) { const { outputSchema: _outputSchema, ...steerAdditions } = additions; await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, steerAdditions); } else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setCommandMessage(""); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>}
+              </div><button className="button button--secondary" type="button" aria-label={t("加入队列")} disabled={!(canQueueOrSteer || voiceActive && canSend) || Boolean(slashCommand) || (session.provider === "claude" && prompt.trim().startsWith("/")) || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy || pendingCommand || session.actions?.queue?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined, additions); else await onQueue(sendText(), sendSettings, imageDraft.images.length ? imageDraft.images : undefined); setCommandMessage(""); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><Plus size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("加入队列")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("排队")}</span></button>
+              {supportsSteer && hasActiveTurn && <button className="button button--primary" type="button" aria-label={t("追加本轮")} disabled={!canQueueOrSteer || Boolean(slashCommand) || (session.provider === "claude" && prompt.trim().startsWith("/")) || !hasInput || imageBlocked || referencesBlocked || busy || pendingCommand || session.actions?.steer?.allowed === false} onClick={async () => { setBusy(true); try { if (additions) { const { outputSchema: _outputSchema, ...steerAdditions } = additions; await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined, steerAdditions); } else await onSteer(sendText(), imageDraft.images.length ? imageDraft.images : undefined); setCommandMessage(""); setPrompt(""); imageDraft.clear(); fileDraft.clear(); setSelectedPlugins([]); referenceCards.forEach(card => removeReference(card.key)); } catch (error) { setCommandMessage(errorMessage(error)); } finally { setBusy(false); } }}><ArrowRight size={14} /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("追加本轮")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("追加")}</span></button>}
             </div>
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>
           ) : (
-            <button className="button button--primary" disabled={!canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError || busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
+            <button className="button button--primary" disabled={busy || (!paletteActive && (!canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError))}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
           )}</div>}
           </div>
         </div>

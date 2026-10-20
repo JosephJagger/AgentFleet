@@ -1,6 +1,7 @@
 import { ChevronDown, Plug, ListTree } from "lucide-react";
 import { t, systemText } from "../i18n";
 import { useEffect, useRef, useState } from "react";
+import type {ComposerCommand} from "../lib/composer-commands";
 import { api } from "../lib/api";
 import type { CodexPreferences, CodexSettings, RuntimeSettings, SettingsScope, FieldOverrides, CodexCatalog } from "../lib/codex-settings";
 
@@ -16,7 +17,7 @@ function overridesOf(data: CodexPreferences, scope: SettingsScope): FieldOverrid
   if (result.mode === "__native__") delete result.mode;
   return result;
 }
-export function CodexSettingsPanel({ sessionId = "", machineId, projectId, workspace = false, observed, onChange = ignoreChoice, onSummary }: { sessionId?: string; machineId?: string; projectId?: string; workspace?: boolean; observed?: RuntimeSettings | null; onChange?: (choice: RuntimeChoice) => void; onSummary?: (summary: RuntimeSummary) => void }) {
+export function CodexSettingsPanel({ sessionId = "", machineId, projectId, workspace = false, observed, onChange = ignoreChoice, onSummary, onCommands }: { sessionId?: string; machineId?: string; projectId?: string; workspace?: boolean; observed?: RuntimeSettings | null; onChange?: (choice: RuntimeChoice) => void; onSummary?: (summary: RuntimeSummary) => void; onCommands?: (value:{sessionId:string;commands:ComposerCommand[]})=>void }) {
   const targetScope: SettingsScope = workspace ? "workspace" : projectId ? "project" : machineId ? "machine" : "session";
   const id = projectId ?? machineId ?? sessionId;
   const [scope, setScope] = useState<SettingsScope>(targetScope);
@@ -80,6 +81,36 @@ export function CodexSettingsPanel({ sessionId = "", machineId, projectId, works
   const plugins = [...new Map(catalogs.flatMap(c => c.plugins ?? []).map(p => [p.pluginId, p])).values()];
   const disabledPlugins = Array.isArray(draft.disabledPluginIds) ? draft.disabledPluginIds : [];
   const changed = !!data && JSON.stringify(draft) !== JSON.stringify(overridesOf(data, scope));
+  useEffect(() => {
+    if (!onCommands || targetScope !== "session") return;
+    const saved = data ? overridesOf(data, "session") : {};
+    const selectedModel = data?.desired?.model ?? observed?.observed?.model;
+    const catalog = data?.catalog?.error ? undefined : data?.catalog;
+    const nativeModel = catalog?.models.find(m => m.model === selectedModel);
+    const definitions = [
+      {name:"model",field:"model",description:t("模型"),values:catalog?.models.map(m=>({value:m.model,label:m.displayName}))??[]},
+      {name:"effort",field:"effort",description:t("推理强度"),values:(nativeModel?.efforts??[]).map(value=>({value,label:value}))},
+      {name:"plan",field:"mode",description:t("计划模式"),values:(catalog?.modes??[]).map(value=>({value,label:t(value==="plan"?"计划":"执行"),aliases:[value==="plan"?"on":"off"]}))},
+      {name:"fast",field:"serviceTier",description:t("服务档位"),values:[{value:"__clear__",label:t("恢复默认档位"),aliases:["off"]},...(nativeModel?.serviceTiers??[]).map(v=>({value:v.id,label:v.name,aliases:v.id==="fast"?["on"]:[]}))]},
+      {name:"personality",field:"personality",description:t("沟通风格"),values:nativeModel?.supportsPersonality?["none","friendly","pragmatic"].map(value=>({value,label:value})):[]},
+      {name:"summary",field:"summary",description:t("推理摘要"),values:["auto","concise","detailed","none"].map(value=>({value,label:value}))},
+    ] as const;
+    const commands: ComposerCommand[] = definitions.map(({name,field,description,values})=>({
+      name,description,unavailable:!data?t("会话配置尚未读取，请重试。"):busy?t("保存中…"):changed?t("请先保存或取消会话配置中的修改"):undefined,
+      choices:[{value:"inherit",label:t("沿用默认配置"),selected:saved[field]===undefined},...(field!=="mode"?[{value:"__native__",label:t("使用原生值（不继承上级）"),selected:saved[field]==="__native__",aliases:["host"]}]:[]),...values.map(v=>({...v,selected:v.value===(saved[field]===null?"__clear__":saved[field]??data?.effective?.[field])}))],
+      apply:async value=>{
+        if(!data||busy||changed)throw new Error(t("会话配置尚未读取，请重试。"));
+        const current=generation.current,nextOverrides={...saved};
+        if(value==="inherit")delete nextOverrides[field];else nextOverrides[field]=value==="__clear__"?null:value;
+        setBusy(true);setMessage("");
+        try {
+          const next=await api.saveRuntimePreferences("session",sessionId,{scope:"session",overrides:nextOverrides,revision:data.preferences.session.revision});
+          if(current===generation.current){setData(next);setDraft(overridesOf(next,scope));}
+        } finally {if(current===generation.current)setBusy(false);}
+      },
+    }));
+    onCommands({sessionId,commands});
+  },[data,busy,changed,scope,onCommands,sessionId,targetScope,observed?.observed?.model]);
   const Container = workspace ? "section" : "details";
   return <Container className="codex-settings-panel session-config-section" {...(workspace ? {} : {open: targetScope !== "session"})}>
     {!workspace && <summary><span>{t(targetScope === "session" ? "运行配置" : "默认运行配置")}<small>{data ? `${sourceLabel(data.source)} · ${data.desired?.model ?? t("继承 Codex")}` : t("读取中")}</small></span></summary>}

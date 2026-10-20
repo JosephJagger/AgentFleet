@@ -12,7 +12,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { saveClaudePreferences:vi.fn(),saveGrokPreferences:vi.fn(),saveRuntimePreferences:vi.fn(), claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -142,6 +142,7 @@ function inspectorProps(id: string) { return { detail: detail(id), loading: fals
 beforeEach(() => {
   vi.mocked(api.cursorPreferences).mockResolvedValue({settings:null,revision:0,options:[],models:[],observedAt:null,supported:true});
   vi.mocked(api.claudePreferences).mockResolvedValue({settings:null,revision:0});
+  vi.mocked(api.saveClaudePreferences).mockImplementation(async(_id,body)=>({settings:body.settings,revision:body.revision+1}));
   vi.mocked(api.grokPreferences).mockResolvedValue({settings:null,revision:0,options:[]});
   const defaults={terms:true,suggestions:true,nlp:true,learning:true};
   const overrides:Record<string,Partial<typeof defaults>>={};
@@ -644,7 +645,7 @@ describe("会话工作区", () => {
     fireEvent.click(screen.getByRole("button", { name: /运行项目检查/ }));
     expect(open).toHaveBeenCalledWith("A");
   });
-  it("会话配置默认隐藏，斜杠命令打开工具，关闭重开保留编辑", () => {
+  it("会话配置默认隐藏，斜杠帮助留在输入框，关闭重开配置保留编辑", () => {
     render(<SessionInspector {...inspectorProps("A")} />);
     expect(screen.getByText("完整历史")).toBeTruthy();
     const tools = screen.getByText("更多工具与命令").closest("details")!;
@@ -662,8 +663,10 @@ describe("会话工作区", () => {
     expect(tools.closest("form")).toBeNull();
     try {
       fireEvent.submit(prompt.form!);
-      expect(tools.open).toBe(true);
-      expect(screen.getByText("全部 / 命令 · 支持范围").closest("details")!.open).toBe(true);
+      expect(prompt.value).toBe("/");
+      expect(tools.open).toBe(false);
+      expect(screen.queryByRole("dialog", {name:"会话配置"})).toBeNull();
+      fireEvent.click(screen.getByRole("button",{name:"会话配置"}));
       expect(screen.getByRole("dialog", {name:"会话配置"})).toBeTruthy();
       const title = screen.getByLabelText("宿主机会话新标题") as HTMLInputElement;
       fireEvent.change(title, {target:{value:"保留未提交的标题"}});
@@ -1152,38 +1155,44 @@ it('运行中可追加时不误报连接错误；同步期间保留草稿和写�
  expect(onQueue).not.toHaveBeenCalled();expect(onSteer).not.toHaveBeenCalled();
 });
 
-it("Claude 输入 / 显示浮层，选择只填草稿，发送 help 不调用模型", async()=>{
+it("Claude 部分输入可点击选模型，与发送使用同步，不弹配置窗或调用模型", async()=>{
   const props=inspectorProps("A"),send=vi.fn(noop);
-  props.detail={...props.detail,session:{...props.detail.session,provider:"claude",collaborationModes:["default","plan"]}};
+  props.detail={...props.detail,session:{...props.detail.session,provider:"claude",collaborationModes:["default","plan"],claudeModels:[{model:"claude-sonnet-test",displayName:"Sonnet test",efforts:["low","medium"]}]}};
   render(<SessionInspector {...props} onSend={send}/>);
   const input=screen.getByRole("textbox",{name:"发送给 Claude Code 的消息"}) as HTMLTextAreaElement;
-  fireEvent.change(input,{target:{value:"/"}});
-  const menu=screen.getByRole("group",{name:"Claude Code 命令"});
-  expect(menu.closest(".completion-floating")?.parentElement).toBe(document.body);
-  expect(input.closest(".composer")?.contains(menu)).toBe(false);
-  for(const command of ["model","effort","plan","help"])expect(within(menu).getByText(`/${command}`)).toBeTruthy();
+  fireEvent.change(input,{target:{value:"/mo"}});
+  fireEvent.click(screen.getByRole("option",{name:/^\/model/}));
+  expect(input.value).toBe("/model ");
+  await waitFor(()=>expect((screen.getByRole("option",{name:"Sonnet test"}) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("option",{name:"Sonnet test"}));
+  await waitFor(()=>expect(input.value).toBe(""));
+  expect(api.saveClaudePreferences).toHaveBeenCalledWith("A",{settings:{model:"claude-sonnet-test",mode:"default",effort:undefined,permissionMode:undefined},revision:0});
+  expect(screen.queryByRole("dialog")).toBeNull();expect(screen.queryByText(/Claude Code 模型：/)).toBeNull();
+  expect(document.querySelector('.runtime-settings-bar')?.textContent).toContain('Sonnet test');
   expect(send).not.toHaveBeenCalled();
-  fireEvent.change(input,{target:{value:"/he"}});
-  expect(screen.queryByText("/model")).toBeNull();
-  fireEvent.click(screen.getByRole("button",{name:/^\/help/}));
-  expect(input.value).toBe("/help ");expect(screen.queryByRole("group",{name:"Claude Code 命令"})).toBeNull();
-  expect(document.activeElement).toBe(input);expect(send).not.toHaveBeenCalled();
-  await waitFor(()=>expect((screen.getByRole("button",{name:"发送"}) as HTMLButtonElement).disabled).toBe(false));
-  fireEvent.click(screen.getByRole("button",{name:"发送"}));
-  await waitFor(()=>expect(screen.getByText(/Claude Code：\/model、\/effort、\/plan/)).toBeTruthy());
-  expect(input.value).toBe("");expect(send).not.toHaveBeenCalled();
-  fireEvent.change(input,{target:{value:"/logout"}});fireEvent.click(screen.getByRole("button",{name:"发送"}));
+  fireEvent.change(input,{target:{value:"/logout"}});fireEvent.submit(input.form!);
   expect(screen.getByText(/此 Claude Code 终端命令尚未接入面板/)).toBeTruthy();expect(send).not.toHaveBeenCalled();
 });
-it("旧主机的 Claude 命令菜单显示版本要求，不能绕过原有检查",async()=>{
+it("旧主机 Claude 快捷命令不能绕过能力校验",async()=>{
   const props=inspectorProps("A"),send=vi.fn(noop);
   props.detail={...props.detail,session:{...props.detail.session,provider:"claude",collaborationModes:[]}};
   render(<SessionInspector {...props} onSend={send}/>);
   const input=screen.getByRole("textbox",{name:"发送给 Claude Code 的消息"}) as HTMLTextAreaElement;
-  fireEvent.change(input,{target:{value:"/"}});
-  expect(within(screen.getByRole("group",{name:"Claude Code 命令"})).getByText(/需要 Agent 0.30.57/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button",{name:/^\/plan/}));
-  await waitFor(()=>expect((screen.getByRole("button",{name:"发送"}) as HTMLButtonElement).disabled).toBe(false));
-  fireEvent.click(screen.getByRole("button",{name:"发送"}));
-  expect(screen.getByText(/需要 Agent 0.30.57/)).toBeTruthy();expect(send).not.toHaveBeenCalled();expect(input.value).toBe("/plan ");
+  fireEvent.change(input,{target:{value:"/plan on"}});fireEvent.submit(input.form!);
+  expect(screen.getByRole('alert').textContent).toContain('需要 Agent 0.30.57');
+  expect(api.saveClaudePreferences).not.toHaveBeenCalled();expect(send).not.toHaveBeenCalled();expect(input.value).toBe('/plan on');
+});
+it("运行中修改 Claude 强度只保存下次配置，不进入追加或排队链路",async()=>{
+ const props=inspectorProps('A'),send=vi.fn(noop),queue=vi.fn(noop),steer=vi.fn(noop);
+ props.detail={...props.detail,session:{...props.detail.session,provider:'claude',collaborationModes:['default','plan'],claudeModels:[{model:'claude-test',displayName:'Claude test',efforts:['low','high']}],activeTurnId:'running',state:{...props.detail.session.state,currentTurn:'in_progress'}}};
+ render(<SessionInspector {...props} onSend={send} onQueue={queue} onSteer={steer}/>);
+ const input=screen.getByRole('textbox',{name:'发送给 Claude Code 的消息'}) as HTMLTextAreaElement;
+ await waitFor(()=>expect(screen.queryByText('请先读取 Grok 会话配置')).toBeNull());
+ fireEvent.change(input,{target:{value:'/effort high'}});
+ await waitFor(()=>expect((screen.getByRole('option',{name:'high'}) as HTMLButtonElement).disabled).toBe(false));
+ expect(screen.queryByRole('button',{name:'加入队列'})).toBeNull();expect(screen.queryByRole('button',{name:'追加本轮'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'确认'}));
+ await waitFor(()=>expect(input.value).toBe(''));
+ expect(api.saveClaudePreferences).toHaveBeenCalledWith('A',expect.objectContaining({settings:expect.objectContaining({effort:'high'})}));
+ expect(send).not.toHaveBeenCalled();expect(queue).not.toHaveBeenCalled();expect(steer).not.toHaveBeenCalled();
 });

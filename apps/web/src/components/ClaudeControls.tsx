@@ -5,7 +5,7 @@ import type { ClaudeModel } from "../lib/types";
 import type { ClaudeSettings } from "../lib/claude-preferences";
 import { t } from "../i18n";
 
-export function ClaudeControls({permissionModes,models,settings,ready,error,onReload,onSave,disabled,openRequest}:{permissionModes:string[];models:ClaudeModel[];settings:ClaudeSettings;ready:boolean;error:string;onReload:()=>void;onSave:(settings:ClaudeSettings)=>Promise<void>;disabled:boolean;openRequest:number}) {
+export function ClaudeControls({permissionModes,models,settings,ready,error,onReload,onSave,onEditingChange,disabled,openRequest}:{permissionModes:string[];models:ClaudeModel[];settings:ClaudeSettings;ready:boolean;error:string;onReload:()=>void;onSave:(settings:ClaudeSettings)=>Promise<void>;onEditingChange?:(editing:boolean)=>void;disabled:boolean;openRequest:number}) {
   const [draft,setDraft]=useState(settings);
   const [saving,setSaving]=useState(false);
   const [saveError,setSaveError]=useState("");
@@ -15,6 +15,8 @@ export function ClaudeControls({permissionModes,models,settings,ready,error,onRe
   const generation=useRef(0);
   const timer=useRef<number | undefined>(undefined);
   const draftRef=useRef(settings);
+  useEffect(()=>{onEditingChange?.(dirty.current||saving);},[draft,saving,open,onEditingChange]);
+  useEffect(()=>()=>{window.clearTimeout(timer.current);onEditingChange?.(false);},[onEditingChange]);
   const model=draft.model,effort=draft.effort ?? "",permission=draft.permissionMode ?? "default",plan=draft.mode === "plan";
   const savedModel=models.find(m=>m.model===settings.model);
   disabled=disabled || !ready || saving;
