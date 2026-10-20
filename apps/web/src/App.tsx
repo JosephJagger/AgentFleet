@@ -645,7 +645,7 @@ function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; se
   );
 }
 
-function ApprovalCard({ approval, provider, onDecide, busy }: { approval: Approval; provider?: string; onDecide: (decision: "accept" | "decline") => void; busy: boolean }) {
+export function ApprovalCard({ approval, provider, onDecide, busy }: { approval: Approval; provider?: string; onDecide: (decision: "accept" | "decline") => void; busy: boolean }) {
   return (
     <section className={`approval-card approval-card--${approval.risk}`}>
       <div className="approval-card__head">
@@ -656,17 +656,19 @@ function ApprovalCard({ approval, provider, onDecide, busy }: { approval: Approv
       <dl className="approval-context">
         <div><dt>{t("主机 / 项目")}</dt><dd>{displayName(approval.machineName)} / {displayName(approval.projectAlias)}</dd></div>
         <div><dt>{t("工作目录")}</dt><dd title={approval.cwd}>{approval.cwd}</dd></div>
-        <div><dt>{t("操作范围")}</dt><dd>{approval.grantScope === "turn" ? t("授权持续到本轮任务结束") : t("本次请求所列操作")}{locale() === "en" ? " " : ""}{t("，不更改主机默认权限")}</dd></div>
+        <div><dt>{t("操作范围")}</dt><dd>{approval.planExit ? t("退出计划阶段，允许按计划修改文件和执行命令") : approval.grantScope === "turn" ? t("授权持续到本轮任务结束") : t("本次请求所列操作")}{locale() === "en" ? " " : ""}{t("，不更改主机默认权限")}</dd></div>
         {approval.networkTarget && <div><dt>{t("联网目标")}</dt><dd>{approval.networkTarget}</dd></div>}
         {!!approval.paths?.length && <div><dt>{t("访问路径")}</dt><dd>{approval.paths.join("、")}</dd></div>}
       </dl>
+      {approval.planExit && <p>{t("选择计划模式不会直接授权开发。仅在你批准下方计划后，才进入执行阶段；自动审核也不会代替这次确认。")}</p>}
+      {approval.planExit?.plan && <details><summary>{t("查看待批准的计划")}</summary><MarkdownMessage body={approval.planExit.plan} sessionId={approval.logicalSessionId} /></details>}
       {approval.command && <pre className="command-block"><span>$</span> {approval.command}</pre>}
       {approval.additionalPermissions && <pre className="command-block">{approval.additionalPermissions}</pre>}
       <div className="approval-actions">
-        <button className="button button--danger-quiet" type="button" disabled={busy} onClick={() => onDecide("decline")}><X size={16} />{t("拒绝")}</button>
-        <button className="button button--primary" type="button" disabled={busy} onClick={() => onDecide("accept")}><Check size={16} />{approval.grantScope === "turn" ? t("仅本轮允许") : t("仅本次允许")}</button>
+        <button className="button button--danger-quiet" type="button" disabled={busy} onClick={() => onDecide("decline")}><X size={16} />{approval.planExit ? t("暂不执行，继续计划") : t("拒绝")}</button>
+        <button className="button button--primary" type="button" disabled={busy} onClick={() => onDecide("accept")}><Check size={16} />{approval.planExit ? t("批准计划并开始执行") : approval.grantScope === "turn" ? t("仅本轮允许") : t("仅本次允许")}</button>
       </div>
-      <p className="approval-foot">{t("只允许本次请求，不会保存长期放行规则。需要持续联网或部署，可在主机、项目或会话的执行权限中配置。")}</p>
+      <p className="approval-foot">{approval.planExit ? t("这是开始执行计划的授权，不是单次工具放行；后续工具仍受本轮权限和原生规则约束。") : t("只允许本次请求，不会保存长期放行规则。需要持续联网或部署，可在主机、项目或会话的执行权限中配置。")}</p>
     </section>
   );
 }
@@ -1830,7 +1832,7 @@ function App() {
   async function steerPrompt(prompt: string, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.steer", payload: { prompt, ...(images?.length ? { images } : {}), ...additions }, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("追加请求已提交，等待主机确认")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function cancelQueuedTurn(queueItemId: string) { if (!detail) return; try { await api.cancelQueuedTurn(detail.session.id, queueItemId); toast("info", t("队列项已取消")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function cancelTurn() { if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.cancel", payload: {}, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("停止请求已提交，等待主机确认")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
-  async function decideApproval(decision: "accept" | "decline") { const approval = detail?.approval; if (!approval) return; try { await api.decideApproval(approval.id, { decision, approvalVersion: approval.approvalVersion, actionHash: approval.actionHash }); toast(decision === "accept" ? "success" : "info", decision === "accept" ? t("已仅本次允许") : t("已拒绝操作")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function decideApproval(decision: "accept" | "decline") { const approval = detail?.approval; if (!approval) return; try { await api.decideApproval(approval.id, { decision, approvalVersion: approval.approvalVersion, actionHash: approval.actionHash }); toast(decision === "accept" ? "success" : "info", decision === "accept" ? approval.planExit ? t("已批准计划执行") : t("已仅本次允许") : approval.planExit ? t("已拒绝开始执行，保留计划阶段") : t("已拒绝操作")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function updateMachineAlias(alias: string | null) { if (!selectedMachine) return; try { await api.updateMachineAlias(selectedMachine.id, alias); toast("success", alias ? t("主机显示名称已改为 {0}", alias) : t("已恢复显示真实 hostname")); await loadDashboard(true); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
 
   function openApproval(sessionId: string) { selectSession(sessionId); }

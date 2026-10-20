@@ -496,13 +496,16 @@ function approvalPaths(action: JsonObject): string[] {
   return [...new Set([...direct, ...changes, ...fileChanges, ...(typeof action.grantRoot === "string" ? [action.grantRoot] : [])])];
 }
 
-function mapApproval(rawValue: unknown, sessions: FleetSession[], machines: Machine[], projects: Project[]): Approval {
+export function mapApproval(rawValue: unknown, sessions: FleetSession[], machines: Machine[], projects: Project[]): Approval {
   const raw = record(rawValue);
   const context = record(raw.context);
   const action = record(context.action ?? context.context ?? context);
   const network = record(action.networkApprovalContext);
   const logicalSessionId = string(raw.logicalSessionId);
   const session = sessions.find((item) => item.id === logicalSessionId);
+  const planExit = session?.provider === "claude" && action.toolName === "ExitPlanMode"
+    ? { plan: string(record(action.input).plan), executionPermissionMode: string(action.executionPermissionMode) || undefined }
+    : undefined;
   const machine = machines.find((item) => item.id === session?.machineId);
   const project = projects.find((item) => item.id === session?.projectId);
   const command = commandText(action.command ?? action.cmd ?? action.parsedCmd);
@@ -518,6 +521,7 @@ function mapApproval(rawValue: unknown, sessions: FleetSession[], machines: Mach
   const expiresAt = string(context.expiresAt, new Date(Date.parse(string(raw.createdAt, new Date().toISOString())) + 5 * 60_000).toISOString());
   return {
     id: string(raw.approvalId),
+    planExit,
     networkTarget: string(network.host) ? `${string(network.protocol, "network")} · ${string(network.host)}` : undefined,
     additionalPermissions: action.kind === "permissions" ? JSON.stringify(action.permissions, null, 2) : string(action.additionalPermissions) || undefined,
     grantScope: action.kind === "permissions" ? "turn" : undefined,
@@ -532,7 +536,7 @@ function mapApproval(rawValue: unknown, sessions: FleetSession[], machines: Mach
     machineName: machine?.name ?? session?.machineName ?? t("未知主机"),
     projectAlias: project?.alias ?? session?.projectAlias ?? t("未知项目"),
     cwd: string(action.cwd, project?.pathHint ?? t("路径未上报")),
-    summary: action.kind === "user_input" ? t("{0} 等待你的回答", agentName(session?.provider)) : string(action.reason, command ? t("执行命令需要确认") : paths.length ? t("写入文件需要确认") : t("操作需要确认")),
+    summary: planExit ? t("是否结束计划并开始执行？") : action.kind === "user_input" ? t("{0} 等待你的回答", agentName(session?.provider)) : string(action.reason, command ? t("执行命令需要确认") : paths.length ? t("写入文件需要确认") : t("操作需要确认")),
     command,
     paths,
     risk,

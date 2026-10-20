@@ -21,7 +21,7 @@ test("Claude starts the first streaming prompt, resumes the original identity an
     nativeClaudeRunning: async () => false,
     query: ({prompt, options: opts}) => {
       options = opts!;
-      return { close: () => { closed = true; }, async *[Symbol.asyncIterator]() {
+      return { close: () => { closed = true; }, setPermissionMode: async (mode: string) => { assert.equal(mode, "plan"); }, async *[Symbol.asyncIterator]() {
         const message = await (prompt as AsyncIterable<unknown>)[Symbol.asyncIterator]().next();
         assert.equal((message.value as {message:{content:Array<{text:string}>}}).message.content[0]?.text, "Continue original context");
         yield { type: "system", subtype: "init", session_id: id.slice(7) };
@@ -41,7 +41,7 @@ test("Claude starts the first streaming prompt, resumes the original identity an
   assert.equal(options.resume, id.slice(7));
   assert.equal(options.pathToClaudeCodeExecutable, "/bin/claude");
   assert.deepEqual(options.settingSources, ["user","project","local"]);
-  assert.equal(options.permissionMode,"plan");
+  assert.equal(options.permissionMode,"default");
   assert.equal(options.model,"sonnet");assert.equal(options.effort,"low");
   assert.deepEqual(events.map(e=>e.type),["item.completed","item.completed","thread.usage","turn.completed"]);
   assert.equal((events[0]!.payload!.item as {type:string}).type,"userMessage");
@@ -94,21 +94,97 @@ test("Claude history preserves the SDK conversation chain and exposes stable ite
  assert.equal(page.items[0]?.item?.type,"userMessage");assert.equal(page.nextCursor,null);
 });
 
-test("Claude native permission modes reach the SDK and plan mode takes precedence",async()=>{
+test("Claude native permission modes reach the SDK and plan is entered before sending",async()=>{
  const {parseClaudeSettings}=await import("../src/claude-settings.js");
  const id="claude_12345678-1234-1234-1234-123456789012";
  const thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;
  const options:Options[]=[];
+ const switches:string[]=[];
  const runtime=new ClaudeRuntime({findManagedThread:()=>thread,findProject:()=>project,onVolatile:()=>{},onDurable:async()=>{},onExit:async()=>{}} as unknown as AppServerCallbacks,"epoch",{
    detectClaude:async()=>({installed:true,version:"2.1.285",path:"/bin/claude"}),nativeClaudeRunning:async()=>false,
    inspectClaudeMetadata:async()=>({models:[],quota:{available:false,observedAt:new Date().toISOString(),subscriptionType:null,windows:[]}}),
-   query:input=>{options.push(input.options!);return {close(){},async *[Symbol.asyncIterator](){yield {type:"result",subtype:"success",is_error:false,result:"ok",usage:{input_tokens:0,output_tokens:0},modelUsage:{}};}} as unknown as Query;},
+   query:input=>{options.push(input.options!);return {close(){},async setPermissionMode(mode:string){switches.push(mode);},async *[Symbol.asyncIterator](){yield {type:"result",subtype:"success",is_error:false,result:"ok",usage:{input_tokens:0,output_tokens:0},modelUsage:{}};}} as unknown as Query;},
  });
  await runtime.start();
  for(const mode of ["auto","acceptEdits","dontAsk"]){await runtime.startTurn(thread,project,"test",undefined,parseClaudeSettings({model:"host",permissionMode:mode}));await new Promise(resolve=>setImmediate(resolve));await runtime.unsubscribeThread(id);}
  assert.deepEqual(options.map(o=>o.permissionMode),["auto","acceptEdits","dontAsk"]);
- await runtime.startTurn(thread,project,"plan",undefined,parseClaudeSettings({model:"host",permissionMode:"auto",mode:"plan"}));await new Promise(resolve=>setImmediate(resolve));assert.equal(options.at(-1)?.permissionMode,"plan");
+ await runtime.startTurn(thread,project,"plan",undefined,parseClaudeSettings({model:"host",permissionMode:"auto",mode:"plan"}));await new Promise(resolve=>setImmediate(resolve));assert.equal(options.at(-1)?.permissionMode,"auto");assert.deepEqual(switches,["plan"]);
  assert.throws(()=>parseClaudeSettings({model:"host",permissionMode:"bypassPermissions"}),/Unsupported/);
+ await runtime.stop();
+});
+
+test("first and resumed Claude plan exits restore only the turn's chosen execution permissions", async () => {
+ for (const fresh of [true, false]) for (const permissionMode of ["auto", "acceptEdits", "default", "dontAsk"] as const) {
+  const {parseClaudeSettings}=await import("../src/claude-settings.js");
+  let options!:Options, input!:AsyncIterable<unknown>;
+  let finishPlan!:()=>void;
+  const planReady=new Promise<void>(resolve=>{finishPlan=resolve;});
+  const approvals:import("../src/types.js").ApprovalRecord[]=[];
+  let consumed=0;
+  const runtime=new ClaudeRuntime({
+   findManagedThread:()=>undefined,findProject:()=>project,onVolatile:()=>{},onExit:async()=>{},
+   onEvent:async e=>{if(e.type==="item.completed")consumed++;},onApprovalResolved:async()=>{},
+   onApproval:async a=>{approvals.push(a);},
+  } as AppServerCallbacks,"epoch",{
+   detectClaude:async()=>({installed:true,version:"2.1.285",path:"/bin/claude"}),
+   nativeClaudeRunning:async()=>false,
+   inspectClaudeMetadata:async()=>({models:[],quota:{available:false,observedAt:new Date().toISOString(),subscriptionType:null,windows:[]}}),
+   query:args=>{
+    options=args.options!;input=args.prompt as AsyncIterable<unknown>;
+    return {close(){},async setPermissionMode(mode:string){assert.equal(mode,"plan");await planReady;},async *[Symbol.asyncIterator](){}} as unknown as Query;
+   },
+  });
+  await runtime.start();
+  const id=fresh?(await runtime.createThread(project)).nativeThreadId:"claude_12345678-1234-1234-1234-123456789012";
+  const thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;
+  const starting=runtime.startTurn(thread,project,"Implement after approval",undefined,parseClaudeSettings({model:"host",mode:"plan",permissionMode}));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(options.permissionMode,permissionMode);
+  assert.equal(fresh?options.sessionId:options.resume,id.slice(7));
+  const iterator=input[Symbol.asyncIterator]();
+  const first=iterator.next();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(consumed,0,"no prompt may run in execution mode before plan initialization succeeds");
+  finishPlan();await starting;await first;
+  assert.equal(consumed,1);
+  const context={signal:new AbortController().signal,toolUseID:"exit",decisionReason:"Plan approval is required",
+   suggestions:[{type:"setMode",mode:"bypassPermissions",destination:"userSettings"}]} as Parameters<NonNullable<Options["canUseTool"]>>[2];
+  for (const decision of ["decline","cancel","accept"] as const) {
+   const result=options.canUseTool!("ExitPlanMode",{plan:"A plan"},context);
+   const approval=approvals.at(-1)!;
+   assert.equal(approval.params.reason,context.decisionReason);
+   assert.equal(approval.params.executionPermissionMode,permissionMode);
+   await runtime.respondApproval(approval,decision);
+   assert.deepEqual(await result,decision==="accept"
+    ?{behavior:"allow",updatedInput:{plan:"A plan"},updatedPermissions:[{type:"setMode",mode:permissionMode,destination:"session"}]}
+    :{behavior:"deny",message:"用户拒绝执行",interrupt:decision==="cancel"});
+  }
+  const tool=options.canUseTool!("Bash",{command:"npm test"},context);
+  await runtime.respondApproval(approvals.at(-1)!,"accept");
+  assert.deepEqual(await tool,{behavior:"allow",updatedInput:{command:"npm test"}},"ordinary approval must not change permissions");
+  const controller=new AbortController();
+  const aborted=options.canUseTool!("ExitPlanMode",{plan:"A plan"},{...context,signal:controller.signal});
+  const expired=approvals.at(-1)!;controller.abort();
+  assert.equal((await aborted)?.behavior,"deny");
+  await assert.rejects(runtime.respondApproval(expired,"accept"),/失效/);
+  await runtime.stop();
+ }
+});
+
+test("Claude plan initialization failure closes its writer without consuming or dispatching the task", async () => {
+ let closed=0,consumed=0;
+ const runtime=new ClaudeRuntime({
+  findManagedThread:()=>undefined,findProject:()=>project,onVolatile:()=>{},onExit:async()=>{},
+  onEvent:async()=>{consumed++;},onApprovalResolved:async()=>{},onApproval:async()=>{},
+ } as AppServerCallbacks,"epoch",{
+  detectClaude:async()=>({installed:true,version:"2.1.285",path:"/bin/claude"}),nativeClaudeRunning:async()=>false,
+  inspectClaudeMetadata:async()=>({models:[],quota:{available:false,observedAt:new Date().toISOString(),subscriptionType:null,windows:[]}}),
+  query:()=>({close(){closed++;},async setPermissionMode(){throw new Error("native plan refused");},async *[Symbol.asyncIterator](){}} as unknown as Query),
+ });
+ await runtime.start();
+ const thread={nativeThreadId:"claude_12345678-1234-1234-1234-123456789012",projectId:project.id,sessionCwd:project.root} as ManagedThread;
+ for(let i=0;i<2;i++)await assert.rejects(runtime.startTurn(thread,project,"Do not send",undefined,{model:"host",mode:"plan"}),/native plan refused/);
+ assert.equal(closed,2);assert.equal(consumed,0);
  await runtime.stop();
 });
 

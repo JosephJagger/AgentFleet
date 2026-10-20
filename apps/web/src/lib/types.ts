@@ -241,6 +241,7 @@ export interface TimelineEvent {
 }
 
 export interface Approval {
+  planExit?: { plan: string; executionPermissionMode?: string };
   grantScope?: "turn";
   networkTarget?: string;
   additionalPermissions?: string;

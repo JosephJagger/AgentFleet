@@ -113,8 +113,8 @@ function messageItems(value: unknown): Array<{ nativeTurnId: string; nativeItemI
   return result;
 }
 
-interface Writer { query: Query; input: SDKUserMessage[]; wake?: () => void; closed: boolean; child?: ChildProcess; turnId?: string; interrupted: boolean; fresh: boolean; promptIds: Set<string>; textItemId?: string; }
-interface Pending { writer: Writer; resolve: (result: PermissionResult) => void; input: Record<string, unknown>; }
+interface Writer { query: Query; input: SDKUserMessage[]; wake?: () => void; closed: boolean; child?: ChildProcess; turnId?: string; interrupted: boolean; fresh: boolean; promptIds: Set<string>; textItemId?: string; executionPermissionMode: NonNullable<ClaudeSettings["permissionMode"]>; }
+interface Pending { writer: Writer; resolve: (result: PermissionResult) => void; input: Record<string, unknown>; toolName: string; }
 
 const defaults = { query, listSessions, getSessionInfo, getSessionMessages, listSubagents, getSubagentMessages, detectClaude, nativeClaudeRunning, inspectClaudeMetadata };
 
@@ -311,7 +311,7 @@ export class ClaudeRuntime implements AppServerClient {
     if (this.writers.has(thread.nativeThreadId)) throw new AgentError("THREAD_BUSY", "Claude 会话仍在运行");
     const id = thread.nativeThreadId;
     const turnId = randomUUID();
-    const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), promptIds: new Set<string>(), turnId } as unknown as Writer;
+    const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), promptIds: new Set<string>(), turnId, executionPermissionMode: (settings as ClaudeSettings | undefined)?.permissionMode ?? "default" } as unknown as Writer;
     const callbacks = this.callbacks, epoch = this.appServerEpoch;
     // The SDK need not echo submitted user messages. Record each consumed input
     // with its native UUID, also used by history/echo deduplication.
@@ -330,14 +330,17 @@ export class ClaudeRuntime implements AppServerClient {
       cwd: thread.sessionCwd ?? project.root, pathToClaudeCodeExecutable: this.binary!,
       ...(this.availability.managed ? {env:{...process.env,DISABLE_AUTOUPDATER:"1"}} : {}),
       settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code" },
-      includePartialMessages: true, permissionMode: settings?.mode === "plan" ? "plan" : (settings as ClaudeSettings|undefined)?.permissionMode ?? "default", permissionPrompts: "host",
+      // Establish the selected execution permission first. Starting directly in
+      // plan loses it: the native CLI has no auto/acceptEdits mode to return to.
+      // Enter plan via the SDK below, before any user input can be consumed.
+      includePartialMessages: true, permissionMode: writer.executionPermissionMode, permissionPrompts: "host",
       ...(writer.fresh ? { sessionId: nativeId(id), ...(thread.titleSource === "name" && thread.title ? { title: thread.title } : {}) } : { resume: nativeId(id) }),
       ...(settings?.model && settings.model !== "host" ? { model: settings.model } : {}),
       ...(settings?.effort ? { effort: settings.effort as NonNullable<Options["effort"]> } : {}),
       canUseTool: async (name, input, context) => {
         const approvalId = randomUUID();
         const questions = name === "AskUserQuestion" && Array.isArray(input.questions) ? input.questions.filter(isRecord).map((q, index) => ({ ...q, id: String(index), isOther: true })) : undefined;
-        const params = questions ? { kind: "user_input", questions, isBlocking: true } : { threadId: id, turnId, toolName: name, input, reason: `${name}: ${JSON.stringify(input).slice(0, 4000)}`, ...(name === "Bash" ? { command: input.command } : {}) };
+        const params = questions ? { kind: "user_input", questions, isBlocking: true } : { threadId: id, turnId, toolName: name, input, reason: context.decisionReason?.slice(0, 4000) || `${name}: ${JSON.stringify(input).slice(0, 4000)}`, ...(name === "ExitPlanMode" ? { executionPermissionMode: writer.executionPermissionMode } : {}), ...(name === "Bash" ? { command: input.command } : {}) };
         const method = questions ? "item/tool/requestUserInput" : "item/commandExecution/requestApproval";
         const approval: ApprovalRecord = { approvalId, nativeRequestId: approvalId, method, actionHash: sha256(canonicalJson(params)), appServerEpoch: this.appServerEpoch, projectId: project.id, nativeThreadId: id, nativeTurnId: turnId, ...(context.toolUseID ? { nativeItemId: context.toolUseID } : {}), expiresAt: new Date(Date.now() + 600_000).toISOString(), state: "pending", params, createdAt: nowIso(), updatedAt: nowIso() };
         return new Promise<PermissionResult>((resolve, reject) => {
@@ -345,7 +348,7 @@ export class ClaudeRuntime implements AppServerClient {
           const abort = () => { this.pending.delete(approvalId); settle({ behavior: "deny", message: "任务已取消" }); void this.callbacks.onApprovalResolved(approvalId, this.appServerEpoch).catch(() => undefined); };
           const timer = setTimeout(() => { if (!this.pending.delete(approvalId)) return; settle({ behavior: "deny", message: "审批已过期" }); void this.callbacks.onApprovalResolved(approvalId, this.appServerEpoch).catch(() => undefined); }, 600_000);
           timer.unref();
-          this.pending.set(approvalId, { writer, resolve: settle, input });
+          this.pending.set(approvalId, { writer, resolve: settle, input, toolName: name });
           if (context.signal.aborted) { abort(); return; }
           context.signal.addEventListener("abort", abort, { once: true });
           void this.callbacks.onApproval(approval).catch(error => { clearTimeout(timer); context.signal.removeEventListener("abort", abort); this.pending.delete(approvalId); reject(error); });
@@ -361,6 +364,15 @@ export class ClaudeRuntime implements AppServerClient {
       },
     };
     writer.query = this.sdk.query({ prompt: input(), options }); this.writers.set(id, writer);
+    if (settings?.mode === "plan") {
+      try {
+        await writer.query.setPermissionMode("plan");
+        if (writer.closed) throw new AgentError("THREAD_RELEASE_PENDING", "Claude 会话在进入计划模式时已释放");
+      } catch (error) {
+        await this.unsubscribeThread(id);
+        throw error;
+      }
+    }
     const content: SDKUserMessage["message"]["content"] = [{ type: "text", text: prompt + (extras?.goal ? `\n\n会话目标：${extras.goal}` : "") + (extras?.attachments?.length ? `\n\n附件路径：\n${extras.attachments.map(f => f.path).join("\n")}` : "") }];
     for (const url of images ?? []) { const m = /^data:(image\/(?:png|jpeg|gif|webp));base64,(.+)$/.exec(url); if (m) content.push({ type: "image", source: { type: "base64", media_type: m[1] as "image/png", data: m[2]! } }); }
     const promptId = randomUUID(); writer.promptIds.add(promptId);
@@ -446,6 +458,19 @@ export class ClaudeRuntime implements AppServerClient {
     return { nativeTurnId: turnId, status: "inProgress" };
   }
   async interruptTurn(id: string, turnId: string) { const writer = this.writers.get(id); if (!writer || writer.turnId !== turnId) throw new AgentError("TURN_PRECONDITION_FAILED", "任务已经变化"); writer.interrupted = true; await writer.query.interrupt(); return {}; }
-  async respondApproval(approval: ApprovalRecord, decision: "accept" | "decline" | "cancel") { const pending = this.pending.get(approval.approvalId); if (!pending) throw new AgentError("APPROVAL_EPOCH_STALE", "审批已失效"); this.pending.delete(approval.approvalId); pending.resolve(decision === "accept" ? { behavior: "allow", updatedInput: pending.input } : { behavior: "deny", message: "用户拒绝执行", interrupt: decision === "cancel" }); }
+  async respondApproval(approval: ApprovalRecord, decision: "accept" | "decline" | "cancel") {
+    const pending = this.pending.get(approval.approvalId);
+    if (!pending) throw new AgentError("APPROVAL_EPOCH_STALE", "审批已失效");
+    this.pending.delete(approval.approvalId);
+    pending.resolve(decision === "accept" ? {
+      behavior: "allow", updatedInput: pending.input,
+      // Only an explicitly approved plan exit restores the permission selected
+      // when this turn started. Never adopt arbitrary CLI suggestions, persist
+      // allow rules, or treat ordinary tool approvals as blanket authorization.
+      ...(pending.toolName === "ExitPlanMode" ? { updatedPermissions: [{
+        type: "setMode" as const, mode: pending.writer.executionPermissionMode, destination: "session" as const,
+      }] } : {}),
+    } : { behavior: "deny", message: "用户拒绝执行", interrupt: decision === "cancel" });
+  }
   async respondInput(approval: ApprovalRecord, answers: InputAnswers) { const pending = this.pending.get(approval.approvalId); if (!pending) throw new AgentError("APPROVAL_EPOCH_STALE", "提问已失效"); this.pending.delete(approval.approvalId); const questions = Array.isArray(pending.input.questions) ? pending.input.questions.filter(isRecord) : []; const mapped = Object.fromEntries(questions.map((q, index) => [String(q.question), answers[String(index)]?.answers.join(", ") ?? ""])); pending.resolve({ behavior: "allow", updatedInput: { ...pending.input, answers: mapped } }); }
 }
