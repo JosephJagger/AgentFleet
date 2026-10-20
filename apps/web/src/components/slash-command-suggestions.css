@@ -22,7 +22,7 @@
   min-width: 0;
   min-height: 44px;
   padding: 8px 10px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: inherit;
@@ -30,16 +30,59 @@
   text-align: start;
   cursor: pointer;
 }
-.slash-command-list > button:hover, .slash-command-list > button:focus-visible { background: var(--cobalt-soft); }
+
 .slash-command-list code, .slash-command-list small { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .slash-command-list code { font-family: var(--mono); font-size: var(--text-caption); }
 .slash-command-list span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: var(--text-caption); line-height: 1.4; }
 .slash-command-list small { color: var(--muted); font-size: var(--text-micro); }
 
 .slash-command-suggestions__note { flex: 0 0 auto; margin: 0; padding: 0 10px 4px; color: var(--muted); font-size: var(--text-micro); line-height: 1.4; }
-.slash-command-list > button[aria-selected="true"] { background: var(--cobalt-soft); }
+
 .slash-command-list > button:disabled { opacity: .6; cursor: default; }
-.slash-command-list > button span svg { margin-inline-start: 8px; vertical-align: middle; }
+
 .slash-command-confirm { padding: 8px; font-size: var(--text-caption); overflow-wrap: anywhere; }
 .slash-command-confirm p { margin: 0 0 8px; }
 .slash-command-confirm button { padding: 8px 16px; margin-inline-end: 8px; border: 1px solid var(--line-strong); border-radius: 8px; color: inherit; background: var(--paper); cursor: pointer; }
+
+/* Use each theme's readable text/surface pair, not its decorative accent tint.
+   Keyboard highlight is distinct from the persistent saved-value badge. */
+.completion-floating .slash-command-list > button[data-current] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-color: var(--ink);
+}
+.completion-floating .slash-command-list .slash-command-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  color: inherit;
+  font-weight: 600;
+}
+.completion-floating .slash-command-list > button:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+.completion-floating .slash-command-list > button[aria-selected="true"]:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper-solid, var(--paper));
+  border-color: var(--ink);
+  box-shadow: inset 3px 0 0 currentColor;
+}
+.completion-floating .slash-command-list > button[aria-selected="true"]:not(:disabled) :is(code, span, small) {
+  color: inherit;
+}
+.completion-floating .slash-command-list > button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+@media (forced-colors: active) {
+  .completion-floating .slash-command-list > button[aria-selected="true"]:not(:disabled) {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+    forced-color-adjust: none;
+  }
+  .completion-floating .slash-command-list > button:focus-visible { outline-color: Highlight; }
+}
