@@ -1,6 +1,6 @@
-# Grok native workbench — candidate Agent 0.30.135
+# Grok native workbench — Agent 0.30.135
 
-Status: implementation validated; publication preparation in progress. Not yet published or installed. The server also requires schema 66 and the matching web build. Old hosts cannot use `grok.manage`. No production database migration or service restart is part of this development verification.
+Status: published on 2026-10-20 at 05:47 UTC, application commit `840b623b3407c479bc98a5383f3f31c81f1f27d5`. The matching server/web build is healthy with schema 66. Old hosts cannot use `grok.manage`; they receive Agent 0.30.135 through the existing safe idle update path. Development validation and subsequent protected production publication are documented separately below.
 
 ## Verified contracts
 
@@ -57,3 +57,13 @@ Publication requires the normal protected release workflow, new immutable 0.30.1
 - Isolated browser inspection covered the real native settings/tools components at desktop and **390 × 844** mobile size; no horizontal overflow was observed. Screenshots are in `output/playwright/grok-native-135/`. The preview server and temporary harness were removed afterward. Task-starter buttons added afterward have component tests, but were not included in those screenshots.
 - No authenticated model-generation, plugin install/uninstall, memory deletion, commit, worktree merge or real voice call was used as a live integration test. These use synthetic ACP peers plus reviewed native contracts; production account-dependent verification remains necessary.
 - Initial development verification did not publish artifacts or migrate production. Publication preparation additionally fixed portable packaging of the new `@noble/hashes` dependency on all four platforms; the release must validate these archives before deployment. Final publication status is recorded below.
+
+## Publication result
+
+- [GitHub CI](https://github.com/JosephJagger/AgentFleet/actions/runs/39376269448): all jobs passed for implementation commit `840b623`.
+- Built Linux x64, macOS arm64/x64 and Windows x64 portable archives. Each archive contains all declared runtime dependencies, including `@noble/hashes`; extracted JavaScript startup/version and BLAKE3 smoke checks passed using Linux Node. This does not substitute for running the macOS/Windows binaries on their native operating systems.
+- Prepared image: `sha256:5bce1dd84f73eb6eb159f363bb72fa92f2427fafacd15957ca3afc343f05a564`. Compared all 164 pre-existing download files, including 12 Codex files, byte-for-byte by SHA-256 and size; none changed.
+- An isolated, network-disabled container with a disposable database started successfully with schema 66 before production publication. It was removed afterward.
+- The normal guarded publisher observed zero global/session voice calls, backed up the production database, switched only the control plane, and verified health/build plus public installers and all four release hashes at the configured public origin. No force restart of host Agents or native tasks was performed.
+- After cutover, all five previously online hosts were online again. The active Linux development host still reported 0.30.134 at verification time and will adopt 0.30.135 when the safe update checks permit it. The already-offline Windows host remained offline. The runtime validator was not redeployed and remained healthy.
+- Reload the panel to receive the new frontend; native operations additionally require the target host to run 0.30.135 and advertise Grok capabilities. Existing native-interface and account-dependent verification limits listed above still apply.
