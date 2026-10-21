@@ -44,7 +44,11 @@ jobs:
         with:
           node-version: "24"
       - run: npm ci --prefix apps/local-agent --no-audit --no-fund
+      - name: Seed an obsolete compiled test from an earlier checkout
+        run: node -e "const fs=require('node:fs');fs.mkdirSync('apps/local-agent/dist/test',{recursive:true});for(const ext of ['js','js.map','d.ts'])fs.writeFileSync('apps/local-agent/dist/test/obsolete-build-fixture.test.'+ext,'throw 1;')"
       - run: npm run build --prefix apps/local-agent
+      - name: Verify the build removed obsolete tests and emitted current tests
+        run: node -e "const fs=require('node:fs'),assert=require('node:assert/strict');for(const ext of ['js','js.map','d.ts'])assert.equal(fs.existsSync('apps/local-agent/dist/test/obsolete-build-fixture.test.'+ext),false);assert.equal(fs.existsSync('apps/local-agent/dist/test/acp-detection-ownership.test.js'),true)"
       - run: node --test apps/local-agent/dist/test/installation-lifecycle.test.js apps/local-agent/dist/test/installer-lock.test.js apps/local-agent/dist/test/update-network.test.js apps/local-agent/dist/test/service.test.js apps/local-agent/dist/test/supervisor-ownership.test.js apps/local-agent/dist/test/windows-process-identity.test.js
       - name: Verify Linux preparation leaves active installation untouched
         if: runner.os == 'Linux'
