@@ -389,3 +389,18 @@ export interface VoiceTaskRecord {
   job:{jobId:string;nativeTurnId:string|null;state:string;result?:string;error?:{code:string;message:string}|null;historyLimited?:boolean;statusFreshness?:'live'|'last_known';deliveredToVoice:boolean;acknowledgedAt:string|null}|null;
 }
 export interface VoiceTaskPage {items:VoiceTaskRecord[];total:number;nextCursor:string|null;instruction:string;}
+
+export interface SshAccount {
+  id: string; machineId: string; name: string; alias: string; algorithm: "ed25519" | "rsa" | "ecdsa"; username: string;
+  address: string; port: number; effectiveAddress: string; publicKey: string; fingerprint: string;
+  hasPrivateKey: boolean; hasPassphrase: boolean; hostKeyFingerprints: string[];
+  verification: { userExists?: boolean | null; authorized?: boolean | null; addresses?: string[]; port?: number | null; checkedAt?: string; error?: string };
+  description: string; enabled: boolean; sources: string[];
+  delivered: { machineId: string; ok: boolean; error?: string; syncedAt: string }[];
+  createdAt: string; updatedAt: string;
+}
+export interface SshAccountInput {
+  machineId?: string; name: string; algorithm: SshAccount["algorithm"]; username: string; address: string; port: number;
+  privateKey?: string; publicKey?: string; passphrase?: string; clearPassphrase?: boolean; description: string; enabled: boolean; sources: string[];
+}
+export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string }

@@ -1,4 +1,5 @@
 import { parseImages } from "./images.js";
+import { sshAccess } from "./ssh-access.js";
 import { type ClaudeSettings } from "./claude-settings.js";
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
@@ -116,7 +117,8 @@ function messageItems(value: unknown): Array<{ nativeTurnId: string; nativeItemI
 interface Writer { query: Query; input: SDKUserMessage[]; wake?: () => void; closed: boolean; child?: ChildProcess; turnId?: string; interrupted: boolean; fresh: boolean; promptIds: Set<string>; completedPromptIds: Set<string>; backgroundTasks: Set<string>; backgroundSnapshotSeen: boolean; awaitingBackground: boolean; textItemId?: string; executionPermissionMode: NonNullable<ClaudeSettings["permissionMode"]>; }
 interface Pending { writer: Writer; resolve: (result: PermissionResult) => void; input: Record<string, unknown>; toolName: string; }
 
-const defaults = { query, listSessions, getSessionInfo, getSessionMessages, listSubagents, getSubagentMessages, detectClaude, nativeClaudeRunning, inspectClaudeMetadata };
+const sshInstructions = () => sshAccess.instructions();
+const defaults = { query, listSessions, getSessionInfo, getSessionMessages, listSubagents, getSubagentMessages, detectClaude, nativeClaudeRunning, inspectClaudeMetadata, sshInstructions };
 
 export class ClaudeRuntime implements AppServerClient {
   availability: ClaudeAvailability = { installed: false, version: null };
@@ -318,6 +320,7 @@ export class ClaudeRuntime implements AppServerClient {
     this.available();
     if (await this.sdk.nativeClaudeRunning(thread.sessionCwd ?? project.root, this.owned)) throw new AgentError("CLAUDE_HOST_BUSY", "Claude 终端仍在运行，退出后可继续原会话");
     if (this.writers.has(thread.nativeThreadId)) throw new AgentError("THREAD_BUSY", "Claude 会话仍在运行");
+    const fleetHosts = await this.sdk.sshInstructions();
     const id = thread.nativeThreadId;
     const turnId = randomUUID();
     const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), promptIds: new Set<string>(), completedPromptIds: new Set<string>(), backgroundTasks: new Set<string>(), backgroundSnapshotSeen: false, awaitingBackground: false, turnId, executionPermissionMode: (settings as ClaudeSettings | undefined)?.permissionMode ?? "default" } as unknown as Writer;
@@ -338,7 +341,7 @@ export class ClaudeRuntime implements AppServerClient {
     const options: Options = {
       cwd: thread.sessionCwd ?? project.root, pathToClaudeCodeExecutable: this.binary!,
       ...(this.availability.managed ? {env:{...process.env,DISABLE_AUTOUPDATER:"1"}} : {}),
-      settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code" },
+      settingSources: ["user", "project", "local"], systemPrompt: { type: "preset", preset: "claude_code", ...(fleetHosts ? { append: fleetHosts } : {}) },
       // Establish the selected execution permission first. Starting directly in
       // plan loses it: the native CLI has no auto/acceptEdits mode to return to.
       // Enter plan via the SDK below, before any user input can be consumed.

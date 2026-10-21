@@ -912,6 +912,12 @@ export const api = {
       body: JSON.stringify({ expectedVersion }),
     });
   },
+  sshAccounts: (machineId: string, signal?: AbortSignal) => request<{accounts: import("./types").SshAccount[]}>(`/api/ssh-accounts?machineId=${encodeURIComponent(machineId)}`, {signal}),
+  sshReachable: (machineId: string, signal?: AbortSignal) => request<{accounts: {id:string;alias:string;targetName:string;username:string;hostname:string;port:number;description:string}[]}>(`/api/machines/${encodeURIComponent(machineId)}/ssh-reachable`, {signal}),
+  saveSshAccount: (input: import("./types").SshAccountInput, id?: string) => request<{account: import("./types").SshAccount}>(id ? `/api/ssh-accounts/${encodeURIComponent(id)}` : "/api/ssh-accounts", {method: id ? "PUT" : "POST", body: JSON.stringify(input)}),
+  deleteSshAccount: (id: string) => request<{ok: true}>(`/api/ssh-accounts/${encodeURIComponent(id)}`, {method: "DELETE"}),
+  verifySshAccount: (id: string) => request<{account: import("./types").SshAccount}>(`/api/ssh-accounts/${encodeURIComponent(id)}/verify`, {method: "POST", body: "{}"}),
+  testSshAccount: (id: string) => request<{results: import("./types").SshTestResult[]}>(`/api/ssh-accounts/${encodeURIComponent(id)}/test`, {method: "POST", body: "{}"}),
   removeMachine(machineId: string) {
     return request<{ ok: true }>(`/api/machines/${encodeURIComponent(machineId)}`, { method: "DELETE" });
   },

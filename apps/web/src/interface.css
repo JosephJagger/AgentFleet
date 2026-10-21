@@ -954,3 +954,26 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .runtime-mode-select [role="alert"] { color:var(--danger); font-size:var(--text-caption); }
 
 .runtime-observed-mode { color:var(--muted); font-size:var(--text-caption); }
+
+/* Host SSH access */
+.host-ssh { display: grid; gap: 14px; }
+.host-ssh__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.host-ssh__heading p { margin: 4px 0 0; color: var(--muted); }
+.host-ssh__form { gap: 12px; }
+.host-ssh__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.host-ssh__grid textarea { font-family: var(--mono, ui-monospace, monospace); font-size: var(--text-small); resize: vertical; }
+.host-ssh__grid small { color: var(--muted); font-size: var(--text-small); }
+.host-ssh__sources { display: flex; flex-wrap: wrap; gap: 8px 16px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+.host-ssh__sources legend { padding: 0 4px; font-size: var(--text-small); color: var(--muted); }
+.host-ssh__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.host-ssh__list, .host-ssh__tests, .host-ssh__reachable { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.host-ssh__item { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.host-ssh__summary { display: grid; gap: 4px; min-width: 0; }
+.host-ssh__summary > span { color: var(--muted); font-size: var(--text-small); overflow-wrap: anywhere; }
+.host-ssh__summary strong { display: flex; align-items: center; gap: 8px; }
+.host-ssh__checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.host-ssh__reachable li { overflow-wrap: anywhere; }
+.ssh-check { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 9px; font-size: var(--text-small); background: var(--line); color: var(--muted); }
+.ssh-check--ok { background: var(--green-soft, #e3f4e8); color: var(--green, #1f7a3d); }
+.ssh-check--bad { background: var(--red-soft); color: var(--red); }
+@media (max-width: 720px) { .host-ssh__grid { grid-template-columns: 1fr; } .host-ssh__heading { flex-direction: column; } }

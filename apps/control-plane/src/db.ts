@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 66) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 67) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1602,6 +1602,33 @@ export class ControlPlaneDatabase {
         this.sqlite.exec("PRAGMA user_version=66");
       }); } finally { this.sqlite.exec("PRAGMA foreign_keys=ON"); }
     }
+    if (version < 67) this.transaction(() => {
+      // Existing SSH accounts on managed Linux hosts, distributed to the workspace's other Linux hosts.
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS host_ssh_accounts (
+        account_id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id),
+        machine_id TEXT NOT NULL REFERENCES machines(machine_id),
+        name TEXT NOT NULL, algorithm TEXT NOT NULL CHECK(algorithm IN ('ed25519','rsa','ecdsa')),
+        username TEXT NOT NULL, address TEXT NOT NULL DEFAULT '', port INTEGER NOT NULL DEFAULT 22,
+        public_key TEXT NOT NULL, fingerprint TEXT NOT NULL,
+        encrypted_private_key TEXT NOT NULL, encrypted_passphrase TEXT NOT NULL DEFAULT '',
+        host_keys_json TEXT NOT NULL DEFAULT '[]', verification_json TEXT NOT NULL DEFAULT '{}',
+        description TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        UNIQUE(workspace_id,name)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS host_ssh_accounts_machine ON host_ssh_accounts(machine_id);
+      CREATE TABLE IF NOT EXISTS host_ssh_access (
+        account_id TEXT NOT NULL REFERENCES host_ssh_accounts(account_id) ON DELETE CASCADE,
+        source_machine_id TEXT NOT NULL REFERENCES machines(machine_id),
+        PRIMARY KEY(account_id,source_machine_id)
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS host_ssh_sync (
+        machine_id TEXT PRIMARY KEY REFERENCES machines(machine_id),
+        revision TEXT NOT NULL, results_json TEXT NOT NULL DEFAULT '{}', synced_at TEXT NOT NULL
+      ) STRICT;
+      PRAGMA user_version=67`);
+    });
   }
 
   transaction<T>(operation: () => T): T {

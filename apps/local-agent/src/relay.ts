@@ -1,4 +1,5 @@
 import { voiceErrorCode } from "./voice-errors.js";
+import { sshAccess } from "./ssh-access.js";
 import { HEARTBEAT_INTERVAL_MS, MAX_WS_FRAME_BYTES } from "./constants.js";
 import { setImmediate as yieldToIO } from "node:timers/promises";
 import { AgentError, errorMessage } from "./errors.js";
@@ -324,6 +325,14 @@ export class RelayConnection {
         }).catch(error => {
           if (this.socket === source) this.send({ type: "subagents.result", requestId: value.requestId, error: { code: error instanceof AgentError ? error.code : "SUBAGENTS_READ_FAILED", message: "Native subagent read failed" } });
         });
+        return;
+      }
+      case "ssh.request": {
+        const source = this.socket;
+        const reply = (body: Record<string, unknown>) => { if (this.socket === source) this.send({ type: "ssh.result", requestId: value.requestId, ...body }); };
+        if (typeof value.requestId !== "string" || value.requestId.length > 256) { this.protocolError("ssh request is malformed"); return; }
+        void sshAccess.handle(value).then(result => reply({ result }))
+          .catch(error => reply({ error: { code: error instanceof AgentError && error.code.startsWith("SSH_") ? error.code : "SSH_HOST_FAILED", message: error instanceof AgentError ? error.message : "主机执行 SSH 操作失败" } }));
         return;
       }
       case "session.history.read": {

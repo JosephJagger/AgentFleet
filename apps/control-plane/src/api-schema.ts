@@ -202,6 +202,7 @@ export interface AgentCapabilities {
   nativeSubagents?: boolean;
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
+  sshAccess?: boolean;
   commandTypes?: string[];
   methods?: string[];
   maintenanceTypes?: string[];

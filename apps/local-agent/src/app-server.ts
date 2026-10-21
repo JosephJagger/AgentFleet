@@ -1,4 +1,5 @@
 import type {CursorSettings} from "./cursor-settings.js";
+import { sshAccess } from "./ssh-access.js";
 import {preferenceInstructions} from './voice-preference-rules.js';
 import { ReasoningSummaries } from './reasoning-summary.js';
 import {discoverCodexDaemon, CodexDaemonTransport} from './daemon-transport.js';
@@ -638,6 +639,7 @@ export class CodexAppServer implements AppServerClient {
 
   async createThread(project: ProjectRecord, profile: PermissionProfile = "project", name?: string): Promise<ThreadStartResult> {
     this.assertInitialized();
+    const fleetHosts = await sshAccess.instructions();
     const raw = resultObject(
       await this.request("thread/start", {
         cwd: project.root,
@@ -646,6 +648,7 @@ export class CodexAppServer implements AppServerClient {
         ephemeral: false,
         threadSource: "agentfleet",
         dynamicTools: [REFERENCE_TOOL],
+        ...(fleetHosts ? { developerInstructions: fleetHosts } : {}),
       }),
       "thread/start",
     );

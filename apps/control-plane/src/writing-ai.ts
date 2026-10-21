@@ -1,10 +1,9 @@
-import { createHash, randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
 import type { Principal } from "./auth.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import { AppError, invariant } from "./errors.js";
 import { safeWritingText, WritingMemory } from "./writing-memory.js";
+import { SecretBox } from "./secret-box.js";
 
 type Profile = { endpoint: string; model: string; encrypted_key: string; enabled: number };
 type Vocabulary = { phrase: string; meaning: string }[];
@@ -28,30 +27,12 @@ export class WritingAI {
   private cache = new Map<string, { expires: number; suggestions: string[] }>();
   private pending = new Map<string, Promise<{ suggestions: string[] }>>();
   private configurationRevision = 0;
-  private key: Buffer | undefined;
-  constructor(private db: ControlPlaneDatabase, private databasePath: string, private memory: WritingMemory, private fetcher: typeof fetch = fetch, private now: () => number = Date.now) {}
-  private encryptionKey() {
-    if (this.key) return this.key;
-    if (this.databasePath === ":memory:") return this.key = randomBytes(32);
-    const path = join(dirname(this.databasePath), "writing-ai.key");
-    try { writeFileSync(path, randomBytes(32), { mode: 0o600, flag: "wx" }); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
-    this.key = readFileSync(path);
-    invariant(this.key.length === 32, 503, "WRITING_KEY_INVALID", "AI configuration key is unavailable");
-    return this.key;
+  private readonly secrets: SecretBox;
+  constructor(private db: ControlPlaneDatabase, databasePath: string, private memory: WritingMemory, private fetcher: typeof fetch = fetch, private now: () => number = Date.now) {
+    this.secrets = new SecretBox(databasePath, "writing-ai.key");
   }
-  private encrypt(value: string) {
-    if (!value) return "";
-    const iv = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", this.encryptionKey(), iv);
-    const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
-    return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64");
-  }
-  private decrypt(value: string) {
-    if (!value) return "";
-    const bytes = Buffer.from(value, "base64"); const cipher = createDecipheriv("aes-256-gcm", this.encryptionKey(), bytes.subarray(0,12));
-    cipher.setAuthTag(bytes.subarray(12,28));
-    return Buffer.concat([cipher.update(bytes.subarray(28)), cipher.final()]).toString("utf8");
-  }
+  private encrypt(value: string) { return this.secrets.encrypt(value); }
+  private decrypt(value: string) { return this.secrets.decrypt(value); }
   read(principal: Principal) {
     const row = this.profile(principal);
     return { endpoint: row?.endpoint ?? "", model: row?.model ?? "", hasKey: Boolean(row?.encrypted_key), enabled: row?.enabled === 1, configured: Boolean(row?.endpoint && row.model) };

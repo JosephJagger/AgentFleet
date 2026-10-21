@@ -1,4 +1,5 @@
 import {parseGrokOperation,grokOperations,grokLiveOperation} from './grok-operations.js';
+import { sshAccess } from "./ssh-access.js";
 import { ProviderRuntimeManager } from "./provider-runtime-manager.js";
 import { threadProvider } from "./provider-identity.js";
 import { isAcpProvider, supportsProviderCommand, type ProviderId } from "./provider-catalog.js";
@@ -771,6 +772,7 @@ export class AgentRuntime {
         maintenanceTypes: ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
         projectFiles: true,
         nativeSubagents: true,
+        sshAccess: sshAccess.supported,
         conversationHistory: this.canRead() && Boolean(this.appServer?.readConversation),
         realtimeVoice: this.isWritable() && supportsNativeVoice(this.support.codexVersion),
         queue: this.isWritable(),
