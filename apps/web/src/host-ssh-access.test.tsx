@@ -34,17 +34,36 @@ it("列出登记的账号、校验状态与可访问主机，并可测试连接"
   expect(await screen.findByText("b → 连接成功（42 ms）")).toBeTruthy();
 });
 
-it("管理员添加账号时提交截图表单的字段", async () => {
+it("管理员只填写连接字段，不提交名称、公钥或预设密钥类型", async () => {
   mocks.sshAccounts.mockResolvedValue({ accounts: [] });
   mocks.sshReachable.mockResolvedValue({ accounts: [] });
   mocks.saveSshAccount.mockResolvedValue({ account });
   render(<HostSshAccess machine={machine("a")} machines={[machine("a"), machine("b")]} canManage />);
   fireEvent.click(await screen.findByRole("button", { name: "添加 SSH 账号" }));
-  fireEvent.change(screen.getByLabelText(/名称/), { target: { value: "qianyi" } });
+  expect(screen.queryByLabelText(/名称|公钥|加密方式/)).toBeNull();
+  expect(screen.getByText(/连接别名自动使用 af-主机名/)).toBeTruthy();
   fireEvent.change(screen.getByLabelText(/用户名/), { target: { value: "deploy" } });
   fireEvent.change(screen.getByLabelText(/私钥 \*/), { target: { value: "-----BEGIN OPENSSH PRIVATE KEY-----" } });
   fireEvent.click(screen.getByRole("button", { name: "保存" }));
   await vi.waitFor(() => expect(mocks.saveSshAccount).toHaveBeenCalled());
-  expect(mocks.saveSshAccount.mock.calls[0]![0]).toMatchObject({ machineId: "a", name: "qianyi", username: "deploy", algorithm: "ed25519", port: 22, sources: [] });
-  expect(mocks.saveSshAccount.mock.calls[0]![0].passphrase).toBeUndefined();
+  expect(mocks.saveSshAccount.mock.calls[0]![0]).toMatchObject({ machineId: "a", username: "deploy", port: 22, sources: [] });
+  const submitted = mocks.saveSshAccount.mock.calls[0]![0];
+  for (const key of ["name", "algorithm", "publicKey", "passphrase"]) expect(submitted[key]).toBeUndefined();
+});
+
+it("编辑时保持别名、访问范围及描述，更换私钥时不发送旧公钥或类型", async () => {
+  mocks.sshAccounts.mockResolvedValue({ accounts: [{ ...account, sources: ["b"], hasPassphrase: true }] });
+  mocks.sshReachable.mockResolvedValue({ accounts: [] });
+  mocks.saveSshAccount.mockResolvedValue({ account });
+  render(<HostSshAccess machine={machine("a")} machines={[machine("a"), machine("b")]} canManage />);
+  fireEvent.click(await screen.findByRole("button", { name: "编辑" }));
+  expect(screen.getByText("连接命令：ssh af-qianyi")).toBeTruthy();
+  expect(screen.getByLabelText("私钥口令").closest("details")?.open).toBe(true);
+  fireEvent.change(screen.getByLabelText(/私钥 \*/), { target: { value: "replacement-private-key" } });
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await vi.waitFor(() => expect(mocks.saveSshAccount).toHaveBeenCalled());
+  const [input, id] = mocks.saveSshAccount.mock.calls[0]!;
+  expect(id).toBe(account.id);
+  expect(input).toMatchObject({ privateKey: "replacement-private-key", sources: ["b"], description: "构建机" });
+  for (const key of ["name", "algorithm", "publicKey", "passphrase"]) expect(input[key]).toBeUndefined();
 });

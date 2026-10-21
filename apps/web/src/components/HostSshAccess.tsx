@@ -7,7 +7,7 @@ import type { Machine, SshAccount, SshAccountInput, SshTestResult } from "../lib
 
 export const isLinuxMachine = (machine: Machine) => /^(linux|ubuntu)\b/i.test(machine.os);
 type Reachable = Awaited<ReturnType<typeof api.sshReachable>>["accounts"];
-const blank = (machineId: string): SshAccountInput => ({ machineId, name: "", algorithm: "ed25519", username: "", address: "", port: 22, privateKey: "", publicKey: "", passphrase: "", description: "", enabled: true, sources: [] });
+const blank = (machineId: string): SshAccountInput => ({ machineId, username: "", address: "", port: 22, privateKey: "", passphrase: "", description: "", enabled: true, sources: [] });
 
 function Check({ value, yes, no, unknown }: { value: boolean | null | undefined; yes: string; no: string; unknown: string }) {
   return <span className={`ssh-check ssh-check--${value === true ? "ok" : value === false ? "bad" : "unknown"}`}>{value === true ? <CheckCircle2 size={14} aria-hidden="true" /> : value === false ? <XCircle size={14} aria-hidden="true" /> : null}{value === true ? yes : value === false ? no : unknown}</span>;
@@ -41,13 +41,13 @@ export function HostSshAccess({ machine, machines, canManage }: { machine: Machi
   }
   const edit = (account?: SshAccount) => {
     setEditing(account);
-    setDraft(account ? { name: account.name, algorithm: account.algorithm, username: account.username, address: account.address, port: account.port, privateKey: "", publicKey: account.publicKey, passphrase: "", description: account.description, enabled: account.enabled, sources: account.sources } : blank(machine.id));
+    setDraft(account ? { username: account.username, address: account.address, port: account.port, privateKey: "", passphrase: "", description: account.description, enabled: account.enabled, sources: account.sources } : blank(machine.id));
   };
   const update = (patch: Partial<SshAccountInput>) => setDraft(current => current && { ...current, ...patch });
 
   if (!linux) return <section className="settings-block host-ssh"><h2>{t("SSH 互通")}</h2><p role="status">{t("SSH 互通暂仅支持 Linux 主机")}</p></section>;
   return <section className="settings-block host-ssh">
-    <div className="host-ssh__heading"><div><h2>{t("SSH 互通")}</h2><p>{t("登记本主机已有的 SSH 账号与密钥。保存后，同账号下其他 Linux 主机上的 Agent 可通过 ssh af-名称 直接操作本主机。")}</p></div>
+    <div className="host-ssh__heading"><div><h2>{t("SSH 互通")}</h2><p>{t("填写 SSH 用户名和私钥，其他已授权的 Linux 主机即可连接本主机。公钥和密钥类型自动识别。")}</p></div>
       {canManage && !draft && <button type="button" className="button button--primary" onClick={() => edit()}><KeyRound size={16} aria-hidden="true" />{t("添加 SSH 账号")}</button>}</div>
     {!canManage && <p className="host-help">{t("仅平台管理员可以添加或修改 SSH 账号。")}</p>}
 
@@ -59,21 +59,22 @@ export function HostSshAccess({ machine, machines, canManage }: { machine: Machi
       });
     }}>
       <div className="host-ssh__grid">
-        <label>{t("名称")} *<input required value={draft.name} maxLength={40} placeholder="qianyi" onChange={e => update({ name: e.target.value })} /><small>{t("Agent 使用的别名为 af-{0}", draft.name.toLowerCase() || "…")}</small></label>
         <label>{t("用户名")} *<input required value={draft.username} maxLength={32} placeholder="root" autoComplete="off" onChange={e => update({ username: e.target.value })} /></label>
-        <label>{t("加密方式")} *<select value={draft.algorithm} onChange={e => update({ algorithm: e.target.value as SshAccountInput["algorithm"] })}><option value="ed25519">ED25519</option><option value="rsa">RSA</option><option value="ecdsa">ECDSA</option></select></label>
-        <label>{t("密码")}<input type="password" value={draft.passphrase ?? ""} autoComplete="new-password" placeholder={editing?.hasPassphrase ? t("已保存，留空则不修改") : t("私钥口令，没有则留空")} onChange={e => update({ passphrase: e.target.value })} /></label>
-        <label>{t("私钥")} *<textarea rows={5} spellCheck={false} required={!editing} value={draft.privateKey ?? ""} placeholder={editing ? t("已保存，留空则不修改") : "-----BEGIN OPENSSH PRIVATE KEY-----"} onChange={e => update({ privateKey: e.target.value })} /></label>
-        <label>{t("公钥")} *<textarea rows={5} spellCheck={false} value={draft.publicKey ?? ""} placeholder={t("ssh-ed25519 AAAA…；OpenSSH 私钥可留空自动提取")} onChange={e => update({ publicKey: e.target.value })} /></label>
         <label>{t("地址")}<input value={draft.address} placeholder={editing?.effectiveAddress ? t("自动：{0}", editing.effectiveAddress) : t("留空则使用主机上报的地址")} onChange={e => update({ address: e.target.value })} /></label>
         <label>{t("端口")}<input type="number" min={1} max={65535} value={draft.port} onChange={e => update({ port: Number(e.target.value) })} /></label>
+        <label className="host-ssh__key">{t("私钥")} *<textarea rows={5} spellCheck={false} required={!editing} value={draft.privateKey ?? ""} placeholder={editing ? t("已保存，留空则不修改") : "-----BEGIN OPENSSH PRIVATE KEY-----"} onChange={e => update({ privateKey: e.target.value })} /></label>
       </div>
-      <label>{t("描述")}<input value={draft.description} maxLength={500} placeholder={t("告诉 Agent 这台主机的用途，例如：生产数据库，只读排查")} onChange={e => update({ description: e.target.value })} /></label>
+      <p className="host-help">{editing ? t("连接命令：{0}", `ssh ${editing.alias}`) : t("连接别名自动使用 af-主机名，重名时添加序号；保存后显示连接命令。")}</p>
+      <details open={editing?.hasPassphrase || undefined}>
+        <summary>{t("更多选项（私钥口令、描述）")}</summary>
+        <label>{t("私钥口令")}<input type="password" value={draft.passphrase ?? ""} autoComplete="new-password" placeholder={editing?.hasPassphrase ? t("已保存，留空则不修改") : t("私钥已加密时填写，不是 SSH 登录密码")} onChange={e => update({ passphrase: e.target.value })} /></label>
+        {editing?.hasPassphrase && <label className="checkbox-row"><input type="checkbox" checked={draft.clearPassphrase === true} onChange={e => update({ clearPassphrase: e.target.checked })} /><span>{t("清除已保存的口令")}</span></label>}
+        <label>{t("描述")}<input value={draft.description} maxLength={500} placeholder={t("告诉 Agent 这台主机的用途，例如：生产数据库，只读排查")} onChange={e => update({ description: e.target.value })} /></label>
+      </details>
       {sources.length > 0 && <fieldset className="host-ssh__sources"><legend>{t("可访问本主机的主机（都不选表示全部 Linux 主机）")}</legend>
         {sources.map(source => <label className="checkbox-row" key={source.id}><input type="checkbox" checked={draft.sources.includes(source.id)} onChange={e => update({ sources: e.target.checked ? [...draft.sources, source.id] : draft.sources.filter(id => id !== source.id) })} /><span>{displayName(source.name)}</span></label>)}
       </fieldset>}
       <label className="checkbox-row"><input type="checkbox" checked={draft.enabled} onChange={e => update({ enabled: e.target.checked })} /><span>{t("启用")}</span></label>
-      {editing?.hasPassphrase && <label className="checkbox-row"><input type="checkbox" checked={draft.clearPassphrase === true} onChange={e => update({ clearPassphrase: e.target.checked })} /><span>{t("清除已保存的口令")}</span></label>}
       <p className="host-help">{t("私钥加密保存在面板，不会回显；它会下发到可访问本主机的 Linux 主机，仅当前系统用户可读。建议使用专用的非 root 账号。")}</p>
       <div className="host-ssh__actions"><button type="submit" className="button button--primary" disabled={busy === "save"}>{busy === "save" && <LoaderCircle className="spin" size={16} aria-hidden="true" />}{t("保存")}</button><button type="button" className="button button--quiet" onClick={() => { setDraft(undefined); setEditing(undefined); }}>{t("取消")}</button></div>
     </form>}

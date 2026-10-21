@@ -403,7 +403,7 @@ export interface SshAccount {
   createdAt: string; updatedAt: string;
 }
 export interface SshAccountInput {
-  machineId?: string; name: string; algorithm: SshAccount["algorithm"]; username: string; address: string; port: number;
+  machineId?: string; name?: string; algorithm?: SshAccount["algorithm"]; username: string; address: string; port: number;
   privateKey?: string; publicKey?: string; passphrase?: string; clearPassphrase?: boolean; description: string; enabled: boolean; sources: string[];
 }
 export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string }

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, randomUUID } from "node:crypto";
 import type { Principal } from "./auth.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import { AppError, invariant } from "./errors.js";
@@ -53,6 +53,36 @@ export function parseSshPrivateKey(input: string): { text: string; encrypted: bo
   const publicBlob = readString(body, options.next + 4).value;
   return { text, encrypted: cipher.value.toString("latin1") !== "none", publicBlob };
 }
+
+/** PEM keys do not embed an OpenSSH public blob; derive it locally without shelling out. */
+function pemPublicKey(privateKey: string, passphrase?: string): SshPublicKey {
+  let jwk;
+  try { jwk = createPublicKey(createPrivateKey({ key: privateKey, ...(passphrase ? { passphrase } : {}) })).export({ format: "jwk" }); }
+  catch { throw new AppError(400, "SSH_PRIVATE_KEY_INVALID", "无法读取私钥，请检查私钥内容和口令"); }
+  const field = (value: string | Buffer) => {
+    const bytes = typeof value === "string" ? Buffer.from(value) : value;
+    const length = Buffer.alloc(4); length.writeUInt32BE(bytes.length);
+    return Buffer.concat([length, bytes]);
+  };
+  const integer = (value: string) => {
+    let bytes = Buffer.from(value, "base64url");
+    while (bytes.length > 1 && bytes[0] === 0) bytes = bytes.subarray(1);
+    return field(bytes[0]! & 128 ? Buffer.concat([Buffer.from([0]), bytes]) : bytes);
+  };
+  let type: string; let blob: Buffer;
+  if (jwk.kty === "RSA" && jwk.e && jwk.n) {
+    type = "ssh-rsa"; blob = Buffer.concat([field(type), integer(jwk.e), integer(jwk.n)]);
+  } else if (jwk.kty === "OKP" && jwk.crv === "Ed25519" && jwk.x) {
+    type = "ssh-ed25519"; blob = Buffer.concat([field(type), field(Buffer.from(jwk.x, "base64url"))]);
+  } else if (jwk.kty === "EC" && jwk.x && jwk.y && ["P-256", "P-384", "P-521"].includes(jwk.crv ?? "")) {
+    const curve = `nistp${jwk.crv!.slice(2)}`;
+    type = `ecdsa-sha2-${curve}`;
+    blob = Buffer.concat([field(type), field(curve), field(Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x, "base64url"), Buffer.from(jwk.y, "base64url")]))]);
+  } else throw new AppError(400, "SSH_ALGORITHM_INVALID", "不支持的加密方式");
+  return parseSshPublicKey(`${type} ${blob.toString("base64")}`);
+}
+
+const aliasName = (value: string) => value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[^a-z0-9]+|[._-]+$/g, "").slice(0, 40);
 
 interface AccountRow {
   account_id: string; workspace_id: string; machine_id: string; name: string; algorithm: SshAlgorithm; username: string;
@@ -129,8 +159,8 @@ export class SshAccessService {
   }
 
   private machine(principal: Principal, machineId: string) {
-    const machine = this.db.get<{ machine_id: string; name: string; platform: string; identity_state: string }>(
-      "SELECT machine_id,name,platform,identity_state FROM machines WHERE machine_id=? AND workspace_id=?", machineId, principal.workspaceId);
+    const machine = this.db.get<{ machine_id: string; name: string; display_alias: string | null; platform: string; identity_state: string }>(
+      "SELECT machine_id,name,display_alias,platform,identity_state FROM machines WHERE machine_id=? AND workspace_id=?", machineId, principal.workspaceId);
     invariant(machine && machine.identity_state === "active", 404, "MACHINE_NOT_FOUND", "Machine was not found");
     return machine;
   }
@@ -180,7 +210,8 @@ export class SshAccessService {
     invariant(machineId, 400, "INVALID_INPUT", "machineId is required");
     const machine = this.machine(principal, machineId);
     invariant(isLinuxPlatform(machine.platform), 409, "SSH_LINUX_ONLY", "SSH 互通暂仅支持 Linux 主机");
-    const name = text(body.name, 40)?.trim() ?? "";
+    const automaticName = body.name === undefined && !previous;
+    let name = body.name === undefined ? previous?.name ?? (aliasName(machine.display_alias ?? "") || aliasName(machine.name) || aliasName(machineId)) : text(body.name, 40)?.trim() ?? "";
     invariant(NAME.test(name), 400, "SSH_NAME_INVALID", "名称仅支持字母、数字、点、下划线和连字符，最长 40 位");
     const username = text(body.username, 32)?.trim() ?? "";
     invariant(USERNAME.test(username), 400, "SSH_USERNAME_INVALID", "请填写有效的 Linux 用户名");
@@ -189,25 +220,25 @@ export class SshAccessService {
     const port = body.port === undefined || body.port === null || body.port === "" ? 22 : Number(body.port);
     invariant(Number.isSafeInteger(port) && port > 0 && port < 65536, 400, "SSH_PORT_INVALID", "端口应在 1-65535 之间");
     const description = (text(body.description, 500) ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
-    invariant(SSH_ALGORITHMS.includes(body.algorithm as SshAlgorithm), 400, "SSH_ALGORITHM_INVALID", "不支持的加密方式");
-    const algorithm = body.algorithm as SshAlgorithm;
 
     const privateInput = text(body.privateKey, MAX_PRIVATE_KEY + 64)?.trim();
     invariant(privateInput || previous, 400, "SSH_PRIVATE_KEY_REQUIRED", "请填写私钥");
     const privateKey = privateInput ? parseSshPrivateKey(privateInput) : undefined;
-    const publicInput = text(body.publicKey, 16_384)?.trim();
-    const publicKey = publicInput ? parseSshPublicKey(publicInput)
-      : privateKey?.publicBlob ? parseSshPublicKey(`${readString(privateKey.publicBlob, 0).value.toString("latin1")} ${privateKey.publicBlob.toString("base64")}`)
-      : previous && !privateKey ? parseSshPublicKey(previous.public_key) : undefined;
-    invariant(publicKey, 400, "SSH_PUBLIC_KEY_REQUIRED", "请填写公钥");
-    invariant(publicKey.algorithm === algorithm, 400, "SSH_ALGORITHM_MISMATCH", "加密方式与公钥类型不一致");
-    if (privateKey?.publicBlob) invariant(privateKey.publicBlob.equals(publicKey.blob), 400, "SSH_KEY_MISMATCH", "私钥与公钥不匹配");
-    if (!privateKey && previous) invariant(previous.public_key === publicKey.line, 400, "SSH_PRIVATE_KEY_REQUIRED", "更换公钥时请同时填写对应私钥");
-
     const passphrase = typeof body.passphrase === "string" && body.passphrase ? body.passphrase : undefined;
     invariant(!passphrase || passphrase.length <= 1024, 400, "SSH_PASSPHRASE_INVALID", "口令过长");
     const encryptedPassphrase = body.clearPassphrase === true ? "" : passphrase ? this.secrets.encrypt(passphrase) : privateKey ? "" : previous?.encrypted_passphrase ?? "";
     if (privateKey?.encrypted) invariant(encryptedPassphrase, 400, "SSH_PASSPHRASE_REQUIRED", "该私钥已加密，请填写口令");
+
+    const derived = privateKey?.publicBlob ? parseSshPublicKey(`${readString(privateKey.publicBlob, 0).value.toString("latin1")} ${privateKey.publicBlob.toString("base64")}`)
+      : privateKey ? pemPublicKey(privateKey.text, passphrase) : undefined;
+    const publicInput = text(body.publicKey, 16_384)?.trim();
+    const publicKey = publicInput ? parseSshPublicKey(publicInput) : derived ?? (previous ? parseSshPublicKey(previous.public_key) : undefined);
+    invariant(publicKey, 400, "SSH_PUBLIC_KEY_REQUIRED", "无法从私钥读取公钥");
+    const algorithm = body.algorithm === undefined ? publicKey.algorithm : body.algorithm as SshAlgorithm;
+    invariant(SSH_ALGORITHMS.includes(algorithm), 400, "SSH_ALGORITHM_INVALID", "不支持的加密方式");
+    invariant(publicKey.algorithm === algorithm, 400, "SSH_ALGORITHM_MISMATCH", "加密方式与公钥类型不一致");
+    if (derived) invariant(derived.blob.equals(publicKey.blob), 400, "SSH_KEY_MISMATCH", "私钥与公钥不匹配");
+    if (!privateKey && previous) invariant(previous.public_key === publicKey.line, 400, "SSH_PRIVATE_KEY_REQUIRED", "更换公钥时请同时填写对应私钥");
 
     const sources = Array.isArray(body.sources) ? [...new Set(body.sources.filter((id): id is string => typeof id === "string"))] : undefined;
     for (const source of sources ?? []) {
@@ -219,6 +250,12 @@ export class SshAccessService {
     const now = nowIso();
     const keyChanged = !previous || previous.public_key !== publicKey.line || previous.username !== username;
     return this.db.transaction(() => {
+      if (automaticName) {
+        const base = name;
+        for (let suffix = 2; this.db.get("SELECT 1 FROM host_ssh_accounts WHERE workspace_id=? AND name=? COLLATE NOCASE", principal.workspaceId, name); suffix++) {
+          const tail = `-${suffix}`; name = base.slice(0, 40 - tail.length) + tail;
+        }
+      }
       invariant(!this.db.get("SELECT 1 AS found FROM host_ssh_accounts WHERE workspace_id=? AND name=? COLLATE NOCASE AND account_id<>?", principal.workspaceId, name, id), 409, "SSH_NAME_TAKEN", "名称已被使用");
       if (previous) this.db.run(
         `UPDATE host_ssh_accounts SET name=?,algorithm=?,username=?,address=?,port=?,public_key=?,fingerprint=?,encrypted_private_key=?,encrypted_passphrase=?,

@@ -4053,5 +4053,13 @@
   "还没有工作树。": "No worktrees yet.",
   "这些工作树由 Codex 桌面版或手动创建，可以接入面板后让智能体在其中工作。": "These worktrees were created by Codex desktop or by hand. Adopt one to let an agent work in it.",
   "配置本地环境": "Local environment",
-  "领先 {0} / 落后 {1}": "{0} ahead / {1} behind"
+  "领先 {0} / 落后 {1}": "{0} ahead / {1} behind",
+  "填写 SSH 用户名和私钥，其他已授权的 Linux 主机即可连接本主机。公钥和密钥类型自动识别。": "Enter the SSH username and private key so other authorized Linux hosts can connect. The public key and key type are detected automatically.",
+  "连接命令：{0}": "Connect with: {0}",
+  "连接别名自动使用 af-主机名，重名时添加序号；保存后显示连接命令。": "The connection alias uses af-hostname, with a number added for duplicates. The command appears after saving.",
+  "更多选项（私钥口令、描述）": "More options (key passphrase, description)",
+  "私钥口令": "Private key passphrase",
+  "私钥已加密时填写，不是 SSH 登录密码": "For encrypted private keys; not the SSH login password",
+  "无法读取私钥，请检查私钥内容和口令": "Unable to read the private key. Check the key and passphrase.",
+  "无法从私钥读取公钥": "Unable to derive the public key from the private key"
 }

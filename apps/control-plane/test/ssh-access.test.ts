@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -10,10 +10,13 @@ import { loadConfig } from "../src/config.js";
 import type { Principal } from "../src/auth.js";
 import { parseInspection, parseSshPrivateKey, parseSshPublicKey, SshAccessBroker, SshAccessService } from "../src/ssh-access.js";
 
-function keyPair(passphrase = "") {
-  const path = join(mkdtempSync(join(tmpdir(), "cp-ssh-")), "key");
-  execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", passphrase, "-C", "test", "-f", path]);
-  return { privateKey: readFileSync(path, "utf8"), publicKey: readFileSync(`${path}.pub`, "utf8").trim() };
+function keyPair(passphrase = "", type = "ed25519", format?: string) {
+  const root = mkdtempSync(join(tmpdir(), "cp-ssh-"));
+  const path = join(root, "key");
+  try {
+    execFileSync("ssh-keygen", ["-q", "-t", type, ...(format ? ["-m", format] : []), "-N", passphrase, "-C", "test", "-f", path]);
+    return { privateKey: readFileSync(path, "utf8"), publicKey: readFileSync(`${path}.pub`, "utf8").trim() };
+  } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
 function fixture() {
@@ -101,4 +104,37 @@ test("broker only accepts replies from the socket it asked", async () => {
   await assert.rejects(failed, /不匹配/);
   const offline = new SshAccessBroker(() => ({ key: socket, ready: true, supported: false, send: () => true }));
   await assert.rejects(offline.request("a", {}), /更新主机连接服务/);
+});
+
+test("minimal input derives a stable host alias; collisions get a suffix without changing existing aliases", () => {
+  const { db, principal, service } = fixture();
+  try {
+    db.run("UPDATE machines SET display_alias='B52H' WHERE machine_id IN ('a','b')");
+    db.run("UPDATE machines SET name='srv-chinese',display_alias='主机' WHERE machine_id='c'");
+    const { privateKey } = keyPair();
+    const first = service.save(principal, { machineId: "a", username: "deploy", privateKey });
+    assert.equal(first.alias, "af-b52h"); assert.equal(first.algorithm, "ed25519"); assert.equal(first.port, 22);
+    assert.equal(service.save(principal, { machineId: "b", username: "ops", privateKey }).alias, "af-b52h-2");
+    assert.equal(service.save(principal, { machineId: "a", username: "other", privateKey }).alias, "af-b52h-3");
+    assert.equal(service.save(principal, { machineId: "c", username: "ops", privateKey }).alias, "af-srv-chinese");
+    db.run("UPDATE machines SET display_alias='Renamed' WHERE machine_id='a'");
+    const edited = service.save(principal, { username: "deploy" }, first.id);
+    assert.equal(edited.alias, "af-b52h"); assert.equal(edited.publicKey, first.publicKey);
+    const replacement = keyPair("", "ecdsa");
+    const rotated = service.save(principal, { username: "deploy", privateKey: replacement.privateKey }, first.id);
+    assert.equal(rotated.algorithm, "ecdsa"); assert.equal(rotated.publicKey, parseSshPublicKey(replacement.publicKey).line);
+  } finally { db.close(); }
+});
+
+for (const [type, format, passphrase] of [
+  ["rsa", "", ""], ["ecdsa", "", ""], ["ed25519", "", "secret"],
+  ["rsa", "PEM", ""], ["rsa", "PEM", "secret"], ["ecdsa", "PEM", ""], ["ecdsa", "PEM", "secret"], ["rsa", "PKCS8", "secret"],
+]) test(`public key and type are derived from ${type} ${format || "OpenSSH"} (encrypted=${Boolean(passphrase)})`, () => {
+  const { db, principal, service } = fixture();
+  try {
+    const pair = keyPair(passphrase, type, format || undefined);
+    const saved = service.save(principal, { machineId: "a", username: "deploy", privateKey: pair.privateKey, passphrase });
+    assert.equal(saved.algorithm, type); assert.equal(saved.publicKey, parseSshPublicKey(pair.publicKey).line);
+    if (format && passphrase) assert.throws(() => service.save(principal, { machineId: "b", username: "deploy", privateKey: pair.privateKey, passphrase: "wrong" }), /私钥/);
+  } finally { db.close(); }
 });

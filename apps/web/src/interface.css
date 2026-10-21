@@ -960,7 +960,10 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .host-ssh__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .host-ssh__heading p { margin: 4px 0 0; color: var(--muted); }
 .host-ssh__form { gap: 12px; }
-.host-ssh__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.host-ssh__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(80px, .5fr); gap: 12px 16px; }
+.host-ssh__key { grid-column: 1 / -1; }
+.host-ssh__form details > label { display: grid; gap: 6px; margin-top: 12px; }
+.host-ssh__form details > .checkbox-row { display: flex; }
 .host-ssh__grid textarea { font-family: var(--mono, ui-monospace, monospace); font-size: var(--text-small); resize: vertical; }
 .host-ssh__grid small { color: var(--muted); font-size: var(--text-small); }
 .host-ssh__sources { display: flex; flex-wrap: wrap; gap: 8px 16px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
