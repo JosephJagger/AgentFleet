@@ -109,7 +109,15 @@ function cursorWorkers(owned:Set<number>) {
   releasedCursorWorkers.set(owned,records);
   return records;
 }
-const ownershipInspection={rows:acpProcessRows,startToken:platformProcessStartToken};
+async function cursorProcessStartToken(pid:number):Promise<string|undefined> {
+  const token=await platformProcessStartToken(pid);
+  if(!token||process.platform!=="linux")return token;
+  // /proc start ticks are only unique within one boot. Persisted exemptions must
+  // not survive a reboot just because a new helper reused the same PID/ticks.
+  const boot=await readFile("/proc/sys/kernel/random/boot_id","utf8").catch(()=>"");
+  return /^[0-9a-f-]{36}$/i.test(boot.trim())?`${boot.trim()}:${token}`:undefined;
+}
+const ownershipInspection={rows:acpProcessRows,startToken:cursorProcessStartToken};
 const isCursorWorker=(row:ProcessRow)=>isCursorNativeCommand(row.args)&&/\sworker-server\s*$/.test(row.args);
 /** Record proven helper descendants before a completed session's parent exits.
  * These native tool servers outlive ACP and are reparented to PID 1. No signal is
