@@ -205,6 +205,7 @@ export interface AgentCapabilities {
   conversationHistory?: boolean;
   sshAccess?: boolean;
   worktrees?: boolean;
+  worktreeFork?: boolean;
   commandTypes?: string[];
   methods?: string[];
   maintenanceTypes?: string[];

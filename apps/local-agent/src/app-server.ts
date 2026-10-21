@@ -220,7 +220,7 @@ export interface AppServerClient {
   getCodexCatalog?(): CodexCatalog;
   readPluginSkill?(reference: { name: string; path: string }): Promise<string>;
   inspectEnvironment?(cwd: string, threadId?: string): Promise<CodexInspection>;
-  threadAction?(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string, range?: { beforeTurnId?: string; lastTurnId?: string }): Promise<Record<string, unknown>>;
+  threadAction?(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string, range?: { beforeTurnId?: string; lastTurnId?: string }, targetProject?: ProjectRecord): Promise<Record<string, unknown>>;
   startNativeTurn?(thread: ManagedThread, action: "compact" | "review", target?: Record<string, unknown>): Promise<TurnStartResult>;
   readonly appServerEpoch: string;
   start(): Promise<void>;
@@ -710,7 +710,7 @@ export class CodexAppServer implements AppServerClient {
     await this.request("thread/delete",{threadId:thread.nativeThreadId});
   }
 
-  async threadAction(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string, range?: { beforeTurnId?: string; lastTurnId?: string }): Promise<Record<string, unknown>> {
+  async threadAction(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string, range?: { beforeTurnId?: string; lastTurnId?: string }, targetProject?: ProjectRecord): Promise<Record<string, unknown>> {
     this.assertInitialized();
     const metadata = resultObject(await this.request("thread/read", { threadId: thread.nativeThreadId, includeTurns: false }), "thread/read");
     const before = historySnapshot(metadata.thread, "thread/read");
@@ -729,11 +729,14 @@ export class CodexAppServer implements AppServerClient {
       await this.request(action === "archive" ? "thread/archive" : "thread/unarchive", { threadId });
       return { archived: action === "archive" };
     }
-    const raw = resultObject(await this.request("thread/fork", { threadId, cwd, excludeTurns: true, deferGoalContinuation: true, ...parseForkRange(range), approvalPolicy: "on-request", approvalsReviewer: "user", sandbox: "workspace-write",
-      config: { approval_policy: "on-request", sandbox_mode: "workspace-write", sandbox_workspace_write: { network_access: false, writable_roots: [project.root], exclude_tmpdir_env_var: true, exclude_slash_tmp: true } } }), "thread/fork");
+    // A fork may continue the same conversation inside another registered directory (a git worktree lane).
+    const forkProject = targetProject ?? project;
+    const forkCwd = targetProject ? await verifySessionCwd(targetProject, targetProject.root) : cwd;
+    const raw = resultObject(await this.request("thread/fork", { threadId, cwd: forkCwd, excludeTurns: true, deferGoalContinuation: true, ...parseForkRange(range), approvalPolicy: "on-request", approvalsReviewer: "user", sandbox: "workspace-write",
+      config: { approval_policy: "on-request", sandbox_mode: "workspace-write", sandbox_workspace_write: { network_access: false, writable_roots: [forkProject.root], exclude_tmpdir_env_var: true, exclude_slash_tmp: true } } }), "thread/fork");
     const fork = resultObject(raw.thread, "thread/fork thread");
     const nativeThreadId = requireString(fork.id, "fork.id", { maxLength: 256 });
-    if (nativeThreadId === threadId || fork.cwd !== cwd) throw new AgentError("APP_SERVER_PROTOCOL", "Fork identity or project does not match");
+    if (nativeThreadId === threadId || fork.cwd !== forkCwd) throw new AgentError("APP_SERVER_PROTOCOL", "Fork identity or project does not match");
     let writerReleased = true;
     try { await this.unsubscribeThread(nativeThreadId); }
     catch { writerReleased = false; }

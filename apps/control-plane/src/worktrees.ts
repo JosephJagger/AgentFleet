@@ -29,8 +29,11 @@ export function parseWorktreeTarget(type: string, value: unknown): Record<string
     invariant(raw.branch === undefined || raw.adoptPath === undefined, 400, "WORKTREE_REQUEST_INVALID", "接入已有工作树不能更改分支");
     invariant(raw.adoptPath === undefined || typeof raw.adoptPath === "string" && (posix.isAbsolute(raw.adoptPath) || win32.isAbsolute(raw.adoptPath)) && raw.adoptPath.length <= 4096, 400, "WORKTREE_PATH_INVALID", "工作树路径无效");
     invariant(Boolean(raw.name) !== Boolean(raw.adoptPath), 400, "WORKTREE_REQUEST_INVALID", "请填写工作树名称，或选择已有工作树");
+    invariant(raw.forkNativeThreadId === undefined || typeof raw.forkNativeThreadId === "string" && raw.forkNativeThreadId.length > 0 && raw.forkNativeThreadId.length <= 256, 400, "WORKTREE_REQUEST_INVALID", "原会话无效");
+    invariant(raw.forkNativeThreadId === undefined || raw.provider === "codex" && raw.adoptPath === undefined, 400, "WORKTREE_FORK_UNSUPPORTED", "目前只有 Codex 会话可以带着对话上下文复制到新工作树");
     return { projectExternalId: externalId(raw.projectExternalId), provider: raw.provider, alias: raw.alias, ...(raw.name ? { name: raw.name } : {}),
-      ...(raw.branch !== undefined ? { branch: raw.branch } : {}), ...(raw.base ? { base: raw.base } : {}), ...(raw.adoptPath ? { adoptPath: raw.adoptPath } : {}), setup: raw.setup === true };
+      ...(raw.branch !== undefined ? { branch: raw.branch } : {}), ...(raw.base ? { base: raw.base } : {}), ...(raw.adoptPath ? { adoptPath: raw.adoptPath } : {}),
+      ...(raw.forkNativeThreadId ? { forkNativeThreadId: raw.forkNativeThreadId } : {}), setup: raw.setup === true };
   }
   if (type === "worktree.merge") return { projectExternalId: externalId(raw.projectExternalId) };
   return { projectExternalId: externalId(raw.projectExternalId), deleteBranch: raw.deleteBranch === true, force: raw.force === true };
@@ -115,9 +118,28 @@ export class WorktreeService {
     const name = adoptPath ? undefined : typeof body.name === "string" && body.name ? body.name : `${body.provider}-${randomUUID().slice(0, 6)}`;
     const leaf = (name ?? adoptPath!.split("/").filter(Boolean).at(-1) ?? "lane").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[^A-Za-z0-9]+/, "");
     const alias = `${main.alias}-${leaf}`.slice(0, 64).replace(/[^A-Za-z0-9]+$/, "") || "worktree";
+    const forkNativeThreadId = body.forkSessionId === undefined ? undefined : this.forkSource(principal, main, body.forkSessionId);
     const target = parseWorktreeTarget("worktree.create", { projectExternalId: main.external_id, provider: body.provider, alias,
+      ...(forkNativeThreadId ? { forkNativeThreadId } : {}),
       ...(name ? { name } : {}), ...(body.branch !== undefined ? { branch: body.branch } : {}), ...(typeof body.base === "string" && body.base ? { base: body.base } : {}), ...(adoptPath ? { adoptPath } : {}), setup: body.setup === true });
     return { machineId: main.machine_id, target };
+  }
+
+  /** Native thread of a managed, idle Codex session in this repository whose conversation will be copied into the lane. */
+  private forkSource(principal: Principal, main: ProjectRow, sessionId: unknown): string {
+    invariant(typeof sessionId === "string" && sessionId.length > 0 && sessionId.length <= 200, 400, "WORKTREE_REQUEST_INVALID", "原会话无效");
+    const row = this.db.get<{ native_thread_id: string; managed: number; execution_state: string; active_turn_id: string | null; provider: string; machine_id: string }>(
+      `SELECT e.native_thread_id,s.managed,s.execution_state,s.active_turn_id,p.provider,s.machine_id
+       FROM logical_sessions s JOIN projects p ON p.project_id=s.project_id
+       JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL
+       WHERE s.logical_session_id=? AND s.workspace_id=? AND s.deleted_at IS NULL AND p.worktree_removed=0
+         AND (p.canonical_root=? OR p.repo_root=?)`, sessionId, principal.workspaceId, main.canonical_root, main.canonical_root);
+    invariant(row?.native_thread_id && row.machine_id === main.machine_id, 404, "WORKTREE_FORK_SOURCE", "原会话不存在，或不属于这个仓库");
+    invariant(row.provider === "codex", 409, "WORKTREE_FORK_UNSUPPORTED", "目前只有 Codex 会话可以带着对话上下文复制到新工作树");
+    invariant(row.managed === 1, 409, "WORKTREE_FORK_SOURCE", "请先接管并同步这个会话，再复制到工作树");
+    invariant(row.active_turn_id === null && !["running", "awaiting_approval", "unknown"].includes(row.execution_state)
+      && !this.db.get("SELECT 1 FROM project_turn_reservations WHERE logical_session_id=?", sessionId), 409, "WORKTREE_FORK_BUSY", "原会话正在执行，请等待完成后再复制");
+    return row.native_thread_id;
   }
 
   /** Merging writes the main directory and removal deletes the lane: both wait for turns there to finish. */

@@ -91,8 +91,15 @@ class FakeAppServer implements AppServerClient {
   async stopVoice(_threadId: string) { this.voiceStops++; }
   async stopBackgroundTerminals(thread: ManagedThread): Promise<void> { this.nativeCalls.push(`stop:${thread.nativeThreadId}`); }
   async respondInput(_request: ApprovalRecord, answers: Record<string, { answers: string[] }>): Promise<void> { this.inputCalls.push(answers); }
-  async threadAction(_thread: ManagedThread, _project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string): Promise<Record<string, unknown>> {
+  forkFailure: Error | undefined;
+  forks: { source: string; target: string | undefined }[] = [];
+  async threadAction(thread: ManagedThread, _project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, _title?: string, _range?: unknown, targetProject?: ProjectRecord): Promise<Record<string, unknown>> {
     this.nativeCalls.push(action);
+    if (action === "fork") {
+      if (this.forkFailure) throw this.forkFailure;
+      this.forks.push({ source: thread.nativeThreadId, target: targetProject?.root });
+      return { forkedNativeThreadId: `fork-of-${thread.nativeThreadId}`, sourceNativeThreadId: thread.nativeThreadId, writerReleased: true };
+    }
     return action === "rename" ? { title: name } : { archived: action === "archive" };
   }
   async startNativeTurn(_thread: ManagedThread, action: "compact" | "review"): Promise<TurnStartResult> { this.nativeCalls.push(action); return { nativeTurnId: `native-${action}`, status: "inProgress" }; }
@@ -1893,4 +1900,40 @@ test("worktree lanes register per agent, report their repository to the panel an
   assert.deepEqual(await runtime.manageWorktree("worktree.remove", { projectExternalId: created.projectExternalId, deleteBranch: true, force: false }), { removed: true, branch: "af/lane", branchDeleted: true });
   assert.ok((runtime.helloPayload().projects as Record<string, unknown>[]).filter(item => item.canonicalRoot === created.canonicalRoot).every(item => item.worktreeRemoved === true));
   await assert.rejects(runtime.readWorktrees({ action: "diff", projectExternalId: joined.projectExternalId }), /不是可用的工作树/);
+});
+
+test("a worktree can carry a Codex conversation: the copy lives in the lane, the original is untouched, failures leave no lane", async (t) => {
+  const { store, projects } = await fixture(); const project = projects[0]!;
+  const git = (...args: string[]) => workspacePromisify(workspaceExecFile)("git", ["-C", project.root, ...args], { env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
+  await git("init", "-q", "-b", "main"); await writeFile(join(project.root, "a.txt"), "a\n"); await git("add", "."); await git("commit", "-qm", "init");
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: (cb) => (server = new FakeAppServer("epoch-fork", cb)) });
+  runtime.setTransportGeneration(1); captureCallbacks(runtime); await runtime.initialize(); t.after(() => runtime.shutdown());
+  assert.equal((runtime.helloPayload().capabilities as Record<string, unknown>).worktreeFork, true);
+  const thread = (nativeThreadId: string, extra: Record<string, unknown> = {}) => ({ nativeThreadId, projectId: project.id, logicalSessionId: `session-${nativeThreadId}`, executionSegmentId: `segment-${nativeThreadId}`, appServerEpoch: server.appServerEpoch, policyVerified: true, subscribed: true, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", policyVersion: 1, contentEpoch: 1, ...extra }) as unknown as ManagedThread;
+  await store.setManagedThread(thread("source-thread"));
+  const request = (name: string, forkNativeThreadId: string, provider = "codex") => ({ projectExternalId: project.id, provider, alias: `project-1-${name}`, name, forkNativeThreadId, setup: false });
+
+  const copied = await runtime.manageWorktree("worktree.create", request("copy", "source-thread"));
+  assert.equal(copied.forkedNativeThreadId, "fork-of-source-thread");
+  assert.deepEqual(server.forks, [{ source: "source-thread", target: copied.canonicalRoot }]);
+  const original = store.snapshot().managedThreads["source-thread"]!;
+  assert.deepEqual([original.projectId, original.subscribed, original.policyVerified], [project.id, false, false], "the original stays in its project; it only re-verifies before its next turn");
+
+  // A session that already lives in a lane can be copied into another lane of the same repository.
+  await store.setManagedThread(thread("lane-thread", { projectId: String(copied.projectExternalId) }));
+  assert.equal((await runtime.manageWorktree("worktree.create", request("second", "lane-thread"))).forkedNativeThreadId, "fork-of-lane-thread");
+
+  await store.setManagedThread(thread("busy-thread", { activeTurnId: "turn-1" }));
+  await assert.rejects(runtime.manageWorktree("worktree.create", request("busy", "busy-thread")), /正在执行/);
+  await assert.rejects(runtime.manageWorktree("worktree.create", request("gone", "missing")), /不存在/);
+  await assert.rejects(runtime.manageWorktree("worktree.create", request("claude", "source-thread", "claude")), /只有 Codex/);
+  await assert.rejects(runtime.manageWorktree("worktree.create", { ...request("adopt", "source-thread"), name: undefined, adoptPath: String(copied.canonicalRoot) }), /只有 Codex/);
+
+  server.forkFailure = new AgentError("THREAD_BUSY", "native refused");
+  const before = (await git("worktree", "list")).stdout.split("\n").filter(Boolean).length;
+  await assert.rejects(runtime.manageWorktree("worktree.create", request("broken", "source-thread")), /native refused/);
+  assert.equal((await git("worktree", "list")).stdout.split("\n").filter(Boolean).length, before, "the lane made for a failed copy is removed again");
+  assert.equal((await git("branch", "--list", "af/broken")).stdout.trim(), "");
+  assert.ok(!(runtime.helloPayload().projects as Record<string, unknown>[]).some(item => String(item.alias).endsWith("-broken") && item.worktreeRemoved !== true));
 });

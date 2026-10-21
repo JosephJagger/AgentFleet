@@ -15,23 +15,39 @@ export function laneProviders(machine?: Machine): ProviderId[] {
   return PROVIDER_IDS.filter(id => id === "codex" || (id === "claude" ? machine?.agentRuntimes?.claude?.installed === true : machine?.agentRuntimes?.[id]?.installed === true));
 }
 
-interface CurrentSession { id: string; title: string; provider: ProviderId }
+/** `forkBlocked` explains why this session cannot be copied into a worktree; absent means it can. */
+interface CurrentSession { id: string; title: string; provider: ProviderId; forkBlocked?: string }
 
-function LaneCreate({ overview, providers, initialProvider, onCreated }: { overview: WorktreeOverview; providers: ProviderId[]; initialProvider?: ProviderId; onCreated: (sessionId: string) => void }) {
+/** Only a Codex conversation can be copied into another directory today. */
+function forkBlockedReason(session?: CurrentSession): string | undefined {
+  if (!session) return undefined;
+  return session.provider !== "codex" ? t("{0} 暂不支持带着对话上下文复制，可以新建空白会话", agentName(session.provider)) : session.forkBlocked;
+}
+
+function LaneCreate({ overview, providers, initialProvider, currentSession, onCreated }: { overview: WorktreeOverview; providers: ProviderId[]; initialProvider?: ProviderId; currentSession?: CurrentSession; onCreated: (sessionId: string) => void }) {
   const [provider, setProvider] = useState<ProviderId>(initialProvider && providers.includes(initialProvider) ? initialProvider : providers[0] ?? "codex");
+  const forkBlocked = forkBlockedReason(currentSession);
+  const [mode, setMode] = useState<"fork" | "blank">(currentSession && !forkBlocked ? "fork" : "blank");
   const [draft, setDraft] = useState<WorktreeDraft>({ branch: "", base: overview.current ?? overview.branches[0] ?? "", setup: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const branchError = worktreeBranchError(overview, draft.branch);
+  const forking = mode === "fork" && Boolean(currentSession) && !forkBlocked;
   return <form className="stack-form worktree-create" onSubmit={event => {
     event.preventDefault(); if (busy || branchError || !draft.base) return; setBusy(true); setError("");
-    void startLaneSession(overview.project.projectId, overview.project.machineId, { provider, ...worktreeBranchInput(overview, draft.branch), base: draft.base, setup: draft.setup }, t("{0} · 工作树", agentName(provider)))
+    const lane = { ...worktreeBranchInput(overview, draft.branch), base: draft.base, setup: draft.setup };
+    void startLaneSession(overview.project.projectId, overview.project.machineId, forking ? { ...lane, provider: "codex", forkSessionId: currentSession!.id } : { ...lane, provider }, t("{0} · 工作树", agentName(provider)))
       .then(result => onCreated(result.sessionId)).catch(reason => setError((reason as Error).message)).finally(() => setBusy(false));
   }}>
-    <label><span>{t("新会话的智能体")}</span><select disabled={busy} value={provider} onChange={e => setProvider(e.target.value as ProviderId)}>{providers.map(id => <option key={id} value={id}>{agentName(id)}</option>)}</select></label>
+    {currentSession && <fieldset className="worktree-mode" disabled={busy}><legend>{t("新工作树里的会话")}</legend>
+      <label className="checkbox-row"><input type="radio" name="worktree-mode" checked={mode === "fork"} disabled={Boolean(forkBlocked)} onChange={() => setMode("fork")} /><span>{t("复制当前会话（带着对话上下文）")}</span></label>
+      <small className={forkBlocked ? "catalog-error" : ""}>{forkBlocked ?? t("把当前会话的对话历史复制到新工作树里继续；当前会话保持原样，不受影响。")}</small>
+      <label className="checkbox-row"><input type="radio" name="worktree-mode" checked={mode === "blank"} onChange={() => setMode("blank")} /><span>{t("新建空白会话")}</span></label>
+    </fieldset>}
+    {!forking && <label><span>{t("新会话的智能体")}</span><select disabled={busy} value={provider} onChange={e => setProvider(e.target.value as ProviderId)}>{providers.map(id => <option key={id} value={id}>{agentName(id)}</option>)}</select></label>}
     <WorktreeFields overview={overview} value={draft} onChange={setDraft} disabled={busy} />
     {error && <p className="catalog-error" role="alert">{systemText(error)}</p>}
-    <button type="submit" className="button button--primary" disabled={busy || !draft.base || Boolean(branchError)}>{busy ? <LoaderCircle className="spin" size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}{busy ? t("正在创建工作树…") : t("创建工作树和新会话")}</button>
+    <button type="submit" className="button button--primary" disabled={busy || !draft.base || Boolean(branchError)}>{busy ? <LoaderCircle className="spin" size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}{busy ? (forking ? t("正在复制会话…") : t("正在创建工作树…")) : forking ? t("创建工作树并复制会话") : t("创建工作树和新会话")}</button>
   </form>;
 }
 
@@ -106,13 +122,13 @@ export function ProjectWorktreesPanel({ projectId, machine, currentSession, onOp
       <strong>{currentSession ? t("当前会话：{0}", currentSession.title) : overview.project.alias}</strong>
       <span>{t("当前分支：{0}", currentLane?.branch ?? overview.current ?? t("未检出分支"))}</span>
       <code>{currentLane?.path ?? overview.project.root}</code>
-      <p>{t("新建工作树会创建独立目录和新会话。当前会话、历史和未提交改动留在原处，新会话不会自动继承对话上下文。")}</p>
+      <p>{t("新建工作树会创建独立目录和分支。当前会话、历史和未提交改动留在原处；可以把对话上下文复制过去继续，也可以新建空白会话。")}</p>
     </div>
     <div className="worktree-choices" role="group" aria-label={t("选择工作树操作")}>
       <button type="button" aria-pressed={section === "create"} onClick={() => setSection("create")}>{t("新建独立会话")}</button>
       <button type="button" aria-pressed={section === "existing"} onClick={() => setSection("existing")}>{t("使用已有工作树（{0}）", String(overview.lanes.length + overview.unmanaged.length))}</button>
     </div>
-    {section === "create" ? <LaneCreate overview={overview} providers={providers} initialProvider={initialProvider} onCreated={id => { refresh(); onOpenSession(id); }} /> : <>
+    {section === "create" ? <LaneCreate overview={overview} providers={providers} initialProvider={initialProvider} currentSession={currentSession} onCreated={id => { refresh(); onOpenSession(id); }} /> : <>
       <p className="host-help">{t("打开已有会话会保留该会话的历史；在工作树中新建会话会从空白对话开始。")}</p>
       <button type="button" className="button button--quiet" onClick={refresh}><RefreshCw size={15} aria-hidden="true" />{t("刷新")}</button>
       {overview.lanes.length > 0 && <ul className="worktree-list">{overview.lanes.map(lane => <LaneCard key={lane.path} lane={lane} overview={overview} providers={providers} initialProvider={initialProvider} currentSessionId={currentSession?.id} onOpenSession={onOpenSession} onChanged={refresh} />)}</ul>}

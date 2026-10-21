@@ -318,11 +318,11 @@ export class SessionAppServer implements AppServerClient {
       }
     });
   }
-  threadAction(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string, range?: { beforeTurnId?: string; lastTurnId?: string }) {
+  threadAction(thread: ManagedThread, project: ProjectRecord, action: "rename" | "archive" | "unarchive" | "fork", name?: string, expectedTitle?: string, range?: { beforeTurnId?: string; lastTurnId?: string }, targetProject?: ProjectRecord) {
     return this.serial(thread.nativeThreadId, async () => {
       const writer = this.writers.get(thread.nativeThreadId) ?? await this.newWriter(thread.nativeThreadId);
       let result: Record<string, unknown>;
-      try { result = await writer.client.threadAction!(thread, project, action, name, expectedTitle, range); }
+      try { result = await writer.client.threadAction!(thread, project, action, name, expectedTitle, range, targetProject); }
       catch (error) { await this.release(writer).catch(() => undefined); throw error; }
       try { await this.release(writer); return { ...result, writerReleased: true }; }
       catch { return { ...result, writerReleased: false }; }

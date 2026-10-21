@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, symlink, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, writeFile, symlink, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseCodexOperation, parseReviewTarget, sanitizeCodexResult } from "../src/codex-operations.js";
@@ -289,6 +289,32 @@ test("fork boundaries are exact, goals are deferred, and confirmed fork receipts
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test("a fork can continue the conversation inside another registered directory, and must land exactly there", async () => {
+  const { CodexAppServer } = await import("../src/app-server.js");
+  const dir = await realpath(await mkdtemp(join(tmpdir(), "af-fork-lane-")));
+  const source = join(dir, "app"), lane = join(dir, "lane"), elsewhere = join(dir, "elsewhere");
+  for (const path of [source, lane, elsewhere]) await mkdir(path);
+  try {
+    const server = new CodexAppServer({} as never, "epoch");
+    const internal = server as unknown as { initialized: boolean; child: unknown; request(method: string, params: Record<string, unknown>): Promise<unknown> };
+    internal.initialized = true; internal.child = {};
+    let landing = lane; const forks: Record<string, unknown>[] = [];
+    internal.request = async (method, params) => {
+      if (method === "thread/read") return { thread: { id: "source", cwd: source, status: { type: "idle" } } };
+      if (method === "thread/unsubscribe") return {};
+      assert.equal(method, "thread/fork"); forks.push(params);
+      return { thread: { id: "fork", cwd: landing } };
+    };
+    const thread = { nativeThreadId: "source" } as never;
+    const result = await server.threadAction(thread, { root: source } as never, "fork", undefined, undefined, undefined, { root: lane } as never);
+    assert.deepEqual(result, { forkedNativeThreadId: "fork", sourceNativeThreadId: "source", writerReleased: true });
+    assert.equal(forks[0]!.cwd, lane);
+    assert.deepEqual((forks[0]!.config as { sandbox_workspace_write: { writable_roots: string[] } }).sandbox_workspace_write.writable_roots, [lane], "the copy may write its own lane only");
+    landing = elsewhere;
+    await assert.rejects(server.threadAction(thread, { root: source } as never, "fork", undefined, undefined, undefined, { root: lane } as never), /Fork identity or project does not match/);
+    await assert.rejects(server.threadAction(thread, { root: source } as never, "fork", undefined, undefined, undefined, { root: join(dir, "missing") } as never), /session directory is no longer available/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
 
 test("goal management saves paused metadata and rejects autonomous activation", async () => {
   assert.throws(() => parseCodexOperation({ operation: "goal.set", arguments: { objective: "work", status: "active" } }));

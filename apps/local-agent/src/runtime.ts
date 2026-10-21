@@ -775,6 +775,7 @@ export class AgentRuntime {
         nativeSubagents: true,
         sshAccess: sshAccess.supported,
         worktrees: true,
+        worktreeFork: true,
         conversationHistory: this.canRead() && Boolean(this.appServer?.readConversation),
         realtimeVoice: this.isWritable() && supportsNativeVoice(this.support.codexVersion),
         queue: this.isWritable(),
@@ -948,6 +949,34 @@ export class AgentRuntime {
     if (busy) throw new AgentError("WORKTREE_BUSY", "相关目录中仍有任务在运行，请等待完成后再操作");
   }
 
+  /** The managed Codex session whose conversation is copied into a new lane; it must be idle and in this repository. */
+  private forkSource(nativeThreadId: string, repository: ProjectRecord, provider: string | undefined, adopting: boolean): { thread: ManagedThread; project: ProjectRecord } {
+    if (provider !== "codex" || adopting) throw new AgentError("WORKTREE_FORK_UNSUPPORTED", "目前只有 Codex 会话可以带着对话上下文复制到新工作树");
+    const state = this.store.snapshot();
+    const thread = state.managedThreads[nativeThreadId];
+    const project = thread ? state.projects.find(entry => entry.id === thread.projectId) : undefined;
+    if (!thread || !project || thread.archived) throw new AgentError("WORKTREE_FORK_SOURCE", "原会话不存在或已归档，请刷新后重试");
+    if (nativeThreadId.startsWith("acp_") || isClaudeThread(nativeThreadId)) throw new AgentError("WORKTREE_FORK_UNSUPPORTED", "目前只有 Codex 会话可以带着对话上下文复制到新工作树");
+    const sameRepository = project.root === repository.root || project.worktree?.sourceRoot === repository.root && !project.worktree.removedAt;
+    if (!sameRepository) throw new AgentError("WORKTREE_FORK_SOURCE", "原会话不属于这个仓库");
+    if (thread.activeTurnId !== undefined || Object.values(state.approvals).some(approval => approval.nativeThreadId === nativeThreadId && approval.state === "pending")) {
+      throw new AgentError("WORKTREE_FORK_BUSY", "原会话正在执行或有待处理的请求，请等待完成后再复制");
+    }
+    return { thread, project };
+  }
+
+  /** Fork the conversation into the lane: same history, new native thread, working in the lane directory. */
+  private async forkThreadInto(source: { thread: ManagedThread; project: ProjectRecord }, lane: ProjectRecord): Promise<Record<string, unknown>> {
+    const server = this.appServer;
+    if (!server?.threadAction) throw new AgentError("WORKTREE_FORK_UNSUPPORTED", "当前运行环境不支持复制会话");
+    const result = await server.threadAction(source.thread, source.project, "fork", undefined, undefined, undefined, lane);
+    // The disposable writer that forked has exited; the next turn on the original thread must resume and verify it again.
+    await this.store.updateManagedThread(source.thread.nativeThreadId, thread => { thread.subscribed = false; thread.policyVerified = false; });
+    const forkedNativeThreadId = typeof result.forkedNativeThreadId === "string" ? result.forkedNativeThreadId : "";
+    if (!forkedNativeThreadId) throw new AgentError("WORKTREE_FORK_FAILED", "复制会话失败");
+    return { forkedNativeThreadId, sourceNativeThreadId: source.thread.nativeThreadId };
+  }
+
   /** Read-only lane information for the panel: overview of a repository, or one lane's diff. */
   async readWorktrees(value: Record<string, unknown>): Promise<unknown> {
     if (value.action === "overview") return worktrees.overview(this.worktreeProject(value.projectExternalId, false), this.store.snapshot().projects);
@@ -961,6 +990,7 @@ export class AgentRuntime {
       const source = this.worktreeProject(request.projectExternalId, false);
       if (source.worktree) throw new AgentError("WORKTREE_SOURCE_INVALID", "请从主仓库项目创建工作树");
       if (!request.alias || !isProviderId(request.provider)) throw new AgentError("WORKTREE_REQUEST_INVALID", "缺少项目名称或智能体");
+      const forkOrigin = request.forkNativeThreadId ? this.forkSource(request.forkNativeThreadId, source, request.provider, Boolean(request.adoptPath)) : undefined;
       const joined = request.adoptPath ? this.store.snapshot().projects.find(project => project.root === request.adoptPath && project.worktree?.sourceRoot === source.root && !project.worktree.removedAt) : undefined;
       if (joined) {
         // Another agent joins an existing lane: same directory, same branch, its own project.
@@ -973,8 +1003,19 @@ export class AgentRuntime {
       const created = await worktrees.create(source, { ...(request.name ? { name: request.name } : {}), ...(request.base ? { base: request.base } : {}), ...(request.branch !== undefined ? { branch: request.branch } : {}), ...(request.adoptPath ? { adoptPath: request.adoptPath } : {}), setup: request.setup, lane });
       const project = await addProjectFromPanel(this.store, created.path, request.alias, false, request.provider);
       await this.store.setProjectWorktree(project.root, created.metadata);
+      let fork: Record<string, unknown> = {};
+      if (forkOrigin) {
+        try { fork = await this.forkThreadInto(forkOrigin, project); }
+        catch (error) {
+          // Never leave an empty lane behind when the conversation could not be carried over.
+          await worktrees.remove({ ...project, worktree: created.metadata }, { deleteBranch: true, force: true }).catch(() => undefined);
+          await this.store.setProjectWorktree(project.root, { ...created.metadata, removedAt: nowIso() }).catch(() => undefined);
+          this.notifyRegistryChanged();
+          throw error;
+        }
+      }
       try { await this.refreshCatalog(); } finally { this.notifyRegistryChanged(); }
-      return { projectExternalId: project.id, provider: request.provider, canonicalRoot: project.root, branch: created.metadata.branch, base: created.metadata.base, setup: created.setup };
+      return { projectExternalId: project.id, provider: request.provider, canonicalRoot: project.root, branch: created.metadata.branch, base: created.metadata.base, setup: created.setup, ...fork };
     }
     const lane = this.worktreeProject(request.projectExternalId, true);
     if (type === "worktree.merge") {

@@ -99,3 +99,38 @@ test("custom branch names survive target building and old agents cannot silently
   }
   assert.throws(() => service.createTarget(principal, "main-codex", { provider: "claude", adoptPath: "/srv/desktop", branch: "feat/new" }));
 });
+
+test("copying a conversation into a lane validates the source session and tells the host which native thread to fork", () => {
+  const { db, principal, session, service } = fixture();
+  const segment = (sessionId: string, projectId: string, nativeThreadId: string | null, ended = false) => db.run(
+    "INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,external_id,native_thread_id,created_at,ended_at) VALUES(?,?,'m',?,?,?,?,?)",
+    `seg-${sessionId}`, sessionId, projectId, `ext-seg-${sessionId}`, nativeThreadId, new Date().toISOString(), ended ? new Date().toISOString() : null);
+  session("idle-main", "main-codex", false); segment("idle-main", "main-codex", "native-main");
+  session("idle-lane", "lane-codex", false); segment("idle-lane", "lane-codex", "native-lane");
+  session("busy", "main-codex", true); segment("busy", "main-codex", "native-busy");
+  session("claude", "main-claude", false); segment("claude", "main-claude", "native-claude");
+  session("lane-claude-session", "lane-claude", false); segment("lane-claude-session", "lane-claude", "native-lane-claude");
+  session("ended", "main-codex", false); segment("ended", "main-codex", "native-ended", true);
+  session("unmanaged", "main-codex", false); segment("unmanaged", "main-codex", "native-unmanaged"); db.run("UPDATE logical_sessions SET managed=0 WHERE logical_session_id='unmanaged'");
+  const fork = (forkSessionId: unknown, provider = "codex") => service.createTarget(principal, "main-codex", { provider, name: "copy", forkSessionId });
+
+  assert.equal(fork("idle-main").target.forkNativeThreadId, "native-main");
+  assert.equal(service.createTarget(principal, "lane-codex", { provider: "codex", name: "copy", forkSessionId: "idle-lane" }).target.forkNativeThreadId, "native-lane", "a session inside a lane can be copied into a sibling lane");
+  assert.equal("forkNativeThreadId" in service.createTarget(principal, "main-codex", { provider: "codex", name: "blank" }).target, false);
+
+  assert.throws(() => fork("busy"), /正在执行/);
+  assert.throws(() => fork("ended"), /不存在/);
+  assert.throws(() => fork("unmanaged"), /先接管并同步/);
+  assert.throws(() => fork("nope"), /不存在/);
+  assert.throws(() => fork(42), /原会话无效/);
+  assert.throws(() => fork("claude"), /只有 Codex/);
+  assert.throws(() => fork("idle-main", "claude"), /只有 Codex/);
+  assert.throws(() => fork("lane-claude-session"), /只有 Codex/);
+  db.run("INSERT INTO project_turn_reservations(project_id,logical_session_id,state,version,reserved_at,updated_at) VALUES('main-codex','idle-main','accepted',1,'x','x')");
+  assert.throws(() => fork("idle-main"), /正在执行/, "a session with a reserved turn is not idle");
+
+  const other = { ...principal, workspaceId: "other-workspace" } as Principal;
+  assert.throws(() => service.createTarget(other, "main-codex", { provider: "codex", forkSessionId: "idle-lane" }), /项目不存在/);
+  assert.throws(() => parseWorktreeTarget("worktree.create", { projectExternalId: "e", provider: "codex", alias: "a", adoptPath: "/p", forkNativeThreadId: "t" }), /只有 Codex/);
+  assert.throws(() => parseWorktreeTarget("worktree.create", { projectExternalId: "e", provider: "grok", alias: "a", name: "x", forkNativeThreadId: "t" }), /只有 Codex/);
+});

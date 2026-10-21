@@ -4096,5 +4096,17 @@
   "在此新建 {0} 会话": "Create a {0} session here",
   "使用独立工作目录（新建工作树）": "Use a separate working directory (new worktree)",
   "适合并行开发：新会话使用独立目录和新分支，原项目保留。": "For parallel development: the new session uses a separate directory and branch, keeping the original project intact.",
-  "请更新主机连接服务至 0.30.141 或更新版本，以使用自定义分支名称": "Update the host connection service to 0.30.141 or later to use custom branch names."
+  "请更新主机连接服务至 0.30.141 或更新版本，以使用自定义分支名称": "Update the host connection service to 0.30.141 or later to use custom branch names.",
+  "新工作树里的会话": "Session in the new worktree",
+  "复制当前会话（带着对话上下文）": "Copy this session (keep the conversation)",
+  "把当前会话的对话历史复制到新工作树里继续；当前会话保持原样，不受影响。": "Copies this session's conversation into the new worktree to continue there. This session stays exactly as it is.",
+  "新建空白会话": "New blank session",
+  "创建工作树并复制会话": "Create worktree and copy session",
+  "正在复制会话…": "Copying session…",
+  "{0} 暂不支持带着对话上下文复制，可以新建空白会话": "{0} cannot copy a conversation into a worktree yet. Start a blank session instead.",
+  "请先接管并同步这个会话，再复制到工作树": "Take over and sync this session first, then copy it to a worktree",
+  "当前会话正在执行，完成后才能复制": "This session is running. Copy it after it finishes.",
+  "新建工作树会创建独立目录和分支。当前会话、历史和未提交改动留在原处；可以把对话上下文复制过去继续，也可以新建空白会话。": "A new worktree is its own directory and branch. This session, its history and uncommitted changes stay where they are. You can copy the conversation over to continue, or start a blank session.",
+  "工作树和会话副本已创建，但会话尚未同步到面板。请稍后在「使用已有工作树」中打开。": "The worktree and the session copy were created, but the session has not reached the panel yet. Open it later from \"Use an existing worktree\".",
+  "工作树已创建，但这台主机没有复制会话。请更新主机连接服务后重试。": "The worktree was created but this host did not copy the session. Update the connection service and try again."
 }

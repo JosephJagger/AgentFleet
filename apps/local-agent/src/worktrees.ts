@@ -242,6 +242,6 @@ export function parseWorktreeRequest(value: unknown) {
   const text = (key: string, max: number) => value[key] === undefined ? undefined : typeof value[key] === "string" && (value[key] as string).length <= max ? value[key] as string : (() => { throw new AgentError("WORKTREE_REQUEST_INVALID", `工作树请求字段 ${key} 无效`); })();
   return {
     projectExternalId: text("projectExternalId", 256), name: text("name", 48), branch: text("branch", 200), base: text("base", 200), adoptPath: text("adoptPath", 4096),
-    alias: text("alias", 64), provider: text("provider", 32), setup: value.setup === true, deleteBranch: value.deleteBranch === true, force: value.force === true,
+    forkNativeThreadId: text("forkNativeThreadId", 256), alias: text("alias", 64), provider: text("provider", 32), setup: value.setup === true, deleteBranch: value.deleteBranch === true, force: value.force === true,
   };
 }

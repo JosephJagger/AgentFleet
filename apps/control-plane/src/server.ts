@@ -86,6 +86,7 @@ interface AgentSocketState {
   conversationHistory?: boolean;
   sshAccess?: boolean;
   worktrees?: boolean;
+  worktreeFork?: boolean;
   verifiedVoiceBinding?: PanelTransportBinding;
 }
 
@@ -637,6 +638,8 @@ export async function buildControlPlane(
   app.post("/api/projects/:id/worktrees", { preHandler: mutate }, async (request, reply) => {
     const principal = request.principal as Principal; const body = record(request.body);
     const { machineId, target } = worktreeService.createTarget(principal, routeId(request), body);
+    // An older host would ignore the fork fields and silently create an empty session instead.
+    invariant(!target.forkNativeThreadId || agents.get(machineId)?.worktreeFork === true, 409, "AGENT_CAPABILITY_UNAVAILABLE", "请更新主机连接服务后，再把会话复制到工作树");
     const operation = machineMaintenance.create(principal, machineId, "worktree.create", mutationId(body), undefined, undefined, undefined, target);
     offerMaintenance(machineId); reply.code(202); return { operation };
   });
@@ -1973,6 +1976,7 @@ export async function buildControlPlane(
             state.conversationHistory = message.capabilities?.conversationHistory === true;
             state.sshAccess = message.capabilities?.sshAccess === true;
             state.worktrees = message.capabilities?.worktrees === true;
+            state.worktreeFork = message.capabilities?.worktreeFork === true;
             delete state.reconciliationId;
             delete state.producerEpoch;
             delete state.appServerEpoch;
