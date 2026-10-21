@@ -1,3 +1,4 @@
+import { posix, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Principal } from "./auth.js";
 import type { ControlPlaneDatabase } from "./db.js";
@@ -24,7 +25,7 @@ export function parseWorktreeTarget(type: string, value: unknown): Record<string
     invariant(typeof raw.alias === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(raw.alias), 400, "WORKTREE_REQUEST_INVALID", "项目名称无效");
     invariant(raw.name === undefined || typeof raw.name === "string" && NAME.test(raw.name), 400, "WORKTREE_NAME_INVALID", "工作树名称仅支持小写字母、数字、点、下划线和连字符，最长 48 位");
     invariant(raw.base === undefined || typeof raw.base === "string" && BRANCH.test(raw.base) && !raw.base.includes(".."), 400, "WORKTREE_BASE_INVALID", "基础分支无效");
-    invariant(raw.adoptPath === undefined || typeof raw.adoptPath === "string" && raw.adoptPath.startsWith("/") && raw.adoptPath.length <= 4096, 400, "WORKTREE_PATH_INVALID", "工作树路径无效");
+    invariant(raw.adoptPath === undefined || typeof raw.adoptPath === "string" && (posix.isAbsolute(raw.adoptPath) || win32.isAbsolute(raw.adoptPath)) && raw.adoptPath.length <= 4096, 400, "WORKTREE_PATH_INVALID", "工作树路径无效");
     invariant(Boolean(raw.name) !== Boolean(raw.adoptPath), 400, "WORKTREE_REQUEST_INVALID", "请填写工作树名称，或选择已有工作树");
     return { projectExternalId: externalId(raw.projectExternalId), provider: raw.provider, alias: raw.alias, ...(raw.name ? { name: raw.name } : {}),
       ...(raw.base ? { base: raw.base } : {}), ...(raw.adoptPath ? { adoptPath: raw.adoptPath } : {}), setup: raw.setup === true };

@@ -77,3 +77,10 @@ test("merge waits for both directories, removal only for the lane; operations ar
   const offer = maintenance.offers("m")[0]!;
   assert.deepEqual([offer.operationType, offer.recoveryTarget], ["worktree.remove", removal.target]);
 });
+
+test("adoption accepts absolute Windows and POSIX paths and refuses relative paths", () => {
+  for (const adoptPath of ["C:\\projects\\lane", "\\\\server\\share\\lane", "/srv/lane"]) {
+    assert.equal(parseWorktreeTarget("worktree.create", { projectExternalId: "p", provider: "codex", alias: "lane", adoptPath }).adoptPath, adoptPath);
+  }
+  for (const adoptPath of ["lane", "C:lane"]) assert.throws(() => parseWorktreeTarget("worktree.create", { projectExternalId: "p", provider: "codex", alias: "lane", adoptPath }));
+});

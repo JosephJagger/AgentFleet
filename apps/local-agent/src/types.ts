@@ -255,6 +255,7 @@ export interface ProjectDiscoveryStatus {
 }
 
 export interface AgentState {
+  releasedCursorWorkers?: import("./acp-providers.js").ReleasedCursorWorker[];
   providerRuntimeState?: import("./provider-runtime-policy.js").ProviderRuntimeState;
   /** Codex managed-runtime version the user explicitly approved on this host; cleared once it is activated. */
   confirmedRuntimeVersion?: string;

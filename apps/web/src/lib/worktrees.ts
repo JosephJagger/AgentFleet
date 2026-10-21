@@ -20,7 +20,7 @@ export async function waitForOperation(operation: HostOperation, timeoutMs = 20 
 /** The host registers a new lane project asynchronously; find it by directory and agent. */
 export async function laneProjectId(machineId: string, root: string, provider: ProviderId): Promise<string> {
   for (let attempt = 0; attempt < 30; attempt += 1) {
-    const page = await api.projects({ machineId, q: root.split("/").filter(Boolean).at(-1) ?? root, limit: 100 });
+    const page = await api.projects({ machineId, q: root.replaceAll("\\", "/").split("/").filter(Boolean).at(-1) ?? root, limit: 100 });
     const project = page.items.find(item => item.pathHint === root && (item.provider ?? "codex") === provider);
     if (project) return project.id;
     await sleep(700);
@@ -34,8 +34,9 @@ export async function startLaneSession(projectId: string, machineId: string, inp
   const result = operation.result ?? {};
   const root = typeof result.canonicalRoot === "string" ? result.canonicalRoot : "";
   if (!root) throw new Error(t("主机未返回工作树目录"));
+  const setup = result.setup && typeof result.setup === "object" ? result.setup as { ran?: boolean; ok?: boolean; output?: string } : undefined;
+  if (setup?.ran && setup.ok === false) throw new Error(t("工作树已创建，但环境初始化失败。请检查初始化输出，修复后从项目列表创建会话。") + (setup.output ? `\n${setup.output.slice(-2000)}` : ""));
   const laneId = await laneProjectId(machineId, root, input.provider);
   const created = await api.createSession(machineId, laneId, title);
-  const setup = result.setup && typeof result.setup === "object" ? result.setup as { ran?: boolean; ok?: boolean; output?: string } : undefined;
   return { sessionId: created.session.id, laneProjectId: laneId, branch: typeof result.branch === "string" ? result.branch : "", setup };
 }

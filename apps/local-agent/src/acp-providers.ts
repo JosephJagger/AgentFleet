@@ -96,32 +96,50 @@ async function acpProcessRows():Promise<ProcessRow[]> {
   }catch{throw new AgentError('PROVIDER_OWNERSHIP_UNKNOWN','Unable to verify native process ownership; write access remains disabled');}
   return rows;
 }
+export interface ReleasedCursorWorker { pid:number; token:string; args:string }
+export interface CursorWorkerPersistence { read():ReleasedCursorWorker[]; write(records:ReleasedCursorWorker[]):Promise<void> }
+const cursorWorkerPersistence=new WeakMap<Set<number>,CursorWorkerPersistence>();
+export function registerCursorWorkerPersistence(owned:Set<number>,persistence:CursorWorkerPersistence):void { cursorWorkerPersistence.set(owned,persistence); }
 const releasedCursorWorkers=new WeakMap<Set<number>,Map<number,{token:string;args:string}>>();
+function cursorWorkers(owned:Set<number>) {
+  const records=releasedCursorWorkers.get(owned)??new Map<number,{token:string;args:string}>();
+  for(const record of cursorWorkerPersistence.get(owned)?.read()??[]) {
+    if(Number.isSafeInteger(record.pid)&&record.pid>0&&typeof record.token==='string'&&record.token&&typeof record.args==='string')records.set(record.pid,{token:record.token,args:record.args});
+  }
+  releasedCursorWorkers.set(owned,records);
+  return records;
+}
+const ownershipInspection={rows:acpProcessRows,startToken:platformProcessStartToken};
 const isCursorWorker=(row:ProcessRow)=>isCursorNativeCommand(row.args)&&/\sworker-server\s*$/.test(row.args);
 /** Record proven helper descendants before a completed session's parent exits.
  * These native tool servers outlive ACP and are reparented to PID 1. No signal is
  * sent, and neither unknown processes nor reused PIDs gain an exemption. */
-export async function retainReleasedCursorWorkers(owned:Set<number>,parentPid:number):Promise<void> {
+export async function retainReleasedCursorWorkers(owned:Set<number>,parentPid:number,inspection=ownershipInspection):Promise<void> {
   if(!owned.has(parentPid))return;
-  const rows=await acpProcessRows(),tree=ownedProcessTree(rows,new Set([parentPid]));
-  const records=releasedCursorWorkers.get(owned)??new Map<number,{token:string;args:string}>();
+  const rows=await inspection.rows(),tree=ownedProcessTree(rows,new Set([parentPid]));
+  const records=cursorWorkers(owned);
+  for(const [pid,record] of records){
+    const row=rows.find(r=>r.pid===pid);
+    if(!row||!isCursorWorker(row)||row.args!==record.args||await inspection.startToken(pid)!==record.token)records.delete(pid);
+  }
   for(const row of rows)if(tree.has(row.pid)&&row.pid!==parentPid&&isCursorWorker(row)){
-    const token=await platformProcessStartToken(row.pid);if(token)records.set(row.pid,{token,args:row.args});
+    const token=await inspection.startToken(row.pid);if(token)records.set(row.pid,{token,args:row.args});
   }
   releasedCursorWorkers.set(owned,records);
+  await cursorWorkerPersistence.get(owned)?.write([...records].map(([pid,record])=>({pid,...record})));
 }
 /** Conservative across the host when native per-session ownership cannot be established. */
-export async function assertAcpUnoccupied(provider:AcpProviderId,owned:Set<number>):Promise<void> {
+export async function assertAcpUnoccupied(provider:AcpProviderId,owned:Set<number>,inspection=ownershipInspection):Promise<void> {
   const config=ACP_COMMANDS[provider];
   const ownedAtScan=new Set(owned);
   const probesAtScan=new Set(detectionProcesses.get(provider));
-  const rows=await acpProcessRows();
+  const rows=await inspection.rows();
   const probes=ownedProcessTree(rows,new Set([...probesAtScan,...(detectionProcesses.get(provider)??[])]));
   const ownedTree=provider==='cursor'?ownedProcessTree(rows,new Set([...ownedAtScan,...owned,...probes])):new Set([...owned,...probes]);
-  const retained=releasedCursorWorkers.get(owned);
+  const retained=provider==='cursor'?cursorWorkers(owned):undefined;
   if(retained)for(const [pid,record] of retained){
     const row=rows.find(r=>r.pid===pid);
-    if(row&&isCursorWorker(row)&&row.args===record.args&&await platformProcessStartToken(pid)===record.token)ownedTree.add(pid);
+    if(row&&isCursorWorker(row)&&row.args===record.args&&await inspection.startToken(pid)===record.token)ownedTree.add(pid);
     else retained.delete(pid);
   }
   for(const row of rows) {

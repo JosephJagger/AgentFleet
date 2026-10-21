@@ -15,7 +15,7 @@ import {isAbsolute,resolve} from 'node:path';
 import {acpImageInput,acpImageBlocks} from './acp-images.js';
 import {MAX_IMAGES,validImageUrl} from './images.js';
 import {AcpConnection} from './acp-connection.js';
-import {ACP_COMMANDS,detectAcp,assertAcpUnoccupied,retainReleasedCursorWorkers,type AcpExecutable} from './acp-providers.js';
+import {ACP_COMMANDS,detectAcp,assertAcpUnoccupied,retainReleasedCursorWorkers,registerCursorWorkerPersistence,type AcpExecutable} from './acp-providers.js';
 import {unavailableCapabilities,type AcpProviderId,type ProviderAvailability} from './provider-catalog.js';
 import {decodeProviderThread,encodeProviderThread} from './provider-identity.js';
 import {AgentError} from './errors.js';
@@ -48,7 +48,7 @@ export class AcpRuntime {
   private quotaCheckedAt=0;
   private quotaReading:Promise<void>|undefined;
   private readonly connections=new Set<AcpConnection>();
-  constructor(readonly provider:AcpProviderId,private readonly callbacks:AppServerCallbacks,readonly appServerEpoch:string,overrides:Partial<typeof dependencies>={}) {this.deps={...dependencies,...overrides};}
+  constructor(readonly provider:AcpProviderId,private readonly callbacks:AppServerCallbacks,readonly appServerEpoch:string,overrides:Partial<typeof dependencies>={}) {this.deps={...dependencies,...overrides};if(provider==='cursor'&&callbacks.cursorWorkerPersistence)registerCursorWorkerPersistence(this.owned,callbacks.cursorWorkerPersistence);}
   async start() {
     if(this.refreshing)return this.refreshing;
     this.refreshing=(async()=>{

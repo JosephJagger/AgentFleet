@@ -1503,6 +1503,10 @@ export class AgentRuntime {
     const server = this.appServerFactory({
       findManagedThread: (threadId) => this.store.snapshot().managedThreads[threadId],
       getExtraSkillRoots: () => this.store.snapshot().extraSkillRoots ?? [],
+      cursorWorkerPersistence: {
+        read: () => this.store.snapshot().releasedCursorWorkers ?? [],
+        write: records => this.store.saveReleasedCursorWorkers(records),
+      },
       onAuxiliaryActivity: (id, active) => this.store.setAuxiliaryActivity(id, active),
       findProject: (projectId) => this.store.snapshot().projects.find((project) => project.id === projectId),
       onEvent: (event, epoch) => this.handleAppEvent(event, epoch),

@@ -59,7 +59,7 @@ test("lanes are created beside the repository, reported with overlaps, merged an
 
   await fs.writeFile(join(second.path, "d.txt"), "unsaved\n");
   await assert.rejects(worktrees.remove(lanes[1]!, { deleteBranch: true, force: false }), /未提交/);
-  assert.deepEqual(await worktrees.remove(lanes[1]!, { deleteBranch: true, force: true }), { removed: true, branch: "af/claude-refactor", branchDeleted: true });
+  assert.deepEqual(await worktrees.remove(lanes[1]!, { deleteBranch: true, force: true }), { removed: true, branch: "af/claude-refactor", branchDeleted: false, branchKept: "分支尚未合并，已保留" });
   assert.deepEqual(await worktrees.remove(lanes[0]!, { deleteBranch: true, force: false }), { removed: true, branch: "af/codex-login", branchDeleted: true });
   assert.equal(git(root, "worktree", "list").split("\n").length, 1);
 });
@@ -85,4 +85,28 @@ test("the setup script runs inside the new lane with its lane number", async () 
   const created = await new Worktrees().create(project(root), { name: "env", setup: true, lane: 4 });
   assert.deepEqual({ ...created.setup, output: created.setup.output?.trim() }, { ran: true, ok: true, output: "done" });
   assert.equal((await fs.readFile(join(created.path, "setup.log"), "utf8")).trim(), "lane=4 branch=af/env");
+});
+
+
+test("dirty tracked paths preserve their first character, spaces and unicode", async () => {
+  const { root } = await repository();
+  const worktrees = new Worktrees();
+  const first = await worktrees.create(project(root), { name: "paths", setup: false, lane: 1 });
+  await fs.writeFile(join(first.path, "a.txt"), "changed");
+  await fs.writeFile(join(first.path, "中文 name.txt"), "new");
+  await fs.writeFile(join(first.path, " leading.txt"), "new");
+  const status = await worktrees.status(first.path, first.metadata.branch, "main");
+  assert.deepEqual(status.changedFiles.sort(), [" leading.txt", "a.txt", "中文 name.txt"].sort());
+});
+
+test("branch changes refuse merge and removal without touching either branch", async () => {
+  const { root } = await repository();
+  const worktrees = new Worktrees();
+  const created = await worktrees.create(project(root), { name: "switched", setup: false, lane: 1 });
+  git(created.path, "checkout", "-qb", "unrelated");
+  const lane = project(created.path, created.metadata);
+  await assert.rejects(worktrees.merge(lane), { code: "WORKTREE_CHANGED" });
+  await assert.rejects(worktrees.remove(lane, { deleteBranch: true, force: true }), { code: "WORKTREE_CHANGED" });
+  assert.equal(git(created.path, "branch", "--show-current"), "unrelated");
+  assert.ok(git(root, "branch", "--list", "af/switched"));
 });

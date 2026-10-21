@@ -49,6 +49,16 @@ function emptyState(): AgentState {
   };
 }
 
+/** Directories whose working files are changed by a durable worktree operation. */
+function worktreeWriteRoots(state: AgentState, operation: MaintenanceOperation): string[] {
+  const project = state.projects.find(p => p.id === operation.recoveryTarget?.projectExternalId);
+  if (!project) return [];
+  if (operation.operationType === "worktree.merge") return [project.root, project.worktree?.sourceRoot ?? project.root];
+  if (operation.operationType === "worktree.remove") return [project.root];
+  if (operation.operationType === "worktree.create" && operation.recoveryTarget?.setup === true && typeof operation.recoveryTarget.adoptPath === "string") return [operation.recoveryTarget.adoptPath];
+  return [];
+}
+
 function externalProjectActivity(
   state: AgentState,
   projectId: string,
@@ -94,6 +104,7 @@ function validateState(value: unknown): AgentState {
   ) {
     throw new AgentError("STATE_CORRUPT", "state is missing a required collection");
   }
+  if (candidate.releasedCursorWorkers !== undefined && (!Array.isArray(candidate.releasedCursorWorkers) || candidate.releasedCursorWorkers.some(record => !isRecord(record) || !Number.isSafeInteger(record.pid) || Number(record.pid) <= 0 || typeof record.token !== "string" || !record.token || typeof record.args !== "string"))) throw new AgentError("STATE_CORRUPT", "Invalid Cursor worker identity records");
   if (candidate.extraSkillRoots !== undefined && (!Array.isArray(candidate.extraSkillRoots) || candidate.extraSkillRoots.length > 16 || candidate.extraSkillRoots.some(p => typeof p !== "string" || !p || p.length > 1024 || p.includes("\0")))) throw new AgentError("STATE_CORRUPT", "Invalid additional skill directories");
   if (candidate.discoveredThreads === undefined) candidate.discoveredThreads = {};
   if (candidate.projectDiscovery === undefined) candidate.projectDiscovery = {};
@@ -664,13 +675,37 @@ export class StateStore {
     });
   }
 
+  async saveReleasedCursorWorkers(records: NonNullable<AgentState["releasedCursorWorkers"]>): Promise<void> {
+    await this.update(state => { state.releasedCursorWorkers = structuredClone(records); });
+  }
+
   async recordMaintenance(operation: MaintenanceOperation): Promise<void> {
     await this.update((state) => {
       const previous = state.maintenanceOperations[operation.operationId];
       if (previous && previous.operationType !== operation.operationType) throw new AgentError("MAINTENANCE_CONFLICT", "operation id was already used for a different action");
+      if (!previous && operation.state === "running" && operation.operationType.startsWith("worktree.") && state.maintenanceDrain) {
+        throw new AgentError("MAINTENANCE_BUSY", "主机正在维护，请结束后重试工作树操作");
+      }
+      if (!previous && operation.state === "running" && operation.operationType.startsWith("worktree.")) {
+        const project = state.projects.find(p => p.id === operation.recoveryTarget?.projectExternalId);
+        const repository = project?.worktree?.sourceRoot ?? project?.root;
+        // Serialize git administrative mutations for a repository, while other repositories keep working.
+        if (repository && Object.values(state.maintenanceOperations).some(other => {
+          if (other.state !== "running" || !other.operationType.startsWith("worktree.")) return false;
+          const target = state.projects.find(p => p.id === other.recoveryTarget?.projectExternalId);
+          return (target?.worktree?.sourceRoot ?? target?.root) === repository;
+        })) throw new AgentError("WORKTREE_BUSY", "该仓库已有工作树操作，请稍后重试");
+        const roots = new Set(worktreeWriteRoots(state, operation));
+        const affected = new Set(state.projects.filter(p => roots.has(p.root)).map(p => p.id));
+        if (Object.values(state.projectReservations).some(r => affected.has(r.projectId)) ||
+          Object.values(state.managedThreads).some(t => (roots.has(t.sessionCwd ?? "") || affected.has(t.projectId)) && (t.activeTurnId !== undefined || t.realtimeSessionId !== undefined)) ||
+          Object.values(state.discoveredThreads).some(t => (roots.has(t.sessionCwd ?? "") || affected.has(t.projectId)) && t.availability === "available" && ["running", "unknown"].includes(t.executionState))) {
+          throw new AgentError("WORKTREE_BUSY", "相关目录仍有任务或待核验操作，请结束后重试");
+        }
+      }
       state.maintenanceOperations[operation.operationId] = structuredClone(operation);
       const terminal = Object.values(state.maintenanceOperations).filter((item) => item.state !== "running").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-      for (const old of terminal.slice(200)) if (old.operationType !== "images.clean" && old.operationType !== "versions.clean") delete state.maintenanceOperations[old.operationId];
+      for (const old of terminal.slice(200)) if (old.operationType !== "images.clean" && old.operationType !== "versions.clean" && !old.operationType.startsWith("worktree.")) delete state.maintenanceOperations[old.operationId];
     });
   }
 
@@ -709,7 +744,7 @@ export class StateStore {
       return journal?.state === "unknown" && journal.commandType === "thread.claim" &&
         journal.error?.code === "APP_SERVER_TIMEOUT" && journal.error.message === "thread/resume did not respond in time";
     }));
-    return this.auxiliaryActivities.size === 0 && !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean", "versions.clean"].includes(operation.operationType)) &&
+    return this.auxiliaryActivities.size === 0 && !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean", "versions.clean", "worktree.create", "worktree.merge", "worktree.remove"].includes(operation.operationType)) &&
       !Object.values(state.managedThreads).some((thread) => thread.activeTurnId !== undefined || thread.realtimeSessionId !== undefined) &&
       !Object.values(state.approvals).some((approval) => approval.state === "pending" || approval.state === "delivery_unknown") &&
       !Object.values(state.commandJournal).some((command) => ["claimed", "invoking", "responded", "unknown"].includes(command.state) && !ignored.has(command.commandId)) &&
@@ -1117,6 +1152,10 @@ export class StateStore {
       const journal = state.commandJournal[input.commandId];
       if (!journal || journal.canonicalAttemptId !== input.attemptId || journal.envelopeHash !== input.envelopeHash) {
         throw new AgentError("COMMAND_JOURNAL_CONFLICT", "project reservation is not owned by the canonical command attempt");
+      }
+      const root = state.projects.find(p => p.id === input.projectId)?.root;
+      if (root && Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && worktreeWriteRoots(state, operation).includes(root))) {
+        throw new AgentError("WORKTREE_BUSY", "该目录正在执行工作树操作，请完成后重试");
       }
       const existing = state.projectReservations[input.projectId];
       if (existing) {

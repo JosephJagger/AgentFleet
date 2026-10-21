@@ -4020,6 +4020,7 @@
   "将从所选分支新建独立的工作树和分支，会话在其中执行，不与其他会话排队。": "Creates a separate worktree and branch from the selected branch. The session runs there without queueing behind other sessions.",
   "工作树": "Worktrees",
   "工作树 {0} 已创建，但环境准备脚本失败": "Worktree {0} was created, but the setup script failed",
+  "工作树已创建，但环境初始化失败。请检查初始化输出，修复后从项目列表创建会话。": "The worktree was created, but environment setup failed. Review the setup output, fix the problem, then create a session from the project list.",
   "工作树已创建，但项目尚未同步到面板，请稍后刷新": "The worktree was created but its project has not reached the panel yet; refresh shortly",
   "工作树有 {0} 个未提交文件，删除会丢弃这些改动。确定删除 {1}？": "The worktree has {0} uncommitted files; removing it discards them. Remove {1}?",
   "工作树目录已不存在": "The worktree directory no longer exists",

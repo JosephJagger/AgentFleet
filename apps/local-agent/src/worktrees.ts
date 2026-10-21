@@ -28,6 +28,17 @@ const defaultRun: Run = (args, cwd, options = {}) => new Promise(resolve => {
 });
 
 const lines = (text: string) => text.split("\n").map(line => line.trim()).filter(Boolean);
+/** Porcelain -z preserves leading spaces, unicode and newlines; rename records have a second source path. */
+function dirtyPaths(output: string): string[] {
+  const entries = output.split("\0"), paths: string[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]!;
+    if (entry.length < 4) continue;
+    paths.push(entry.slice(3));
+    if (/[RC]/.test(entry.slice(0, 2))) { const source = entries[++i]; if (source) paths.push(source); }
+  }
+  return [...new Set(paths)];
+}
 const tail = (text: string, max = 4000) => text.length > max ? `…${text.slice(-max)}` : text;
 const failure = (code: string, message: string, detail?: string) => new AgentError(code, detail ? `${message}：${detail.trim().split("\n").filter(Boolean).pop()?.slice(0, 300) ?? ""}` : message);
 
@@ -82,16 +93,16 @@ export class Worktrees {
     const exists = await access(path).then(() => true, () => false);
     if (!exists) return { path, branch, base, exists, dirtyFiles: 0, ahead: 0, behind: 0, changedFiles: [], lastCommit: "" };
     const [status, counts, committed, last] = await Promise.all([
-      this.run(["status", "--porcelain=v1", "--untracked-files=all"], path),
+      this.run(["status", "--porcelain=v1", "-z", "--untracked-files=all"], path),
       this.run(["rev-list", "--left-right", "--count", `${base}...HEAD`], path),
-      this.run(["diff", "--name-only", `${base}...HEAD`], path),
+      this.run(["diff", "--name-only", "-z", `${base}...HEAD`], path),
       this.run(["log", "-1", "--format=%s"], path),
     ]);
-    const dirty = lines(status.stdout).map(line => line.slice(3).replace(/^.* -> /, ""));
+    const dirty = dirtyPaths(status.stdout);
     const [behind, ahead] = counts.code === 0 ? counts.stdout.trim().split(/\s+/).map(Number) : [0, 0];
     return {
       path, branch, base, exists, dirtyFiles: dirty.length, ahead: ahead || 0, behind: behind || 0,
-      changedFiles: [...new Set([...lines(committed.stdout), ...dirty])].slice(0, MAX_FILES), lastCommit: last.stdout.trim().slice(0, 200),
+      changedFiles: [...new Set([...committed.stdout.split("\0").filter(Boolean), ...dirty])].slice(0, MAX_FILES), lastCommit: last.stdout.trim().slice(0, 200),
     };
   }
 
@@ -164,11 +175,21 @@ export class Worktrees {
     return { path, metadata: { sourceRoot: repository.root, gitCommonDir: repository.gitCommonDir, branch, base } satisfies WorktreeMetadata, setup };
   }
 
+  private async verifyLane(lane: ProjectRecord) {
+    const metadata = lane.worktree!;
+    const repository = await this.repository(metadata.sourceRoot);
+    const registered = (await this.registered(metadata.sourceRoot)).find(item => item.path === lane.root);
+    if (repository.gitCommonDir !== metadata.gitCommonDir || !registered || registered.branch !== metadata.branch) {
+      throw new AgentError("WORKTREE_CHANGED", "工作树目录或分支已变化，请先核对并重新接入后操作");
+    }
+  }
+
   /** Merges a lane's commits into whatever the main worktree has checked out, refusing rather than clobbering. */
   async merge(lane: ProjectRecord) {
     const { sourceRoot, branch } = lane.worktree!;
-    if (lines((await this.run(["status", "--porcelain=v1", "--untracked-files=all"], lane.root)).stdout).length) throw new AgentError("WORKTREE_DIRTY", "工作树还有未提交的改动，请先让智能体提交");
-    if (lines((await this.run(["status", "--porcelain=v1", "--untracked-files=no"], sourceRoot)).stdout).length) throw new AgentError("WORKTREE_MAIN_DIRTY", "主目录有未提交的改动，请先处理后再合并");
+    await this.verifyLane(lane);
+    if (lines(await this.git(lane.root, ["status", "--porcelain=v1", "--untracked-files=all"], "WORKTREE_GIT_FAILED", "读取工作树状态失败")).length) throw new AgentError("WORKTREE_DIRTY", "工作树还有未提交的改动，请先让智能体提交");
+    if (lines(await this.git(sourceRoot, ["status", "--porcelain=v1", "--untracked-files=no"], "WORKTREE_GIT_FAILED", "读取主目录状态失败")).length) throw new AgentError("WORKTREE_MAIN_DIRTY", "主目录有未提交的改动，请先处理后再合并");
     const target = (await this.repository(sourceRoot)).current;
     if (!target) throw new AgentError("WORKTREE_MAIN_DETACHED", "主目录没有检出分支，无法合并");
     const counts = await this.git(sourceRoot, ["rev-list", "--count", `HEAD..${branch}`], "WORKTREE_GIT_FAILED", "读取提交失败");
@@ -178,6 +199,7 @@ export class Worktrees {
       const conflicts = lines(preview.stdout).slice(1, 51);
       throw new AgentError("WORKTREE_CONFLICT", `与 ${target} 存在冲突：${conflicts.join("、") || "请在工作树中先变基"}`);
     }
+    if (preview.code !== 0) throw failure("WORKTREE_GIT_FAILED", "无法核验合并结果", preview.stderr || preview.stdout);
     const identity = (await this.run(["config", "user.email"], sourceRoot)).code === 0 ? {} : {
       GIT_AUTHOR_NAME: "AgentFleets", GIT_AUTHOR_EMAIL: "agentfleets@localhost", GIT_COMMITTER_NAME: "AgentFleets", GIT_COMMITTER_EMAIL: "agentfleets@localhost" };
     const merged = await this.run(["merge", "--no-ff", "--no-edit", "-m", `Merge ${branch} into ${target} (AgentFleets)`, branch], sourceRoot, { env: identity, timeoutMs: 120_000 });
@@ -193,15 +215,17 @@ export class Worktrees {
     const { sourceRoot, branch } = lane.worktree!;
     const exists = await access(lane.root).then(() => true, () => false);
     if (exists) {
-      if (!options.force && lines((await this.run(["status", "--porcelain=v1", "--untracked-files=all"], lane.root)).stdout).length) {
+      await this.verifyLane(lane);
+      if (!options.force && lines(await this.git(lane.root, ["status", "--porcelain=v1", "--untracked-files=all"], "WORKTREE_GIT_FAILED", "读取工作树状态失败")).length) {
         throw new AgentError("WORKTREE_DIRTY", "工作树还有未提交的改动；确认放弃这些改动后才能删除");
       }
       await this.git(sourceRoot, ["worktree", "remove", ...(options.force ? ["--force"] : []), lane.root], "WORKTREE_REMOVE_FAILED", "删除工作树失败", 120_000);
     } else await this.run(["worktree", "prune"], sourceRoot);
     let branchDeleted = false; let branchKept: string | undefined;
     if (options.deleteBranch) {
-      const deleted = await this.run(["branch", options.force ? "-D" : "-d", branch], sourceRoot);
-      branchDeleted = deleted.code === 0;
+      const merged = await this.run(["merge-base", "--is-ancestor", branch, "HEAD"], sourceRoot);
+      const deleted = merged.code === 0 ? await this.run(["branch", "-d", branch], sourceRoot) : undefined;
+      branchDeleted = deleted?.code === 0;
       if (!branchDeleted) branchKept = "分支尚未合并，已保留";
     }
     return { removed: true, branch, branchDeleted, ...(branchKept ? { branchKept } : {}) };

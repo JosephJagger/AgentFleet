@@ -225,3 +225,69 @@ test('provider policy mutations use exact request once; interrupted operations n
  await store.recordMaintenance({operationId:'interrupted-provider',operationType:'provider.runtime',state:'running',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),recoveryTarget:target});
  await maintenance.replay();assert.equal(calls,1);assert.equal(store.snapshot().maintenanceOperations['interrupted-provider']?.state,'failed');
 });
+
+
+for (const operationType of ["worktree.create", "worktree.merge", "worktree.remove"] as const) {
+  test(`${operationType} blocks updates and never repeats interrupted writes after restart`, async t => {
+    const directory = await mkdtemp(join(tmpdir(), "af-worktree-recovery-"));
+    const store = new StateStore(directory); await store.initialize();
+    t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+    let calls = 0;
+    const runtime = { manageWorktree: async () => { calls++; return {}; } } as unknown as AgentRuntime;
+    const operation = { operationId: "worktree-interrupted", operationType, state: "running" as const, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    await store.recordMaintenance(operation);
+    assert.equal(store.canSafelyRestart(), false);
+    assert.equal(await store.tryBeginUpdate("update"), false);
+    store.close(); await store.initialize();
+    const maintenance = new AgentMaintenance({ store, runtime, signal: new AbortController().signal, report: () => {} });
+    await maintenance.replay();
+    await maintenance.handle({ operationId: operation.operationId, operationType });
+    assert.equal(calls, 0);
+    assert.equal(store.snapshot().maintenanceOperations[operation.operationId]?.error?.code, "WORKTREE_OUTCOME_UNCONFIRMED");
+    assert.equal(store.canSafelyRestart(), true);
+  });
+}
+
+test("worktree admission loses cleanly to an update drain and releases active tracking", async t => {
+  const directory = await mkdtemp(join(tmpdir(), "af-worktree-admission-"));
+  const store = new StateStore(directory); await store.initialize();
+  t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+  assert.equal(await store.tryBeginUpdate("update"), true);
+  let calls = 0;
+  const runtime = { manageWorktree: async () => { calls++; return {}; } } as unknown as AgentRuntime;
+  const maintenance = new AgentMaintenance({ store, runtime, signal: new AbortController().signal, report: () => {} });
+  await maintenance.handle({ operationId: "blocked-worktree", operationType: "worktree.create" });
+  assert.equal(calls, 0);
+  assert.equal(store.snapshot().maintenanceOperations["blocked-worktree"]?.error?.code, "MAINTENANCE_BUSY");
+  assert.equal(store.snapshot().maintenanceDrain?.operationId, "update");
+});
+
+test("worktree mutations and command admission serialize by directory across providers, leaving other directories usable", async t => {
+  const directory = await mkdtemp(join(tmpdir(), "af-worktree-lock-"));
+  const store = new StateStore(directory); await store.initialize();
+  t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
+  await store.update(state => {
+    const metadata = { sourceRoot: "/repo", gitCommonDir: "/repo/.git", branch: "af/lane", base: "main" };
+    for (const [id, root, provider] of [["main", "/repo", "codex"], ["lane", "/lane", "codex"], ["claude-lane", "/lane", "claude"], ["other", "/other", "grok"]]) {
+      state.projects.push({ id, root, alias: id, provider, ...(root === "/lane" ? { worktree: metadata } : {}) } as import("../src/types.js").ProjectRecord);
+    }
+  });
+  const operation = { operationId: "merge-lane", operationType: "worktree.merge" as const, state: "running" as const, createdAt: "now", updatedAt: "now", recoveryTarget: { projectExternalId: "lane" } };
+  const reservation = async (projectId: string) => {
+    const command = { commandId: `cmd-${projectId}`, attemptId: `attempt-${projectId}`, type: "turn.start", projectId } as import("../src/types.js").FleetCommand;
+    await store.claimCommand(command, projectId);
+    return { projectId, commandId: command.commandId, attemptId: command.attemptId, envelopeHash: projectId, appServerEpoch: "epoch" };
+  };
+  const claude = await reservation("claude-lane"), main = await reservation("main"), other = await reservation("other");
+  await store.reserveProjectCommand(claude);
+  await assert.rejects(store.recordMaintenance(operation), { code: "WORKTREE_BUSY" });
+  await store.releaseProjectCommand(claude);
+  await store.recordMaintenance(operation);
+  await assert.rejects(store.reserveProjectCommand(claude), { code: "WORKTREE_BUSY" });
+  await assert.rejects(store.reserveProjectCommand(main), { code: "WORKTREE_BUSY" });
+  await store.reserveProjectCommand(other);
+  await assert.rejects(store.recordMaintenance({ ...operation, operationId: "second-mutation" }), { code: "WORKTREE_BUSY" });
+  await store.recordMaintenance({ ...operation, state: "succeeded" });
+  await store.reserveProjectCommand(claude);
+  await store.reserveProjectCommand(main);
+});

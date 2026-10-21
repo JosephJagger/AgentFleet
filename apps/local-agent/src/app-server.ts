@@ -127,6 +127,7 @@ export interface VolatileAppEvent {
 }
 
 export interface AppServerCallbacks {
+  cursorWorkerPersistence?: import("./acp-providers.js").CursorWorkerPersistence;
   getExtraSkillRoots?(): string[];
   onAuxiliaryActivity?(id: string, active: boolean): void;
   onPanelTool?(args: unknown): Promise<unknown>;
