@@ -816,6 +816,13 @@ export class StateStore {
     });
   }
 
+  /** Attach, refresh or retire the worktree metadata of every provider's project at this root. */
+  async setProjectWorktree(root: string, worktree: NonNullable<ProjectRecord["worktree"]>): Promise<void> {
+    await this.update((state) => {
+      for (const project of state.projects) if (project.root === root) project.worktree = { ...worktree };
+    });
+  }
+
   async addProject(project: ProjectRecord): Promise<void> {
     await this.update((state) => {
       const sameAlias = state.projects.find(

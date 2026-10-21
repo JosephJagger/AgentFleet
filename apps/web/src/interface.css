@@ -977,3 +977,30 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .ssh-check--ok { background: var(--green-soft, #e3f4e8); color: var(--green, #1f7a3d); }
 .ssh-check--bad { background: var(--red-soft); color: var(--red); }
 @media (max-width: 720px) { .host-ssh__grid { grid-template-columns: 1fr; } .host-ssh__heading { flex-direction: column; } }
+
+/* Git worktree lanes */
+.worktrees { display: grid; gap: 12px; }
+.worktrees h3 { margin: 6px 0 0; }
+.worktrees__repo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.worktrees__repo span { color: var(--muted); font-size: var(--text-small); flex: 1; }
+.worktree-create__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; }
+.worktree-create__grid small { color: var(--muted); font-size: var(--text-small); }
+.worktree-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.worktree-lane { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.worktree-lane__head { display: grid; gap: 3px; min-width: 0; }
+.worktree-lane__head strong { display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+.worktree-lane__meta { color: var(--muted); font-size: var(--text-small); }
+.worktree-lane__path { font-size: var(--text-small); color: var(--muted); overflow-wrap: anywhere; }
+.worktree-lane__agents, .worktree-lane__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.worktree-lane__sessions { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: var(--text-small); }
+.worktree-lane__sessions li { display: flex; align-items: center; gap: 6px; }
+.worktree-chip { border-radius: 999px; padding: 1px 9px; font-size: var(--text-small); background: var(--line); color: var(--muted); }
+.worktree-chip--running { background: var(--green-soft, #e3f4e8); color: var(--green, #1f7a3d); }
+.worktree-warning { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--amber, #a15c07); font-size: var(--text-small); }
+.worktree-diff { display: grid; gap: 6px; min-width: 0; }
+.worktree-diff pre { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--paper-2, rgba(127,127,127,.08)); font-size: var(--text-small); overflow: auto; max-height: 320px; white-space: pre; }
+.worktree-diff__patch { max-height: 480px; }
+.worktree-toggle { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+.worktree-toggle legend { padding: 0 4px; font-size: var(--text-small); color: var(--muted); }
+.link-button { background: none; border: 0; padding: 0; color: var(--accent, inherit); text-decoration: underline; cursor: pointer; font: inherit; text-align: left; }
+@media (max-width: 720px) { .worktree-create__grid { grid-template-columns: 1fr; } }

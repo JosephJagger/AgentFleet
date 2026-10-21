@@ -327,6 +327,14 @@ export class RelayConnection {
         });
         return;
       }
+      case "worktree.read": {
+        const source = this.socket;
+        if (typeof value.requestId !== "string" || value.requestId.length > 256) { this.protocolError("worktree request is malformed"); return; }
+        const reply = (body: Record<string, unknown>) => { if (this.socket === source) this.send({ type: "worktree.result", requestId: value.requestId, ...body }); };
+        void this.runtime.readWorktrees(value).then(result => reply({ result }))
+          .catch(error => reply({ error: { code: error instanceof AgentError && error.code.startsWith("WORKTREE_") ? error.code : "WORKTREE_FAILED", message: error instanceof AgentError ? error.message : "读取工作树失败" } }));
+        return;
+      }
       case "ssh.request": {
         const source = this.socket;
         const reply = (body: Record<string, unknown>) => { if (this.socket === source) this.send({ type: "ssh.result", requestId: value.requestId, ...body }); };

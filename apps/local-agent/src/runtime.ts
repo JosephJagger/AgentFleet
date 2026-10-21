@@ -1,8 +1,9 @@
 import {parseGrokOperation,grokOperations,grokLiveOperation} from './grok-operations.js';
 import { sshAccess } from "./ssh-access.js";
+import { parseWorktreeRequest, worktrees } from "./worktrees.js";
 import { ProviderRuntimeManager } from "./provider-runtime-manager.js";
 import { threadProvider } from "./provider-identity.js";
-import { isAcpProvider, supportsProviderCommand, type ProviderId } from "./provider-catalog.js";
+import { isAcpProvider, isProviderId, supportsProviderCommand, type ProviderId } from "./provider-catalog.js";
 import {snapshotWorkspace, workspaceChanges, type WorkspaceSnapshot} from "./workspace-changes.js";
 import {preferenceRules} from './voice-preference-rules.js';
 import { parseRealtimeVoice, supportsNativeVoice } from "./voice-options.js";
@@ -769,10 +770,11 @@ export class AgentRuntime {
           ? ["thread/list", "thread/read", "thread/resume", "thread/unsubscribe", "thread/start", "turn/start", "turn/steer", "turn/interrupt", "approval/reply-once"]
           : this.canRead() && this.appServer ? ["thread/list", "thread/read"] : [],
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : this.support.providerHostSupported && this.appServer ? ["thread.claim","thread.release","turn.start","turn.queue","turn.cancel","approval.decide_once","input.respond"] : [],
-        maintenanceTypes: ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"],
+        maintenanceTypes: ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean", "worktree.create", "worktree.merge", "worktree.remove"],
         projectFiles: true,
         nativeSubagents: true,
         sshAccess: sshAccess.supported,
+        worktrees: true,
         conversationHistory: this.canRead() && Boolean(this.appServer?.readConversation),
         realtimeVoice: this.isWritable() && supportsNativeVoice(this.support.codexVersion),
         queue: this.isWritable(),
@@ -904,6 +906,7 @@ export class AgentRuntime {
       canonicalRoot: project.root,
       identityHash: sha256(canonicalJson({ device: project.device, inode: project.inode, root: project.root, ...(project.provider && project.provider !== "codex" ? { provider: project.provider } : {}) })),
       leaseVersion: project.identityVersion,
+      ...(project.worktree ? { repoRoot: project.worktree.sourceRoot, branch: project.worktree.branch, worktreeBase: project.worktree.base, worktreeRemoved: Boolean(project.worktree.removedAt) } : {}),
     }));
   }
 
@@ -928,6 +931,61 @@ export class AgentRuntime {
     try { await this.refreshCatalog(); }
     finally { this.notifyRegistryChanged(); }
     return project;
+  }
+
+  private worktreeProject(externalId: unknown, lane: boolean): ProjectRecord {
+    const project = typeof externalId === "string" ? this.store.snapshot().projects.find(entry => entry.id === externalId) : undefined;
+    if (!project) throw new AgentError("WORKTREE_PROJECT_NOT_FOUND", "项目不存在，请刷新后重试");
+    if (lane && (!project.worktree || project.worktree.removedAt)) throw new AgentError("WORKTREE_PROJECT_NOT_FOUND", "该项目不是可用的工作树");
+    return project;
+  }
+
+  /** A lane merge or removal must not race a turn writing in either directory. */
+  private assertWorktreeIdle(roots: string[]): void {
+    const state = this.store.snapshot();
+    const busy = Object.values(state.managedThreads).some(thread => thread.activeTurnId !== undefined
+      && roots.includes(thread.sessionCwd ?? state.projects.find(project => project.id === thread.projectId)?.root ?? ""));
+    if (busy) throw new AgentError("WORKTREE_BUSY", "相关目录中仍有任务在运行，请等待完成后再操作");
+  }
+
+  /** Read-only lane information for the panel: overview of a repository, or one lane's diff. */
+  async readWorktrees(value: Record<string, unknown>): Promise<unknown> {
+    if (value.action === "overview") return worktrees.overview(this.worktreeProject(value.projectExternalId, false), this.store.snapshot().projects);
+    if (value.action === "diff") return worktrees.diff(this.worktreeProject(value.projectExternalId, true));
+    throw new AgentError("WORKTREE_REQUEST_INVALID", "不支持的工作树操作");
+  }
+
+  async manageWorktree(type: "worktree.create" | "worktree.merge" | "worktree.remove", target: unknown): Promise<Record<string, unknown>> {
+    const request = parseWorktreeRequest(target);
+    if (type === "worktree.create") {
+      const source = this.worktreeProject(request.projectExternalId, false);
+      if (source.worktree) throw new AgentError("WORKTREE_SOURCE_INVALID", "请从主仓库项目创建工作树");
+      if (!request.alias || !isProviderId(request.provider)) throw new AgentError("WORKTREE_REQUEST_INVALID", "缺少项目名称或智能体");
+      const joined = request.adoptPath ? this.store.snapshot().projects.find(project => project.root === request.adoptPath && project.worktree?.sourceRoot === source.root && !project.worktree.removedAt) : undefined;
+      if (joined) {
+        // Another agent joins an existing lane: same directory, same branch, its own project.
+        const project = await addProjectFromPanel(this.store, joined.root, request.alias, false, request.provider);
+        await this.store.setProjectWorktree(project.root, joined.worktree!);
+        try { await this.refreshCatalog(); } finally { this.notifyRegistryChanged(); }
+        return { projectExternalId: project.id, provider: request.provider, canonicalRoot: project.root, branch: joined.worktree!.branch, base: joined.worktree!.base, setup: { ran: false } };
+      }
+      const lane = new Set(this.store.snapshot().projects.filter(project => project.worktree?.sourceRoot === source.root && !project.worktree.removedAt).map(project => project.root)).size + 1;
+      const created = await worktrees.create(source, { ...(request.name ? { name: request.name } : {}), ...(request.base ? { base: request.base } : {}), ...(request.adoptPath ? { adoptPath: request.adoptPath } : {}), setup: request.setup, lane });
+      const project = await addProjectFromPanel(this.store, created.path, request.alias, false, request.provider);
+      await this.store.setProjectWorktree(project.root, created.metadata);
+      try { await this.refreshCatalog(); } finally { this.notifyRegistryChanged(); }
+      return { projectExternalId: project.id, provider: request.provider, canonicalRoot: project.root, branch: created.metadata.branch, base: created.metadata.base, setup: created.setup };
+    }
+    const lane = this.worktreeProject(request.projectExternalId, true);
+    if (type === "worktree.merge") {
+      this.assertWorktreeIdle([lane.root, lane.worktree!.sourceRoot]);
+      return worktrees.merge(lane);
+    }
+    this.assertWorktreeIdle([lane.root]);
+    const result = await worktrees.remove(lane, { deleteBranch: request.deleteBranch, force: request.force });
+    await this.store.setProjectWorktree(lane.root, { ...lane.worktree!, removedAt: nowIso() });
+    this.notifyRegistryChanged();
+    return result;
   }
 
   async handleCommand(value: unknown, deliveryGeneration: number): Promise<void> {

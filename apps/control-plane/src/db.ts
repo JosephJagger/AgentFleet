@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 67) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 68) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1628,6 +1628,24 @@ export class ControlPlaneDatabase {
         revision TEXT NOT NULL, results_json TEXT NOT NULL DEFAULT '{}', synced_at TEXT NOT NULL
       ) STRICT;
       PRAGMA user_version=67`);
+    });
+    if (version < 68) this.transaction(() => {
+      // Git worktree lanes: hosts report repo_root/branch for lane projects, plus the base and retirement below.
+      const schema=this.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE type='table' AND name='machine_operations'")!.sql;
+      if (!schema.includes("'worktree.create'")) {
+        const indexes=this.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='machine_operations' AND type IN ('index','trigger') AND sql IS NOT NULL");
+        const revised=schema.replace("'provider.runtime'", "'provider.runtime','worktree.create','worktree.merge','worktree.remove'");
+        if(revised===schema)throw new Error('Unexpected machine operation schema');
+        this.sqlite.exec("ALTER TABLE machine_operations RENAME TO machine_operations_v67");
+        this.sqlite.exec(revised);
+        this.sqlite.exec("INSERT INTO machine_operations SELECT * FROM machine_operations_v67; DROP TABLE machine_operations_v67");
+        for(const index of indexes)this.sqlite.exec(index.sql);
+      }
+      const columns=new Set(this.all<{name:string}>("PRAGMA table_info(projects)").map(row=>row.name));
+      if (!columns.has("worktree_base")) this.sqlite.exec("ALTER TABLE projects ADD COLUMN worktree_base TEXT");
+      if (!columns.has("worktree_removed")) this.sqlite.exec("ALTER TABLE projects ADD COLUMN worktree_removed INTEGER NOT NULL DEFAULT 0 CHECK (worktree_removed IN (0,1))");
+      if(this.all("PRAGMA foreign_key_check").length)throw new Error('Worktree migration foreign-key violation');
+      this.sqlite.exec("PRAGMA user_version=68");
     });
   }
 

@@ -1865,3 +1865,32 @@ test("workspace snapshot is captured before execution and delivered on completio
  await runtime.handleCommand(command(project,'private-attempt','private-command','private-session','epoch-diff'),1);
  assert.equal(store.snapshot().outbox.filter(e=>e.nativeItemId==='workspace-diff-turn').length,1,'content-disabled task must not emit a snapshot');
 });
+
+test("worktree lanes register per agent, report their repository to the panel and refuse removal while busy", async (t) => {
+  const { store, projects } = await fixture(); const project = projects[0]!;
+  const git = (...args: string[]) => workspacePromisify(workspaceExecFile)("git", ["-C", project.root, ...args], { env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
+  await git("init", "-q", "-b", "main"); await writeFile(join(project.root, "a.txt"), "a\n"); await git("add", "."); await git("commit", "-qm", "init");
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: (cb) => (server = new FakeAppServer("epoch-worktree", cb)) });
+  runtime.setTransportGeneration(1); const { registryChanges } = captureCallbacks(runtime); await runtime.initialize(); t.after(() => runtime.shutdown());
+
+  const created = await runtime.manageWorktree("worktree.create", { projectExternalId: project.id, provider: "claude", alias: "project-1-lane", name: "lane", setup: false });
+  assert.equal(created.branch, "af/lane");
+  const joined = await runtime.manageWorktree("worktree.create", { projectExternalId: project.id, provider: "codex", alias: "project-1-lane", adoptPath: created.canonicalRoot, setup: false });
+  assert.equal(joined.canonicalRoot, created.canonicalRoot);
+  assert.ok(registryChanges.count >= 2);
+  const reported = (runtime.helloPayload().projects as Record<string, unknown>[]).filter(item => item.canonicalRoot === created.canonicalRoot);
+  assert.deepEqual(reported.map(item => [item.provider, item.repoRoot, item.branch, item.worktreeBase, item.worktreeRemoved]).sort(),
+    [["claude", project.root, "af/lane", "main", false], ["codex", project.root, "af/lane", "main", false]]);
+  const overview = await runtime.readWorktrees({ action: "overview", projectExternalId: project.id }) as { lanes: { path: string; providers: string[] }[] };
+  assert.deepEqual(overview.lanes.map(lane => [lane.path, lane.providers.sort()]), [[created.canonicalRoot, ["claude", "codex"]]]);
+  await assert.rejects(runtime.manageWorktree("worktree.create", { projectExternalId: joined.projectExternalId, provider: "codex", alias: "x", name: "nested", setup: false }), /主仓库/);
+
+  await store.setManagedThread({ nativeThreadId: "thread-lane", projectId: String(joined.projectExternalId), logicalSessionId: "session-lane", executionSegmentId: "segment-lane", appServerEpoch: server.appServerEpoch, policyVerified: true, activeTurnId: "turn-lane", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", policyVersion: 1, contentEpoch: 1 } as unknown as ManagedThread);
+  await assert.rejects(runtime.manageWorktree("worktree.remove", { projectExternalId: created.projectExternalId, deleteBranch: true, force: false }), /仍有任务在运行/);
+  const { activeTurnId: _finished, ...idle } = store.snapshot().managedThreads["thread-lane"]!;
+  await store.setManagedThread(idle as ManagedThread);
+  assert.deepEqual(await runtime.manageWorktree("worktree.remove", { projectExternalId: created.projectExternalId, deleteBranch: true, force: false }), { removed: true, branch: "af/lane", branchDeleted: true });
+  assert.ok((runtime.helloPayload().projects as Record<string, unknown>[]).filter(item => item.canonicalRoot === created.canonicalRoot).every(item => item.worktreeRemoved === true));
+  await assert.rejects(runtime.readWorktrees({ action: "diff", projectExternalId: joined.projectExternalId }), /不是可用的工作树/);
+});

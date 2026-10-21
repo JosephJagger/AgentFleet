@@ -25,6 +25,8 @@ import { NativeVoicePanel } from "./components/NativeVoicePanel";
 import { parseOutputSchema } from "./lib/output-schema";
 import { CodexOutputPanel } from "./components/CodexOutputPanel";
 import { SessionWorkspace } from "./components/SessionWorkspace";
+import { ProjectWorktrees } from "./components/ProjectWorktrees";
+import { startLaneSession } from "./lib/worktrees";
 import { useClaudePreferences, type ClaudeSettings } from "./lib/claude-preferences";
 import { grokSettingsActive, useGrokPreferences, type GrokSettings } from "./lib/grok-preferences";
 import { ClaudeControls } from "./components/ClaudeControls";
@@ -144,6 +146,7 @@ import type {
   FleetSession,
   Machine,
   Project,
+  WorktreeOverview,
   SessionDetail,
   TimelineEvent,
 } from "./lib/types";
@@ -681,7 +684,7 @@ type TurnAdditions = {
   goal?: string;
 };
 
-export function SessionInspector({ detail, loading, onBrowseSessions, catalogExpanded, draftOwner, referenceCandidates = [], onLoadHistory, historyLoading, onRefresh, onClaim, onReleaseManagement,  onSend, onQueue, onSteer, onCancelQueued, onCancel, onApproval, onClose, onNewSession, onSchedule }: {
+export function SessionInspector({ machine, onOpenSession, detail, loading, onBrowseSessions, catalogExpanded, draftOwner, referenceCandidates = [], onLoadHistory, historyLoading, onRefresh, onClaim, onReleaseManagement,  onSend, onQueue, onSteer, onCancelQueued, onCancel, onApproval, onClose, onNewSession, onSchedule }: { machine?: Machine; onOpenSession?: (id: string) => void; 
   detail?: SessionDetail;
   loading: boolean;
   draftOwner?: string;
@@ -1065,6 +1068,7 @@ export function SessionInspector({ detail, loading, onBrowseSessions, catalogExp
 
 
       {(session.provider ?? "codex") === "codex" && <SessionWorkspace key={`workspace:${session.id}`} session={session} commands={detail.commands ?? []} onChanged={onRefresh}/> }
+      {onOpenSession && session.projectId && <ProjectWorktrees key={`worktrees:${session.projectId}`} projectId={session.projectId} machine={machine} title={displayName(`${session.projectAlias ?? ""} · ${session.machineName ?? ""}`)} onOpenSession={onOpenSession} />}
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
           <SessionActions>
       {(session.provider ?? "codex") === "codex" && managed && <NativeVoicePanel menuEntry key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
@@ -1371,7 +1375,7 @@ export function RemoveMachineDialog({ machine, onClose, onRemoved, onToast }: {
   );
 }
 
-function CreateSessionDialog({ open, machines, selectedMachineId, initialProject, onClose, onCreate, onToast }: { open: boolean; machines: Machine[]; selectedMachineId?: string; initialProject?: Project; onClose: () => void; onCreate: (machineId: string, projectId: string, title: string) => Promise<void>; onToast: (tone: Toast["tone"], message: string) => void }) {
+function CreateSessionDialog({ open, machines, selectedMachineId, initialProject, onClose, onCreate, onToast }: { open: boolean; machines: Machine[]; selectedMachineId?: string; initialProject?: Project; onClose: () => void; onCreate: (machineId: string, projectId: string, title: string, worktree?: { provider: ProviderId; base: string; setup: boolean }) => Promise<void>; onToast: (tone: Toast["tone"], message: string) => void }) {
   const writableMachines = machines.filter((machine) => machine.reachability === "live" && machine.compatibility === "compatible" && machine.identity === "paired");
   const initialMachine = writableMachines.find((machine) => machine.id === selectedMachineId) ?? writableMachines[0];
   const [machineId, setMachineId] = useState(initialMachine?.id ?? "");
@@ -1379,6 +1383,19 @@ function CreateSessionDialog({ open, machines, selectedMachineId, initialProject
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [projectOptions, setProjectOptions] = useState<Project[]>([]);
+  const [worktree, setWorktree] = useState(false);
+  const [worktreeInfo, setWorktreeInfo] = useState<WorktreeOverview>();
+  const [worktreeBase, setWorktreeBase] = useState("");
+  const [worktreeSetup, setWorktreeSetup] = useState(false);
+  const [worktreeError, setWorktreeError] = useState("");
+  useEffect(() => {
+    setWorktreeInfo(undefined); setWorktreeError("");
+    if (!open || !worktree || !projectId) return;
+    const controller = new AbortController();
+    void api.worktrees(projectId, controller.signal).then(info => { setWorktreeInfo(info); setWorktreeBase(info.current ?? info.branches[0] ?? ""); setWorktreeSetup(info.setupScript); })
+      .catch(error => { if (!controller.signal.aborted) setWorktreeError(errorMessage(error)); });
+    return () => controller.abort();
+  }, [open, worktree, projectId]);
   useEffect(() => { if (open) { const machine = writableMachines.find((item) => item.id === (initialProject?.machineId ?? selectedMachineId)) ?? writableMachines[0]; setMachineId(machine?.id ?? ""); setProjectId(initialProject?.id ?? machine?.projects[0]?.id ?? ""); setTitle(""); } }, [open, selectedMachineId, initialProject?.id]);
   useEffect(() => {
     if (!open || !machineId) return;
@@ -1403,7 +1420,15 @@ function CreateSessionDialog({ open, machines, selectedMachineId, initialProject
     return () => controller.abort();
   }, [open, machineId, initialProject?.id]);
   if (!open) return null;
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-session-title"><div className="modal-head"><div><div className="eyebrow">New conversation</div><h2 id="new-session-title">{t("创建会话")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有可用主机")}</h3><p>{t("连接在线主机并完成项目发现后，可以创建会话。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !projectId || !title.trim()) return; setBusy(true); try { await onCreate(machineId, projectId, title.trim()); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { setMachineId(event.target.value); setProjectId(""); setProjectOptions([]); }}>{writableMachines.map((item) => <option key={item.id} value={item.id}>{displayName(item.name)}</option>)}</select></label><label><span>{t("项目")}</span><select value={projectId} title={projectOptions.find((project) => project.id === projectId)?.pathHint} onChange={(event) => setProjectId(event.target.value)} required>{projectOptions.map((project) => <option key={project.id} value={project.id}>{displayName(project.alias)} · {displayName(project.pathHint)}</option>)}</select></label><label><span>{t("会话名称")}</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("例如：修复结算页测试")} required autoFocus /></label><p className="subtle">{t("会话在所选主机和项目中执行。")}</p><button className="button button--primary button--full" disabled={busy || !projectId}>{busy ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}{locale() === "en" ? " " : ""}{t("创建会话")}</button></form>}</section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-session-title"><div className="modal-head"><div><div className="eyebrow">New conversation</div><h2 id="new-session-title">{t("创建会话")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有可用主机")}</h3><p>{t("连接在线主机并完成项目发现后，可以创建会话。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !projectId || !title.trim()) return; setBusy(true); try { await onCreate(machineId, projectId, title.trim(), worktree ? { provider: projectOptions.find((project) => project.id === projectId)?.provider ?? "codex", base: worktreeBase, setup: worktreeSetup } : undefined); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { setMachineId(event.target.value); setProjectId(""); setProjectOptions([]); }}>{writableMachines.map((item) => <option key={item.id} value={item.id}>{displayName(item.name)}</option>)}</select></label><label><span>{t("项目")}</span><select value={projectId} title={projectOptions.find((project) => project.id === projectId)?.pathHint} onChange={(event) => setProjectId(event.target.value)} required>{projectOptions.map((project) => <option key={project.id} value={project.id}>{displayName(project.alias)} · {displayName(project.pathHint)}</option>)}</select></label><label><span>{t("会话名称")}</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("例如：修复结算页测试")} required autoFocus /></label>
+          <fieldset className="worktree-toggle"><legend>{t("配置本地环境")}</legend>
+            <label className="checkbox-row"><input type="checkbox" checked={worktree} onChange={(event) => setWorktree(event.target.checked)} /><span>{t("新建工作树")}</span></label>
+            {worktree && (worktreeError ? <p className="catalog-error" role="alert">{systemText(worktreeError)}</p> : !worktreeInfo ? <p className="subtle" role="status">{t("正在读取分支…")}</p> : <>
+              <label><span>{t("分支")}</span><select value={worktreeBase} onChange={(event) => setWorktreeBase(event.target.value)}>{worktreeInfo.branches.map((branch) => <option key={branch} value={branch}>{branch}</option>)}</select></label>
+              <label><span>{t("环境")}</span><select value={worktreeSetup ? "setup" : "none"} disabled={!worktreeInfo.setupScript} onChange={(event) => setWorktreeSetup(event.target.value === "setup")}><option value="none">{t("无环境")}</option>{worktreeInfo.setupScript && <option value="setup">{t("运行 .agentfleet/worktree-setup.sh")}</option>}</select></label>
+            </>)}
+          </fieldset>
+          <p className="subtle">{worktree ? t("将从所选分支新建独立的工作树和分支，会话在其中执行，不与其他会话排队。") : t("会话在所选主机和项目中执行。")}</p><button className="button button--primary button--full" disabled={busy || !projectId || (worktree && (!worktreeInfo || !worktreeBase))}>{busy ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}{locale() === "en" ? " " : ""}{busy && worktree ? t("正在创建工作树…") : t("创建会话")}</button></form>}</section></div>;
 }
 
 function projectAliasFromPath(path: string): string {
@@ -1872,14 +1897,22 @@ function App() {
           setHostProviderFilters(current=>({...current,[selectedMachineId]:provider}));
           // This picker filters session choices; only selecting a session navigates.
         }} sessions={dashboard.activitySessions ?? dashboard.sessions} selectedId={selectedSessionId} detail={detail} onSelect={selectSession} onBrowse={()=>{setStreamFocus(false);setCatalogCollapsed(false);}} onCreate={()=>openCreate()}>
-        <SessionInspector catalogExpanded={!streamFocus && !catalogCollapsed} onBrowseSessions={()=>{if(streamFocus){setStreamFocus(false);setCatalogCollapsed(false);}else setCatalogCollapsed(value=>!value);}} referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => loadDetail(selectedSessionId, true)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
+        <SessionInspector machine={dashboard.machines.find(item => item.id === displayedSession?.machineId)} onOpenSession={id => { selectSession(id); void loadDashboard(true); }} catalogExpanded={!streamFocus && !catalogCollapsed} onBrowseSessions={()=>{if(streamFocus){setStreamFocus(false);setCatalogCollapsed(false);}else setCatalogCollapsed(value=>!value);}} referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => loadDetail(selectedSessionId, true)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, pathHint: t("当前会话项目"), syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
         </HostSessions>
         {buzhouDesktop && <BuzhoushanScreensaver detail={detail} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onRefresh={loadDashboard}/>}
         {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong>{broadcastCanvas&&<BuzhoushanBroadcastStatus/>}<FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayName(displayedSession?.projectAlias)}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}
       </div> : view === "hosts" ? <HostsView canManageVersions={dashboard.user.platformAdmin === true} onConfigure={id => { setSettingsMachineId(id); setView("security"); }} machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView initialMachineId={settingsMachineId} dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />
-      <CreateSessionDialog open={createOpen} machines={providerMachines} selectedMachineId={selectedMachineId} initialProject={createProject} onClose={() => setCreateOpen(false)} onToast={toast} onCreate={async (machineId, projectId, title) => { const result = await api.createSession(machineId, projectId, title); setSelectedMachineId(machineId); selectSession(result.session.id); toast("success", t("受管会话已创建")); await loadDashboard(true); }} />
+      <CreateSessionDialog open={createOpen} machines={providerMachines} selectedMachineId={selectedMachineId} initialProject={createProject} onClose={() => setCreateOpen(false)} onToast={toast} onCreate={async (machineId, projectId, title, worktree) => {
+        if (worktree) {
+          const name = title.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+          const lane = await startLaneSession(projectId, machineId, { ...worktree, ...(name.length >= 3 ? { name: `${name}-${crypto.randomUUID().slice(0, 4)}` } : {}) }, title);
+          setSelectedMachineId(machineId); selectSession(lane.sessionId);
+          toast(lane.setup?.ran && !lane.setup.ok ? "danger" : "success", lane.setup?.ran && !lane.setup.ok ? t("工作树 {0} 已创建，但环境准备脚本失败", lane.branch) : t("已在工作树 {0} 中创建会话", lane.branch));
+          await loadDashboard(true); return;
+        }
+        const result = await api.createSession(machineId, projectId, title); setSelectedMachineId(machineId); selectSession(result.session.id); toast("success", t("受管会话已创建")); await loadDashboard(true); }} />
       <CreateProjectDialog open={createProjectOpen} machines={providerMachines} selectedMachineId={selectedMachineId} onClose={() => setCreateProjectOpen(false)} onToast={toast} onCreate={async (machineId, path, alias, createDirectory) => {
         let operation = await api.createProject(machineId, path, alias, createDirectory, selectedProvider);
         const deadline = Date.now() + 120_000;

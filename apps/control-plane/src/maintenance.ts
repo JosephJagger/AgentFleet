@@ -5,9 +5,10 @@ import { CloudImages } from "./cloud-images.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import type { Principal } from "./auth.js";
 import { invariant } from "./errors.js";
+import { parseWorktreeTarget } from "./worktrees.js";
 import { futureIso, newId, nowIso } from "./crypto.js";
 
-export const MAINTENANCE_TYPES = ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"] as const;
+export const MAINTENANCE_TYPES = ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean", "worktree.create", "worktree.merge", "worktree.remove"] as const;
 export type MaintenanceType = (typeof MAINTENANCE_TYPES)[number];
 
 /**
@@ -28,12 +29,13 @@ export class MaintenanceService {
     invariant(mutationId.length>=8 && mutationId.length<=200,400,"INVALID_MUTATION_ID","clientMutationId must be between 8 and 200 characters");
     let hostRequest: ReturnType<typeof parseHostCodexOperation> | undefined;
     if (type === "codex.host") { try { hostRequest = parseHostCodexOperation(nativeRequest); } catch { invariant(false,400,"INVALID_CODEX_OPERATION","此操作或参数不适用于主机级管理"); } }
+    const worktreeRequest = type.startsWith("worktree.") ? parseWorktreeTarget(type, nativeRequest) : undefined;
     const providerRequest = type === "provider.runtime" ? (() => {try{return parseProviderRuntimeRequest(nativeRequest);}catch{invariant(false,400,"INVALID_PROVIDER_RUNTIME_REQUEST","Invalid provider runtime request");}})() : undefined;
     return this.db.transaction(()=>{
       const previous=this.db.get<{operation_id:string;type:string;request_json:string|null}>("SELECT operation_id,type,request_json FROM machine_operations WHERE machine_id=? AND actor_client_session_id=? AND client_mutation_id=?",machineId,principal.clientSessionId,mutationId);
       if(previous) {
         const previousRequest = previous.request_json ? JSON.parse(previous.request_json) : {};
-        invariant(previous.type===type && (type!=="provider.runtime" || JSON.stringify(previousRequest)===JSON.stringify(providerRequest)) && (type!=="codex.host" || JSON.stringify(previousRequest)===JSON.stringify(hostRequest)) && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
+        invariant(previous.type===type && (type!=="provider.runtime" || JSON.stringify(previousRequest)===JSON.stringify(providerRequest)) && (type!=="codex.host" || JSON.stringify(previousRequest)===JSON.stringify(hostRequest)) && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)) && (!worktreeRequest || JSON.stringify(previousRequest)===JSON.stringify(worktreeRequest)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
         return this.get(principal,previous.operation_id);
       }
       const machine=this.db.get<{identity_state:string;reachability:string;maintenance_types_json:string}>("SELECT identity_state,reachability,maintenance_types_json FROM machines WHERE machine_id=? AND workspace_id=?",machineId,principal.workspaceId);
@@ -67,6 +69,9 @@ export class MaintenanceService {
         const supersededMaintenanceOperationIds=this.db.all<{operation_id:string}>(`SELECT operation_id FROM machine_operations
           WHERE machine_id=? AND state IN ('succeeded','failed','unknown','expired') ORDER BY updated_at DESC LIMIT 50`,machineId).map(row=>row.operation_id);
         target={appServerEpoch:connection.app_server_epoch,commands,supersededMaintenanceOperationIds,sessions:sessions.map(row=>({logicalSessionId:row.logical_session_id,contentEpoch:row.content_epoch,executionSegmentId:row.execution_segment_id,nativeThreadId:row.native_thread_id,nativeTurnId:row.native_turn_id,previousAppServerEpoch:row.bound_app_server_epoch}))};
+      } else if(worktreeRequest) {
+        invariant(logicalSessionId === undefined && previewOperationId === undefined && projectTarget === undefined,400,"INVALID_OPERATION_TARGET","Worktree operations do not accept session targets");
+        target={...worktreeRequest};
       } else if(type === "project.add") {
         invariant(projectTarget,400,"PROJECT_TARGET_REQUIRED","Project path and alias are required");
         invariant(projectTarget.path.length > 0 && projectTarget.path.length <= 4096,400,"PROJECT_PATH_INVALID","Project path is required");

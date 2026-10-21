@@ -49,6 +49,8 @@ import { ControlPlaneDatabase } from "./db.js";
 import { IdentityService } from "./identity.js";
 import { AuthService, type Principal } from "./auth.js";
 import { RegistryService, type AgentConnectionIdentity } from "./registry.js";
+import { WorktreeService } from "./worktrees.js";
+import { HostReadBroker } from "./host-read-broker.js";
 import { parseInspection, SshAccessBroker, SshAccessService, type SshTestResult } from "./ssh-access.js";
 import { CoordinationService, type DispatchTarget } from "./coordination.js";
 import { CloudImages } from "./cloud-images.js";
@@ -83,6 +85,7 @@ interface AgentSocketState {
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
   sshAccess?: boolean;
+  worktrees?: boolean;
   verifiedVoiceBinding?: PanelTransportBinding;
 }
 
@@ -604,6 +607,47 @@ export async function buildControlPlane(
     return { key: agent.socket, generation: agent.identity.transportGeneration, producerEpoch: agent.producerEpoch, appServerEpoch: agent.appServerEpoch, ready: agent.reconciliationReady && !agent.dispatchPaused, supported: agent.nativeSubagents === true, send: value => sendJson(agent.socket, value) };
   });
   app.addHook("onClose", async () => subagentsBroker.close());
+  const worktreeService = new WorktreeService(db);
+  const worktreeBroker = new HostReadBroker("worktree.read", "WORKTREE_", machineId => {
+    const agent = agents.get(machineId);
+    if (!agent || agent.socket.readyState !== WebSocket.OPEN) return undefined;
+    return { key: agent.socket, ready: agent.reconciliationReady, supported: agent.worktrees === true, send: value => sendJson(agent.socket, value) };
+  }, "请更新主机连接服务以使用工作树");
+  app.addHook("onClose", async () => worktreeBroker.close());
+  const offerMaintenance = (machineId: string) => {
+    const agent = agents.get(machineId);
+    if (agent?.reconciliationReady) for (const offer of machineMaintenance.offers(machineId)) sendJson(agent.socket, offer);
+  };
+  const mutationId = (body: Record<string, unknown>) => requiredString(body.clientMutationId, "clientMutationId", 200);
+  app.get("/api/projects/:id/worktrees", { preHandler: authenticate }, async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    const principal = request.principal as Principal;
+    const main = worktreeService.main(principal, routeId(request));
+    const host = await worktreeBroker.request(main.machine_id, { action: "overview", projectExternalId: main.external_id });
+    return worktreeService.overview(principal, routeId(request), host);
+  });
+  app.get("/api/projects/:id/worktrees/diff", { preHandler: authenticate }, async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    const lane = worktreeService.lane(request.principal as Principal, routeId(request));
+    const diff = record(await worktreeBroker.request(lane.machine_id, { action: "diff", projectExternalId: lane.external_id }));
+    const text = (value: unknown, max: number) => typeof value === "string" ? value.slice(0, max) : "";
+    return { branch: text(diff.branch, 200), base: text(diff.base, 200), stat: text(diff.stat, 20_000), patch: text(diff.patch, 150_000), truncated: diff.truncated === true,
+      status: Array.isArray(diff.status) ? diff.status.filter((line): line is string => typeof line === "string").slice(0, 300).map(line => line.slice(0, 4096)) : [] };
+  });
+  app.post("/api/projects/:id/worktrees", { preHandler: mutate }, async (request, reply) => {
+    const principal = request.principal as Principal; const body = record(request.body);
+    const { machineId, target } = worktreeService.createTarget(principal, routeId(request), body);
+    const operation = machineMaintenance.create(principal, machineId, "worktree.create", mutationId(body), undefined, undefined, undefined, target);
+    offerMaintenance(machineId); reply.code(202); return { operation };
+  });
+  for (const [path, type] of [["merge", "worktree.merge"], ["remove", "worktree.remove"]] as const) {
+    app.post(`/api/projects/:id/worktrees/${path}`, { preHandler: mutate }, async (request, reply) => {
+      const principal = request.principal as Principal; const body = record(request.body);
+      const { machineId, target } = worktreeService.laneTarget(principal, routeId(request), type, body);
+      const operation = machineMaintenance.create(principal, machineId, type, mutationId(body), undefined, undefined, undefined, target);
+      offerMaintenance(machineId); reply.code(202); return { operation };
+    });
+  }
   const sshAccess = new SshAccessService(db, config.databasePath);
   const sshBroker = new SshAccessBroker(machineId => {
     const agent = agents.get(machineId);
@@ -1919,6 +1963,7 @@ export async function buildControlPlane(
           incomingType=typeof message.type==='string'&&/^[a-zA-Z0-9_.]{1,48}$/.test(message.type)?message.type:undefined;
           if(message.type === "subagents.result"){subagentsBroker.receive(identity.machineId,socket,message);return;}
           if(message.type === "session.history.result"){historyBroker.receive(identity.machineId,socket,message);return;}
+          if((message.type as string) === "worktree.result"){worktreeBroker.receive(identity.machineId,socket,message as unknown as Record<string,unknown>);return;}
           if((message.type as string) === "ssh.result"){sshBroker.receive(identity.machineId,socket,message as unknown as Record<string,unknown>);return;}
           if (message.type === "hello") {
             state.reconciliationReady = false;
@@ -1927,6 +1972,7 @@ export async function buildControlPlane(
             state.realtimeVoice = message.capabilities?.realtimeVoice === true;
             state.conversationHistory = message.capabilities?.conversationHistory === true;
             state.sshAccess = message.capabilities?.sshAccess === true;
+            state.worktrees = message.capabilities?.worktrees === true;
             delete state.reconciliationId;
             delete state.producerEpoch;
             delete state.appServerEpoch;
@@ -2292,7 +2338,7 @@ export async function buildControlPlane(
       });
       socket.on("close", (code: number, reason: Buffer) => {
         app.log.info({machineId:identity.machineId,transportGeneration:identity.transportGeneration,code,superseded:agents.get(identity.machineId)!==state},"Agent transport closed");
-        historyBroker.disconnect(identity.machineId,socket);subagentsBroker.disconnect(identity.machineId,socket);sshBroker.disconnect(identity.machineId,socket);
+        historyBroker.disconnect(identity.machineId,socket);subagentsBroker.disconnect(identity.machineId,socket);sshBroker.disconnect(identity.machineId,socket);worktreeBroker.disconnect(identity.machineId,socket);
         cancelMachineFiles(identity.machineId, identity.transportGeneration);
         if (agents.get(identity.machineId) === state) agents.delete(identity.machineId);
         if (closing) return;

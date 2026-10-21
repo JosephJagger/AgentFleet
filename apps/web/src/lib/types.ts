@@ -14,6 +14,9 @@ export interface Project {
   pathHint: string;
   gitBranch?: string | null;
   gitDirty?: boolean | null;
+  /** Set for a git worktree lane: the main repository root and the branch the lane started from. */
+  repoRoot?: string | null;
+  worktreeBase?: string | null;
   identityVersion?: number;
   activeSessionId?: string | null;
   syncContent: boolean;
@@ -106,7 +109,7 @@ export interface HostCheck {
   action?: MaintenanceType;
 }
 
-export type MaintenanceType = "provider.runtime" | "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host" | "versions.preview" | "versions.clean";
+export type MaintenanceType = "provider.runtime" | "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host" | "versions.preview" | "versions.clean" | "worktree.create" | "worktree.merge" | "worktree.remove";
 export interface HostOperation {
   id: string;
   type: MaintenanceType;
@@ -404,3 +407,15 @@ export interface SshAccountInput {
   privateKey?: string; publicKey?: string; passphrase?: string; clearPassphrase?: boolean; description: string; enabled: boolean; sources: string[];
 }
 export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string }
+
+export interface WorktreeLane {
+  path: string; branch: string; base: string; exists: boolean; dirtyFiles: number; ahead: number; behind: number; changedFiles: string[]; lastCommit: string;
+  projects: { projectId: string; provider: ProviderId; alias: string }[];
+  sessions: { id: string; projectId: string; provider: ProviderId; title: string; executionState: string; running: boolean; updatedAt: string }[];
+}
+export interface WorktreeOverview {
+  project: { projectId: string; alias: string; root: string; provider: ProviderId; machineId: string };
+  current: string | null; branches: string[]; mainDirtyFiles: number; setupScript: boolean;
+  lanes: WorktreeLane[]; overlaps: { file: string; branches: string[] }[]; unmanaged: { path: string; branch: string | null }[];
+}
+export interface WorktreeDiff { branch: string; base: string; stat: string; patch: string; truncated: boolean; status: string[] }

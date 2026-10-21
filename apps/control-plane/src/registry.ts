@@ -1985,11 +1985,12 @@ export class RegistryService {
         this.db.run(
           `INSERT INTO projects(
             project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,
-            repo_root,branch,dirty,lease_version,created_at,last_reported_at,provider
-          ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            repo_root,branch,dirty,lease_version,created_at,last_reported_at,provider,worktree_base,worktree_removed
+          ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           ON CONFLICT(machine_id,external_id) DO UPDATE SET
             alias=excluded.alias,canonical_root=excluded.canonical_root,identity_hash=excluded.identity_hash,
             repo_root=excluded.repo_root,branch=excluded.branch,dirty=excluded.dirty,
+            worktree_base=excluded.worktree_base,worktree_removed=excluded.worktree_removed,
             lease_version=excluded.lease_version,last_reported_at=excluded.last_reported_at,provider=excluded.provider`,
           projectId,
           connection.workspaceId,
@@ -1998,13 +1999,15 @@ export class RegistryService {
           alias,
           canonicalRoot,
           identityHash,
-          project.repoRoot ?? null,
-          project.branch ?? null,
+          project.repoRoot ? cleanText(project.repoRoot, "project.repoRoot", 4096) : null,
+          project.branch ? cleanText(project.branch, "project.branch", 200) : null,
           project.dirty === undefined || project.dirty === null ? null : project.dirty ? 1 : 0,
           project.leaseVersion,
           timestamp,
           timestamp,
           isProviderId(project.provider) ? project.provider : "codex",
+          project.repoRoot && project.worktreeBase ? cleanText(project.worktreeBase, "project.worktreeBase", 200) : null,
+          project.worktreeRemoved === true ? 1 : 0,
         );
         projectMap[externalId] = projectId;
         const contentPolicy = this.db.get<{ sync_content: number; retention_days: number }>(
@@ -2633,23 +2636,23 @@ export class RegistryService {
     const rows = machineId
       ? this.db.all<{
           provider: ProviderId; project_id: string; machine_id: string; alias: string; canonical_root: string;
-          identity_hash: string; repo_root: string | null; branch: string | null; dirty: number | null;
+          identity_hash: string; repo_root: string | null; worktree_base: string | null; branch: string | null; dirty: number | null;
           lease_version: number; last_reported_at: string;
           sync_content: number; retention_days: 1 | 3 | 7 | 14 | 30;
         }>(
           `SELECT p.* FROM projects p JOIN machines m ON m.machine_id=p.machine_id
-           WHERE p.workspace_id=? AND p.machine_id=? AND m.identity_state='active' ORDER BY p.alias`,
+           WHERE p.workspace_id=? AND p.machine_id=? AND m.identity_state='active' AND p.worktree_removed=0 ORDER BY p.alias`,
           principal.workspaceId,
           machineId,
         )
       : this.db.all<{
           provider: ProviderId; project_id: string; machine_id: string; alias: string; canonical_root: string;
-          identity_hash: string; repo_root: string | null; branch: string | null; dirty: number | null;
+          identity_hash: string; repo_root: string | null; worktree_base: string | null; branch: string | null; dirty: number | null;
           lease_version: number; last_reported_at: string;
           sync_content: number; retention_days: 1 | 3 | 7 | 14 | 30;
         }>(
           `SELECT p.* FROM projects p JOIN machines m ON m.machine_id=p.machine_id
-           WHERE p.workspace_id=? AND m.identity_state='active' ORDER BY p.alias`,
+           WHERE p.workspace_id=? AND m.identity_state='active' AND p.worktree_removed=0 ORDER BY p.alias`,
           principal.workspaceId,
         );
     return rows.map((row) => ({
@@ -2660,6 +2663,7 @@ export class RegistryService {
       canonicalRoot: row.canonical_root,
       identityHash: row.identity_hash,
       repoRoot: row.repo_root,
+      worktreeBase: row.worktree_base,
       branch: row.branch,
       dirty: row.dirty === null ? null : row.dirty === 1,
       leaseVersion: row.lease_version,
@@ -2674,19 +2678,19 @@ export class RegistryService {
     const scope = JSON.stringify(["projects", principal.workspaceId, options.machineId ?? null, options.q ?? null, options.provider ?? null]);
     invariant(!(options.cursor && options.offset !== undefined), 400, "INVALID_PAGINATION", "cursor and offset cannot be combined");
     const cursor = parsePageCursor(options.cursor, scope);
-    const where = ["p.workspace_id=?", "m.identity_state='active'"];
+    const where = ["p.workspace_id=?", "m.identity_state='active'", "p.worktree_removed=0"];
     const params: Array<string | number> = [principal.workspaceId];
     if (options.provider) { where.push("p.provider=?"); params.push(options.provider); }
     if (options.machineId) { where.push("p.machine_id=?"); params.push(options.machineId); }
     if (options.q) { where.push("(instr(lower(p.alias),lower(?))>0 OR instr(lower(p.canonical_root),lower(?))>0 OR instr(lower(m.name),lower(?))>0 OR instr(lower(coalesce(m.display_alias,'')),lower(?))>0)"); params.push(options.q, options.q, options.q, options.q); }
     const total = this.db.get<{ count: number }>(`SELECT count(*) AS count FROM projects p JOIN machines m ON m.machine_id=p.machine_id WHERE ${where.join(" AND ")}`, ...params)!.count;
     if (cursor) { where.push("(p.alias>? OR (p.alias=? AND p.project_id>?))"); params.push(cursor[0]!,cursor[0]!,cursor[1]!); }
-    const rows = this.db.all<{ provider: ProviderId; project_id: string; alias: string; machine_id: string; canonical_root: string; identity_hash: string; repo_root: string | null; branch: string | null; dirty: number | null; lease_version: number; last_reported_at: string; sync_content: number; retention_days: 1 | 3 | 7 | 14 | 30 }>(
+    const rows = this.db.all<{ provider: ProviderId; project_id: string; alias: string; machine_id: string; canonical_root: string; identity_hash: string; repo_root: string | null; worktree_base: string | null; branch: string | null; dirty: number | null; lease_version: number; last_reported_at: string; sync_content: number; retention_days: 1 | 3 | 7 | 14 | 30 }>(
       `SELECT p.* FROM projects p JOIN machines m ON m.machine_id=p.machine_id WHERE ${where.join(" AND ")} ORDER BY p.alias,p.project_id LIMIT ?${options.offset !== undefined ? " OFFSET ?" : ""}`,
       ...params, limit + 1, ...(options.offset !== undefined ? [options.offset] : []));
     const visible = rows.slice(0,limit);
     const last = visible.at(-1);
-    return { items: visible.map((row) => ({ projectId: row.project_id,provider: row.provider,machineId: row.machine_id,alias: row.alias,canonicalRoot: row.canonical_root,identityHash: row.identity_hash,repoRoot: row.repo_root,branch: row.branch,dirty: row.dirty===null?null:row.dirty===1,leaseVersion: row.lease_version,lastReportedAt: row.last_reported_at,syncContent: row.sync_content===1,retentionDays: row.retention_days })),
+    return { items: visible.map((row) => ({ projectId: row.project_id,provider: row.provider,machineId: row.machine_id,alias: row.alias,canonicalRoot: row.canonical_root,identityHash: row.identity_hash,repoRoot: row.repo_root,worktreeBase: row.worktree_base,branch: row.branch,dirty: row.dirty===null?null:row.dirty===1,leaseVersion: row.lease_version,lastReportedAt: row.last_reported_at,syncContent: row.sync_content===1,retentionDays: row.retention_days })),
       nextCursor: rows.length>limit && last ? pageCursor(scope,[last.alias,last.project_id]) : null,total };
   }
 

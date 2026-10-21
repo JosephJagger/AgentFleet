@@ -11,7 +11,7 @@ import { readUpdateTransaction, workerHealthDiagnostics } from "./supervisor.js"
 import { collectServiceDiagnostics } from "./service-diagnostics.js";
 import { delay } from "./util.js";
 
-const TYPES: readonly MaintenanceType[] = ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean"];
+const TYPES: readonly MaintenanceType[] = ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean", "worktree.create", "worktree.merge", "worktree.remove"];
 
 export class AgentMaintenance {
   private readonly active = new Set<string>();
@@ -101,7 +101,7 @@ export class AgentMaintenance {
       await this.options.store.recordMaintenance(operation);
       this.report(operation);
     };
-    if (["provider.runtime", "connection.repair", "session.reconcile", "images.preview", "images.clean", "project.add", "codex.host"].includes(operationType)) operation.recoveryTarget = previous?.recoveryTarget ?? (offer.recoveryTarget as Record<string, unknown>);
+    if (["provider.runtime", "connection.repair", "session.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "worktree.create", "worktree.merge", "worktree.remove"].includes(operationType)) operation.recoveryTarget = previous?.recoveryTarget ?? (offer.recoveryTarget as Record<string, unknown>);
     if (operationType === "commands.reconcile" && Array.isArray(offer.commands) && offer.commands.length <= 20 && offer.commands.every(id => typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id))) operation.commands = offer.commands;
     const versionsMayClean = operationType !== "versions.clean" || this.options.store.canSafelyRestart();
     await progress({ phase: "running" });
@@ -137,6 +137,8 @@ export class AgentMaintenance {
         await this.options.store.setMaintenanceDrain(operationId);
         for(const commandId of commands)await this.options.store.recoverLateTerminalTurn(commandId);
         result={...await this.options.runtime.repairConnection(target),reconciledCommands:commands.length};
+      } else if (operationType === "worktree.create" || operationType === "worktree.merge" || operationType === "worktree.remove") {
+        result = await this.options.runtime.manageWorktree(operationType, operation.recoveryTarget);
       } else if (operationType === "project.add") {
         const target = operation.recoveryTarget;
         if (!target || typeof target.path !== "string" || typeof target.alias !== "string" || typeof target.createDirectory !== "boolean") {

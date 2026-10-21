@@ -125,6 +125,8 @@ function mapProject(rawValue: unknown): Project {
     pathHint: string(raw.canonicalRoot, string(raw.repoRoot, t("路径未上报"))),
     gitBranch: typeof raw.branch === "string" ? raw.branch : null,
     gitDirty: typeof raw.dirty === "boolean" ? raw.dirty : null,
+    repoRoot: typeof raw.repoRoot === "string" ? raw.repoRoot : null,
+    worktreeBase: typeof raw.worktreeBase === "string" ? raw.worktreeBase : null,
     identityVersion: integer(raw.leaseVersion),
     syncContent: raw.syncContent !== false,
     retentionDays: ([1, 3, 7, 14, 30].includes(integer(raw.retentionDays)) ? integer(raw.retentionDays) : 7) as Project["retentionDays"],
@@ -949,6 +951,17 @@ export const api = {
       body: JSON.stringify({ machineId, path, alias, createDirectory, provider, clientMutationId: crypto.randomUUID() }),
     });
     return mapHostOperation(raw.operation);
+  },
+  worktrees: (projectId: string, signal?: AbortSignal) => request<import("./types").WorktreeOverview>(`/api/projects/${encodeURIComponent(projectId)}/worktrees`, { signal }),
+  worktreeDiff: (laneProjectId: string, signal?: AbortSignal) => request<import("./types").WorktreeDiff>(`/api/projects/${encodeURIComponent(laneProjectId)}/worktrees/diff`, { signal }),
+  async createWorktree(projectId: string, input: { provider: ProviderId; name?: string; base?: string; adoptPath?: string; setup: boolean }, clientMutationId: string): Promise<HostOperation> {
+    return mapHostOperation((await request<JsonObject>(`/api/projects/${encodeURIComponent(projectId)}/worktrees`, { method: "POST", body: JSON.stringify({ ...input, clientMutationId }) })).operation);
+  },
+  async mergeWorktree(laneProjectId: string, clientMutationId: string): Promise<HostOperation> {
+    return mapHostOperation((await request<JsonObject>(`/api/projects/${encodeURIComponent(laneProjectId)}/worktrees/merge`, { method: "POST", body: JSON.stringify({ clientMutationId }) })).operation);
+  },
+  async removeWorktree(laneProjectId: string, input: { deleteBranch: boolean; force: boolean }, clientMutationId: string): Promise<HostOperation> {
+    return mapHostOperation((await request<JsonObject>(`/api/projects/${encodeURIComponent(laneProjectId)}/worktrees/remove`, { method: "POST", body: JSON.stringify({ ...input, clientMutationId }) })).operation);
   },
   async readHostOperation(operationId: string): Promise<HostOperation> {
     return mapHostOperation((await request<JsonObject>(`/api/operations/${encodeURIComponent(operationId)}`)).operation);

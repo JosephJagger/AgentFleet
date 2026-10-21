@@ -38,6 +38,8 @@ export interface ProjectRecord {
   identityVersion: number;
   addedAt: string;
   source?: "explicit" | "session_discovery" | "bootstrap_fallback";
+  /** Set when this project is a panel-managed git worktree lane of another project. */
+  worktree?: { sourceRoot: string; gitCommonDir: string; branch: string; base: string; removedAt?: string };
 }
 
 export type InboxState = "claimed" | "invoking" | "responded" | "applied" | "unknown" | "rejected";
@@ -230,7 +232,7 @@ export interface NativeThreadBinding {
   title?: string;
 }
 
-export type MaintenanceType = "provider.runtime" | "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host" | "versions.preview" | "versions.clean";
+export type MaintenanceType = "provider.runtime" | "connection.repair" | "catalog.refresh" | "agent.update" | "runtime.reconnect" | "diagnostics.collect" | "session.reconcile" | "commands.reconcile" | "images.preview" | "images.clean" | "project.add" | "codex.host" | "versions.preview" | "versions.clean" | "worktree.create" | "worktree.merge" | "worktree.remove";
 export interface MaintenanceOperation {
   recoveryTarget?: Record<string, unknown>;
   commands?: string[];

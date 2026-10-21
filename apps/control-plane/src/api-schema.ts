@@ -123,6 +123,7 @@ export interface ProjectSummary {
   repoRoot: string | null;
   branch: string | null;
   dirty: boolean | null;
+  worktreeBase: string | null;
   leaseVersion: number;
   lastReportedAt: string;
   syncContent: boolean;
@@ -203,6 +204,7 @@ export interface AgentCapabilities {
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
   sshAccess?: boolean;
+  worktrees?: boolean;
   commandTypes?: string[];
   methods?: string[];
   maintenanceTypes?: string[];
@@ -262,6 +264,8 @@ export interface AgentProjectHello {
   repoRoot?: string | null;
   branch?: string | null;
   dirty?: boolean | null;
+  worktreeBase?: string | null;
+  worktreeRemoved?: boolean;
   leaseVersion: number;
 }
 
