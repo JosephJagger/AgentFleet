@@ -27,12 +27,14 @@ it("显示工作树、重叠预警和外部工作树，并可打开已有会话"
   mocks.worktrees.mockResolvedValue(overview);
   const open = vi.fn();
   render(<ProjectWorktreesPanel projectId="main" machine={machine} onOpenSession={open} />);
+  fireEvent.click(await screen.findByRole("button", { name: "使用已有工作树（2）" }));
   expect(await screen.findByText(/af\/login/, { selector: "strong" })).toBeTruthy();
   expect(screen.getByText(/领先 2 \/ 落后 0/)).toBeTruthy();
   expect(screen.getByText(/与其他工作树改动了相同文件：a\.ts/)).toBeTruthy();
   expect(screen.getByText("/srv/desktop")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: /登录修复/ }));
   expect(open).toHaveBeenCalledWith("s1");
+  fireEvent.click(screen.getByText("查看改动、合并或删除"));
   expect((screen.getByRole("button", { name: "合并到 main" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
@@ -43,9 +45,11 @@ it("新建工作树后为所选智能体创建会话并打开", async () => {
   mocks.createSession.mockResolvedValue({ session: { id: "new-session" } });
   const open = vi.fn();
   render(<ProjectWorktreesPanel projectId="main" machine={machine} onOpenSession={open} />);
-  fireEvent.change(await screen.findByLabelText("智能体"), { target: { value: "claude" } });
-  fireEvent.change(screen.getByLabelText(/名称/), { target: { value: "api" } });
-  fireEvent.click(screen.getByRole("button", { name: "新建工作树并开始会话" }));
+  fireEvent.change(await screen.findByLabelText("新会话的智能体"), { target: { value: "claude" } });
+  fireEvent.change(screen.getByLabelText(/新分支名称/), { target: { value: "af/api" } });
+  fireEvent.click(screen.getByText(/初始化环境（可选）/));
+  fireEvent.click(screen.getByRole("checkbox", { name: "创建后运行项目的初始化脚本" }));
+  fireEvent.click(screen.getByRole("button", { name: "创建工作树和新会话" }));
   await vi.waitFor(() => expect(open).toHaveBeenCalledWith("new-session"));
   expect(mocks.createWorktree.mock.calls[0]![1]).toEqual({ provider: "claude", name: "api", base: "main", setup: true });
   expect(mocks.createSession).toHaveBeenCalledWith("m", "lane-claude", "Claude Code · 工作树");
