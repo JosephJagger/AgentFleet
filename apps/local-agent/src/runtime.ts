@@ -970,7 +970,7 @@ export class AgentRuntime {
         return { projectExternalId: project.id, provider: request.provider, canonicalRoot: project.root, branch: joined.worktree!.branch, base: joined.worktree!.base, setup: { ran: false } };
       }
       const lane = new Set(this.store.snapshot().projects.filter(project => project.worktree?.sourceRoot === source.root && !project.worktree.removedAt).map(project => project.root)).size + 1;
-      const created = await worktrees.create(source, { ...(request.name ? { name: request.name } : {}), ...(request.base ? { base: request.base } : {}), ...(request.adoptPath ? { adoptPath: request.adoptPath } : {}), setup: request.setup, lane });
+      const created = await worktrees.create(source, { ...(request.name ? { name: request.name } : {}), ...(request.base ? { base: request.base } : {}), ...(request.branch !== undefined ? { branch: request.branch } : {}), ...(request.adoptPath ? { adoptPath: request.adoptPath } : {}), setup: request.setup, lane });
       const project = await addProjectFromPanel(this.store, created.path, request.alias, false, request.provider);
       await this.store.setProjectWorktree(project.root, created.metadata);
       try { await this.refreshCatalog(); } finally { this.notifyRegistryChanged(); }

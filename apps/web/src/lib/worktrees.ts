@@ -29,7 +29,7 @@ export async function laneProjectId(machineId: string, root: string, provider: P
 }
 
 /** Create (or join) a lane on the host and open a new session for the chosen agent in it. */
-export async function startLaneSession(projectId: string, machineId: string, input: { provider: ProviderId; name?: string; base?: string; adoptPath?: string; setup: boolean }, title: string) {
+export async function startLaneSession(projectId: string, machineId: string, input: { provider: ProviderId; name?: string; branch?: string; base?: string; adoptPath?: string; setup: boolean }, title: string) {
   const operation = await waitForOperation(await api.createWorktree(projectId, input, crypto.randomUUID()));
   const result = operation.result ?? {};
   const root = typeof result.canonicalRoot === "string" ? result.canonicalRoot : "";

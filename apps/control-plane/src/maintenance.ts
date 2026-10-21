@@ -38,11 +38,15 @@ export class MaintenanceService {
         invariant(previous.type===type && (type!=="provider.runtime" || JSON.stringify(previousRequest)===JSON.stringify(providerRequest)) && (type!=="codex.host" || JSON.stringify(previousRequest)===JSON.stringify(hostRequest)) && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)) && (!worktreeRequest || JSON.stringify(previousRequest)===JSON.stringify(worktreeRequest)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
         return this.get(principal,previous.operation_id);
       }
-      const machine=this.db.get<{identity_state:string;reachability:string;maintenance_types_json:string}>("SELECT identity_state,reachability,maintenance_types_json FROM machines WHERE machine_id=? AND workspace_id=?",machineId,principal.workspaceId);
+      const machine=this.db.get<{identity_state:string;reachability:string;maintenance_types_json:string;agent_version:string}>("SELECT identity_state,reachability,maintenance_types_json,agent_version FROM machines WHERE machine_id=? AND workspace_id=?",machineId,principal.workspaceId);
       invariant(machine,404,"MACHINE_NOT_FOUND","Machine was not found");
       invariant(machine.identity_state==="active",409,"MACHINE_REVOKED","Machine was removed");
       invariant(machine.reachability==="online",409,"MACHINE_OFFLINE","Machine must be online");
       invariant((JSON.parse(machine.maintenance_types_json) as string[]).includes(type),409,"AGENT_CAPABILITY_UNAVAILABLE","Update the connection service to use this operation");
+      if (worktreeRequest?.branch !== undefined) {
+        const version = /^(\d+)\.(\d+)\.(\d+)$/.exec(machine.agent_version)?.slice(1).map(Number);
+        invariant(version && (version[0]! > 0 || version[1]! > 30 || version[1] === 30 && version[2]! >= 141), 409, "AGENT_CAPABILITY_UNAVAILABLE", "请更新主机连接服务至 0.30.141 或更新版本，以使用自定义分支名称");
+      }
       let target: Record<string,unknown> | null = null;
       if(type === "provider.runtime") {
         invariant(logicalSessionId === undefined && previewOperationId === undefined && projectTarget === undefined,400,"INVALID_OPERATION_TARGET","Runtime management does not accept session or project targets");

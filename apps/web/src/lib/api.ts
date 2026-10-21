@@ -954,7 +954,7 @@ export const api = {
   },
   worktrees: (projectId: string, signal?: AbortSignal) => request<import("./types").WorktreeOverview>(`/api/projects/${encodeURIComponent(projectId)}/worktrees`, { signal }),
   worktreeDiff: (laneProjectId: string, signal?: AbortSignal) => request<import("./types").WorktreeDiff>(`/api/projects/${encodeURIComponent(laneProjectId)}/worktrees/diff`, { signal }),
-  async createWorktree(projectId: string, input: { provider: ProviderId; name?: string; base?: string; adoptPath?: string; setup: boolean }, clientMutationId: string): Promise<HostOperation> {
+  async createWorktree(projectId: string, input: { provider: ProviderId; name?: string; branch?: string; base?: string; adoptPath?: string; setup: boolean }, clientMutationId: string): Promise<HostOperation> {
     return mapHostOperation((await request<JsonObject>(`/api/projects/${encodeURIComponent(projectId)}/worktrees`, { method: "POST", body: JSON.stringify({ ...input, clientMutationId }) })).operation);
   },
   async mergeWorktree(laneProjectId: string, clientMutationId: string): Promise<HostOperation> {

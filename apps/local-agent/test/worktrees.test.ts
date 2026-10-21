@@ -110,3 +110,20 @@ test("branch changes refuse merge and removal without touching either branch", a
   assert.equal(git(created.path, "branch", "--show-current"), "unrelated");
   assert.ok(git(root, "branch", "--list", "af/switched"));
 });
+
+test("custom branch names are preserved exactly, checked before creation and independent of the directory name", async t => {
+  const { parent, root } = await repository();
+  t.after(() => fs.rm(parent, { recursive: true, force: true }));
+  const worktrees = new Worktrees();
+  const created = await worktrees.create(project(root), { name: "safe-directory", branch: "feat/Login-Fix", base: "main", setup: false, lane: 1 });
+  assert.equal(created.metadata.branch, "feat/Login-Fix");
+  assert.equal(git(created.path, "branch", "--show-current"), "feat/Login-Fix");
+  assert.equal(created.path, join(parent, ".app.worktrees", "safe-directory"));
+  assert.equal(git(root, "branch", "--show-current"), "main");
+  await assert.rejects(worktrees.create(project(root), { name: "duplicate", branch: "feat/Login-Fix", setup: false, lane: 2 }), { code: "WORKTREE_EXISTS" });
+  for (const branch of ["../escape", "main..other", "HEAD", "--help", "foo.lock", "@{-1}"]) {
+    await assert.rejects(worktrees.create(project(root), { name: "invalid", branch, setup: false, lane: 2 }), { code: "WORKTREE_NAME_INVALID" });
+  }
+  await assert.rejects(fs.access(join(parent, ".app.worktrees", "invalid")));
+  await assert.rejects(worktrees.create(project(root), { adoptPath: created.path, branch: "other", setup: false, lane: 2 }), { code: "WORKTREE_REQUEST_INVALID" });
+});

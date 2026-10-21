@@ -84,3 +84,18 @@ test("adoption accepts absolute Windows and POSIX paths and refuses relative pat
   }
   for (const adoptPath of ["lane", "C:lane"]) assert.throws(() => parseWorktreeTarget("worktree.create", { projectExternalId: "p", provider: "codex", alias: "lane", adoptPath }));
 });
+
+test("custom branch names survive target building and old agents cannot silently ignore them", () => {
+  const { db, principal, service, maintenance } = fixture();
+  const { target } = service.createTarget(principal, "main-codex", { provider: "claude", branch: "feat/Login-Fix", base: "main", setup: false });
+  assert.equal(target.branch, "feat/Login-Fix");
+  db.run("UPDATE machines SET agent_version='0.30.140' WHERE machine_id='m'");
+  assert.throws(() => maintenance.create(principal, "m", "worktree.create", "custom-old", undefined, undefined, undefined, target), /0.30.141/);
+  db.run("UPDATE machines SET agent_version='0.30.141' WHERE machine_id='m'");
+  maintenance.create(principal, "m", "worktree.create", "custom-new", undefined, undefined, undefined, target);
+  assert.equal((maintenance.offers("m")[0]!.recoveryTarget as Record<string, unknown>).branch, "feat/Login-Fix");
+  for (const branch of ["../escape", "main..other", "HEAD", "--help", "foo.lock", "x//y", "x/"]) {
+    assert.throws(() => service.createTarget(principal, "main-codex", { provider: "claude", branch }));
+  }
+  assert.throws(() => service.createTarget(principal, "main-codex", { provider: "claude", adoptPath: "/srv/desktop", branch: "feat/new" }));
+});

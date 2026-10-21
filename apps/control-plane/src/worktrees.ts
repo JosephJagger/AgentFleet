@@ -25,10 +25,12 @@ export function parseWorktreeTarget(type: string, value: unknown): Record<string
     invariant(typeof raw.alias === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(raw.alias), 400, "WORKTREE_REQUEST_INVALID", "项目名称无效");
     invariant(raw.name === undefined || typeof raw.name === "string" && NAME.test(raw.name), 400, "WORKTREE_NAME_INVALID", "工作树名称仅支持小写字母、数字、点、下划线和连字符，最长 48 位");
     invariant(raw.base === undefined || typeof raw.base === "string" && BRANCH.test(raw.base) && !raw.base.includes(".."), 400, "WORKTREE_BASE_INVALID", "基础分支无效");
+    invariant(raw.branch === undefined || typeof raw.branch === "string" && BRANCH.test(raw.branch) && raw.branch !== "HEAD" && !raw.branch.includes("..") && !raw.branch.includes("//") && !raw.branch.endsWith("/") && !raw.branch.split("/").some(part => part.startsWith(".") || part.endsWith(".") || part.endsWith(".lock")), 400, "WORKTREE_NAME_INVALID", "新分支名称无效");
+    invariant(raw.branch === undefined || raw.adoptPath === undefined, 400, "WORKTREE_REQUEST_INVALID", "接入已有工作树不能更改分支");
     invariant(raw.adoptPath === undefined || typeof raw.adoptPath === "string" && (posix.isAbsolute(raw.adoptPath) || win32.isAbsolute(raw.adoptPath)) && raw.adoptPath.length <= 4096, 400, "WORKTREE_PATH_INVALID", "工作树路径无效");
     invariant(Boolean(raw.name) !== Boolean(raw.adoptPath), 400, "WORKTREE_REQUEST_INVALID", "请填写工作树名称，或选择已有工作树");
     return { projectExternalId: externalId(raw.projectExternalId), provider: raw.provider, alias: raw.alias, ...(raw.name ? { name: raw.name } : {}),
-      ...(raw.base ? { base: raw.base } : {}), ...(raw.adoptPath ? { adoptPath: raw.adoptPath } : {}), setup: raw.setup === true };
+      ...(raw.branch !== undefined ? { branch: raw.branch } : {}), ...(raw.base ? { base: raw.base } : {}), ...(raw.adoptPath ? { adoptPath: raw.adoptPath } : {}), setup: raw.setup === true };
   }
   if (type === "worktree.merge") return { projectExternalId: externalId(raw.projectExternalId) };
   return { projectExternalId: externalId(raw.projectExternalId), deleteBranch: raw.deleteBranch === true, force: raw.force === true };
@@ -91,6 +93,7 @@ export class WorktreeService {
     const number = (value: unknown) => Number.isSafeInteger(value) ? Number(value) : 0;
     return {
       project: { projectId: main.project_id, alias: main.alias, root: main.canonical_root, provider: main.provider, machineId: main.machine_id },
+      customBranchNames: raw.customBranchNames === true,
       current: typeof raw.current === "string" ? raw.current : null,
       branches: list(raw.branches, 200), mainDirtyFiles: number(raw.mainDirtyFiles), setupScript: raw.setupScript === true,
       lanes: this.lanes(main).map(lane => {
@@ -113,7 +116,7 @@ export class WorktreeService {
     const leaf = (name ?? adoptPath!.split("/").filter(Boolean).at(-1) ?? "lane").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[^A-Za-z0-9]+/, "");
     const alias = `${main.alias}-${leaf}`.slice(0, 64).replace(/[^A-Za-z0-9]+$/, "") || "worktree";
     const target = parseWorktreeTarget("worktree.create", { projectExternalId: main.external_id, provider: body.provider, alias,
-      ...(name ? { name } : {}), ...(typeof body.base === "string" && body.base ? { base: body.base } : {}), ...(adoptPath ? { adoptPath } : {}), setup: body.setup === true });
+      ...(name ? { name } : {}), ...(body.branch !== undefined ? { branch: body.branch } : {}), ...(typeof body.base === "string" && body.base ? { base: body.base } : {}), ...(adoptPath ? { adoptPath } : {}), setup: body.setup === true });
     return { machineId: main.machine_id, target };
   }
 

@@ -414,6 +414,7 @@ export interface WorktreeLane {
   sessions: { id: string; projectId: string; provider: ProviderId; title: string; executionState: string; running: boolean; updatedAt: string }[];
 }
 export interface WorktreeOverview {
+  customBranchNames?: boolean;
   project: { projectId: string; alias: string; root: string; provider: ProviderId; machineId: string };
   current: string | null; branches: string[]; mainDirtyFiles: number; setupScript: boolean;
   lanes: WorktreeLane[]; overlaps: { file: string; branches: string[] }[]; unmanaged: { path: string; branch: string | null }[];

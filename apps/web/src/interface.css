@@ -1007,3 +1007,22 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .worktree-toggle legend { padding: 0 4px; font-size: var(--text-small); color: var(--muted); }
 .link-button { background: none; border: 0; padding: 0; color: var(--accent, inherit); text-decoration: underline; cursor: pointer; font: inherit; text-align: left; }
 @media (max-width: 720px) { .worktree-create__grid { grid-template-columns: 1fr; } }
+
+/* Explain the working directory before asking users to create another conversation. */
+.worktree-current { display: grid; gap: 5px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.worktree-current > span, .worktree-current > code { font-size: var(--text-small); color: var(--muted); overflow-wrap: anywhere; }
+.worktree-current p { margin: 5px 0 0; font-size: var(--text-small); line-height: 1.6; }
+.worktree-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.worktree-choices button { flex: 1 1 180px; padding: 10px 12px; border: 2px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.worktree-choices button[aria-pressed="true"] { border-color: currentColor; font-weight: 700; text-decoration: underline; text-underline-offset: 5px; }
+.worktree-choices button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.worktree-fields { display: grid; gap: 12px; min-width: 0; }
+.worktree-fields > label { display: grid; gap: 6px; min-width: 0; }
+.worktree-fields small { color: var(--muted); font-size: var(--text-small); line-height: 1.5; overflow-wrap: anywhere; }
+.worktree-fields small.catalog-error { color: var(--red); }
+.worktree-fields input, .worktree-fields select { width: 100%; min-width: 0; box-sizing: border-box; }
+.worktree-environment, .worktree-management { border-top: 1px solid var(--line); padding-top: 10px; min-width: 0; }
+.worktree-environment summary, .worktree-management summary { cursor: pointer; font-size: var(--text-small); }
+.worktree-environment p, .worktree-environment .checkbox-row { margin: 10px 0 6px; font-size: var(--text-small); }
+.worktree-management > .worktree-lane__actions { margin-top: 10px; }
+.worktree-lane__actions select { max-width: 100%; min-width: 0; }

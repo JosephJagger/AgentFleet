@@ -124,6 +124,7 @@ export class Worktrees {
     const mainStatus = await this.run(["status", "--porcelain=v1", "--untracked-files=no"], repository.root);
     return {
       root: repository.root, current: repository.current, branches: await this.branches(repository.root), mainDirtyFiles: lines(mainStatus.stdout).length,
+      customBranchNames: true,
       setupScript: await access(join(repository.root, SETUP_SCRIPT)).then(() => true, () => false),
       lanes: statuses, overlaps, unmanaged,
     };
@@ -143,10 +144,11 @@ export class Worktrees {
   }
 
   /** Creates a lane from a local branch, or adopts an existing worktree of the same repository. */
-  async create(source: ProjectRecord, request: { name?: string; base?: string; adoptPath?: string; setup: boolean; lane: number }) {
+  async create(source: ProjectRecord, request: { name?: string; branch?: string; base?: string; adoptPath?: string; setup: boolean; lane: number }) {
     const repository = await this.repository(source.root);
     let path: string; let branch: string; let base: string;
     if (request.adoptPath) {
+      if (request.branch !== undefined) throw new AgentError("WORKTREE_REQUEST_INVALID", "接入已有工作树不能更改分支");
       if (!isAbsolute(request.adoptPath)) throw new AgentError("WORKTREE_PATH_INVALID", "工作树路径无效");
       const adopted = (await this.registered(repository.root)).find(item => item.path === request.adoptPath && item.path !== repository.root);
       if (!adopted) throw new AgentError("WORKTREE_CHANGED", "该工作树已不存在，请刷新后重试");
@@ -156,7 +158,8 @@ export class Worktrees {
       if (!request.name || !NAME.test(request.name)) throw new AgentError("WORKTREE_NAME_INVALID", "工作树名称仅支持小写字母、数字、点、下划线和连字符");
       base = request.base ?? repository.current ?? "";
       if (!base || (await this.run(["rev-parse", "--verify", "--quiet", `refs/heads/${base}^{commit}`], repository.root)).code !== 0) throw new AgentError("WORKTREE_BASE_INVALID", "基础分支不存在");
-      branch = `af/${request.name}`;
+      branch = request.branch ?? `af/${request.name}`;
+      if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(branch) || branch === "HEAD") throw new AgentError("WORKTREE_NAME_INVALID", "新分支名称无效");
       if ((await this.run(["check-ref-format", "--branch", branch], repository.root)).code !== 0) throw new AgentError("WORKTREE_NAME_INVALID", "工作树名称不能作为分支名");
       if ((await this.run(["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], repository.root)).code === 0) throw new AgentError("WORKTREE_EXISTS", `分支 ${branch} 已存在，请换一个名称`);
       path = this.laneDirectory(repository.root, request.name);
@@ -238,7 +241,7 @@ export function parseWorktreeRequest(value: unknown) {
   if (!isRecord(value)) throw new AgentError("WORKTREE_REQUEST_INVALID", "工作树请求无效");
   const text = (key: string, max: number) => value[key] === undefined ? undefined : typeof value[key] === "string" && (value[key] as string).length <= max ? value[key] as string : (() => { throw new AgentError("WORKTREE_REQUEST_INVALID", `工作树请求字段 ${key} 无效`); })();
   return {
-    projectExternalId: text("projectExternalId", 256), name: text("name", 48), base: text("base", 200), adoptPath: text("adoptPath", 4096),
+    projectExternalId: text("projectExternalId", 256), name: text("name", 48), branch: text("branch", 200), base: text("base", 200), adoptPath: text("adoptPath", 4096),
     alias: text("alias", 64), provider: text("provider", 32), setup: value.setup === true, deleteBranch: value.deleteBranch === true, force: value.force === true,
   };
 }
