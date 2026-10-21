@@ -270,6 +270,51 @@ for (const source of ["edges", "snapshot", "queued-notification"] as const) test
  assert.ok(JSON.stringify(events).includes("Final plan"));
 });
 
+for (const terminal of ["completed", "interrupted"] as const) test(`Claude authoritative idle releases a held background turn (${terminal})`, async t => {
+ const id="claude_parent",thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;
+ const events:Array<{type:string;payload:Record<string,unknown>}>=[];
+ let closed=0,queries=0,activeTurnId="";
+ let finish!:()=>void;
+ const runtime=new ClaudeRuntime({findManagedThread:()=>thread,findProject:()=>project,onVolatile:()=>{},onExit:async()=>{},onApproval:async()=>{},onApprovalResolved:async()=>{},onEvent:async e=>{
+  events.push(e);if(e.type==="turn.completed"){await runtime.unsubscribeThread(id);finish();}
+ }} as AppServerCallbacks,"epoch",{
+  detectClaude:async()=>({installed:true,version:"2.1.285",path:"/bin/claude"}),nativeClaudeRunning:async()=>false,
+  inspectClaudeMetadata:async()=>({models:[],quota:{available:false,observedAt:new Date().toISOString(),subscriptionType:null,windows:[]}}),
+  query:({prompt})=>{const previousClosed=closed;queries++;return {close(){closed++;},async interrupt(){},async *[Symbol.asyncIterator](){
+   const input=(prompt as AsyncIterable<{uuid:string}>)[Symbol.asyncIterator]();
+   const sent=await input.next();
+   const state=(state:string,session_id="parent")=>({type:"system",subtype:"session_state_changed",session_id,state});
+   yield state("idle"); // Restored session idle is not acknowledgement of our input.
+   assert.equal(closed,previousClosed);
+   yield {type:"system",subtype:"background_tasks_changed",session_id:"parent",tasks:[{task_id:"child",task_type:"local_agent"}]};
+   yield {type:"result",is_error:false,num_turns:1,user_message_uuid:sent.value!.uuid,modelUsage:{},usage:{input_tokens:0,output_tokens:0}};
+   yield state("running");yield state("requires_action");yield state("idle","another-session");
+   yield {...state("idle"),parent_tool_use_id:"child-tool"};
+   assert.equal(closed,previousClosed,"child/foreign states and approval waits must not finish the parent");
+   // New user input accepted while waiting must survive an idle for the prior input.
+   await runtime.steerTurn(thread,activeTurnId,"Follow up");
+   yield state("idle");assert.equal(closed,previousClosed,"unacknowledged follow-up must not be discarded");
+   const followup=await input.next();
+   yield {type:"result",is_error:false,num_turns:1,user_message_uuid:followup.value!.uuid,modelUsage:{},usage:{input_tokens:0,output_tokens:0}};
+   if(terminal==="interrupted")await runtime.interruptTurn(id,activeTurnId);
+   // Native idle follows held-result flush and background-loop exit. A stale
+   // snapshot must not wedge the turn, and no extra parent result is required.
+   yield state("idle");
+   assert.fail("idle should finish this query without reading another result");
+  }} as unknown as Query;},
+ });
+ t.after(()=>runtime.stop());await runtime.start();
+ for(let i=0;i<2;i++){
+  const completed=new Promise<void>(r=>{finish=r;});
+  activeTurnId=(await runtime.startTurn(thread,project,`Plan ${i}`)).nativeTurnId;
+  await completed;
+ }
+ assert.equal(queries,2);assert.equal(closed,2);
+ assert.equal(events.filter(e=>e.type==="turn.completed").length,2);
+ assert.equal((events.find(e=>e.type==="turn.completed")!.payload.turn as {status:string}).status,terminal);
+ assert.equal(events.some(e=>e.type==="turn.error"),false);
+});
+
 test("unattributed Claude startup failure is reported instead of waiting for a matching prompt forever",async()=>{
  const id="claude_12345678-1234-1234-1234-123456789012";
  const thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;

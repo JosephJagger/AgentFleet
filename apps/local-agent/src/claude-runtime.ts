@@ -405,6 +405,15 @@ export class ClaudeRuntime implements AppServerClient {
         const rawMessage: unknown = msg;
         if (isRecord(rawMessage) && (typeof rawMessage.parent_tool_use_id === "string" || typeof rawMessage.parent_agent_id === "string")) continue;
         if (isRecord(rawMessage) && rawMessage.type === "system" && rawMessage.session_id === nativeId(id)) {
+          // Native idle is emitted after the held result is flushed and the
+          // background-agent loop exits. There need not be another attributed
+          // parent result. Only release an already acknowledged turn: startup
+          // idle or idle preceding an accepted follow-up must not lose input.
+          if (rawMessage.subtype === "session_state_changed" && rawMessage.state === "idle" && writer.awaitingBackground && writer.promptIds.size === 0) {
+            delete writer.turnId;
+            await emit("turn.completed", { turn: { id: turnId, status: writer.interrupted ? "interrupted" : "completed" } });
+            break;
+          }
           if (rawMessage.subtype === "background_tasks_changed" && Array.isArray(rawMessage.tasks)) {
             // Native snapshots are authoritative. Their order relative to edge
             // events is unspecified; never merge late edges into a snapshot.
