@@ -1362,6 +1362,39 @@ for (const code of ["PROVIDER_NATIVE_BUSY", "PROVIDER_OWNERSHIP_UNKNOWN", "PROVI
   }
 }
 
+for(const commandType of ["turn.start","turn.queue"] as const) for(const code of ["CLAUDE_SESSION_MISSING","THREAD_CWD_MISMATCH"]) test(`resume metadata failure ${code} cannot freeze or resend ${commandType}`,async t=>{
+ const {store,projects}=await fixture(),project=projects[0]!;
+ let server!:FakeAppServer;
+ const runtime=new AgentRuntime({store,identity,pairing,support,appServerFactory:callbacks=>{
+  server=new FakeAppServer("epoch-resume",callbacks);
+  server.listThreadsHook=async()=>[{nativeThreadId:"original",cwd:project.root,title:"Original",executionState:"idle",historyMode:"legacy"}];
+  server.histories.set("original",{nativeThreadId:"original",cwd:project.root,historyMode:"legacy",executionState:"idle",updatedAt:null,items:[]});
+  return server;
+ }});
+ t.after(async()=>{await runtime.shutdown();store.close();});runtime.setTransportGeneration(1);
+ const {acks}=captureCallbacks(runtime);await runtime.initialize();
+ // Claim the existing original first, so turn.start takes the resume path.
+ await runtime.handleCommand(claimCommand(project,"original","session-original","epoch-resume"),1);
+ const thread=store.snapshot().managedThreads.original!;assert.ok(thread);
+ await store.update(state=>{state.managedThreads.original!.subscribed=false;});
+ const resume=server.resumeThread.bind(server);let failures=0;
+ server.resumeThread=async()=>{failures++;throw new AgentError(code,"Native metadata preflight refused");};
+ const first=command(project,"attempt-refused","command-refused","session-original","epoch-resume");
+ first.type=commandType;
+ if(commandType==="turn.queue")first.precondition.queueVersion=1;
+ await runtime.handleCommand(first,1);
+ assert.equal(store.snapshot().commandJournal[first.commandId]?.state,"applied");
+ assert.equal(store.snapshot().commandJournal[first.commandId]?.error?.code,code);
+ assert.equal(store.snapshot().projectReservations[project.id],undefined);
+ assert.equal(server.startTurnCount,0);
+ await runtime.handleCommand({...first,attemptId:"attempt-replay"},1);
+ assert.equal(failures,1);assert.equal(server.startTurnCount,0);
+ assert.deepEqual(acks.find(a=>a.dispatchAttemptId==="attempt-replay"&&a.state==="applied")?.detail,{ok:false,error:{code,message:"Native metadata preflight refused"}});
+ server.resumeThread=resume;
+ await runtime.handleCommand(command(project,"attempt-next","command-next","session-original","epoch-resume"),1);
+ assert.equal(server.startTurnCount,1);
+});
+
 test("uncertain invocation remains fenced across retry and App Server restart", async () => {
   const { store, projects } = await fixture();
   const project = projects[0] as ProjectRecord;

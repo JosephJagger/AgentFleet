@@ -235,6 +235,35 @@ test("late-turn repair keeps ambiguous or out-of-window evidence frozen", async 
   assert.equal(store.canSafelyRestart(),false);
 });
 
+for (const variant of ["missing", "queued", "cwd", "timeout", "active", "hash", "provider", "response"] as const) test(`Claude preflight recovery preserves negative evidence and refuses ambiguity: ${variant}`, async t => {
+ const directory=await mkdtemp(join(tmpdir(),"claude-preflight-"));
+ const store=new StateStore(directory);await store.initialize();
+ t.after(async()=>{store.close();await rm(directory,{recursive:true,force:true});});
+ const command=testCommand(),envelopeHash="sha256:preflight";
+ if(variant==="queued")command.type="turn.queue";
+ await store.update(state=>{state.projects.push({id:command.projectId,provider:variant==="provider"?"codex":"claude",root:directory,alias:"fixture"} as import("../src/types.js").ProjectRecord);});
+ await store.claimCommand(command,envelopeHash);
+ await store.reserveProjectCommand({projectId:command.projectId,commandId:command.commandId,attemptId:command.attemptId,envelopeHash,appServerEpoch:"epoch"});
+ await store.transitionCommand(command.attemptId,"claimed","invoking");
+ await store.setManagedThread({nativeThreadId:"claude_original",projectId:command.projectId,sessionCwd:directory,appServerEpoch:"epoch",policyVersion:"remote-restricted-v1",policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),...(variant==="active"?{activeTurnId:"running"}:{})});
+ const error={code:variant==="timeout"?"APP_SERVER_TIMEOUT":variant==="cwd"?"THREAD_CWD_MISMATCH":"CLAUDE_SESSION_MISSING",message:"original failure"};
+ await store.markCommandUnknown(command.attemptId,error);
+ if(variant==="hash")await store.update(state=>{state.projectReservations[command.projectId]!.envelopeHash="different";});
+ if(variant==="response")await store.update(state=>{state.commandJournal[command.commandId]!.response={nativeTurnId:"possibly-executed"};});
+ const expected=variant==="missing"||variant==="cwd"||variant==="queued";
+ assert.equal(await store.recoverClaudeResumePreflight(command.commandId),expected);
+ const state=store.snapshot();
+ assert.equal(state.commandJournal[command.commandId]!.state,expected?"applied":"unknown");
+ assert.deepEqual(state.commandJournal[command.commandId]!.error,error);
+ if(expected){
+  assert.equal(state.projectReservations[command.projectId],undefined);
+  assert.equal(state.commandJournal[command.commandId]!.response,undefined);
+  const replay=await store.claimCommand({...command,attemptId:"retry"},envelopeHash);
+  assert.equal(replay.isNew,false);assert.deepEqual(replay.entry.error,error);
+  assert.equal(replay.entry.state,"applied");assert.equal(await store.recoverClaudeResumePreflight(command.commandId),false);
+ }else assert.ok(state.projectReservations[command.projectId]);
+});
+
 test("released claim timeout recovery is narrow, durable and never treats failure as success", async t => {
   const directory = await mkdtemp(join(tmpdir(), "claim-recovery-"));
   const store = new StateStore(directory); await store.initialize();

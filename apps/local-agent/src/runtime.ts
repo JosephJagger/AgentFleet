@@ -264,8 +264,10 @@ const KNOWN_FAILED_INVOCATION_CODES = new Set([
   "VOICE_POLICY_CHANGED",
 ]);
 
-function isKnownFailedInvocation(error: unknown): boolean {
-  return error instanceof AgentError && KNOWN_FAILED_INVOCATION_CODES.has(error.code);
+function isKnownFailedInvocation(error: unknown, commandType: FleetCommand["type"]): boolean {
+  return error instanceof AgentError && (KNOWN_FAILED_INVOCATION_CODES.has(error.code) ||
+    // resumeThread only reads metadata before startTurn can consume the prompt.
+    ["turn.start", "turn.queue"].includes(commandType) && ["CLAUDE_SESSION_MISSING", "THREAD_CWD_MISMATCH"].includes(error.code));
 }
 
 export function commandEnvelopeHash(command: FleetCommand | Record<string, unknown>): string {
@@ -1042,7 +1044,7 @@ export class AgentRuntime {
           this.ackCommand(command, "unknown", current.error ?? publicFailure);
           return;
         }
-        if (current.state === "invoking" && isKnownFailedInvocation(error)) {
+        if (current.state === "invoking" && isKnownFailedInvocation(error, command.type)) {
           await this.store.transitionCommand(command.attemptId, "invoking", "responded", { error: publicFailure });
           await this.emitCommandState(command, "responded", publicFailure);
           this.ackCommand(command, "responded", { error: publicFailure });

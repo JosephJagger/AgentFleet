@@ -144,6 +144,28 @@ test("journal recovery only reads persisted evidence and never invokes or replay
   assert.deepEqual(store.snapshot().outbox,before.outbox);
 });
 
+test("reconciling a proven Claude preflight failure clears only that fence and returns failure without executing",async t=>{
+ const directory=await mkdtemp(join(tmpdir(),"claude-preflight-reconcile-"));
+ const store=new StateStore(directory);await store.initialize();
+ t.after(async()=>{store.close();await rm(directory,{recursive:true,force:true});});
+ const command={commandId:"cmd-preflight",attemptId:"attempt-preflight",projectId:"p",type:"turn.start"} as import("../src/types.js").FleetCommand;
+ await store.update(s=>{s.projects.push({id:"p",root:directory,alias:"fixture",provider:"claude"} as import("../src/types.js").ProjectRecord);});
+ await store.claimCommand(command,"exact-hash");
+ await store.reserveProjectCommand({projectId:"p",commandId:command.commandId,attemptId:command.attemptId,envelopeHash:"exact-hash",appServerEpoch:"epoch"});
+ await store.transitionCommand(command.attemptId,"claimed","invoking");
+ await store.setManagedThread({nativeThreadId:"claude_original",projectId:"p",sessionCwd:directory,appServerEpoch:"epoch",policyVersion:"remote-restricted-v1",policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString()});
+ const error={code:"CLAUDE_SESSION_MISSING",message:"original metadata check failed"};
+ await store.markCommandUnknown(command.attemptId,error);
+ const reports:Record<string,unknown>[]=[];
+ const maintenance=new AgentMaintenance({store,runtime:new Proxy({} as AgentRuntime,{get(){throw Error("must not execute or resume");}}),signal:new AbortController().signal,report:result=>reports.push(result)});
+ const offer={operationId:"check-claude-receipt",operationType:"commands.reconcile",commands:[command.commandId]};
+ await maintenance.handle(offer);await maintenance.handle(offer);
+ assert.equal(reports.at(-1)?.state,"succeeded");
+ const receipt=(reports.at(-1)?.result as {commands:Record<string,unknown>[]}).commands[0]!;
+ assert.equal(receipt.state,"applied");assert.deepEqual(receipt.error,error);assert.deepEqual(receipt.response,{});
+ assert.equal(store.snapshot().projectReservations.p,undefined);assert.ok(store.snapshot().managedThreads.claude_original);
+});
+
 test("image cleanup crash replay never invokes deletion again, successful proof replays", async t => {
   const directory = await mkdtemp(join(tmpdir(), "image-maintenance-"));
   const store = new StateStore(directory); await store.initialize();

@@ -230,6 +230,46 @@ test("resumed background results cannot complete or discard a newly submitted Cl
  await runtime.stop();
 });
 
+for (const source of ["edges", "snapshot", "queued-notification"] as const) test(`Claude waits for background planning and parent synthesis (${source}), without resending`, async t => {
+ const id="claude_parent",thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;
+ const events:Array<{type:string;payload:Record<string,unknown>}>=[];
+ let done!:()=>void;const completed=new Promise<void>(r=>{done=r;});
+ let queries=0,closed=0;
+ const runtime=new ClaudeRuntime({findManagedThread:()=>thread,findProject:()=>project,onVolatile:()=>{},onExit:async()=>{},onApproval:async()=>{},onApprovalResolved:async()=>{},onEvent:async e=>{
+  events.push(e);if(e.type==="turn.completed"){await runtime.unsubscribeThread(id);done();}
+ }} as AppServerCallbacks,"epoch",{
+  detectClaude:async()=>({installed:true,version:"2.1.285",path:"/bin/claude"}),nativeClaudeRunning:async()=>false,
+  inspectClaudeMetadata:async()=>({models:[],quota:{available:false,observedAt:new Date().toISOString(),subscriptionType:null,windows:[]}}),
+  query:({prompt})=>{queries++;return {close(){closed++;},async setPermissionMode(mode:string){assert.equal(mode,"plan");},async *[Symbol.asyncIterator](){
+   const sent=await (prompt as AsyncIterable<{uuid:string}>)[Symbol.asyncIterator]().next();
+   const result={type:"result",is_error:false,num_turns:1,modelUsage:{},usage:{input_tokens:0,output_tokens:0}};
+   const task={task_id:"child",task_type:"local_agent",description:"Explore"};
+   yield source==="edges"?{type:"system",subtype:"task_started",session_id:"parent",...task}:{type:"system",subtype:"background_tasks_changed",session_id:"parent",tasks:[task]};
+   if(source==="queued-notification")yield {type:"system",subtype:"background_tasks_changed",session_id:"parent",tasks:[]};
+   yield {...result,user_message_uuid:sent.value!.uuid,...(source==="queued-notification"?{queued_turn_count:1}:{})};
+   assert.equal(closed,0,"first parent result must not close active background work");
+   assert.equal(events.some(e=>e.type==="turn.completed"),false);
+   yield {...result,user_message_uuid:"another-prompt"};
+   yield {...result,num_turns:0};
+   assert.equal(closed,0,"unrelated and metadata results cannot finish the task");
+   if(source!=="edges") {
+    yield {type:"system",subtype:"background_tasks_changed",session_id:"parent",tasks:[{task_id:"watcher",task_type:"local_agent",ambient:true}]};
+    // SDK explicitly permits late edges after its authoritative level signal.
+    yield {type:"system",subtype:"task_started",session_id:"parent",...task};
+   } else yield {type:"system",subtype:"task_notification",session_id:"parent",task_id:"child",status:"completed"};
+   assert.equal(closed,0,"child completion alone is not parent completion");
+   yield {type:"assistant",message:{id:"synthesis",content:[{type:"text",text:"Final plan"}]}};
+   yield result;
+  }} as unknown as Query;},
+ });
+ t.after(()=>runtime.stop());await runtime.start();await runtime.startTurn(thread,project,"Plan only",undefined,{model:"host",mode:"plan"});await completed;
+ assert.equal(queries,1);assert.equal(closed,1);
+ assert.equal(events.filter(e=>e.type==="turn.completed").length,1);
+ assert.equal((events.find(e=>e.type==="turn.completed")!.payload.turn as {status:string}).status,"completed");
+ assert.equal(events.filter(e=>e.type==="item.completed"&&(e.payload.item as {type:string}).type==="userMessage").length,1);
+ assert.ok(JSON.stringify(events).includes("Final plan"));
+});
+
 test("unattributed Claude startup failure is reported instead of waiting for a matching prompt forever",async()=>{
  const id="claude_12345678-1234-1234-1234-123456789012";
  const thread={nativeThreadId:id,projectId:project.id,sessionCwd:project.root} as ManagedThread;
@@ -329,9 +369,10 @@ test("Claude child stream and result cannot become parent reply or complete pare
 
 for (const ending of ["parent-result", "stream-error", "release"] as const) test(`Claude ${ending} loses unconfirmed child running state and preserves reported terminal outcomes`, async () => {
   const id = "claude_parent", thread = { nativeThreadId: id, projectId: project.id, sessionCwd: project.root } as ManagedThread;
+  let terminalStatus: string | undefined;
   let ready!: () => void, finish!: () => void, terminal!: () => void;
   const started = new Promise<void>(resolve => { ready = resolve; }), released = new Promise<void>(resolve => { finish = resolve; }), ended = new Promise<void>(resolve => { terminal = resolve; });
-  const runtime = new ClaudeRuntime({ findManagedThread: () => thread, findProject: () => project, onVolatile: () => {}, onEvent: async event => { if (event.type === "turn.completed") terminal(); }, onExit: async () => {}, onApproval: async () => {}, onApprovalResolved: async () => {} } as AppServerCallbacks, "epoch", {
+  const runtime = new ClaudeRuntime({ findManagedThread: () => thread, findProject: () => project, onVolatile: () => {}, onEvent: async event => { if (event.type === "turn.completed") { terminalStatus=(event.payload.turn as {status:string}).status; terminal(); } }, onExit: async () => {}, onApproval: async () => {}, onApprovalResolved: async () => {} } as AppServerCallbacks, "epoch", {
     detectClaude: async () => ({ installed: true, version: "2.1.285", path: "/bin/claude" }), nativeClaudeRunning: async () => false,
     inspectClaudeMetadata: async () => ({ models: [], quota: { available: false, observedAt: new Date().toISOString(), subscriptionType: null, windows: [] } }),
     getSessionInfo: async () => ({ sessionId: "parent", cwd: "/tmp", summary: "", lastModified: 0 }), listSubagents: async () => [],
@@ -359,6 +400,7 @@ for (const ending of ["parent-result", "stream-error", "release"] as const) test
   assert.equal(before.items.some(item => item.id === "internal"), false, "internal events and later progress cannot register a visible child");
   if (ending === "release") await runtime.unsubscribeThread(id);
   else { finish(); await ended; }
+  assert.equal(terminalStatus,ending==="release"?undefined:"failed","EOF while waiting for children cannot report success");
   await new Promise(resolve => setImmediate(resolve));
   const after = await runtime.readNativeSubagents(id, project, "/tmp");
   assert.deepEqual(Object.fromEntries(after.items.map(item => [item.id, item.status])), { completed: "completed", failed: "failed", killed: "killed", stopped: "stopped", unconfirmed: "unknown" });

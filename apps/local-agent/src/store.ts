@@ -787,6 +787,35 @@ export class StateStore {
     });
   }
 
+  /** Older agents fenced metadata-only Claude resume failures as uncertain sends.
+   * These exact failures happen before startTurn; retain the negative receipt,
+   * never fabricate a native turn or retry the original command.
+   */
+  async recoverClaudeResumePreflight(commandId: string): Promise<boolean> {
+    return this.update(state => {
+      const journal = state.commandJournal[commandId];
+      if (journal?.state !== "unknown" || !["turn.start", "turn.queue"].includes(journal.commandType) || !journal.invokingAt || journal.response !== undefined ||
+          !["CLAUDE_SESSION_MISSING", "THREAD_CWD_MISMATCH"].includes(journal.error?.code ?? "")) return false;
+      const reservations = Object.values(state.projectReservations).filter(r => r.commandId === commandId);
+      if (reservations.length !== 1) return false;
+      const reservation = reservations[0]!;
+      if (reservation.state !== "unknown" || reservation.envelopeHash !== journal.envelopeHash || reservation.attemptId !== journal.canonicalAttemptId ||
+          state.projects.find(p => p.id === reservation.projectId)?.provider !== "claude") return false;
+      const threads = Object.values(state.managedThreads).filter(t => t.projectId === reservation.projectId);
+      if (!threads.length || threads.some(t => t.activeTurnId !== undefined || t.realtimeSessionId !== undefined || !t.nativeThreadId.startsWith("claude_"))) return false;
+      if (Object.values(state.approvals).some(a => a.projectId === reservation.projectId && ["pending", "delivery_unknown"].includes(a.state))) return false;
+      const entries = Object.values(state.inbox).filter(e => e.commandId === commandId);
+      const original = state.inbox[journal.canonicalAttemptId];
+      if (!original || !entries.length || entries.some(e => e.state !== "unknown" || e.envelopeHash !== journal.envelopeHash || e.response !== undefined || e.error?.code !== journal.error?.code)) return false;
+      const timestamp = nowIso();
+      journal.state = "applied";
+      journal.updatedAt = timestamp;
+      for (const entry of entries) { entry.state = "applied"; entry.updatedAt = timestamp; }
+      delete state.projectReservations[reservation.projectId];
+      return true;
+    });
+  }
+
   async addProject(project: ProjectRecord): Promise<void> {
     await this.update((state) => {
       const sameAlias = state.projects.find(

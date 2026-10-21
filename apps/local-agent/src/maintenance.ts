@@ -158,7 +158,10 @@ export class AgentMaintenance {
         if (!Array.isArray(requests) || requests.length > 20 || requests.some(id => typeof id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(id))) {
           throw new AgentError("RECOVERY_REQUEST_INVALID", "请重新发起主机回执核验");
         }
-        for (const commandId of requests) await this.options.store.recoverLateTerminalTurn(commandId);
+        for (const commandId of requests) {
+          await this.options.store.recoverClaudeResumePreflight(commandId);
+          await this.options.store.recoverLateTerminalTurn(commandId);
+        }
         const state = this.options.store.snapshot();
         const commands = requests.map(commandId => {
           const journal = state.commandJournal[commandId];

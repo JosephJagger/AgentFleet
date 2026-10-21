@@ -113,7 +113,7 @@ function messageItems(value: unknown): Array<{ nativeTurnId: string; nativeItemI
   return result;
 }
 
-interface Writer { query: Query; input: SDKUserMessage[]; wake?: () => void; closed: boolean; child?: ChildProcess; turnId?: string; interrupted: boolean; fresh: boolean; promptIds: Set<string>; textItemId?: string; executionPermissionMode: NonNullable<ClaudeSettings["permissionMode"]>; }
+interface Writer { query: Query; input: SDKUserMessage[]; wake?: () => void; closed: boolean; child?: ChildProcess; turnId?: string; interrupted: boolean; fresh: boolean; promptIds: Set<string>; completedPromptIds: Set<string>; backgroundTasks: Set<string>; backgroundSnapshotSeen: boolean; awaitingBackground: boolean; textItemId?: string; executionPermissionMode: NonNullable<ClaudeSettings["permissionMode"]>; }
 interface Pending { writer: Writer; resolve: (result: PermissionResult) => void; input: Record<string, unknown>; toolName: string; }
 
 const defaults = { query, listSessions, getSessionInfo, getSessionMessages, listSubagents, getSubagentMessages, detectClaude, nativeClaudeRunning, inspectClaudeMetadata };
@@ -162,19 +162,28 @@ export class ClaudeRuntime implements AppServerClient {
     // even when discovery later returns a generated native summary.
     return thread?.origin === "agentfleet" && thread.titleSource === "name" ? thread.title : undefined;
   }
+  private sessionInfo(id: string) {
+    const thread = this.callbacks.findManagedThread?.(id);
+    const cwd = thread?.sessionCwd ?? (thread && this.callbacks.findProject?.(thread.projectId)?.root);
+    // Unscoped SDK metadata reads only a bounded transcript head/tail. A large
+    // first user record can put cwd outside that window despite a valid file.
+    // Scope to the existing binding; never manufacture metadata or a new session.
+    return this.sdk.getSessionInfo(nativeId(id), cwd ? { dir: cwd } : undefined);
+  }
   async listThreads() {
     await this.start();
     if (!this.binary) return [];
     const running = new Map<string, Promise<boolean>>();
     const isRunning = (cwd: string) => { if (!running.has(cwd)) running.set(cwd, this.sdk.nativeClaudeRunning(cwd, this.owned)); return running.get(cwd)!; };
-    return Promise.all((await this.sdk.listSessions()).filter(s => s.cwd).map(async s => ({ nativeThreadId: CLAUDE_PREFIX + s.sessionId, cwd: s.cwd!, title: this.panelTitle(CLAUDE_PREFIX + s.sessionId) ?? s.customTitle ?? (s.summary || s.firstPrompt || "Claude Code"), titleSource: this.panelTitle(CLAUDE_PREFIX + s.sessionId) || s.customTitle ? "name" as const : "preview" as const, executionState: await isRunning(s.cwd!) ? "running" as const : "idle" as const, historyMode: "paginated" as const })));
+    const sessions = await Promise.all((await this.sdk.listSessions()).map(async s => s.cwd ? s : this.callbacks.findManagedThread?.(CLAUDE_PREFIX + s.sessionId) ? await this.sessionInfo(CLAUDE_PREFIX + s.sessionId) : s));
+    return Promise.all(sessions.filter((s): s is NonNullable<typeof s> => Boolean(s?.cwd)).map(async s => ({ nativeThreadId: CLAUDE_PREFIX + s.sessionId, cwd: s.cwd!, title: this.panelTitle(CLAUDE_PREFIX + s.sessionId) ?? s.customTitle ?? (s.summary || s.firstPrompt || "Claude Code"), titleSource: this.panelTitle(CLAUDE_PREFIX + s.sessionId) || s.customTitle ? "name" as const : "preview" as const, executionState: await isRunning(s.cwd!) ? "running" as const : "idle" as const, historyMode: "paginated" as const })));
   }
   async readHistoryPage(id: string, cursor: string | null): Promise<ThreadHistoryPage> {
     const offset = cursor ? Number(cursor) : 0;
     if (!Number.isSafeInteger(offset) || offset < 0) throw new AgentError("INVALID_CURSOR", "Invalid Claude history cursor");
     const messages = await this.sdk.getSessionMessages(nativeId(id), { offset, limit: 100, includeSystemMessages: true });
     // SDK determines the canonical parent chain; local timestamps are display metadata only.
-    const info = await this.sdk.getSessionInfo(nativeId(id));
+    const info = await this.sessionInfo(id);
     const timestamps = new Map<string,string>();
     const wanted=new Set(messages.flatMap(message=>[message.uuid,...(isRecord(message.message) && typeof message.message.id === "string" ? [message.message.id] : [])]));
     if (info?.cwd && /^[a-f0-9-]{36}$/i.test(nativeId(id))) {
@@ -196,7 +205,7 @@ export class ClaudeRuntime implements AppServerClient {
     return { items, order, nextCursor: messages.length === 100 ? String(offset + 100) : null };
   }
   async readThread(id: string): Promise<ThreadHistorySnapshot> {
-    const info = await this.sdk.getSessionInfo(nativeId(id));
+    const info = await this.sessionInfo(id);
     if (!info?.cwd && !this.fresh.has(id)) throw new AgentError("CLAUDE_SESSION_MISSING", "Claude 原会话不存在，未创建替代会话");
     const thread = this.callbacks.findManagedThread(id);
     const cwd = info?.cwd ?? thread?.sessionCwd ?? this.callbacks.findProject(thread?.projectId ?? "")?.root ?? "";
@@ -311,7 +320,7 @@ export class ClaudeRuntime implements AppServerClient {
     if (this.writers.has(thread.nativeThreadId)) throw new AgentError("THREAD_BUSY", "Claude 会话仍在运行");
     const id = thread.nativeThreadId;
     const turnId = randomUUID();
-    const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), promptIds: new Set<string>(), turnId, executionPermissionMode: (settings as ClaudeSettings | undefined)?.permissionMode ?? "default" } as unknown as Writer;
+    const writer = { input: [], closed: false, interrupted: false, fresh: this.fresh.has(id), promptIds: new Set<string>(), completedPromptIds: new Set<string>(), backgroundTasks: new Set<string>(), backgroundSnapshotSeen: false, awaitingBackground: false, turnId, executionPermissionMode: (settings as ClaudeSettings | undefined)?.permissionMode ?? "default" } as unknown as Writer;
     const callbacks = this.callbacks, epoch = this.appServerEpoch;
     // The SDK need not echo submitted user messages. Record each consumed input
     // with its native UUID, also used by history/echo deduplication.
@@ -392,6 +401,19 @@ export class ClaudeRuntime implements AppServerClient {
         // transcript. It must never alter the parent's text id or finish its turn.
         const rawMessage: unknown = msg;
         if (isRecord(rawMessage) && (typeof rawMessage.parent_tool_use_id === "string" || typeof rawMessage.parent_agent_id === "string")) continue;
+        if (isRecord(rawMessage) && rawMessage.type === "system" && rawMessage.session_id === nativeId(id)) {
+          if (rawMessage.subtype === "background_tasks_changed" && Array.isArray(rawMessage.tasks)) {
+            // Native snapshots are authoritative. Their order relative to edge
+            // events is unspecified; never merge late edges into a snapshot.
+            writer.backgroundSnapshotSeen = true;
+            writer.backgroundTasks = new Set(rawMessage.tasks.filter(isRecord).filter(task => task.ambient !== true && task.task_type === "local_agent" && typeof task.task_id === "string").map(task => task.task_id as string));
+          } else if (!writer.backgroundSnapshotSeen && typeof rawMessage.task_id === "string") {
+            const task = this.nativeTasks.get(id)?.get(rawMessage.task_id);
+            const status = rawMessage.subtype === "task_notification" ? rawMessage.status : isRecord(rawMessage.patch) ? rawMessage.patch.status : task?.status;
+            if (rawMessage.ambient === true || rawMessage.skip_transcript === true || typeof status === "string" && ["completed", "failed", "stopped", "killed"].includes(status)) writer.backgroundTasks.delete(rawMessage.task_id);
+            else if (task) writer.backgroundTasks.add(rawMessage.task_id);
+          }
+        }
         if (msg.type === "system" && msg.subtype === "init") {
           if (CLAUDE_PREFIX + msg.session_id !== id) throw new AgentError("CLAUDE_RESUME_MISMATCH", "Claude 返回了不同会话，已停止执行");
           this.fresh.delete(id);
@@ -409,9 +431,10 @@ export class ClaudeRuntime implements AppServerClient {
           // Match all consumed UUIDs because the CLI can merge prompt batches.
           const ids = [...(msg.user_message_uuids ?? []), ...(msg.user_message_uuid ? [msg.user_message_uuid] : [])];
           const matches = ids.some(uuid => writer.promptIds.has(uuid));
+          const continuation = writer.awaitingBackground && msg.num_turns > 0 && (ids.length === 0 || ids.some(uuid => writer.completedPromptIds.has(uuid)));
           const attributesPrompts = supportsClaudeSteering(this.availability.version);
-          if (!matches && (ids.length > 0 || (!msg.is_error && !writer.interrupted && (attributesPrompts || (msg.queued_turn_count ?? 0) > 0 || msg.num_turns === 0)))) continue;
-          for (const uuid of ids) writer.promptIds.delete(uuid);
+          if (!matches && !continuation && (ids.length > 0 || (!msg.is_error && !writer.interrupted && (attributesPrompts || (msg.queued_turn_count ?? 0) > 0 || msg.num_turns === 0)))) continue;
+          for (const uuid of ids) if (writer.promptIds.delete(uuid)) writer.completedPromptIds.add(uuid);
           // Unattributed fatal startup errors and interrupt results still end
           // the attempt; older CLIs without attribution retain legacy behavior.
           // Native modelUsage is conversation-cumulative; usage is this query's consumption.
@@ -426,6 +449,13 @@ export class ClaudeRuntime implements AppServerClient {
           // A later native result may cover an input accepted near the end of this one.
           // Keep reading the SAME query until all accepted inputs are accounted for.
           if (!msg.is_error && !writer.interrupted && attributesPrompts && writer.promptIds.size > 0) continue;
+          if (!msg.is_error && !writer.interrupted && (writer.backgroundTasks.size > 0 || (msg.queued_turn_count ?? 0) > 0)) {
+            writer.awaitingBackground = true;
+            // Keep the same query alive for native child completion and the
+            // parent's follow-up, including an already queued notification
+            // after the last child exits. A main-loop result is not completion.
+            continue;
+          }
           delete writer.turnId;
           await emit("turn.completed", { turn: { id: turnId, status: writer.interrupted ? "interrupted" : msg.is_error ? "failed" : "completed" } });
           break;
