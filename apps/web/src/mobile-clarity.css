@@ -25,6 +25,24 @@
 /* The live theme has an additional voice control. On very narrow phones,
    keep the emblem and every touch target; the full brand remains accessible. */
 @media (max-width: 360px) {
+  :root .workspace-catalog > .section-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  :root .workspace-catalog .catalog-heading-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  :root .workspace-catalog .catalog-heading-actions .button {
+    min-width: 0;
+    justify-content: center;
+    padding-inline: 8px;
+    gap: 6px;
+    font-size: var(--text-caption);
+    white-space: nowrap;
+  }
   :root[data-theme="buzhoushan"] .topbar .brand-lockup > span:last-child {
     position: absolute;
     width: 1px;
