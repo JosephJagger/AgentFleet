@@ -56,10 +56,11 @@ it("后台刷新不插入加载行，保留已有项目和会话 DOM", async () 
 });
 
 it("后台刷新保留所有已加载页，较晚页失败也不提交半份列表", async () => {
-  vi.mocked(api.sessions).mockImplementation(async ({ cursor }) => cursor ? { items: [row("31")], nextCursor: null } : { items: [row("1")], nextCursor: "page-2" });
+  vi.mocked(api.sessions).mockImplementation(async ({ cursor }) => cursor ? { items: [row("31")], nextCursor: null } : { items: Array.from({ length: 30 }, (_, i) => row(String(i + 1))), nextCursor: "page-2" });
   const { rerender } = render(<WorkspaceCatalog {...props} refreshKey="1" />);
   fireEvent.click(await screen.findByRole("button", { name: /测试项目.*\/srv/ }));
-  fireEvent.click(await screen.findByRole("button", { name: "加载更多会话" }));
+  await screen.findByText("会话 1");
+  for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "下一页" }));
   await screen.findByText("会话 31");
   rerender(<WorkspaceCatalog {...props} refreshKey="2" />);
   await waitFor(() => expect(api.sessions).toHaveBeenCalledTimes(5));
@@ -71,7 +72,7 @@ it("后台刷新保留所有已加载页，较晚页失败也不提交半份列�
   });
   rerender(<WorkspaceCatalog {...props} refreshKey="3" />);
   await screen.findByText("网络暂时不可用");
-  expect(screen.getByText("会话 1")).toBeTruthy();
+  expect(screen.queryByText("会话 1")).toBeNull();
   expect(screen.getByText("会话 31")).toBeTruthy();
   expect(screen.queryByText("会话 new")).toBeNull();
 });
@@ -176,4 +177,43 @@ it("选中工作树会话展开归属位置，刷新不重新打开手动收起�
   await screen.findByRole("button", { name: /^工作树 · 1/ });
   expect(screen.getByRole("button", { name: /^工作树 · 1/ }).getAttribute("aria-expanded")).toBe("false");
   expect(screen.queryByText("会话 selected")).toBeNull();
+});
+
+
+it("主目录每页五条，支持按钮和左右滑动，并忽略纵向滚动与多指手势", async () => {
+  vi.mocked(api.sessions).mockResolvedValue({ items: Array.from({ length: 12 }, (_, i) => row(String(i + 1))), nextCursor: null });
+  const { container, rerender } = render(<WorkspaceCatalog {...props} refreshKey="pages" />);
+  fireEvent.click(await screen.findByRole("button", { name: /测试项目.*\/srv/ }));
+  await screen.findByText("会话 1");
+  expect(container.querySelectorAll(".session-row")).toHaveLength(5);
+  expect(screen.queryByText("会话 6")).toBeNull();
+  expect((screen.getByRole("button", { name: "上一页" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+  expect(screen.getByText("会话 6")).toBeTruthy();
+  const area = container.querySelector(".catalog-main-session-pages")!;
+  const swipe = (x: number, y: number) => {
+    fireEvent.touchStart(area, { touches: [{ clientX: 150, clientY: 100 }] });
+    fireEvent.touchMove(area, { touches: [{ clientX: x, clientY: y }] });
+    fireEvent.touchEnd(area, { changedTouches: [{ clientX: x, clientY: y }] });
+  };
+  swipe(50, 200);
+  expect(screen.getByText("会话 6")).toBeTruthy();
+  fireEvent.touchStart(area, { touches: [{ clientX: 150, clientY: 100 }, { clientX: 180, clientY: 100 }] });
+  fireEvent.touchEnd(area, { changedTouches: [{ clientX: 50, clientY: 100 }] });
+  expect(screen.getByText("会话 6")).toBeTruthy();
+  swipe(50, 100);
+  expect(screen.getByText("第 3 / 3 页")).toBeTruthy();
+  expect(container.querySelectorAll(".session-row")).toHaveLength(2);
+  expect((screen.getByRole("button", { name: "下一页" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByText("会话 11"), { detail: 1 });
+  expect(props.onSelect).not.toHaveBeenCalled();
+  swipe(250, 100);
+  expect(screen.getByText("会话 6")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "上一页" }));
+  expect(screen.getByText("会话 1")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+  vi.mocked(api.sessions).mockResolvedValue({ items: [row("1")], nextCursor: null });
+  rerender(<WorkspaceCatalog {...props} refreshKey="shrunk" />);
+  await screen.findByText("会话 1");
+  expect(screen.queryByRole("navigation", { name: "会话分页" })).toBeNull();
 });

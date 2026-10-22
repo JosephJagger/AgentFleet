@@ -95,7 +95,13 @@
 :root .workspace-catalog .project-session-group--worktree > .catalog-project-heading { background:var(--paper); border-radius:inherit; border-left:0; }
 :root .workspace-catalog .project-session-group--worktree .project-session-group__heading { padding:12px 10px 4px; min-height:0; }
 :root .workspace-catalog .project-session-group--worktree .project-usage { padding:0 10px 6px 35px; }
-.catalog-worktree-label { display:inline-flex; padding:2px 6px; border:1px solid currentColor; border-radius:4px; font-size:var(--text-small); font-weight:500; white-space:nowrap; }
+/* Compact metadata badges follow the active theme without competing with project names. */
+.workspace-catalog .project-session-group__heading :is(.catalog-worktree-label, .catalog-worktree-count, .project-agent-label) {
+  display:inline-flex; align-items:center; flex:0 0 auto; margin:0; padding:2px 7px;
+  border:0; border-radius:5px; background:color-mix(in srgb, var(--muted) 9%, transparent);
+  color:var(--muted); font-family:inherit; font-size:var(--text-micro); font-weight:500;
+  line-height:1.5; letter-spacing:0; white-space:nowrap;
+}
 .catalog-family-activity { display:flex; gap:4px 10px; flex-wrap:wrap; font-size:var(--text-small); color:var(--ink); }
 .catalog-family-activity:empty { display:none; }
 .catalog-worktree-path { padding:0 10px 10px 35px; color:var(--muted); font-size:var(--text-small); }
@@ -103,9 +109,7 @@
 .catalog-worktree-path code, .catalog-worktree-path small { display:block; margin-top:6px; white-space:normal; overflow-wrap:anywhere; }
 .project-usage > small { display:block; color:var(--muted); font-size:var(--text-small); }
 .workspace-catalog .project-session-group__heading strong { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; overflow-wrap:anywhere; }
-.workspace-catalog .project-session-group__heading .project-agent-label { margin:0; }
 .project-session-group__copy > .catalog-worktree-branch { white-space:normal; overflow-wrap:anywhere; }
-.catalog-worktree-count { font-size:var(--text-caption); font-weight:500; color:var(--muted); }
 .project-session-group__copy > .catalog-family-activity { display:flex; white-space:normal; font-family:inherit; color:var(--ink); }
 @media(max-width:720px) {
   .catalog-worktrees { margin:0 6px 10px; }
@@ -113,3 +117,5 @@
   .catalog-worktrees-list > .project-session-group::before { left:-10px; width:9px; }
   :root .workspace-catalog .project-session-group--worktree .project-session-group__children { margin:8px 6px; padding-left:6px; }
 }
+
+.catalog-main-session-pages { touch-action: pan-y pinch-zoom; }

@@ -32,6 +32,18 @@ function ProjectGroup({ project, worktrees = [], parent, expanded, expandedIds, 
   const [retry, setRetry] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [pageCount, setPageCount] = useState(1);
+  const [sessionPage, setSessionPage] = useState(0);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressClick = useRef(false);
+  const lastLoadedPage = Math.max(0, Math.ceil(page.items.length / 5) - 1);
+  const visiblePage = Math.min(sessionPage, lastLoadedPage);
+  const hasNextPage = visiblePage < lastLoadedPage || Boolean(page.nextCursor);
+  const changeSessionPage = (direction: number) => {
+    if (loading || (direction < 0 ? visiblePage === 0 : !hasNextPage)) return;
+    const next = visiblePage + direction;
+    setSessionPage(next);
+    if (next > lastLoadedPage) setPageCount(count => count + 1);
+  };
   useEffect(() => {
     if (!expanded || !mainOpen) return;
     const controller = new AbortController();
@@ -49,6 +61,7 @@ function ProjectGroup({ project, worktrees = [], parent, expanded, expandedIds, 
         if (!cursor) break;
       }
       setPage({ items: [...items.values()], nextCursor: cursor });
+      if (!cursor) setSessionPage(current => Math.min(current, Math.max(0, Math.ceil(items.size / 5) - 1)));
       setLoaded(true); setError("");
     })().catch((reason) => { if (!controller.signal.aborted) setError(reason.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -59,7 +72,42 @@ function ProjectGroup({ project, worktrees = [], parent, expanded, expandedIds, 
       {lane && <details className="catalog-worktree-path"><summary>{t('目录详情')}</summary><code>{displayName(project.pathHint)}</code>{!parent&&<small>{t('所属项目：{0}',displayName(project.repoRoot!))}</small>}</details>}
     </div>
     {expanded && worktrees.length>0&&<button type="button" className="catalog-worktrees-toggle catalog-main-toggle" aria-label={t("主目录会话")} aria-expanded={mainOpen} aria-controls={`catalog-project-${project.id}`} onClick={()=>onToggle(`${project.id}:main-collapsed`)}><ChevronRight size={16} className={mainOpen?'catalog-expanded':''}/><FolderGit2 size={16}/><strong>{t('主目录会话')}</strong><Activity projects={[project]}/></button>}
-    {expanded && mainOpen && <div id={`catalog-project-${project.id}`} className="project-session-group__children">{error && <p className="catalog-error" role="alert">{systemText(error)}<button type="button" onClick={() => setRetry((value) => value + 1)}>{t("重试")}</button></p>}<SessionRows sessions={page.items} selectedId={selectedId} onSelect={onSelect} />{loading && !loaded ? <div className="catalog-loading"><LoaderCircle className="spin" size={16} />{t("正在读取会话")}</div> : loaded && page.items.length === 0 && !error ? <p className="catalog-empty">{t("暂无会话，点击下方新会话开始。")}</p> : null}{page.nextCursor && <button className="catalog-more" type="button" disabled={loading} onClick={() => setPageCount((count) => count + 1)}>{t("加载更多会话")}</button>}<div className="project-session-group__actions"><button type="button" className="project-create-session" aria-label={displayName(t("在 {0} 新建会话", project.alias))} onClick={() => onCreate(project)}><Plus size={16} /><span>{t("新会话")}</span></button>{onSchedule && <button type="button" className="project-create-session" aria-label={displayName(t("管理 {0} 的定时任务", project.alias))} onClick={() => onSchedule(project)}><span>{t("定时任务")}</span></button>}</div></div>}
+    {expanded && mainOpen && <div id={`catalog-project-${project.id}`} className="project-session-group__children">{error && <p className="catalog-error" role="alert">{systemText(error)}<button type="button" onClick={() => setRetry((value) => value + 1)}>{t("重试")}</button></p>}<div
+      className={!lane ? "catalog-main-session-pages" : undefined}
+      onTouchStart={event => {
+        suppressClick.current = false;
+        swipeStart.current = !lane && event.touches.length === 1
+          ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
+      }}
+      onTouchMove={event => {
+        const start = swipeStart.current;
+        if (!start) return;
+        if (event.touches.length !== 1 || Math.abs(event.touches[0].clientY - start.y) > 30) swipeStart.current = null;
+      }}
+      onTouchCancel={() => { swipeStart.current = null; }}
+      onTouchEnd={event => {
+        const start = swipeStart.current;
+        swipeStart.current = null;
+        if (!start || !event.changedTouches.length) return;
+        const dx = event.changedTouches[0].clientX - start.x;
+        const dy = event.changedTouches[0].clientY - start.y;
+        if (Math.abs(dx) >= 60 && Math.abs(dx) > Math.abs(dy) * 2) {
+          suppressClick.current = true;
+          changeSessionPage(dx < 0 ? 1 : -1);
+        }
+      }}
+      onClickCapture={event => {
+        if (suppressClick.current && event.detail !== 0) {
+          event.preventDefault(); event.stopPropagation(); suppressClick.current = false;
+        }
+      }}
+    ><SessionRows sessions={lane ? page.items : page.items.slice(visiblePage * 5, visiblePage * 5 + 5)} selectedId={selectedId} onSelect={onSelect} /></div>{loading && !loaded ? <div className="catalog-loading"><LoaderCircle className="spin" size={16} />{t("正在读取会话")}</div> : loaded && page.items.length === 0 && !error ? <p className="catalog-empty">{t("暂无会话，点击下方新会话开始。")}</p> : null}{lane && page.nextCursor && <button className="catalog-more" type="button" disabled={loading} onClick={() => setPageCount((count) => count + 1)}>{t("加载更多会话")}</button>}{!lane && (visiblePage > 0 || hasNextPage) && <nav className="project-pagination" aria-label={t("会话分页")}>
+      <span className="project-pagination__range" aria-live="polite">{page.nextCursor ? t("第 {0} 页", visiblePage + 1) : t("第 {0} / {1} 页", visiblePage + 1, lastLoadedPage + 1)}</span>
+      <span className="project-pagination__actions">
+        <button type="button" aria-label={t("上一页")} disabled={visiblePage === 0 || loading} onClick={() => changeSessionPage(-1)}><ChevronLeft size={15} /></button>
+        <button type="button" aria-label={t("下一页")} disabled={!hasNextPage || loading} onClick={() => changeSessionPage(1)}><ChevronRight size={15} /></button>
+      </span>
+    </nav>}<div className="project-session-group__actions"><button type="button" className="project-create-session" aria-label={displayName(t("在 {0} 新建会话", project.alias))} onClick={() => onCreate(project)}><Plus size={16} /><span>{t("新会话")}</span></button>{onSchedule && <button type="button" className="project-create-session" aria-label={displayName(t("管理 {0} 的定时任务", project.alias))} onClick={() => onSchedule(project)}><span>{t("定时任务")}</span></button>}</div></div>}
     {expanded && worktrees.length>0 && <div className="catalog-worktrees"><button type="button" className="catalog-worktrees-toggle" aria-expanded={lanesOpen} aria-controls={groupId} onClick={()=>onToggle(groupId)}><ChevronRight size={16} className={lanesOpen?"catalog-expanded":""}/><GitBranch size={16}/><strong>{t('工作树 · {0}',worktrees.length)}</strong><Activity projects={worktrees}/></button>{lanesOpen&&<div id={groupId} className="catalog-worktrees-list">{worktrees.map(child=><ProjectGroup key={child.id} project={child} parent={project} expanded={expandedIds.has(child.id)} expandedIds={expandedIds} selectedId={selectedId} refreshKey={refreshKey} onToggle={onToggle} onSelect={onSelect} onCreate={onCreate} onSchedule={onSchedule}/>)}</div>}</div>}
   </section>;
 }
