@@ -282,6 +282,7 @@ export interface CurrentUser {
 }
 
 export interface PendingCommit {
+  dismissalToken?: string;
   id: string;
   logicalSessionId: string;
   title: string;

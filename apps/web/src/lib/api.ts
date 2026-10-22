@@ -644,7 +644,7 @@ async function loadDashboard(): Promise<Dashboard> {
       if (!string(item.id) || !string(item.logicalSessionId)) return [];
       return [{ id: string(item.id), logicalSessionId: string(item.logicalSessionId), title: string(item.title),
         machineId: string(item.machineId), machineName: string(item.machineName), projectAlias: string(item.projectAlias),
-        path: string(item.path), provider: isProviderId(item.provider) ? item.provider : "codex" as const, checkedAt: string(item.checkedAt) }];
+        path: string(item.path), provider: isProviderId(item.provider) ? item.provider : "codex" as const, checkedAt: string(item.checkedAt), dismissalToken: string(item.dismissalToken) || undefined }];
     }),
     activitySessions: Array.isArray(rawDashboard.activitySessions) ? rawDashboard.activitySessions.map(session => mapSession(session, machines, projects, clientSessionId)) : sessions,
     compatibilityProfile: {
@@ -705,6 +705,7 @@ export const api = {
   deleteScheduledTask: (id:string) => request<{ok:true}>(`/api/scheduled-tasks/${encodeURIComponent(id)}`,{method:"DELETE"}),
   scheduledNotifications: () => request<{notifications:import("./types").ScheduledNotification[];unread:number}>("/api/scheduled-notifications"),
   readScheduledNotifications: (id?:string) => request<{ok:true}>("/api/scheduled-notifications/read",{method:"POST",body:JSON.stringify(id?{id}:{})}),
+  dismissPendingCommit: (id: string, token: string) => request<{ok: boolean}>("/api/pending-commits/dismiss", {method: "POST", body: JSON.stringify({id, token})}),
   writingPreferences: (id?:string,signal?:AbortSignal) => request<WritingPreferencesState>(id ? `/api/sessions/${encodeURIComponent(id)}/writing-preferences` : '/api/settings/writing',{signal}),
   saveWritingPreferences: (settings:Partial<CompletionPreferences>|null,id?:string,signal?:AbortSignal) => request<WritingPreferencesState>(id ? `/api/sessions/${encodeURIComponent(id)}/writing-preferences` : '/api/settings/writing',{method:'PUT',body:JSON.stringify({settings}),signal}),
   writingMemory: (id: string, signal?: AbortSignal) => request<WritingMemoryState>(`/api/sessions/${encodeURIComponent(id)}/writing-memory`, { signal }),

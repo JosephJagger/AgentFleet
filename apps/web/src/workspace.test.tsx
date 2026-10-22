@@ -12,7 +12,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { decideApproval:vi.fn(), createSession:vi.fn(),saveClaudePreferences:vi.fn(),saveGrokPreferences:vi.fn(),saveRuntimePreferences:vi.fn(), claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { dismissPendingCommit:vi.fn(), decideApproval:vi.fn(), createSession:vi.fn(),saveClaudePreferences:vi.fn(),saveGrokPreferences:vi.fn(),saveRuntimePreferences:vi.fn(), claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -1245,4 +1245,42 @@ it("待处理合并未提交提醒计数，并可打开不在首页列表中的�
   fireEvent.click(screen.getByRole("button", { name: /修复分页/ }));
   await waitFor(() => expect(api.session).toHaveBeenCalledWith("B", expect.any(AbortSignal)));
   expect(api.decideApproval).not.toHaveBeenCalled();
+});
+
+
+it("忽略本次只移除当前提醒和计数，刷新保持生效，新改动重新显示", async () => {
+  const item = { id: "m:/repo", logicalSessionId: "B", title: "本地缓存", machineId: "m", machineName: "主机2", projectAlias: "项目2", path: "/repo", provider: "claude" as const, checkedAt: new Date().toISOString(), dismissalToken: "a".repeat(64) };
+  const data = { ...dashboard(), pendingCommits: [item], stats: { ...dashboard().stats, approvals: 0 }, pendingApprovals: [] };
+  vi.mocked(api.dashboard).mockResolvedValue(data);
+  vi.mocked(api.dismissPendingCommit).mockImplementation(async () => { vi.mocked(api.dashboard).mockResolvedValue({ ...data, pendingCommits: [] }); return {ok: true}; });
+  const page = render(<App />);
+  const nav = await screen.findByRole("navigation", { name: "主导航" });
+  fireEvent.click(within(nav).getByRole("button", { name: /待处理.*1/ }));
+  const before = vi.mocked(api.session).mock.calls.length;
+  fireEvent.click(screen.getByRole("button", { name: "忽略本次" }));
+  await screen.findByText("暂无待处理事项");
+  expect(api.dismissPendingCommit).toHaveBeenCalledWith(item.id, item.dismissalToken);
+  expect(api.decideApproval).not.toHaveBeenCalled();
+  expect(vi.mocked(api.session).mock.calls.length).toBe(before);
+  expect(within(nav).queryByRole("button", { name: /待处理.*1/ })).toBeNull();
+  page.unmount(); render(<App />);
+  await screen.findByText("暂无待处理事项");
+  cleanup();
+  vi.mocked(api.dashboard).mockResolvedValue({ ...data, pendingCommits: [{ ...item, dismissalToken: "b".repeat(64) }] });
+  render(<App />);
+  await screen.findByRole("button", { name: "忽略本次" });
+  expect(screen.getByText("本地缓存")).toBeTruthy();
+});
+
+it("忽略失败保留卡片并显示错误，旧版 Agent 不允许永久忽略", async () => {
+  const item = { id: "m:/repo", logicalSessionId: "B", title: "缓存", machineId: "m", machineName: "主机", projectAlias: "项目", path: "/repo", provider: "codex" as const, checkedAt: new Date().toISOString(), dismissalToken: "a".repeat(64) };
+  const onDismiss = vi.fn().mockRejectedValue(new Error("提醒已变化，请刷新后重试"));
+  const onOpen = vi.fn();
+  const props = { approvals: [], pendingCommits: [item], onOpen, onBack: vi.fn(), onDismiss };
+  const view = render(<ApprovalsView {...props} />);
+  fireEvent.click(screen.getByRole("button", {name: "忽略本次"}));
+  await screen.findByRole("alert");
+  expect(screen.getByText("缓存")).toBeTruthy(); expect(onOpen).not.toHaveBeenCalled();
+  view.rerender(<ApprovalsView {...props} pendingCommits={[{...item, dismissalToken: undefined}]} />);
+  expect((screen.getByRole("button", {name: "忽略本次"}) as HTMLButtonElement).disabled).toBe(true);
 });

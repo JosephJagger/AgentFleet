@@ -1,14 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { ControlPlaneDatabase } from "../src/db.js";
 import { loadConfig } from "../src/config.js";
 import type { Principal } from "../src/auth.js";
 import { RegistryService } from "../src/registry.js";
-import { pendingCommits, parseWorkspaceGitStatus } from "../src/pending-commits.js";
+import { dismissPendingCommit, pendingCommits, parseWorkspaceGitStatus } from "../src/pending-commits.js";
 
-function fixture(t: test.TestContext) {
-  const db = new ControlPlaneDatabase(":memory:"); t.after(() => db.close());
+function fixture(t: test.TestContext, path = ":memory:") {
+  const db = new ControlPlaneDatabase(path); t.after(() => db.close());
   const config = loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL: "pending@example.test", ADMIN_PASSWORD: randomUUID(), DATABASE_PATH: ":memory:", PUBLIC_ORIGIN: "http://test.local", COOKIE_SECURE: "false" });
   const { workspaceId, userId } = db.bootstrap(config);
   const at = new Date().toISOString();
@@ -66,4 +69,73 @@ test("host discovery keeps only Git metadata and dashboard exposes reminders ind
   assert.equal((dashboard.pendingCommits as Array<{ logicalSessionId: string }>)[0]?.logicalSessionId, "s");
   registry.updateDiscovery("m", { state: "ready", workspaceGitStatus: [status("/repo", false)] });
   assert.deepEqual(registry.dashboard(principal).pendingCommits, []);
+});
+
+
+test("dismissal survives refresh and new sessions, is per-account, and new work reappears", t => {
+  const { db, add, report, status, principal, at } = fixture(t); add("s", "/repo");
+  db.run("INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,created_at) VALUES('seg','s','m','s',?)", at);
+  const fingerprint = "a".repeat(64), next = "b".repeat(64);
+  report([{ ...status("/repo"), fingerprint }]);
+  const item = pendingCommits(db, principal)[0]!;
+  assert.equal(item.dismissalToken, fingerprint);
+  dismissPendingCommit(db, principal, { id: item.id, token: item.dismissalToken });
+  dismissPendingCommit(db, principal, { id: item.id, token: item.dismissalToken }); // retry is idempotent
+  assert.deepEqual(pendingCommits(db, principal), []);
+  report([{ ...status("/repo", true, new Date(Date.parse(at) + 1).toISOString()), fingerprint }]);
+  add("new-session", "/repo", "claude");
+  assert.deepEqual(pendingCommits(db, { ...principal, clientSessionId: "another-browser" }), []);
+  assert.equal(pendingCommits(db, { ...principal, userId: "another-user" }).length, 1);
+  report([{ ...status("/repo"), fingerprint: next }]);
+  assert.equal(pendingCommits(db, principal).length, 1);
+  assert.throws(() => dismissPendingCommit(db, principal, { id: item.id, token: fingerprint }), /提醒已变化/);
+  assert.equal(pendingCommits(db, principal)[0]!.dismissalToken, next);
+  assert.throws(() => dismissPendingCommit(db, { ...principal, workspaceId: "another" }, { id: item.id, token: next }), /提醒已变化/);
+  assert.equal(db.get<{token: string}>("SELECT token FROM pending_commit_dismissals")!.token, fingerprint);
+});
+
+test("legacy, invalid, stale and busy samples cannot be dismissed", t => {
+  const { db, add, report, status, principal } = fixture(t); add("s", "/repo");
+  const token = "a".repeat(64);
+  for (const fingerprint of [undefined, "bad", "a".repeat(65)]) {
+    report([{ ...status("/repo"), fingerprint }]);
+    assert.equal(pendingCommits(db, principal)[0]?.dismissalToken, undefined);
+    assert.throws(() => dismissPendingCommit(db, principal, { id: "m:/repo", token }), /提醒已变化/);
+  }
+  report([{ ...status("/repo", true, "2020-01-01"), fingerprint: token }]);
+  assert.throws(() => dismissPendingCommit(db, principal, { id: "m:/repo", token }), /提醒已变化/);
+  report([{ ...status("/repo"), fingerprint: token }]); add("running", "/repo", "claude", "running");
+  assert.throws(() => dismissPendingCommit(db, principal, { id: "m:/repo", token }), /提醒已变化/);
+  assert.equal(db.all("SELECT * FROM pending_commit_dismissals").length, 0);
+});
+
+test("dismiss endpoint requires login and CSRF and validates the observed revision", async t => {
+  const { buildControlPlane, cookieFromSetCookie, csrfHeaders } = await import("../src/server.js");
+  const password = randomUUID(), origin = "http://test.local";
+  const { app } = await buildControlPlane({ ...loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL: "pending@example.test", ADMIN_PASSWORD: password, DATABASE_PATH: ":memory:", PUBLIC_ORIGIN: origin, COOKIE_SECURE: "false", LOG_LEVEL: "silent" }), databasePath: ":memory:" });
+  t.after(() => app.close());
+  const url = "/api/pending-commits/dismiss", payload = {id: "m:/repo", token: "a".repeat(64)};
+  const anonymous = await app.inject({method: "POST", url, headers: {origin}, payload});
+  assert.equal(anonymous.statusCode, 401);
+  const login = await app.inject({method: "POST", url: "/api/auth/login", headers: {origin}, payload: {email: "pending@example.test", password}});
+  assert.equal(login.statusCode, 200);
+  const cookie = cookieFromSetCookie(login.headers["set-cookie"]);
+  assert.equal((await app.inject({method: "POST", url, headers: {origin, cookie}, payload})).statusCode, 403);
+  const headers = {...csrfHeaders(login.json().csrfToken, origin), cookie};
+  assert.equal((await app.inject({method: "POST", url, headers, payload: {id: payload.id, token: "bad"}})).statusCode, 400);
+  assert.equal((await app.inject({method: "POST", url, headers, payload})).statusCode, 409);
+});
+
+
+test("dismissals are durable across database connections", t => {
+  const directory = mkdtempSync(join(tmpdir(), "dismiss-pending-"));
+  const path = join(directory, "db.sqlite");
+  const { db, add, report, status, principal } = fixture(t, path);
+  add("s", "/repo"); report([{ ...status("/repo"), fingerprint: "a".repeat(64) }]);
+  const item = pendingCommits(db, principal)[0]!;
+  dismissPendingCommit(db, principal, {id: item.id, token: item.dismissalToken});
+  const reopened = new ControlPlaneDatabase(path);
+  try { assert.deepEqual(pendingCommits(reopened, principal), []); }
+  finally { reopened.close(); }
+  t.after(() => rmSync(directory, {recursive: true, force: true}));
 });

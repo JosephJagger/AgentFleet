@@ -1,3 +1,4 @@
+import { dismissPendingCommit } from "./pending-commits.js";
 import { projectCatalog } from "./project-catalog.js";
 import { VideoStorage, readVideoStorageConfig } from "./video-storage.js";
 import { isProviderId, isAcpProvider } from "./provider-catalog.js";
@@ -1583,6 +1584,8 @@ export async function buildControlPlane(
       queue: coordination.listQueue(principal, logicalSessionId),
     };
   });
+  app.post("/api/pending-commits/dismiss", { preHandler: mutate }, async request =>
+    dismissPendingCommit(db, request.principal as Principal, record(request.body)));
   app.get("/api/settings/writing", { preHandler: authenticate }, async (request,reply) => {
     reply.header("cache-control","no-store"); return writingPreferences.read(request.principal as Principal);
   });

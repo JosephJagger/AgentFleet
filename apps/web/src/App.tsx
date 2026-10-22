@@ -1306,21 +1306,33 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
   );
 }
 
-export function ApprovalsView({ approvals, pendingCommits = [], onOpen, onBack }: { approvals: Approval[]; pendingCommits?: PendingCommit[]; onOpen: (id: string) => void; onBack: () => void }) {
+export function ApprovalsView({ approvals, pendingCommits = [], onDismiss, onOpen, onBack }: { approvals: Approval[]; pendingCommits?: PendingCommit[]; onDismiss?: (item: PendingCommit) => Promise<void>; onOpen: (id: string) => void; onBack: () => void }) {
+  const [dismissing, setDismissing] = useState<string>();
+  const [dismissError, setDismissError] = useState("");
+  async function dismiss(item: PendingCommit) {
+    if (!onDismiss || dismissing) return;
+    setDismissing(item.id); setDismissError("");
+    try { await onDismiss(item); }
+    catch (error) { setDismissError(errorMessage(error)); }
+    finally { setDismissing(undefined); }
+  }
   return (
     <section className="wide-view">
+      {dismissError && <p role="alert">{dismissError}</p>}
       <div className="wide-view__heading"><div><h1>{t("待处理")}</h1><p>{t("查看需要确认的操作、问题和未提交改动。")}</p></div><KeyRound size={31} /></div>
       <div className="request-explainer"><div><strong>{t("确认操作")}</strong><p>{t("需要你允许的命令或文件修改。你可以只允许这一次，也可以拒绝。")}</p></div><div><strong>{t("回答问题")}</strong><p>{t("Codex 需要了解你的选择或补充要求，例如计划模式中的提问。")}</p></div></div>
       {approvals.length === 0 && pendingCommits.length === 0 ? <div className="wide-empty request-empty"><Check size={30} /><h2>{t("暂无待处理事项")}</h2><p>{t("有新的确认请求、问题或未提交改动时，会在这里提醒你。")}</p><button type="button" className="button button--primary" onClick={onBack}>{t("返回工作台")}</button></div> : (
         <div className="approval-grid">{approvals.map((approval) => <button type="button" key={approval.id} className="approval-preview" onClick={() => onOpen(approval.logicalSessionId)}><span className={`risk-stripe risk-stripe--${approval.risk}`} /><div><span className="request-kind">{approval.type === "user_input" ? t("需要回答") : t("需要确认")}</span><div className="eyebrow">{displayName(approval.machineName)} · {displayName(approval.projectAlias)}</div><h3>{approval.summary}</h3><p>{approval.command || approval.paths?.join(", ")}</p><span className="request-open">{t("打开会话处理 →")}</span></div><ChevronRight size={18} /></button>)}
-          {pendingCommits.map(item => <button type="button" key={`commit:${item.id}`} className="approval-preview approval-preview--commit" onClick={() => onOpen(item.logicalSessionId)}>
+          {pendingCommits.map(item => <div key={`commit:${item.id}`} className="commit-reminder-card"><button type="button" className="approval-preview approval-preview--commit" onClick={() => onOpen(item.logicalSessionId)}>
             <span className="risk-stripe risk-stripe--medium" /><div>
               <span className="request-kind">{t("未提交改动")}</span>
               <div className="eyebrow">{displayName(item.machineName)} · {displayName(item.projectAlias)} · {agentName(item.provider)}</div>
               <h3>{displayName(item.title)}</h3><p className="commit-reminder-description">{t("会话已结束，所在目录仍有未提交改动。")}</p><p>{displayName(item.path)}</p>
               <span className="request-open">{t("打开会话处理 →")}</span>
             </div><ChevronRight size={18} />
-          </button>)}
+          </button><button type="button" className="button button--quiet commit-reminder-dismiss" disabled={!item.dismissalToken || !onDismiss || !!dismissing}
+            title={item.dismissalToken ? t("仅忽略当前改动，出现新改动后会再次提醒") : t("暂时无法识别这批改动，请更新 Agent 后重试")}
+            onClick={() => void dismiss(item)}>{dismissing === item.id ? t("正在忽略…") : t("忽略本次")}</button></div>)}
         </div>
       )}
     </section>
@@ -1886,6 +1898,13 @@ function App() {
 
   const pendingCount = dashboard.stats.approvals + (dashboard.pendingCommits?.length ?? 0);
 
+  async function dismissCommit(item: PendingCommit) {
+    if (!item.dismissalToken) return;
+    await api.dismissPendingCommit(item.id, item.dismissalToken);
+    dashboardRequest.current++; // Ignore an older dashboard response already in flight.
+    setDashboard(current => current ? { ...current, pendingCommits: current.pendingCommits?.filter(row => row.id !== item.id || row.dismissalToken !== item.dismissalToken) } : current);
+    await loadDashboard(true);
+  }
   function openApproval(sessionId: string) { selectSession(sessionId); }
   function openScheduled(projectId?: string, sessionId?: string) {
     setSchedulePrefill({ projectId, sessionId });
@@ -1927,7 +1946,7 @@ function App() {
         </HostSessions>
         {buzhouDesktop && <BuzhoushanScreensaver detail={detail} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onRefresh={loadDashboard}/>}
         {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong>{broadcastCanvas&&<BuzhoushanBroadcastStatus/>}<FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayName(displayedSession?.projectAlias)}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}
-      </div> : view === "hosts" ? <HostsView canManageVersions={dashboard.user.platformAdmin === true} onConfigure={id => { setSettingsMachineId(id); setView("security"); }} machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} pendingCommits={dashboard.pendingCommits} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView initialMachineId={settingsMachineId} dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
+      </div> : view === "hosts" ? <HostsView canManageVersions={dashboard.user.platformAdmin === true} onConfigure={id => { setSettingsMachineId(id); setView("security"); }} machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} pendingCommits={dashboard.pendingCommits} onDismiss={dismissCommit} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView initialMachineId={settingsMachineId} dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />
       <CreateSessionDialog open={createOpen} machines={providerMachines} selectedMachineId={selectedMachineId} initialProject={createProject} onClose={() => setCreateOpen(false)} onToast={toast} onCreate={async (machineId, projectId, title, worktree) => {

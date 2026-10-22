@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 71) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 72) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1699,6 +1699,16 @@ export class ControlPlaneDatabase {
         ON durable_events(logical_session_id,occurred_at DESC)
         WHERE type IN ('turn.completed','turn.failed','turn.interrupted');
         PRAGMA user_version=71`);
+    });
+    if (version < 72) this.transaction(() => {
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS pending_commit_dismissals (
+        workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+        machine_id TEXT NOT NULL REFERENCES machines(machine_id) ON DELETE CASCADE,
+        root TEXT NOT NULL,
+        token TEXT NOT NULL,
+        PRIMARY KEY(workspace_id,user_id,machine_id,root)
+      ) STRICT; PRAGMA user_version=72`);
     });
   }
 

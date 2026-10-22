@@ -124,3 +124,7 @@
 .approval-preview--commit > div { min-width:0; }
 .approval-preview--commit h3 { overflow-wrap:anywhere; }
 .approval-preview--commit .commit-reminder-description { font-family:inherit; white-space:normal; margin-bottom:4px; }
+
+.commit-reminder-card { min-width:0; display:flex; flex-direction:column; gap:6px; }
+.commit-reminder-card > .approval-preview { width:100%; flex:1; }
+.commit-reminder-dismiss { align-self:flex-end; min-height:40px; }

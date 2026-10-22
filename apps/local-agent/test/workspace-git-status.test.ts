@@ -40,3 +40,32 @@ test("sampler deduplicates reads, expires evidence, and never reports a failed c
   assert.deepEqual(sampler.snapshot(time + 31_000), []);
   await sampler.refresh([], time + 62_000); assert.deepEqual(sampler.snapshot(), []);
 });
+
+
+test("fingerprints detect same-path edits, nested untracked files, index-only changes, renames and deletions", async t => {
+  const root = await mkdtemp(join(tmpdir(), "git-fingerprint-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const git = (...args: string[]) => execFileSync("git", ["-C", root, ...args], { stdio: "pipe" });
+  git("init"); git("config", "user.email", "test@example.test"); git("config", "user.name", "Test");
+  await writeFile(join(root, "code.txt"), "base"); git("add", "."); git("commit", "-m", "base");
+  await writeFile(join(root, "code.txt"), "edit");
+  const first = (await readWorkspaceGitStatus(root))!.fingerprint;
+  assert.match(first!, /^[a-f0-9]{64}$/);
+  assert.equal((await readWorkspaceGitStatus(root))!.fingerprint, first);
+  await writeFile(join(root, "code.txt"), "next"); // identical length and status
+  const next = (await readWorkspaceGitStatus(root))!.fingerprint;
+  assert.notEqual(next, first);
+  await mkdir(join(root, "uploads")); await writeFile(join(root, "uploads", "a.txt"), "one");
+  const nested = (await readWorkspaceGitStatus(root))!.fingerprint;
+  await writeFile(join(root, "uploads", "a.txt"), "two");
+  assert.notEqual((await readWorkspaceGitStatus(root))!.fingerprint, nested);
+  assert.equal((await readWorkspaceGitStatus(join(root, "uploads")))!.fingerprint, (await readWorkspaceGitStatus(root))!.fingerprint);
+  git("add", ".");
+  const staged = (await readWorkspaceGitStatus(root))!.fingerprint;
+  git("update-index", "--cacheinfo", "100644", git("rev-parse", "HEAD:code.txt").toString().trim(), "code.txt");
+  assert.notEqual((await readWorkspaceGitStatus(root))!.fingerprint, staged);
+  git("mv", "code.txt", "renamed file.txt");
+  assert.match((await readWorkspaceGitStatus(root))!.fingerprint!, /^[a-f0-9]{64}$/);
+  await rm(join(root, "renamed file.txt"));
+  assert.match((await readWorkspaceGitStatus(root))!.fingerprint!, /^[a-f0-9]{64}$/);
+});
