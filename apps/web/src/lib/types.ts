@@ -281,7 +281,20 @@ export interface CurrentUser {
   clientSessionId: string;
 }
 
+export interface PendingCommit {
+  id: string;
+  logicalSessionId: string;
+  title: string;
+  machineId: string;
+  machineName: string;
+  projectAlias: string;
+  path: string;
+  provider: ProviderId;
+  checkedAt: string;
+}
+
 export interface Dashboard {
+  pendingCommits?: PendingCommit[];
   activitySessions?: FleetSession[];
   user: CurrentUser;
   machines: Machine[];

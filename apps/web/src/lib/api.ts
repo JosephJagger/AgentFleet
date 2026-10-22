@@ -639,6 +639,13 @@ async function loadDashboard(): Promise<Dashboard> {
     machines,
     sessions,
     pendingApprovals: approvals,
+    pendingCommits: list(rawDashboard.pendingCommits).flatMap(value => {
+      const item = record(value);
+      if (!string(item.id) || !string(item.logicalSessionId)) return [];
+      return [{ id: string(item.id), logicalSessionId: string(item.logicalSessionId), title: string(item.title),
+        machineId: string(item.machineId), machineName: string(item.machineName), projectAlias: string(item.projectAlias),
+        path: string(item.path), provider: isProviderId(item.provider) ? item.provider : "codex" as const, checkedAt: string(item.checkedAt) }];
+    }),
     activitySessions: Array.isArray(rawDashboard.activitySessions) ? rawDashboard.activitySessions.map(session => mapSession(session, machines, projects, clientSessionId)) : sessions,
     compatibilityProfile: {
       profileVersion: string(rawProfile.profileVersion, t("未发布")),

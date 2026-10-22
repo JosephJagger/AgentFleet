@@ -4183,5 +4183,9 @@
   "{0} → 经面板中转连接成功（{1} ms）": "{0} → connected through the panel relay ({1} ms)",
   "面板中转未启用": "Panel relay is not enabled",
   "需更新连接服务以支持中转": "Update the connection service to support the relay",
-  "目标主机指纹未固定，中转需要先固定": "The target host's key fingerprint is not pinned; the relay needs it pinned first"
+  "目标主机指纹未固定，中转需要先固定": "The target host's key fingerprint is not pinned; the relay needs it pinned first",
+  "未提交改动": "Uncommitted changes",
+  "会话已结束，所在目录仍有未提交改动。": "The session has finished, but its directory still has uncommitted changes.",
+  "查看需要确认的操作、问题和未提交改动。": "Review pending approvals, questions, and uncommitted changes.",
+  "有新的确认请求、问题或未提交改动时，会在这里提醒你。": "New approvals, questions, and uncommitted changes will appear here."
 }

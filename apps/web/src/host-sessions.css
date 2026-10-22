@@ -119,3 +119,8 @@
 }
 
 .catalog-main-session-pages { touch-action: pan-y pinch-zoom; }
+
+.approval-preview--commit { grid-template-columns:4px minmax(0,1fr) auto; }
+.approval-preview--commit > div { min-width:0; }
+.approval-preview--commit h3 { overflow-wrap:anywhere; }
+.approval-preview--commit .commit-reminder-description { font-family:inherit; white-space:normal; margin-bottom:4px; }
