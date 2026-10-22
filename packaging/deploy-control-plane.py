@@ -19,6 +19,9 @@ import urllib.request
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from deployment_provenance import validate_candidate
+
 SCHEMA = json.loads((ROOT / 'apps/control-plane/src/voice-deployment-schema.json').read_text())
 
 
@@ -152,6 +155,8 @@ def main():
                 print('Abandoned deployment fence released; no service restarted.')
                 return 0
             image = json.loads(run('docker', 'image', 'inspect', args.image))[0]
+            runtime = json.loads(run('docker', 'inspect', 'agentfleet-control-plane'))[0]
+            validate_candidate(ROOT, image, runtime)
             image_id = image['Id']  # pin before waiting; mutable tags cannot switch underneath us
             build = next((v.split('=', 1)[1] for v in image['Config'].get('Env', []) if v.startswith('AGENTFLEET_BUILD_SHA=')), None)
             if not build or build in ('unknown', 'local'):
@@ -184,6 +189,9 @@ def main():
                     print(json.dumps({'phase': 'pruned_backups', 'removed': len(pruned)}), flush=True)
                 ensure_backup_space(path)
                 backup_database(db, backup_path)
+                # Recheck after draining and backup: another release or main commit may have arrived.
+                runtime = json.loads(run('docker', 'inspect', 'agentfleet-control-plane'))[0]
+                validate_candidate(ROOT, image, runtime)
                 # Fence remains in the shared DB throughout recreation and startup.
                 switching = True
                 run('docker', 'tag', image_id, 'agentfleet:local')

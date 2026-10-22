@@ -9,6 +9,12 @@ permissions:
   contents: read
 
 jobs:
+  release-provenance:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 packaging/test-release-provenance.py
+      - run: python3 packaging/test-voice-deployment.py
   npm-installer:
     strategy:
       fail-fast: false

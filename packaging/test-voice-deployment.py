@@ -115,8 +115,8 @@ class DeploymentFenceTests(unittest.TestCase):
             self.db.commit()
         self.assertTrue(deploy.wait_idle(self.db, 'owner', 10, sleep=user_hangs_up))
 
-    def invoke(self, fail=False, public_fail=False, validator_phase=None):
-        commands = []
+    def invoke(self, fail=False, public_fail=False, validator_phase=None, validation=None, commands=None):
+        commands = commands if commands is not None else []
         def runner(*args):
             commands.append(args)
             if args[:3] == ('docker', 'image', 'inspect'):
@@ -132,24 +132,38 @@ class DeploymentFenceTests(unittest.TestCase):
             if args[:2] == ('docker', 'compose') and fail:
                 raise RuntimeError('synthetic switch failure')
             return ''
-        with patch.object(deploy.sys, 'argv', ['deploy', '--database', str(self.path), '--image', 'fixture'] + (['--with-validator'] if validator_phase else [])), patch.object(deploy, 'run', runner), patch.object(deploy, 'health', return_value={'status':'ok','build':'fixture-build','voiceDeploymentGuard':1,'schemaVersion':52}):
+        with patch.object(deploy, 'validate_candidate', side_effect=validation), patch.object(deploy.sys, 'argv', ['deploy', '--database', str(self.path), '--image', 'fixture'] + (['--with-validator'] if validator_phase else [])), patch.object(deploy, 'run', runner), patch.object(deploy, 'health', return_value={'status':'ok','build':'fixture-build','voiceDeploymentGuard':1,'schemaVersion':52}):
             result = deploy.main()
         return result, commands
+
+    def test_invalid_provenance_never_fences_or_switches(self):
+        commands = []
+        with self.assertRaisesRegex(RuntimeError, 'missing receipt'):
+            self.invoke(validation=RuntimeError('missing receipt'), commands=commands)
+        self.assertFalse(any(c[:2] in [('docker', 'tag'), ('docker', 'compose')] for c in commands))
+        self.assertIsNone(self.db.execute("SELECT 1 FROM sqlite_master WHERE name='voice_deployment_guard'").fetchone())
+
+    def test_version_change_during_wait_or_backup_reopens_without_switch(self):
+        commands = []
+        with self.assertRaisesRegex(RuntimeError, 'live changed'):
+            self.invoke(validation=[None, RuntimeError('live changed')], commands=commands)
+        self.assertFalse(any(c[:2] in [('docker', 'tag'), ('docker', 'compose')] for c in commands))
+        self.assertEqual(self.db.execute('SELECT count(*) FROM voice_deployment_guard').fetchone()[0], 0)
 
     def test_timeout_does_not_tag_or_restart_and_reopens_admission(self):
         self.db.execute("INSERT INTO panel_voice_calls VALUES('existing','active')")
         self.db.commit()
         result, commands = self.invoke()
         self.assertEqual(result, 75)
-        self.assertEqual(len(commands), 1)  # inspect only
+        self.assertEqual(len(commands), 2)  # inspect candidate and live image only
         self.assertEqual(self.db.execute('SELECT count(*) FROM voice_deployment_guard').fetchone()[0], 0)
         self.assertEqual(self.db.execute('SELECT state FROM panel_voice_calls').fetchone()[0], 'active')
 
     def test_success_switches_only_after_empty_calls_and_health_releases_fence(self):
         result, commands = self.invoke()
         self.assertEqual(result, 0)
-        self.assertEqual(commands[3], ('docker','tag','sha256:fixture','agentfleet:local'))
-        self.assertEqual(commands[4][-4:], ('-d','--no-deps','--no-build','control-plane'))
+        self.assertIn(('docker','tag','sha256:fixture','agentfleet:local'), commands)
+        self.assertTrue(any(cmd[-4:] == ('-d','--no-deps','--no-build','control-plane') for cmd in commands))
         self.assertEqual(self.db.execute('SELECT count(*) FROM voice_deployment_guard').fetchone()[0], 0)
         self.assertEqual(len(list(self.path.parent.glob('*.predeploy-*.sqlite'))), 1)
 

@@ -4,7 +4,7 @@ The control plane owns live browser/host signaling sockets. Recreating this sing
 
 ## Prepare first, switch last
 
-1. Pull source, build a separate image (`agentfleet:prepared`) and run relevant tests. Do not change the running `agentfleet:local` tag or recreate the service yet. A backend-only build can use `packaging/Dockerfile.control-plane` with the currently verified image as `BASE_IMAGE` and a concrete `AGENTFLEET_BUILD_SHA`. Preserve immutable Agent artifacts; no Agent bump is needed for this feature.
+1. Commit and merge into clean `main`, run relevant tests, then use `python3 packaging/prepare-panel-release.py --mode web` (or `--mode control-plane`). Use the printed unique prepared image tag below. The [provenance gate](release-provenance.md) rejects dirty/unmerged source, images without build receipts, and stale candidates. Do not change the running `agentfleet:local` tag or recreate the service manually. Preserve immutable Agent artifacts; no Agent bump is needed for panel-only changes.
 2. Find the actual host path of the `agentfleet-data` Docker volume with `docker volume inspect`; use its `control-plane.sqlite`. This workflow requires Linux Docker/Compose and Python 3 on the deployment host.
 3. Check and publish:
 
@@ -16,7 +16,7 @@ python3 packaging/deploy-control-plane.py --database /actual/volume/control-plan
 
 The publisher pins the image digest, takes an OS publication lock, then atomically creates a durable admission fence. SQLite INSERT triggers block both panel/global and session voice starts, including starts from old browser pages or an older running backend. Existing heartbeats, tool requests, task reports and hangups remain unaffected. The new backend returns `VOICE_DEPLOYMENT_WAIT` with a user-readable explanation for a rejected start. Old backends during first rollout may show a generic connection error instead.
 
-`starting`, `active`, `closing` and `unknown` calls all block publication. There is no age-based forced closure. If calls remain after the chosen timeout (default zero), exit **75** means deferred: no image switch/restart occurred and the fence is removed so new calls can start again. Retry the same prepared image later. Waiting never executes or replays historical tasks.
+`starting`, `active`, `closing` and `unknown` calls all block publication. There is no age-based forced closure. If calls remain after the chosen timeout (default zero), exit **75** means deferred: no image switch/restart occurred and the fence is removed so new calls can start again. Retry the same prepared image later only if main and the live image have not changed; otherwise rebuild. Waiting never executes or replays historical tasks.
 
 Once both call lists are empty, the script first keeps only the newest `--keep-backups` (default 5) pre-deploy backups of this database (exactly `<db>.predeploy-<32 hex>.sqlite` files and their `-wal`/`-shm` sidecars; nothing else is touched) and refuses to continue, before changing anything, if the volume lacks room for another copy plus 256 MB. A failed backup never leaves a partial file. Without this each publication left a full database copy and filled the disk. The script then backs up SQLite (mode 0600), switches only `control-plane` with `--no-deps --no-build`, and verifies readiness, expected build and guard support before reopening admission. Existing native project tasks continue on their hosts; ordinary panel/host sockets briefly reconnect at cutover. No browser refresh is forced. Publication does not update identity, proxy or validator services.
 
