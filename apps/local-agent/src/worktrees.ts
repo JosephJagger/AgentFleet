@@ -62,8 +62,7 @@ export class Worktrees {
     if (result.code !== 0) throw new AgentError("WORKTREE_NOT_GIT", "项目不是 Git 仓库");
     const [top, commonDir, current] = lines(result.stdout);
     if (!top || !commonDir) throw new AgentError("WORKTREE_NOT_GIT", "项目不是 Git 仓库");
-    const canonicalTop = await realpath(top);
-    const canonicalCommon = await realpath(commonDir);
+    const [canonicalTop, canonicalCommon] = await Promise.all([realpath(top), realpath(commonDir)]);
     if (canonicalTop !== root) throw new AgentError("WORKTREE_SOURCE_INVALID", "请从仓库根目录的项目创建工作树");
     if (dirname(canonicalCommon) !== canonicalTop) throw new AgentError("WORKTREE_SOURCE_INVALID", "该项目本身是工作树，请从主仓库创建");
     return { root: canonicalTop, gitCommonDir: canonicalCommon, current: current === "HEAD" ? null : current ?? null };
@@ -114,18 +113,24 @@ export class Worktrees {
       if (project.worktree?.sourceRoot !== repository.root || project.worktree.removedAt) continue;
       lanes.set(project.root, [...(lanes.get(project.root) ?? []), project]);
     }
-    const statuses: LaneStatus[] = await Promise.all([...lanes].map(async ([path, records]) => ({
-      ...await this.status(path, records[0]!.worktree!.branch, records[0]!.worktree!.base), providers: records.map(record => record.provider ?? "codex"),
-    })));
+    // These reads are independent; a large lane must not delay fetching the branch picker.
+    const [statuses, registered, mainStatus, branches, setupScript] = await Promise.all([
+      Promise.all([...lanes].map(async ([path, records]): Promise<LaneStatus> => ({
+        ...await this.status(path, records[0]!.worktree!.branch, records[0]!.worktree!.base), providers: records.map(record => record.provider ?? "codex"),
+      }))),
+      this.registered(repository.root),
+      this.run(["status", "--porcelain=v1", "--untracked-files=no"], repository.root),
+      this.branches(repository.root),
+      access(join(repository.root, SETUP_SCRIPT)).then(() => true, () => false),
+    ]);
     const owners = new Map<string, string[]>();
     for (const lane of statuses) for (const file of lane.changedFiles) owners.set(file, [...(owners.get(file) ?? []), lane.branch]);
     const overlaps = [...owners].filter(([, branches]) => branches.length > 1).slice(0, 100).map(([file, branches]) => ({ file, branches }));
-    const unmanaged = (await this.registered(repository.root)).filter(item => item.path !== repository.root && !lanes.has(item.path));
-    const mainStatus = await this.run(["status", "--porcelain=v1", "--untracked-files=no"], repository.root);
+    const unmanaged = registered.filter(item => item.path !== repository.root && !lanes.has(item.path));
     return {
-      root: repository.root, current: repository.current, branches: await this.branches(repository.root), mainDirtyFiles: lines(mainStatus.stdout).length,
+      root: repository.root, current: repository.current, branches, mainDirtyFiles: lines(mainStatus.stdout).length,
       customBranchNames: true,
-      setupScript: await access(join(repository.root, SETUP_SCRIPT)).then(() => true, () => false),
+      setupScript,
       lanes: statuses, overlaps, unmanaged,
     };
   }
@@ -157,13 +162,21 @@ export class Worktrees {
     } else {
       if (!request.name || !NAME.test(request.name)) throw new AgentError("WORKTREE_NAME_INVALID", "工作树名称仅支持小写字母、数字、点、下划线和连字符");
       base = request.base ?? repository.current ?? "";
-      if (!base || (await this.run(["rev-parse", "--verify", "--quiet", `refs/heads/${base}^{commit}`], repository.root)).code !== 0) throw new AgentError("WORKTREE_BASE_INVALID", "基础分支不存在");
+      if (!base) throw new AgentError("WORKTREE_BASE_INVALID", "基础分支不存在");
       branch = request.branch ?? `af/${request.name}`;
       if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(branch) || branch === "HEAD") throw new AgentError("WORKTREE_NAME_INVALID", "新分支名称无效");
-      if ((await this.run(["check-ref-format", "--branch", branch], repository.root)).code !== 0) throw new AgentError("WORKTREE_NAME_INVALID", "工作树名称不能作为分支名");
-      if ((await this.run(["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], repository.root)).code === 0) throw new AgentError("WORKTREE_EXISTS", `分支 ${branch} 已存在，请换一个名称`);
       path = this.laneDirectory(repository.root, request.name);
-      if (await access(path).then(() => true, () => false)) throw new AgentError("WORKTREE_EXISTS", "同名工作树目录已存在，请换一个名称");
+      // Keep all validation before the first mutation, without serial process startups.
+      const [baseRef, branchFormat, branchRef, pathExists] = await Promise.all([
+        this.run(["rev-parse", "--verify", "--quiet", `refs/heads/${base}^{commit}`], repository.root),
+        this.run(["check-ref-format", "--branch", branch], repository.root),
+        this.run(["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], repository.root),
+        access(path).then(() => true, () => false),
+      ]);
+      if (baseRef.code !== 0) throw new AgentError("WORKTREE_BASE_INVALID", "基础分支不存在");
+      if (branchFormat.code !== 0) throw new AgentError("WORKTREE_NAME_INVALID", "工作树名称不能作为分支名");
+      if (branchRef.code === 0) throw new AgentError("WORKTREE_EXISTS", `分支 ${branch} 已存在，请换一个名称`);
+      if (pathExists) throw new AgentError("WORKTREE_EXISTS", "同名工作树目录已存在，请换一个名称");
       await mkdir(dirname(path), { recursive: true });
       await this.git(repository.root, ["worktree", "add", "-b", branch, path, base], "WORKTREE_CREATE_FAILED", "创建工作树失败", 120_000);
       path = await realpath(path);

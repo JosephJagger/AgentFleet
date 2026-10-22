@@ -328,6 +328,8 @@ export class AgentRuntime {
   private readonly discoverySeen = new Set<string>();
   private readonly discoveryCursors = new Set<string>();
   private historySyncOffset = 0;
+  private discoveryMetadata: Promise<void> | undefined;
+  private projectDiscoveryJobs = 0;
   private discoveryScanId = randomUUID();
   private discoveryScannedPages = 0;
   private discoverySkippedCount = 0;
@@ -929,10 +931,65 @@ export class AgentRuntime {
     }
   }
 
+  /** Establish write eligibility for this project without hydrating unrelated histories or models. */
+  private async refreshProjectDiscovery(project: ProjectRecord): Promise<void> {
+    const server = this.appServer;
+    if (!server || !this.canRead()) throw new AgentError("PROJECT_DISCOVERY_UNAVAILABLE", "项目会话状态暂不可用，请稍后重试");
+    this.projectDiscoveryJobs++;
+    try {
+      // A full scan must commit its metadata first, so it cannot overwrite this
+      // newer evidence. Its subsequent history hydration is independent.
+      await this.discoveryMetadata;
+      const threads = await server.listThreads();
+      const known = this.store.snapshot();
+      const observed: Array<Omit<DiscoveredThread, "firstSeenAt" | "lastSeenAt" | "lastReconciledAt">> = [];
+      for (const thread of threads) {
+        if (threadProvider(thread.nativeThreadId) !== (project.provider ?? "codex")) continue;
+        try {
+          const prior = known.managedThreads[thread.nativeThreadId] ?? known.discoveredThreads[thread.nativeThreadId];
+          const sessionCwd = (threadProvider(thread.nativeThreadId) !== "codex" ? undefined : await readNativeSessionCwd(this.support.codexProfile?.codexHome, thread.rolloutPath, thread.nativeThreadId)) ?? prior?.sessionCwd ?? thread.cwd;
+          const owner = await discoverProjectFromCwd(sessionCwd, known.projects, project.provider ?? "codex");
+          if (owner.id !== project.id || known.managedThreads[thread.nativeThreadId]) continue;
+          observed.push({
+            externalId: thread.nativeThreadId, executionSegmentExternalId: thread.nativeThreadId,
+            nativeThreadId: thread.nativeThreadId, projectId: project.id, sessionCwd, codexProfileId: "default",
+            title: thread.title, ...(thread.titleSource ? { titleSource: thread.titleSource } : {}),
+            archived: thread.archived ?? false, availability: "available", executionState: thread.executionState,
+            historyCompleteness: "unknown", ...(thread.historyMode ? { historyMode: thread.historyMode } : {}),
+            ...(known.projectContentPolicies[project.id]?.syncContent !== false && prior?.nativeUsage ? { nativeUsage: prior.nativeUsage } : {}),
+          });
+        } catch {
+          // Match ordinary discovery: inaccessible old directories cannot be
+          // assigned to this project. Execution still rechecks its identity.
+        }
+      }
+      const assertCurrent = () => {
+        const current = this.store.snapshot().projects.find(candidate => candidate.id === project.id);
+        if (this.appServer !== server || this.shuttingDown || !current || current.identityVersion !== project.identityVersion || current.root !== project.root) {
+          throw new AgentError("PROJECT_DISCOVERY_UNAVAILABLE", "项目或会话服务已变化，请刷新后重试");
+        }
+      };
+      assertCurrent();
+      await verifyProjectIdentity(project);
+      assertCurrent();
+      await this.store.reconcileDiscoveredThreads(project.id, observed, server.appServerEpoch);
+    } catch (error) {
+      if (this.appServer === server && !this.shuttingDown) await this.store.markDiscoveryUnavailable(project.id, server.appServerEpoch);
+      throw error;
+    } finally {
+      this.projectDiscoveryJobs--;
+      this.notifyRegistryChanged();
+      if (!this.projectDiscoveryJobs && this.discoveryRequested && !this.discoveryRunning) {
+        this.discoveryRequested = false;
+        if (this.discoveryCursor !== null) void this.reconcileExistingThreads();
+        else this.catalogSync.request("full");
+      }
+    }
+  }
+
   async addProject(path: string, alias: string, createDirectory: boolean, provider: ProviderId = "codex"): Promise<ProjectRecord> {
     const project = await addProjectFromPanel(this.store, path, alias, createDirectory, provider);
-    try { await this.refreshCatalog(); }
-    finally { this.notifyRegistryChanged(); }
+    await this.refreshProjectDiscovery(project);
     return project;
   }
 
@@ -998,7 +1055,7 @@ export class AgentRuntime {
         // Another agent joins an existing lane: same directory, same branch, its own project.
         const project = await addProjectFromPanel(this.store, joined.root, request.alias, false, request.provider);
         await this.store.setProjectWorktree(project.root, joined.worktree!);
-        try { await this.refreshCatalog(); } finally { this.notifyRegistryChanged(); }
+        await this.refreshProjectDiscovery(project);
         return { projectExternalId: project.id, provider: request.provider, canonicalRoot: project.root, branch: joined.worktree!.branch, base: joined.worktree!.base, setup: { ran: false } };
       }
       const lane = new Set(this.store.snapshot().projects.filter(project => project.worktree?.sourceRoot === source.root && !project.worktree.removedAt).map(project => project.root)).size + 1;
@@ -1016,7 +1073,7 @@ export class AgentRuntime {
           throw error;
         }
       }
-      try { await this.refreshCatalog(); } finally { this.notifyRegistryChanged(); }
+      await this.refreshProjectDiscovery(project);
       return { projectExternalId: project.id, provider: request.provider, canonicalRoot: project.root, branch: created.metadata.branch, base: created.metadata.base, setup: created.setup, ...fork };
     }
     const lane = this.worktreeProject(request.projectExternalId, true);
@@ -1390,8 +1447,11 @@ export class AgentRuntime {
   private async reconcileExistingThreads(indexOnly = false): Promise<void> {
     const server = this.appServer;
     if (!server || this.discoveryRunning) return;
+    if (this.projectDiscoveryJobs) { this.discoveryRequested = true; return; }
     const previousVisibleState = this.getDiscoveryStatus().state;
     this.discoveryRunning = true;
+    let settleMetadata!: () => void;
+    const metadata = this.discoveryMetadata = new Promise<void>(resolve => { settleMetadata = resolve; });
     let changed = false;
     try {
       try {
@@ -1479,6 +1539,8 @@ export class AgentRuntime {
           scannedPages: this.discoveryScannedPages, skippedCount: this.discoverySkippedCount,
           scannedCount: this.discoveryStatus.scannedCount, discoveredCount: this.discoveryStatus.discoveredCount,
           lastSuccessfulAt: this.discoveryStatus.lastSuccessfulAt! };
+        settleMetadata();
+        if (this.discoveryMetadata === metadata) this.discoveryMetadata = undefined;
         const eligibleThreads = Object.values(this.store.snapshot().managedThreads)
           .filter((thread) => thread.historySyncInitialized === true && !thread.realtimeSessionId && thread.activeTurnId === undefined && !this.store.snapshot().projectReservations[thread.projectId])
           .sort((left, right) => left.nativeThreadId.localeCompare(right.nativeThreadId));
@@ -1518,6 +1580,8 @@ export class AgentRuntime {
         this.discoveryStatus = { ...this.discoveryStatus, state: "error", error: publicError(error).message };
       }
     } finally {
+      settleMetadata();
+      if (this.discoveryMetadata === metadata) this.discoveryMetadata = undefined;
       this.discoveryRunning = false;
     }
     // Recovery already publishes after checking that the new server survived.
@@ -1754,8 +1818,10 @@ export class AgentRuntime {
         if (command.precondition.projectLeaseVersion !== project.identityVersion) {
           throw new AgentError("PROJECT_VERSION_CONFLICT", "project identity version changed; refresh before claiming");
         }
-        if (Object.values(this.store.snapshot().managedThreads).some(
-          (candidate) => this.store.snapshot().projects.find(p => p.id === candidate.projectId)?.root === project.root && candidate.activeTurnId !== undefined,
+        const activityState = this.store.snapshot();
+        const sharedRootProjects = new Set(activityState.projects.filter(candidate => candidate.root === project.root).map(candidate => candidate.id));
+        if (Object.values(activityState.managedThreads).some(
+          (candidate) => candidate.activeTurnId !== undefined && sharedRootProjects.has(candidate.projectId),
         )) {
           throw new AgentError("PROJECT_BUSY", "project already has an active AgentFleet turn");
         }
@@ -1906,8 +1972,10 @@ export class AgentRuntime {
         if (command.precondition.projectLeaseVersion !== project.identityVersion) {
           throw new AgentError("PROJECT_VERSION_CONFLICT", "project identity version changed; refresh before sending");
         }
-        if (Object.values(this.store.snapshot().managedThreads).some(
-          (candidate) => this.store.snapshot().projects.find(p => p.id === candidate.projectId)?.root === project.root && candidate.activeTurnId !== undefined,
+        const activityState = this.store.snapshot();
+        const sharedRootProjects = new Set(activityState.projects.filter(candidate => candidate.root === project.root).map(candidate => candidate.id));
+        if (Object.values(activityState.managedThreads).some(
+          (candidate) => candidate.activeTurnId !== undefined && sharedRootProjects.has(candidate.projectId),
         )) {
           throw new AgentError("PROJECT_BUSY", "project already has an active AgentFleet turn");
         }

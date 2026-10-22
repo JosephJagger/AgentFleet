@@ -261,7 +261,7 @@ test("upgrading a version 68 database adds routes and test results without touch
     db.close();
     for (const round of [1, 2]) {
       db = new ControlPlaneDatabase(path);
-      assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 70, `round ${round}`);
+      assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 71, `round ${round}`);
       assert.deepEqual({ ...db.get<Record<string, unknown>>("SELECT route,proxy_jump_machine_id FROM host_ssh_accounts WHERE account_id='ssh_old'") }, { route: "direct", proxy_jump_machine_id: null }, "existing accounts stay direct");
       assert.equal(db.get<{ n: number }>("SELECT count(*) AS n FROM host_ssh_link_tests")?.n, 0);
       assert.throws(() => db.run("UPDATE host_ssh_accounts SET route='bogus' WHERE account_id='ssh_old'"), /CHECK/);
@@ -335,7 +335,7 @@ test("upgrading a version 69 database adds the relay switch and stream records",
     db.close();
     for (const round of [1, 2]) {
       db = new ControlPlaneDatabase(path);
-      assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 70, `round ${round}`);
+      assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 71, `round ${round}`);
       assert.equal(db.get<{ n: number }>("SELECT count(*) AS n FROM host_ssh_settings")?.n, 0, "no workspace has the relay on by default");
       assert.equal(db.get<{ n: number }>("SELECT count(*) AS n FROM ssh_relay_streams")?.n, 0);
       assert.throws(() => db.run("INSERT INTO ssh_relay_streams(stream_id,workspace_id,account_id,source_machine_id,target_machine_id,state,started_at,last_active_at) VALUES('s','w','a','m','n','bogus','t','t')"), /CHECK/);

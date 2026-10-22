@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 70) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 71) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1691,6 +1691,14 @@ export class ControlPlaneDatabase {
       CREATE INDEX IF NOT EXISTS ssh_relay_streams_live ON ssh_relay_streams(closed_at) WHERE closed_at IS NULL;
       CREATE INDEX IF NOT EXISTS ssh_relay_streams_workspace ON ssh_relay_streams(workspace_id,started_at);
       PRAGMA user_version=70`);
+    });
+    if (version < 71) this.transaction(() => {
+      // Session summaries need only the most recent terminal turn. Do not scan
+      // every streamed event when opening or refreshing a long conversation.
+      this.sqlite.exec(`CREATE INDEX IF NOT EXISTS durable_events_terminal_time_idx
+        ON durable_events(logical_session_id,occurred_at DESC)
+        WHERE type IN ('turn.completed','turn.failed','turn.interrupted');
+        PRAGMA user_version=71`);
     });
   }
 

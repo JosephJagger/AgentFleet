@@ -25,3 +25,29 @@ it("new-session worktrees carry the entered branch, source and explicit setup ch
   view.rerender(<CreateSessionDialog open {...props} />);
   expect((screen.getByRole("checkbox", { name: "使用独立工作目录（新建工作树）" }) as HTMLInputElement).checked).toBe(false);
 });
+
+it("can create from known projects while catalog requests are still pending", async () => {
+  const project = { id: "known", machineId: "m", alias: "repo", pathHint: "/repo" } as Project;
+  const machine = { id: "m", name: "host", reachability: "live", compatibility: "compatible", identity: "paired", projects: [project] } as Machine;
+  vi.spyOn(api, "projects").mockImplementation(() => new Promise(() => {}));
+  const create = vi.fn().mockResolvedValue(undefined);
+  render(<CreateSessionDialog open machines={[machine]} onClose={vi.fn()} onCreate={create} onToast={vi.fn()} />);
+  expect(screen.getByRole("option", { name: "repo · /repo" })).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("会话名称"), { target: { value: "立即创建" } });
+  fireEvent.click(screen.getByRole("button", { name: "创建会话" }));
+  await waitFor(() => expect(create).toHaveBeenCalledWith("m", "known", "立即创建", undefined));
+});
+
+it("shows the first catalog page before later pages finish loading", async () => {
+  const project = { id: "first", machineId: "m", alias: "first", pathHint: "/first" } as Project;
+  const machine = { id: "m", name: "host", reachability: "live", compatibility: "compatible", identity: "paired", projects: [] } as unknown as Machine;
+  vi.spyOn(api, "projects").mockResolvedValueOnce({ items: [project], nextCursor: "page-2" })
+    .mockImplementation(() => new Promise(() => {}));
+  const create = vi.fn().mockResolvedValue(undefined);
+  render(<CreateSessionDialog open machines={[machine]} onClose={vi.fn()} onCreate={create} onToast={vi.fn()} />);
+  await screen.findByRole("option", { name: "first · /first" });
+  expect(api.projects).toHaveBeenCalledTimes(2);
+  fireEvent.change(screen.getByLabelText("会话名称"), { target: { value: "无需等待所有页面" } });
+  fireEvent.click(screen.getByRole("button", { name: "创建会话" }));
+  await waitFor(() => expect(create).toHaveBeenCalledWith("m", "first", "无需等待所有页面", undefined));
+});

@@ -247,7 +247,7 @@ test('schema 49 migration preserves work and enables another host project after 
  let db=new ControlPlaneDatabase(path);
  db.sqlite.exec("DROP INDEX IF EXISTS panel_voice_one_session_job; CREATE UNIQUE INDEX panel_voice_one_job ON panel_voice_jobs(user_id) WHERE state IN ('submitted','running','unknown'); PRAGMA user_version=49");db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,70);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,71);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_jobs')?.job_id,original.jobId);
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
  const registry=new RegistryService(db,config);const service=new PanelVoiceService(db,registry,new CoordinationService(db,config));
@@ -330,7 +330,7 @@ test('schema 50 backfills existing jobs without execution and recovery paginates
  f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
  let db=new ControlPlaneDatabase(path);db.sqlite.exec('DROP TABLE panel_voice_todo_resolutions; DROP TABLE panel_voice_task_records; DROP TABLE panel_voice_todos; PRAGMA user_version=50');db.close();
  db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,70);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,71);
  assert.equal(db.get<{job_id:string}>('SELECT job_id FROM panel_voice_task_records')?.job_id,old.jobId);
  assert.equal(db.get<{original_intent:string}>('SELECT original_intent FROM panel_voice_task_records')?.original_intent,'Read project status');
  const config=loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'panel@example.test',ADMIN_PASSWORD:'panel-test-password',PUBLIC_ORIGIN:'http://panel.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'});
@@ -796,7 +796,7 @@ test('schema 64 adds a turn lookup index without changing sessions or event sema
  const path=join(dir,'db.sqlite');const f=fixture(path);const id=f.session.logicalSessionId;
  f.db.run('DROP INDEX durable_events_turn_idx');f.db.run('PRAGMA user_version=63');f.db.close();
  const db=new ControlPlaneDatabase(path);t.after(()=>db.close());
- assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,70);
+ assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,71);
  assert.equal(db.get<{logical_session_id:string}>('SELECT logical_session_id FROM logical_sessions WHERE logical_session_id=?',id)?.logical_session_id,id);
  assert.deepEqual(db.all('PRAGMA foreign_key_check'),[]);
  const plan=db.all<{detail:string}>('EXPLAIN QUERY PLAN SELECT type FROM durable_events WHERE logical_session_id=? AND native_turn_id=? ORDER BY session_seq DESC LIMIT 120',id,'turn-current');

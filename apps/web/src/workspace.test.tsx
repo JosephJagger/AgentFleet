@@ -12,7 +12,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { saveClaudePreferences:vi.fn(),saveGrokPreferences:vi.fn(),saveRuntimePreferences:vi.fn(), claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { createSession:vi.fn(),saveClaudePreferences:vi.fn(),saveGrokPreferences:vi.fn(),saveRuntimePreferences:vi.fn(), claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -169,6 +169,41 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); });
 
 describe("会话工作区", () => {
+  it("发送回执已确认接收时立即清空草稿，不等历史和概览刷新", async () => {
+    history.replaceState(null, "", "/sessions/A");
+    render(<App />);
+    const prompt = await screen.findByRole("textbox", { name: "发送给 Codex 的消息" }) as HTMLTextAreaElement;
+    vi.mocked(api.session).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.dashboard).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.command).mockResolvedValue({ command: { id: "accepted-send", type: "turn.start", state: "accepted", outcome: "pending", createdAt: "2026-09-05T00:00:00Z" } });
+    fireEvent.change(prompt, { target: { value: "开始任务" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(prompt.value).toBe(""));
+    expect(screen.getByText("等待主机")).toBeTruthy();
+    expect(api.session).toHaveBeenCalledTimes(2);
+    expect(api.dashboard).toHaveBeenCalledTimes(2);
+    // The accepted receipt continues to prevent another start while the turn state is stale.
+    fireEvent.change(prompt, { target: { value: "下一条草稿" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    expect(api.command).toHaveBeenCalledTimes(1);
+    expect(prompt.value).toBe("下一条草稿");
+  });
+
+  it("新会话创建成功后关闭窗口并读取详情，不等概览刷新", async () => {
+    render(<App />);
+    await screen.findByText("选择一个会话");
+    vi.mocked(api.createSession).mockResolvedValue({ session: sessions[0] });
+    vi.mocked(api.dashboard).mockImplementation(() => new Promise(() => {}));
+    fireEvent.click(screen.getAllByRole("button", { name: "新会话" })[0]);
+    const dialog = screen.getByRole("dialog", { name: "创建会话" });
+    fireEvent.change(within(dialog).getByLabelText("会话名称"), { target: { value: "新任务" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "创建会话" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "创建会话" })).toBeNull());
+    expect(api.createSession).toHaveBeenCalledWith("1", "project-1", "新任务");
+    await screen.findByRole("heading", { name: "会话A" });
+    expect(location.pathname).toBe("/sessions/A");
+  });
+
   it("顶部智能体仅筛选切换列表，保留会话、草稿和滚动位置，点选会话才跳转", async () => {
     const claude = {...session("C", "1"), provider: "claude" as const};
     const data = dashboard();

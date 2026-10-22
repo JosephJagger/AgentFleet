@@ -32,3 +32,31 @@ test('non Git projects and different roots do not invent changes',async t=>{
  const root=await mkdtemp(join(tmpdir(),'no-git-diff-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const before=await snapshotWorkspace(root);assert.equal(before.supported,false);assert.deepEqual(workspaceChanges(before,before),{changes:[],limited:true});
 });
+
+test('parallel snapshots retain deterministic ordering and a shared byte budget', async t => {
+ const root = await fixture(t);
+ const names = Array.from({length: 40}, (_, i) => `file-${String(i).padStart(2, '0')}.txt`);
+ const text = 'x'.repeat(512 * 1024);
+ await Promise.all(names.map(name => writeFile(join(root, name), text)));
+ const before = await snapshotWorkspace(root);
+ assert.equal(before.complete, false);
+ assert.deepEqual([...before.files.keys()], names.slice(0, 32));
+ assert.equal([...before.files.values()].reduce((sum, value) => sum + Buffer.byteLength(value), 0), 16 * 1024 * 1024);
+ assert.equal(before.listed.size, names.length, 'unread files stay unknown, rather than appearing deleted');
+ await writeFile(join(root, names[39]!), 'now fits');
+ const after = await snapshotWorkspace(root);
+ assert.deepEqual([...after.files.keys()], names.slice(0, 32));
+ assert.deepEqual(workspaceChanges(before, after), {changes: [], limited: true});
+});
+
+test('parallel snapshots keep the file count limit across batch boundaries', async t => {
+ const root = await fixture(t);
+ const names = Array.from({length: 2003}, (_, i) => `file-${String(i).padStart(4, '0')}`);
+ for (let offset = 0; offset < names.length; offset += 64) {
+  await Promise.all(names.slice(offset, offset + 64).map(name => writeFile(join(root, name), '')));
+ }
+ const snapshot = await snapshotWorkspace(root);
+ assert.equal(snapshot.complete, false);
+ assert.equal(snapshot.listed.size, 2003);
+ assert.deepEqual([...snapshot.files.keys()], names.slice(0, 2000));
+});

@@ -113,9 +113,23 @@ export class MaintenanceService {
 
   get(principal: Principal, operationId: string): Record<string, unknown> {
     this.expire();
-    const row=this.db.get<{operation_id:string;machine_id:string;type:string;state:string;result_json:string|null;error_json:string|null;created_at:string;updated_at:string;expires_at:string}>("SELECT * FROM machine_operations WHERE operation_id=? AND workspace_id=?",operationId,principal.workspaceId);
+    const row=this.db.get<{operation_id:string;machine_id:string;type:string;state:string;request_json:string|null;result_json:string|null;error_json:string|null;created_at:string;updated_at:string;expires_at:string}>("SELECT * FROM machine_operations WHERE operation_id=? AND workspace_id=?",operationId,principal.workspaceId);
     invariant(row,404,"OPERATION_NOT_FOUND","Operation was not found");
-    return {operationId:row.operation_id,machineId:row.machine_id,type:row.type,state:row.state,result:row.result_json?JSON.parse(row.result_json):null,error:row.error_json?JSON.parse(row.error_json):null,createdAt:row.created_at,updatedAt:row.updated_at,expiresAt:row.expires_at};
+    const result = row.result_json ? JSON.parse(row.result_json) : null;
+    if (row.state === "succeeded" && ["worktree.create", "project.add"].includes(row.type) && result && typeof result === "object" && !Array.isArray(result)) {
+      // The host knows its external ID; only the registry can resolve the panel
+      // project. Resolve on read so a result arriving before hello also catches up.
+      delete result.projectId;
+      if (typeof result.projectExternalId === "string") {
+        const target = row.request_json ? JSON.parse(row.request_json) : {};
+        const project = this.db.get<{ project_id: string }>(
+          "SELECT project_id FROM projects WHERE workspace_id=? AND machine_id=? AND external_id=? AND provider=? AND worktree_removed=0",
+          principal.workspaceId, row.machine_id, result.projectExternalId, target.provider ?? "codex",
+        );
+        if (project) result.projectId = project.project_id;
+      }
+    }
+    return {operationId:row.operation_id,machineId:row.machine_id,type:row.type,state:row.state,result,error:row.error_json?JSON.parse(row.error_json):null,createdAt:row.created_at,updatedAt:row.updated_at,expiresAt:row.expires_at};
   }
 
   list(principal: Principal, machineId: string): Record<string, unknown>[] {

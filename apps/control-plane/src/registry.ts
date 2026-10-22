@@ -2871,8 +2871,8 @@ export class RegistryService {
       recorded_tokens: number | null;
     }>(
       `SELECT s.*,p.provider,e.execution_segment_id,e.native_thread_id,e.history_completeness,e.history_mode,
-        (SELECT MAX(de.occurred_at) FROM durable_events de WHERE de.logical_session_id=s.logical_session_id
-          AND de.type IN ('turn.completed','turn.failed','turn.interrupted')) AS last_turn_ended_at,
+        (SELECT de.occurred_at FROM durable_events de WHERE de.logical_session_id=s.logical_session_id
+          AND de.type IN ('turn.completed','turn.failed','turn.interrupted') ORDER BY de.occurred_at DESC LIMIT 1) AS last_turn_ended_at,
         p.lease_version AS project_lease_version,p.alias AS project_alias,p.canonical_root,p.repo_root,p.branch AS project_branch,
         (SELECT root.alias FROM projects root WHERE root.workspace_id=p.workspace_id AND root.machine_id=p.machine_id AND root.provider=p.provider AND root.canonical_root=p.repo_root AND root.worktree_removed=0 AND (root.repo_root IS NULL OR root.repo_root=root.canonical_root) ORDER BY root.project_id LIMIT 1) AS project_root_alias,json_extract(u.recorded_json,'$.totalTokens') AS recorded_tokens FROM logical_sessions s
        JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL

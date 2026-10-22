@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +9,10 @@ import { Worktrees } from "../src/worktrees.js";
 import type { ProjectRecord } from "../src/types.js";
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } }).trim();
+const runGit = async (args: string[], cwd: string) => {
+  try { return { code: 0, ...await promisify(execFile)("git", ["-C", cwd, ...args]) }; }
+  catch (error) { const failure = error as { code: number; stdout: string; stderr: string }; return { code: failure.code, stdout: failure.stdout, stderr: failure.stderr }; }
+};
 
 async function repository() {
   const parent = await fs.realpath(await fs.mkdtemp(join(tmpdir(), "af-wt-")));
@@ -126,4 +131,45 @@ test("custom branch names are preserved exactly, checked before creation and ind
   }
   await assert.rejects(fs.access(join(parent, ".app.worktrees", "invalid")));
   await assert.rejects(worktrees.create(project(root), { adoptPath: created.path, branch: "other", setup: false, lane: 2 }), { code: "WORKTREE_REQUEST_INVALID" });
+});
+
+test("creation overlaps independent Git validation but waits for every check before writing", async t => {
+  const { parent, root } = await repository();
+  t.after(() => fs.rm(parent, { recursive: true, force: true }));
+  let activeChecks = 0;
+  let maxChecks = 0;
+  let completedChecks = 0;
+  const worktrees = new Worktrees(async (args, cwd) => {
+    const validation = args[0] === "check-ref-format" || args[0] === "rev-parse" && args.includes("--verify");
+    if (validation) {
+      activeChecks++;
+      maxChecks = Math.max(maxChecks, activeChecks);
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    if (args[0] === "worktree" && args[1] === "add") {
+      assert.equal(activeChecks, 0, "the checkout must not race validation");
+      assert.equal(completedChecks, 3);
+    }
+    try { return await runGit(args, cwd); }
+    finally { if (validation) { activeChecks--; completedChecks++; } }
+  });
+  const created = await worktrees.create(project(root), { name: "parallel", setup: false, lane: 1 });
+  assert.equal(maxChecks, 3);
+  assert.equal(git(created.path, "branch", "--show-current"), "af/parallel");
+});
+
+test("overview reads branches while lane status is still pending", async t => {
+  const { parent, root } = await repository();
+  t.after(() => fs.rm(parent, { recursive: true, force: true }));
+  const created = await new Worktrees().create(project(root), { name: "overview", setup: false, lane: 1 });
+  const completed: string[] = [];
+  const worktrees = new Worktrees(async (args, cwd) => {
+    if (args[0] === "for-each-ref") completed.push("branches-requested");
+    const result = await runGit(args, cwd);
+    if (args[0] === "status" && cwd === created.path) completed.push("lane-status-completed");
+    return result;
+  });
+  const overview = await worktrees.overview(project(root), [project(created.path, created.metadata)]);
+  assert.deepEqual(overview.branches.sort(), ["af/overview", "main"]);
+  assert.ok(completed.indexOf("branches-requested") < completed.indexOf("lane-status-completed"));
 });

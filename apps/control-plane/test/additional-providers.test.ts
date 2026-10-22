@@ -86,7 +86,7 @@ test('schema 61 runtime-operation migration preserves existing receipts and inde
  f.db.run(`INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at,result_json) VALUES('old-operation','m',?,?,'unique-mutation','catalog.refresh','succeeded',?,?,?,?)`,f.principal.workspaceId,f.principal.clientSessionId,at,at,at,JSON.stringify({kept:true}));
  const schema=f.db.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")!.sql;const indexes=f.db.all<{sql:string}>("SELECT sql FROM sqlite_master WHERE tbl_name='machine_operations' AND type='index' AND sql IS NOT NULL");
  f.db.transaction(()=>{f.db.sqlite.exec('ALTER TABLE machine_operations RENAME TO old_ops');f.db.sqlite.exec(schema.replace(",'provider.runtime'",''));f.db.sqlite.exec('INSERT INTO machine_operations SELECT * FROM old_ops; DROP TABLE old_ops');for(const index of indexes)f.db.sqlite.exec(index.sql);f.db.sqlite.exec('PRAGMA user_version=61');});f.db.close();
- const upgraded=new ControlPlaneDatabase(path);t.after(()=>upgraded.close());assert.equal(upgraded.get<{user_version:number}>('PRAGMA user_version')?.user_version,70);
+ const upgraded=new ControlPlaneDatabase(path);t.after(()=>upgraded.close());assert.equal(upgraded.get<{user_version:number}>('PRAGMA user_version')?.user_version,71);
  assert.equal(upgraded.get<{result_json:string}>("SELECT result_json FROM machine_operations WHERE operation_id='old-operation'")?.result_json,JSON.stringify({kept:true}));
  assert.ok(upgraded.get<{sql:string}>("SELECT sql FROM sqlite_master WHERE name='machine_operations'")?.sql.includes("'provider.runtime'"));assert.equal(upgraded.all('PRAGMA foreign_key_check').length,0);
  for(const index of indexes)assert.ok(upgraded.get('SELECT 1 FROM sqlite_master WHERE sql=?',index.sql));
@@ -240,7 +240,7 @@ test('schema 65 upgrade preserves commands, contents, projection and indexes',t=
  });f.db.close();
  for(let reopen=0;reopen<2;reopen++){
   const db=new ControlPlaneDatabase(path);
-  assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,70);
+  assert.equal(db.get<{user_version:number}>('PRAGMA user_version')?.user_version,71);
   assert.deepEqual(db.all('SELECT * FROM commands'),before);assert.deepEqual(db.all('SELECT * FROM command_contents'),contents);assert.deepEqual(db.all('SELECT * FROM command_projection'),projection);
   for(const i of indexes)assert.ok(db.get('SELECT 1 FROM sqlite_master WHERE sql=?',i.sql));assert.deepEqual(db.all('PRAGMA foreign_key_check'),[]);db.close();
  }

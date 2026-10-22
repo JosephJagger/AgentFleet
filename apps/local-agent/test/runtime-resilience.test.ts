@@ -632,6 +632,33 @@ test("same-project reservation rejects a racing Session immediately without an R
   await runtime.shutdown();
 });
 
+test("turn dispatch does not clone the entire host state once per idle session", async t => {
+  const { store, projects } = await fixture();
+  const project = projects[0]!;
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({store, identity, pairing, support, appServerFactory: callbacks => {
+    server = new FakeAppServer("epoch-scale", callbacks);
+    return server;
+  }});
+  t.after(async () => { await runtime.shutdown(); store.close(); });
+  runtime.setTransportGeneration(1);
+  await runtime.initialize();
+  await store.update(state => {
+    for (let index = 0; index < 250; index++) {
+      const nativeThreadId = `idle-${index}`;
+      state.managedThreads[nativeThreadId] = {
+        nativeThreadId, projectId: project.id, logicalSessionId: `idle-session-${index}`,
+        appServerEpoch: server.appServerEpoch, policyVersion: "remote-restricted-v1", policyVerified: true,
+        contentEpoch: 1, createdAt: new Date().toISOString(),
+      };
+    }
+  });
+  const snapshot = t.mock.method(store, "snapshot");
+  await runtime.handleCommand(command(project, "scale-attempt", "scale-command", "new-session", server.appServerEpoch), 1);
+  assert.equal(server.startTurnCount, 1);
+  assert.ok(snapshot.mock.callCount() < 80, `state clones must not scale with session count: ${snapshot.mock.callCount()}`);
+});
+
 test("detected external Codex activity blocks a remote turn before any App Server write", async (t) => {
   for (const executionState of ["running", "unknown"] as const) {
     await t.test(executionState, async () => {
@@ -1873,6 +1900,86 @@ test("workspace snapshot is captured before execution and delivered on completio
  assert.equal(store.snapshot().outbox.filter(e=>e.nativeItemId==='workspace-diff-turn').length,1,'content-disabled task must not emit a snapshot');
 });
 
+test("new projects and lanes can execute their first task while unrelated history hydration is blocked", { timeout: 6_000 }, async t => {
+  const { directory, store, projects } = await fixture(); const project = projects[0]!;
+  const git = (...args: string[]) => workspacePromisify(workspaceExecFile)("git", ["-C", project.root, ...args], { env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
+  await git("init", "-q", "-b", "main"); await writeFile(join(project.root, "a.txt"), "a\n"); await git("add", "."); await git("commit", "-qm", "init");
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: callbacks => (server = new FakeAppServer("epoch-fast-registration", callbacks)) });
+  runtime.setTransportGeneration(1);
+  const { registryChanges } = captureCallbacks(runtime);
+  await runtime.initialize();
+  await store.setManagedThread({ nativeThreadId: "slow-history", projectId: project.id, logicalSessionId: "history-session", executionSegmentId: "history-segment", contentEpoch: 1, appServerEpoch: server.appServerEpoch, policyVersion: "remote-restricted-v1", policyVerified: true, historySyncInitialized: true, createdAt: new Date().toISOString() });
+  const history = deferred<ThreadHistorySnapshot>();
+  let historyRequested = false;
+  const readThread = server.readThread.bind(server);
+  server.readThread = async id => { if (id === "slow-history") { historyRequested = true; return history.promise; } return readThread(id); };
+  let hydrationDone = false;
+  const hydration = runtime.refreshCatalog(false).then(() => { hydrationDone = true; });
+  t.after(async () => { history.resolve({ nativeThreadId: "slow-history", cwd: project.root, historyMode: "legacy", executionState: "idle", updatedAt: null, items: [] }); await hydration; await runtime.shutdown(); });
+  await waitFor(() => historyRequested, "the background history hydration was not started");
+  let modelRefreshes = 0;
+  (server as AppServerClient).refreshCodexCatalog = async () => { modelRefreshes++; throw new Error("unrelated model service unavailable"); };
+  const before = registryChanges.count;
+  const added = await runtime.addProject(join(directory, "new-project"), "new-project", true);
+  assert.ok(registryChanges.count > before);
+  assert.equal(store.externalProjectActivity(added.id, server.appServerEpoch), undefined);
+  await runtime.handleCommand(command(added, "new-project-attempt", "new-project-command", "new-project-session", server.appServerEpoch), 1);
+  assert.equal(store.snapshot().commandJournal["new-project-command"]?.state, "applied");
+  assert.equal(server.startTurnCount, 1, "the first task must execute immediately after project creation");
+
+  const created = await runtime.manageWorktree("worktree.create", { projectExternalId: project.id, provider: "codex", alias: "fast-lane", name: "fast-lane", setup: false });
+  const joined = await runtime.manageWorktree("worktree.create", { projectExternalId: project.id, provider: "claude", alias: "fast-lane", adoptPath: created.canonicalRoot, setup: false });
+  assert.equal(created.canonicalRoot, joined.canonicalRoot);
+  assert.equal(store.externalProjectActivity(String(joined.projectExternalId), server.appServerEpoch), undefined);
+  const lane = store.snapshot().projects.find(candidate => candidate.id === created.projectExternalId)!;
+  await runtime.handleCommand(command(lane, "new-lane-attempt", "new-lane-command", "new-lane-session", server.appServerEpoch), 1);
+  assert.equal(store.snapshot().commandJournal["new-lane-command"]?.state, "applied");
+  assert.equal(server.startTurnCount, 2, "the first lane task must not wait for unrelated history");
+  assert.equal(hydrationDone, false);
+  assert.equal(modelRefreshes, 0, "registering a directory does not change the provider's model catalog");
+});
+
+test("registration waits for activity metadata and its first task refuses an external running thread", async t => {
+  const { directory, store } = await fixture();
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: callbacks => (server = new FakeAppServer("epoch-project-activity", callbacks)) });
+  runtime.setTransportGeneration(1); captureCallbacks(runtime); await runtime.initialize();
+  const metadata = deferred<DiscoveredThreadSummary[]>();
+  t.after(async () => { metadata.resolve([]); await runtime.shutdown(); });
+  server.listThreadsHook = () => metadata.promise;
+  const root = join(directory, "external-project");
+  let returned = false;
+  const adding = runtime.addProject(root, "external-project", true).then(project => { returned = true; return project; });
+  await waitFor(() => server.listCount > 1, "registration did not check native activity");
+  assert.equal(returned, false);
+  metadata.resolve([{ nativeThreadId: "external-running", cwd: root, title: "Host task", executionState: "running" }]);
+  const added = await adding;
+  await runtime.handleCommand(command(added, "external-attempt", "external-command", "external-session", server.appServerEpoch), 1);
+  assert.equal(server.startTurnCount, 0);
+  assert.equal(store.snapshot().commandJournal["external-command"]?.error?.code, "PROJECT_EXTERNAL_ACTIVITY");
+});
+
+test("registration cannot mark discovery healthy with metadata from a replaced runtime epoch", async t => {
+  const { directory, store } = await fixture();
+  let server!: FakeAppServer; let epoch = 0;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: callbacks => (server = new FakeAppServer(`epoch-registration-${++epoch}`, callbacks)) });
+  captureCallbacks(runtime); await runtime.initialize();
+  const oldServer = server;
+  const metadata = deferred<DiscoveredThreadSummary[]>();
+  t.after(async () => { metadata.resolve([]); await runtime.shutdown(); });
+  oldServer.listThreadsHook = () => metadata.promise;
+  const adding = runtime.addProject(join(directory, "epoch-project"), "epoch-project", true);
+  const failure = assert.rejects(adding, { code: "PROJECT_DISCOVERY_UNAVAILABLE" });
+  await waitFor(() => oldServer.listCount > 1, "registration did not start its activity check");
+  await runtime.reconnectRuntime();
+  assert.notEqual(server.appServerEpoch, oldServer.appServerEpoch);
+  metadata.resolve([]);
+  await failure;
+  const project = store.snapshot().projects.find(candidate => candidate.alias === "epoch-project")!;
+  assert.notEqual(store.snapshot().projectDiscovery[project.id]?.appServerEpoch, oldServer.appServerEpoch);
+});
+
 test("worktree lanes register per agent, report their repository to the panel and refuse removal while busy", async (t) => {
   const { store, projects } = await fixture(); const project = projects[0]!;
   const git = (...args: string[]) => workspacePromisify(workspaceExecFile)("git", ["-C", project.root, ...args], { env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
@@ -1910,6 +2017,7 @@ test("a worktree can carry a Codex conversation: the copy lives in the lane, the
   const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: (cb) => (server = new FakeAppServer("epoch-fork", cb)) });
   runtime.setTransportGeneration(1); captureCallbacks(runtime); await runtime.initialize(); t.after(() => runtime.shutdown());
   assert.equal((runtime.helloPayload().capabilities as Record<string, unknown>).worktreeFork, true);
+  server.listThreadsHook = async () => server.forks.map(fork => ({ nativeThreadId: `fork-of-${fork.source}`, cwd: fork.target!, title: "Copied conversation", executionState: "idle" as const }));
   const thread = (nativeThreadId: string, extra: Record<string, unknown> = {}) => ({ nativeThreadId, projectId: project.id, logicalSessionId: `session-${nativeThreadId}`, executionSegmentId: `segment-${nativeThreadId}`, appServerEpoch: server.appServerEpoch, policyVerified: true, subscribed: true, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", policyVersion: 1, contentEpoch: 1, ...extra }) as unknown as ManagedThread;
   await store.setManagedThread(thread("source-thread"));
   const request = (name: string, forkNativeThreadId: string, provider = "codex") => ({ projectExternalId: project.id, provider, alias: `project-1-${name}`, name, forkNativeThreadId, setup: false });
@@ -1917,6 +2025,8 @@ test("a worktree can carry a Codex conversation: the copy lives in the lane, the
   const copied = await runtime.manageWorktree("worktree.create", request("copy", "source-thread"));
   assert.equal(copied.forkedNativeThreadId, "fork-of-source-thread");
   assert.deepEqual(server.forks, [{ source: "source-thread", target: copied.canonicalRoot }]);
+  assert.equal(store.snapshot().discoveredThreads["fork-of-source-thread"]?.projectId, copied.projectExternalId, "the copied conversation is already discoverable in its lane");
+  assert.equal(store.externalProjectActivity(String(copied.projectExternalId), server.appServerEpoch), undefined);
   const original = store.snapshot().managedThreads["source-thread"]!;
   assert.deepEqual([original.projectId, original.subscribed, original.policyVerified], [project.id, false, false], "the original stays in its project; it only re-verifies before its next turn");
 

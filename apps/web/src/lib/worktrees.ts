@@ -8,10 +8,14 @@ const sleep = (ms: number) => new Promise(resolve => window.setTimeout(resolve, 
 /** Wait for a host operation; worktree setup scripts may install dependencies, so allow them time. */
 export async function waitForOperation(operation: HostOperation, timeoutMs = 20 * 60_000): Promise<HostOperation> {
   const deadline = Date.now() + timeoutMs;
+  let delay = 150;
   while (operation.state === "accepted" || operation.state === "running") {
     if (Date.now() >= deadline) throw new Error(t("主机仍在处理，请稍后刷新"));
-    await sleep(800);
+    // Observe fast local operations promptly, then retain the steady polling rate for setup scripts.
+    await sleep(Math.min(delay, deadline - Date.now()));
+    if (Date.now() >= deadline) throw new Error(t("主机仍在处理，请稍后刷新"));
     operation = await api.readHostOperation(operation.id);
+    delay = Math.min(delay * 2, 800);
   }
   if (operation.state !== "succeeded") throw new Error(operation.error?.message ?? t("主机操作未完成，请重试"));
   return operation;
@@ -57,7 +61,8 @@ export async function startLaneSession(projectId: string, machineId: string, inp
   if (!root) throw new Error(t("主机未返回工作树目录"));
   const setup = result.setup && typeof result.setup === "object" ? result.setup as { ran?: boolean; ok?: boolean; output?: string } : undefined;
   if (setup?.ran && setup.ok === false) throw new Error(t("工作树已创建，但环境初始化失败。请检查初始化输出，修复后从项目列表创建会话。") + (setup.output ? `\n${setup.output.slice(-2000)}` : ""));
-  const laneId = await laneProjectId(machineId, root, input.provider);
+  const laneId = typeof result.projectId === "string" && result.projectId
+    ? result.projectId : await laneProjectId(machineId, root, input.provider);
   const branch = typeof result.branch === "string" ? result.branch : "";
   if (input.forkSessionId) {
     const forked = typeof result.forkedNativeThreadId === "string" ? result.forkedNativeThreadId : "";

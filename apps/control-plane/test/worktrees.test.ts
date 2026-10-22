@@ -78,6 +78,29 @@ test("merge waits for both directories, removal only for the lane; operations ar
   assert.deepEqual([offer.operationType, offer.recoveryTarget], ["worktree.remove", removal.target]);
 });
 
+test("creation results resolve registered project IDs without trusting host IDs and catch up after hello", t => {
+  const { db, principal, service, maintenance } = fixture();
+  t.after(() => db.close());
+  const { target } = service.createTarget(principal, "main-codex", { provider: "codex", name: "new-lane" });
+  const operation = maintenance.create(principal, "m", "worktree.create", "create-project-id", undefined, undefined, undefined, target);
+  maintenance.result("m", String(operation.operationId), "succeeded", { projectExternalId: "not-yet-registered", projectId: "host-untrusted" }, undefined);
+  const result = () => maintenance.get(principal, String(operation.operationId)).result as Record<string, unknown>;
+  assert.equal(result().projectId, undefined);
+  db.run("UPDATE projects SET external_id='not-yet-registered' WHERE project_id='lane-codex'");
+  assert.equal(result().projectId, "lane-codex");
+  db.run("UPDATE projects SET provider='claude' WHERE project_id='lane-codex'");
+  assert.equal(result().projectId, undefined, "a host result cannot silently switch the requested provider");
+  db.run("UPDATE projects SET provider='codex' WHERE project_id='lane-codex'");
+  db.run("UPDATE projects SET worktree_removed=1 WHERE project_id='lane-codex'");
+  assert.equal(result().projectId, undefined);
+  assert.throws(() => maintenance.get({ ...principal, workspaceId: "other-workspace" }, String(operation.operationId)), /not found/);
+
+  db.run("UPDATE machines SET maintenance_types_json='[\"project.add\"]' WHERE machine_id='m'");
+  const added = maintenance.create(principal, "m", "project.add", "add-project-id", undefined, undefined, { path: "/srv/app", alias: "app", createDirectory: false });
+  maintenance.result("m", String(added.operationId), "succeeded", { projectExternalId: "ext-main-codex" }, undefined);
+  assert.equal((maintenance.get(principal, String(added.operationId)).result as Record<string, unknown>).projectId, "main-codex");
+});
+
 test("adoption accepts absolute Windows and POSIX paths and refuses relative paths", () => {
   for (const adoptPath of ["C:\\projects\\lane", "\\\\server\\share\\lane", "/srv/lane"]) {
     assert.equal(parseWorktreeTarget("worktree.create", { projectExternalId: "p", provider: "codex", alias: "lane", adoptPath }).adoptPath, adoptPath);

@@ -909,14 +909,16 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
     });
   }
 
+  // Typing and command-receipt updates do not change the conversation projection.
+  const rawEvents = useMemo(() => rawView ? (detail?.events ?? []).filter(event => event.payloadState !== "deleted" && event.body) : [], [detail?.events, rawView]);
+  const projectedEvents = useMemo(() => timelineItems(detail?.events ?? []), [detail?.events]);
+  const conversationEvents = useMemo(() => projectedEvents.filter(isConversationEvent), [projectedEvents]);
+
   if (loading && (!buzhouDesktop || !detail)) return <aside className="inspector inspector--loading"><IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton><LoaderCircle className="spin" size={22} /><span>{t("正在读取会话")}</span></aside>;
   if (!detail) return <aside className="inspector inspector--empty"><MonitorDot size={27} /><h2>{onBrowseSessions ? <button type="button" className="buzhou-empty-select" aria-expanded={catalogExpanded} aria-controls="workbench-catalog" onClick={onBrowseSessions}>{t("选择一个会话")}</button> : t("选择一个会话")}</h2><p>{t("打开已有会话，或新建会话开始。")}</p></aside>;
 
   const { session, approval } = detail;
-  const rawEvents = rawView ? detail.events.filter(event => event.payloadState !== "deleted" && event.body) : [];
-  const projectedEvents = timelineItems(detail.events);
   const visibleEvents = projectedEvents;
-  const conversationEvents = projectedEvents.filter(isConversationEvent);
   const lease = session.controlLease;
   const managed = session.state.ownership === "agentfleet_owned";
   const pendingCommand = (detail.commands ?? []).some(commandPending);
@@ -1403,6 +1405,12 @@ export function CreateSessionDialog({ open, machines, selectedMachineId, initial
   useEffect(() => {
     if (!open || !machineId) return;
     const controller = new AbortController();
+    const knownProjects = machines.find((machine) => machine.id === machineId)?.projects ?? [];
+    const seed = initialProject?.machineId === machineId && !knownProjects.some((item) => item.id === initialProject.id)
+      ? [initialProject, ...knownProjects] : knownProjects;
+    // Existing dashboard projects are usable while the rest of the catalog loads.
+    setProjectOptions(seed);
+    setProjectId((current) => seed.some((item) => item.id === current) ? current : seed[0]?.id ?? "");
     const loadProjects = async () => {
       const projects: Project[] = [];
       const seen = new Set<string>();
@@ -1411,6 +1419,9 @@ export function CreateSessionDialog({ open, machines, selectedMachineId, initial
         const page = await api.projects({ machineId, limit: 100, ...(cursor ? { cursor } : {}) }, controller.signal);
         if (controller.signal.aborted) return;
         projects.push(...page.items);
+        const items = [...projects, ...seed.filter((item) => !projects.some((project) => project.id === item.id))];
+        setProjectOptions(items);
+        setProjectId((current) => items.some((item) => item.id === current) ? current : items[0]?.id ?? "");
         cursor = page.nextCursor;
         if (cursor && seen.has(cursor)) throw new Error(t("项目列表加载未完成，请重新打开创建会话窗口"));
         if (cursor) seen.add(cursor);
@@ -1766,6 +1777,7 @@ function App() {
   if (!authKnown) return <main className="boot-screen"><span className="brand-glyph"><Radio size={19} /></span><LoaderCircle className="spin" size={22} /><span>{t("正在接入 Control Plane")}</span></main>;
   if (!dashboard) return <Login onLogin={(next) => { setDashboard(next); const session = next.sessions.find((item) => item.id === selectedSessionRef.current); setSelectedMachineId(routeRef.current.machineId ?? session?.machineId ?? next.machines[0]?.id); }} />;
 
+  // A mutation receipt confirms submission; refreshing history must not hold the composer or dialog open.
   async function refreshAll() { await Promise.all([loadDashboard(true), loadDetail(selectedSessionId, true)]); }
   async function loadEarlierHistory() {
     const current = detailRef.current;
@@ -1813,7 +1825,7 @@ function App() {
         },
       });
       toast("info", t("接管请求已提交，可在操作进度中查看主机结果"));
-      await refreshAll();
+      void refreshAll();
     } catch (error) {
       toast("danger", errorMessage(error));
       throw error;
@@ -1827,8 +1839,7 @@ function App() {
       setSelectedMachineId(source.machineId);
       selectSession(result.session.id);
       toast("success", t("已在同项目新建会话，不继承旧会话上下文"));
-      await loadDashboard(true);
-      await loadDetail(result.session.id, true);
+      void loadDashboard(true);
     } catch (error) {
       toast("danger", errorMessage(error));
       throw error;
@@ -1849,18 +1860,18 @@ function App() {
         },
       });
       toast("info", t("正在等待主机释放面板写入占用，请以操作回执为准"));
-      await refreshAll();
+      void refreshAll();
     } catch (error) {
       toast("danger", errorMessage(error));
       throw error;
     }
   }
-  async function sendPrompt(prompt: string, settings?: TurnSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) return; try { await submitCommand({ type: "turn.start", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: null, projectLeaseVersion: detail.session.projectLeaseVersion } }); toast("info", t("消息已提交，等待主机处理")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
-  async function queuePrompt(prompt: string, settings?: TurnSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) throw new Error(t("会话已切换，请在当前会话重试")); try { await submitCommand({ type: "turn.queue", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), expiresInSeconds: 3600, precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: detail.session.activeTurnId ?? null, projectLeaseVersion: detail.session.projectLeaseVersion, queueVersion: detail.session.queueVersion } }); toast("info", t("排队请求已提交，请查看操作进度")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
-  async function steerPrompt(prompt: string, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.steer", payload: { prompt, ...(images?.length ? { images } : {}), ...additions }, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("追加请求已提交，等待主机确认")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
-  async function cancelQueuedTurn(queueItemId: string) { if (!detail) return; try { await api.cancelQueuedTurn(detail.session.id, queueItemId); toast("info", t("队列项已取消")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
-  async function cancelTurn() { if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.cancel", payload: {}, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("停止请求已提交，等待主机确认")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
-  async function decideApproval(decision: "accept" | "decline") { const approval = detail?.approval; if (!approval) return; try { await api.decideApproval(approval.id, { decision, approvalVersion: approval.approvalVersion, actionHash: approval.actionHash }); toast(decision === "accept" ? "success" : "info", decision === "accept" ? approval.planExit ? t("已批准计划执行") : t("已仅本次允许") : approval.planExit ? t("已拒绝开始执行，保留计划阶段") : t("已拒绝操作")); await refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function sendPrompt(prompt: string, settings?: TurnSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) return; try { await submitCommand({ type: "turn.start", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: null, projectLeaseVersion: detail.session.projectLeaseVersion } }); toast("info", t("消息已提交，等待主机处理")); void refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function queuePrompt(prompt: string, settings?: TurnSettings, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail) throw new Error(t("会话已切换，请在当前会话重试")); try { await submitCommand({ type: "turn.queue", payload: { prompt, ...(images?.length ? { images } : {}), ...additions, ...(settings ? { settings } : {}) }, clientMutationId: crypto.randomUUID(), expiresInSeconds: 3600, precondition: { executionSegmentId: detail.session.executionSegmentId, threadControlVersion: detail.session.threadControlVersion, expectedActiveTurnId: detail.session.activeTurnId ?? null, projectLeaseVersion: detail.session.projectLeaseVersion, queueVersion: detail.session.queueVersion } }); toast("info", t("排队请求已提交，请查看操作进度")); void refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function steerPrompt(prompt: string, images?: string[], additions?: TurnAdditions) { if (parseCodexCommand(prompt)) throw new Error(t("请使用面板命令入口；未将斜杠命令作为聊天消息发送。")); if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.steer", payload: { prompt, ...(images?.length ? { images } : {}), ...additions }, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("追加请求已提交，等待主机确认")); void refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function cancelQueuedTurn(queueItemId: string) { if (!detail) return; try { await api.cancelQueuedTurn(detail.session.id, queueItemId); toast("info", t("队列项已取消")); void refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function cancelTurn() { if (!detail?.session.activeTurnId) return; try { await submitCommand({ type: "turn.cancel", payload: {}, clientMutationId: crypto.randomUUID(), precondition: { nativeTurnId: detail.session.activeTurnId, turnControlVersion: detail.session.turnControlVersion } }); toast("info", t("停止请求已提交，等待主机确认")); void refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
+  async function decideApproval(decision: "accept" | "decline") { const approval = detail?.approval; if (!approval) return; try { await api.decideApproval(approval.id, { decision, approvalVersion: approval.approvalVersion, actionHash: approval.actionHash }); toast(decision === "accept" ? "success" : "info", decision === "accept" ? approval.planExit ? t("已批准计划执行") : t("已仅本次允许") : approval.planExit ? t("已拒绝开始执行，保留计划阶段") : t("已拒绝操作")); void refreshAll(); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
   async function updateMachineAlias(alias: string | null) { if (!selectedMachine) return; try { await api.updateMachineAlias(selectedMachine.id, alias); toast("success", alias ? t("主机显示名称已改为 {0}", alias) : t("已恢复显示真实 hostname")); await loadDashboard(true); } catch (error) { toast("danger", errorMessage(error)); throw error; } }
 
   function openApproval(sessionId: string) { selectSession(sessionId); }
@@ -1913,9 +1924,9 @@ function App() {
           const lane = await startLaneSession(projectId, machineId, { ...worktree, ...(!worktree.name && name.length >= 3 ? { name: `${name}-${crypto.randomUUID().slice(0, 4)}` } : {}) }, title);
           setSelectedMachineId(machineId); selectSession(lane.sessionId);
           toast(lane.setup?.ran && !lane.setup.ok ? "danger" : "success", lane.setup?.ran && !lane.setup.ok ? t("工作树 {0} 已创建，但环境准备脚本失败", lane.branch) : t("已在工作树 {0} 中创建会话", lane.branch));
-          await loadDashboard(true); return;
+          void loadDashboard(true); return;
         }
-        const result = await api.createSession(machineId, projectId, title); setSelectedMachineId(machineId); selectSession(result.session.id); toast("success", t("受管会话已创建")); await loadDashboard(true); }} />
+        const result = await api.createSession(machineId, projectId, title); setSelectedMachineId(machineId); selectSession(result.session.id); toast("success", t("受管会话已创建")); void loadDashboard(true); }} />
       <CreateProjectDialog open={createProjectOpen} machines={providerMachines} selectedMachineId={selectedMachineId} onClose={() => setCreateProjectOpen(false)} onToast={toast} onCreate={async (machineId, path, alias, createDirectory) => {
         let operation = await api.createProject(machineId, path, alias, createDirectory, selectedProvider);
         const deadline = Date.now() + 120_000;
@@ -1926,7 +1937,7 @@ function App() {
         }
         if (operation.state !== "succeeded") throw new Error(operation.error?.message ?? t("项目创建未完成，请重试"));
         setSelectedMachineId(machineId);
-        await loadDashboard(true);
+        void loadDashboard(true);
         toast("success", t("项目 {0} 已添加", alias));
       }} />
       <div className="toast-stack" aria-live="polite">{toasts.map((item) => <div className={`toast toast--${item.tone}`} key={item.id}>{item.tone === "success" ? <Check size={16} /> : item.tone === "danger" ? <OctagonX size={16} /> : <CircleDot size={16} />}<span>{systemText(item.message)}</span></div>)}</div>
