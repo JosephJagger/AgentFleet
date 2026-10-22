@@ -13,8 +13,8 @@ export interface SshAccount {
   id: string; alias: string; name: string; targetName: string; username: string; hostname: string; port: number;
   publicKey: string; privateKey: string; passphrase: string; hostKeys: string[]; description: string;
 }
-type Summary = Pick<SshAccount, "alias" | "targetName" | "username" | "description">;
-type Run = (command: string, args: string[], timeoutMs: number) => Promise<{ code: number; stdout: string; stderr: string }>;
+type Summary = Pick<SshAccount, "alias" | "targetName" | "username" | "description"> & { pinned?: boolean | undefined };
+type Run = (command: string, args: string[], timeoutMs: number, env?: Record<string, string>) => Promise<{ code: number; stdout: string; stderr: string }>;
 
 const INCLUDE_MARKER = "# AgentFleets managed SSH hosts";
 const ALIAS = /^af-[a-z0-9][a-z0-9._-]{0,39}$/;
@@ -23,8 +23,8 @@ const USERNAME = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}$/;
 const PUBLIC_KEY = /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)) ([A-Za-z0-9+/]+={0,2})$/;
 const PRIVATE_KEY = /^-----BEGIN ((?:OPENSSH|RSA|EC|ENCRYPTED)? ?PRIVATE KEY)-----\n[A-Za-z0-9+/=:,\-\s]+\n-----END \1-----\n$/;
 
-const defaultRun: Run = (command, args, timeoutMs) => new Promise(resolve => {
-  execFile(command, args, { timeout: timeoutMs, maxBuffer: 1024 * 1024, windowsHide: true }, (error, stdout, stderr) => {
+const defaultRun: Run = (command, args, timeoutMs, env) => new Promise(resolve => {
+  execFile(command, args, { timeout: timeoutMs, maxBuffer: 1024 * 1024, windowsHide: true, ...(env ? { env: { ...process.env, ...env } } : {}) }, (error, stdout, stderr) => {
     const code = error ? (typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === "number" ? Number((error as { code: number }).code) : 255) : 0;
     resolve({ code, stdout: String(stdout), stderr: error && !stderr ? error.message : String(stderr) });
   });
@@ -100,8 +100,8 @@ export class SshAccess {
     for (const name of await fs.readdir(join(this.root, "keys"))) if (!keep.has(name)) await fs.rm(join(this.root, "keys", name), { force: true });
     await this.write("known_hosts", installed.flatMap(account => account.hostKeys.map(line => `${account.alias} ${keyToken(line)![0]}`)).join("\n") + "\n");
     await this.write("config", this.config(installed));
-    await this.write("HOSTS.md", this.hostsDocument(installed));
-    const summaries = installed.map(({ alias, targetName, username, description }) => ({ alias, targetName, username, description }));
+    const summaries: Summary[] = installed.map(({ alias, targetName, username, description, hostKeys }) => ({ alias, targetName, username, description, pinned: hostKeys.length > 0 }));
+    await this.write("HOSTS.md", this.hostsDocument(summaries));
     await this.write("state.json", JSON.stringify({ hosts: summaries }));
     await this.ensureInclude();
     this.summaries = summaries;
@@ -117,14 +117,27 @@ export class SshAccess {
       await fs.writeFile(temporary, text, { mode: 0o600 });
       // Agents run non-interactively, so an encrypted key is stored without its passphrase in this 0600 file.
       if (account.passphrase) {
-        const decrypted = await this.run("ssh-keygen", ["-p", "-q", "-P", account.passphrase, "-N", "", "-f", temporary], 15_000);
+        // The passphrase travels in the child's environment, never in its argv: command lines are readable by every local user,
+        // while /proc/<pid>/environ is limited to the same user and root.
+        const askpass = await this.askpassScript();
+        const decrypted = await this.run("ssh-keygen", ["-p", "-q", "-N", "", "-f", temporary], 15_000,
+          { AGENTFLEET_KEY_PASSPHRASE: account.passphrase, SSH_ASKPASS: askpass, SSH_ASKPASS_REQUIRE: "force", DISPLAY: process.env.DISPLAY || "agentfleet:0" });
         if (decrypted.code !== 0) throw new AgentError("SSH_PASSPHRASE_INVALID", "私钥口令不正确");
       }
       const derived = await this.run("ssh-keygen", ["-y", "-P", "", "-f", temporary], 15_000);
-      if (derived.code !== 0) throw new AgentError("SSH_KEY_INVALID", account.passphrase ? "私钥无法解密" : "私钥无法读取，若已加密请填写口令");
+      // In askpass mode ssh-keygen can exit 0 after a wrong passphrase, so the key still being locked is the authoritative signal.
+      if (derived.code !== 0) throw account.passphrase ? new AgentError("SSH_PASSPHRASE_INVALID", "私钥口令不正确或私钥无法解密") : new AgentError("SSH_KEY_INVALID", "私钥无法读取，若已加密请填写口令");
       if (keyToken(derived.stdout)?.[2] !== keyToken(account.publicKey)?.[2]) throw new AgentError("SSH_KEY_MISMATCH", "私钥与公钥不匹配");
       await fs.rename(temporary, target);
     } finally { await fs.rm(temporary, { force: true }); }
+  }
+
+  /** A fixed helper that only echoes an environment variable; it contains no secret and is safe to leave on disk. */
+  private async askpassScript() {
+    const path = join(this.root, "askpass.sh");
+    await fs.writeFile(path, "#!/bin/sh\nprintf '%s\\n' \"$AGENTFLEET_KEY_PASSPHRASE\"\n", { mode: 0o700 });
+    await fs.chmod(path, 0o700);
+    return path;
   }
 
   private config(accounts: SshAccount[]) {
@@ -139,9 +152,9 @@ export class SshAccess {
     return lines.join("\n");
   }
 
-  private hostsDocument(accounts: Pick<SshAccount, "alias" | "targetName" | "username" | "description">[]) {
+  private hostsDocument(accounts: Summary[]) {
     return ["# AgentFleets 可访问主机", "", "本文件由 AgentFleets 面板生成，请勿手动修改。", "", ...accounts.map(account =>
-      `- \`ssh ${account.alias}\` → ${account.targetName}（用户 ${account.username}）${account.description ? `：${account.description}` : ""}`), ""].join("\n");
+      `- \`ssh ${account.alias}\` → ${account.targetName}（用户 ${account.username}）${account.description ? `：${account.description}` : ""}${account.pinned === false ? "（主机指纹未固定，首次连接自动信任）" : ""}`), ""].join("\n");
   }
 
   private async write(name: string, content: string) {
@@ -234,7 +247,7 @@ export class SshAccess {
     if (this.summaries) return this.summaries;
     try {
       const state = JSON.parse(await fs.readFile(join(this.root, "state.json"), "utf8")) as { hosts?: unknown };
-      this.summaries = Array.isArray(state.hosts) ? state.hosts.filter((host): host is Summary => isRecord(host) && typeof host.alias === "string" && ALIAS.test(host.alias)) : [];
+      this.summaries = Array.isArray(state.hosts) ? state.hosts.filter((host): host is Summary => isRecord(host) && typeof host.alias === "string" && ALIAS.test(host.alias)).map(host => ({ ...host, pinned: typeof host.pinned === "boolean" ? host.pinned : undefined })) : [];
     } catch { this.summaries = []; }
     return this.summaries;
   }
@@ -244,8 +257,8 @@ export class SshAccess {
     if (!hosts.length) return undefined;
     return [
       "## AgentFleets 主机互通（SSH）",
-      "本机已由 AgentFleets 配置以下主机的 SSH 访问（非交互、主机指纹已校验），可直接运行 `ssh <别名> '<命令>'`，或用 `scp`/`rsync` 传输文件：",
-      ...hosts.map(host => `- ${host.alias} → ${oneLine(host.targetName)}（用户 ${host.username}）${host.description ? `：${oneLine(host.description)}` : ""}`),
+      "本机已由 AgentFleets 配置以下主机的 SSH 访问（非交互），可直接运行 `ssh <别名> '<命令>'`，或用 `scp`/`rsync` 传输文件。指纹状态按各主机标注：",
+      ...hosts.map(host => `- ${host.alias} → ${oneLine(host.targetName)}（用户 ${host.username}）${host.description ? `：${oneLine(host.description)}` : ""}${host.pinned === true ? " [主机指纹已固定]" : host.pinned === false ? " [主机指纹未固定，首次连接自动信任并记住]" : ""}`),
       `在远程主机上执行修改性或破坏性操作前，先说明目标主机和意图。完整清单见 ${join(this.root, "HOSTS.md")}。`,
     ].join("\n");
   }

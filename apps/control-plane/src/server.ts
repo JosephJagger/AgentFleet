@@ -696,6 +696,9 @@ export async function buildControlPlane(
   });
   app.post("/api/ssh-accounts/:id/verify", { preHandler: mutate }, async request => {
     const principal = request.principal as Principal;
+    // Verification inspects the target host and pushes secrets to every source host, so it needs the same authority as saving.
+    auth.requirePlatformAdmin(principal);
+    limiter.check(`ssh-verify:${principal.userId}`, 20, 60_000);
     sshAccess.get(principal, routeId(request));
     await inspectSsh(routeId(request));
     await syncSshWorkspace(principal.workspaceId);
@@ -703,6 +706,9 @@ export async function buildControlPlane(
   });
   app.post("/api/ssh-accounts/:id/test", { preHandler: mutate }, async request => {
     const principal = request.principal as Principal;
+    // The test runs ssh from every source host, so it is an administrative action and rate limited.
+    auth.requirePlatformAdmin(principal);
+    limiter.check(`ssh-test:${principal.userId}`, 10, 60_000);
     const account = sshAccess.get(principal, routeId(request));
     const sources = sshAccess.machinesIn(principal.workspaceId).filter(machine => machine.machine_id !== account.machineId && (!account.sources.length || account.sources.includes(machine.machine_id)));
     const results: SshTestResult[] = await Promise.all(sources.map(async machine => {
