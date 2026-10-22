@@ -26,6 +26,9 @@ def install(root):
             relative = 'packaging/' + name
             path = worktree / relative
             old = path.read_text() if path.exists() else ''
+            canonical = Path(root) / relative
+            if old and canonical.exists() and old == canonical.read_text():
+                continue  # Current scripts already enforce main-only publication; keep clean worktrees clean.
             if old and MARKER not in old:
                 tracked = subprocess.run(['git', '-C', str(worktree), 'show', 'HEAD:' + relative], capture_output=True, text=True)
                 if tracked.returncode or tracked.stdout != old:
