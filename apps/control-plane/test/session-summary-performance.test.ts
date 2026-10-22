@@ -43,7 +43,7 @@ test("session summaries use an indexed terminal timestamp and preserve event-tim
   db.sqlite.exec("DROP INDEX durable_events_terminal_time_idx; PRAGMA user_version=70");
   db.close();
   db = new ControlPlaneDatabase(path);
-  assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 71);
+  assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 72);
   const originalGet = db.get.bind(db);
   let summarySql = "";
   t.mock.method(db, "get", (sql: string, ...values: SQLInputValue[]) => {
