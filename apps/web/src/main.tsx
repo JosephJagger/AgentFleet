@@ -22,6 +22,9 @@ import "./interaction-stability.css";
 import "./workbench-panels.css";
 import "./typography.css";
 import "./session-toolbar.css";
+import "./theme-refinements.css";
+import "./panel-details.css";
+import "./panel-polish.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

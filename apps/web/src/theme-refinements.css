@@ -1,0 +1,257 @@
+/* Material finishing for all 19 palettes. The scenes, silhouettes and storage
+   keys stay with their original themes; these tokens give shared components
+   consistent depth without turning every theme into the same skin. */
+:root {
+  --finish-tone: #9abed8;
+  --finish-shadow-rgb: 30 53 72;
+  --finish-highlight: rgb(255 255 255 / .84);
+  --finish-shadow-soft: .045;
+  --finish-shadow-deep: .11;
+  --finish-edge: color-mix(in srgb, var(--line) 72%, var(--line-strong));
+  --finish-surface-tint: color-mix(in srgb, var(--paper) 96%, var(--finish-tone));
+  --finish-panel-shadow: inset 0 1px 0 var(--finish-highlight),
+    0 1px 2px rgb(var(--finish-shadow-rgb) / var(--finish-shadow-soft)),
+    0 5px 18px rgb(var(--finish-shadow-rgb) / var(--finish-shadow-soft));
+  --finish-control-shadow: inset 0 1px 0 var(--finish-highlight),
+    0 1px 2px rgb(var(--finish-shadow-rgb) / var(--finish-shadow-soft));
+  --finish-float-shadow: 0 16px 48px rgb(var(--finish-shadow-rgb) / var(--finish-shadow-deep)),
+    0 3px 10px rgb(var(--finish-shadow-rgb) / var(--finish-shadow-soft));
+}
+
+:root:is([data-theme="midnight"], [data-theme="forest"], [data-theme="matrix"],
+  [data-theme="cyber"], [data-theme="wizard"], [data-theme="starwars"],
+  [data-theme="wukong"], [data-theme="jiangshan"]) {
+  --finish-shadow-rgb: 0 0 0;
+  --finish-shadow-soft: .12;
+  --finish-shadow-deep: .34;
+  --finish-highlight: rgb(255 255 255 / .065);
+  --finish-edge: color-mix(in srgb, var(--line) 82%, var(--line-strong));
+}
+
+/* Light porcelain, cloud blue, armor, moss and warm stationery. */
+:root[data-theme="official"] {
+  --finish-tone: #bccde0;
+  --finish-shadow-rgb: 29 29 31;
+  --finish-shadow-soft: .035;
+  --finish-edge: #d9dce2;
+  --finish-surface-tint: #ffffff;
+}
+:root[data-theme="daylight"] {
+  --finish-tone: #b6d8eb;
+  --finish-shadow-rgb: 36 76 103;
+  --finish-highlight: rgb(255 255 255 / .95);
+}
+:root[data-theme="midnight"] {
+  --finish-tone: #a9b5c5;
+  --finish-highlight: rgb(189 201 218 / .085);
+}
+:root[data-theme="forest"] {
+  --finish-tone: #9fb28a;
+  --finish-highlight: rgb(201 222 171 / .08);
+}
+:root[data-theme="eyecare"] {
+  --finish-tone: #ddc991;
+  --finish-shadow-rgb: 95 72 34;
+  --finish-highlight: rgb(255 251 233 / .95);
+}
+
+/* Phosphor, ice, antique brass, industrial steel and a deep-space bridge. */
+:root[data-theme="matrix"] {
+  --finish-tone: #4e9a66;
+  --finish-highlight: rgb(121 239 154 / .075);
+  --finish-surface-tint: #0d1811;
+}
+:root[data-theme="frozen"] {
+  --finish-tone: #bcd5ef;
+  --finish-shadow-rgb: 66 101 144;
+  --finish-highlight: #ffffff;
+}
+:root[data-theme="wizard"] {
+  --finish-tone: #ad8c63;
+  --finish-highlight: rgb(231 195 134 / .09);
+}
+:root[data-theme="cyber"] {
+  --finish-tone: #91b9bf;
+  --finish-highlight: rgb(164 211 216 / .075);
+  --finish-panel-shadow: inset 0 1px 0 var(--finish-highlight), 0 3px 12px rgb(0 0 0 / .14);
+}
+:root[data-theme="starwars"] {
+  --finish-tone: #6da5d5;
+  --finish-highlight: rgb(150 205 248 / .09);
+}
+
+/* Bathhouse paper, elven leaves and tactile platform-game cards. */
+:root[data-theme="spirited"] {
+  --finish-tone: #ddbd94;
+  --finish-shadow-rgb: 100 62 35;
+  --finish-highlight: rgb(255 252 239 / .94);
+}
+:root[data-theme="rivendell"] {
+  --finish-tone: #b5c19b;
+  --finish-shadow-rgb: 57 78 50;
+  --finish-highlight: rgb(255 255 246 / .94);
+}
+:root[data-theme="mario"] {
+  --finish-tone: #bedceb;
+  --finish-shadow-rgb: 53 82 104;
+  --finish-panel-shadow: inset 0 1px 0 #fff, 0 2px 0 #c7d8e4,
+    0 5px 12px rgb(53 82 104 / .055);
+  --finish-control-shadow: inset 0 1px 0 #fff, 0 1px 0 #c7d8e4;
+}
+
+/* Lacquer, lotus porcelain, celadon, silk scroll and mineral pigment. */
+:root[data-theme="wukong"] {
+  --finish-tone: #bc8656;
+  --finish-highlight: rgb(236 194 126 / .085);
+}
+:root[data-theme="nezha"] {
+  --finish-tone: #efb8a8;
+  --finish-shadow-rgb: 111 67 54;
+  --finish-highlight: rgb(255 252 247 / .95);
+}
+:root[data-theme="whitesnake"] {
+  --finish-tone: #badacc;
+  --finish-shadow-rgb: 49 88 71;
+  --finish-highlight: rgb(255 255 255 / .92);
+}
+:root[data-theme="qingming"] {
+  --finish-tone: #c9b78f;
+  --finish-shadow-rgb: 86 67 38;
+  --finish-highlight: rgb(255 250 231 / .8);
+  --finish-panel-shadow: inset 0 1px 0 var(--finish-highlight),
+    0 2px 8px rgb(86 67 38 / .045);
+}
+:root[data-theme="jiangshan"] {
+  --finish-tone: #8eb09a;
+  --finish-highlight: rgb(186 217 182 / .08);
+}
+
+/* The broadcast workbench keeps its flat, precise editor material. */
+:root[data-theme="buzhoushan"] {
+  --finish-tone: #8f9ba8;
+  --finish-highlight: rgb(255 255 255 / .045);
+  --finish-shadow-rgb: 0 0 0;
+  --finish-edge: var(--line);
+  --finish-surface-tint: var(--paper);
+  --finish-panel-shadow: none;
+  --finish-control-shadow: none;
+  --finish-float-shadow: 0 8px 28px rgb(0 0 0 / .3);
+}
+
+/* Larger cards catch light once; nested components remain quiet. Keep host
+   selection styling separate so decorative material never masks state. */
+:root[data-theme] :is(.settings-block, .host-card:where(:not(.host-card--selected))) {
+  box-shadow: var(--finish-panel-shadow);
+  border-color: var(--finish-edge);
+  background-image: linear-gradient(160deg, var(--finish-surface-tint), transparent 180px);
+}
+:root[data-theme="official"] :is(.settings-block, .host-card:where(:not(.host-card--selected))),
+:root[data-theme="buzhoushan"] :is(.settings-block, .host-card:where(:not(.host-card--selected))) {
+  background-image: none;
+}
+
+/* Keep the original ornamental edge, with less competition against text. */
+:root[data-theme="midnight"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-top-color: #63707d; }
+:root[data-theme="eyecare"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-top-color: #d2b77c; }
+:root[data-theme="frozen"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-top-color: #fff; }
+:root[data-theme="wizard"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-left-color: #7e6b51; }
+:root[data-theme="starwars"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-top-color: #526e87; }
+:root[data-theme="spirited"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-top-color: #ac8c6f; }
+:root[data-theme="rivendell"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-top-color: #b2aa81; }
+:root[data-theme="wukong"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-left-color: #a58861; }
+:root[data-theme="nezha"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-top-color: #cb9585; }
+:root[data-theme="qingming"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-inline-color: #b9a685; }
+:root[data-theme="jiangshan"] :is(.host-card:where(:not(.host-card--selected)), .settings-block) { border-top-color: #a39b72; }
+
+/* Theme previews should use the actual palette, including all five Chinese
+   themes, instead of falling back to the original cyan terminal border. */
+.theme-option--official { --sample-canvas: #fff; --sample-paper: #f5f5f7; --sample-line: #d9dce2; --sample-accent: #0066cc; }
+.theme-option--daylight { --sample-canvas: #edf5fa; --sample-paper: #fcfeff; --sample-line: #a5bfce; --sample-accent: #24688c; }
+.theme-option--midnight { --sample-canvas: #14171c; --sample-paper: #2c333c; --sample-line: #586573; --sample-accent: #e5c66d; }
+.theme-option--forest { --sample-canvas: #14251e; --sample-paper: #293d30; --sample-line: #647b5e; --sample-accent: #c7d99c; }
+.theme-option--eyecare { --sample-canvas: #f4ecd6; --sample-paper: #fff9e9; --sample-line: #b89d6e; --sample-accent: #96532c; }
+.theme-option--matrix { --sample-canvas: #050907; --sample-paper: #122019; --sample-line: #355b40; --sample-accent: #65f58d; }
+.theme-option--frozen { --sample-canvas: #eaf4fb; --sample-paper: #fafdff; --sample-line: #9dbdd5; --sample-accent: #27699d; }
+.theme-option--wizard { --sample-canvas: #171522; --sample-paper: #312a39; --sample-line: #79634d; --sample-accent: #e5bf77; }
+.theme-option--cyber { --sample-canvas: #14171c; --sample-paper: #272e35; --sample-line: #53646c; --sample-accent: #f3dd45; }
+.theme-option--starwars { --sample-canvas: #0c1420; --sample-paper: #1d2e42; --sample-line: #526d88; --sample-accent: #8ccfff; }
+.theme-option--spirited { --sample-canvas: #f4eddf; --sample-paper: #fffaf0; --sample-line: #b69d7e; --sample-accent: #a13e32; }
+.theme-option--rivendell { --sample-canvas: #edf0e6; --sample-paper: #fbfcf5; --sample-line: #9cae8b; --sample-accent: #386446; }
+.theme-option--mario { --sample-canvas: #edf6fc; --sample-paper: #fffefa; --sample-line: #94b0c5; --sample-accent: #b9362e; }
+.theme-option--wukong { --sample-canvas: #241b20; --sample-paper: #423037; --sample-line: #87624d; --sample-accent: #edc777; }
+.theme-option--nezha { --sample-canvas: #fbefe7; --sample-paper: #fffbf7; --sample-line: #c69c8c; --sample-accent: #aa4239; }
+.theme-option--whitesnake { --sample-canvas: #edf4f0; --sample-paper: #fbfefb; --sample-line: #95b9a5; --sample-accent: #347569; }
+.theme-option--qingming { --sample-canvas: #f0e8d6; --sample-paper: #faf5e7; --sample-line: #af9972; --sample-accent: #83533c; }
+.theme-option--jiangshan { --sample-canvas: #102d32; --sample-paper: #254a4b; --sample-line: #66896f; --sample-accent: #e0c788; }
+.theme-option--buzhoushan { --sample-canvas: #1e1e1e; --sample-paper: #252526; --sample-line: #454545; --sample-accent: #3794ff; }
+
+.theme-option {
+  background: var(--paper);
+  box-shadow: inset 0 1px 0 var(--finish-highlight);
+  transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out;
+}
+.theme-option__preview {
+  border-color: color-mix(in srgb, var(--sample-line) 65%, var(--sample-paper));
+  box-shadow: 0 1px 3px rgb(var(--finish-shadow-rgb) / .08);
+}
+.theme-option__copy strong { font-weight: 600; }
+.theme-option__check { color: var(--paper); border: 1px solid var(--line); }
+.theme-option[aria-checked="true"] {
+  background: color-mix(in srgb, var(--paper) 65%, var(--cobalt-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cobalt) 25%, transparent);
+}
+.theme-option[aria-checked="true"] .theme-option__check { border-color: var(--cobalt); color: var(--canvas); }
+.theme-option:hover { transform: none; }
+@media (hover: hover) and (pointer: fine) {
+  .theme-option:hover { border-color: var(--cobalt); box-shadow: var(--finish-control-shadow); }
+}
+
+/* The wizard's light parchment is a light surface within a dark theme. Scope
+   its controls too: attachment labels and menus must not inherit pale ink. */
+:root[data-theme="wizard"] .composer-input {
+  color-scheme: light;
+  --canvas: #eee1c2;
+  --paper: #fbf3df;
+  --paper-solid: #e7d9b7;
+  --paper-raised: #f5eace;
+  --ink: #382c26;
+  --muted: #6c5944;
+  --faint: #75624c;
+  --line: #c9b690;
+  --line-strong: #97774f;
+  --component-line: #b59863;
+  --cobalt: #704139;
+  --cobalt-deep: #583129;
+  --cobalt-soft: #ead2bd;
+  --teal: #38644e;
+  --teal-soft: #dce5cb;
+  --amber: #815517;
+  --amber-soft: #f4e5b9;
+  --red: #a2343d;
+  --red-soft: #f5dcd5;
+  --magenta: #75517c;
+  --magenta-soft: #e9dbeb;
+}
+:root[data-theme="wizard"] .composer-input .button--primary { color: #fff5df; }
+
+/* Late, theme-aware fallbacks also cover the frosted rail added by typography. */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme] :is(.topbar, .primary-nav, .modal, .activity-panel,
+    .session-config-dialog, .usage-dialog, .machine-rail .rail-status) {
+    background-color: var(--paper);
+    background-image: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+@media (prefers-contrast: more) {
+  :root[data-theme] {
+    --finish-edge: var(--muted);
+    --finish-highlight: transparent;
+    --finish-panel-shadow: none;
+    --finish-control-shadow: none;
+  }
+  :root[data-theme] :is(.settings-block, .host-card:where(:not(.host-card--selected))) { background-image: none; }
+  :root[data-theme] .theme-option { border-color: var(--muted); }
+  :root[data-theme] .theme-option[aria-checked="true"] { border-color: var(--cobalt); outline: 1px solid var(--cobalt); }
+}
