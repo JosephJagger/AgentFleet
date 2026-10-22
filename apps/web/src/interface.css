@@ -980,6 +980,9 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .ssh-check--ok { background: var(--green-soft, #e3f4e8); color: var(--green, #1f7a3d); }
 .ssh-check--bad { background: var(--red-soft); color: var(--red); }
 .host-ssh__grid--route { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.host-relay { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.host-relay h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.host-relay__notes { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 .host-links { display: grid; gap: 10px; }
 .host-links h3 { margin: 0; }
 .host-links__scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }

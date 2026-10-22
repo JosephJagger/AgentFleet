@@ -200,8 +200,9 @@ export class RelayConnection {
     this.runtime.setTransportGeneration(ticket.transportGeneration);
     socket.addEventListener("message", (event) => this.enqueueInbound(event, socket));
     socket.addEventListener("error", () => closeRelaySocket(socket, 4011, "relay transport error"));
+    sshAccess.relay.attach(frame => this.send(frame));
     socket.addEventListener("close", event => {
-      if(this.socket===socket)this.runtime.setTransportGeneration(undefined);
+      if(this.socket===socket){this.runtime.setTransportGeneration(undefined);sshAccess.relay.transportLost();}
       this.logger.info(`relay closed (generation ${ticket.transportGeneration}, code ${event.code}, clean ${event.wasClean})`);
     });
     this.beginHelloCycle();
@@ -343,6 +344,11 @@ export class RelayConnection {
           .catch(error => reply({ error: { code: error instanceof AgentError && error.code.startsWith("SSH_") ? error.code : "SSH_HOST_FAILED", message: error instanceof AgentError ? error.message : "主机执行 SSH 操作失败" } }));
         return;
       }
+      case "relay.open": case "relay.opened": case "relay.error": case "relay.data": case "relay.ack": case "relay.resume": case "relay.close": {
+        // Byte streams for SSH through the panel. The manager validates everything it is given and never executes anything.
+        sshAccess.relay.handleFrame(value);
+        return;
+      }
       case "session.history.read": {
         if(!this.reconciliationReady)return;
         const source=this.socket;
@@ -450,6 +456,7 @@ export class RelayConnection {
           this.scheduleFollowupHello();
         } else {
           this.reconciliationReady = true;
+          sshAccess.relay.transportReady();
           for(const event of this.pendingVoiceEvents.values()) if(event.producerEpoch===this.runtime.producerEpoch && event.appServerEpoch===this.runtime.getAppServerEpoch()) this.send(event);
           this.pendingVoiceEvents.clear();
           this.onReady?.();

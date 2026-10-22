@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 69) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 70) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1663,6 +1663,34 @@ export class ControlPlaneDatabase {
       ) STRICT`);
       if (this.all("PRAGMA foreign_key_check").length) throw new Error('Host interconnect migration foreign-key violation');
       this.sqlite.exec("PRAGMA user_version=69");
+    });
+    if (version < 70) this.transaction(() => {
+      // Panel relay for SSH between hosts that cannot reach each other. The switch is per workspace and off by default.
+      // Streams are recorded so the publisher can see them and wait, exactly as it does for voice calls; there is no foreign
+      // key on purpose, because a stream's history must outlive the account or host it served.
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS host_ssh_settings (
+        workspace_id TEXT PRIMARY KEY REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+        relay_enabled INTEGER NOT NULL DEFAULT 0 CHECK (relay_enabled IN (0,1)),
+        revision INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      ) STRICT;
+      CREATE TABLE IF NOT EXISTS ssh_relay_streams (
+        stream_id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        source_machine_id TEXT NOT NULL,
+        target_machine_id TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('opening','open','suspended','closed')),
+        started_at TEXT NOT NULL,
+        last_active_at TEXT NOT NULL,
+        closed_at TEXT,
+        close_reason TEXT,
+        bytes_up INTEGER NOT NULL DEFAULT 0,
+        bytes_down INTEGER NOT NULL DEFAULT 0
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS ssh_relay_streams_live ON ssh_relay_streams(closed_at) WHERE closed_at IS NULL;
+      CREATE INDEX IF NOT EXISTS ssh_relay_streams_workspace ON ssh_relay_streams(workspace_id,started_at);
+      PRAGMA user_version=70`);
     });
   }
 

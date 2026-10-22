@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish a prepared panel image only after both kinds of voice call have ended.
+"""Publish a prepared panel image only after both kinds of voice call and every SSH relay stream have ended.
 Requires local Docker/Compose, Python 3 and read/write access to the shared SQLite DB.
 No task dispatch, host restart, forced call closure or implicit rollback is performed.
 """
@@ -22,9 +22,21 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = json.loads((ROOT / 'apps/control-plane/src/voice-deployment-schema.json').read_text())
 
 
+# The panel refreshes a live relay stream's row every 30 seconds. A row nobody has touched for this long was left behind
+# by a process that died, and waiting for it would block every future deployment.
+STALE_RELAY_SECONDS = 300
+
+
 def counts(db):
-    return {table: db.execute(f"SELECT count(*) FROM {table} WHERE state<>'closed'").fetchone()[0]
-            for table in ('panel_voice_calls', 'voice_sessions')}
+    active = {table: db.execute(f"SELECT count(*) FROM {table} WHERE state<>'closed'").fetchone()[0]
+              for table in ('panel_voice_calls', 'voice_sessions')}
+    # SSH relay streams exist from schema 70 on; an older database simply has none. Restarting the panel cuts them off,
+    # so a deployment waits for them exactly as it waits for voice calls.
+    if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ssh_relay_streams'").fetchone():
+        active['ssh_relay_streams'] = db.execute(
+            "SELECT count(*) FROM ssh_relay_streams WHERE closed_at IS NULL AND last_active_at>strftime('%Y-%m-%dT%H:%M:%fZ','now',?)",
+            (f'-{STALE_RELAY_SECONDS} seconds',)).fetchone()[0]
+    return active
 
 
 def acquire(db, target, token):

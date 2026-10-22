@@ -168,8 +168,9 @@ test("inspection keeps only known address kinds and whether sshd listens", () =>
 test("jump routes need a direct account on the jump host and never form chains", () => {
   const f = fixture();
   const inner = { machineId: "a", name: "inner", route: "proxyjump", proxyJumpMachineId: "b" };
-  assert.throws(() => addAccount(f, "a", "inner", { route: "relay" }), /暂不支持该路由方式/);
-  assert.throws(() => addAccount(f, "a", "inner", { route: "auto" }), /暂不支持该路由方式/, "reserved for the panel relay, not offered yet");
+  assert.throws(() => addAccount(f, "a", "inner", { route: "tunnel" }), /暂不支持该路由方式/);
+  assert.throws(() => addAccount(f, "a", "inner", { route: "relay" }), /请先启用面板中转/, "the panel relay is a workspace switch, off by default");
+  assert.throws(() => addAccount(f, "a", "inner", { route: "auto" }), /请先启用面板中转/);
   assert.throws(() => addAccount(f, "a", "inner", { route: "proxyjump" }), /请选择跳板机/);
   assert.throws(() => addAccount(f, "a", "inner", { route: "proxyjump", proxyJumpMachineId: "a" }), /不能是目标主机自身/);
   assert.throws(() => addAccount(f, "a", "inner", { route: "proxyjump", proxyJumpMachineId: "win" }), /仅支持 Linux 和 macOS/);
@@ -210,7 +211,7 @@ test("the matrix reports each source's real state and why a link is absent", () 
   const f = fixture();
   const bastion = addAccount(f, "b", "bastion", {}, "203.0.113.7");
   const inner = addAccount(f, "a", "inner", { route: "proxyjump", proxyJumpMachineId: "b" }, "10.9.0.4");
-  const caps = (state: Record<string, { connected: boolean; ssh: boolean; routes: boolean }>) => (id: string) => state[id] ?? { connected: true, ssh: true, routes: true };
+  const caps = (state: Record<string, { connected: boolean; ssh: boolean; routes: boolean; relay?: boolean }>) => (id: string) => ({ relay: true, ...(state[id] ?? { connected: true, ssh: true, routes: true }) });
   const link = (matrix: ReturnType<typeof f.service.matrix>, accountId: string, source: string) => matrix.links.find(item => item.accountId === accountId)!.sources.find(item => item.machineId === source)!;
 
   let matrix = f.service.matrix(f.principal, caps({}));
@@ -260,10 +261,84 @@ test("upgrading a version 68 database adds routes and test results without touch
     db.close();
     for (const round of [1, 2]) {
       db = new ControlPlaneDatabase(path);
-      assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 69, `round ${round}`);
+      assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 70, `round ${round}`);
       assert.deepEqual({ ...db.get<Record<string, unknown>>("SELECT route,proxy_jump_machine_id FROM host_ssh_accounts WHERE account_id='ssh_old'") }, { route: "direct", proxy_jump_machine_id: null }, "existing accounts stay direct");
       assert.equal(db.get<{ n: number }>("SELECT count(*) AS n FROM host_ssh_link_tests")?.n, 0);
       assert.throws(() => db.run("UPDATE host_ssh_accounts SET route='bogus' WHERE account_id='ssh_old'"), /CHECK/);
+      db.close();
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("relay accounts are delivered only when the switch, both agents and a pinned host key allow it, and the matrix says which is missing", () => {
+  const f = fixture();
+  f.service.saveRelaySettings(f.principal, { enabled: true, revision: 0 });
+  const behindNat = addAccount(f, "a", "behind-nat", { route: "relay" }, "192.168.1.5");
+  const either = addAccount(f, "b", "either", { route: "auto" }, "203.0.113.7");
+  // An account whose host key has not been pinned yet: the inspection helper pins one by default, so clear it.
+  f.db.run("UPDATE host_ssh_accounts SET host_keys_json='[]'");
+  const caps = (override: Record<string, { connected: boolean; ssh: boolean; routes: boolean; relay: boolean }> = {}) => (id: string) => override[id] ?? { connected: true, ssh: true, routes: true, relay: true };
+  const cell = (matrix: ReturnType<typeof f.service.matrix>, account: string, source: string) => matrix.links.find(link => link.accountId === account)!.sources.find(item => item.machineId === source)!;
+
+  assert.equal(cell(f.service.matrix(f.principal, caps()), behindNat.id, "c").reason, "host_key_unpinned", "the panel in the middle needs a pinned key to be detectable");
+  assert.deepEqual(f.service.desired("c", false).map(account => account.alias), [], "nothing is delivered until the key is pinned");
+
+  const pinned = (id: string) => f.service.recordInspection(id, parseInspection({ userExists: true, authorized: true, hostKeys: [keyPair().publicKey], addresses: ["192.168.1.5"], port: 22 }));
+  pinned(behindNat.id); pinned(either.id);
+  assert.equal(cell(f.service.matrix(f.principal, caps()), behindNat.id, "c").state, "untested");
+  const delivered = f.service.desired("c", false);
+  assert.deepEqual(delivered.map(account => [account.alias, account.route]).sort(), [["af-behind-nat", "relay"], ["af-either", "auto"]]);
+  assert.equal(f.service.desired("a", false).some(account => account.alias === "af-behind-nat"), false, "never to the host it points at");
+
+  // An older agent cannot carry it, and a target known not to support it is excluded; an offline one is only unknown.
+  assert.equal(cell(f.service.matrix(f.principal, caps({ c: { connected: true, ssh: true, routes: true, relay: false } })), behindNat.id, "c").reason, "relay_unsupported");
+  assert.equal(cell(f.service.matrix(f.principal, caps({ a: { connected: true, ssh: true, routes: true, relay: false } })), behindNat.id, "c").reason, "relay_unsupported", "the target's agent must carry it too");
+  assert.equal(cell(f.service.matrix(f.principal, caps({ a: { connected: false, ssh: false, routes: false, relay: false } })), behindNat.id, "c").state, "untested", "offline is unknown, not unsupported");
+  assert.deepEqual(f.service.desired("c", false, { relay: false }).map(account => account.alias), [], "a source agent without relay is not given relay accounts");
+
+  // Without an address the host is still configured (ssh needs a name) but never connected to directly.
+  f.service.save(f.principal, { name: "behind-nat", algorithm: "ed25519", username: "deploy", address: "" }, behindNat.id);
+  f.service.recordInspection(behindNat.id, parseInspection({ userExists: true, authorized: true, hostKeys: [keyPair().publicKey], addresses: [], port: 22 }));
+  assert.equal(f.service.desired("c", false).find(account => account.alias === "af-behind-nat")?.hostname, "relay.invalid");
+
+  // Turning the switch off withdraws everything at once; the matrix explains why.
+  f.service.saveRelaySettings(f.principal, { enabled: false, revision: 1 });
+  assert.deepEqual(f.service.desired("c", false).map(account => account.alias), []);
+  assert.equal(cell(f.service.matrix(f.principal, caps()), either.id, "c").reason, "relay_disabled");
+  // A jump account may not be a relay account, and relay accounts do not take part in jump chains.
+  assert.throws(() => f.service.save(f.principal, { machineId: "c", name: "hop", algorithm: "ed25519", username: "u", ...keyPair(), route: "proxyjump", proxyJumpMachineId: "a" }), /跳板机需要先登记一个直连的 SSH 账号/);
+});
+
+test("authorising a relay checks the same plan the host was given, and says why not", () => {
+  const f = fixture();
+  f.service.saveRelaySettings(f.principal, { enabled: true, revision: 0 });
+  const relay = addAccount(f, "a", "db", { route: "relay" });
+  f.service.recordInspection(relay.id, parseInspection({ userExists: true, authorized: true, hostKeys: [keyPair().publicKey], addresses: ["10.0.0.9"], port: 22 }));
+  const direct = addAccount(f, "b", "plain", {});
+  const ok = f.service.authoriseRelay("c", relay.id);
+  assert.deepEqual(ok.ok && [ok.targetMachineId, ok.alias], ["a", "af-db"]);
+  assert.deepEqual(f.service.authoriseRelay("a", relay.id), { ok: false, reason: "not_found" }, "a host cannot relay to itself");
+  assert.deepEqual(f.service.authoriseRelay("c", "ssh_unknown"), { ok: false, reason: "not_found" });
+  assert.deepEqual(f.service.authoriseRelay("c", direct.id), { ok: false, reason: "not_relay" });
+  assert.deepEqual(f.service.authoriseRelay("win", relay.id), { ok: false, reason: "not_found" }, "an unsupported platform is never a source");
+  f.service.save(f.principal, { name: "db", algorithm: "ed25519", username: "deploy", sources: ["b"] }, relay.id);
+  assert.deepEqual(f.service.authoriseRelay("c", relay.id), { ok: false, reason: "not_allowed" });
+  assert.equal(f.service.authoriseRelay("b", relay.id).ok, true);
+});
+
+test("upgrading a version 69 database adds the relay switch and stream records", () => {
+  const root = mkdtempSync(join(osTmp(), "cp-mig70-"));
+  const path = join(root, "control-plane.sqlite");
+  try {
+    let db = new ControlPlaneDatabase(path);
+    db.sqlite.exec("DROP TABLE ssh_relay_streams; DROP TABLE host_ssh_settings; PRAGMA user_version=69");
+    db.close();
+    for (const round of [1, 2]) {
+      db = new ControlPlaneDatabase(path);
+      assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 70, `round ${round}`);
+      assert.equal(db.get<{ n: number }>("SELECT count(*) AS n FROM host_ssh_settings")?.n, 0, "no workspace has the relay on by default");
+      assert.equal(db.get<{ n: number }>("SELECT count(*) AS n FROM ssh_relay_streams")?.n, 0);
+      assert.throws(() => db.run("INSERT INTO ssh_relay_streams(stream_id,workspace_id,account_id,source_machine_id,target_machine_id,state,started_at,last_active_at) VALUES('s','w','a','m','n','bogus','t','t')"), /CHECK/);
       db.close();
     }
   } finally { rmSync(root, { recursive: true, force: true }); }

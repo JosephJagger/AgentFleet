@@ -226,3 +226,95 @@ test("jump hosts are configured only through another installed direct account, n
     [account({ id: "ssh_a", alias: "af-a", ...pair, proxyJump: "x\n  ProxyCommand evil" })],
   ]) assert.throws(() => parseSshAccounts(bad), /无效/);
 });
+
+const relayHome = async () => { const home = await fs.mkdtemp(join(tmpdir(), "afx-")); return home; };
+const fakeCli = ["/opt/agentfleet/runtime/node", "/opt/agentfleet/lib/dist/src/cli.js"];
+
+test("relay accounts get a ProxyCommand that ssh really parses, and the local socket follows the accounts", async () => {
+  const home = await relayHome();
+  const pair = await keyPair(home);
+  const hostKey = (await keyPair(home)).publicKey;
+  const ssh = new SshAccess(home, undefined, "linux", undefined, () => fakeCli);
+  const accounts = parseSshAccounts([
+    account({ id: "ssh_r", alias: "af-behind-nat", targetName: "Behind NAT", ...pair, hostKeys: [hostKey], route: "relay" }),
+    account({ id: "ssh_a", alias: "af-either", targetName: "Either", ...pair, hostKeys: [hostKey], route: "auto", hostname: "203.0.113.7", port: 2222 }),
+    account({ id: "ssh_d", alias: "af-plain", targetName: "Plain", ...pair, hostKeys: [hostKey] }),
+  ]);
+  assert.deepEqual(await ssh.sync(accounts), { accounts: { ssh_r: { ok: true }, ssh_a: { ok: true }, ssh_d: { ok: true } } });
+  assert.equal((await fs.stat(ssh.relaySocket)).mode & 0o777, 0o600, "the relay socket is private to this user");
+
+  const config = join(ssh.root, "config");
+  const resolved = (alias: string) => execFileSync("ssh", ["-G", "-F", config, alias], { encoding: "utf8" }).split("\n").find(line => line.startsWith("proxycommand "));
+  const relayLine = resolved("af-behind-nat")!;
+  assert.match(relayLine, /^proxycommand "\/opt\/agentfleet\/runtime\/node" "\/opt\/agentfleet\/lib\/dist\/src\/cli.js" ssh-proxy --alias af-behind-nat --socket ".*\/relay\.sock" --path-dir ".*\/last-path"$/);
+  assert.ok(!relayLine.includes("--direct-host"), "relay-only never tries the address");
+  assert.match(resolved("af-either")!, /ssh-proxy --alias af-either .* --direct-host "203\.0\.113\.7" --direct-port 2222$/, "auto tries the real address first");
+  assert.equal(resolved("af-plain"), undefined, "direct accounts are untouched");
+  assert.match(await ssh.instructions() ?? "", /af-behind-nat[^\n]*\[经面板中转，延迟较高\]/);
+  assert.match(await ssh.instructions() ?? "", /af-either[^\n]*\[直连不通时经面板中转\]/);
+  assert.match(await fs.readFile(join(ssh.root, "HOSTS.md"), "utf8"), /af-either[^\n]*直连不通时经面板中转/);
+
+  // Without relay accounts the socket goes away; clearing removes everything.
+  await ssh.sync(parseSshAccounts([account({ id: "ssh_d", alias: "af-plain", ...pair, hostKeys: [hostKey] })]));
+  await assert.rejects(fs.stat(ssh.relaySocket));
+  await ssh.sync(accounts);
+  assert.ok((await fs.stat(ssh.relaySocket)).isSocket());
+  await ssh.sync([]);
+  await assert.rejects(fs.stat(ssh.relaySocket));
+  await ssh.relay.stop();
+});
+
+test("a command path that is not plainly safe never reaches ssh_config; only that account fails", async () => {
+  const home = await relayHome();
+  const pair = await keyPair(home);
+  const ssh = new SshAccess(home, undefined, "linux", undefined, () => ["/opt/agent fleet/$(touch hacked)/node", "/x/cli.js"]);
+  const result = await ssh.sync(parseSshAccounts([
+    account({ id: "ssh_r", alias: "af-risky", ...pair, route: "relay" }),
+    account({ id: "ssh_d", alias: "af-plain", ...pair }),
+  ]));
+  assert.equal(result.accounts.ssh_r?.ok, false);
+  assert.match(result.accounts.ssh_r?.error ?? "", /不支持的字符/);
+  assert.deepEqual(result.accounts.ssh_d, { ok: true }, "direct accounts are unaffected");
+  const config = await fs.readFile(join(ssh.root, "config"), "utf8");
+  assert.doesNotMatch(config, /af-risky|touch hacked|ProxyCommand/);
+  assert.deepEqual(await fs.readdir(join(ssh.root, "keys")), ["af-plain"]);
+  await assert.rejects(fs.stat(ssh.relaySocket), "no listener is left for an account that was refused");
+});
+
+test("route values and jump hops cannot be combined or invented", () => {
+  const pair = { privateKey: "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----", publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGtmzWk2xH0a" };
+  const base = { id: "ssh_x", alias: "af-x", name: "x", targetName: "X", username: "u", hostname: "10.0.0.1", port: 22, passphrase: "", hostKeys: [], description: "" };
+  assert.equal(parseSshAccounts([{ ...base, ...pair, route: "relay" }])[0]?.route, "relay");
+  assert.equal(parseSshAccounts([{ ...base, ...pair, route: "direct" }])[0]?.route, undefined, "direct is the absence of a route");
+  assert.throws(() => parseSshAccounts([{ ...base, ...pair, route: "tunnel" }]), /无效/);
+  assert.throws(() => parseSshAccounts([{ ...base, ...pair, route: "relay", proxyJump: "af-y" }, { ...base, ...pair, id: "ssh_y", alias: "af-y" }]), /无效/, "ProxyJump and ProxyCommand are different ways to reach a host");
+});
+
+test("a connection test reports which path ssh-proxy used, but only from this test", async () => {
+  const home = await relayHome();
+  const dir = join(home, ".ssh", "agentfleet", "last-path");
+  await fs.mkdir(dir, { recursive: true });
+  let note: unknown;
+  const run = async () => { if (note !== undefined) await fs.writeFile(join(dir, "af-db"), JSON.stringify(note)); return { code: 0, stdout: "", stderr: "" }; };
+  const ssh = new SshAccess(home, run, "linux");
+  note = { path: "relay", at: Date.now() };
+  assert.equal((await ssh.test("af-db")).path, "relay");
+  note = { path: "direct", at: Date.now() - 60_000 };
+  assert.equal((await ssh.test("af-db")).path, undefined, "an old note from an earlier connection says nothing about this one");
+  note = { path: "elsewhere", at: Date.now() };
+  assert.equal((await ssh.test("af-db")).path, undefined, "only known paths are reported");
+});
+
+test("by default the ProxyCommand names the small proxy entry point next to the main one, never a shell word", async () => {
+  const home = await relayHome();
+  const pair = await keyPair(home);
+  const original = process.argv[1];
+  process.argv[1] = "/opt/agentfleet/lib/dist/src/cli.js";
+  try {
+    const ssh = new SshAccess(home, undefined, "linux");
+    await ssh.sync(parseSshAccounts([account({ id: "ssh_r", alias: "af-r", ...pair, hostKeys: [(await keyPair(home)).publicKey], route: "relay" })]));
+    const config = await fs.readFile(join(ssh.root, "config"), "utf8");
+    assert.match(config, /ProxyCommand ".*\/node(?:\.exe)?" "\/opt\/agentfleet\/lib\/dist\/src\/ssh-proxy-cli\.js" ssh-proxy --alias af-r /);
+    await ssh.relay.stop();
+  } finally { if (original !== undefined) process.argv[1] = original; }
+});
