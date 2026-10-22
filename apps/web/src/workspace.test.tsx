@@ -12,7 +12,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { createSession:vi.fn(),saveClaudePreferences:vi.fn(),saveGrokPreferences:vi.fn(),saveRuntimePreferences:vi.fn(), claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { decideApproval:vi.fn(), createSession:vi.fn(),saveClaudePreferences:vi.fn(),saveGrokPreferences:vi.fn(),saveRuntimePreferences:vi.fn(), claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -1230,4 +1230,19 @@ it("运行中修改 Claude 强度只保存下次配置，不进入追加或排�
  await waitFor(()=>expect(input.value).toBe(''));
  expect(api.saveClaudePreferences).toHaveBeenCalledWith('A',expect.objectContaining({settings:expect.objectContaining({effort:'high'})}));
  expect(send).not.toHaveBeenCalled();expect(queue).not.toHaveBeenCalled();expect(steer).not.toHaveBeenCalled();
+});
+
+it("待处理合并未提交提醒计数，并可打开不在首页列表中的会话", async () => {
+  const item = { id: "m:/repo", logicalSessionId: "B", title: "修复分页", machineId: "m", machineName: "主机2", projectAlias: "项目2", path: "/repo/worktree", provider: "claude" as const, checkedAt: new Date().toISOString() };
+  vi.mocked(api.dashboard).mockResolvedValue({ ...dashboard(), sessions: [sessions[0]!], pendingCommits: [item],
+    stats: { ...dashboard().stats, approvals: 1 }, pendingApprovals: [{ id: "confirm", logicalSessionId: "A", type: "command", summary: "运行检查", machineName: "主机1", projectAlias: "项目1", risk: "medium" } as Approval] });
+  render(<App />);
+  const nav = await screen.findByRole("navigation", { name: "主导航" });
+  fireEvent.click(within(nav).getByRole("button", { name: /待处理.*2/ }));
+  expect(screen.getByText("需要确认")).toBeTruthy();
+  expect(screen.getByText("未提交改动")).toBeTruthy();
+  expect(screen.getByText("会话已结束，所在目录仍有未提交改动。")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /修复分页/ }));
+  await waitFor(() => expect(api.session).toHaveBeenCalledWith("B", expect.any(AbortSignal)));
+  expect(api.decideApproval).not.toHaveBeenCalled();
 });

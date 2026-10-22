@@ -1,3 +1,4 @@
+import { pendingCommits, parseWorkspaceGitStatus } from "./pending-commits.js";
 import {grokNativeDiscovery} from "./grok-operations.js";
 import {parseCursorModels} from './cursor-settings.js';
 import {parseGrokQuota} from './grok-quota.js';
@@ -2581,6 +2582,7 @@ export class RegistryService {
   updateDiscovery(machineId: string, discovery: Record<string, unknown>): void {
     invariant(discovery && typeof discovery === "object" && !Array.isArray(discovery) && ["scanning","ready","error"].includes(String(discovery.state)),400,"INVALID_DISCOVERY","Invalid discovery state");
     const safe: Record<string,unknown>={state:discovery.state};
+    safe.workspaceGitStatus = parseWorkspaceGitStatus(discovery.workspaceGitStatus);
     const providerPolicy=parseProviderRuntimeState(discovery.providerRuntimePolicy);
     if(providerPolicy)safe.providerRuntimePolicy=providerPolicy;
     if (discovery.agentRuntimes && typeof discovery.agentRuntimes === "object" && !Array.isArray(discovery.agentRuntimes)) {
@@ -2994,6 +2996,7 @@ export class RegistryService {
   }
 
   dashboard(principal: Principal): Record<string, unknown> {
+    const uncommitted = pendingCommits(this.db, principal);
     const machines = this.listMachines(principal);
     const sessions = this.listSessions(principal);
     const pendingApprovals = this.db.get<{ count: number }>(
@@ -3013,9 +3016,11 @@ export class RegistryService {
         sessions: sessions.length,
         activeSessions: sessions.filter((session) => ["running", "awaiting_approval"].includes(session.executionState)).length,
         pendingApprovals,
+        pendingCommits: uncommitted.length,
         unresolvedAlerts,
       },
       machines,
+      pendingCommits: uncommitted,
       recentSessions: sessions.slice(0, 20),
       activitySessions: sessions.filter(session => session.managed || ["running", "awaiting_approval"].includes(session.executionState)),
       compatibilityProfile: CODEX_COMPATIBILITY_PROFILE,

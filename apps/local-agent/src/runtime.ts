@@ -1,3 +1,4 @@
+import { WorkspaceGitStatusSampler } from "./workspace-git-status.js";
 import {parseGrokOperation,grokOperations,grokLiveOperation} from './grok-operations.js';
 import { sshAccess } from "./ssh-access.js";
 import { parseWorktreeRequest, worktrees } from "./worktrees.js";
@@ -343,6 +344,7 @@ export class AgentRuntime {
   private restartController: AbortController | undefined;
   private restartLoop: Promise<void> | undefined;
   private shuttingDown = false;
+  private readonly workspaceGitStatus = new WorkspaceGitStatusSampler();
   private workspaceWatches = new Map<string,{before:WorkspaceSnapshot; thread:ManagedThread; turnId?:string; epoch:string; lastDigest?:string; timer:ReturnType<typeof setInterval>; lane:Promise<void>}>();
   private discardWorkspaceWatch(id:string):void {
     const watch=this.workspaceWatches.get(id);if(watch)clearInterval(watch.timer);
@@ -789,7 +791,7 @@ export class AgentRuntime {
       },
       resumeStreams,
       capacity: this.capacityState(),
-      discovery: { ...this.getDiscoveryStatus(), providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       projects: this.projectSummaries(),
       sessions: [...Object.values(state.managedThreads).flatMap((thread) => {
@@ -877,6 +879,11 @@ export class AgentRuntime {
   heartbeatPayload(): Record<string, unknown> {
     if (!this.shuttingDown) void this.refreshHostCodex().catch(() => undefined);
     const state = this.store.snapshot();
+    if (!this.shuttingDown) void this.workspaceGitStatus.refresh([
+      ...state.projects.filter(project => !project.worktree?.removedAt).map(project => project.root),
+      ...Object.values(state.managedThreads).filter(thread => !thread.archived).flatMap(thread => thread.sessionCwd ? [thread.sessionCwd] : []),
+      ...Object.values(state.discoveredThreads).filter(thread => !thread.archived && thread.availability === "available").flatMap(thread => thread.sessionCwd ? [thread.sessionCwd] : []),
+    ]).catch(() => undefined);
     return {
       type: "heartbeat",
       quota: this.appServer?.getQuotaSnapshot?.() ?? null,
@@ -884,7 +891,7 @@ export class AgentRuntime {
       activeTurns: Object.values(state.managedThreads).filter((thread) => thread.activeTurnId !== undefined).length,
       readOnly: !this.isWritable(),
       readOnlyReasons: this.readOnlyReasons(),
-      discovery: { ...this.getDiscoveryStatus(), providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       ...(this.support.codexProfile ? { codexProfile: this.support.codexProfile } : {}),
       ...(this.isWritable() ? {} : { unreachableReason: this.readOnlyReasons().join("; ") }),

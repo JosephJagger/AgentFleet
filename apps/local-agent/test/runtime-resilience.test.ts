@@ -2047,3 +2047,21 @@ test("a worktree can carry a Codex conversation: the copy lives in the lane, the
   assert.equal((await git("branch", "--list", "af/broken")).stdout.trim(), "");
   assert.ok(!(runtime.helloPayload().projects as Record<string, unknown>[]).some(item => String(item.alias).endsWith("-broken") && item.worktreeRemoved !== true));
 });
+
+
+test("heartbeats report background Git dirtiness without waiting for a model turn", async t => {
+  const { store, projects } = await fixture();
+  const project = projects[0]!;
+  await workspacePromisify(workspaceExecFile)("git", ["-C", project.root, "init"]);
+  await writeFile(join(project.root, "pending.txt"), "not committed");
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: callbacks => new FakeAppServer("git-status", callbacks) });
+  t.after(async () => { await runtime.shutdown(); store.close(); });
+  await runtime.initialize();
+  const first = runtime.heartbeatPayload();
+  assert.deepEqual((first.discovery as Record<string, unknown>).workspaceGitStatus, []);
+  await waitFor(() => {
+    const discovery = runtime.heartbeatPayload().discovery as { workspaceGitStatus: Array<{ cwd: string; dirty: boolean }> };
+    return discovery.workspaceGitStatus.some(status => status.cwd === project.root && status.dirty);
+  }, "Git status should arrive on a later heartbeat");
+  assert.equal(Object.keys(store.snapshot().commandJournal).length, 0);
+});

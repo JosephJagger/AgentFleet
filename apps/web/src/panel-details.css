@@ -1,0 +1,459 @@
+/* Secondary pages share a quiet reading rhythm while retaining theme surfaces. */
+:is(.settings-view, .hosts-view, .usage-view, .scheduled-view, .admin-view) > .wide-view__heading {
+  gap: 20px;
+  align-items: center;
+}
+
+:is(.settings-view, .hosts-view, .usage-view, .scheduled-view, .admin-view) > .wide-view__heading > div {
+  min-width: 0;
+}
+
+:is(.settings-view, .hosts-view, .usage-view, .scheduled-view, .admin-view) > .wide-view__heading p {
+  max-width: 64ch;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+:is(.settings-view, .hosts-view, .admin-view) .settings-block > h2 {
+  margin-top: 0;
+  line-height: 1.45;
+}
+
+:is(.settings-view, .hosts-view, .admin-view) .settings-block > .subtle {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+/* Navigation already supplies separation; avoid a second empty band above forms. */
+.settings-view .settings-layout--grouped {
+  padding-top: 0;
+}
+
+.settings-category--pair {
+  align-items: start;
+}
+
+.settings-view .settings-field > span,
+.settings-view .codex-settings-fields > label {
+  line-height: 1.5;
+}
+
+.settings-view .settings-more-toggle {
+  line-height: 1.5;
+}
+
+.settings-view .client-session-row {
+  gap: 12px;
+  min-height: 92px;
+}
+
+.settings-view .client-session-row > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-view .client-session-row > button {
+  min-height: 40px;
+  max-width: 128px;
+  line-height: 1.5;
+}
+
+:is(.settings-view, .hosts-view) .settings-sections {
+  scroll-padding-inline: 6px;
+  overscroll-behavior-x: contain;
+}
+
+/* A host is a selector, so its shape follows content rather than a large square. */
+.hosts-view .host-card {
+  aspect-ratio: auto;
+  min-height: 204px;
+  gap: 12px;
+}
+
+.hosts-view .host-card__identity strong {
+  min-height: 1.4em;
+}
+
+.hosts-view .host-card__identity small,
+.hosts-view .host-card__activity > span:last-child {
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.hosts-view .host-heading {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.hosts-view .host-heading > div,
+.hosts-view .host-alias > label {
+  min-width: 0;
+}
+
+.hosts-view .host-heading h2 {
+  overflow-wrap: anywhere;
+}
+
+.hosts-view .host-alias > .button {
+  flex-shrink: 0;
+  min-height: 42px;
+}
+
+.hosts-view .host-workspace .discovery-status {
+  margin-inline: 0;
+}
+
+.hosts-view .host-runtime dl > div {
+  grid-template-columns: minmax(90px, .65fr) minmax(0, 1fr);
+  line-height: 1.6;
+}
+
+.hosts-view .host-operation strong {
+  flex-wrap: wrap;
+  line-height: 1.55;
+}
+
+.hosts-view .host-operation > svg {
+  margin-top: 2px;
+}
+
+/* Flexible filters and tabular figures keep usage readable at in-between widths. */
+.usage-view .usage-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 14px;
+}
+
+.usage-view .usage-toolbar > label {
+  min-width: 0;
+}
+
+.usage-view .usage-toolbar select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+.usage-view .usage-toolbar > .button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.usage-view .usage-overview-cards {
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.usage-view .usage-overview-cards article {
+  min-width: 0;
+  align-content: start;
+  gap: 10px;
+}
+
+.usage-view .usage-overview-cards strong {
+  font-family: var(--font);
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -.025em;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-view .usage-overview-cards small {
+  line-height: 1.55;
+}
+
+.usage-view .usage-section-head {
+  padding-top: 24px;
+}
+
+.usage-view .usage-table th,
+.usage-view .usage-table td {
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+.usage-view .usage-pagination {
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-view .usage-empty {
+  margin-top: 24px;
+  padding: 32px 24px;
+  border: 1px dashed var(--component-line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.usage-view .usage-empty h2 {
+  margin: 0 0 8px;
+  font-size: 1.125rem;
+}
+
+.usage-view .usage-empty p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+/* Selected schedule choices remain legible even without their native radio dot. */
+.scheduled-view .scheduled-layout {
+  margin-top: 24px;
+}
+
+.scheduled-view .scheduled-editor > h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
+
+.scheduled-view .scheduled-list__tabs > button {
+  min-height: 42px;
+  font: inherit;
+  font-size: var(--text-small);
+}
+
+.scheduled-view .scheduled-list__item {
+  padding: 14px 10px;
+  gap: 6px 10px;
+  font: inherit;
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.scheduled-view .scheduled-list__item > span,
+.scheduled-view .scheduled-list__item > small {
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+
+.scheduled-view .scheduled-choice > label,
+.scheduled-view .scheduled-weekdays label {
+  min-height: 44px;
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.scheduled-view :is(.scheduled-choice, .scheduled-weekdays) label:has(input:checked) {
+  background: var(--cobalt-soft);
+  border-color: var(--cobalt);
+  color: var(--ink);
+}
+
+.scheduled-view :is(.scheduled-choice, .scheduled-weekdays) label:has(input:focus-visible) {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 3px;
+}
+
+.scheduled-view .scheduled-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  padding: 12px;
+}
+
+.scheduled-view .scheduled-weekdays > legend {
+  padding-inline: 6px;
+  font-size: var(--text-small);
+  font-weight: 550;
+}
+
+.scheduled-view .scheduled-weekdays label {
+  min-width: 0;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 4px;
+}
+
+.scheduled-view .scheduled-session-results > button {
+  min-height: 52px;
+  font: inherit;
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.scheduled-view .scheduled-session-selected {
+  background: var(--cobalt-soft);
+  line-height: 1.5;
+  font-size: var(--text-small);
+}
+
+.scheduled-view .scheduled-session-selected > svg {
+  color: var(--cobalt);
+  flex-shrink: 0;
+}
+
+.scheduled-view .scheduled-editor__actions {
+  justify-content: flex-start;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.scheduled-view .scheduled-history__item > button {
+  min-height: 36px;
+  font: inherit;
+  font-size: var(--text-small);
+}
+
+/* Management rows align at their identity; secondary dates stay quiet. */
+.admin-view .admin-user {
+  align-items: flex-start;
+  padding-block: 20px;
+}
+
+.admin-view .admin-user__identity {
+  gap: 7px;
+  line-height: 1.5;
+}
+
+.admin-view .admin-user__identity > small {
+  color: var(--muted);
+  opacity: 1;
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+
+.admin-view .admin-user__actions {
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.admin-view .admin-user:last-child {
+  border-bottom: 0;
+}
+
+@media (min-width: 701px) {
+  .usage-view .usage-table th:first-child,
+  .usage-view .usage-table td:first-child {
+    width: 36%;
+  }
+
+  .usage-view .usage-table td:not(:first-child) {
+    white-space: nowrap;
+  }
+
+  .usage-view .usage-table td > small {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--font);
+    font-size: var(--text-caption);
+  }
+}
+
+@media (max-width: 850px) {
+  .scheduled-view .scheduled-list {
+    scrollbar-width: thin;
+    overscroll-behavior-y: contain;
+  }
+}
+
+@media (max-width: 680px) {
+  .usage-view .usage-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding-top: 20px;
+  }
+
+  .usage-view .usage-toolbar > .button {
+    grid-column: 1 / -1;
+    min-height: 44px;
+  }
+
+  .usage-view .usage-overview-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .usage-view .usage-overview-cards article {
+    min-height: 116px;
+    padding: 14px;
+    gap: 8px;
+  }
+
+  .usage-view .usage-overview-cards article:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .usage-view .usage-overview-cards article:last-child:nth-child(odd) small {
+    grid-column: 1 / -1;
+  }
+
+  .usage-view .usage-overview-cards strong {
+    font-size: 1.1875rem;
+  }
+
+  .usage-view .usage-pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .hosts-view .host-card {
+    min-height: 184px;
+    gap: 10px;
+  }
+
+  .hosts-view .host-alias {
+    gap: 8px;
+  }
+
+  .scheduled-view .scheduled-layout {
+    margin-top: 18px;
+    gap: 16px;
+  }
+
+  .scheduled-view :is(.scheduled-list, .scheduled-editor) {
+    padding: 16px;
+  }
+
+  .scheduled-view .scheduled-editor__actions > .button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .admin-view .admin-user__actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-view .client-session-row {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .settings-view .client-session-row > :is(button, .current-label) {
+    grid-column: 2;
+    justify-self: start;
+    padding-left: 0;
+  }
+
+  .settings-view .client-session-row > .client-icon {
+    align-self: start;
+  }
+
+  .scheduled-view .scheduled-weekdays {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .admin-view .admin-sections {
+    gap: 6px;
+  }
+
+  .admin-view .admin-sections > .button {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding-inline: 10px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .scheduled-view .scheduled-list__item:not(.active):hover {
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+}
