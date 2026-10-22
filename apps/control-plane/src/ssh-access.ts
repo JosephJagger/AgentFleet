@@ -17,8 +17,8 @@ const ADDRESS = /^[A-Za-z0-9.:%[\]-]{1,253}$/;
 const MAX_PRIVATE_KEY = 16_384;
 
 export const isSshPlatform = (platform: string | null | undefined) => ["linux", "ubuntu", "darwin", "macos"].includes(String(platform).toLowerCase());
-/** Routes a user may select today. 'auto' and 'relay' exist in the schema for the panel relay but are not offered yet. */
-export const SSH_ROUTES = ["direct", "proxyjump"] as const;
+/** 'auto' tries the host's own address first and falls back to the panel relay; 'relay' always goes through the panel. */
+export const SSH_ROUTES = ["direct", "proxyjump", "auto", "relay"] as const;
 export type SshRoute = (typeof SSH_ROUTES)[number];
 export const ADDRESS_KINDS = ["lan", "public", "overlay"] as const;
 export const sshAlias = (name: string) => `af-${name.toLowerCase()}`;
@@ -104,10 +104,12 @@ export interface SshDesiredAccount {
   publicKey: string; privateKey: string; passphrase: string; hostKeys: string[]; description: string;
   /** Alias of the direct account this connection hops through; absent for direct routes. */
   proxyJump?: string;
+  /** Present only for accounts that use the panel relay; the host builds a ProxyCommand from it. */
+  route?: "relay" | "auto";
 }
 export interface SshSyncResult { accounts: Record<string, { ok: boolean; error?: string }> }
-export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string; path?: "direct" | "proxyjump" }
-export type SshExclusion = "disabled" | "not_allowed" | "target_unsupported" | "no_address" | "jump_missing" | "routes_unsupported";
+export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string; path?: "direct" | "proxyjump" | "relay" }
+export type SshExclusion = "disabled" | "not_allowed" | "target_unsupported" | "no_address" | "jump_missing" | "routes_unsupported" | "relay_disabled" | "relay_unsupported" | "host_key_unpinned";
 export type SshLinkState = "ok" | "failed" | "untested" | "excluded" | "unsupported";
 /** One cell of the matrix: a source host's standing for one target account. */
 export interface SshMatrixSource {
@@ -155,7 +157,10 @@ export class SshAccessBroker {
   }
 }
 
-interface PlanEntry { row: AccountRow & { target_name: string; target_platform: string; target_state: string }; hostname?: string; excluded?: SshExclusion; jumpAlias?: string }
+interface PlanEntry { row: AccountRow & { target_name: string; target_platform: string; target_state: string }; hostname?: string; excluded?: SshExclusion; jumpAlias?: string; relayRoute?: "relay" | "auto" }
+/** What the source host's connection service can do, and what is known about each target's. Unknown is not "no": offline hosts are planned optimistically. */
+export interface PlanOptions { routes: boolean; relay: boolean; targetRelay: (machineId: string) => "yes" | "no" | "unknown" }
+const DEFAULT_PLAN: PlanOptions = { routes: true, relay: true, targetRelay: () => "unknown" };
 const text = (value: unknown, max: number) => typeof value === "string" && value.length <= max ? value : undefined;
 const stringList = (value: unknown, max: number, each: number) => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length <= each).slice(0, max) : [];
 
@@ -221,7 +226,7 @@ export class SshAccessService {
   }
 
   /** Accounts the given host may use, as aliases only; secrets never leave the server through this path. */
-  reachable(principal: Principal, sourceMachineId: string, options: { routes?: boolean } = {}) {
+  reachable(principal: Principal, sourceMachineId: string, options: Partial<PlanOptions> = {}) {
     this.machine(principal, sourceMachineId);
     return this.desired(sourceMachineId, false, options).map(({ privateKey: _p, passphrase: _s, ...account }) => account);
   }
@@ -266,6 +271,8 @@ export class SshAccessService {
 
     const route = (body.route === undefined ? previous?.route ?? "direct" : body.route) as SshRoute;
     invariant((SSH_ROUTES as readonly unknown[]).includes(route), 400, "SSH_ROUTE_INVALID", "暂不支持该路由方式");
+    // Choosing the relay needs the workspace switch; an account that already uses it can still be edited while the switch is off.
+    invariant((route !== "relay" && route !== "auto") || route === previous?.route || this.relayEnabled(principal.workspaceId), 409, "SSH_RELAY_DISABLED", "请先启用面板中转");
     let jumpMachineId: string | null = null;
     if (route === "proxyjump") {
       const requested = body.proxyJumpMachineId === undefined ? previous?.proxy_jump_machine_id ?? undefined : text(body.proxyJumpMachineId, 300);
@@ -359,7 +366,7 @@ export class SshAccessService {
    * Which accounts one source host gets, and why the others are left out. Both the sync and the matrix use this, so the
    * panel never claims a link that the host was not actually given.
    */
-  private plan(sourceMachineId: string, routes: boolean) {
+  private plan(sourceMachineId: string, options: PlanOptions) {
     const source = this.db.get<{ workspace_id: string; platform: string; identity_state: string }>("SELECT workspace_id,platform,identity_state FROM machines WHERE machine_id=?", sourceMachineId);
     if (!source || source.identity_state !== "active" || !isSshPlatform(source.platform)) return { source, entries: [] as PlanEntry[] };
     const rows = this.db.all<AccountRow & { target_name: string; target_platform: string; target_state: string }>(
@@ -370,7 +377,9 @@ export class SshAccessService {
       "SELECT s.account_id,s.source_machine_id FROM host_ssh_access s JOIN host_ssh_accounts a ON a.account_id=s.account_id WHERE a.workspace_id=?", source.workspace_id)) {
       (allowed.get(item.account_id) ?? allowed.set(item.account_id, new Set()).get(item.account_id)!).add(item.source_machine_id);
     }
-    const hostnameOf = (row: AccountRow) => row.address || (JSON.parse(row.verification_json) as Partial<SshInspection>).addresses?.[0];
+    // A host that is only reachable through the relay may have no address at all; ssh_config still needs a name for the host.
+    const hostnameOf = (row: AccountRow) => row.address || (JSON.parse(row.verification_json) as Partial<SshInspection>).addresses?.[0] || (row.route === "relay" || row.route === "auto" ? "relay.invalid" : undefined);
+    const relayEnabled = this.relayEnabled(source.workspace_id);
     const base = rows.map((row): PlanEntry => {
       const scope = allowed.get(row.account_id);
       const hostname = hostnameOf(row);
@@ -385,34 +394,80 @@ export class SshAccessService {
       if (jumpMachine === sourceMachineId) continue;
       const jump = base.find(candidate => !candidate.excluded && candidate.row.machine_id === jumpMachine && candidate.row.route === "direct");
       if (!jump) entry.excluded = "jump_missing";
-      else if (!routes) entry.excluded = "routes_unsupported";
+      else if (!options.routes) entry.excluded = "routes_unsupported";
       else entry.jumpAlias = sshAlias(jump.row.name);
+    }
+    // The relay is only offered when the workspace switched it on, both ends can carry it, and the target's host key is pinned,
+    // because the panel sits in the middle and only a pinned key lets ssh notice if it were ever tampered with.
+    for (const entry of base) {
+      if (entry.excluded || (entry.row.route !== "relay" && entry.row.route !== "auto")) continue;
+      if (!relayEnabled) entry.excluded = "relay_disabled";
+      else if (!options.relay || options.targetRelay(entry.row.machine_id) === "no") entry.excluded = "relay_unsupported";
+      else if ((JSON.parse(entry.row.host_keys_json) as string[]).length === 0) entry.excluded = "host_key_unpinned";
+      else entry.relayRoute = entry.row.route;
     }
     return { source, entries: base };
   }
 
   /** The complete desired state for one source host. Disabled, revoked, unsupported and out-of-scope targets are absent. */
-  desired(sourceMachineId: string, withSecrets = true, options: { routes?: boolean } = {}): SshDesiredAccount[] {
-    return this.plan(sourceMachineId, options.routes !== false).entries.flatMap(({ row, hostname, excluded, jumpAlias }) => {
+  desired(sourceMachineId: string, withSecrets = true, options: Partial<PlanOptions> = {}): SshDesiredAccount[] {
+    return this.plan(sourceMachineId, { ...DEFAULT_PLAN, ...options }).entries.flatMap(({ row, hostname, excluded, jumpAlias, relayRoute }) => {
       if (excluded || !hostname) return [];
       return [{
         id: row.account_id, alias: sshAlias(row.name), name: row.name, targetName: row.target_name, username: row.username, hostname, port: row.port,
         publicKey: row.public_key, privateKey: withSecrets ? this.secrets.decrypt(row.encrypted_private_key) : "",
         passphrase: withSecrets ? this.secrets.decrypt(row.encrypted_passphrase) : "",
         hostKeys: JSON.parse(row.host_keys_json) as string[], description: row.description,
-        ...(jumpAlias ? { proxyJump: jumpAlias } : {}),
+        ...(jumpAlias ? { proxyJump: jumpAlias } : {}), ...(relayRoute ? { route: relayRoute } : {}),
       }];
     });
   }
 
-  recordTest(accountId: string, sourceMachineId: string, result: { ok: boolean; durationMs?: number; error?: string }, path: "direct" | "proxyjump") {
+  /** Whether a source host may open a relay stream to the target of this account right now, and to whom. */
+  authoriseRelay(sourceMachineId: string, accountId: string, options: Partial<PlanOptions> = {}):
+    { ok: true; workspaceId: string; targetMachineId: string; alias: string } | { ok: false; reason: SshExclusion | "not_found" | "not_relay" } {
+    const { source, entries } = this.plan(sourceMachineId, { ...DEFAULT_PLAN, ...options });
+    const entry = entries.find(item => item.row.account_id === accountId);
+    if (!source || !entry) return { ok: false, reason: "not_found" };
+    if (entry.row.route !== "relay" && entry.row.route !== "auto") return { ok: false, reason: "not_relay" };
+    if (entry.excluded) return { ok: false, reason: entry.excluded };
+    return { ok: true, workspaceId: source.workspace_id, targetMachineId: entry.row.machine_id, alias: sshAlias(entry.row.name) };
+  }
+
+  // ---- workspace switch for the panel relay ----
+
+  relayEnabled(workspaceId: string) {
+    return this.db.get<{ relay_enabled: number }>("SELECT relay_enabled FROM host_ssh_settings WHERE workspace_id=?", workspaceId)?.relay_enabled === 1;
+  }
+
+  relaySettings(principal: Principal) {
+    const row = this.db.get<{ relay_enabled: number; revision: number; updated_at: string }>("SELECT relay_enabled,revision,updated_at FROM host_ssh_settings WHERE workspace_id=?", principal.workspaceId);
+    return { enabled: row?.relay_enabled === 1, revision: row?.revision ?? 0, updatedAt: row?.updated_at ?? null };
+  }
+
+  saveRelaySettings(principal: Principal, input: Record<string, unknown>) {
+    invariant(Object.keys(input).every(key => ["enabled", "revision"].includes(key)) && typeof input.enabled === "boolean", 400, "INVALID_SETTINGS", "请选择是否启用面板中转");
+    invariant(Number.isSafeInteger(input.revision) && Number(input.revision) >= 0, 400, "INVALID_SETTINGS_REVISION", "Settings revision is required");
+    return this.db.transaction(() => {
+      const current = this.relaySettings(principal);
+      invariant(current.revision === input.revision, 409, "SETTINGS_REVISION_CONFLICT", "Settings changed in another browser; reload before saving");
+      this.db.run(`INSERT INTO host_ssh_settings(workspace_id,relay_enabled,revision,updated_at) VALUES(?,?,?,?)
+        ON CONFLICT(workspace_id) DO UPDATE SET relay_enabled=excluded.relay_enabled,revision=excluded.revision,updated_at=excluded.updated_at`,
+        principal.workspaceId, input.enabled ? 1 : 0, current.revision + 1, nowIso());
+      this.db.audit({ workspaceId: principal.workspaceId, actorUserId: principal.userId, actorClientSessionId: principal.clientSessionId,
+        action: input.enabled ? "ssh.relay.enable" : "ssh.relay.disable", metadata: { revision: current.revision + 1 } });
+      return this.relaySettings(principal);
+    });
+  }
+
+  recordTest(accountId: string, sourceMachineId: string, result: { ok: boolean; durationMs?: number; error?: string }, path: "direct" | "proxyjump" | "relay") {
     this.db.run(`INSERT INTO host_ssh_link_tests(account_id,source_machine_id,ok,path,duration_ms,error,tested_at) VALUES(?,?,?,?,?,?,?)
       ON CONFLICT(account_id,source_machine_id) DO UPDATE SET ok=excluded.ok,path=excluded.path,duration_ms=excluded.duration_ms,error=excluded.error,tested_at=excluded.tested_at`,
       accountId, sourceMachineId, result.ok ? 1 : 0, path, Number.isSafeInteger(result.durationMs) ? result.durationMs! : null, (result.error ?? "").slice(0, 300), nowIso());
   }
 
   /** Source hosts (columns) by target accounts (rows), with the latest test outcome for each pair. */
-  matrix(principal: Principal, capability: (machineId: string) => { connected: boolean; ssh: boolean; routes: boolean }) {
+  matrix(principal: Principal, capability: (machineId: string) => { connected: boolean; ssh: boolean; routes: boolean; relay: boolean }) {
     const machines = this.db.all<{ machine_id: string; name: string; display_alias: string | null; platform: string }>(
       "SELECT machine_id,name,display_alias,platform FROM machines WHERE workspace_id=? AND identity_state='active' ORDER BY name", principal.workspaceId);
     const accounts = this.db.all<AccountRow & { target_name: string }>(
@@ -425,7 +480,11 @@ export class SshAccessService {
     // An offline host's abilities are unknown, so it is planned optimistically and marked offline; it is re-planned when it reconnects.
     const plans = new Map(machines.map(machine => {
       const cap = caps.get(machine.machine_id)!;
-      return [machine.machine_id, new Map(this.plan(machine.machine_id, cap.connected ? cap.routes : true).entries.map(entry => [entry.row.account_id, entry]))];
+      const options: PlanOptions = {
+        routes: cap.connected ? cap.routes : true, relay: cap.connected ? cap.relay : true,
+        targetRelay: id => { const other = caps.get(id); return !other || !other.connected ? "unknown" : other.relay ? "yes" : "no"; },
+      };
+      return [machine.machine_id, new Map(this.plan(machine.machine_id, options).entries.map(entry => [entry.row.account_id, entry]))];
     }));
     return {
       hosts: machines.map(machine => ({ machineId: machine.machine_id, name: machine.display_alias || machine.name, platform: machine.platform, supported: isSshPlatform(machine.platform) })),

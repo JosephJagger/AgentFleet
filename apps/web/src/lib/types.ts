@@ -412,11 +412,15 @@ export interface SshAccount {
 export type SshAddressKind = "lan" | "public" | "overlay";
 export type SshRoute = "direct" | "proxyjump" | "auto" | "relay";
 export interface SshAccountInput {
-  route?: "direct" | "proxyjump"; proxyJumpMachineId?: string;
+  route?: "direct" | "proxyjump" | "auto" | "relay"; proxyJumpMachineId?: string;
   machineId?: string; name?: string; algorithm?: SshAccount["algorithm"]; username: string; address: string; port: number;
   privateKey?: string; publicKey?: string; passphrase?: string; clearPassphrase?: boolean; description: string; enabled: boolean; sources: string[];
 }
-export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string; path?: "direct" | "proxyjump" }
+export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string; path?: "direct" | "proxyjump" | "relay" }
+export interface SshRelaySettings {
+  enabled: boolean; revision: number; updatedAt: string | null; active: number;
+  limits: { perSource: number; perTarget: number; perWorkspace: number; resumeGraceSeconds: number };
+}
 export type SshLinkState = "ok" | "failed" | "untested" | "excluded" | "unsupported";
 export interface SshMatrixSource {
   machineId: string; machineName: string; agent: "ready" | "outdated" | "offline"; state: SshLinkState;

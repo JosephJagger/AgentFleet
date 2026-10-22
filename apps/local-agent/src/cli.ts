@@ -35,6 +35,7 @@ import { configureRuntimeProfile } from "./runtime-profile.js";
 import { repairManagedCodeMode } from "./managed-code-mode.js";
 import { superviseAgent, writeWorkerHealth, readUpdateTransaction, workerStopExitCode } from "./supervisor.js";
 import { AgentMaintenance } from "./maintenance.js";
+import { runSshProxy } from "./ssh-proxy.js";
 
 function defaultDataDir(): string {
   if (process.platform === "linux" && typeof process.getuid === "function" && process.getuid() === 0) return ROOT_AGENT_DATA_DIR;
@@ -601,6 +602,17 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     case "service":
       await service(args);
       return;
+    case "ssh-proxy": {
+      // Used as an ssh ProxyCommand: stdin/stdout are the connection, so nothing else may be written to stdout.
+      ensureOptions(args, ["alias", "socket", "direct-host", "direct-port", "path-dir"]);
+      const directPort = option(args, "direct-port");
+      const code = await runSshProxy({
+        alias: option(args, "alias", true)!, socket: option(args, "socket", true)!,
+        ...(option(args, "direct-host") ? { directHost: option(args, "direct-host")! } : {}), ...(directPort ? { directPort: Number(directPort) } : {}),
+        ...(option(args, "path-dir") ? { pathDir: option(args, "path-dir")! } : {}),
+      });
+      process.exit(code);
+    }
     default:
       throw new AgentError("COMMAND_UNKNOWN", `unknown command '${args.words[0]}'`);
   }

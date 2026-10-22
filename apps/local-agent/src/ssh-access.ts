@@ -2,8 +2,10 @@ import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import { connect } from "node:net";
 import { homedir, networkInterfaces } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { isSea } from "node:sea";
 import { AgentError } from "./errors.js";
+import { SshRelay } from "./ssh-relay.js";
 import { isRecord } from "./util.js";
 
 /**
@@ -15,9 +17,11 @@ export interface SshAccount {
   publicKey: string; privateKey: string; passphrase: string; hostKeys: string[]; description: string;
   /** Alias of another account in the same desired state that this connection hops through (ssh ProxyJump). */
   proxyJump?: string | undefined;
+  /** Absent means a direct connection; `relay` and `auto` go through the panel when needed. */
+  route?: "relay" | "auto" | undefined;
 }
 export type AddressKind = "lan" | "public" | "overlay";
-type Summary = Pick<SshAccount, "alias" | "targetName" | "username" | "description"> & { pinned?: boolean | undefined; via?: string | undefined };
+type Summary = Pick<SshAccount, "alias" | "targetName" | "username" | "description"> & { pinned?: boolean | undefined; via?: string | undefined; route?: "relay" | "auto" | undefined };
 type Run = (command: string, args: string[], timeoutMs: number, env?: Record<string, string>) => Promise<{ code: number; stdout: string; stderr: string }>;
 
 const INCLUDE_MARKER = "# AgentFleets managed SSH hosts";
@@ -33,6 +37,19 @@ const defaultRun: Run = (command, args, timeoutMs, env) => new Promise(resolve =
     resolve({ code, stdout: String(stdout), stderr: error && !stderr ? error.message : String(stderr) });
   });
 });
+
+/**
+ * The command this very process was started with, so ProxyCommand keeps working across agent updates. The proxy has a
+ * small dedicated entry point beside the main one, because loading the whole agent for every ssh connection costs a
+ * quarter of a second; a single-file build has only the main entry.
+ */
+const defaultProxyCommand = (): string[] => isSea() ? [process.execPath] : [process.execPath, join(dirname(process.argv[1] ?? ""), "ssh-proxy-cli.js")];
+/** ProxyCommand is run through a shell and token-expanded by ssh: allow only plainly safe characters, never rely on escaping. */
+const SAFE_COMMAND_PART = /^[A-Za-z0-9_./@+:=,~-][A-Za-z0-9_./@+:=,~ -]*$/;
+const quoteCommandPart = (value: string) => {
+  if (!SAFE_COMMAND_PART.test(value)) throw new AgentError("SSH_RELAY_PATH_UNSAFE", "本机路径含有不支持的字符，无法配置面板中转");
+  return `"${value}"`;
+};
 
 const isListening = (port: number) => new Promise<boolean>(resolve => {
   const socket = connect({ host: "127.0.0.1", port, timeout: 1500 });
@@ -66,7 +83,11 @@ export function parseSshAccounts(value: unknown): SshAccount[] {
       hostKeys: Array.isArray(item.hostKeys) ? item.hostKeys.filter((line): line is string => typeof line === "string" && Boolean(keyToken(line))).slice(0, 8) : [],
       description: oneLine(string("description", 500)),
       ...(item.proxyJump === undefined || item.proxyJump === null || item.proxyJump === "" ? {} : { proxyJump: string("proxyJump", 43) }),
+      ...(item.route === "relay" || item.route === "auto" ? { route: item.route } : {}),
     };
+    // A hop and the panel relay are different ways of reaching the host; ssh cannot combine two ProxyCommands.
+    if (item.route !== undefined && !["direct", "relay", "auto"].includes(String(item.route))) throw new AgentError("SSH_REQUEST_INVALID", "SSH 配置字段无效");
+    if (account.route !== undefined && account.proxyJump !== undefined) throw new AgentError("SSH_REQUEST_INVALID", "SSH 配置字段无效");
     // Every value below is written into an ssh_config file: reject anything that could add a directive.
     if (!ALIAS.test(account.alias) || seen.has(account.alias) || !HOSTNAME.test(account.hostname) || !USERNAME.test(account.username)
       || !Number.isSafeInteger(account.port) || account.port < 1 || account.port > 65535 || !keyToken(account.publicKey) || !/^[A-Za-z0-9_]+$/.test(account.id)) {
@@ -88,8 +109,12 @@ export function parseSshAccounts(value: unknown): SshAccount[] {
 export class SshAccess {
   private summaries: Summary[] | undefined;
   private queue: Promise<unknown> = Promise.resolve();
+  /** The relay shares this host's sshd lookup, so a target never needs the panel to name a port. */
+  readonly relay: SshRelay;
   constructor(private readonly home = homedir(), private readonly run: Run = defaultRun, private readonly platform: NodeJS.Platform = process.platform,
-    private readonly listening: (port: number) => Promise<boolean> = isListening) {}
+    private readonly listening: (port: number) => Promise<boolean> = isListening, private readonly proxyCommand: () => string[] = defaultProxyCommand, relay?: SshRelay) {
+    this.relay = relay ?? new SshRelay({ sshdPort: () => this.sshdPort() });
+  }
   get root() { return join(this.home, ".ssh", "agentfleet"); }
   get supported() { return this.platform === "linux" || this.platform === "darwin"; }
 
@@ -134,11 +159,19 @@ export class SshAccess {
         results[account.id] = { ok: false, error: "跳板机账号未能安装" };
       }
     }
+    // Accounts that go through the panel need the local relay socket and a ProxyCommand this host can run safely.
+    const fail = (account: SshAccount, error: unknown) => { installed.splice(installed.indexOf(account), 1); results[account.id] = { ok: false, error: error instanceof AgentError ? error.message : "面板中转配置失败" }; };
+    for (const account of installed.filter(item => item.route !== undefined)) {
+      try { this.relayCommand(); } catch (error) { fail(account, error); }
+    }
+    const routed = installed.filter(account => account.route !== undefined);
+    try { await this.relay.configure(routed.length ? this.relaySocket : undefined, new Map(routed.map(account => [account.alias, account.id]))); }
+    catch (error) { for (const account of routed) fail(account, error); await this.relay.configure(undefined, new Map()).catch(() => undefined); }
     const keep = new Set(installed.map(account => account.alias));
     for (const name of await fs.readdir(join(this.root, "keys"))) if (!keep.has(name)) await fs.rm(join(this.root, "keys", name), { force: true });
     await this.write("known_hosts", installed.flatMap(account => account.hostKeys.map(line => `${account.alias} ${keyToken(line)![0]}`)).join("\n") + "\n");
     await this.write("config", this.config(installed));
-    const summaries: Summary[] = installed.map(({ alias, targetName, username, description, hostKeys, proxyJump }) => ({ alias, targetName, username, description, pinned: hostKeys.length > 0, ...(proxyJump ? { via: proxyJump } : {}) }));
+    const summaries: Summary[] = installed.map(({ alias, targetName, username, description, hostKeys, proxyJump, route }) => ({ alias, targetName, username, description, pinned: hostKeys.length > 0, ...(proxyJump ? { via: proxyJump } : {}), ...(route ? { route } : {}) }));
     await this.write("HOSTS.md", this.hostsDocument(summaries));
     await this.write("state.json", JSON.stringify({ hosts: summaries }));
     await this.ensureInclude();
@@ -183,16 +216,25 @@ export class SshAccess {
     for (const account of accounts) {
       const pinned = account.hostKeys.length > 0;
       lines.push(`# ${account.targetName.replace(/[^\p{L}\p{N} ._-]/gu, "")}`, `Host ${account.alias}`, `  HostName ${account.hostname}`, `  Port ${account.port}`, `  User ${account.username}`,
-        ...(account.proxyJump ? [`  ProxyJump ${account.proxyJump}`] : []), `  IdentityFile "${join(this.root, "keys", account.alias)}"`, "  IdentitiesOnly yes", `  HostKeyAlias ${account.alias}`,
+        ...(account.proxyJump ? [`  ProxyJump ${account.proxyJump}`] : []), ...(account.route ? [`  ProxyCommand ${this.proxyLine(account)}`] : []), `  IdentityFile "${join(this.root, "keys", account.alias)}"`, "  IdentitiesOnly yes", `  HostKeyAlias ${account.alias}`,
         `  UserKnownHostsFile "${join(this.root, pinned ? "known_hosts" : "known_hosts.learned")}"`,
         `  StrictHostKeyChecking ${pinned ? "yes" : "accept-new"}`, "  BatchMode yes", "  ConnectTimeout 10", "  ServerAliveInterval 30", "");
     }
     return lines.join("\n");
   }
 
+  get relaySocket() { return join(this.root, "relay.sock"); }
+  private get pathDirectory() { return join(this.root, "last-path"); }
+  private relayCommand() { return this.proxyCommand().map(quoteCommandPart).join(" "); }
+  /** `auto` tries the real address first and only then the relay; the address is left out when it is not plainly safe to embed. */
+  private proxyLine(account: SshAccount) {
+    const direct = account.route === "auto" && /^[A-Za-z0-9.:-]{1,253}$/.test(account.hostname) ? ` --direct-host ${quoteCommandPart(account.hostname)} --direct-port ${account.port}` : "";
+    return `${this.relayCommand()} ssh-proxy --alias ${account.alias} --socket ${quoteCommandPart(this.relaySocket)} --path-dir ${quoteCommandPart(this.pathDirectory)}${direct}`;
+  }
+
   private hostsDocument(accounts: Summary[]) {
     return ["# AgentFleets 可访问主机", "", "本文件由 AgentFleets 面板生成，请勿手动修改。", "", ...accounts.map(account =>
-      `- \`ssh ${account.alias}\` → ${account.targetName}（用户 ${account.username}）${account.description ? `：${account.description}` : ""}${account.via ? `（经 ${account.via} 跳转）` : ""}${account.pinned === false ? "（主机指纹未固定，首次连接自动信任）" : ""}`), ""].join("\n");
+      `- \`ssh ${account.alias}\` → ${account.targetName}（用户 ${account.username}）${account.description ? `：${account.description}` : ""}${account.via ? `（经 ${account.via} 跳转）` : ""}${account.route === "relay" ? "（经面板中转，延迟较高）" : account.route === "auto" ? "（直连不通时经面板中转）" : ""}${account.pinned === false ? "（主机指纹未固定，首次连接自动信任）" : ""}`), ""].join("\n");
   }
 
   private async write(name: string, content: string) {
@@ -228,6 +270,7 @@ export class SshAccess {
       if (lines[index] === "") lines.splice(index, 1);
       await this.writeUserConfig(lines.join("\n"));
     }
+    await this.relay.configure(undefined, new Map()).catch(() => undefined);
     await fs.rm(this.root, { recursive: true, force: true });
     this.summaries = [];
   }
@@ -296,7 +339,10 @@ export class SshAccess {
     const started = Date.now();
     const result = await this.run("ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", alias, "true"], 20_000);
     const error = result.code === 0 ? undefined : result.stderr.trim().split("\n").filter(Boolean).pop()?.slice(0, 300) || `ssh 退出码 ${result.code}`;
-    return { ok: result.code === 0, durationMs: Date.now() - started, ...(error ? { error } : {}) };
+    // ssh-proxy leaves a note of the path it used; only a note written during this very test counts.
+    const note = await fs.readFile(join(this.pathDirectory, alias), "utf8").then(text => JSON.parse(text) as { path?: unknown; at?: unknown }, () => undefined);
+    const path = note && typeof note.at === "number" && note.at >= started - 1_000 && (note.path === "direct" || note.path === "relay") ? note.path : undefined;
+    return { ok: result.code === 0, durationMs: Date.now() - started, ...(path ? { path } : {}), ...(error ? { error } : {}) };
   }
 
   /** Hosts this machine can reach, for agent instructions. Loaded lazily from the last sync. */
@@ -305,7 +351,7 @@ export class SshAccess {
     if (this.summaries) return this.summaries;
     try {
       const state = JSON.parse(await fs.readFile(join(this.root, "state.json"), "utf8")) as { hosts?: unknown };
-      this.summaries = Array.isArray(state.hosts) ? state.hosts.filter((host): host is Summary => isRecord(host) && typeof host.alias === "string" && ALIAS.test(host.alias)).map(host => ({ ...host, pinned: typeof host.pinned === "boolean" ? host.pinned : undefined, via: typeof host.via === "string" && ALIAS.test(host.via) ? host.via : undefined })) : [];
+      this.summaries = Array.isArray(state.hosts) ? state.hosts.filter((host): host is Summary => isRecord(host) && typeof host.alias === "string" && ALIAS.test(host.alias)).map(host => ({ ...host, pinned: typeof host.pinned === "boolean" ? host.pinned : undefined, via: typeof host.via === "string" && ALIAS.test(host.via) ? host.via : undefined, route: host.route === "relay" || host.route === "auto" ? host.route : undefined })) : [];
     } catch { this.summaries = []; }
     return this.summaries;
   }
@@ -316,7 +362,7 @@ export class SshAccess {
     return [
       "## AgentFleets 主机互通（SSH）",
       "本机已由 AgentFleets 配置以下主机的 SSH 访问（非交互），可直接运行 `ssh <别名> '<命令>'`，或用 `scp`/`rsync` 传输文件。指纹状态按各主机标注：",
-      ...hosts.map(host => `- ${host.alias} → ${oneLine(host.targetName)}（用户 ${host.username}）${host.description ? `：${oneLine(host.description)}` : ""}${host.via ? ` [经 ${host.via} 跳转]` : ""}${host.pinned === true ? " [主机指纹已固定]" : host.pinned === false ? " [主机指纹未固定，首次连接自动信任并记住]" : ""}`),
+      ...hosts.map(host => `- ${host.alias} → ${oneLine(host.targetName)}（用户 ${host.username}）${host.description ? `：${oneLine(host.description)}` : ""}${host.via ? ` [经 ${host.via} 跳转]` : ""}${host.route === "relay" ? " [经面板中转，延迟较高]" : host.route === "auto" ? " [直连不通时经面板中转]" : ""}${host.pinned === true ? " [主机指纹已固定]" : host.pinned === false ? " [主机指纹未固定，首次连接自动信任并记住]" : ""}`),
       `在远程主机上执行修改性或破坏性操作前，先说明目标主机和意图。完整清单见 ${join(this.root, "HOSTS.md")}。`,
     ].join("\n");
   }

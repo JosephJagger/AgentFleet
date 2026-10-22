@@ -208,6 +208,7 @@ export interface AgentCapabilities {
   conversationHistory?: boolean;
   sshAccess?: boolean;
   sshRoutes?: boolean;
+  sshRelay?: boolean;
   worktrees?: boolean;
   worktreeFork?: boolean;
   commandTypes?: string[];

@@ -2,8 +2,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { HostSshAccess } from "./components/HostSshAccess";
-import type { Machine, SshAccount, SshLinkMatrix } from "./lib/types";
-const mocks = vi.hoisted(() => ({ sshAccounts: vi.fn(), sshLinks: vi.fn(), sshReachable: vi.fn(), saveSshAccount: vi.fn(), testSshAccount: vi.fn(), verifySshAccount: vi.fn(), deleteSshAccount: vi.fn() }));
+import type { Machine, SshAccount, SshLinkMatrix, SshRelaySettings } from "./lib/types";
+const mocks = vi.hoisted(() => ({ sshAccounts: vi.fn(), sshLinks: vi.fn(), sshRelay: vi.fn(), saveSshRelay: vi.fn(), sshReachable: vi.fn(), saveSshAccount: vi.fn(), testSshAccount: vi.fn(), verifySshAccount: vi.fn(), deleteSshAccount: vi.fn() }));
 vi.mock("./lib/api", () => ({ api: mocks }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 const machine = (id: string, os = "linux 6.14") => ({ id, name: id, os } as Machine);
@@ -172,4 +172,121 @@ it("编辑时可从候选地址选择，并标注局域网、公网与虚拟网�
   expect([...picker.options].map(option => option.textContent)).toEqual(["选择后填入地址…", "192.168.1.9 · 局域网", "100.101.1.1 · 虚拟网络", "203.0.113.5 · 公网"]);
   fireEvent.change(picker, { target: { value: "100.101.1.1" } });
   expect((screen.getByLabelText("地址") as HTMLInputElement).value).toBe("100.101.1.1");
+});
+
+const relaySettings = (over: Partial<SshRelaySettings> = {}): SshRelaySettings => ({ enabled: false, revision: 0, updatedAt: null, active: 0, limits: { perSource: 8, perTarget: 16, perWorkspace: 24, resumeGraceSeconds: 60 }, ...over });
+const base = () => { mocks.sshAccounts.mockResolvedValue({ accounts: [] }); mocks.sshReachable.mockResolvedValue({ accounts: [] }); mocks.sshLinks.mockResolvedValue({ hosts: [], links: [] }); };
+
+it("面板中转默认关闭，所有人可见状态和限制，只有管理员能切换并先确认", async () => {
+  base();
+  mocks.sshRelay.mockResolvedValue(relaySettings({ active: 2 }));
+  mocks.saveSshRelay.mockResolvedValue(relaySettings({ enabled: true, revision: 1, active: 2 }));
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  const view = render(<HostSshAccess machine={machine("a")} machines={[machine("a"), machine("b")]} canManage={false} />);
+  expect(await screen.findByText("未启用")).toBeTruthy();
+  expect(screen.getByText("当前中转连接：2")).toBeTruthy();
+  expect(screen.getByText(/连接断开后 60 秒内重连可自动续传/)).toBeTruthy();
+  expect(screen.getByText(/每台主机最多 8 条、目标主机最多 16 条、工作区最多 24 条/)).toBeTruthy();
+  expect(screen.getByText(/请确认其服务条款允许转发 SSH 数据/)).toBeTruthy();
+  expect(screen.getByText("仅平台管理员可以启用或关闭面板中转。")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "启用面板中转" })).toBeNull();
+  view.unmount();
+
+  render(<HostSshAccess machine={machine("a")} machines={[machine("a"), machine("b")]} canManage />);
+  const enableButton = await screen.findByRole("button", { name: "启用面板中转" });
+  mocks.sshRelay.mockResolvedValue(relaySettings({ enabled: true, revision: 1, active: 2 })); // what the server returns once it is saved
+  fireEvent.click(enableButton);
+  expect(confirm.mock.calls[0]![0]).toContain("端到端加密");
+  await vi.waitFor(() => expect(mocks.saveSshRelay).toHaveBeenCalledWith({ enabled: true, revision: 0 }));
+  expect(await screen.findByText("已启用")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "关闭面板中转" })).toBeTruthy();
+  confirm.mockRestore();
+});
+
+it("不确认就不改变面板中转开关，冲突时显示原因", async () => {
+  base();
+  mocks.sshRelay.mockResolvedValue(relaySettings({ enabled: true, revision: 3 }));
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  render(<HostSshAccess machine={machine("a")} machines={[machine("a")]} canManage />);
+  fireEvent.click(await screen.findByRole("button", { name: "关闭面板中转" }));
+  expect(confirm.mock.calls[0]![0]).toContain("立即断开");
+  expect(mocks.saveSshRelay).not.toHaveBeenCalled();
+  confirm.mockReturnValue(true);
+  mocks.saveSshRelay.mockRejectedValue(new Error("Settings changed in another browser; reload before saving"));
+  fireEvent.click(screen.getByRole("button", { name: "关闭面板中转" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("reload before saving");
+  expect(screen.getByText("已启用")).toBeTruthy();
+  confirm.mockRestore();
+});
+
+it("「自动」和「仅经面板中转」只在启用面板中转后可选，并随账号保存", async () => {
+  base();
+  mocks.saveSshRelay.mockResolvedValue(relaySettings());
+  mocks.saveSshAccount.mockResolvedValue({ account });
+  mocks.sshRelay.mockResolvedValue(relaySettings());
+  const off = render(<HostSshAccess machine={machine("a")} machines={[machine("a"), machine("b")]} canManage />);
+  fireEvent.click(await screen.findByRole("button", { name: "添加 SSH 账号" }));
+  expect((screen.getByRole("option", { name: "自动：直连优先，不通时经面板中转" }) as HTMLOptionElement).disabled).toBe(true);
+  expect((screen.getByRole("option", { name: "仅经面板中转" }) as HTMLOptionElement).disabled).toBe(true);
+  expect(screen.getByText("「自动」和「仅经面板中转」需要先在下方启用面板中转。")).toBeTruthy();
+  off.unmount();
+
+  mocks.sshRelay.mockResolvedValue(relaySettings({ enabled: true, revision: 1 }));
+  render(<HostSshAccess machine={machine("a")} machines={[machine("a"), machine("b")]} canManage />);
+  fireEvent.click(await screen.findByRole("button", { name: "添加 SSH 账号" }));
+  const route = screen.getByLabelText("连接方式") as HTMLSelectElement;
+  expect((screen.getByRole("option", { name: "仅经面板中转" }) as HTMLOptionElement).disabled).toBe(false);
+  expect(screen.queryByText("「自动」和「仅经面板中转」需要先在下方启用面板中转。")).toBeNull();
+  fireEvent.change(route, { target: { value: "relay" } });
+  fireEvent.change(screen.getByLabelText(/用户名/), { target: { value: "deploy" } });
+  fireEvent.change(screen.getByLabelText(/私钥 \*/), { target: { value: "-----BEGIN OPENSSH PRIVATE KEY-----" } });
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await vi.waitFor(() => expect(mocks.saveSshAccount).toHaveBeenCalled());
+  expect(mocks.saveSshAccount.mock.calls[0]![0]).toMatchObject({ machineId: "a", route: "relay" });
+});
+
+it("已经使用中转的账号在开关关闭后仍可编辑，并显示它的连接方式", async () => {
+  base();
+  mocks.sshRelay.mockResolvedValue(relaySettings());
+  mocks.sshAccounts.mockResolvedValue({ accounts: [{ ...account, route: "relay" }] });
+  render(<HostSshAccess machine={machine("a")} machines={[machine("a"), machine("b")]} canManage />);
+  expect(await screen.findByText("经面板中转")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+  expect((screen.getByLabelText("连接方式") as HTMLSelectElement).value).toBe("relay");
+  expect((screen.getByRole("option", { name: "仅经面板中转" }) as HTMLOptionElement).disabled).toBe(false);
+});
+
+it("互通矩阵区分中转与直连的真实结果，并说明中转为何没有生效", async () => {
+  mocks.sshAccounts.mockResolvedValue({ accounts: [] });
+  mocks.sshReachable.mockResolvedValue({ accounts: [] });
+  mocks.sshRelay.mockResolvedValue(relaySettings({ enabled: true, revision: 1 }));
+  mocks.sshLinks.mockResolvedValue({
+    hosts: [{ machineId: "a", name: "a", platform: "linux", supported: true }, { machineId: "b", name: "b", platform: "linux", supported: true }, { machineId: "c", name: "c", platform: "linux", supported: true }],
+    links: [
+      link("ssh_r", "af-nat", "a", [{ machineId: "b", machineName: "b", agent: "ready", state: "ok", path: "relay" }, { machineId: "c", machineName: "c", agent: "ready", state: "untested" }], { route: "relay" }),
+      link("ssh_a", "af-either", "b", [{ machineId: "a", machineName: "a", agent: "ready", state: "untested" }, { machineId: "c", machineName: "c", agent: "ready", state: "excluded", reason: "host_key_unpinned" }], { route: "auto" }),
+      link("ssh_x", "af-off", "c", [{ machineId: "a", machineName: "a", agent: "ready", state: "excluded", reason: "relay_disabled" }, { machineId: "b", machineName: "b", agent: "outdated", state: "unsupported", reason: "relay_unsupported" }], { route: "relay" }),
+    ],
+  } as SshLinkMatrix);
+  render(<HostSshAccess machine={machine("a")} machines={[machine("a"), machine("b")]} canManage />);
+  await screen.findByRole("table");
+  expect(screen.getByText("经中转 ✓")).toBeTruthy();
+  expect(screen.getByText("未测试（经中转）")).toBeTruthy();
+  expect(screen.getByText("未测试（直连或中转）")).toBeTruthy();
+  expect(screen.getByText("目标主机指纹未固定，中转需要先固定")).toBeTruthy();
+  expect(screen.getByText("面板中转未启用")).toBeTruthy();
+  expect(screen.getByText("需更新连接服务以支持中转")).toBeTruthy();
+  const rows = screen.getAllByRole("row").map(row => row.textContent ?? "");
+  expect(rows.some(text => text.includes("af-nat") && text.includes("经面板中转"))).toBe(true);
+  expect(rows.some(text => text.includes("af-either") && text.includes("自动（直连优先）"))).toBe(true);
+});
+
+it("连接测试会说明实际走的是面板中转", async () => {
+  base();
+  mocks.sshRelay.mockResolvedValue(relaySettings({ enabled: true }));
+  mocks.sshAccounts.mockResolvedValue({ accounts: [{ ...account, route: "auto" }] });
+  mocks.testSshAccount.mockResolvedValue({ results: [{ machineId: "b", machineName: "b", ok: true, durationMs: 380, path: "relay" }] });
+  render(<HostSshAccess machine={machine("a")} machines={[machine("a"), machine("b")]} canManage />);
+  fireEvent.click(await screen.findByRole("button", { name: "测试连接" }));
+  expect(await screen.findByText("b → 经面板中转连接成功（380 ms）")).toBeTruthy();
 });

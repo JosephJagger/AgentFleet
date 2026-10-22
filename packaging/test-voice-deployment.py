@@ -174,5 +174,54 @@ class DeploymentFenceTests(unittest.TestCase):
             self.invoke(fail=True)
         self.assertEqual(self.db.execute('SELECT count(*) FROM voice_deployment_guard').fetchone()[0], 1)
 
+class RelayStreamWaitTests(unittest.TestCase):
+    """A deployment restarts the panel, which cuts relayed SSH sessions; it waits for them like it waits for calls."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / 'db.sqlite'
+        self.db = sqlite3.connect(self.path)
+        self.db.executescript("CREATE TABLE panel_voice_calls(id TEXT,state TEXT); CREATE TABLE voice_sessions(id TEXT,state TEXT);")
+        self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(self.db.close)
+
+    def make_relay_table(self):
+        self.db.executescript("CREATE TABLE ssh_relay_streams(stream_id TEXT PRIMARY KEY, state TEXT, last_active_at TEXT, closed_at TEXT);")
+
+    def add(self, stream_id, state, age_seconds, closed=False):
+        self.db.execute(
+            "INSERT INTO ssh_relay_streams VALUES(?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now',?),?)",
+            (stream_id, state, f'-{age_seconds} seconds', '2026-01-01T00:00:00.000Z' if closed else None))
+        self.db.commit()
+
+    def test_a_database_without_the_relay_table_is_simply_idle(self):
+        self.assertEqual(deploy.counts(self.db), {'panel_voice_calls': 0, 'voice_sessions': 0})
+        self.assertFalse(any(deploy.counts(self.db).values()))
+
+    def test_live_streams_are_waited_for_whatever_their_state(self):
+        self.make_relay_table()
+        self.add('open-one', 'open', 5)
+        self.add('suspended', 'suspended', 40)
+        self.add('opening', 'opening', 1)
+        self.assertEqual(deploy.counts(self.db)['ssh_relay_streams'], 3)
+
+    def test_closed_streams_and_ghosts_of_a_dead_process_are_not_waited_for(self):
+        self.make_relay_table()
+        self.add('done', 'closed', 2, closed=True)
+        self.add('ghost', 'open', deploy.STALE_RELAY_SECONDS + 60)
+        self.add('fresh', 'open', deploy.STALE_RELAY_SECONDS - 60)
+        self.assertEqual(deploy.counts(self.db)['ssh_relay_streams'], 1, 'only the stream the panel is still refreshing counts')
+
+    def test_the_wait_ends_when_the_last_stream_closes_and_never_forces_it(self):
+        self.make_relay_table()
+        self.add('long-session', 'open', 3)
+        deploy.acquire(self.db, 'image', 'owner')
+        self.assertFalse(deploy.wait_idle(self.db, 'owner', 0), 'a live stream defers the deployment')
+        self.assertEqual(self.db.execute("SELECT state FROM ssh_relay_streams").fetchone()[0], 'open', 'nothing is closed on its behalf')
+        def closes(_):
+            self.db.execute("UPDATE ssh_relay_streams SET closed_at='2026-01-01T00:00:00.000Z', state='closed'")
+            self.db.commit()
+        self.assertTrue(deploy.wait_idle(self.db, 'owner', 10, sleep=closes))
+
+
 if __name__ == '__main__':
     unittest.main()
