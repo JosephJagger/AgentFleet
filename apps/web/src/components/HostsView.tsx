@@ -81,7 +81,7 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
   }
   if (!machine) return <section className="wide-view"><h1>{selectedId ? t("该主机不存在或已移除") : t("连接你的 Codex 主机")}</h1><p>{selectedId ? t("请选择其他主机，或添加新主机。") : t("一条命令连接，自动发现已有项目和会话。")}</p><HostCards machines={machines} onSelect={onSelect} /><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></section>;
   const repair = repairCommand(machine, location.origin);
-  return <section className="wide-view hosts-view"><div className="wide-view__heading"><div><h1>{t("主机")}</h1><p>{t("选择一台主机，修改名称或检查连接。")}</p></div><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></div>
+  return <section className="wide-view hosts-view"><div className="wide-view__heading"><div><h1>{t("主机")}</h1></div><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></div>
     <HostCards machines={machines} selectedId={machine.id} onSelect={onSelect} />
     {machine.reachability !== "live" && <HostRecovery key={`recovery:${machine.id}`} machine={machine} />}
     <SettingsSections label={t("主机管理分类")} value={section} onChange={setSection} items={[

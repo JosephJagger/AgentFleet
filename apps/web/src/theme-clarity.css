@@ -1,0 +1,165 @@
+/* Readable type and a clear line hierarchy across every theme. Palette, scene
+   artwork and characteristic corners continue to come from the theme files. */
+:root[data-theme] {
+  --clarity-divider: var(--line);
+  --clarity-frame: var(--finish-edge, var(--component-line));
+}
+
+/* A panel boundary, its row separators and its selection ring have different
+   jobs. Avoid giving all three the weight of an active control. */
+:root[data-theme] .host-session-editor .buzhou-session-providers > .buzhou-session-provider {
+  border-color: var(--clarity-divider);
+}
+:root[data-theme] .buzhou-session-window:where(:not([aria-pressed="true"])) {
+  border-color: var(--clarity-divider);
+}
+:root[data-theme] .buzhou-session-window__preview {
+  border-top-color: var(--clarity-divider);
+  font-size: max(var(--text-micro), 12px);
+  line-height: 1.45;
+}
+:root[data-theme] .buzhou-session-window__title strong { font-weight: 600; }
+:root[data-theme] .buzhou-session-window__title small { font-weight: 400; font-variant-numeric: tabular-nums; }
+:root[data-theme] .project-session-group__children { border-left-color: var(--clarity-divider); }
+:root[data-theme] .session-row:where(:not(.session-row--active)) { border-color: var(--clarity-divider); }
+:root[data-theme] .settings-view .settings-more {
+  border-color: var(--clarity-divider);
+  background: color-mix(in srgb, var(--paper) 70%, var(--paper-solid));
+}
+:root[data-theme] .session-config-body .session-config-section {
+  border-color: var(--clarity-divider);
+  box-shadow: none;
+}
+:root[data-theme] .session-config-body .session-config-section[open] { border-color: var(--clarity-frame); }
+
+@media (max-width: 900px) {
+  /* One frame around a project is enough on a phone. Session rows retain a
+     fine baseline; only the selected session gets a complete accent outline. */
+  :root[data-theme] .workspace-catalog .session-row:where(:not(.session-row--active)) {
+    border-color: transparent;
+    border-bottom-color: var(--clarity-divider);
+    box-shadow: none;
+  }
+  :root[data-theme] .workspace-catalog .session-row--active {
+    border-color: var(--cobalt);
+    box-shadow: inset 2px 0 0 var(--cobalt);
+  }
+  :root[data-theme] .settings-view .settings-more {
+    border-inline-color: transparent;
+    background: transparent;
+  }
+  :root[data-theme] .buzhou-session-window__title strong { font-size: var(--text-small); line-height: 1.4; }
+  :root[data-theme] .buzhou-session-row__label small { font-size: var(--text-caption); }
+}
+
+/* The editor theme previously mixed 10px previews with 11px controls. Keep a
+   compact hierarchy, with explicit readable floors for dense desktop chrome.
+   Deliberately leave --buzhou-conversation-font-size and its consumers alone. */
+@media (min-width: 901px) {
+  :root[data-theme="buzhoushan"] {
+    --buzhou-ui-helper: max(.8125rem, 12px);
+    --buzhou-ui-body: max(.875rem, 13px);
+    --buzhou-ui-title: max(1rem, 14px);
+    --text-micro: var(--buzhou-ui-helper);
+    --text-caption: var(--buzhou-ui-helper);
+    --text-small: var(--buzhou-ui-body);
+    --text-body: var(--buzhou-ui-title);
+    --clarity-divider: #383a3e;
+    --clarity-frame: #4a4d53;
+  }
+
+  :root[data-theme="buzhoushan"] :is(.rail-heading h2, .workspace-catalog h2, .buzhou-session-provider h3) {
+    font-size: var(--buzhou-ui-title);
+    line-height: 1.4;
+    font-weight: 600;
+  }
+  :root[data-theme="buzhoushan"] .machine-link strong { font-size: var(--buzhou-ui-body); line-height: 1.4; }
+  :root[data-theme="buzhoushan"] .machine-link small { font-size: var(--buzhou-ui-helper); line-height: 1.4; }
+  :root[data-theme="buzhoushan"] .project-session-group__heading { font-size: var(--buzhou-ui-title); line-height: 1.45; }
+  :root[data-theme="buzhoushan"] .project-session-group__heading strong { font-size: var(--buzhou-ui-title); line-height: 1.45; }
+  :root[data-theme="buzhoushan"] .catalog-heading-actions .button { font-size: var(--buzhou-ui-helper); min-height: 32px; line-height: 1.4; }
+  :root[data-theme="buzhoushan"] .catalog-search :is(label, select) { font-size: var(--buzhou-ui-body); }
+  :root[data-theme="buzhoushan"] .fleet-main :is(.quota-card, .host-quota, .discovery-status) { font-size: var(--buzhou-ui-helper); line-height: 1.5; }
+
+  :root[data-theme="buzhoushan"] :is(.buzhou-session-row__label, .buzhou-session-row__label small,
+    .buzhou-session-provider > header small, .buzhou-session-track > p,
+    .buzhou-session-window__title small, .buzhou-session-window__project,
+    .buzhou-session-empty-actions button, .buzhou-session-toggle button) {
+    font-size: var(--buzhou-ui-helper);
+    line-height: 1.5;
+  }
+  :root[data-theme="buzhoushan"] .buzhou-session-window__title strong {
+    font-size: var(--buzhou-ui-title);
+    line-height: 1.4;
+  }
+  :root[data-theme="buzhoushan"] .buzhou-session-window__preview {
+    font-size: var(--buzhou-ui-helper);
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  :root[data-theme="buzhoushan"] .buzhou-session-window__title small { color: var(--muted); }
+  :root[data-theme="buzhoushan"] .buzhou-session-provider > header small { color: var(--muted); }
+  :root[data-theme="buzhoushan"] .buzhou-session-track > p { color: var(--muted); }
+
+  :root[data-theme="buzhoushan"] .inspector-head--compact .session-heading h2 {
+    font-size: var(--buzhou-ui-title);
+    font-weight: 600;
+  }
+  :root[data-theme="buzhoushan"] .inspector-context {
+    font-size: var(--buzhou-ui-helper);
+    color: var(--muted);
+    opacity: 1;
+  }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card small { font-size: var(--buzhou-ui-helper); line-height: 1.5; }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card strong { font-size: var(--buzhou-ui-title); }
+  :root[data-theme="buzhoushan"] .buzhou-dock { font-size: var(--buzhou-ui-body); }
+  :root[data-theme="buzhoushan"] :is(.buzhou-dock__list strong, .buzhou-dock__list small,
+    .buzhou-dock__caption, .buzhou-dock__limit) { font-size: var(--buzhou-ui-helper); line-height: 1.5; }
+  :root[data-theme="buzhoushan"] .buzhou-dock__list strong { font-weight: 500; }
+  :root[data-theme="buzhoushan"] :is(.buzhou-dock__list small, .buzhou-dock__limit) { color: var(--muted); }
+  :root[data-theme="buzhoushan"] .buzhou-dock__output > pre { font-size: var(--buzhou-ui-body); line-height: 1.65; }
+
+  /* The 24px status strip and 30px toolbar keep their original geometry. */
+  :root[data-theme="buzhoushan"] .buzhou-status,
+  :root[data-theme="buzhoushan"] .buzhou-status .fleet-shortcut :is(strong, span),
+  :root[data-theme="buzhoushan"] .buzhou-status .relay-state,
+  :root[data-theme="buzhoushan"] .buzhou-status .relay-state > span:last-child {
+    font-size: var(--buzhou-ui-helper);
+    line-height: 24px;
+  }
+  :root[data-theme="buzhoushan"] .topbar-actions .buzhou-focus-toggle,
+  :root[data-theme="buzhoushan"] .topbar-actions > .panel-voice-control > .button:not(.panel-voice-control__floating),
+  :root[data-theme="buzhoushan"] .topbar-actions > .language-switcher select { font-size: var(--buzhou-ui-body); }
+
+  /* Focus mode still chooses its compact content and user-sized conversation.
+     Improve only small labels; do not undo its hidden metadata or fixed bars. */
+  :root[data-theme="buzhoushan"] .buzhou-focus .inspector-head__actions :is(.button, .icon-button),
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-facts,
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-facts .state-pill,
+  :root[data-theme="buzhoushan"] .buzhou-focus .history-mark,
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-call-actions .usage-trigger,
+  :root[data-theme="buzhoushan"] .buzhou-focus .usage-trigger-text small,
+  :root[data-theme="buzhoushan"] .buzhou-focus .session-facts > [role="status"],
+  :root[data-theme="buzhoushan"] .buzhou-focus .buzhou-quota-card strong { font-size: var(--buzhou-ui-helper); }
+
+  /* Flat editor regions get one structural divider; selected controls retain
+     the blue boundary and their keyboard focus ring. */
+  :root[data-theme="buzhoushan"] :is(.machine-rail, .fleet-main, .catalog-toggle-bar,
+    .buzhou-session-switcher, .buzhou-dock__head, .buzhou-dock__list, .buzhou-dock__limit) {
+    border-color: var(--clarity-divider);
+  }
+  :root[data-theme="buzhoushan"] .buzhou-dock { border-top-color: var(--clarity-frame); }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card {
+    border-color: var(--clarity-divider);
+    border-left-color: var(--teal);
+  }
+  :root[data-theme="buzhoushan"] .buzhou-quota-card--forecast { border-left-color: var(--cobalt); }
+  :root[data-theme="buzhoushan"] .buzhou-session-window[aria-pressed="true"] { border-color: var(--cobalt); }
+  :root[data-theme="buzhoushan"] .composer-input { border-color: var(--clarity-frame); }
+}
+
+@media (prefers-contrast: more) {
+  :root[data-theme] { --clarity-divider: var(--muted); --clarity-frame: var(--ink); }
+  :root[data-theme] .workspace-catalog .session-row:where(:not(.session-row--active)) { border-color: var(--clarity-divider); }
+  :root[data-theme] .settings-view .settings-more { border-color: var(--clarity-divider); }
+}

@@ -34,7 +34,7 @@ it("does not turn missing telemetry into zero or retain another scope's result",
 it("labels stale account snapshots and English UI explicitly",async()=>{
  setLocale("en");vi.mocked(api.usage).mockResolvedValue({...data,scope:"machine",accounts:[{...data.accounts[0],stale:true}]});
  render(<UsageButton scope="machine" id="m1"/>);fireEvent.click(await screen.findByRole("button",{name:/Weekly quota\s*38%/}));
- expect(await screen.findByText(/Out of date/)).toBeTruthy();expect(screen.getByText("Account quota (shared)")).toBeTruthy();
+ expect(await screen.findByText(/Out of date/)).toBeTruthy();expect(screen.getByText("Account quota")).toBeTruthy();
 });
 
 it("keeps quota discoverable with multiple model windows and no session token reports",async()=>{
@@ -101,8 +101,8 @@ it("shows both quota windows and separate total and cycle project rankings",asyn
  expect(button.textContent).toMatch(/5 小时额度\s*85%/);
  expect(button.textContent?.match(/下次重置/g)?.length).toBe(2);
  fireEvent.click(button);
- expect(await screen.findByText("项目总消耗排名（前 10）")).toBeTruthy();
- expect(screen.getByText("项目本周消耗排名（前 10）")).toBeTruthy();
+ expect(await screen.findByText("项目累计")).toBeTruthy();
+ expect(screen.getByText("项目本周")).toBeTruthy();
  expect(screen.getByText("Active project")).toBeTruthy();
 });
 
@@ -113,7 +113,7 @@ it("shows a dedicated host usage page with weekly cache rates and opens sessions
  expect(await screen.findByRole("heading",{name:"消耗"})).toBeTruthy();
  expect(screen.getAllByText("37.5%").length).toBeGreaterThanOrEqual(2);
  expect(screen.getByText("1,020")).toBeTruthy();
- expect(screen.getByText("1,020").closest("td")?.getAttribute("data-label")).toBe("总消耗");
+ expect(screen.getByText("1,020").closest("td")?.getAttribute("data-label")).toBe("累计");
  fireEvent.click(screen.getByRole("button",{name:"Usage page"}));expect(select).toHaveBeenCalledWith("s1");
 });
 
@@ -141,11 +141,33 @@ it("keeps mobile usage concise and permits closing after expanding details",asyn
   render(<UsageButton scope="project" id="p1"/>);
   fireEvent.click(await screen.findByRole("button",{name:/总消耗/}));
   const dialog=screen.getByRole("dialog");
-  expect(within(dialog).queryByText("账号额度（共享）")).toBeNull();
-  fireEvent.click(within(dialog).getByRole("button",{name:"查看完整明细"}));
-  expect(within(dialog).getByText("账号额度（共享）")).toBeTruthy();
+  expect(within(dialog).queryByText("账号额度")).toBeNull();
+  fireEvent.click(within(dialog).getByRole("button",{name:"查看明细"}));
+  expect(within(dialog).getByText("账号额度")).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button",{name:"收起明细"}));
+  expect(within(dialog).queryByText("账号额度")).toBeNull();
+  expect(within(dialog).getByRole("button",{name:"查看明细"}).getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(within(dialog).getAllByRole("button",{name:"关闭用量"}).at(-1)!);
   await waitFor(()=>expect(dialog.hasAttribute("open")).toBe(false));
+ } finally {window.matchMedia=original;}
+});
+it("keeps exact accessible totals and incomplete coverage visible in a compact mobile summary",async()=>{
+ const original=window.matchMedia;
+ window.matchMedia=vi.fn().mockReturnValue({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()});
+ try {
+  vi.mocked(api.usage).mockResolvedValue({...data,recorded:{...counts,totalTokens:1234567},discontinuities:1,quotaCycle:{startsAt:"2026-09-03T12:34:00Z",resetsAt:"2026-09-10T12:34:00Z",recordedTokens:23456,boundaryIncomplete:true}});
+  render(<UsageButton scope="project" id="compact"/>);
+  const trigger=await screen.findByRole("button",{name:/总消耗 1,234,567 tokens · 本周消耗 23,456 tokens/});
+  expect(trigger.title).toContain("总消耗 1,234,567 tokens");
+  expect(trigger.textContent?.match(/tokens/g)).toHaveLength(1);
+  expect(trigger.textContent).not.toContain("周命中");
+  fireEvent.click(trigger);
+  const modal=within(screen.getByRole("dialog",{name:"用量与剩余额度"}));
+  expect(modal.getByText("1,234,567")).toBeTruthy();
+  expect(modal.getByText("已获取 1 / 3 个会话")).toBeTruthy();
+  for (const status of modal.getAllByRole("status")) expect(status.closest("details")).toBeNull();
+  expect(modal.getByText("跨越重置时刻且无法精确拆分的用量未计入本轮。").closest("details")).toBeNull();
+  expect(modal.getByText("检测到计数不连续，缺失区间未估算。").closest("details")).toBeNull();
  } finally {window.matchMedia=original;}
 });
 it("clicking the forecast card opens the Chinese timeline without changing native reset dates",async()=>{

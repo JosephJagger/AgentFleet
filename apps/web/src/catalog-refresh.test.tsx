@@ -123,8 +123,8 @@ it("会话行在历史标记右侧展示独立 token 数，并区分零和未记
   expect(labels).toHaveLength(3);
   expect(labels[0].getAttribute("title")).toBe("总消耗 1,200 tokens · 本周消耗 — tokens");
   expect(labels[0].previousElementSibling?.className).toBe("history-mark");
-  expect(labels[1].textContent).toBe("总消耗 0 tokens · 本周消耗 — tokens");
-  expect(labels[2].textContent).toBe("总消耗 — tokens · 本周消耗 — tokens");
+  expect(labels[1].textContent).toBe("累计 0 · 本周 — tokens");
+  expect(labels[2].textContent).toBe("累计 — · 本周 — tokens");
 });
 
 it("切换 Agent 重新加载独立项目目录", async () => {

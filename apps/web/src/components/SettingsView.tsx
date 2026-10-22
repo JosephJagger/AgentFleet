@@ -100,7 +100,7 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
     finally { setRevoking(undefined); }
   }
   return <section className="wide-view settings-view">
-    <div className="wide-view__heading"><div><h1>{t("设置")}</h1><p>{t("按用途管理默认配置、界面外观和数据。")}</p></div><ShieldCheck size={30} /></div>
+    <div className="wide-view__heading"><div><h1>{t("设置")}</h1></div><ShieldCheck size={30} /></div>
     <SettingsSections label={t("设置分类")} value={category} onChange={setCategory} items={[
       {id:"updates",label:t("更新中心"),icon:<Settings2 size={19}/>,description:t("版本、进度与恢复")},
       {id:"codex",label:t("Codex 配置"),icon:<Settings2 size={19}/>,description:t("模型、语音与权限")},

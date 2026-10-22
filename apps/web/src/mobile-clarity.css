@@ -1,0 +1,23 @@
+/* Completed-turn statistics are metadata, not part of the speaker heading. */
+:root .timeline-event__head { flex-wrap: wrap; gap: 4px 12px; }
+:root .timeline-event__head > strong { flex: 1; min-width: 0; }
+:root .timeline-event__head > time { flex: none; margin-left: auto; }
+:root .timeline-event__head > .timeline-event__turn-tokens {
+  flex: 0 0 100%; min-width: 0; color: var(--muted); font-family: var(--font);
+  font-size: var(--text-caption); line-height: 1.5; font-weight: 400;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  :root .wide-view__heading { margin-bottom: 20px; padding-bottom: 18px; gap: 12px; }
+  :root .wide-view__heading h1 { font-size: 1.5rem; line-height: 1.35; }
+  :root .wide-view__heading > svg { width: 24px; height: 24px; }
+  :root .inspector-head--compact .session-heading h2 { font-size: .9375rem; font-weight: 600; }
+  :root .timeline-event__head > strong { font-size: .875rem; }
+  :root .timeline-event__head > time { font-size: .75rem; color: var(--muted); }
+  :root .timeline-event__head > .timeline-event__turn-tokens { font-size: .8125rem; }
+  :root .image-draft-notice:not([role]) { font-size: .75rem; line-height: 1.5; margin-block: 4px; }
+  :root .host-settings-link small { line-height: 1.5; }
+  /* Primary content gets space; the menu already names its controls. */
+  :root .composer-add-popover__head > strong { font-size: .8125rem; letter-spacing: 0; }
+  :root .composer-add-popover b { font-size: .875rem; font-weight: 600; }
+}

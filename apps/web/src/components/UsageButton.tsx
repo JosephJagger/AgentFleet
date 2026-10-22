@@ -56,7 +56,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
   const fiveHour=data?.accounts.flatMap(a=>a.windows.filter(w=>w.windowMinutes===300&&w.bucket===provider))??[];
   const accountCredits=data?.accounts.length===1?data.accounts[0]?.credits:null;
   const showCreditBalance=Boolean(accountCredits?.unlimited || (accountCredits?.balance!=null && Number(accountCredits.balance)>0));
-  const label=scope!=="machine"?t("总消耗 {0} tokens",data?.recorded?short(data.recorded.totalTokens):"—"):scope==="machine"&&weekly.length===1?t("周额度剩余 {0}%",formatQuotaPercent(weekly[0].w.remainingPercent,locale())):scope==="machine"&&!!data?.accounts.some(a=>a.windows.length)?t("用量与剩余额度"):data?.recorded?t("总消耗 {0} tokens",short(data.recorded.totalTokens)):t("用量未上报");
+  const label=scope!=="machine"?t("累计 {0}",data?.recorded?short(data.recorded.totalTokens):"—"):scope==="machine"&&weekly.length===1?t("周额度剩余 {0}%",formatQuotaPercent(weekly[0].w.remainingPercent,locale())):scope==="machine"&&!!data?.accounts.some(a=>a.windows.length)?t("用量与剩余额度"):data?.recorded?t("总消耗 {0} tokens",short(data.recorded.totalTokens)):t("用量未上报");
   const showWeeklyReset=scope==="machine"&&weekly.length===1&&!failed;
   const resetAt=showWeeklyReset?weekly[0].w.resetsAt:null;
   const richMachineSummary=scope==="machine"&&!failed&&data?.accounts.length===1&&(weekly.length===1||fiveHour.length===1||accountCredits||data.resetPrediction);
@@ -67,6 +67,13 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
   const periodTokens=data?.quotaCycle?.recordedTokens;
   const weeklyCacheRate=cacheRate(data?.quotaCycle?.inputTokens,data?.quotaCycle?.cachedInputTokens);
   const rate=(value:number|null)=>value==null?t("未记录"):t("{0}%",new Intl.NumberFormat(locale(),{maximumFractionDigits:1}).format(value));
+  const showCycle=codex||Boolean(data?.quotaCycle);
+  const exactUsageLabel=scope!=="machine"&&!failed?[
+    t("总消耗 {0} tokens",data?.recorded?number(data.recorded.totalTokens):"—"),
+    ...(showCycle?[t("本周消耗 {0} tokens",periodTokens==null?"—":number(periodTokens)),t("周命中 {0}",rate(weeklyCacheRate))]:[]),
+    ...(data?.quotaCycle?.boundaryIncomplete?[t("跨越重置时刻且无法精确拆分的用量未计入本轮。")]:[]),
+  ].join(" · "):undefined;
+  const recordedHeading=<div className="usage-summary-heading"><h3>{t("消耗")}</h3><small>tokens</small></div>;
   return <>
     {compactQuota ? <div className="buzhou-session-quota">
       <button type="button" className="buzhou-quota-card" onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>
@@ -76,9 +83,9 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
       </button>
       {codex&&<button type="button" className="buzhou-quota-card buzhou-quota-card--forecast" onClick={()=>{setRadarOpen(true);refreshUsage.current();}} aria-haspopup="dialog">
         <span><small className="buzhou-full-label">{t("临时重置预测")}</small><small className="buzhou-focus-label">{t("重置预测")}</small><strong>{failed?t("更新暂时延迟"):radarLabel}</strong></span>
-        <small>{t("公告仅供参考，额度与日期以原生最新数据为准")}</small>
+        <small title={t("公告仅供参考，额度与日期以原生最新数据为准")} aria-label={t("公告仅供参考，额度与日期以原生最新数据为准")}>{t("仅供参考")}</small>
       </button>}
-    </div> : <button type="button" className={`button button--quiet usage-trigger${richMachineSummary?" usage-trigger--machine-rich":""}`} onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>
+    </div> : <button type="button" className={`button button--quiet usage-trigger${scope!=="machine"?" usage-trigger--tokens":""}${richMachineSummary?" usage-trigger--machine-rich":""}`} onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" aria-label={exactUsageLabel} title={exactUsageLabel??t("查看用量与剩余额度")}>
       {richMachineSummary?<>
         <span className="host-quota-icon" aria-hidden="true"><BarChart3 size={18}/></span>
         <span className="host-quota-summary">
@@ -86,11 +93,11 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
             {weekly.length===1&&<span className="host-quota-metric host-quota-metric--weekly"><small>{t("周额度")}</small><strong>{formatQuotaPercent(weekly[0].w.remainingPercent,locale())}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${weekly[0].w.remainingPercent}%`}}/></span><em>{weekly[0].w.resetsAt?t("下次重置：{0}",date(new Date(weekly[0].w.resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
             {fiveHour.length===1&&<span className="host-quota-metric host-quota-metric--five-hour"><small>{t("5 小时额度")}</small><strong>{formatQuotaPercent(fiveHour[0].remainingPercent,locale())}%</strong><span className="host-quota-meter" aria-hidden="true"><i style={{width:`${fiveHour[0].remainingPercent}%`}}/></span><em>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</em></span>}
             {showCreditBalance?<span className="host-quota-metric host-quota-metric--credits"><small>{t("点数余额")}</small><strong>{accountCredits?.balance!=null&&!accountCredits.unlimited?<>{creditBalance(accountCredits.balance)} <b>{t("点")}</b></>:creditText(accountCredits)}</strong><em>{t("由原生 Codex 上报")}</em></span>
-            :codex?<span className="host-quota-metric host-quota-metric--forecast" onClick={event=>{event.stopPropagation();setRadarOpen(true);}}><small>{t("临时重置预测")}</small><strong>{radarLabel}</strong><em>{t("公告仅供参考，额度与日期以原生最新数据为准")}</em></span>:null}
+            :codex?<span className="host-quota-metric host-quota-metric--forecast" onClick={event=>{event.stopPropagation();setRadarOpen(true);}}><small>{t("临时重置预测")}</small><strong>{radarLabel}</strong><em title={t("公告仅供参考，额度与日期以原生最新数据为准")} aria-label={t("公告仅供参考，额度与日期以原生最新数据为准")}>{t("仅供参考")}</em></span>:null}
           </span>
           {updatedAt&&<span className="host-quota-updated"><i aria-hidden="true"/>{t("更新于 {0}",date(updatedAt))}<b aria-hidden="true">→</b></span>}
         </span>
-      </>:<><BarChart3 size={14}/><span className="usage-trigger-text"><span>{failed?t("用量暂不可用"):label}</span>{scope==="machine"&&codex&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope!=="machine"&&!failed&&codex&&<small>{t("本周消耗 {0} tokens",periodTokens==null?"—":short(periodTokens))} · {t("周命中 {0}",rate(weeklyCacheRate))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</small>}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",formatQuotaPercent(fiveHour[0].remainingPercent,locale()))}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
+      </>:<><BarChart3 size={14}/><span className="usage-trigger-text">{scope!=="machine"&&!failed?<span className="usage-trigger-metrics" aria-hidden="true"><span>{label}</span>{showCycle&&<span>{t("本周 {0}",periodTokens==null?"—":short(periodTokens))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</span>}<small>tokens</small></span>:<span>{failed?t("用量暂不可用"):label}</span>}{scope==="machine"&&codex&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",formatQuotaPercent(fiveHour[0].remainingPercent,locale()))}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
     </button>}
     {scope==="machine"&&createPortal(<dialog ref={radarDialog} className="modal usage-dialog radar-dialog" aria-label={t("重置消息时间轴")} onClick={event=>{if(event.target===event.currentTarget){const r=event.currentTarget.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)setRadarOpen(false);}}} onCancel={()=>setRadarOpen(false)} onClose={()=>setRadarOpen(false)}>
       <header className="modal-head"><div><h2>{t("重置消息时间轴")}</h2><p>{t("最近 7 天 · 最新在上")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setRadarOpen(false)}><X size={18}/></button></header>
@@ -107,12 +114,16 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
       </nav>}
     </dialog>,document.body)}
     {createPortal(<dialog ref={dialog} className="modal usage-dialog" aria-label={t("用量与剩余额度")} onClick={event=>{if(event.target!==event.currentTarget)return;const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)setOpen(false);}} onCancel={()=>setOpen(false)} onClose={()=>setOpen(false)}>
-      <header className="modal-head"><div><h2>{agentName(provider)} · {t("用量与剩余额度")}</h2><p>{t("账号看额度，项目和会话看已记录 token")}</p></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setOpen(false)}><X size={18}/></button></header>
+      <header className="modal-head"><div><h2>{agentName(provider)} · {t("用量")}</h2></div><button type="button" className="icon-button" aria-label={t("关闭用量")} onClick={()=>setOpen(false)}><X size={18}/></button></header>
       <div className="usage-body">
         {failed&&<p role="status">{t("用量读取失败，已有数据可能过期。")}</p>}
-        {mobile&&scope!=="machine"&&<section className="usage-mobile-summary"><h3>{t("已记录 token 消耗")}</h3><dl className="usage-totals"><div><dt>{t("已记录总量")}</dt><dd>{data?.recorded?number(data.recorded.totalTokens):"—"}</dd></div>{(codex||data?.quotaCycle)&&<div><dt>{t("本轮周额度内已记录")}</dt><dd>{periodTokens==null?"—":number(periodTokens)}</dd></div>}{(codex||data?.quotaCycle)&&<div><dt>{t("周缓存命中率")}</dt><dd>{rate(weeklyCacheRate)}</dd></div>}</dl>{data&&<p>{t("已获取 {0} / {1} 个会话",data.observedSessions,data.totalSessions)}</p>}<button type="button" className="button button--quiet" aria-expanded={expanded} onClick={()=>setExpanded(value=>!value)}>{expanded?t("收起明细"):t("查看完整明细")}</button></section>}
+        {mobile&&scope!=="machine"&&<section className="usage-mobile-summary">
+          {!expanded&&recordedHeading}
+          {!expanded&&<><dl className="usage-totals"><div><dt>{t("累计")}</dt><dd>{data?.recorded?number(data.recorded.totalTokens):"—"}</dd></div>{showCycle&&<div><dt>{t("本周")}</dt><dd>{periodTokens==null?"—":number(periodTokens)}</dd></div>}{showCycle&&<div><dt>{t("缓存命中")}</dt><dd>{rate(weeklyCacheRate)}</dd></div>}</dl>{data&&<p className="usage-coverage">{t("已获取 {0} / {1} 个会话",data.observedSessions,data.totalSessions)}</p>}{!data?.recorded&&<p className="usage-note">{t("尚无用量数据。升级 Agent 后，新产生的原生用量通知会开始记录；未获取不代表零消耗。")}</p>}</>}
+          <button type="button" className="button button--quiet" aria-expanded={expanded} onClick={()=>setExpanded(value=>!value)}>{expanded?t("收起明细"):t("查看明细")}</button>
+        </section>}
         {(!mobile||scope==="machine"||expanded)&&<>
-        <section><h3>{t("账号额度（共享）")}</h3>
+        <section><h3>{t("账号额度")}</h3>
           {scope==="machine"&&codex&&<button type="button" className="button button--quiet" disabled={refreshing} onClick={()=>void refreshHost()}>{t("刷新额度")}</button>}
           {refreshNotice&&<p role="status">{refreshNotice}</p>}
           {!data?.accounts.length&&<p>{t(claude ? "Claude Code 未返回订阅额度；请确认宿主机已登录，且原生版本支持额度查询。" : grok ? "Grok 未返回账号额度；请确认主机已登录 Grok，并使用支持额度查询的版本。" : provider === "cursor" ? "Cursor 未返回账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。" : "账号额度未上报；需要支持额度查询的 Codex 认证。")}</p>}
@@ -126,7 +137,6 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
             {account.windows.map(w=><div className="usage-window" key={`${w.bucket}:${w.window}`}><div><strong>{w.windowMinutes===10080?t("周额度"):w.windowMinutes===300?t("5 小时额度"):t("{0} 分钟额度",w.windowMinutes)} · {w.bucket === "claude" ? "Claude Code" : w.bucket}</strong><span>{t("已用 {0}% · 剩余 {1}%",formatQuotaPercent(w.usedPercent,locale()),formatQuotaPercent(w.remainingPercent,locale()))}</span></div><progress max={100} value={w.usedPercent} aria-label={t("额度已用比例")}/><small>{w.resetsAt?t("重置于 {0}",date(new Date(w.resetsAt*1000).toISOString())):t("重置时间未上报")}</small></div>)}
             {!account.identityKnown&&<small>{t("账号身份未上报，此处仅展示来源主机快照，不与其他主机相加。")}</small>}
           </div>)}
-          <p className="usage-note">{t("账号额度由同账号的多个设备和会话共享，不能按 token 比例归属到某个项目。")}</p>
           {scope==="machine"&&codex&&<div className="usage-reset-forecast" aria-live="polite">
             <strong>{t("临时重置预测")}</strong><p>{radarLabel}</p>
             <button type="button" className="button button--quiet" onClick={()=>setRadarOpen(true)}>{t("查看消息时间轴")}</button>
@@ -134,19 +144,25 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
             <small>{t("重置卡发放暂无可靠预测；到账数量来自原生 Codex。")}</small>
           </div>}
         </section>
-        <section><h3>{t("已记录 token 消耗")}</h3>
-          {data?.recorded?<><dl className="usage-totals"><div><dt>{t("已记录总量")}</dt><dd>{number(data.recorded.totalTokens)}</dd></div>{(codex||data?.quotaCycle)&&<div><dt>{t("本轮周额度内已记录")}</dt><dd>{data.quotaCycle?.recordedTokens == null ? "—" : number(data.quotaCycle.recordedTokens)}</dd></div>}{(codex||data?.quotaCycle)&&<div><dt>{t("周缓存命中率")}</dt><dd>{rate(weeklyCacheRate)}</dd></div>}<div><dt>{t("输入 token")}</dt><dd>{number(data.recorded.inputTokens)}</dd></div><div><dt>{t("输出 token")}</dt><dd>{number(data.recorded.outputTokens)}</dd></div><div><dt>{t("缓存输入（包含于输入）")}</dt><dd>{number(data.recorded.cachedInputTokens)}</dd></div><div><dt>{t("推理输出（包含于输出）")}</dt><dd>{number(data.recorded.reasoningOutputTokens)}</dd></div></dl>
-          <p>{t("已获取 {0} / {1} 个会话",data.observedSessions,data.totalSessions)}</p><p>{t("开始记录：{0}",data.firstObservedAt?date(data.firstObservedAt):"—")}<br/>{t("最近上报：{0}",data.lastObservedAt?date(data.lastObservedAt):"—")}</p></>:<p>{t("尚无用量数据。升级 Agent 后，新产生的原生用量通知会开始记录；未获取不代表零消耗。")}</p>}
-          {data?.quotaCycle?<p>{t("当前周额度周期：{0} 至 {1}",date(data.quotaCycle.startsAt),date(data.quotaCycle.resetsAt))}{data.quotaCycle.boundaryIncomplete&&<><br/>{t("跨越重置时刻且无法精确拆分的用量未计入本轮。")}</>}</p>:codex&&<p>{t("尚未获取有效的下次周额度重置时间，暂不计算本轮用量。")}</p>}
-          {!!data?.discontinuities&&<p>{t("检测到计数不连续，缺失区间未估算。")}</p>}
-          <p className="usage-note">{t(claude ? "仅统计当前 Claude Code 项目或会话已上报的 token，不代表账号额度；未同步的历史消耗未估算。" : grok ? "Grok 用量取自原生持久记录；接入前的历史不回填，缓存和推理已包含在总量中。" : "本轮按下次周额度重置时间倒推 7 天计算，仅包含已记录用量，不等于账号官方额度消耗。缓存和推理明细不能再次加到总量。")}</p>
+        <section>{recordedHeading}
+          {data?.recorded?<><dl className="usage-totals"><div><dt>{t("累计")}</dt><dd>{number(data.recorded.totalTokens)}</dd></div>{(codex||data?.quotaCycle)&&<div><dt>{t("本周")}</dt><dd>{data.quotaCycle?.recordedTokens == null ? "—" : number(data.quotaCycle.recordedTokens)}</dd></div>}{(codex||data?.quotaCycle)&&<div><dt>{t("缓存命中")}</dt><dd>{rate(weeklyCacheRate)}</dd></div>}<div><dt>{t("输入用量")}</dt><dd>{number(data.recorded.inputTokens)}</dd></div><div><dt>{t("输出用量")}</dt><dd>{number(data.recorded.outputTokens)}</dd></div><div><dt>{t("缓存输入")}</dt><dd>{number(data.recorded.cachedInputTokens)}</dd></div><div><dt>{t("推理输出")}</dt><dd>{number(data.recorded.reasoningOutputTokens)}</dd></div></dl>
+          <p className="usage-coverage">{t("已获取 {0} / {1} 个会话",data.observedSessions,data.totalSessions)}</p></>:<p>{t("尚无用量数据。升级 Agent 后，新产生的原生用量通知会开始记录；未获取不代表零消耗。")}</p>}
           {data?.last&&<details><summary>{t("最近请求与原生累计")}</summary><p>{t("最近请求：{0} tokens",number(data.last.totalTokens))}</p><p>{t("原生累计：{0} tokens",number(data.nativeTotal?.totalTokens??0))}</p><p>{t("原生累计可能包含接入前或分支继承的历史，不计入项目已记录总量。")}</p></details>}
         </section>
-        {scope==="machine"&&!!data?.topProjects?.length&&<section><h3>{t("项目总消耗排名（前 10）")}</h3><ol className="usage-ranking">{data.topProjects.map(p=><li key={p.id}>{displayName(p.title)}<strong>{number(p.totalTokens)} tokens</strong></li>)}</ol></section>}
-        {scope==="machine"&&codex&&<section><h3>{t("项目本周消耗排名（前 10）")}</h3>{data?.topWeeklyProjects?.length?<ol className="usage-ranking">{data.topWeeklyProjects.map(p=><li key={p.id}>{displayName(p.title)}<strong>{number(p.totalTokens)} tokens · {t("周命中 {0}",rate(cacheRate(p.inputTokens,p.cachedInputTokens)))}</strong></li>)}</ol>:<p>{data?.quotaCycle?t("本轮暂无已记录消耗。"):t("重置时间未知，暂不计算本周排名。")}</p>}</section>}
-        {scope!=="session"&&!!data?.topSessions.length&&<section><h3>{t("会话总消耗排名（前 10）")}</h3><ol className="usage-ranking">{data.topSessions.map(s=><li key={s.id}>{onSession?<button type="button" onClick={()=>{setOpen(false);onSession(s.id);}}>{displayName(s.title)}</button>:<a href={`/sessions/${encodeURIComponent(s.id)}`}>{displayName(s.title)}</a>}<strong>{number(s.totalTokens)} tokens</strong></li>)}</ol></section>}
-        {scope!=="session"&&codex&&<section><h3>{t("会话本周消耗排名（前 10）")}</h3>{data?.topWeeklySessions?.length?<ol className="usage-ranking">{data.topWeeklySessions.map(s=><li key={s.id}>{onSession?<button type="button" onClick={()=>{setOpen(false);onSession(s.id);}}>{displayName(s.title)}</button>:<a href={`/sessions/${encodeURIComponent(s.id)}`}>{displayName(s.title)}</a>}<strong>{number(s.totalTokens)} tokens · {t("周命中 {0}",rate(cacheRate(s.inputTokens,s.cachedInputTokens)))}</strong></li>)}</ol>:<p>{data?.quotaCycle?t("本轮暂无已记录消耗。"):t("重置时间未知，暂不计算本周排名。")}</p>}</section>}
+        {scope==="machine"&&!!data?.topProjects?.length&&<section><div className="usage-summary-heading"><h3>{t("项目累计")}</h3><small>TOP 10 · tokens</small></div><ol className="usage-ranking">{data.topProjects.map(p=><li key={p.id}>{displayName(p.title)}<strong>{number(p.totalTokens)}</strong></li>)}</ol></section>}
+        {scope==="machine"&&codex&&<section><div className="usage-summary-heading"><h3>{t("项目本周")}</h3><small>TOP 10 · tokens</small></div>{data?.topWeeklyProjects?.length?<ol className="usage-ranking">{data.topWeeklyProjects.map(p=><li key={p.id}>{displayName(p.title)}<strong>{number(p.totalTokens)} · {t("周命中 {0}",rate(cacheRate(p.inputTokens,p.cachedInputTokens)))}</strong></li>)}</ol>:<p>{data?.quotaCycle?t("本轮暂无已记录消耗。"):t("重置时间未知，暂不计算本周排名。")}</p>}</section>}
+        {scope!=="session"&&!!data?.topSessions.length&&<section><div className="usage-summary-heading"><h3>{t("会话累计")}</h3><small>TOP 10 · tokens</small></div><ol className="usage-ranking">{data.topSessions.map(s=><li key={s.id}>{onSession?<button type="button" onClick={()=>{setOpen(false);onSession(s.id);}}>{displayName(s.title)}</button>:<a href={`/sessions/${encodeURIComponent(s.id)}`}>{displayName(s.title)}</a>}<strong>{number(s.totalTokens)}</strong></li>)}</ol></section>}
+        {scope!=="session"&&codex&&<section><div className="usage-summary-heading"><h3>{t("会话本周")}</h3><small>TOP 10 · tokens</small></div>{data?.topWeeklySessions?.length?<ol className="usage-ranking">{data.topWeeklySessions.map(s=><li key={s.id}>{onSession?<button type="button" onClick={()=>{setOpen(false);onSession(s.id);}}>{displayName(s.title)}</button>:<a href={`/sessions/${encodeURIComponent(s.id)}`}>{displayName(s.title)}</a>}<strong>{number(s.totalTokens)} · {t("周命中 {0}",rate(cacheRate(s.inputTokens,s.cachedInputTokens)))}</strong></li>)}</ol>:<p>{data?.quotaCycle?t("本轮暂无已记录消耗。"):t("重置时间未知，暂不计算本周排名。")}</p>}</section>}
         </>}
+        {data?.quotaCycle?.boundaryIncomplete&&<p className="usage-data-note" role="status">{t("跨越重置时刻且无法精确拆分的用量未计入本轮。")}</p>}
+        {!!data?.discontinuities&&<p className="usage-data-note" role="status">{t("检测到计数不连续，缺失区间未估算。")}</p>}
+        <details className="usage-basis"><summary>{t("统计说明")}</summary>
+          <p>{t("账号额度由同账号的多个设备和会话共享，不能按 token 比例归属到某个项目。")}</p>
+          {data?.quotaCycle?<p>{t("当前周额度周期：{0} 至 {1}",date(data.quotaCycle.startsAt),date(data.quotaCycle.resetsAt))}</p>:codex&&<p>{t("尚未获取有效的下次周额度重置时间，暂不计算本轮用量。")}</p>}
+          <p>{t(claude ? "仅统计当前 Claude Code 项目或会话已上报的 token，不代表账号额度；未同步的历史消耗未估算。" : grok ? "Grok 用量取自原生持久记录；接入前的历史不回填，缓存和推理已包含在总量中。" : "本轮按下次周额度重置时间倒推 7 天计算，仅包含已记录用量，不等于账号官方额度消耗。缓存和推理明细不能再次加到总量。")}</p>
+          <p>{t("缓存输入 ÷ 输入 token")}</p>
+          {data?.recorded&&<p>{t("开始记录：{0}",data.firstObservedAt?date(data.firstObservedAt):"—")}<br/>{t("最近上报：{0}",data.lastObservedAt?date(data.lastObservedAt):"—")}</p>}
+        </details>
       </div>
       {mobile&&<footer className="usage-dialog-footer"><button type="button" className="button button--quiet" onClick={()=>setOpen(false)}>{t("关闭用量")}</button></footer>}
     </dialog>,document.body)}

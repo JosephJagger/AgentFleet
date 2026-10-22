@@ -1,3 +1,4 @@
+import { TurnUsage } from "./components/TurnUsage";
 import { sessionLocation } from "./lib/project-tree";
 import {GrokNativePanel} from "./components/GrokNativePanel";
 import {ComposerCommandPalette,type CommandPaletteHandle} from "./components/ComposerCommandPalette";
@@ -638,8 +639,9 @@ function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; se
         <article className={`timeline-event timeline-event--${event.actor ?? "system"}`} key={event.id} data-scroll-anchor={event.id}>
           <span className="timeline-event__node"><EventIcon event={event} /></span>
           <div className="timeline-event__head">
-            <strong>{displayName((event.title === "Codex" ? agentName(provider) : systemText(event.title?.replace(/^Codex/, agentName(provider)))) || (event.actor === "user" ? t("你") : event.actor === "agent" ? agentName(provider) : event.type))}{event.type === "turn.completed" && <span className="timeline-event__turn-tokens"> · {event.turnTokens == null ? t("本轮 token 未记录") : t("本轮消耗 {0} tokens", new Intl.NumberFormat(locale()).format(event.turnTokens))} · {event.turnCacheHitRate == null ? t("缓存命中率未记录") : t("缓存命中率 {0}%", new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(event.turnCacheHitRate))}</span>}</strong>
+            <strong>{displayName((event.title === "Codex" ? agentName(provider) : systemText(event.title?.replace(/^Codex/, agentName(provider)))) || (event.actor === "user" ? t("你") : event.actor === "agent" ? agentName(provider) : event.type))}</strong>
             <time>{new Date(event.occurredAt).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</time>
+            {event.type === "turn.completed" && <TurnUsage tokens={event.turnTokens} cacheHitRate={event.turnCacheHitRate} />}
           </div>
           {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} sessionId={sessionId} /> : event.actor === "user" ? <UserMessage body={event.body} /> : <p>{event.body}</p> : null}
           {event.payloadState !== "deleted" && Boolean(event.images?.length) && <MessageImages images={event.images!} />}
@@ -1187,7 +1189,7 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
         {fileDraft.processing && <p className="image-draft-notice" role="status">{t("正在读取文件…")}</p>}
         {imageDraft.error && <p className="image-draft-notice" role="alert">{systemText(imageDraft.error)}</p>}
         {fileDraft.error && <p className="image-draft-notice" role="alert">{systemText(fileDraft.error)}</p>}
-        {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("当前智能体暂不可接收图片，请检查其原生版本、模型及主机连接服务") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("图片已处理为发送尺寸 · 可点击预览 · 最多 4 张")}</p>}
+        {imageDraft.images.length > 0 && <p className="image-draft-notice">{!session.imageInputSupported ? t("当前智能体暂不可接收图片，请检查其原生版本、模型及主机连接服务") : slashCommand ? t("图片请搭配普通消息发送，不与 / 命令一起执行") : t("点击预览 · 最多 4 张")}</p>}
         {completions.length > 0 && <CompletionSurface anchor={textArea}><div className={`prompt-completions-shell${completions.some(item => item.kind === "rewrite") ? " prompt-completions-shell--rewrite" : ""}`}><div className="prompt-completions" role="listbox" id="prompt-completions" aria-label={completions[0]?.kind === "plugin" ? t("插件") : t("编程提示语补全")}>
           <div className="prompt-completions__head" role="presentation">{completions[0]?.kind === "plugin" ? <Puzzle size={14} aria-hidden="true" /> : <Code2 size={14} aria-hidden="true" />}<span>{completions[0]?.kind === "plugin" ? t("插件") : t("输入建议")}</span><kbd>Tab</kbd><span className="prompt-completions__touch">{t("点击采用")}</span></div>
           {completions.map((completion, index) => <button
@@ -1914,7 +1916,7 @@ function App() {
         <main className="fleet-main">
           <div className="catalog-toggle-bar"><button type="button" className="catalog-toggle" aria-label={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话")} title={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话，让对话更宽")} aria-expanded={!catalogCollapsed} aria-controls="workbench-catalog" onClick={() => setCatalogCollapsed((value) => !value)}>{catalogCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}<span>{catalogCollapsed ? t("展开") : t("收起列表")}</span></button></div>
           <div id="workbench-catalog" className="fleet-catalog-content" role="region" aria-label={t("项目与会话列表")} tabIndex={0}>
-          {selectedMachine && <><MachineSummaryHeader machine={selectedMachine} onAliasChange={updateMachineAlias} provider={selectedProvider} onProviderChange={selectProvider} /><button className="catalog-more" type="button" onClick={() => setView("hosts")}>{t("管理主机与默认设置")}</button>{selectedMachine.discovery?.state !== "ready" && <DiscoveryStatus discovery={selectedMachine.discovery} />}</>}
+          {selectedMachine && <><MachineSummaryHeader machine={selectedMachine} onAliasChange={updateMachineAlias} provider={selectedProvider} onProviderChange={selectProvider} /><button className="catalog-more" type="button" onClick={() => setView("hosts")}>{t("主机设置")}</button>{selectedMachine.discovery?.state !== "ready" && <DiscoveryStatus discovery={selectedMachine.discovery} />}</>}
           {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog key={`${selectedMachineId}:${selectedProvider}`} provider={selectedProvider} machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} onSchedule={project => openScheduled(project.id)} />}
           </div>
         </main>

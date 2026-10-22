@@ -1,0 +1,142 @@
+/* Repeated usage summaries carry the figures; definitions live in one disclosure. */
+.usage-trigger--tokens .usage-trigger-metrics {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-trigger--tokens .usage-trigger-metrics > span {
+  white-space: nowrap;
+}
+
+.usage-trigger--tokens .usage-trigger-metrics > span + span::before {
+  content: "·";
+  margin-inline-end: 6px;
+  color: var(--muted);
+}
+
+.usage-trigger--tokens .usage-trigger-metrics > small {
+  color: var(--muted);
+  font-size: inherit;
+}
+
+.project-usage .usage-trigger--tokens .usage-trigger-metrics > small::before {
+  content: none;
+}
+
+.usage-summary-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.usage-body .usage-summary-heading > h3 {
+  margin: 0;
+}
+
+.usage-summary-heading > small,
+.usage-unit-key,
+.usage-coverage {
+  color: var(--muted);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.usage-unit-key {
+  margin: 0 0 10px;
+  text-align: end;
+}
+
+.usage-view .usage-overview-cards strong > sup {
+  margin-left: 3px;
+  color: var(--muted);
+  font-size: .7em;
+}
+
+.usage-basis {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--text-caption);
+  line-height: 1.65;
+}
+
+.usage-basis > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink);
+}
+
+.usage-basis > summary::-webkit-details-marker {
+  display: none;
+}
+
+.usage-basis > summary::before {
+  content: "›";
+  font-size: 1.25em;
+}
+
+.usage-basis[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.usage-basis > summary:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 2px;
+}
+
+.usage-basis > p {
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+}
+
+.usage-data-note {
+  padding: 10px 12px;
+  border-inline-start: 2px solid var(--amber);
+  background: var(--amber-soft);
+  color: var(--ink);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+
+.usage-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .usage-mobile-summary .usage-totals > div:last-child:nth-child(3) {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+
+  .usage-mobile-summary .usage-totals > div:last-child:nth-child(3) dd {
+    margin: 0;
+  }
+
+  .usage-mobile-summary > .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .usage-body .usage-coverage {
+    margin-block: 12px;
+  }
+}

@@ -25,6 +25,9 @@ import "./session-toolbar.css";
 import "./theme-refinements.css";
 import "./panel-details.css";
 import "./panel-polish.css";
+import "./usage-clarity.css";
+import "./theme-clarity.css";
+import "./mobile-clarity.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
