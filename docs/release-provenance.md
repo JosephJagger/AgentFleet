@@ -12,7 +12,7 @@ A worktree protects source edits from another worktree. It does not protect a sh
    # Or --mode control-plane for backend + web, --mode full for a full application build.
    ```
 
-   This requires a completely clean main worktree (including untracked files), exports the exact full commit with `git archive` into a temporary build directory, pins the current live image, and writes a receipt only after a successful build and recheck. Ignored local secrets and generated files never enter the archive. The receipt binds the source SHA/tree, base image, build mode and resulting immutable image digest. Application changes outside the chosen build mode are rejected; identity has a separate coordinated deployment procedure.
+   This requires a completely clean main worktree (including untracked files), exports the exact full commit with `git archive` into a temporary build directory, pins the current live image, and writes a receipt only after a successful build and recheck. Ignored local secrets and generated files never enter the archive. The receipt binds the source SHA/tree, base image, build mode and resulting immutable image digest. Full builds preserve the pinned live image’s versioned downloads, reject conflicting immutable filenames, and replace only the two mutable manifests (`manifest.json` and `codex-manifest.json`). Application changes outside the chosen build mode are rejected; identity has a separate coordinated deployment procedure.
 
 3. Publish the printed image tag/digest from the same canonical worktree:
 

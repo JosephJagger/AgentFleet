@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
+# The guarded preparer pins this to the current live image. Fresh installs start empty.
+ARG BASE_IMAGE=node:24-bookworm-slim
+
 FROM node:24-bookworm-slim AS web-build
 WORKDIR /build/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
@@ -109,6 +112,16 @@ RUN tar -xzf /build/bwrap-validated.tar.gz -C /build/codex-smoke --no-same-owner
 
 RUN node /build/packaging/prepare-code-mode.mjs /build/release
 
+FROM ${BASE_IMAGE} AS previous-downloads
+USER root
+RUN mkdir -p /app/web/downloads
+
+FROM node:24-bookworm-slim AS release-downloads
+COPY --from=previous-downloads /app/web/downloads/ /build/downloads/
+COPY --from=local-agent-release /build/release/ /build/new-release/
+COPY packaging/merge-release-downloads.mjs /build/merge-release-downloads.mjs
+RUN node /build/merge-release-downloads.mjs /build/downloads /build/new-release
+
 FROM node:24-bookworm-slim AS runtime
 ARG AGENTFLEET_BUILD_SHA=unknown
 ENV NODE_ENV=production \
@@ -128,7 +141,7 @@ COPY --from=control-plane-build --chown=agentfleet:agentfleet /build/apps/contro
 COPY --from=control-plane-deps --chown=agentfleet:agentfleet /build/apps/control-plane/node_modules ./control-plane/node_modules
 COPY --from=control-plane-build --chown=agentfleet:agentfleet /build/apps/control-plane/dist ./control-plane/dist
 COPY --from=web-build --chown=agentfleet:agentfleet /build/apps/web/dist ./web
-COPY --from=local-agent-release --chown=agentfleet:agentfleet /build/release/ ./web/downloads/
+COPY --from=release-downloads --chown=agentfleet:agentfleet /build/downloads/ ./web/downloads/
 COPY --chown=agentfleet:agentfleet --chmod=0555 packaging/install.sh ./web/install
 COPY --chown=agentfleet:agentfleet --chmod=0555 packaging/install-macos.sh ./web/install-macos
 COPY --chown=agentfleet:agentfleet packaging/install.ps1 ./web/install.ps1
