@@ -156,6 +156,66 @@
   :root[data-theme="buzhoushan"] .buzhou-quota-card--forecast { border-left-color: var(--cobalt); }
   :root[data-theme="buzhoushan"] .buzhou-session-window[aria-pressed="true"] { border-color: var(--cobalt); }
   :root[data-theme="buzhoushan"] .composer-input { border-color: var(--clarity-frame); }
+
+  /* Usage is secondary information, but still needs a readable floor in the
+     narrow catalog. Its numeric values share the label size and weight. */
+  :root[data-theme="buzhoushan"] .usage-trigger--tokens .usage-trigger-metrics,
+  :root[data-theme="buzhoushan"] .session-row__tokens {
+    font-size: var(--buzhou-ui-helper);
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  /* The sidebar already shows reset dates and forecast notes. The session
+     toolbar keeps the live quota and opens those same details on demand. */
+  :root[data-theme="buzhoushan"] .inspector-head--compact :is(.inspector-context, .history-mark) { display: none; }
+  :root[data-theme="buzhoushan"] .inspector-head--compact .session-heading { flex: 1 1 180px; min-width: 120px; }
+  :root[data-theme="buzhoushan"] .inspector-head--compact .state-pill { flex: none; white-space: nowrap; }
+  :root[data-theme="buzhoushan"] .inspector-head--compact .buzhou-session-quota {
+    flex: 0 1 auto;
+    max-width: none;
+    gap: 8px;
+    margin: 0;
+  }
+  :root[data-theme="buzhoushan"] .inspector-head--compact .buzhou-quota-card {
+    flex: 0 1 auto;
+    padding: 3px 8px;
+    gap: 0;
+  }
+  :root[data-theme="buzhoushan"] .inspector-head--compact .buzhou-quota-card > span:first-child {
+    flex-wrap: nowrap;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  :root[data-theme="buzhoushan"] .inspector-head--compact .buzhou-quota-card > :is(small, .host-quota-meter) { display: none; }
+  :root[data-theme="buzhoushan"] .inspector-head--compact .buzhou-quota-card .buzhou-full-label { display: none; }
+  :root[data-theme="buzhoushan"] .inspector-head--compact .buzhou-quota-card .buzhou-focus-label { display: inline; }
+
+  /* Normal 1440px windows reserve a dedicated metadata line. Wide workspaces
+     and broadcast focus retain their single-row toolbar. */
+  @container host-editor (max-width: 1200px) {
+    :root[data-theme="buzhoushan"] :where(.app-shell:not(.buzhou-focus)) .inspector-head--compact {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) auto;
+      gap: 6px 12px;
+      padding: 8px 14px;
+    }
+    :root[data-theme="buzhoushan"] :where(.app-shell:not(.buzhou-focus)) .inspector-head--compact .session-heading {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    :root[data-theme="buzhoushan"] :where(.app-shell:not(.buzhou-focus)) .inspector-head--compact .inspector-head__actions {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    :root[data-theme="buzhoushan"] :where(.app-shell:not(.buzhou-focus)) .inspector-head--compact .session-facts {
+      display: flex;
+      grid-column: 1 / -1;
+      grid-row: 2;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+    }
+  }
 }
 
 @media (prefers-contrast: more) {

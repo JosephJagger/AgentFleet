@@ -21,3 +21,19 @@
   :root .composer-add-popover__head > strong { font-size: .8125rem; letter-spacing: 0; }
   :root .composer-add-popover b { font-size: .875rem; font-weight: 600; }
 }
+
+/* The live theme has an additional voice control. On very narrow phones,
+   keep the emblem and every touch target; the full brand remains accessible. */
+@media (max-width: 360px) {
+  :root[data-theme="buzhoushan"] .topbar .brand-lockup > span:last-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  :root[data-theme="buzhoushan"] .topbar .brand-lockup { flex: none; gap: 0; }
+}
