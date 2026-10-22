@@ -1,0 +1,69 @@
+/* Shared finishing details. Theme materials are supplied by theme-refinements.css.
+   Keep structural geometry, IP artwork and the compact workbench intact. */
+:root[data-theme] :is(.agent-picker-menu, .session-actions-popover, .composer-add-popover) {
+  border-color: var(--finish-edge, var(--line-strong));
+  box-shadow: var(--finish-float-shadow, var(--shadow));
+}
+:root[data-theme] :is(.modal, .activity-panel, .session-config-dialog, .usage-dialog) {
+  box-shadow: var(--finish-float-shadow, var(--shadow));
+  overscroll-behavior: contain;
+}
+:root :is(.activity-list, .session-config-body, .usage-body, .composer-add-popover, .agent-picker-menu) {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+:root :is(.agent-picker-menu, .session-actions-popover, .composer-add-popover) button:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: -2px;
+}
+/* This is a data card even though its trigger is a button. */
+:root[data-theme="official"] .machine-summary__actions > .usage-trigger--machine-rich { border-radius: var(--radius-md); }
+/* Long labels and attached filenames must yield before the action beside them. */
+:root .attachment-chip > span { min-width: 0; }
+:root .attachment-chip :is(button, small) { flex-shrink: 0; }
+:root .composer-add-popover small { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+:root .composer-add-popover__head { gap: 12px; }
+:root .composer-add-popover__head > strong { letter-spacing: .02em; }
+:root .agent-picker-menu__label { border-bottom: 1px solid var(--line); margin: 0 4px 4px; padding-inline: 6px; }
+:root .agent-picker-option__copy small { overflow-wrap: anywhere; }
+:root .agent-picker-option:disabled { opacity: .65; }
+:root .activity-item__copy { min-width: 0; }
+:root .activity-panel h2 > span { font-family: inherit; font-size: .85em; font-weight: 500; }
+/* Reading surfaces retain the theme's frame, with quiet dividers and crisp code. */
+:root .message-markdown__body a { text-underline-offset: .2em; text-decoration-thickness: 1px; }
+:root .markdown-code__header { min-height: 40px; }
+:root .markdown-code__header > span { font-family: var(--mono); font-size: var(--text-caption); }
+:root :is(.markdown-table, .markdown-code pre, .command-execution__log) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  overscroll-behavior-x: contain;
+}
+/* Feedback uses color instead of shifting the target under a pointer. */
+@media (hover: hover) and (pointer: fine) {
+  :root .session-actions-popover .button:hover:not(:disabled),
+  :root .composer-add-popover > button:hover:not(:disabled) { background: var(--cobalt-soft); }
+  :root .markdown-code__header button:hover { background: var(--cobalt-soft); }
+}
+@media (max-width: 900px) {
+  /* Compact desktop icon sizes must not become small mobile touch targets. */
+  :root .inspector-head--compact .inspector-head__actions > :is(.button, .icon-button),
+  :root .inspector-head--compact .session-config-trigger { min-width: 44px; min-height: 44px; height: 44px; padding: 8px; }
+  :root .host-agent-toolbar .agent-picker-trigger { min-height: 44px; }
+  :root .buzhou-session-toggle button { min-height: 44px; }
+  :root .composer-add-popover { position: fixed; left: 12px; right: 12px; bottom: max(12px, calc(100dvh - var(--visible-height, 100dvh) - var(--visible-top, 0px) + 76px)); width: auto; max-height: max(120px, calc(var(--visible-height, 100dvh) - 156px)); background: var(--paper-solid); }
+  :root .composer-add-popover__head { position: sticky; top: -12px; z-index: 1; margin-top: -12px; padding-block: 8px 4px; background: var(--paper-solid); }
+  :root .composer-add-popover__close { display: grid; }
+  :root .attachment-chip button { min-width: 36px; min-height: 36px; }
+  :root .message-image .message-image-remove { min-width: 32px; min-height: 32px; color: var(--ink); }
+  :root .command-execution__header { flex-wrap: wrap; row-gap: 2px; }
+  :root .command-execution__header .command-execution__toggle { min-width: 100px; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root :is(.composer-add-popover, .agent-picker-menu, .session-actions-popover) { background: var(--paper-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  :root .machine-rail .rail-status { background: var(--canvas); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  :root :is(.composer-add-popover, .agent-picker-menu, .session-actions-popover) { border-color: var(--ink); }
+  :root .agent-picker-option:disabled { opacity: 1; color: var(--muted); }
+}
