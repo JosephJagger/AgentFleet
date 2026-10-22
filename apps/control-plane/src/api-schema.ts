@@ -204,6 +204,7 @@ export interface AgentCapabilities {
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
   sshAccess?: boolean;
+  sshRoutes?: boolean;
   worktrees?: boolean;
   worktreeFork?: boolean;
   commandTypes?: string[];

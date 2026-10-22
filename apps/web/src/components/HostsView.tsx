@@ -87,7 +87,7 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
     <SettingsSections label={t("主机管理分类")} value={section} onChange={setSection} items={[
       {id:"overview",label:t("状态与连接"),icon:<Server size={18}/>},
       {id:"environment",label:t("账号与工具"),icon:<Server size={18}/>},
-      {id:"ssh",label:t("SSH 互通"),icon:<KeyRound size={18}/>},
+      {id:"ssh",label:t("主机互通"),icon:<KeyRound size={18}/>},
       {id:"storage",label:t("附件和版本"),icon:<Paperclip size={18}/>},
       {id:"guide",label:t("使用帮助"),icon:<BookOpen size={18}/>},
     ]}/>

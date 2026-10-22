@@ -979,6 +979,16 @@ html[data-keyboard-open] .inspector-head { min-height: 60px; }
 .ssh-check { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 9px; font-size: var(--text-small); background: var(--line); color: var(--muted); }
 .ssh-check--ok { background: var(--green-soft, #e3f4e8); color: var(--green, #1f7a3d); }
 .ssh-check--bad { background: var(--red-soft); color: var(--red); }
+.host-ssh__grid--route { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.host-links { display: grid; gap: 10px; }
+.host-links h3 { margin: 0; }
+.host-links__scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.host-links table { width: 100%; border-collapse: collapse; font-size: var(--text-small); }
+.host-links th, .host-links td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.host-links tbody tr:last-child > * { border-bottom: 0; }
+.host-links thead th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.host-links tbody th small, .host-links td small { display: block; margin-top: 4px; color: var(--muted); overflow-wrap: anywhere; }
+.host-links__self { color: var(--muted); }
 @media (max-width: 720px) { .host-ssh__grid { grid-template-columns: 1fr; } .host-ssh__heading { flex-direction: column; } }
 
 /* Git worktree lanes */

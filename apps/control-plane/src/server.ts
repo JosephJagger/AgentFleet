@@ -85,6 +85,7 @@ interface AgentSocketState {
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
   sshAccess?: boolean;
+  sshRoutes?: boolean;
   worktrees?: boolean;
   worktreeFork?: boolean;
   verifiedVoiceBinding?: PanelTransportBinding;
@@ -658,11 +659,17 @@ export async function buildControlPlane(
     return { key: agent.socket, ready: agent.reconciliationReady, supported: agent.sshAccess === true, send: value => sendJson(agent.socket, value) };
   });
   app.addHook("onClose", async () => sshBroker.close());
+  // What a host's connection service can do, so accounts it could not honour (e.g. jump hops on an older agent) are withheld.
+  const sshCapability = (machineId: string) => {
+    const agent = agents.get(machineId);
+    const connected = Boolean(agent && agent.socket.readyState === WebSocket.OPEN);
+    return { connected, ssh: connected && agent!.sshAccess === true, routes: connected && agent!.sshRoutes === true };
+  };
   // Push the complete desired state; the host replaces its managed SSH directory atomically.
   const syncSsh = async (machineId: string) => {
     if (!sshBroker.available(machineId)) return;
     const revision = sshAccess.revision();
-    try { sshAccess.recordSync(machineId, revision, await sshBroker.request(machineId, { action: "sync", revision, accounts: sshAccess.desired(machineId) }, 60_000)); }
+    try { sshAccess.recordSync(machineId, revision, await sshBroker.request(machineId, { action: "sync", revision, accounts: sshAccess.desired(machineId, true, { routes: sshCapability(machineId).routes }) }, 60_000)); }
     catch (error) { app.log.warn({ machineId, code: error instanceof AppError ? error.code : undefined }, "SSH access sync failed"); }
   };
   const syncSshWorkspace = (workspaceId: string) => Promise.all(sshAccess.machinesIn(workspaceId).map(machine => syncSsh(machine.machine_id)));
@@ -678,7 +685,8 @@ export async function buildControlPlane(
     return { accounts: sshAccess.list(request.principal as Principal, typeof query.machineId === "string" ? query.machineId : undefined) };
   });
   app.get("/api/machines/:id/ssh-reachable", { preHandler: authenticate }, async request =>
-    ({ accounts: sshAccess.reachable(request.principal as Principal, routeId(request)) }));
+    ({ accounts: sshAccess.reachable(request.principal as Principal, routeId(request), { routes: sshCapability(routeId(request)).routes }) }));
+  app.get("/api/ssh-links", { preHandler: authenticate }, async request => sshAccess.matrix(request.principal as Principal, sshCapability));
   const saveSsh = async (principal: Principal, body: Record<string, unknown>, accountId?: string) => {
     auth.requirePlatformAdmin(principal);
     const saved = sshAccess.save(principal, body, accountId);
@@ -710,12 +718,23 @@ export async function buildControlPlane(
     auth.requirePlatformAdmin(principal);
     limiter.check(`ssh-test:${principal.userId}`, 10, 60_000);
     const account = sshAccess.get(principal, routeId(request));
-    const sources = sshAccess.machinesIn(principal.workspaceId).filter(machine => machine.machine_id !== account.machineId && (!account.sources.length || account.sources.includes(machine.machine_id)));
+    // Only hosts that were actually given this account can run the test; withheld ones show their reason in the matrix.
+    const planned = new Map<string, "direct" | "proxyjump">();
+    for (const machine of sshAccess.machinesIn(principal.workspaceId)) {
+      if (machine.machine_id === account.machineId) continue;
+      const entry = sshAccess.desired(machine.machine_id, false, { routes: sshCapability(machine.machine_id).routes }).find(item => item.id === account.id);
+      if (entry) planned.set(machine.machine_id, entry.proxyJump ? "proxyjump" : "direct");
+    }
+    const sources = sshAccess.machinesIn(principal.workspaceId).filter(machine => planned.has(machine.machine_id));
     const results: SshTestResult[] = await Promise.all(sources.map(async machine => {
+      const path = planned.get(machine.machine_id)!;
+      let result: SshTestResult;
       try {
         const value = record(await sshBroker.request(machine.machine_id, { action: "test", alias: account.alias }, 30_000));
-        return { machineId: machine.machine_id, machineName: machine.name, ok: value.ok === true, ...(Number.isSafeInteger(value.durationMs) ? { durationMs: Number(value.durationMs) } : {}), ...(typeof value.error === "string" ? { error: value.error.slice(0, 300) } : {}) };
-      } catch (error) { return { machineId: machine.machine_id, machineName: machine.name, ok: false, error: error instanceof AppError ? error.message : "测试失败" }; }
+        result = { machineId: machine.machine_id, machineName: machine.name, ok: value.ok === true, path, ...(Number.isSafeInteger(value.durationMs) ? { durationMs: Number(value.durationMs) } : {}), ...(typeof value.error === "string" ? { error: value.error.slice(0, 300) } : {}) };
+      } catch (error) { result = { machineId: machine.machine_id, machineName: machine.name, ok: false, path, error: error instanceof AppError ? error.message : "测试失败" }; }
+      sshAccess.recordTest(account.id, machine.machine_id, result, path);
+      return result;
     }));
     return { results };
   });
@@ -1981,6 +2000,7 @@ export async function buildControlPlane(
             state.realtimeVoice = message.capabilities?.realtimeVoice === true;
             state.conversationHistory = message.capabilities?.conversationHistory === true;
             state.sshAccess = message.capabilities?.sshAccess === true;
+            state.sshRoutes = message.capabilities?.sshRoutes === true;
             state.worktrees = message.capabilities?.worktrees === true;
             state.worktreeFork = message.capabilities?.worktreeFork === true;
             delete state.reconciliationId;

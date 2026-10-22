@@ -800,7 +800,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 68) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 69) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1646,6 +1646,23 @@ export class ControlPlaneDatabase {
       if (!columns.has("worktree_removed")) this.sqlite.exec("ALTER TABLE projects ADD COLUMN worktree_removed INTEGER NOT NULL DEFAULT 0 CHECK (worktree_removed IN (0,1))");
       if(this.all("PRAGMA foreign_key_check").length)throw new Error('Worktree migration foreign-key violation');
       this.sqlite.exec("PRAGMA user_version=68");
+    });
+    if (version < 69) this.transaction(() => {
+      // Host interconnect routes: how a source host reaches an SSH target (direct, or hopping through another host), plus the
+      // latest per-source test outcome so the matrix survives restarts. 'auto' and 'relay' are reserved for the panel relay.
+      const columns = new Set(this.all<{ name: string }>("PRAGMA table_info(host_ssh_accounts)").map(row => row.name));
+      if (!columns.has("route")) this.sqlite.exec("ALTER TABLE host_ssh_accounts ADD COLUMN route TEXT NOT NULL DEFAULT 'direct' CHECK (route IN ('direct','auto','relay','proxyjump'))");
+      if (!columns.has("proxy_jump_machine_id")) this.sqlite.exec("ALTER TABLE host_ssh_accounts ADD COLUMN proxy_jump_machine_id TEXT REFERENCES machines(machine_id)");
+      this.sqlite.exec(`CREATE TABLE IF NOT EXISTS host_ssh_link_tests (
+        account_id TEXT NOT NULL REFERENCES host_ssh_accounts(account_id) ON DELETE CASCADE,
+        source_machine_id TEXT NOT NULL REFERENCES machines(machine_id) ON DELETE CASCADE,
+        ok INTEGER NOT NULL CHECK (ok IN (0,1)),
+        path TEXT NOT NULL DEFAULT 'direct' CHECK (path IN ('direct','proxyjump','relay')),
+        duration_ms INTEGER, error TEXT NOT NULL DEFAULT '', tested_at TEXT NOT NULL,
+        PRIMARY KEY(account_id,source_machine_id)
+      ) STRICT`);
+      if (this.all("PRAGMA foreign_key_check").length) throw new Error('Host interconnect migration foreign-key violation');
+      this.sqlite.exec("PRAGMA user_version=69");
     });
   }
 

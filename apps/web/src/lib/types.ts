@@ -397,16 +397,29 @@ export interface SshAccount {
   id: string; machineId: string; name: string; alias: string; algorithm: "ed25519" | "rsa" | "ecdsa"; username: string;
   address: string; port: number; effectiveAddress: string; publicKey: string; fingerprint: string;
   hasPrivateKey: boolean; hasPassphrase: boolean; hostKeyFingerprints: string[];
-  verification: { userExists?: boolean | null; authorized?: boolean | null; addresses?: string[]; port?: number | null; checkedAt?: string; error?: string };
+  verification: { userExists?: boolean | null; authorized?: boolean | null; addresses?: string[]; addressKinds?: Record<string, SshAddressKind>; port?: number | null; listening?: boolean | null; checkedAt?: string; error?: string };
+  route: SshRoute; proxyJumpMachineId: string | null;
   description: string; enabled: boolean; sources: string[];
   delivered: { machineId: string; ok: boolean; error?: string; syncedAt: string }[];
   createdAt: string; updatedAt: string;
 }
+export type SshAddressKind = "lan" | "public" | "overlay";
+export type SshRoute = "direct" | "proxyjump" | "auto" | "relay";
 export interface SshAccountInput {
+  route?: "direct" | "proxyjump"; proxyJumpMachineId?: string;
   machineId?: string; name?: string; algorithm?: SshAccount["algorithm"]; username: string; address: string; port: number;
   privateKey?: string; publicKey?: string; passphrase?: string; clearPassphrase?: boolean; description: string; enabled: boolean; sources: string[];
 }
-export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string }
+export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string; path?: "direct" | "proxyjump" }
+export type SshLinkState = "ok" | "failed" | "untested" | "excluded" | "unsupported";
+export interface SshMatrixSource {
+  machineId: string; machineName: string; agent: "ready" | "outdated" | "offline"; state: SshLinkState;
+  reason?: string; via?: string; delivered?: { ok: boolean; error?: string }; path?: string; testedAt?: string; durationMs?: number; error?: string;
+}
+export interface SshLinkMatrix {
+  hosts: { machineId: string; name: string; platform: string; supported: boolean }[];
+  links: { accountId: string; alias: string; targetMachineId: string; targetName: string; route: SshRoute; proxyJumpMachineId: string | null; enabled: boolean; sources: SshMatrixSource[] }[];
+}
 
 export interface WorktreeLane {
   path: string; branch: string; base: string; exists: boolean; dirtyFiles: number; ahead: number; behind: number; changedFiles: string[]; lastCommit: string;

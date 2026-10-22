@@ -7,7 +7,7 @@ import { SecretBox } from "./secret-box.js";
 
 /**
  * Hosts already own their SSH accounts and key pairs. The panel only records them (secrets encrypted at rest)
- * and distributes them to the workspace's other Linux hosts so their agents can `ssh af-<name>`.
+ * and distributes them to the workspace's other Linux and macOS hosts so their agents can `ssh af-<name>`.
  */
 export const SSH_ALGORITHMS = ["ed25519", "rsa", "ecdsa"] as const;
 export type SshAlgorithm = (typeof SSH_ALGORITHMS)[number];
@@ -16,7 +16,11 @@ const USERNAME = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}$/;
 const ADDRESS = /^[A-Za-z0-9.:%[\]-]{1,253}$/;
 const MAX_PRIVATE_KEY = 16_384;
 
-export const isLinuxPlatform = (platform: string | null | undefined) => ["linux", "ubuntu"].includes(String(platform).toLowerCase());
+export const isSshPlatform = (platform: string | null | undefined) => ["linux", "ubuntu", "darwin", "macos"].includes(String(platform).toLowerCase());
+/** Routes a user may select today. 'auto' and 'relay' exist in the schema for the panel relay but are not offered yet. */
+export const SSH_ROUTES = ["direct", "proxyjump"] as const;
+export type SshRoute = (typeof SSH_ROUTES)[number];
+export const ADDRESS_KINDS = ["lan", "public", "overlay"] as const;
 export const sshAlias = (name: string) => `af-${name.toLowerCase()}`;
 
 function readString(buffer: Buffer, offset: number): { value: Buffer; next: number } {
@@ -88,14 +92,29 @@ interface AccountRow {
   account_id: string; workspace_id: string; machine_id: string; name: string; algorithm: SshAlgorithm; username: string;
   address: string; port: number; public_key: string; fingerprint: string; encrypted_private_key: string; encrypted_passphrase: string;
   host_keys_json: string; verification_json: string; description: string; enabled: number; created_at: string; updated_at: string;
+  route: string; proxy_jump_machine_id: string | null;
 }
-export interface SshInspection { userExists: boolean | null; authorized: boolean | null; addresses: string[]; port: number | null; checkedAt: string; error?: string }
+export interface SshInspection {
+  userExists: boolean | null; authorized: boolean | null; addresses: string[]; addressKinds?: Record<string, string>; port: number | null;
+  /** Whether sshd accepts connections on this host (macOS: Remote Login enabled). */
+  listening?: boolean | null; checkedAt: string; error?: string;
+}
 export interface SshDesiredAccount {
   id: string; alias: string; name: string; targetName: string; username: string; hostname: string; port: number;
   publicKey: string; privateKey: string; passphrase: string; hostKeys: string[]; description: string;
+  /** Alias of the direct account this connection hops through; absent for direct routes. */
+  proxyJump?: string;
 }
 export interface SshSyncResult { accounts: Record<string, { ok: boolean; error?: string }> }
-export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string }
+export interface SshTestResult { machineId: string; machineName: string; ok: boolean; durationMs?: number; error?: string; path?: "direct" | "proxyjump" }
+export type SshExclusion = "disabled" | "not_allowed" | "target_unsupported" | "no_address" | "jump_missing" | "routes_unsupported";
+export type SshLinkState = "ok" | "failed" | "untested" | "excluded" | "unsupported";
+/** One cell of the matrix: a source host's standing for one target account. */
+export interface SshMatrixSource {
+  machineId: string; machineName: string; agent: "ready" | "outdated" | "offline"; state: SshLinkState;
+  reason?: string; via?: string; delivered?: { ok: boolean; error?: string };
+  path?: string; testedAt?: string; durationMs?: number; error?: string;
+}
 
 /** Sends one request to one host's connection service and resolves with its `ssh.result`. */
 export interface SshEndpoint { key: object; ready: boolean; supported: boolean; send: (value: Record<string, unknown>) => boolean }
@@ -136,6 +155,7 @@ export class SshAccessBroker {
   }
 }
 
+interface PlanEntry { row: AccountRow & { target_name: string; target_platform: string; target_state: string }; hostname?: string; excluded?: SshExclusion; jumpAlias?: string }
 const text = (value: unknown, max: number) => typeof value === "string" && value.length <= max ? value : undefined;
 const stringList = (value: unknown, max: number, each: number) => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length <= each).slice(0, max) : [];
 
@@ -144,9 +164,12 @@ export function parseInspection(value: unknown): SshInspection & { hostKeys: str
   const raw = value as Record<string, unknown>;
   const flag = (item: unknown) => typeof item === "boolean" ? item : null;
   const hostKeys = stringList(raw.hostKeys, 8, 2048).flatMap(line => { try { return [parseSshPublicKey(line).line]; } catch { return []; } });
+  const addresses = stringList(raw.addresses, 16, 64).filter(address => ADDRESS.test(address));
+  const kinds = raw.addressKinds && typeof raw.addressKinds === "object" && !Array.isArray(raw.addressKinds) ? raw.addressKinds as Record<string, unknown> : {};
+  const addressKinds = Object.fromEntries(addresses.flatMap(address => (ADDRESS_KINDS as readonly unknown[]).includes(kinds[address]) ? [[address, kinds[address] as string]] : []));
   return {
     userExists: flag(raw.userExists), authorized: flag(raw.authorized),
-    addresses: stringList(raw.addresses, 16, 64).filter(address => ADDRESS.test(address)),
+    addresses, ...(Object.keys(addressKinds).length ? { addressKinds } : {}), listening: flag(raw.listening),
     port: Number.isSafeInteger(raw.port) && Number(raw.port) > 0 && Number(raw.port) < 65536 ? Number(raw.port) : null,
     checkedAt: nowIso(), hostKeys,
   };
@@ -185,6 +208,7 @@ export class SshAccessService {
       address: row.address, port: row.port, effectiveAddress: row.address || verification.addresses?.[0] || "",
       publicKey: row.public_key, fingerprint: row.fingerprint, hasPrivateKey: Boolean(row.encrypted_private_key), hasPassphrase: Boolean(row.encrypted_passphrase),
       hostKeyFingerprints: hostKeys.map(line => parseSshPublicKey(line).fingerprint), verification, description: row.description,
+      route: row.route, proxyJumpMachineId: row.proxy_jump_machine_id,
       enabled: row.enabled === 1, sources, delivered, createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }
@@ -197,9 +221,9 @@ export class SshAccessService {
   }
 
   /** Accounts the given host may use, as aliases only; secrets never leave the server through this path. */
-  reachable(principal: Principal, sourceMachineId: string) {
+  reachable(principal: Principal, sourceMachineId: string, options: { routes?: boolean } = {}) {
     this.machine(principal, sourceMachineId);
-    return this.desired(sourceMachineId, false).map(({ privateKey: _p, passphrase: _s, ...account }) => account);
+    return this.desired(sourceMachineId, false, options).map(({ privateKey: _p, passphrase: _s, ...account }) => account);
   }
 
   get(principal: Principal, accountId: string) { return this.view(this.row(principal, accountId)); }
@@ -209,12 +233,12 @@ export class SshAccessService {
     const machineId = previous?.machine_id ?? text(body.machineId, 300);
     invariant(machineId, 400, "INVALID_INPUT", "machineId is required");
     const machine = this.machine(principal, machineId);
-    invariant(isLinuxPlatform(machine.platform), 409, "SSH_LINUX_ONLY", "SSH 互通暂仅支持 Linux 主机");
+    invariant(isSshPlatform(machine.platform), 409, "SSH_PLATFORM_UNSUPPORTED", "SSH 互通仅支持 Linux 和 macOS 主机");
     const automaticName = body.name === undefined && !previous;
     let name = body.name === undefined ? previous?.name ?? (aliasName(machine.display_alias ?? "") || aliasName(machine.name) || aliasName(machineId)) : text(body.name, 40)?.trim() ?? "";
     invariant(NAME.test(name), 400, "SSH_NAME_INVALID", "名称仅支持字母、数字、点、下划线和连字符，最长 40 位");
     const username = text(body.username, 32)?.trim() ?? "";
-    invariant(USERNAME.test(username), 400, "SSH_USERNAME_INVALID", "请填写有效的 Linux 用户名");
+    invariant(USERNAME.test(username), 400, "SSH_USERNAME_INVALID", "请填写有效的系统用户名");
     const address = text(body.address, 253)?.trim() ?? "";
     invariant(!address || ADDRESS.test(address), 400, "SSH_ADDRESS_INVALID", "地址应为主机名或 IP");
     const port = body.port === undefined || body.port === null || body.port === "" ? 22 : Number(body.port);
@@ -240,15 +264,32 @@ export class SshAccessService {
     if (derived) invariant(derived.blob.equals(publicKey.blob), 400, "SSH_KEY_MISMATCH", "私钥与公钥不匹配");
     if (!privateKey && previous) invariant(previous.public_key === publicKey.line, 400, "SSH_PRIVATE_KEY_REQUIRED", "更换公钥时请同时填写对应私钥");
 
+    const route = (body.route === undefined ? previous?.route ?? "direct" : body.route) as SshRoute;
+    invariant((SSH_ROUTES as readonly unknown[]).includes(route), 400, "SSH_ROUTE_INVALID", "暂不支持该路由方式");
+    let jumpMachineId: string | null = null;
+    if (route === "proxyjump") {
+      const requested = body.proxyJumpMachineId === undefined ? previous?.proxy_jump_machine_id ?? undefined : text(body.proxyJumpMachineId, 300);
+      invariant(requested, 400, "SSH_JUMP_REQUIRED", "请选择跳板机");
+      invariant(requested !== machineId, 400, "SSH_JUMP_INVALID", "跳板机不能是目标主机自身");
+      invariant(isSshPlatform(this.machine(principal, requested).platform), 409, "SSH_PLATFORM_UNSUPPORTED", "SSH 互通仅支持 Linux 和 macOS 主机");
+      invariant(this.db.get("SELECT 1 AS found FROM host_ssh_accounts WHERE workspace_id=? AND machine_id=? AND enabled=1 AND route='direct'", principal.workspaceId, requested),
+        409, "SSH_JUMP_ACCOUNT_REQUIRED", "跳板机需要先登记一个直连的 SSH 账号");
+      // Chains are never configured: a host that other accounts hop through must stay direct.
+      invariant(!this.db.get("SELECT 1 AS found FROM host_ssh_accounts WHERE workspace_id=? AND proxy_jump_machine_id=? AND account_id<>?", principal.workspaceId, machineId, previous?.account_id ?? ""),
+        409, "SSH_JUMP_IN_USE", "该主机正作为其他账号的跳板机，不能再经跳板连接");
+      jumpMachineId = requested;
+    }
     const sources = Array.isArray(body.sources) ? [...new Set(body.sources.filter((id): id is string => typeof id === "string"))] : undefined;
     for (const source of sources ?? []) {
       invariant(source !== machineId, 400, "SSH_SOURCE_INVALID", "无需授权主机访问自身");
-      invariant(isLinuxPlatform(this.machine(principal, source).platform), 409, "SSH_LINUX_ONLY", "SSH 互通暂仅支持 Linux 主机");
+      invariant(isSshPlatform(this.machine(principal, source).platform), 409, "SSH_PLATFORM_UNSUPPORTED", "SSH 互通仅支持 Linux 和 macOS 主机");
     }
     const enabled = body.enabled === false ? 0 : 1;
     const id = previous?.account_id ?? newId("ssh");
     const now = nowIso();
     const keyChanged = !previous || previous.public_key !== publicKey.line || previous.username !== username;
+    // Test outcomes describe a specific path; any change to it makes them stale.
+    const pathChanged = Boolean(previous) && (previous!.route !== route || previous!.proxy_jump_machine_id !== jumpMachineId || previous!.address !== address || previous!.port !== port);
     return this.db.transaction(() => {
       if (automaticName) {
         const base = name;
@@ -259,21 +300,22 @@ export class SshAccessService {
       invariant(!this.db.get("SELECT 1 AS found FROM host_ssh_accounts WHERE workspace_id=? AND name=? COLLATE NOCASE AND account_id<>?", principal.workspaceId, name, id), 409, "SSH_NAME_TAKEN", "名称已被使用");
       if (previous) this.db.run(
         `UPDATE host_ssh_accounts SET name=?,algorithm=?,username=?,address=?,port=?,public_key=?,fingerprint=?,encrypted_private_key=?,encrypted_passphrase=?,
-         verification_json=?,description=?,enabled=?,updated_at=? WHERE account_id=?`,
+         verification_json=?,description=?,enabled=?,route=?,proxy_jump_machine_id=?,updated_at=? WHERE account_id=?`,
         name, algorithm, username, address, port, publicKey.line, publicKey.fingerprint,
         privateKey ? this.secrets.encrypt(privateKey.text) : previous.encrypted_private_key, encryptedPassphrase,
-        keyChanged ? "{}" : previous.verification_json, description, enabled, now, id);
+        keyChanged ? "{}" : previous.verification_json, description, enabled, route, jumpMachineId, now, id);
       else this.db.run(
         `INSERT INTO host_ssh_accounts(account_id,workspace_id,machine_id,name,algorithm,username,address,port,public_key,fingerprint,
-         encrypted_private_key,encrypted_passphrase,description,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         encrypted_private_key,encrypted_passphrase,description,enabled,route,proxy_jump_machine_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, principal.workspaceId, machineId, name, algorithm, username, address, port, publicKey.line, publicKey.fingerprint,
-        this.secrets.encrypt(privateKey!.text), encryptedPassphrase, description, enabled, now, now);
+        this.secrets.encrypt(privateKey!.text), encryptedPassphrase, description, enabled, route, jumpMachineId, now, now);
+      if (previous && (keyChanged || pathChanged)) this.db.run("DELETE FROM host_ssh_link_tests WHERE account_id=?", id);
       if (sources) {
         this.db.run("DELETE FROM host_ssh_access WHERE account_id=?", id);
         for (const source of sources) this.db.run("INSERT INTO host_ssh_access(account_id,source_machine_id) VALUES(?,?)", id, source);
       }
       this.db.audit({ workspaceId: principal.workspaceId, actorUserId: principal.userId, actorClientSessionId: principal.clientSessionId, machineId,
-        action: previous ? "ssh.account.update" : "ssh.account.create", metadata: { accountId: id, name, username, fingerprint: publicKey.fingerprint, keyReplaced: Boolean(privateKey) } });
+        action: previous ? "ssh.account.update" : "ssh.account.create", metadata: { accountId: id, name, username, fingerprint: publicKey.fingerprint, keyReplaced: Boolean(privateKey), route, ...(jumpMachineId ? { jumpMachineId } : {}) } });
       return this.view(this.row(principal, id));
     });
   }
@@ -313,27 +355,101 @@ export class SshAccessService {
       machineId, revision, JSON.stringify(results), nowIso());
   }
 
-  /** The complete desired state for one source host. Disabled, revoked, non-Linux and out-of-scope targets are absent. */
-  desired(sourceMachineId: string, withSecrets = true): SshDesiredAccount[] {
+  /**
+   * Which accounts one source host gets, and why the others are left out. Both the sync and the matrix use this, so the
+   * panel never claims a link that the host was not actually given.
+   */
+  private plan(sourceMachineId: string, routes: boolean) {
     const source = this.db.get<{ workspace_id: string; platform: string; identity_state: string }>("SELECT workspace_id,platform,identity_state FROM machines WHERE machine_id=?", sourceMachineId);
-    if (!source || source.identity_state !== "active" || !isLinuxPlatform(source.platform)) return [];
-    const rows = this.db.all<AccountRow & { target_name: string; target_platform: string }>(
-      `SELECT a.*,m.name AS target_name,m.platform AS target_platform FROM host_ssh_accounts a JOIN machines m ON m.machine_id=a.machine_id
-       WHERE a.workspace_id=? AND a.enabled=1 AND a.machine_id<>? AND m.identity_state='active'
-         AND (NOT EXISTS(SELECT 1 FROM host_ssh_access s WHERE s.account_id=a.account_id)
-              OR EXISTS(SELECT 1 FROM host_ssh_access s WHERE s.account_id=a.account_id AND s.source_machine_id=?))
-       ORDER BY a.name`, source.workspace_id, sourceMachineId, sourceMachineId);
-    return rows.filter(row => isLinuxPlatform(row.target_platform)).flatMap(row => {
-      const verification = JSON.parse(row.verification_json) as Partial<SshInspection>;
-      const hostname = row.address || verification.addresses?.[0];
-      if (!hostname) return [];
+    if (!source || source.identity_state !== "active" || !isSshPlatform(source.platform)) return { source, entries: [] as PlanEntry[] };
+    const rows = this.db.all<AccountRow & { target_name: string; target_platform: string; target_state: string }>(
+      `SELECT a.*,m.name AS target_name,m.platform AS target_platform,m.identity_state AS target_state FROM host_ssh_accounts a JOIN machines m ON m.machine_id=a.machine_id
+       WHERE a.workspace_id=? AND a.machine_id<>? ORDER BY a.name`, source.workspace_id, sourceMachineId);
+    const allowed = new Map<string, Set<string>>();
+    for (const item of this.db.all<{ account_id: string; source_machine_id: string }>(
+      "SELECT s.account_id,s.source_machine_id FROM host_ssh_access s JOIN host_ssh_accounts a ON a.account_id=s.account_id WHERE a.workspace_id=?", source.workspace_id)) {
+      (allowed.get(item.account_id) ?? allowed.set(item.account_id, new Set()).get(item.account_id)!).add(item.source_machine_id);
+    }
+    const hostnameOf = (row: AccountRow) => row.address || (JSON.parse(row.verification_json) as Partial<SshInspection>).addresses?.[0];
+    const base = rows.map((row): PlanEntry => {
+      const scope = allowed.get(row.account_id);
+      const hostname = hostnameOf(row);
+      const excluded: SshExclusion | undefined = row.enabled !== 1 ? "disabled" : scope?.size && !scope.has(sourceMachineId) ? "not_allowed"
+        : row.target_state !== "active" || !isSshPlatform(row.target_platform) ? "target_unsupported" : !hostname ? "no_address" : undefined;
+      return { row, ...(hostname ? { hostname } : {}), ...(excluded ? { excluded } : {}) };
+    });
+    // A hop must itself be a usable direct account for this source; otherwise the account is withheld, never tried directly.
+    for (const entry of base) {
+      if (entry.excluded || entry.row.route !== "proxyjump") continue;
+      const jumpMachine = entry.row.proxy_jump_machine_id;
+      if (jumpMachine === sourceMachineId) continue;
+      const jump = base.find(candidate => !candidate.excluded && candidate.row.machine_id === jumpMachine && candidate.row.route === "direct");
+      if (!jump) entry.excluded = "jump_missing";
+      else if (!routes) entry.excluded = "routes_unsupported";
+      else entry.jumpAlias = sshAlias(jump.row.name);
+    }
+    return { source, entries: base };
+  }
+
+  /** The complete desired state for one source host. Disabled, revoked, unsupported and out-of-scope targets are absent. */
+  desired(sourceMachineId: string, withSecrets = true, options: { routes?: boolean } = {}): SshDesiredAccount[] {
+    return this.plan(sourceMachineId, options.routes !== false).entries.flatMap(({ row, hostname, excluded, jumpAlias }) => {
+      if (excluded || !hostname) return [];
       return [{
         id: row.account_id, alias: sshAlias(row.name), name: row.name, targetName: row.target_name, username: row.username, hostname, port: row.port,
         publicKey: row.public_key, privateKey: withSecrets ? this.secrets.decrypt(row.encrypted_private_key) : "",
         passphrase: withSecrets ? this.secrets.decrypt(row.encrypted_passphrase) : "",
         hostKeys: JSON.parse(row.host_keys_json) as string[], description: row.description,
+        ...(jumpAlias ? { proxyJump: jumpAlias } : {}),
       }];
     });
+  }
+
+  recordTest(accountId: string, sourceMachineId: string, result: { ok: boolean; durationMs?: number; error?: string }, path: "direct" | "proxyjump") {
+    this.db.run(`INSERT INTO host_ssh_link_tests(account_id,source_machine_id,ok,path,duration_ms,error,tested_at) VALUES(?,?,?,?,?,?,?)
+      ON CONFLICT(account_id,source_machine_id) DO UPDATE SET ok=excluded.ok,path=excluded.path,duration_ms=excluded.duration_ms,error=excluded.error,tested_at=excluded.tested_at`,
+      accountId, sourceMachineId, result.ok ? 1 : 0, path, Number.isSafeInteger(result.durationMs) ? result.durationMs! : null, (result.error ?? "").slice(0, 300), nowIso());
+  }
+
+  /** Source hosts (columns) by target accounts (rows), with the latest test outcome for each pair. */
+  matrix(principal: Principal, capability: (machineId: string) => { connected: boolean; ssh: boolean; routes: boolean }) {
+    const machines = this.db.all<{ machine_id: string; name: string; display_alias: string | null; platform: string }>(
+      "SELECT machine_id,name,display_alias,platform FROM machines WHERE workspace_id=? AND identity_state='active' ORDER BY name", principal.workspaceId);
+    const accounts = this.db.all<AccountRow & { target_name: string }>(
+      `SELECT a.*,m.name AS target_name FROM host_ssh_accounts a JOIN machines m ON m.machine_id=a.machine_id WHERE a.workspace_id=? ORDER BY a.name`, principal.workspaceId);
+    const tests = new Map(this.db.all<{ account_id: string; source_machine_id: string; ok: number; path: string; duration_ms: number | null; error: string; tested_at: string }>(
+      "SELECT t.* FROM host_ssh_link_tests t JOIN host_ssh_accounts a ON a.account_id=t.account_id WHERE a.workspace_id=?", principal.workspaceId)
+      .map(row => [`${row.account_id}|${row.source_machine_id}`, row]));
+    const syncs = new Map(this.db.all<{ machine_id: string; results_json: string }>("SELECT machine_id,results_json FROM host_ssh_sync").map(row => [row.machine_id, JSON.parse(row.results_json) as SshSyncResult["accounts"]]));
+    const caps = new Map(machines.map(machine => [machine.machine_id, capability(machine.machine_id)]));
+    // An offline host's abilities are unknown, so it is planned optimistically and marked offline; it is re-planned when it reconnects.
+    const plans = new Map(machines.map(machine => {
+      const cap = caps.get(machine.machine_id)!;
+      return [machine.machine_id, new Map(this.plan(machine.machine_id, cap.connected ? cap.routes : true).entries.map(entry => [entry.row.account_id, entry]))];
+    }));
+    return {
+      hosts: machines.map(machine => ({ machineId: machine.machine_id, name: machine.display_alias || machine.name, platform: machine.platform, supported: isSshPlatform(machine.platform) })),
+      links: accounts.map(account => ({
+        accountId: account.account_id, alias: sshAlias(account.name), targetMachineId: account.machine_id, targetName: account.target_name, route: account.route,
+        proxyJumpMachineId: account.proxy_jump_machine_id, enabled: account.enabled === 1,
+        sources: machines.filter(machine => machine.machine_id !== account.machine_id).map((machine): SshMatrixSource => {
+          const cap = caps.get(machine.machine_id)!;
+          const agent = cap.connected ? (cap.ssh ? "ready" as const : "outdated" as const) : "offline" as const;
+          const head = { machineId: machine.machine_id, machineName: machine.display_alias || machine.name, agent };
+          if (!isSshPlatform(machine.platform)) return { ...head, state: "unsupported", reason: "source_platform" };
+          const entry = plans.get(machine.machine_id)?.get(account.account_id);
+          if (entry?.excluded) return { ...head, state: "excluded", reason: entry.excluded };
+          if (agent === "outdated") return { ...head, state: "unsupported", reason: "agent_outdated" };
+          const delivered = syncs.get(machine.machine_id)?.[account.account_id];
+          const test = tests.get(`${account.account_id}|${machine.machine_id}`);
+          return {
+            ...head, state: test ? (test.ok === 1 ? "ok" : "failed") : "untested",
+            ...(entry?.jumpAlias ? { via: entry.jumpAlias } : {}), ...(delivered ? { delivered } : {}),
+            ...(test ? { path: test.path, testedAt: test.tested_at, ...(test.duration_ms !== null ? { durationMs: test.duration_ms } : {}), ...(test.error ? { error: test.error } : {}) } : {}),
+          };
+        }),
+      })),
+    };
   }
 
   /** Opaque per-push revision. Never derived from content, so no digest of a secret is persisted. */
@@ -342,7 +458,7 @@ export class SshAccessService {
   workspaceOf(machineId: string) { return this.db.get<{ workspace_id: string }>("SELECT workspace_id FROM machines WHERE machine_id=?", machineId)?.workspace_id; }
   machinesIn(workspaceId: string) {
     return this.db.all<{ machine_id: string; name: string; platform: string }>("SELECT machine_id,name,platform FROM machines WHERE workspace_id=? AND identity_state='active'", workspaceId)
-      .filter(machine => isLinuxPlatform(machine.platform));
+      .filter(machine => isSshPlatform(machine.platform));
   }
   target(accountId: string) {
     return this.db.get<{ account_id: string; machine_id: string; username: string; public_key: string; name: string; workspace_id: string }>(

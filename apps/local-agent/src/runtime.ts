@@ -774,6 +774,7 @@ export class AgentRuntime {
         projectFiles: true,
         nativeSubagents: true,
         sshAccess: sshAccess.supported,
+        sshRoutes: sshAccess.supported,
         worktrees: true,
         worktreeFork: true,
         conversationHistory: this.canRead() && Boolean(this.appServer?.readConversation),

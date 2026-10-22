@@ -9,6 +9,7 @@ import { ControlPlaneDatabase } from "../src/db.js";
 import { loadConfig } from "../src/config.js";
 import type { Principal } from "../src/auth.js";
 import { parseInspection, parseSshPrivateKey, parseSshPublicKey, SshAccessBroker, SshAccessService } from "../src/ssh-access.js";
+import { tmpdir as osTmp } from "node:os";
 
 function keyPair(passphrase = "", type = "ed25519", format?: string) {
   const root = mkdtempSync(join(tmpdir(), "cp-ssh-"));
@@ -23,7 +24,7 @@ function fixture() {
   const db = new ControlPlaneDatabase(":memory:");
   const { workspaceId, userId } = db.bootstrap(loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL: "ssh@example.test", ADMIN_PASSWORD: randomUUID(), DATABASE_PATH: ":memory:", PUBLIC_ORIGIN: "http://ssh.test", COOKIE_SECURE: "false" }));
   const at = new Date().toISOString();
-  for (const [machine, platform] of [["a", "linux"], ["b", "linux"], ["c", "linux"], ["mac", "darwin"]] as const) {
+  for (const [machine, platform] of [["a", "linux"], ["b", "linux"], ["c", "linux"], ["mac", "darwin"], ["win", "win32"]] as const) {
     db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,agent_version,identity_state,security_state,reachability,compatibility,capacity,created_at,updated_at) VALUES(?,?,?,?,?,?,'24','x64','0.30.0','active','normal','online','compatible','idle',?,?)`, machine, workspaceId, `key-${machine}`, `fingerprint-${machine}`, machine, platform, at, at);
   }
   db.run("INSERT INTO client_sessions(client_session_id,workspace_id,user_id,token_hash,csrf_hash,created_at,last_seen_at,expires_at) VALUES('csess_test',?,?,'token','csrf',?,?,?)", workspaceId, userId, at, at, at);
@@ -56,7 +57,7 @@ test("accounts are encrypted at rest, never echoed, and validated against their 
   assert.throws(() => service.save(principal, { machineId: "b", name: "x", algorithm: "ed25519", username: "u", privateKey: other.privateKey, publicKey: pair.publicKey }), /不匹配/);
   assert.throws(() => service.save(principal, { machineId: "b", name: "x", algorithm: "rsa", username: "u", ...other }), /不一致/);
   assert.throws(() => service.save(principal, { machineId: "b", name: "x", algorithm: "ed25519", username: "u", ...keyPair("pw") }), /口令/);
-  assert.throws(() => service.save(principal, { machineId: "mac", name: "x", algorithm: "ed25519", username: "u", ...other }), /仅支持 Linux/);
+  assert.throws(() => service.save(principal, { machineId: "win", name: "x", algorithm: "ed25519", username: "u", ...other }), /仅支持 Linux 和 macOS/);
   assert.throws(() => service.save(principal, { machineId: "b", name: "QIANYI", algorithm: "ed25519", username: "u", ...other }), /已被使用/);
 
   // Editing without re-entering the private key keeps it.
@@ -77,7 +78,8 @@ test("desired state covers other Linux hosts in scope and pins reported host key
   assert.equal(desired[0]?.passphrase, "pw");
   assert.deepEqual(desired[0]?.hostKeys, [parseSshPublicKey(hostKey).line]);
   assert.deepEqual(service.desired("a"), [], "a host does not receive its own account");
-  assert.deepEqual(service.desired("mac"), [], "non-Linux hosts receive nothing");
+  assert.equal(service.desired("mac").length, 1, "macOS hosts receive accounts like Linux hosts");
+  assert.deepEqual(service.desired("win"), [], "Windows hosts receive nothing");
   assert.equal(service.get(principal, saved.id).verification.authorized, true);
 
   service.save(principal, { name: "qianyi", algorithm: "ed25519", username: "deploy", sources: ["c"] }, saved.id);
@@ -137,4 +139,132 @@ for (const [type, format, passphrase] of [
     assert.equal(saved.algorithm, type); assert.equal(saved.publicKey, parseSshPublicKey(pair.publicKey).line);
     if (format && passphrase) assert.throws(() => service.save(principal, { machineId: "b", username: "deploy", privateKey: pair.privateKey, passphrase: "wrong" }), /私钥/);
   } finally { db.close(); }
+});
+
+function addAccount(f: ReturnType<typeof fixture>, machineId: string, name: string, extra: Record<string, unknown> = {}, address = "192.168.1.5") {
+  const saved = f.service.save(f.principal, { machineId, name, algorithm: "ed25519", username: "deploy", ...keyPair(), ...extra });
+  f.service.recordInspection(saved.id, parseInspection({ userExists: true, authorized: true, hostKeys: [keyPair().publicKey], addresses: [address], port: 22 }));
+  return saved;
+}
+
+test("macOS hosts can be targets and sources of SSH accounts", () => {
+  const f = fixture();
+  const onMac = addAccount(f, "mac", "macbook", {}, "192.168.1.30");
+  assert.equal(onMac.machineId, "mac");
+  assert.equal(f.service.desired("a")[0]?.hostname, "192.168.1.30");
+  assert.deepEqual(f.service.desired("win"), [], "Windows is neither a source nor a target");
+  assert.throws(() => f.service.save(f.principal, { machineId: "win", name: "w", algorithm: "ed25519", username: "u", ...keyPair() }), /仅支持 Linux 和 macOS/);
+  assert.throws(() => f.service.save(f.principal, { machineId: "a", name: "x", algorithm: "ed25519", username: "u", ...keyPair(), sources: ["win"] }), /仅支持 Linux 和 macOS/);
+});
+
+test("inspection keeps only known address kinds and whether sshd listens", () => {
+  const parsed = parseInspection({ userExists: true, authorized: true, hostKeys: [], addresses: ["10.0.0.4", "100.101.1.1", "203.0.113.5", "bad addr!"], addressKinds: { "10.0.0.4": "lan", "100.101.1.1": "overlay", "203.0.113.5": "weird", "bad addr!": "lan", "9.9.9.9": "public" }, port: 22, listening: false });
+  assert.deepEqual(parsed.addressKinds, { "10.0.0.4": "lan", "100.101.1.1": "overlay" }, "unknown kinds and addresses that were filtered out are dropped");
+  assert.equal(parsed.listening, false);
+  assert.equal(parseInspection({ addresses: [], port: 22 }).listening, null, "an older host that does not report it is unknown, not off");
+  assert.equal("addressKinds" in parseInspection({ addresses: ["10.0.0.4"], port: 22 }), false);
+});
+
+test("jump routes need a direct account on the jump host and never form chains", () => {
+  const f = fixture();
+  const inner = { machineId: "a", name: "inner", route: "proxyjump", proxyJumpMachineId: "b" };
+  assert.throws(() => addAccount(f, "a", "inner", { route: "relay" }), /暂不支持该路由方式/);
+  assert.throws(() => addAccount(f, "a", "inner", { route: "auto" }), /暂不支持该路由方式/, "reserved for the panel relay, not offered yet");
+  assert.throws(() => addAccount(f, "a", "inner", { route: "proxyjump" }), /请选择跳板机/);
+  assert.throws(() => addAccount(f, "a", "inner", { route: "proxyjump", proxyJumpMachineId: "a" }), /不能是目标主机自身/);
+  assert.throws(() => addAccount(f, "a", "inner", { route: "proxyjump", proxyJumpMachineId: "win" }), /仅支持 Linux 和 macOS/);
+  assert.throws(() => addAccount(f, "a", "inner", { route: "proxyjump", proxyJumpMachineId: "b" }), /跳板机需要先登记一个直连的 SSH 账号/);
+  void inner;
+
+  addAccount(f, "b", "bastion", {}, "203.0.113.7");
+  const saved = addAccount(f, "a", "inner", { route: "proxyjump", proxyJumpMachineId: "b" }, "10.9.0.4");
+  assert.equal(saved.route, "proxyjump");
+  assert.equal(saved.proxyJumpMachineId, "b");
+  // The bastion cannot itself hop, because inner hops through it.
+  const bastion = f.service.list(f.principal, "b")[0]!;
+  addAccount(f, "c", "other-direct");
+  assert.throws(() => f.service.save(f.principal, { name: "bastion", algorithm: "ed25519", username: "deploy", route: "proxyjump", proxyJumpMachineId: "c" }, bastion.id), /不能再经跳板连接/);
+  assert.throws(() => addAccount(f, "c", "chained", { route: "proxyjump", proxyJumpMachineId: "a" }), /跳板机需要先登记一个直连的 SSH 账号/, "a hopping account is not a valid jump");
+});
+
+test("sources only get a jump account when they can honour it; the jump host itself connects directly", () => {
+  const f = fixture();
+  addAccount(f, "b", "bastion", {}, "203.0.113.7");
+  addAccount(f, "a", "inner", { route: "proxyjump", proxyJumpMachineId: "b" }, "10.9.0.4");
+
+  const forC = f.service.desired("c", false);
+  assert.deepEqual(forC.map(account => [account.alias, account.proxyJump ?? null]).sort(), [["af-bastion", null], ["af-inner", "af-bastion"]]);
+  assert.deepEqual(f.service.desired("b", false).map(account => [account.alias, account.proxyJump ?? null]), [["af-inner", null]], "from the bastion itself the target is reached directly");
+  assert.deepEqual(f.service.desired("c", false, { routes: false }).map(account => account.alias), ["af-bastion"], "an agent without jump support is not given an account it would try directly");
+
+  // Scope and state changes of the jump account withhold the dependants instead of silently going direct.
+  const bastion = f.service.list(f.principal, "b")[0]!;
+  f.service.save(f.principal, { name: "bastion", algorithm: "ed25519", username: "deploy", sources: ["mac"] }, bastion.id);
+  assert.deepEqual(f.service.desired("c", false).map(account => account.alias), [], "the jump account is not available to c, so neither is the hop");
+  assert.deepEqual(f.service.desired("mac", false).map(account => account.alias).sort(), ["af-bastion", "af-inner"]);
+  f.service.save(f.principal, { name: "bastion", algorithm: "ed25519", username: "deploy", sources: [], enabled: false }, bastion.id);
+  assert.deepEqual(f.service.desired("c", false).map(account => account.alias), [], "a disabled jump withholds the hop");
+});
+
+test("the matrix reports each source's real state and why a link is absent", () => {
+  const f = fixture();
+  const bastion = addAccount(f, "b", "bastion", {}, "203.0.113.7");
+  const inner = addAccount(f, "a", "inner", { route: "proxyjump", proxyJumpMachineId: "b" }, "10.9.0.4");
+  const caps = (state: Record<string, { connected: boolean; ssh: boolean; routes: boolean }>) => (id: string) => state[id] ?? { connected: true, ssh: true, routes: true };
+  const link = (matrix: ReturnType<typeof f.service.matrix>, accountId: string, source: string) => matrix.links.find(item => item.accountId === accountId)!.sources.find(item => item.machineId === source)!;
+
+  let matrix = f.service.matrix(f.principal, caps({}));
+  assert.deepEqual(matrix.hosts.map(host => [host.machineId, host.supported]), [["a", true], ["b", true], ["c", true], ["mac", true], ["win", false]]);
+  assert.equal(link(matrix, inner.id, "c").state, "untested");
+  assert.equal(link(matrix, inner.id, "c").via, "af-bastion");
+  assert.equal(link(matrix, inner.id, "win").state, "unsupported");
+  assert.equal(link(matrix, inner.id, "win").reason, "source_platform");
+  assert.equal(link(matrix, inner.id, "b").state, "untested", "the bastion reaches the target directly");
+  assert.equal(link(matrix, inner.id, "b").via, undefined);
+  assert.equal(matrix.links.find(item => item.accountId === inner.id)!.sources.some(item => item.machineId === "a"), false, "no row for the target itself");
+
+  f.service.recordTest(inner.id, "c", { ok: true, durationMs: 120 }, "proxyjump");
+  f.service.recordTest(bastion.id, "c", { ok: false, error: "Connection timed out" }, "direct");
+  matrix = f.service.matrix(f.principal, caps({}));
+  assert.deepEqual([link(matrix, inner.id, "c").state, link(matrix, inner.id, "c").path, link(matrix, inner.id, "c").durationMs], ["ok", "proxyjump", 120]);
+  assert.deepEqual([link(matrix, bastion.id, "c").state, link(matrix, bastion.id, "c").error], ["failed", "Connection timed out"]);
+
+  // An older agent cannot be given a hop; an offline one is simply untested; an agent without SSH support cannot take part at all.
+  matrix = f.service.matrix(f.principal, caps({ c: { connected: true, ssh: true, routes: false }, mac: { connected: false, ssh: false, routes: false }, b: { connected: true, ssh: false, routes: false } }));
+  assert.deepEqual([link(matrix, inner.id, "c").state, link(matrix, inner.id, "c").reason], ["excluded", "routes_unsupported"]);
+  assert.deepEqual([link(matrix, inner.id, "mac").state, link(matrix, inner.id, "mac").agent], ["untested", "offline"]);
+  assert.deepEqual([link(matrix, inner.id, "b").state, link(matrix, inner.id, "b").reason], ["unsupported", "agent_outdated"]);
+
+  // Changing the path or the target invalidates test evidence about the old one; unrelated edits keep it.
+  f.service.save(f.principal, { name: "inner", algorithm: "ed25519", username: "deploy", description: "note" }, inner.id);
+  assert.equal(link(f.service.matrix(f.principal, caps({})), inner.id, "c").state, "ok");
+  f.service.save(f.principal, { name: "inner", algorithm: "ed25519", username: "deploy", address: "10.9.0.5" }, inner.id);
+  assert.equal(link(f.service.matrix(f.principal, caps({})), inner.id, "c").state, "untested");
+  f.service.recordTest(inner.id, "c", { ok: true }, "proxyjump");
+  f.service.save(f.principal, { name: "inner", algorithm: "ed25519", username: "deploy", route: "direct" }, inner.id);
+  assert.equal(link(f.service.matrix(f.principal, caps({})), inner.id, "c").state, "untested", "switching route drops the old evidence");
+});
+
+test("upgrading a version 68 database adds routes and test results without touching accounts", () => {
+  const root = mkdtempSync(join(osTmp(), "cp-mig-"));
+  const path = join(root, "control-plane.sqlite");
+  try {
+    let db = new ControlPlaneDatabase(path);
+    const { workspaceId } = db.bootstrap(loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL: "mig@example.test", ADMIN_PASSWORD: randomUUID(), DATABASE_PATH: path, PUBLIC_ORIGIN: "http://mig.test", COOKIE_SECURE: "false" }));
+    const at = new Date().toISOString();
+    db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,agent_version,identity_state,security_state,reachability,compatibility,capacity,created_at,updated_at)
+      VALUES('m1',?,'k','f','m1','linux','24','x64','0.30.0','active','normal','online','compatible','idle',?,?)`, workspaceId, at, at);
+    db.sqlite.exec("DROP TABLE host_ssh_link_tests; ALTER TABLE host_ssh_accounts DROP COLUMN route; ALTER TABLE host_ssh_accounts DROP COLUMN proxy_jump_machine_id; PRAGMA user_version=68");
+    db.run(`INSERT INTO host_ssh_accounts(account_id,workspace_id,machine_id,name,algorithm,username,public_key,fingerprint,encrypted_private_key,created_at,updated_at)
+      VALUES('ssh_old',?,'m1','legacy','ed25519','deploy','pk','fp','secret',?,?)`, workspaceId, at, at);
+    db.close();
+    for (const round of [1, 2]) {
+      db = new ControlPlaneDatabase(path);
+      assert.equal(db.get<{ user_version: number }>("PRAGMA user_version")?.user_version, 69, `round ${round}`);
+      assert.deepEqual({ ...db.get<Record<string, unknown>>("SELECT route,proxy_jump_machine_id FROM host_ssh_accounts WHERE account_id='ssh_old'") }, { route: "direct", proxy_jump_machine_id: null }, "existing accounts stay direct");
+      assert.equal(db.get<{ n: number }>("SELECT count(*) AS n FROM host_ssh_link_tests")?.n, 0);
+      assert.throws(() => db.run("UPDATE host_ssh_accounts SET route='bogus' WHERE account_id='ssh_old'"), /CHECK/);
+      db.close();
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
