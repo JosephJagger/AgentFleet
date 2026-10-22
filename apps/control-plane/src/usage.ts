@@ -71,14 +71,17 @@ export class UsageService {
     this.db.run(`INSERT INTO machine_usage(machine_id,account_key,observed_at,windows_json,credits_json,reset_cards_available) VALUES(?,?,?,?,?,?)
       ON CONFLICT(machine_id) DO UPDATE SET account_key=excluded.account_key,observed_at=excluded.observed_at,windows_json=excluded.windows_json,credits_json=excluded.credits_json,reset_cards_available=excluded.reset_cards_available WHERE excluded.observed_at>=machine_usage.observed_at`,machineId,accountKey,new Date(at).toISOString(),JSON.stringify(windows),credits===null?null:JSON.stringify(credits),cardCount);
   }
-  read(workspaceId: string, scope: "session" | "project" | "machine", id: string, requestedProvider: ProviderId = "codex") {
+  read(workspaceId: string, scope: "session" | "project" | "machine", id: string, requestedProvider: ProviderId = "codex", includeWorktrees = false) {
     const table=scope==="session"?"logical_sessions":scope==="project"?"projects":"machines";
     const column=scope==="session"?"logical_session_id":scope==="project"?"project_id":"machine_id";
     invariant(this.db.get(`SELECT 1 FROM ${table} WHERE ${column}=? AND workspace_id=?${scope==="session"?" AND deleted_at IS NULL":""}`,id,workspaceId),404,"USAGE_SCOPE_NOT_FOUND","Usage scope was not found");
     const provider = scope === "machine" ? requestedProvider : this.db.get<{provider:ProviderId}>(scope === "project" ? "SELECT provider FROM projects WHERE project_id=?" : "SELECT p.provider FROM projects p JOIN logical_sessions s USING(project_id) WHERE s.logical_session_id=?",id)!.provider;
     const providerFilter = ` AND project_id IN (SELECT project_id FROM projects WHERE provider='${isProviderId(provider) ? provider : "codex"}')`;
-    const sessions=this.db.all<{logical_session_id:string;machine_id:string;title:string}>(`SELECT logical_session_id,machine_id,title FROM logical_sessions WHERE workspace_id=? AND ${column}=? AND deleted_at IS NULL${providerFilter}`,workspaceId,id);
-    const rows=this.db.all<Row & {title:string;project_id:string;project_title:string}>(`SELECT u.*,s.title,s.project_id,p.alias AS project_title FROM session_usage u JOIN logical_sessions s USING(logical_session_id) JOIN projects p ON p.project_id=s.project_id WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")}`,workspaceId,id);
+    const scopePredicate = scope === "project" && includeWorktrees
+      ? `project_id IN (SELECT child.project_id FROM projects child JOIN projects root ON root.project_id=? WHERE child.workspace_id=root.workspace_id AND child.machine_id=root.machine_id AND child.provider=root.provider AND (child.project_id=root.project_id OR (child.repo_root=root.canonical_root AND child.canonical_root<>child.repo_root AND (root.repo_root IS NULL OR root.repo_root=root.canonical_root))))`
+      : `${column}=?`;
+    const sessions=this.db.all<{logical_session_id:string;machine_id:string;title:string}>(`SELECT logical_session_id,machine_id,title FROM logical_sessions WHERE workspace_id=? AND ${scopePredicate} AND deleted_at IS NULL${providerFilter}`,workspaceId,id);
+    const rows=this.db.all<Row & {title:string;project_id:string;project_title:string}>(`SELECT u.*,s.title,s.project_id,p.alias AS project_title FROM session_usage u JOIN logical_sessions s USING(logical_session_id) JOIN projects p ON p.project_id=s.project_id WHERE s.workspace_id=? AND s.${scopePredicate} AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")}`,workspaceId,id);
     const recorded=zero(); for(const row of rows) { const c=counts(JSON.parse(row.recorded_json))!; for(const key of keys) recorded[key]+=c[key]; }
     const machineIds=new Set(sessions.map(s=>s.machine_id)); if(scope==="machine")machineIds.add(id);
     if(scope==="project") { const project=this.db.get<{machine_id:string}>("SELECT machine_id FROM projects WHERE project_id=?",id); if(project)machineIds.add(project.machine_id); }
@@ -118,14 +121,14 @@ export class UsageService {
         COALESCE(SUM(CASE WHEN d.starts_at>=? AND d.ends_at<? AND (d.input_tokens IS NULL OR d.cached_input_tokens IS NULL) THEN 1 ELSE 0 END),0) AS detailsMissing,
         COALESCE(SUM(CASE WHEN d.starts_at<? OR d.ends_at>=? THEN 1 ELSE 0 END),0) AS uncertain
         FROM usage_intervals d JOIN logical_sessions s USING(logical_session_id)
-        WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")} AND d.ends_at>=? AND d.starts_at<?`,
+        WHERE s.workspace_id=? AND s.${scopePredicate} AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")} AND d.ends_at>=? AND d.starts_at<?`,
         startsAt,resetsAt,startsAt,resetsAt,startsAt,resetsAt,startsAt,resetsAt,startsAt,resetsAt,workspaceId,id,startsAt,resetsAt)!;
       quotaCycle = { startsAt,resetsAt,recordedTokens:rows.length ? period.total : null,inputTokens:rows.length&&period.detailsMissing===0?period.input:null,cachedInputTokens:rows.length&&period.detailsMissing===0?period.cached:null,boundaryIncomplete:period.uncertain>0 };
       weeklySessions = this.db.all<{id:string;title:string;projectId:string;projectTitle:string;totalTokens:number;inputTokens:number|null;cachedInputTokens:number|null;detailsMissing:number}>(`SELECT s.logical_session_id AS id,s.title,s.project_id AS projectId,p.alias AS projectTitle,SUM(d.total_tokens) AS totalTokens,
           SUM(d.input_tokens) AS inputTokens,SUM(d.cached_input_tokens) AS cachedInputTokens,
           SUM(CASE WHEN d.input_tokens IS NULL OR d.cached_input_tokens IS NULL THEN 1 ELSE 0 END) AS detailsMissing
         FROM usage_intervals d JOIN logical_sessions s USING(logical_session_id) JOIN projects p ON p.project_id=s.project_id
-        WHERE s.workspace_id=? AND s.${column}=? AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")} AND d.starts_at>=? AND d.ends_at<?
+        WHERE s.workspace_id=? AND s.${scopePredicate} AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")} AND d.starts_at>=? AND d.ends_at<?
         GROUP BY s.logical_session_id HAVING SUM(d.total_tokens)>0 ORDER BY totalTokens DESC,s.logical_session_id`,workspaceId,id,startsAt,resetsAt);
       weeklySessions = weeklySessions.map(row=>({...row,inputTokens:row.detailsMissing?null:row.inputTokens,cachedInputTokens:row.detailsMissing?null:row.cachedInputTokens}));
 

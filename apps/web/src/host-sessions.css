@@ -82,3 +82,34 @@
 .host-agent-toolbar > .buzhou-session-toggle { margin-left:auto; padding:0; background:transparent; }
 .host-agent-toolbar .agent-picker-trigger { min-height:30px; }
 .buzhou-session-providers.buzhou-session-providers--single { grid-template-columns:minmax(0,1fr); }
+
+/* Repository families: a connected branch, not another top-level project card. */
+.catalog-worktrees { margin: 0 12px 14px; min-width: 0; }
+.catalog-worktrees-toggle { display:flex; flex-wrap:wrap; align-items:center; gap:8px; width:100%; min-height:42px; padding:10px 8px; border:0; border-top:1px solid var(--line); background:transparent; color:var(--ink); font:inherit; text-align:left; cursor:pointer; }
+.catalog-worktrees-toggle > svg { flex-shrink:0; }
+.catalog-worktrees-toggle:focus-visible, .catalog-worktree-path summary:focus-visible { outline:2px solid var(--cobalt); outline-offset:2px; }
+.catalog-main-toggle { width:calc(100% - 24px); margin:6px 12px 0; }
+.catalog-worktrees-list { margin-left:14px; padding-left:12px; border-left:1px solid var(--line-strong); }
+.catalog-worktrees-list > .project-session-group { position:relative; margin:8px 0 0; border:1px solid var(--line); border-radius:8px; min-width:0; }
+.catalog-worktrees-list > .project-session-group::before { content:""; position:absolute; left:-13px; top:25px; width:12px; border-top:1px solid var(--line-strong); }
+:root .workspace-catalog .project-session-group--worktree > .catalog-project-heading { background:var(--paper); border-radius:inherit; border-left:0; }
+:root .workspace-catalog .project-session-group--worktree .project-session-group__heading { padding:12px 10px 4px; min-height:0; }
+:root .workspace-catalog .project-session-group--worktree .project-usage { padding:0 10px 6px 35px; }
+.catalog-worktree-label { display:inline-flex; padding:2px 6px; border:1px solid currentColor; border-radius:4px; font-size:var(--text-small); font-weight:500; white-space:nowrap; }
+.catalog-family-activity { display:flex; gap:4px 10px; flex-wrap:wrap; font-size:var(--text-small); color:var(--ink); }
+.catalog-family-activity:empty { display:none; }
+.catalog-worktree-path { padding:0 10px 10px 35px; color:var(--muted); font-size:var(--text-small); }
+.catalog-worktree-path summary { cursor:pointer; }
+.catalog-worktree-path code, .catalog-worktree-path small { display:block; margin-top:6px; white-space:normal; overflow-wrap:anywhere; }
+.project-usage > small { display:block; color:var(--muted); font-size:var(--text-small); }
+.workspace-catalog .project-session-group__heading strong { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; overflow-wrap:anywhere; }
+.workspace-catalog .project-session-group__heading .project-agent-label { margin:0; }
+.project-session-group__copy > .catalog-worktree-branch { white-space:normal; overflow-wrap:anywhere; }
+.catalog-worktree-count { font-size:var(--text-caption); font-weight:500; color:var(--muted); }
+.project-session-group__copy > .catalog-family-activity { display:flex; white-space:normal; font-family:inherit; color:var(--ink); }
+@media(max-width:720px) {
+  .catalog-worktrees { margin:0 6px 10px; }
+  .catalog-worktrees-list { margin-left:7px; padding-left:9px; }
+  .catalog-worktrees-list > .project-session-group::before { left:-10px; width:9px; }
+  :root .workspace-catalog .project-session-group--worktree .project-session-group__children { margin:8px 6px; padding-left:6px; }
+}

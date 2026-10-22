@@ -9,7 +9,7 @@ import {formatQuotaPercent} from "../lib/usage";
 import type { UsageSummary } from "../lib/usage";
 import { locale, t } from "../i18n";
 const cacheRate=(input:number|null|undefined,cached:number|null|undefined)=>input&&cached!=null?cached/input*100:null;
-export function UsageButton({scope,id,onSession,provider="codex",compactQuota=false}:{compactQuota?:boolean;provider?:ProviderId;scope:"session"|"project"|"machine";id:string;onSession?:(id:string)=>void}) {
+export function UsageButton({scope,id,onSession,provider="codex",compactQuota=false,includeWorktrees=false}:{includeWorktrees?:boolean;compactQuota?:boolean;provider?:ProviderId;scope:"session"|"project"|"machine";id:string;onSession?:(id:string)=>void}) {
   const [data,setData]=useState<UsageSummary>();const [failed,setFailed]=useState(false);const [open,setOpen]=useState(false);
   const [refreshing,setRefreshing]=useState(false);const [refreshNotice,setRefreshNotice]=useState("");
   const dialog=useRef<HTMLDialogElement>(null);
@@ -30,13 +30,13 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
   useEffect(()=>{
     setData(undefined);setFailed(false);setOpen(false);setRadarOpen(false);setRefreshNotice("");
     const controller=new AbortController();let busy=false;
-    const update=async()=>{if(busy||controller.signal.aborted)return;busy=true;try{const next=await api.usage(scope,id,controller.signal,provider);if(!next || next.coverage!=="observed-only" || !Array.isArray(next.accounts) || !Array.isArray(next.topSessions))throw new Error("Invalid usage response");if(!controller.signal.aborted){setData(next);setFailed(false);}}catch{if(!controller.signal.aborted)setFailed(true);}finally{busy=false;}};
+    const update=async()=>{if(busy||controller.signal.aborted)return;busy=true;try{const next=await (includeWorktrees ? api.usage(scope,id,controller.signal,provider,true) : api.usage(scope,id,controller.signal,provider));if(!next || next.coverage!=="observed-only" || !Array.isArray(next.accounts) || !Array.isArray(next.topSessions))throw new Error("Invalid usage response");if(!controller.signal.aborted){setData(next);setFailed(false);}}catch{if(!controller.signal.aborted)setFailed(true);}finally{busy=false;}};
     refreshUsage.current=()=>{void update();};
     if(!document.hidden)void update();
     const onVisible=()=>{if(!document.hidden)void update();};document.addEventListener("visibilitychange",onVisible);
     const timer=window.setInterval(()=>{if(!document.hidden)void update();},30_000);
     return ()=>{controller.abort();window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible);};
-  },[scope,id,provider]);
+  },[scope,id,provider,includeWorktrees]);
   useEffect(()=>{const element=dialog.current;if(open&&!element?.open)element?.showModal?.();else if(!open&&element?.open)element.close();},[open]);
   async function refreshHost() {
     setRefreshing(true);setRefreshNotice("");

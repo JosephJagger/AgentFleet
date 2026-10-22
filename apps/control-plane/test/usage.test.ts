@@ -318,3 +318,30 @@ test('Cursor quota comes from its own account report, never from Grok; malformed
  set({cursor:{cursorQuota:{...cursorQuota,windows:[{...cursorQuota.windows[0],bucket:'grok'}]}}});
  assert.equal(service.read(workspaceId,'machine','a','cursor').accounts.length,0);
 });
+
+test("repository usage includes worktrees exactly once while individual lanes and other scopes remain isolated", t => {
+  const { db, workspaceId, service, at } = fixture(); t.after(() => db.close());
+  for (const [id, machine, provider] of [["lane", "a", "codex"], ["other-agent", "a", "claude"], ["other-host", "b", "codex"]] as const) {
+    db.run(`INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,created_at,last_reported_at,repo_root,provider) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+      id, workspaceId, machine, id, id, `/work/.a.worktrees/${id}`, id, at, at, "/work/a", provider);
+    db.run(`INSERT INTO logical_sessions(logical_session_id,workspace_id,machine_id,project_id,title,managed,execution_state,reachability,created_at,updated_at) VALUES(?,?,?,?,?,1,'idle','live',?,?)`,
+      id, workspaceId, machine, id, id, at, at);
+  }
+  db.run("UPDATE projects SET repo_root=canonical_root WHERE project_id='p-a'");
+  db.run("UPDATE projects SET branch='feat/seo' WHERE project_id='lane'");
+  db.run("INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,native_thread_id,created_at) VALUES('lane-segment','lane','a','lane','native-lane',?)", at);
+  const summary = new RegistryService(db, config()).getSession({ workspaceId, userId: 'test', clientSessionId: 'test', email: 'test@example.test', csrfHash: '', expiresAt: at }, 'lane');
+  assert.deepEqual([summary.canonicalRoot, summary.repoRoot, summary.projectRootAlias, summary.projectBranch], ['/work/.a.worktrees/lane', '/work/a', 'Project a', 'feat/seo']);
+  service.quota("a", { accountKey: "a".repeat(64), observedAt: at, windows: [{ bucket: "codex", window: "secondary", windowMinutes: 10080, usedPercent: 10, resetsAt: Math.floor(Date.now()/1000)+86400 }] });
+  for (const id of ["a1", "lane", "other-agent", "other-host"]) { service.record(event(id, 100, 2)); service.record(event(id, 100, 2)); }
+  const family = service.read(workspaceId, "project", "p-a", "codex", true);
+  assert.equal(family.recorded?.totalTokens, 40);
+  assert.equal(family.quotaCycle?.recordedTokens, 40);
+  assert.deepEqual(new Set(family.topSessions.map(s => s.id)), new Set(["a1", "lane"]));
+  assert.equal(service.read(workspaceId, "project", "p-a").recorded?.totalTokens, 20);
+  assert.equal(service.read(workspaceId, "project", "lane", "codex", true).recorded?.totalTokens, 20);
+  assert.equal(service.read(workspaceId, "machine", "a").recorded?.totalTokens, 40);
+  assert.throws(() => service.read("other-workspace", "project", "p-a", "codex", true));
+  db.run("UPDATE logical_sessions SET deleted_at=? WHERE logical_session_id='lane'", at);
+  assert.equal(service.read(workspaceId, "project", "p-a", "codex", true).recorded?.totalTokens, 20);
+});

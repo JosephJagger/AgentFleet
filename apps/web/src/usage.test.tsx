@@ -225,3 +225,11 @@ it("shows Grok native quota and tokens without Codex authentication or refresh a
  expect(screen.queryByText(/Codex 认证/)).toBeNull();
  expect(screen.queryByText('点数余额')).toBeNull();
 });
+
+it("project family usage requests the aggregate explicitly and switching to a worktree restores individual scope", async () => {
+ vi.mocked(api.usage).mockResolvedValue(data);
+ const view=render(<UsageButton scope="project" id="main" includeWorktrees/>);
+ await waitFor(()=>expect(api.usage).toHaveBeenCalledWith("project","main",expect.any(AbortSignal),"codex",true));
+ view.rerender(<UsageButton scope="project" id="lane"/>);
+ await waitFor(()=>expect(api.usage).toHaveBeenLastCalledWith("project","lane",expect.any(AbortSignal),"codex"));
+});

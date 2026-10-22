@@ -4146,5 +4146,16 @@
   "需更新连接服务": "Update the connection service",
   "局域网": "LAN",
   "公网": "Public",
-  "虚拟网络": "Overlay network"
+  "虚拟网络": "Overlay network",
+  "执行中 {0}": "Running {0}",
+  "等待确认 {0}": "Awaiting approval {0}",
+  "待核验 {0}": "Needs verification {0}",
+  "分支：{0}": "Branch: {0}",
+  "项目汇总（含工作树）": "Project total (including worktrees)",
+  "此工作树用量": "This worktree’s usage",
+  "目录详情": "Directory details",
+  "所属项目：{0}": "Repository: {0}",
+  "主目录会话": "Main directory sessions",
+  "工作树 · {0}": "Worktrees · {0}",
+  "主目录": "Main directory"
 }

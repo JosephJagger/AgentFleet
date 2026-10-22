@@ -126,6 +126,8 @@ function mapProject(rawValue: unknown): Project {
     gitBranch: typeof raw.branch === "string" ? raw.branch : null,
     gitDirty: typeof raw.dirty === "boolean" ? raw.dirty : null,
     repoRoot: typeof raw.repoRoot === "string" ? raw.repoRoot : null,
+    parentProjectId: typeof raw.parentProjectId === "string" ? raw.parentProjectId : null,
+    activity: raw.activity ? { running: integer(record(raw.activity).running), waiting: integer(record(raw.activity).waiting), uncertain: integer(record(raw.activity).uncertain) } : undefined,
     worktreeBase: typeof raw.worktreeBase === "string" ? raw.worktreeBase : null,
     identityVersion: integer(raw.leaseVersion),
     syncContent: raw.syncContent !== false,
@@ -289,6 +291,10 @@ function mapSession(
     machineName: machine?.name ?? t("未知主机"),
     projectId,
     projectAlias: project?.alias ?? string(raw.projectAlias, t("未知项目")),
+    projectPath: typeof raw.canonicalRoot === "string" ? raw.canonicalRoot : project?.pathHint,
+    projectRepoRoot: typeof raw.repoRoot === "string" ? raw.repoRoot : project?.repoRoot,
+    projectBranch: typeof raw.projectBranch === "string" ? raw.projectBranch : project?.gitBranch,
+    projectRootAlias: typeof raw.projectRootAlias === "string" ? raw.projectRootAlias : null,
     nativeThreadId: typeof raw.nativeThreadId === "string" ? raw.nativeThreadId : null,
     historyMode,
     state: {
@@ -708,7 +714,7 @@ export const api = {
   cancelSessionReference: (id: string) => request<{cancelled:boolean}>(`/api/session-references/${encodeURIComponent(id)}`, { method: "DELETE" }),
   writingNLP: (id: string, draft: string, signal: AbortSignal) => request<{suggestions:NLPSuggestion[]}>(`/api/sessions/${encodeURIComponent(id)}/writing-nlp`, {method:"POST",body:JSON.stringify({draft}),signal}),
   refreshQuota: (id:string) => request<{requested:boolean}>(`/api/machines/${encodeURIComponent(id)}/usage/refresh`,{method:"POST",body:"{}"}),
-  usage: (scope: "session" | "project" | "machine", id: string, signal?: AbortSignal, provider: ProviderId = "codex") => request<UsageSummary>(`/api/${scope === "session" ? "sessions" : scope === "project" ? "projects" : "machines"}/${encodeURIComponent(id)}/usage?provider=${provider}`, { signal }),
+  usage: (scope: "session" | "project" | "machine", id: string, signal?: AbortSignal, provider: ProviderId = "codex", includeWorktrees = false) => request<UsageSummary>(`/api/${scope === "session" ? "sessions" : scope === "project" ? "projects" : "machines"}/${encodeURIComponent(id)}/usage?provider=${provider}${includeWorktrees ? "&includeWorktrees=true" : ""}`, { signal }),
   imageSessions: (id: string, cursor = "", signal?: AbortSignal) => request<{sessions: import("./types").ImageSessionUsage[]; nextCursor: string | null}>(`/api/machines/${encodeURIComponent(id)}/images/sessions?cursor=${encodeURIComponent(cursor)}`, { signal }),
   async imageOperation(machineId: string, logicalSessionId: string, previewOperationId?: string): Promise<HostOperation> {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { method: "POST", body: JSON.stringify({type: previewOperationId ? "images.clean" : "images.preview", logicalSessionId, previewOperationId, clientMutationId: crypto.randomUUID()}) });
@@ -771,7 +777,7 @@ export const api = {
     const raw = await request<JsonObject>("/api/release");
     return { build: string(raw.controlPlaneBuild, t("未上报")), schema: integer(raw.dbSchemaVersion), agentVersion: string(raw.agentVersion, t("未确认")), manifestStatus: string(record(raw.agentManifest).status, "unavailable") };
   },
-  async projects(options: { provider?: ProviderId; machineId?: string; cursor?: string | null; q?: string; limit?: number; offset?: number }, signal?: AbortSignal): Promise<Page<Project>> {
+  async projects(options: { provider?: ProviderId; machineId?: string; cursor?: string | null; q?: string; limit?: number; offset?: number; groupWorktrees?: boolean; includeProjectId?: string }, signal?: AbortSignal): Promise<Page<Project>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 8) });
     for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
     const raw = await request<JsonObject>(`/api/projects?${query}`, { signal });

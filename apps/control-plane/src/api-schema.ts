@@ -184,6 +184,9 @@ export interface LogicalSessionSummary {
   codexProfileId: string;
   sessionCwd: string | null;
   projectAlias: string;
+  repoRoot?: string | null;
+  projectBranch?: string | null;
+  projectRootAlias?: string | null;
   canonicalRoot: string;
   actions: SessionActions;
 }

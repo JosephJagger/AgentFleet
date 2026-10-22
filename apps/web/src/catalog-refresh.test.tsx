@@ -11,6 +11,7 @@ const row = (id: string) => ({ id, title: `会话 ${id}`, machineName: "主机",
 const props = { machineId: "m", onSelect: vi.fn(), onCreate: vi.fn() };
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((done) => { resolve = done; }); return { promise, resolve }; }
 beforeEach(() => {
+  localStorage.clear();
   vi.mocked(api.projects).mockResolvedValue({ items: [project], nextCursor: null });
   vi.mocked(api.sessions).mockResolvedValue({ items: [row("1")], nextCursor: null });
 });
@@ -37,7 +38,7 @@ it("项目分页在左侧显示总页数并通过前后按钮翻页", async () =
   fireEvent.click(screen.getByRole("button", { name: "下一页" }));
   await screen.findByText("第九个项目");
   expect(screen.getByText("第 2 / 5 页")).toBeTruthy();
-  expect(api.projects).toHaveBeenLastCalledWith({ machineId: "m", provider: "codex", offset: 8, limit: 8 }, expect.any(AbortSignal));
+  expect(api.projects).toHaveBeenLastCalledWith({ machineId: "m", provider: "codex", offset: 8, limit: 8, groupWorktrees: true }, expect.any(AbortSignal));
 });
 
 it("后台刷新不插入加载行，保留已有项目和会话 DOM", async () => {
@@ -133,4 +134,46 @@ it("切换 Agent 重新加载独立项目目录", async () => {
   await screen.findByText("Claude 项目");
   expect(screen.queryByText("Codex 项目")).toBeNull();
   expect(api.projects).toHaveBeenLastCalledWith(expect.objectContaining({ provider: "claude", offset: 0 }), expect.any(AbortSignal));
+});
+
+it("工作树嵌套在项目中，折叠后仍显示运行状态，创建会话使用工作树项目", async () => {
+  const child: Project = { ...project, id: "lane", alias: "测试项目-seo", pathHint: "/srv/.test.worktrees/seo", repoRoot: project.pathHint, gitBranch: "feat/seo", parentProjectId: project.id, activity: { running: 1, waiting: 0, uncertain: 0 } };
+  vi.mocked(api.projects).mockResolvedValue({ items: [child, project], nextCursor: null, total: 1 });
+  const view = render(<WorkspaceCatalog {...props} refreshKey="tree" />);
+  const parent = await screen.findByRole("button", { name: /测试项目.*\/srv/ });
+  expect(screen.getByText("执行中 1")).toBeTruthy();
+  expect(screen.queryByText("seo")).toBeNull();
+  fireEvent.click(parent);
+  fireEvent.click(screen.getByRole("button", { name: /^工作树 · 1/ }));
+  const lane = screen.getByRole("button", { name: /seo 工作树.*分支：feat\/seo/ });
+  expect(lane.closest(".catalog-worktrees-list")).toBeTruthy();
+  expect(view.container.querySelectorAll(".workspace-catalog > .project-session-group")).toHaveLength(1);
+  fireEvent.click(lane);
+  fireEvent.click(await screen.findByRole("button", { name: "在 测试项目-seo 新建会话" }));
+  expect(props.onCreate).toHaveBeenCalledWith(child);
+  fireEvent.click(screen.getByRole("button", { name: /^工作树 · 1/ }));
+  view.unmount();
+  render(<WorkspaceCatalog {...props} refreshKey="remount" />);
+  expect((await screen.findByRole("button", { name: /测试项目.*\/srv/ })).getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("button", { name: /^工作树 · 1/ }).getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByText("seo")).toBeNull();
+});
+
+it("选中工作树会话展开归属位置，刷新不重新打开手动收起的工作树", async () => {
+  const child: Project = { ...project, id: "lane", alias: "测试项目-seo", pathHint: "/srv/seo", repoRoot: project.pathHint, parentProjectId: project.id };
+  vi.mocked(api.projects).mockResolvedValue({ items: [project, child], nextCursor: null, total: 1 });
+  const selected = { ...row("selected"), machineId: "m", projectId: "lane", provider: "codex" as const };
+  vi.mocked(api.sessions).mockImplementation(async ({ projectId }) => ({ items: projectId === "lane" ? [selected] : [], nextCursor: null }));
+  const view = render(<WorkspaceCatalog {...props} selectedSession={selected} refreshKey="one" />);
+  await screen.findByText("会话 selected");
+  fireEvent.click(screen.getByRole("button", { name: /^工作树 · 1/ }));
+  view.rerender(<WorkspaceCatalog {...props} selectedSession={selected} refreshKey="two" />);
+  await waitFor(() => expect(api.projects).toHaveBeenCalledTimes(2));
+  expect(screen.getByRole("button", { name: /^工作树 · 1/ }).getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByText("会话 selected")).toBeNull();
+  view.unmount();
+  render(<WorkspaceCatalog {...props} selectedSession={selected} refreshKey="reloaded" />);
+  await screen.findByRole("button", { name: /^工作树 · 1/ });
+  expect(screen.getByRole("button", { name: /^工作树 · 1/ }).getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByText("会话 selected")).toBeNull();
 });

@@ -1,3 +1,4 @@
+import { sessionLocation } from "./lib/project-tree";
 import {GrokNativePanel} from "./components/GrokNativePanel";
 import {ComposerCommandPalette,type CommandPaletteHandle} from "./components/ComposerCommandPalette";
 import {claudeComposerCommands,grokComposerCommands,cursorComposerCommands,parseComposerCommand,type ComposerCommand} from "./lib/composer-commands";
@@ -1044,7 +1045,7 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
         <IconButton label={t("关闭会话详情")} className="inspector-back" onClick={onClose}><ChevronLeft size={22} /></IconButton>
         <div className="session-heading">
           <h2 title={displayName(session.title)}>{displayName(session.title)}</h2>
-        <div className="eyebrow inspector-context" title={displayName(`${session.machineName} · ${agentName(session.provider)} · ${session.projectAlias}`)}>{displayName(session.machineName)} · {agentName(session.provider)} · {displayName(session.projectAlias)}</div>
+        <div className="eyebrow inspector-context" title={displayName(`${session.machineName} · ${agentName(session.provider)} · ${sessionLocation(session)}`)}>{displayName(session.machineName)} · {agentName(session.provider)} · {displayName(sessionLocation(session))}</div>
         </div>
           <div className="session-facts">
             <StatePill session={session} />

@@ -1,3 +1,4 @@
+import { projectCatalog } from "./project-catalog.js";
 import { VideoStorage, readVideoStorageConfig } from "./video-storage.js";
 import { isProviderId, isAcpProvider } from "./provider-catalog.js";
 import { TakeoverPolicy } from "./takeover-policy.js";
@@ -1244,14 +1245,14 @@ export async function buildControlPlane(
   });
   app.get("/api/projects", { preHandler: authenticate }, async (request) => {
     const query = request.query as Record<string, unknown>;
-    if (query.provider !== undefined || query.limit !== undefined || query.cursor !== undefined || query.q !== undefined || query.offset !== undefined) {
+    if (query.groupWorktrees === "true" || query.provider !== undefined || query.limit !== undefined || query.cursor !== undefined || query.q !== undefined || query.offset !== undefined) {
       const options = listOptions(query);
       if (query.offset !== undefined) {
         const offset = Number(query.offset);
         invariant(Number.isSafeInteger(offset) && offset >= 0 && offset <= 1_000_000, 400, "INVALID_OFFSET", "offset must be between 0 and 1000000");
         options.offset = offset;
       }
-      const page = registry.listProjectsPage(request.principal as Principal, options);
+      const page = query.groupWorktrees === "true" ? projectCatalog(db, request.principal as Principal, options, typeof query.includeProjectId === "string" ? query.includeProjectId : undefined) : registry.listProjectsPage(request.principal as Principal, options);
       return { ...page, projects: page.items };
     }
     return { projects: registry.listProjects(request.principal as Principal, typeof query.machineId === "string" ? query.machineId : undefined) };
@@ -1438,7 +1439,7 @@ export async function buildControlPlane(
     app.get(`/api/${path}/:id/usage`, { preHandler: authenticate }, async request => {
       const workspaceId=(request.principal as Principal).workspaceId,id=routeId(request);
       const requestedProvider=(request.query as {provider?:string}).provider; invariant(requestedProvider === undefined || isProviderId(requestedProvider),400,"INVALID_PROVIDER","Unknown agent provider"); const provider=requestedProvider ?? "codex";
-      const summary=usage.read(workspaceId,scope,id,provider);if(summary.provider === "codex")quotaRefresh.request(workspaceId,scope,id);
+      const summary=usage.read(workspaceId,scope,id,provider,(request.query as Record<string,unknown>).includeWorktrees === "true");if(summary.provider === "codex")quotaRefresh.request(workspaceId,scope,id);
       if(scope!=="machine" || summary.provider !== "codex")return summary;
       const account=summary.accounts.length===1?summary.accounts[0]:null;
       const weekly=account?.windows.find((window:{bucket:string;windowMinutes:number;remainingPercent:number})=>window.bucket==="codex"&&window.windowMinutes===10080);

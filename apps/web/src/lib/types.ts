@@ -17,6 +17,8 @@ export interface Project {
   /** Set for a git worktree lane: the main repository root and the branch the lane started from. */
   repoRoot?: string | null;
   worktreeBase?: string | null;
+  parentProjectId?: string | null;
+  activity?: { running: number; waiting: number; uncertain: number };
   identityVersion?: number;
   activeSessionId?: string | null;
   syncContent: boolean;
@@ -174,6 +176,10 @@ export interface FleetSession {
   machineName: string;
   projectId: string;
   projectAlias: string;
+  projectPath?: string;
+  projectRepoRoot?: string | null;
+  projectBranch?: string | null;
+  projectRootAlias?: string | null;
   nativeThreadId?: string | null;
   historyMode: "legacy" | "paginated" | "unknown";
   state: SessionState;

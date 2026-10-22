@@ -134,3 +134,31 @@ test("copying a conversation into a lane validates the source session and tells 
   assert.throws(() => parseWorktreeTarget("worktree.create", { projectExternalId: "e", provider: "codex", alias: "a", adoptPath: "/p", forkNativeThreadId: "t" }), /只有 Codex/);
   assert.throws(() => parseWorktreeTarget("worktree.create", { projectExternalId: "e", provider: "grok", alias: "a", name: "x", forkNativeThreadId: "t" }), /只有 Codex/);
 });
+
+test("project catalog pages complete repository families and pins a selected off-page family", async t => {
+  const { projectCatalog } = await import("../src/project-catalog.js");
+  const { db, principal, session } = fixture(); t.after(() => db.close());
+  session("running", "lane-codex", true);
+  session("waiting", "lane-codex", false);
+  session("deleted", "lane-codex", true);
+  db.run("UPDATE logical_sessions SET execution_state='awaiting_approval' WHERE logical_session_id='waiting'");
+  db.run("UPDATE logical_sessions SET deleted_at='2026-01-01' WHERE logical_session_id='deleted'");
+  const options = { machineId: "m", limit: 1 };
+  const first = projectCatalog(db, principal, options);
+  assert.equal(first.total, 3, "two agent-specific roots and one orphan worktree");
+  assert.deepEqual(first.items.map(p => p.projectId), ["lane-grok"], "an unmatched worktree remains visible");
+  assert.equal(first.items[0]!.parentProjectId, null);
+  const second = projectCatalog(db, principal, { ...options, offset: 1 });
+  assert.deepEqual(second.items.map(p => [p.projectId, p.parentProjectId]), [["lane-claude", "main-claude"], ["main-claude", null]]);
+  const pinned = projectCatalog(db, principal, options, "lane-codex");
+  assert.equal(pinned.total, 3, "pinning does not inflate page count");
+  assert.deepEqual(new Set(pinned.items.map(p => p.projectId)), new Set(["lane-grok", "main-codex", "lane-codex"]));
+  assert.deepEqual(pinned.items.find(p => p.projectId === "lane-codex")!.activity, { running: 1, waiting: 1, uncertain: 0 });
+  const codex = projectCatalog(db, principal, { ...options, provider: "codex" }, "lane-claude");
+  assert.equal(codex.total, 1);
+  assert.deepEqual(codex.items.map(p => p.projectId), ["lane-codex", "main-codex"], "pin cannot bypass provider filtering; removed lanes stay hidden");
+  assert.equal(projectCatalog(db, principal, { ...options, machineId: "other" }, "lane-codex").items.length, 0);
+  assert.equal(projectCatalog(db, { ...principal, workspaceId: "other" }, options, "lane-codex").items.length, 0);
+  db.run("UPDATE machines SET identity_state='revoked' WHERE machine_id='m'");
+  assert.equal(projectCatalog(db, principal, options, "lane-codex").total, 0);
+});
