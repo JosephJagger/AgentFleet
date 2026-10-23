@@ -94,7 +94,14 @@ export function timelineItems(events: TimelineEvent[]): TimelineEvent[] {
       && previous.payloadState !== "deleted" && previous.payloadState !== "suppressed"
       && event.payloadState !== "deleted" && event.payloadState !== "suppressed"
       ? (previous.body?.trim() ? previous.body : event.body) : selected.body;
-    result[position] = { ...selected, body, id: key };
+    // Claude reports tool input and its result separately under the same item ID.
+    // Keep the command inside the existing execution card when the result arrives,
+    // including out-of-order replay; never recover content from a deleted payload.
+    const commandEvent = previous.command ? previous : event.command ? event : undefined;
+    const retainCommand = selected.itemType === "mcpToolCall" && !selected.command && commandEvent
+      && selected.payloadState !== "deleted" && selected.payloadState !== "suppressed"
+      && commandEvent.payloadState !== "deleted" && commandEvent.payloadState !== "suppressed";
+    result[position] = { ...selected, body, ...(retainCommand ? { command: commandEvent.command, title: commandEvent.title } : {}), id: key };
   }
   // Reorder conversation slots using the native chain, leaving operational events in place.
   const slots=result.map((event,index)=>({event,index})).filter(({event})=>event.nativeThreadId?.startsWith("claude_") && historyOrder.has(JSON.stringify([event.nativeThreadId,event.nativeItemId])));

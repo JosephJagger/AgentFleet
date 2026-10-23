@@ -149,7 +149,7 @@ it("原生进度更新同一卡片，旧事件和另一轮任务不能覆盖完�
 
 it("工具结果和推理进入时间线，原始参数和环境不会进入消息", () => {
   const tool = mapEvent({ eventId: "tool", sessionSeq: 1, type: "item.completed", nativeTurnId: "turn", payload: { item: { id: "tool", type: "mcpToolCall", tool: "Bash", arguments: { command: "npm test", raw: "secret" }, result: { text: "ok" } } } });
-  expect(tool).toMatchObject({ command: "npm test", output: "ok", body: null, title: "npm test" });
+  expect(tool).toMatchObject({ command: "npm test", output: "ok", body: null, title: "命令执行 · Bash" });
   expect(JSON.stringify(tool)).not.toContain("secret");
   const thought = mapEvent({ eventId: "thought", sessionSeq: 2, type: "item.completed", nativeTurnId: "turn", payload: { item: { id: "thought", type: "reasoning", text: "public thought" } } });
   expect(thought.body).toBe("public thought");
@@ -203,3 +203,24 @@ it.each(["codex", "claude", "grok", "cursor", "qwen", "kimi", "codebuddy", "gemi
     expect(isBuzhoushanChatEvent(event)).toBe(true);
   },
 );
+
+
+it.each(["completed", "failed"])("Claude 工具输入与 %s 回执保留同一卡片，命令不作为标题重复", status => {
+  const command = "python3 - <<'EOF'\nprint('hello')\nEOF";
+  const base = { nativeThreadId: "claude_original", nativeTurnId: "turn", nativeItemId: "tool", type: "item.completed" };
+  const running = mapEvent({ ...base, eventId: "start", sessionSeq: 1, payload: { item: { id: "tool", type: "mcpToolCall", tool: "Bash", arguments: { command }, status: "inProgress" } } });
+  const done = mapEvent({ ...base, eventId: "done", sessionSeq: 2, payload: { item: { id: "tool", type: "mcpToolCall", tool: "tool result", result: "result text", status } } });
+  const live = timelineItems([running])[0];
+  expect(live).toMatchObject({ title: "命令执行 · Bash", command, body: null, status: "inProgress" });
+  for (const input of [[running, done], [done, running], [running, done, running]]) {
+    const items = timelineItems(input);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ id: live.id, title: "命令执行 · Bash", command, output: "result text", body: null, status });
+  }
+  expect(timelineItems([done])[0].command).toBeNull(); // A result-only history page cannot invent its input.
+  const deleted = { ...done, payloadState: "deleted" as const, output: null };
+  expect(timelineItems([running, deleted, running])[0]).toMatchObject({ payloadState: "deleted", command: null, output: null });
+  const other = { ...done, nativeThreadId: "claude_other" };
+  expect(timelineItems([running, other])).toHaveLength(2);
+  expect(timelineItems([running, other])[1].command).toBeNull();
+});

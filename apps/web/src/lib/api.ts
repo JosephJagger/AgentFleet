@@ -387,7 +387,10 @@ function eventTitle(type: string, item: JsonObject): string {
   if (item.type === "plan") return t("计划");
   if (item.type === "reasoning") return t("推理摘要");
   if (item.type === "commandExecution") return t("命令执行");
-  if (item.type === "mcpToolCall") return string(record(item.arguments).command) || (item.tool === "tool result" ? t("工具输出") : string(item.tool)) || t("工具调用");
+  if (item.type === "mcpToolCall") {
+    if (string(record(item.arguments).command)) return `${t("命令执行")}${item.tool && item.tool !== "tool result" ? ` · ${string(item.tool)}` : ""}`;
+    return (item.tool === "tool result" ? t("工具输出") : string(item.tool)) || t("工具调用");
+  }
   if (item.type === "fileChange") return t("文件变更");
   const titles: Record<string, string> = {
     "thread.started": t("受管 Thread 已创建"),
