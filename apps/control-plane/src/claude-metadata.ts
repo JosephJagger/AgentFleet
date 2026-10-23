@@ -8,7 +8,7 @@ export function parseClaudeMetadata(raw: unknown) {
   }
   const q=value.quota as Record<string,unknown>|undefined;
   const quota=q && typeof q.observedAt === "string" && Number.isFinite(Date.parse(q.observedAt)) && Date.parse(q.observedAt)<=Date.now()+60_000 ? {
-    observedAt:new Date(q.observedAt).toISOString(),available:q.available===true,subscriptionType:typeof q.subscriptionType === "string"?q.subscriptionType.slice(0,40):null,
+    observedAt:new Date(q.observedAt).toISOString(),...(q.refreshFailed===true?{refreshFailed:true}:{}),available:q.available===true,subscriptionType:typeof q.subscriptionType === "string"?q.subscriptionType.slice(0,40):null,
     windows:q.available===true && Array.isArray(q.windows)?q.windows.slice(0,24).flatMap(w=>{
       if(!w || typeof w !== "object" || typeof w.bucket !== "string" || typeof w.window !== "string" || typeof w.usedPercent !== "number" || !Number.isFinite(w.usedPercent) || w.usedPercent<0 || w.usedPercent>100 || ![300,10080].includes(w.windowMinutes))return [];
       return [{bucket:w.bucket.slice(0,80),window:w.window.slice(0,100),usedPercent:w.usedPercent,remainingPercent:100-w.usedPercent,windowMinutes:w.windowMinutes as number,resetsAt:typeof w.resetsAt === "number" && Number.isSafeInteger(w.resetsAt) && w.resetsAt>0?w.resetsAt:null}];

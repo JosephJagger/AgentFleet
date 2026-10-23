@@ -20,7 +20,7 @@ import type { InputAnswers } from "./user-input.js";
 import { AgentError } from "./errors.js";
 import { isRecord, nowIso, sha256, canonicalJson } from "./util.js";
 
-import { inspectClaudeMetadata, type ClaudeModel, type ClaudeQuota } from "./claude-metadata.js";
+import { inspectClaudeMetadata, retainedClaudeQuota, type ClaudeModel, type ClaudeQuota } from "./claude-metadata.js";
 
 export const CLAUDE_PREFIX = "claude_";
 export const isClaudeThread = (id: string) => id.startsWith(CLAUDE_PREFIX);
@@ -130,6 +130,7 @@ export class ClaudeRuntime implements AppServerClient {
   private readonly nativeTasks = new Map<string, Map<string, NativeSubagent>>();
   private readonly sdk: typeof defaults;
   constructor(private readonly callbacks: AppServerCallbacks, readonly appServerEpoch: string, dependencies: Partial<typeof defaults> = {}) { this.sdk = { ...defaults, ...dependencies }; }
+  private quotaAccountKey: string | undefined;
   private metadataAt = 0;
   private metadataPending: Promise<void> | undefined;
   async refreshMetadata(force = false): Promise<void> {
@@ -137,7 +138,20 @@ export class ClaudeRuntime implements AppServerClient {
     if(this.metadataPending)return this.metadataPending;
     this.metadataAt=Date.now();
     const binary=this.binary;
-    this.metadataPending=(async()=>{try {const metadata=await this.sdk.inspectClaudeMetadata(binary,this.owned,this.availability.managed);if(this.binary!==binary)return;this.availability={...this.availability,...metadata,models:metadata.models.length ? metadata.models : this.availability.models ?? []};} catch {if(this.availability.quota)this.availability.quota={...this.availability.quota,available:false,windows:[]};}finally{this.metadataPending=undefined;}})();
+    this.metadataPending=(async()=>{
+      try {
+        const metadata=await this.sdk.inspectClaudeMetadata(binary,this.owned,this.availability.managed);
+        if(this.binary!==binary)return;
+        const quota=retainedClaudeQuota(this.availability.quota,this.quotaAccountKey,metadata);
+        this.quotaAccountKey=metadata.quotaAccountKey;
+        this.availability={...this.availability,quota,models:metadata.models.length ? metadata.models : this.availability.models ?? []};
+      } catch {
+        if(this.binary!==binary)return;
+        // No verified identity: do not show a previous account's quota.
+        this.quotaAccountKey=undefined;
+        if(this.availability.quota)this.availability.quota={...this.availability.quota,available:false,windows:[],refreshFailed:true};
+      } finally {this.metadataPending=undefined;}
+    })();
     return this.metadataPending;
   }
   private discoveryGeneration = 0;
@@ -146,7 +160,11 @@ export class ClaudeRuntime implements AppServerClient {
     try {
       const { path, ...availability } = await this.sdk.detectClaude();
       if (generation !== this.discoveryGeneration) return;
-      if(this.binary!==path)this.metadataAt=0;
+      if(this.binary!==path){
+        this.metadataAt=0;
+        this.quotaAccountKey=undefined;
+        delete this.availability.quota;
+      }
       this.binary = path;
       this.availability = path ? {...this.availability,...availability,managed:availability.managed===true,steerSupported:supportsClaudeSteering(availability.version)} : availability;
       void this.refreshMetadata();

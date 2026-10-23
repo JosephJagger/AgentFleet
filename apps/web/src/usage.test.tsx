@@ -255,3 +255,31 @@ it("project family usage requests the aggregate explicitly and switching to a wo
  view.rerender(<UsageButton scope="project" id="lane"/>);
  await waitFor(()=>expect(api.usage).toHaveBeenLastCalledWith("project","lane",expect.any(AbortSignal),"codex"));
 });
+
+it("keeps Claude quota cards and timestamp on host refresh failure, then clears the warning on recovery",async()=>{
+ const snapshot={...data,scope:"machine" as const,accounts:[{...data.accounts[0],credits:null,windows:[{...data.accounts[0].windows[0],bucket:"claude"}]}]};
+ vi.mocked(api.usage).mockResolvedValueOnce(snapshot).mockResolvedValue({...snapshot,accounts:[{...snapshot.accounts[0],refreshFailed:true,stale:true}]});
+ render(<UsageButton scope="machine" id="claude-host" provider="claude"/>);
+ const card=await screen.findByRole("button",{name:/周额度\s*38%/});
+ const timestamp=within(card).getByText(/更新于/).textContent;
+ document.dispatchEvent(new Event("visibilitychange"));
+ await waitFor(()=>expect(within(card).getByText("额度更新失败，显示上次数据")).toBeTruthy());
+ expect(within(card).getByText(/更新于/).textContent).toBe(timestamp);
+ expect(within(card).getByText("38%")).toBeTruthy();
+ vi.mocked(api.usage).mockResolvedValue(snapshot);
+ document.dispatchEvent(new Event("visibilitychange"));
+ await waitFor(()=>expect(within(card).queryByText("额度更新失败，显示上次数据")).toBeNull());
+});
+
+it("keeps existing cards on HTTP failure but removes them on a successful empty account response",async()=>{
+ vi.mocked(api.usage).mockResolvedValueOnce({...data,scope:"machine"}).mockRejectedValue(new Error("offline"));
+ render(<UsageButton scope="machine" id="m-http"/>);
+ const card=await screen.findByRole("button",{name:/周额度\s*38%/});
+ document.dispatchEvent(new Event("visibilitychange"));
+ await waitFor(()=>expect(within(card).getByText("额度更新失败，显示上次数据")).toBeTruthy());
+ expect(within(card).getByText("38%")).toBeTruthy();
+ vi.mocked(api.usage).mockResolvedValue({...data,accounts:[]});
+ document.dispatchEvent(new Event("visibilitychange"));
+ await waitFor(()=>expect(within(card).queryByText("38%")).toBeNull());
+ expect(within(card).queryByText("额度更新失败，显示上次数据")).toBeNull();
+});

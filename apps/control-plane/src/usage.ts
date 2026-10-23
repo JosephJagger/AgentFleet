@@ -94,7 +94,7 @@ export class UsageService {
       if(!machineIds.has(machine.machine_id))return [];
       const quota=parseClaudeMetadata(JSON.parse(machine.discovery_json ?? "{}").agentRuntimes?.claude).quota;
       if(!quota?.available || !quota.windows.length)return [];
-      return [{sourceMachine:machine.name,identityKnown:false,observedAt:quota.observedAt,stale:Date.now()-Date.parse(quota.observedAt)>180_000,subscriptionType:quota.subscriptionType,windows:quota.windows,credits:null,resetCardsAvailable:null}];
+      return [{sourceMachine:machine.name,identityKnown:false,observedAt:quota.observedAt,...(quota.refreshFailed?{refreshFailed:true}:{}),stale:quota.refreshFailed===true||Date.now()-Date.parse(quota.observedAt)>180_000,subscriptionType:quota.subscriptionType,windows:quota.windows,credits:null,resetCardsAvailable:null}];
     });
     if(provider === "claude")accounts.push(...claudeAccounts);
     if(provider==='grok'||provider==='cursor') {

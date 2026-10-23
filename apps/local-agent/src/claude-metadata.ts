@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
+import type { AccountInfo, Query } from "@anthropic-ai/claude-agent-sdk";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
 export interface ClaudeModel { model: string; displayName: string; efforts: string[]; supportsAutoMode?:boolean; }
-export interface ClaudeQuota { observedAt: string; available: boolean; subscriptionType: string | null; windows: Array<{bucket:string;window:string;usedPercent:number;remainingPercent:number;windowMinutes:number;resetsAt:number|null}>; }
+export interface ClaudeQuota { refreshFailed?: boolean; observedAt: string; available: boolean; subscriptionType: string | null; windows: Array<{bucket:string;window:string;usedPercent:number;remainingPercent:number;windowMinutes:number;resetsAt:number|null}>; }
 export function normalizeClaudeMetadata(models: unknown, usage: unknown) {
   const catalog: ClaudeModel[] = [];
   if (Array.isArray(models)) for (const raw of models.slice(0,64)) {
@@ -32,23 +34,65 @@ export function normalizeClaudeMetadata(models: unknown, usage: unknown) {
   return {models:catalog,quota};
 }
 
+/** Only kept in this process; neither account details nor this key enter discovery. */
+export function claudeQuotaAccountKey(account: AccountInfo): string | undefined {
+  if (!account.email || !account.organization || (account.apiProvider && account.apiProvider !== "firstParty") || (account.apiKeySource && account.apiKeySource !== "none")) return undefined;
+  return createHash("sha256").update(JSON.stringify([
+    account.email, account.organization, account.tokenSource, account.subscriptionType,
+  ])).digest("hex");
+}
+
+export interface ClaudeMetadata {
+  models: ClaudeModel[];
+  quota: ClaudeQuota;
+  quotaAccountKey?: string | undefined;
+  quotaRefreshFailed?: boolean;
+}
+
+export function retainedClaudeQuota(previous: ClaudeQuota | undefined, previousKey: string | undefined, next: ClaudeMetadata): ClaudeQuota {
+  // A successful unavailable result (logout, API key, missing scope) clears quota.
+  // A failed request may reuse a snapshot only with fresh proof of the same account.
+  if (next.quotaRefreshFailed && next.quotaAccountKey && next.quotaAccountKey === previousKey && previous?.available && previous.windows.length) {
+    return {...previous, refreshFailed: true};
+  }
+  return next.quota;
+}
+
+async function metadataDeadline<T>(operation: () => Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(operation),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Claude metadata timeout")), 15_000); }),
+    ]);
+  } finally { if (timer) clearTimeout(timer); }
+}
+
+/** Testable native control requests; no user prompt or inference is sent. */
+export async function collectClaudeMetadata(q: Pick<Query, "supportedModels" | "accountInfo" | "usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET">): Promise<ClaudeMetadata> {
+  // Settle separately: a usage timeout must not discard a verified identity or models.
+  const [models, usage, account] = await Promise.allSettled([
+    metadataDeadline(() => q.supportedModels()),
+    metadataDeadline(() => q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({skipBehaviors:true})),
+    metadataDeadline(() => q.accountInfo()),
+  ]);
+  const metadata = normalizeClaudeMetadata(models.status === "fulfilled" ? models.value : [], usage.status === "fulfilled" ? usage.value : null);
+  return {
+    ...metadata,
+    quotaAccountKey: account.status === "fulfilled" ? claudeQuotaAccountKey(account.value) : undefined,
+    quotaRefreshFailed: usage.status === "rejected" || (usage.value?.rate_limits_available !== false && !metadata.quota.windows.length),
+  };
+}
+
 /** Native metadata only: the input stream never yields a user message or starts inference. */
-export async function inspectClaudeMetadata(binary:string,owned:Set<number>,managed=false) {
+export async function inspectClaudeMetadata(binary:string,owned:Set<number>,managed=false): Promise<ClaudeMetadata> {
   let release:(()=>void)|undefined;
   const prompt=async function*(){await new Promise<void>(resolve=>{release=resolve;});};
   const q=query({prompt:prompt(),options:{...(managed?{env:{...process.env,DISABLE_AUTOUPDATER:"1"}}:{}),cwd:homedir(),pathToClaudeCodeExecutable:binary,settingSources:["user","project","local"],spawnClaudeCodeProcess:options=>{
     const child=spawn(options.command,options.args,{cwd:options.cwd,env:options.env,stdio:["pipe","pipe","pipe"],windowsHide:true});
     if(child.pid){owned.add(child.pid);child.once("close",()=>owned.delete(child.pid!));}return child;
   }}});
-  let timer:ReturnType<typeof setTimeout>|undefined;
   try {
-    return await Promise.race([
-      (async()=>{
-        const results=await Promise.allSettled([q.supportedModels(),q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({skipBehaviors:true})]);
-        if(results.every(r=>r.status==="rejected"))throw new Error("Claude metadata unavailable");
-        return normalizeClaudeMetadata(results[0].status==="fulfilled"?results[0].value:[],results[1].status==="fulfilled"?results[1].value:null);
-      })(),
-      new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error("Claude metadata timeout")),15000);}),
-    ]);
-  } finally {if(timer)clearTimeout(timer);release?.();q.close();}
+    return await collectClaudeMetadata(q);
+  } finally {release?.();q.close();}
 }

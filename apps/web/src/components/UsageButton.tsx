@@ -57,9 +57,12 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
   const accountCredits=data?.accounts.length===1?data.accounts[0]?.credits:null;
   const showCreditBalance=Boolean(accountCredits?.unlimited || (accountCredits?.balance!=null && Number(accountCredits.balance)>0));
   const label=scope!=="machine"?t("累计 {0}",data?.recorded?short(data.recorded.totalTokens):"—"):scope==="machine"&&weekly.length===1?t("周额度剩余 {0}%",formatQuotaPercent(weekly[0].w.remainingPercent,locale())):scope==="machine"&&!!data?.accounts.some(a=>a.windows.length)?t("用量与剩余额度"):data?.recorded?t("总消耗 {0} tokens",short(data.recorded.totalTokens)):t("用量未上报");
-  const showWeeklyReset=scope==="machine"&&weekly.length===1&&!failed;
+  const showWeeklyReset=scope==="machine"&&weekly.length===1;
   const resetAt=showWeeklyReset?weekly[0].w.resetsAt:null;
-  const richMachineSummary=scope==="machine"&&!failed&&data?.accounts.length===1&&(weekly.length===1||fiveHour.length===1||accountCredits||data.resetPrediction);
+  const richMachineSummary=scope==="machine"&&data?.accounts.length===1&&(weekly.length===1||fiveHour.length===1||accountCredits||data.resetPrediction);
+  const quotaRefreshFailed=failed||data?.accounts.some(a=>a.refreshFailed);
+  const quotaStale=data?.accounts.some(a=>a.stale||Date.now()-Date.parse(a.observedAt)>180_000);
+  const quotaNotice=quotaRefreshFailed?t("额度更新失败，显示上次数据"):quotaStale?t("额度数据已过期"):null;
   const updatedAt=data?.accounts.length?data.accounts.map(a=>a.observedAt).sort().at(-1):null;
   const signalLabel=(signal:string)=>signal==="conditional"?t("有条件额度重置"):signal==="card-conditional"?t("有条件发放重置卡"):signal==="announced"?t("已宣布将重置"):signal==="confirmed"?t("已宣布完成重置"):signal==="card-announced"?t("已宣布发放重置卡"):signal==="card-confirmed"?t("已宣布重置卡发放完成"):t("无重置信号");
   const radarEmpty=data?.resetRadar?.state==="error"?t("更新暂时延迟"):data?.resetRadar?.state==="unconfigured"?t("数据源未配置"):data?.resetRadar?.state==="pending"?t("正在检查信号"):t("暂无预测");
@@ -77,8 +80,9 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
   return <>
     {compactQuota ? <div className="buzhou-session-quota">
       <button type="button" className="buzhou-quota-card" onClick={()=>{setOpen(true);refreshUsage.current();}} aria-haspopup="dialog" title={t("查看用量与剩余额度")}>
-        <span><small>{weekly.length===1?t("周额度"):t("已记录消耗")}</small><strong>{failed?t("用量暂不可用"):weekly.length===1?`${formatQuotaPercent(weekly[0].w.remainingPercent,locale())}%`:data?.recorded?short(data.recorded.totalTokens):t("用量未上报")}</strong></span>
-        {weekly.length===1&&!failed&&<span className="host-quota-meter" aria-hidden="true"><i style={{width:`${Math.max(0,Math.min(100,weekly[0].w.remainingPercent))}%`}}/></span>}
+        <span><small>{weekly.length===1?t("周额度"):t("已记录消耗")}</small><strong>{weekly.length===1?`${formatQuotaPercent(weekly[0].w.remainingPercent,locale())}%`:failed?t("用量暂不可用"):data?.recorded?short(data.recorded.totalTokens):t("用量未上报")}</strong></span>
+        {weekly.length===1&&<span className="host-quota-meter" aria-hidden="true"><i style={{width:`${Math.max(0,Math.min(100,weekly[0].w.remainingPercent))}%`}}/></span>}
+        {quotaNotice&&weekly.length===1&&<small role="status">{quotaNotice}</small>}
         <small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>
       </button>
       {codex&&<button type="button" className="buzhou-quota-card buzhou-quota-card--forecast" onClick={()=>{setRadarOpen(true);refreshUsage.current();}} aria-haspopup="dialog">
@@ -95,7 +99,8 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
             {showCreditBalance?<span className="host-quota-metric host-quota-metric--credits"><small>{t("点数余额")}</small><strong>{accountCredits?.balance!=null&&!accountCredits.unlimited?<>{creditBalance(accountCredits.balance)} <b>{t("点")}</b></>:creditText(accountCredits)}</strong><em>{t("由原生 Codex 上报")}</em></span>
             :codex?<span className="host-quota-metric host-quota-metric--forecast" onClick={event=>{event.stopPropagation();setRadarOpen(true);}}><small>{t("临时重置预测")}</small><strong>{radarLabel}</strong><em title={t("公告仅供参考，额度与日期以原生最新数据为准")} aria-label={t("公告仅供参考，额度与日期以原生最新数据为准")}>{t("仅供参考")}</em></span>:null}
           </span>
-          {updatedAt&&<span className="host-quota-updated"><i aria-hidden="true"/>{t("更新于 {0}",date(updatedAt))}<b aria-hidden="true">→</b></span>}
+          {quotaNotice&&<span role="status">{quotaNotice}</span>}
+          {updatedAt&&<span className="host-quota-updated">{!quotaNotice&&<i aria-hidden="true"/>}{t("更新于 {0}",date(updatedAt))}<b aria-hidden="true">→</b></span>}
         </span>
       </>:<><BarChart3 size={14}/><span className="usage-trigger-text">{scope!=="machine"&&!failed?<span className="usage-trigger-metrics" aria-hidden="true"><span>{label}</span>{showCycle&&<span>{t("本周 {0}",periodTokens==null?"—":short(periodTokens))}{data?.quotaCycle?.boundaryIncomplete?" *":""}</span>}<small>tokens</small></span>:<span>{failed?t("用量暂不可用"):label}</span>}{scope==="machine"&&codex&&!failed&&data?.accounts.length===1&&<small>{t("点数余额 {0}",creditText(accountCredits))}</small>}{showWeeklyReset&&<small>{resetAt?t("下次重置：{0}",date(new Date(resetAt*1000).toISOString())):t("重置时间未上报")}</small>}{scope==="machine"&&data?.accounts.length&&!failed?<small>{t("更新于 {0}",updatedAt?date(updatedAt):"—")}</small>:null}{scope==="machine"&&!failed&&fiveHour.length===1&&<><span>{t("5 小时额度剩余 {0}%",formatQuotaPercent(fiveHour[0].remainingPercent,locale()))}</span><small>{fiveHour[0].resetsAt?t("下次重置：{0}",date(new Date(fiveHour[0].resetsAt*1000).toISOString())):t("重置时间未上报")}</small></>}</span></>}
     </button>}
@@ -129,6 +134,7 @@ export function UsageButton({scope,id,onSession,provider="codex",compactQuota=fa
           {!data?.accounts.length&&<p>{t(claude ? "Claude Code 未返回订阅额度；请确认宿主机已登录，且原生版本支持额度查询。" : grok ? "Grok 未返回账号额度；请确认主机已登录 Grok，并使用支持额度查询的版本。" : provider === "cursor" ? "Cursor 未返回账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。" : "账号额度未上报；需要支持额度查询的 Codex 认证。")}</p>}
           {data?.accounts.map((account,i)=><div className="usage-account" key={i}>
             <p>{account.sourceMachine} · {t("更新于 {0}",date(account.observedAt))}{(account.stale||Date.now()-Date.parse(account.observedAt)>180_000)&&<strong> · {t("数据已过期")}</strong>}</p>
+            {account.refreshFailed&&<p role="status">{t("额度更新失败，显示上次数据")}</p>}
             {claude&&<p>{account.subscriptionType ? `${account.subscriptionType.toUpperCase()} · ` : ""}{t("由宿主机 Claude Code 原生查询")}</p>}
             {grok&&<p>{t("由宿主机 Grok 原生查询，后台定期刷新。")}</p>}
             {provider==="cursor"&&<p>{account.subscriptionType?`${account.subscriptionType} · `:""}{t("由宿主机 Cursor 账号接口查询，后台定期刷新。")}</p>}

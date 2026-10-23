@@ -345,3 +345,21 @@ test("repository usage includes worktrees exactly once while individual lanes an
   db.run("UPDATE logical_sessions SET deleted_at=? WHERE logical_session_id='lane'", at);
   assert.equal(service.read(workspaceId, "project", "p-a", "codex", true).recorded?.totalTokens, 20);
 });
+
+test("Claude cached quota survives discovery with an explicit failed-refresh marker and unchanged time",t=>{
+ const {db,workspaceId,service,at}=fixture();t.after(()=>db.close());
+ const registry=new RegistryService(db,config());
+ const windows=[{bucket:"claude",window:"seven_day",windowMinutes:10080,usedPercent:37,resetsAt:Math.floor(Date.now()/1000)+86400}];
+ const report=(refreshFailed:boolean)=>registry.updateDiscovery("a",{state:"ready",agentRuntimes:{claude:{installed:true,quotaAccountKey:"private",quota:{available:true,observedAt:at,refreshFailed,windows}}}});
+ report(true);
+ const result=service.read(workspaceId,"machine","a","claude");
+ assert.equal(result.accounts[0]?.observedAt,at);
+ assert.equal(result.accounts[0]?.windows[0]?.remainingPercent,63);
+ assert.equal(result.accounts[0]?.stale,true);
+ assert.equal((result.accounts[0] as {refreshFailed?:boolean}).refreshFailed,true);
+ assert.equal(JSON.stringify(result).includes("private"),false);
+ assert.equal(db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='a'")!.discovery_json.includes("private"),false);
+ assert.deepEqual(service.read(workspaceId,"machine","b","claude").accounts,[]);
+ report(false);
+ assert.equal((service.read(workspaceId,"machine","a","claude").accounts[0] as {refreshFailed?:boolean}).refreshFailed,undefined);
+});

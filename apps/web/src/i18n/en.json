@@ -1,4 +1,6 @@
 {
+  "额度更新失败，显示上次数据": "Quota refresh failed; showing the last snapshot",
+  "额度数据已过期": "Quota data is out of date",
   "下次发送 · 计划模式": "Next send · Plan mode",
   "是否结束计划并开始执行？": "Finish planning and start execution?",
   "退出计划阶段，允许按计划修改文件和执行命令": "Leave planning and allow file changes and commands according to the plan",
