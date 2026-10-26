@@ -218,6 +218,52 @@ class Migration:
         self.copy(path, path)
         return path
 
+    def prepare_engine(self):
+        """Match the source's config-digest image store before importing receipts.
+
+        Only a gated, otherwise empty destination is eligible. Never rewrite a
+        build receipt to accommodate containerd manifest IDs.
+        """
+        require_active_host(self.root)
+        validate_candidate(self.root, self.image, self.source)
+        if self.remote('hostname') != self.plan['targetHost']:
+            raise RuntimeError('Target hostname mismatch')
+        proxy = self.plan['targetProxyContainer']
+        present = self.remote('docker', 'ps', '-a', '--format', '{{.Names}}').splitlines()
+        if set(present) != {proxy}:
+            raise RuntimeError('Engine preparation requires only the gated proxy on the target')
+        self.remote('test', '-f', self.plan['targetGate'])
+        if 'io.containerd.snapshotter.v1' not in self.remote('docker', 'info', '--format', '{{json .DriverStatus}}'):
+            print('Destination already uses the classic image store.')
+            return 0
+        code = r'''
+import json,os,pathlib,subprocess,sys
+directory,proxy=sys.argv[1:]
+d=pathlib.Path(directory)
+def run(*args): return subprocess.check_output(args,text=True).strip()
+c=json.loads(run('docker','inspect',proxy))[0]
+compose=c['Config']['Labels']['com.docker.compose.project.config_files']
+working=c['Config']['Labels']['com.docker.compose.project.working_dir']
+image=c['Config']['Image']
+config=pathlib.Path('/etc/docker/daemon.json')
+original=config.read_text()
+backup=d/'docker-daemon.before.json'
+if backup.exists(): raise RuntimeError('Engine backup already exists; inspect the previous attempt')
+backup.write_text(original);backup.chmod(0o600)
+run('docker','image','save','-o',str(d/'proxy-image.tar'),image)
+run('docker','update','--restart=no',proxy)
+run('docker','stop','--timeout','-1',proxy)
+settings=json.loads(original);settings.setdefault('features',{})['containerd-snapshotter']=False
+config.write_text(json.dumps(settings,indent=2)+'\n')
+run('systemctl','restart','docker')
+run('docker','image','load','-i',str(d/'proxy-image.tar'))
+run('docker','compose','--project-directory',working,'-f',compose,'up','-d','--no-build','--pull','never')
+run('docker','exec',proxy,'nginx','-t')
+print(run('docker','info','--format','{{.Driver}} {{json .DriverStatus}}'))
+'''
+        print(self.remote('python3', '-c', code, str(self.directory), proxy), flush=True)
+        return 0
+
     def remote_health(self):
         code = "import json,urllib.request;print(json.dumps(json.load(urllib.request.urlopen('http://127.0.0.1:3215/ready',timeout=5))))"
         return json.loads(self.remote('python3', '-c', code))
@@ -424,6 +470,8 @@ def run_migration(root, args, publisher):
             if remote_lock.stdout.readline().strip() != 'locked':
                 raise RuntimeError('Could not acquire target publication lock')
             migration.target_lock = remote_lock
+            if args.migration_phase == 'prepare-engine':
+                return migration.prepare_engine()
             if args.migration_phase == 'preflight':
                 migration.validate()
                 migration.save_compose()

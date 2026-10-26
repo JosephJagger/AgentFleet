@@ -133,7 +133,7 @@ def main():
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--release', action='store_true', help='Explicitly release an abandoned fence after checking service health')
     parser.add_argument('--migration-config', help='Private, reviewed host migration inventory JSON')
-    parser.add_argument('--migration-phase', choices=('preflight', 'rehearse', 'cutover', 'abort-before-traffic'))
+    parser.add_argument('--migration-phase', choices=('prepare-engine', 'preflight', 'rehearse', 'cutover', 'abort-before-traffic'))
     args = parser.parse_args()
     if args.migration_config or args.migration_phase:
         if not (args.migration_config and args.migration_phase and args.image) or args.check or args.release:
