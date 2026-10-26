@@ -137,10 +137,11 @@ it("切换 Agent 重新加载独立项目目录", async () => {
   expect(api.projects).toHaveBeenLastCalledWith(expect.objectContaining({ provider: "claude", offset: 0 }), expect.any(AbortSignal));
 });
 
-it("工作树嵌套在项目中，折叠后仍显示运行状态，创建会话使用工作树项目", async () => {
+it("工作树收起和展开时均提供新会话与定时任务，并传递工作树项目", async () => {
   const child: Project = { ...project, id: "lane", alias: "测试项目-seo", pathHint: "/srv/.test.worktrees/seo", repoRoot: project.pathHint, gitBranch: "feat/seo", parentProjectId: project.id, activity: { running: 1, waiting: 0, uncertain: 0 } };
   vi.mocked(api.projects).mockResolvedValue({ items: [child, project], nextCursor: null, total: 1 });
-  const view = render(<WorkspaceCatalog {...props} refreshKey="tree" />);
+  const onSchedule = vi.fn();
+  const view = render(<WorkspaceCatalog {...props} refreshKey="tree" onSchedule={onSchedule} />);
   const parent = await screen.findByRole("button", { name: /测试项目.*\/srv/ });
   expect(screen.getByText("执行中 1")).toBeTruthy();
   expect(screen.queryByText("seo")).toBeNull();
@@ -149,9 +150,17 @@ it("工作树嵌套在项目中，折叠后仍显示运行状态，创建会话�
   const lane = screen.getByRole("button", { name: /seo 工作树.*分支：feat\/seo/ });
   expect(lane.closest(".catalog-worktrees-list")).toBeTruthy();
   expect(view.container.querySelectorAll(".workspace-catalog > .project-session-group")).toHaveLength(1);
+  expect(lane.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(screen.getByRole("button", { name: "在 测试项目-seo 新建会话" }));
+  expect(props.onCreate).toHaveBeenLastCalledWith(child);
+  fireEvent.click(screen.getByRole("button", { name: "管理 测试项目-seo 的定时任务" }));
+  expect(onSchedule).toHaveBeenLastCalledWith(child);
+  expect(lane.getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(lane);
-  fireEvent.click(await screen.findByRole("button", { name: "在 测试项目-seo 新建会话" }));
-  expect(props.onCreate).toHaveBeenCalledWith(child);
+  expect(screen.getAllByRole("button", { name: "在 测试项目-seo 新建会话" })).toHaveLength(1);
+  expect(screen.getAllByRole("button", { name: "管理 测试项目-seo 的定时任务" })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "管理 测试项目 的定时任务" }));
+  expect(onSchedule).toHaveBeenLastCalledWith(project);
   fireEvent.click(screen.getByRole("button", { name: /^工作树 · 1/ }));
   view.unmount();
   render(<WorkspaceCatalog {...props} refreshKey="remount" />);

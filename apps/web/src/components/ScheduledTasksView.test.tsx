@@ -8,7 +8,7 @@ import { ScheduledTasksView } from "./ScheduledTasksView";
 import { api } from "../lib/api";
 
 vi.mock("../lib/api", () => ({ api: {
-  scheduledTasks: vi.fn(), scheduledHistory: vi.fn(), sessions: vi.fn(), scheduledTask: vi.fn(),
+  createScheduledTask: vi.fn(), scheduledTasks: vi.fn(), scheduledHistory: vi.fn(), sessions: vi.fn(), scheduledTask: vi.fn(),
 } }));
 
 const sessions = Array.from({ length: 20 }, (_, index) => ({
@@ -60,4 +60,21 @@ it("searches host, project, and path before choosing a project for a new session
   fireEvent.click(within(results).getByRole("option", { name: /Blog_规划/ }));
   expect(screen.getByRole("textbox", { name: "任务名称" }).matches(":disabled")).toBe(false);
   expect(screen.getByText(/已选项目 · Home \/ Blog_规划/)).toBeTruthy();
+});
+
+
+it("worktree shortcut preselects its directory and creates the schedule for that project", async () => {
+  setLocale("zh-CN");
+  vi.mocked(api.scheduledTasks).mockResolvedValue({tasks: []});
+  vi.mocked(api.scheduledHistory).mockResolvedValue({runs: []});
+  vi.mocked(api.createScheduledTask).mockResolvedValue({task: {id: "created"}} as never);
+  const lane = { ...machines[0].projects[0], id: "lane", alias: "Demo-feature", pathHint: "/work/.demo.worktrees/feature", repoRoot: "/work/demo", parentProjectId: "project-1" };
+  render(<ScheduledTasksView machines={[{...machines[0], projects: [...machines[0].projects, lane]}]} initialProjectId="lane" onSession={vi.fn()} onToast={vi.fn()} />);
+  expect(screen.getByRole("option", {name: /Demo-feature/}).getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByText(/将在 Home 的目录 \/work\/\.demo.worktrees\/feature 中执行/)).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("任务名称"), {target: {value: "工作树检查"}});
+  fireEvent.change(screen.getByLabelText("执行指令"), {target: {value: "检查当前分支"}});
+  fireEvent.change(screen.getByLabelText("执行频率"), {target: {value: "minutes"}});
+  fireEvent.click(screen.getByRole("button", {name: "创建任务"}));
+  await waitFor(() => expect(api.createScheduledTask).toHaveBeenCalledWith(expect.objectContaining({projectId: "lane", destinationSessionId: null})));
 });

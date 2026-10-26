@@ -128,3 +128,5 @@
 .commit-reminder-card { min-width:0; display:flex; flex-direction:column; gap:6px; }
 .commit-reminder-card > .approval-preview { width:100%; flex:1; }
 .commit-reminder-dismiss { align-self:flex-end; min-height:40px; }
+
+.catalog-worktree-actions { padding:0 10px 12px; }

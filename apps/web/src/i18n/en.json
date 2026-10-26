@@ -4219,5 +4219,7 @@
   "输出用量": "Output",
   "项目本周": "Weekly projects",
   "项目累计": "Project totals",
-  "仅供参考": "For reference"
+  "仅供参考": "For reference",
+  "暂无会话，可在此工作树新建会话。": "No sessions yet. Create a session in this worktree.",
+  "将在 {0} 的目录 {1} 中执行；同项目任务会顺序等待。离线超过 24 小时不补跑。": "Runs in {1} on {0}; tasks in the same project wait their turn. Runs missed while offline for over 24 hours are not retried."
 }

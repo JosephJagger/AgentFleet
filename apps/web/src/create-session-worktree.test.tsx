@@ -51,3 +51,18 @@ it("shows the first catalog page before later pages finish loading", async () =>
   fireEvent.click(screen.getByRole("button", { name: "创建会话" }));
   await waitFor(() => expect(create).toHaveBeenCalledWith("m", "first", "无需等待所有页面", undefined));
 });
+
+
+it("existing worktree entry keeps its project selected even outside the dashboard and creates there without another worktree", async () => {
+  const main = { id: "main", machineId: "m", alias: "repo", pathHint: "/repo" } as Project;
+  const lane = { ...main, id: "lane", alias: "repo-feature", pathHint: "/repo.worktrees/feature", repoRoot: "/repo", parentProjectId: "main" };
+  const machine = { id: "m", name: "host", reachability: "live", compatibility: "compatible", identity: "paired", projects: [main] } as Machine;
+  vi.spyOn(api, "projects").mockResolvedValue({ items: [main], nextCursor: null });
+  const create = vi.fn().mockResolvedValue(undefined);
+  render(<CreateSessionDialog open machines={[machine]} initialProject={lane} onClose={vi.fn()} onCreate={create} onToast={vi.fn()} />);
+  await waitFor(() => expect((screen.getByRole("combobox", {name: "项目"}) as HTMLSelectElement).value).toBe("lane"));
+  expect((screen.getByRole("checkbox", {name: "使用独立工作目录（新建工作树）"}) as HTMLInputElement).checked).toBe(false);
+  fireEvent.change(screen.getByLabelText("会话名称"), {target: {value: "继续工作树开发"}});
+  fireEvent.click(screen.getByRole("button", {name: "创建会话"}));
+  await waitFor(() => expect(create).toHaveBeenCalledWith("m", "lane", "继续工作树开发", undefined));
+});
