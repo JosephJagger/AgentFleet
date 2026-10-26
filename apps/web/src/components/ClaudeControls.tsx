@@ -17,6 +17,7 @@ export function ClaudeControls({permissionModes,models,settings,ready,error,onRe
   const draftRef=useRef(settings);
   useEffect(()=>{onEditingChange?.(dirty.current||saving);},[draft,saving,open,onEditingChange]);
   useEffect(()=>()=>{window.clearTimeout(timer.current);onEditingChange?.(false);},[onEditingChange]);
+  // The display fallback is not an explicit permission override; model edits must preserve omission.
   const model=draft.model,effort=draft.effort ?? "",permission=draft.permissionMode ?? "default",plan=draft.mode === "plan";
   const savedModel=models.find(m=>m.model===settings.model);
   disabled=disabled || !ready || saving;
@@ -43,7 +44,7 @@ export function ClaudeControls({permissionModes,models,settings,ready,error,onRe
   const extraModels=[model,settings.model].filter((id,index,all)=>id!=="host"&&!models.some(item=>item.model===id)&&all.indexOf(id)===index);
   const knownPermissions=new Set(["default",...permissionModes]);
   const controls=<>
-    <label>{t("模型")}<select aria-label={t("Claude Code 模型")} value={model} onChange={e=>{const nextModel=e.target.value;const nextPermission=permission==="auto"&&nextModel!=="host"&&models.find(m=>m.model===nextModel)?.supportsAutoMode!==true?"default":permission;edit({...draft,model:nextModel,effort:undefined,permissionMode:nextPermission});}} disabled={disabled}><option value="host">{t("继承宿主机")}</option>{extraModels.map(id=><option key={id} value={id}>{id}</option>)}{models.map(m=><option key={m.model} value={m.model}>{m.displayName}</option>)}</select></label>
+    <label>{t("模型")}<select aria-label={t("Claude Code 模型")} value={model} onChange={e=>{const nextModel=e.target.value;const nextPermission=draft.permissionMode==="auto"&&nextModel!=="host"&&models.find(m=>m.model===nextModel)?.supportsAutoMode!==true?"default":draft.permissionMode;edit({...draft,model:nextModel,effort:undefined,permissionMode:nextPermission});}} disabled={disabled}><option value="host">{t("继承宿主机")}</option>{extraModels.map(id=><option key={id} value={id}>{id}</option>)}{models.map(m=><option key={m.model} value={m.model}>{m.displayName}</option>)}</select></label>
     <label>{t("思考强度")}<select aria-label={t("Claude Code 思考强度")} value={effort} onChange={e=>edit({...draft,effort:e.target.value||undefined})} disabled={disabled || !efforts.length}><option value="">{t("继承宿主机")}</option>{effort&&!efforts.includes(effort)&&<option value={effort}>{effort}</option>}{efforts.map(e=><option key={e} value={e}>{e}</option>)}</select></label>
   </>;
   return <>
