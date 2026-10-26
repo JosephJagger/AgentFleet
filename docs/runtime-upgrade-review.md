@@ -180,3 +180,57 @@ resume and preservation of saved thread settings, Windows Negotiate/NTLM proxy
 authentication, config overrides across subcommand levels, prompts waiting for
 pending permission selection, sandbox path/symlink hardening, installation/cache/
 daemon-log cleanup, and embedded JavaScript Array.sort safety checks.
+
+## Codex 0.164.0 implementation — Agent 0.30.149 (2026-10-26)
+
+Following the pre-upgrade assessment, 0.164.0 is now registered in both reviewed
+schema lists and in the compatible native-voice gate. Unknown patch versions
+remain rejected. The bundled 0.154.0 installer baseline is unchanged; the managed
+runtime channel discovers and validates 0.164.0 separately. A complete isolated
+run of the production promoter passed official downloads, four-platform digest
+checks, the exact schema, native handshake/history/config probes and Code Mode
+execution, producing a 0.164.0 target in a disposable directory, not the live
+channel. Hosts still require the normal administrator confirmation, idle-time
+validation and rollback health acknowledgement.
+
+Generated image items now appear directly in the conversation at a readable
+size, with optional enlargement and original-image download. Started/completed
+notifications keep the same item identity, including after history replay.
+Generating, failed, unavailable and cloud-cleared states remain visible.
+
+The adapter handles both inline `result` and `fileId` items. The official
+0.164.0 implementation saves a native artifact before emitting the file reference:
+`CODEX_HOME/generated_images/<thread>/<call>.png`. See the pinned upstream
+[artifact layout](https://github.com/openai/codex/blob/rust-v0.164.0/codex-rs/ext/image-generation/src/artifact.rs),
+[save/upload order](https://github.com/openai/codex/blob/rust-v0.164.0/codex-rs/ext/image-generation/src/tool.rs)
+and [app-server save root](https://github.com/openai/codex/blob/rust-v0.164.0/codex-rs/app-server/src/extensions.rs).
+There is no public app-server RPC resolving arbitrary cloud file IDs. The adapter
+reads only the exact thread/item artifact and checks the native `savedPath` when
+present; it does not fetch provider URLs or read arbitrary paths. Symlinks,
+hardlinks, changed files, non-regular files and files over 8 MiB are refused.
+An unavailable local artifact produces an unavailable image state, not a claim
+that cloud-only file IDs were downloaded. Provider file IDs, prompts and local
+paths are not included in the synchronized generated-image item.
+
+Original PNG/JPEG/WebP bytes up to 8 MiB are synchronized without lossy resizing.
+Uploaded/pasted input images retain their separate 128 KiB limit. Generated
+images reuse owner-bound cloud image storage, the 50 MB per-host quota, project
+content policy, retention and cleanup tombstones. A refresh can display the
+stored image while the host is offline. Clearing cloud images cannot be undone
+by replaying native history. Image loading is ordered before turn completion;
+RPC responses remain unblocked while reading native artifacts.
+
+Validation: 37 local-agent tests (including opt-in real 0.164.0 runtime tests),
+37 control-plane tests and 84 web tests passed, none skipped. These cover original
+bytes larger than the input limit, exact artifact binding and unsafe paths,
+file-reference precedence, real persisted inline/file-backed history across a
+native process restart, event ordering, legacy/paginated history readers,
+owner/machine isolation, cleanup replay, state rendering and unchanged runtime
+gates. TypeScript checks passed. Chromium exercised the actual Timeline at
+1280px and 390px widths: inline images decoded, no mobile horizontal overflow,
+enlargement/Escape worked, the original PNG downloaded, and reload rendered it
+again. The browser used synthetic data; no paid image generation or real account
+request was made. macOS/Windows execution and live voice remain unverified.
+
+Release mode must be `full` because the adapter, control plane and web UI change
+together. This implementation record does not assert that a build was published.

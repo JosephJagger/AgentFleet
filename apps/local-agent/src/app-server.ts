@@ -22,6 +22,7 @@ import { previewNativeDeletion, type DeletionPreview } from "./native-deletion.j
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { parseImages, validImageUrl, MAX_IMAGES } from "./images.js";
+import { generatedImageItem, resolveGeneratedImage } from "./generated-images.js";
 import type { TurnExtras } from "./attachments.js";
 import { createInterface } from "node:readline";
 import { AgentError, errorMessage } from "./errors.js";
@@ -294,6 +295,7 @@ function safeText(value: unknown, maxBytes = MAX_CONTENT_BYTES): { text: string;
 export function sanitizeThreadItem(value: unknown): Record<string, unknown> | null {
   if (!isRecord(value) || typeof value.type !== "string" || typeof value.id !== "string") return null;
   switch (value.type) {
+    case "imageGeneration": return generatedImageItem(value);
     case "userMessage": {
       if (!Array.isArray(value.content)) return null;
       let images = 0;
@@ -467,6 +469,7 @@ export class CodexAppServer implements AppServerClient {
   private readonly reasoningSummaries: ReasoningSummaries;
   private readonly voiceIds = new Map<string, string>();
   private voiceNotifications: Promise<void> = Promise.resolve();
+  private readonly imageNotifications = new Map<string, Promise<void>>();
   private readonly voiceClosures = new Map<string,{resolve:()=>void,reject:(error:Error)=>void}>();
 
   constructor(callbacks: AppServerCallbacks, epoch: string = randomUUID(), private readonly environment: NodeJS.ProcessEnv = process.env, private readonly connectionOptions: {daemonThreadId?:string} = {}) {
@@ -898,6 +901,16 @@ export class CodexAppServer implements AppServerClient {
     if (snapshot.nativeThreadId !== threadId) {
       throw new AgentError("THREAD_ID_MISMATCH", "thread/read returned a different thread id");
     }
+    if (isRecord(raw.thread) && Array.isArray(raw.thread.turns)) {
+      for (const turn of raw.thread.turns) {
+        if (!isRecord(turn) || !Array.isArray(turn.items)) continue;
+        for (const value of turn.items) {
+          if (!isRecord(value) || value.type !== "imageGeneration") continue;
+          const entry = snapshot.items.find(item => item.nativeTurnId === turn.id && item.nativeItemId === value.id);
+          if (entry) entry.item = await resolveGeneratedImage(value, threadId, this.environment);
+        }
+      }
+    }
     if (metadataOnly && snapshot.historyMode === "legacy") return this.readThread(threadId,false);
     return {...snapshot, ...(metadataOnly ? {paged:true} : {})};
   }
@@ -924,10 +937,11 @@ export class CodexAppServer implements AppServerClient {
     this.assertInitialized();
     const raw = resultObject(await this.request("thread/items/list", {threadId,cursor,limit:100,sortDirection:"asc"}),"thread/items/list");
     if (!Array.isArray(raw.data) || raw.data.length > 100 || (raw.nextCursor != null && (typeof raw.nextCursor !== "string" || !raw.nextCursor || raw.nextCursor.length > 8192))) throw new AgentError("HISTORY_PAGE_INVALID","Invalid native history page");
-    const items = raw.data.map(entry => {
+    const items: ThreadHistoryItem[] = [];
+    for (const entry of raw.data) {
       if (!isRecord(entry) || !isRecord(entry.item)) throw new AgentError("HISTORY_PAGE_INVALID","Invalid native history item");
-      return {nativeTurnId:requireString(entry.turnId,"turnId",{maxLength:256}),nativeItemId:requireString(entry.item.id,"item.id",{maxLength:256}),item:sanitizeThreadItem(entry.item)};
-    });
+      items.push({nativeTurnId:requireString(entry.turnId,"turnId",{maxLength:256}),nativeItemId:requireString(entry.item.id,"item.id",{maxLength:256}),item:entry.item.type === "imageGeneration" ? await resolveGeneratedImage(entry.item, threadId, this.environment) : sanitizeThreadItem(entry.item)});
+    }
     if (raw.nextCursor && (raw.nextCursor === cursor || items.length === 0)) throw new AgentError("HISTORY_CURSOR_STALLED","Native history cursor did not advance");
     return {items,nextCursor:typeof raw.nextCursor === "string" ? raw.nextCursor : null};
   }
@@ -1331,6 +1345,13 @@ export class CodexAppServer implements AppServerClient {
     if(voiceThread && (this.voiceIds.has(voiceThread) || message.method.startsWith("thread/realtime/"))) {
       this.voiceNotifications=this.voiceNotifications.catch(()=>undefined).then(()=>this.handleNotification(message.method as string,params));
       await this.voiceNotifications;
+    } else if (voiceThread && (this.imageNotifications.has(voiceThread) || isRecord(params.item) && params.item.type === "imageGeneration")) {
+      // Reading native image bytes must not let turn/completed overtake its image.
+      // RPC responses remain outside the notification queue.
+      const pending = (this.imageNotifications.get(voiceThread) ?? Promise.resolve()).catch(() => undefined)
+        .then(() => this.handleNotification(message.method as string, params));
+      this.imageNotifications.set(voiceThread, pending);
+      try { await pending; } finally { if (this.imageNotifications.get(voiceThread) === pending) this.imageNotifications.delete(voiceThread); }
     } else await this.handleNotification(message.method, params);
   }
 
@@ -1647,7 +1668,8 @@ export class CodexAppServer implements AppServerClient {
         payload: { status: params.status },
       };
     } else if ((method === "item/started" || method === "item/completed") && isRecord(params.item)) {
-      const item = sanitizeThreadItem(params.item);
+      const item = params.item.type === "imageGeneration" && typeof params.item.id === "string" && typeof params.threadId === "string"
+        ? await resolveGeneratedImage(params.item, params.threadId, this.environment) : sanitizeThreadItem(params.item);
       if (item && typeof params.threadId === "string" && typeof params.turnId === "string") {
         const nativeItemId = typeof params.item.id === "string" ? params.item.id : undefined;
         if (method === "item/completed" && item.type === "reasoning" && nativeItemId) {

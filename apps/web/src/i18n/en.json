@@ -4221,5 +4221,12 @@
   "项目累计": "Project totals",
   "仅供参考": "For reference",
   "暂无会话，可在此工作树新建会话。": "No sessions yet. Create a session in this worktree.",
-  "将在 {0} 的目录 {1} 中执行；同项目任务会顺序等待。离线超过 24 小时不补跑。": "Runs in {1} on {0}; tasks in the same project wait their turn. Runs missed while offline for over 24 hours are not retried."
+  "将在 {0} 的目录 {1} 中执行；同项目任务会顺序等待。离线超过 24 小时不补跑。": "Runs in {1} on {0}; tasks in the same project wait their turn. Runs missed while offline for over 24 hours are not retried.",
+  "正在生成图片…": "Generating image…",
+  "图片生成失败": "Image generation failed",
+  "图片暂不可用，原图可能已移动、清理或超出同步大小限制。": "Image unavailable. The original may have been moved, cleared, or exceeded the sync size limit.",
+  "放大生成的图片": "Enlarge generated image",
+  "生成的图片": "Generated image",
+  "下载图片": "Download image",
+  "图片生成": "Image generation"
 }

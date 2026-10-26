@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { ControlPlaneDatabase } from "./db.js";
 import type { Principal } from "./auth.js";
 import { invariant } from "./errors.js";
-import { validImageUrl } from "./images.js";
+import { validImageUrl, validGeneratedImageUrl } from "./images.js";
 import type { SQLInputValue } from "node:sqlite";
 
 export const CLOUD_IMAGE_QUOTA = 50_000_000; // 50 decimal MB, encoded image content, per machine.
@@ -59,7 +59,7 @@ export class CloudImages {
 
   store(machineId: string, ownerType: Owner, ownerId: string, value: unknown, mode: "command" | "sync" | "migration", scope?: {logicalSessionId?: string | undefined; nativeThreadId?: string | undefined; nativeTurnId?: string | undefined}): unknown {
     const image = (url: unknown): unknown => {
-      if (!validImageUrl(url)) return url;
+      if (typeof url !== "string" || !(mode === "command" ? validImageUrl(url) : validGeneratedImageUrl(url))) return url;
       const hash = createHash("sha256").update(url).digest("hex");
       if (scope?.logicalSessionId && scope.nativeThreadId && scope.nativeTurnId && this.db.get("SELECT 1 FROM image_cleaned_turns WHERE machine_id=? AND logical_session_id=? AND native_thread_id=? AND native_turn_id=? AND image_hash=?", machineId, scope.logicalSessionId, scope.nativeThreadId, scope.nativeTurnId, hash)) return "[图片已按会话清理，文字保留]";
       if (mode === "command") this.db.run(`INSERT OR IGNORE INTO image_uploads(machine_id,logical_session_id,execution_segment_id,command_id,image_hash)

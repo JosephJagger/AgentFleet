@@ -77,6 +77,8 @@ test("reviewed releases retain native voice while unknown versions remain gated"
  assert.equal(supportsNativeVoice("0.162.1"),true);
  assert.equal(supportsNativeVoice("0.162.2"),false);
  assert.equal(supportsNativeVoice("0.163.0"),true);
+ assert.equal(supportsNativeVoice("0.164.0"),true);
+ assert.equal(supportsNativeVoice("0.164.1"),false);
  assert.equal(supportsNativeVoice("0.160.1"),true);
  assert.equal(supportsNativeVoice("0.159.2"),true);
  assert.equal(supportsNativeVoice("0.159.0"),false);

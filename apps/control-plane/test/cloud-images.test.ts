@@ -23,6 +23,25 @@ async function fixture(t: import("node:test").TestContext, disk = false) {
   return { ...result, path, headers, store: new CloudImages(result.db) };
 }
 
+test("generated images retain original pixels above the input limit and use owner-bound storage and cleanup tombstones", async t => {
+  const { db, store, app, headers } = await fixture(t);
+  const bytes = Buffer.concat([Buffer.from(png.split(",")[1]!, "base64"), Buffer.alloc(180_000)]);
+  const generated = `data:image/png;base64,${bytes.toString("base64")}`;
+  const body = { item: { type: "imageGeneration", id: "generated", status: "completed", content: [{ type: "image", url: generated }] } };
+  const saved = db.transaction(() => store.store("image-a", "event", "generated-event", body, "sync"));
+  assert.equal(JSON.stringify(saved).includes(generated), false);
+  assert.deepEqual(store.hydrate("image-a", "event", "generated-event", saved), body);
+  assert.equal(JSON.stringify(store.hydrate("image-b", "event", "generated-event", saved)).includes(generated), false);
+  assert.equal(JSON.stringify(store.hydrate("image-a", "event", "other-event", saved)).includes(generated), false);
+  assert.equal(store.stats("image-a").usedBytes, Buffer.byteLength(generated));
+  const cleared = await app.inject({ method: "POST", url: "/api/machines/image-a/images/clear", headers, payload: { revision: store.stats("image-a").revision, confirmCloudOnly: true } });
+  assert.equal(cleared.statusCode, 200, cleared.body);
+  assert.equal(JSON.stringify(store.hydrate("image-a", "event", "generated-event", saved)).includes(generated), false);
+  const replay = db.transaction(() => store.store("image-a", "event", "generated-replay", body, "sync"));
+  assert.equal(JSON.stringify(replay).includes(generated), false);
+  assert.equal(store.stats("image-a").usedBytes, 0);
+});
+
 test("image quota is per machine, counts unique encoded bytes; clear needs confirmation and never restores replayed pixels", async t => {
   const { app, db, store, headers } = await fixture(t);
   const body = { item: { type: "userMessage", content: [{ type: "text", text: "keep this text" }, { type: "image", url: png }] } };

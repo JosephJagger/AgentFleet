@@ -3,6 +3,7 @@ export type VideoStoragePage = { configured:boolean; label?:string; quotaBytes?:
 import { parseProviderRuntimeState } from "./provider-runtime-policy";
 import { isProviderId, type ProviderId } from "./provider-catalog";
 import { agentName } from "./agent-provider";
+import { isGeneratedImage } from "./generated-images";
 export type VoiceDirectoryPage={generatedAt:string;hostTotal:number;hostsTruncated:boolean;hosts:{id:string;name:string;heartbeatAt:string|null}[];total:number;nextCursor:string|null;sessions:{id:string;title:string;provider:string;host:string;project:string;managed:boolean;executionState:string;freshness:string;hostHeartbeatAt:string|null;sessionUpdatedAt:string}[]};
 export type LongTermPreference={id:string;body:string;conditions:string;enabled:boolean;expiresAt:string|null;revision:number};
 export type LongTermPreferenceList={revision:number;items:LongTermPreference[];bytes:number;budget:number};
@@ -367,6 +368,7 @@ function toolResultText(value: unknown): string {
 }
 
 function eventBody(type: string, item: JsonObject, payload: JsonObject): string | null {
+  if (item.type === "imageGeneration") return list(item.content).map(record).filter(entry => entry.type === "text").map(entry => string(entry.text)).filter(Boolean).join("\n") || null;
   if (item.type === "userMessage") {
     const body = list(item.content)
       .map((entry) => string(record(entry).text))
@@ -382,6 +384,7 @@ function eventBody(type: string, item: JsonObject, payload: JsonObject): string 
 }
 
 function eventTitle(type: string, item: JsonObject): string {
+  if (item.type === "imageGeneration") return t("图片生成");
   if (item.type === "userMessage") return t("你");
   if (item.type === "agentMessage") return "Codex";
   if (item.type === "plan") return t("计划");
@@ -440,7 +443,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
   const itemType = string(item.type);
   const actor = itemType === "userMessage"
     ? "user"
-    : ["agentMessage", "plan", "reasoning"].includes(itemType)
+    : ["agentMessage", "plan", "reasoning", "imageGeneration"].includes(itemType)
       ? "agent"
       : "system";
   const diffText = string(payload.diff, string(payload.finalDiff));
@@ -480,7 +483,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     ...(item.source === "workspace_snapshot" ? {changeSource:"workspace_snapshot",changeLimited:item.limited===true,changeSupported:item.supported===true}:{}),
     title: commandFailure ? t("请求未执行成功") : eventTitle(type, item),
     ...(type === "thread.history.order" ? {historyOrder:list(payload.items).map(record).filter(x=>typeof x.itemId === "string" && Number.isSafeInteger(x.index)).map(x=>({itemId:String(x.itemId),index:Number(x.index),...(typeof x.occurredAt === "string" ? {occurredAt:x.occurredAt} : {})}))} : {}),
-    images: list(item.content).map(record).filter(entry => entry.type === "image" && isInlineImage(entry.url)).slice(0, 4).map(entry => entry.url as string),
+    images: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? [] : list(item.content).map(record).filter(entry => entry.type === "image" && (itemType === "imageGeneration" ? isGeneratedImage(entry.url) : isInlineImage(entry.url))).slice(0, 4).map(entry => entry.url as string),
     body: commandFailureBody ?? eventBody(type, item, payload),
     payloadState: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? raw.payloadState : "present",
     status: commandFailure ? (payload.state === "unknown" ? "unknown" : "failed") : string(item.status, string(record(payload.turn).status)) || null,

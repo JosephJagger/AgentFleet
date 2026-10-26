@@ -120,6 +120,7 @@ import { CodexSettingsPanel, type RuntimeChoice } from "./components/CodexSettin
 import { PermissionPanel } from "./components/PermissionPanel";
 import { CommandExecution } from "./components/CommandExecution";
 import { MessageImages } from "./components/MessageImages";
+import { GeneratedImage } from "./components/GeneratedImage";
 import { useImageDraft } from "./lib/image-drafts";
 import { timelineItems } from "./lib/timeline-items";
 import { pageItems } from "./lib/pagination";
@@ -631,7 +632,7 @@ function EventIcon({ event }: { event: TimelineEvent }) {
   return <Activity size={15} />;
 }
 
-function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; sessionId: string; provider?: string }) {
+export function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; sessionId: string; provider?: string }) {
   if (events.length === 0) return <div className="timeline-empty"><Clock3 size={19} />{t("发送消息后，{0} 的回复和操作进度会显示在这里。", agentName(provider))}</div>;
   return (
     <div className="timeline">
@@ -643,8 +644,8 @@ function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; se
             <time>{new Date(event.occurredAt).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</time>
             {event.type === "turn.completed" && <TurnUsage tokens={event.turnTokens} cacheHitRate={event.turnCacheHitRate} />}
           </div>
-          {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} sessionId={sessionId} /> : event.actor === "user" ? <UserMessage body={event.body} /> : <p>{event.body}</p> : null}
-          {event.payloadState !== "deleted" && Boolean(event.images?.length) && <MessageImages images={event.images!} />}
+          {event.payloadState === "deleted" ? <p className="deleted-copy">{t("正文已按保留策略删除")}</p> : event.itemType === "imageGeneration" ? <GeneratedImage event={event} /> : event.body ? event.actor === "agent" ? <MarkdownMessage body={event.body} sessionId={sessionId} /> : event.actor === "user" ? <UserMessage body={event.body} /> : <p>{event.body}</p> : null}
+          {event.payloadState !== "deleted" && event.itemType !== "imageGeneration" && Boolean(event.images?.length) && <MessageImages images={event.images!} />}
           {event.payloadState !== "deleted" && <CommandExecution command={event.command} output={event.output} />}
           {event.diff && <div className="diff-summary"><FileDiff size={14} />{count(event.diff.files, "个文件")} <b>+{event.diff.additions}</b> <i>−{event.diff.deletions}</i></div>}
         </article>

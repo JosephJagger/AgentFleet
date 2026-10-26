@@ -1,0 +1,8 @@
+.generated-image { width: min(100%, 680px); margin: 8px 0 12px; min-width: 0; }
+.generated-image__open { display: block; max-width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: zoom-in; background: repeating-conic-gradient(#f4f4f4 0% 25%, #fff 0% 50%) 0 0 / 20px 20px; }
+.generated-image__open img { display: block; max-width: 100%; max-height: 640px; width: auto; height: auto; object-fit: contain; }
+.generated-image figcaption { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 6px; font-size: 12px; color: var(--muted); }
+.generated-image figcaption a { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; color: var(--cobalt); }
+.generated-image__open:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 3px; }
+.generated-image__status { color: var(--muted); font-size: 13px; }
+@media (max-width: 600px) { .generated-image__open img { max-height: 65vh; } }
