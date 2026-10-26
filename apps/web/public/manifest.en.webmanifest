@@ -1,7 +1,7 @@
 {
-  "name": "AgentFleets for Codex",
+  "name": "AgentFleets",
   "short_name": "AgentFleets",
-  "description": "Manage Codex across your hosts",
+  "description": "A workspace for AI agents across your hosts",
   "lang": "en",
   "start_url": "/",
   "scope": "/",

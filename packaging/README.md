@@ -1,4 +1,4 @@
-# AgentFleets for Codex · zero-dependency multi-platform distribution
+# AgentFleets · zero-dependency multi-platform distribution
 
 The release builder first produces a Node 24 Single Executable Application
 (SEA). The local agent is bundled into one CommonJS entry with `esbuild`, a SEA

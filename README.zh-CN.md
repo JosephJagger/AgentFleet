@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/hero.svg" alt="AgentFleets — 在多台电脑上管理 Codex 与 Claude Code" width="100%">
+  <img src="docs/assets/hero.svg" alt="AgentFleets — 在多台电脑上管理 AI 智能体" width="100%">
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center"><strong>一个网页工作台，管理多台电脑上的 AI 工作。</strong><br>
-继续 Codex 与 Claude Code 会话，用语音派发任务，<br>
+继续各个 AI 智能体的会话，用语音派发任务，<br>
 随时查看 Linux、macOS 和 Windows 上各个项目的进度。</p>
 
 ![AgentFleets 工作台，主机、会话和用量均为虚构演示数据](docs/assets/workspace-zh.png)

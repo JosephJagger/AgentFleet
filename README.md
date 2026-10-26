@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/hero.svg" alt="AgentFleets — Codex and Claude Code across your computers" width="100%">
+  <img src="docs/assets/hero.svg" alt="AgentFleets — AI agents across your computers" width="100%">
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center"><strong>One browser workspace for AI work across your computers.</strong><br>
-Continue Codex and Claude Code conversations, delegate work by voice,<br>
+Continue your AI agent conversations, delegate work by voice,<br>
 and follow projects running on Linux, macOS and Windows.</p>
 
 ![AgentFleets workspace with fictional hosts, conversations and usage data](docs/assets/workspace-en.png)

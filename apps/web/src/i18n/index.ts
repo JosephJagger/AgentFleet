@@ -23,7 +23,7 @@ export function useLocale() {
 function updateDocument() {
   if (typeof document === "undefined") return;
   document.documentElement.lang = current;
-  document.querySelector('meta[name="description"]')?.setAttribute("content", current === "en" ? "AgentFleets for Codex — Manage Codex across your hosts" : "AgentFleets for Codex — 你的 Codex 主机控制面");
+  document.querySelector('meta[name="description"]')?.setAttribute("content", current === "en" ? "AgentFleets — A workspace for AI agents across your hosts" : "AgentFleets — 多主机、多智能体工作台");
   document.querySelector('link[rel="manifest"]')?.setAttribute("href", current === "en" ? "/manifest.en.webmanifest" : "/manifest.webmanifest");
 }
 updateDocument();

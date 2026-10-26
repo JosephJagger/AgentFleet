@@ -1,7 +1,7 @@
 {
-  "name": "AgentFleets for Codex",
+  "name": "AgentFleets",
   "short_name": "AgentFleets",
-  "description": "你的 Codex 主机控制面",
+  "description": "多主机、多智能体工作台",
   "lang": "zh-CN",
   "start_url": "/",
   "scope": "/",

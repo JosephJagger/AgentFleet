@@ -258,10 +258,10 @@ function Login({ onLogin }: { onLogin: (dashboard: Dashboard) => void }) {
         <div className="login-preferences"><LanguageSwitcher /><ThemeSwitcher /></div>
         <div className="brand-lockup brand-lockup--large">
           <span className="brand-glyph"><ThemeEmblem /></span>
-          <span>AgentFleets for Codex</span>
+          <span>AgentFleets</span>
         </div>
         <h1>{t("你的代码留在主机。")}<br />{t("控制权跟你走。")}</h1>
-        <p>{t("统一连接 Linux、macOS 与 Windows 上的 Codex。切换主机，接管会话，从任何地方继续你的开发任务。")}</p>
+        <p>{t("统一连接 Linux、macOS 与 Windows 上的 AI 智能体。切换主机，接管会话，从任何地方继续你的开发任务。")}</p>
         <div className="trust-line">
           <span><ShieldCheck size={16} /> {t("权限按需配置")}</span>
           <span><LockKeyhole size={16} /> {t("无入站端口")}</span>
@@ -269,7 +269,7 @@ function Login({ onLogin }: { onLogin: (dashboard: Dashboard) => void }) {
         </div>
       </section>
       <section className="login-panel" aria-labelledby="login-title">
-        <div className="eyebrow">{t("Codex · 多主机控制台")}</div>
+        <div className="eyebrow">{t("多智能体 · 多主机工作台")}</div>
         <h2 id="login-title">{t("进入控制面")}</h2>
         <p className="subtle">{t("输入邮箱接收验证码，首次登录自动创建独立工作区。")}</p>
         <EmailLoginForm onLogin={onLogin} />

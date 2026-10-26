@@ -79,7 +79,7 @@ export function HostsView({ machines, selectedId, onSelect, onPair, onRemove, on
     try { const operation = await api.hostOperation(hostId, type, id); if (generation.current === currentGeneration) setOperations((current) => [operation, ...current.filter((item) => item.id !== operation.id)]); mutationRef.current.delete(key); await onChanged(); }
     catch (reason) { setError((reason as Error).message); } finally { setBusy(false); }
   }
-  if (!machine) return <section className="wide-view"><h1>{selectedId ? t("该主机不存在或已移除") : t("连接你的 Codex 主机")}</h1><p>{selectedId ? t("请选择其他主机，或添加新主机。") : t("一条命令连接，自动发现已有项目和会话。")}</p><HostCards machines={machines} onSelect={onSelect} /><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></section>;
+  if (!machine) return <section className="wide-view"><h1>{selectedId ? t("该主机不存在或已移除") : t("连接你的主机")}</h1><p>{selectedId ? t("请选择其他主机，或添加新主机。") : t("一条命令连接，自动发现已有项目和会话。")}</p><HostCards machines={machines} onSelect={onSelect} /><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></section>;
   const repair = repairCommand(machine, location.origin);
   return <section className="wide-view hosts-view"><div className="wide-view__heading"><div><h1>{t("主机")}</h1></div><button className="button button--primary" type="button" onClick={onPair}>{t("添加主机")}</button></div>
     <HostCards machines={machines} selectedId={machine.id} onSelect={onSelect} />
