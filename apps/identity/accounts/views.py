@@ -1,5 +1,6 @@
 import json
 import math
+import os
 import re
 import secrets
 import uuid
@@ -168,4 +169,5 @@ def verify_code(body):
 def health(request):
     with connection.cursor() as cursor:
         cursor.execute("SELECT 1")
-    return JsonResponse({"status": "ok"})
+    return JsonResponse({"status": "ok", "databaseBackend": connection.vendor,
+                         "build": os.getenv("AGENTFLEET_BUILD_SHA", "local")})

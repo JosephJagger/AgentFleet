@@ -125,6 +125,31 @@ class ProvenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'retain changed components'):
             p.require_mode_covers_changes(self.root, self.first, self.g('rev-parse', 'HEAD'), 'control-plane')
 
+    def test_identity_changes_require_a_paired_build_and_both_verified_images(self):
+        self.commit('apps/identity/app.py','new identity')
+        sha=self.g('rev-parse','HEAD');identity_id='sha256:'+'d'*64;identity_base='sha256:'+'e'*64
+        with self.assertRaisesRegex(RuntimeError,'retain changed components'):
+            p.require_mode_covers_changes(self.root,self.first,sha,'control-plane')
+        record={**self.record,'image':OTHER,'source':sha,'mode':'control-plane','identityImage':identity_id,'baseIdentityImage':identity_base}
+        p.write_receipt(self.root,record)
+        p.write_receipt(self.root,{'policyVersion':1,'kind':'prepared-identity','image':identity_id,'source':sha,'baseImage':identity_base,'mode':'identity'})
+        image={'Id':OTHER,'Config':{'Env':['AGENTFLEET_BUILD_SHA='+sha],'Labels':{p.SOURCE_LABEL:sha,p.BASE_LABEL:BASE,p.MODE_LABEL:'control-plane'}}}
+        identity={'Id':identity_id,'Config':{'Env':['AGENTFLEET_BUILD_SHA='+sha],'Labels':{p.SOURCE_LABEL:sha,p.BASE_LABEL:identity_base,p.MODE_LABEL:'identity'}}}
+        with self.assertRaisesRegex(RuntimeError,'coordinated'):
+            p.validate_candidate(self.root,image,self.runtime)
+        self.assertEqual(p.validate_candidate(self.root,image,self.runtime,identity_runtime={'Image':identity_base},identity_image=identity),record)
+        with self.assertRaisesRegex(RuntimeError,'Identity changed'):
+            p.validate_candidate(self.root,image,self.runtime,identity_runtime={'Image':OTHER},identity_image=identity)
+        identity['Config']['Labels'][p.SOURCE_LABEL]='f'*40
+        with self.assertRaisesRegex(RuntimeError,'Identity image metadata'):
+            p.validate_candidate(self.root,image,self.runtime,identity_runtime={'Image':identity_base},identity_image=identity)
+
+    def test_retired_sqlite_cannot_be_reopened_by_old_publication_commands(self):
+        path=self.root/'old.sqlite';path.touch()
+        (p.registry(self.root)/'database-owner.json').write_text(json.dumps({'engine':'postgresql','retiredSqlite':[str(path)]}))
+        with self.assertRaisesRegex(RuntimeError,'retired'): p.require_current_sqlite(self.root,path)
+        p.require_current_sqlite(self.root,self.root/'independent.sqlite')
+
     def test_receipt_is_immutable_and_digest_path_is_validated(self):
         p.write_receipt(self.root, self.record)
         with self.assertRaisesRegex(RuntimeError, 'refusing to overwrite'):

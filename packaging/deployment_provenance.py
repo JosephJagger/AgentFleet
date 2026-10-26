@@ -47,6 +47,14 @@ def require_active_host(root):
             raise RuntimeError('This host has handed production to ' + str(owner.get('activeHost')))
 
 
+def require_current_sqlite(root, path):
+    marker = registry(root) / 'database-owner.json'
+    if marker.exists():
+        owner = json.loads(marker.read_text())
+        if owner.get('engine') == 'postgresql' and str(Path(path).resolve()) in owner.get('retiredSqlite', []):
+            raise RuntimeError('This SQLite database was retired after PostgreSQL cutover; use the recorded PostgreSQL publication config')
+
+
 def registry(root):
     common = Path(git(root, 'rev-parse', '--git-common-dir'))
     if not common.is_absolute():
@@ -97,7 +105,7 @@ def require_ancestor(root, previous, candidate):
         raise RuntimeError('Candidate does not contain the live source commit; merge the live changes before rebuilding')
 
 
-def require_mode_covers_changes(root, previous, candidate, mode):
+def require_mode_covers_changes(root, previous, candidate, mode, *, with_identity=False):
     if mode not in ('web', 'control-plane', 'full'):
         raise RuntimeError('Unsupported build mode')
     paths = git(root, 'diff', '--name-only', previous, candidate).splitlines()
@@ -107,7 +115,8 @@ def require_mode_covers_changes(root, previous, candidate, mode):
         protected += ['apps/control-plane/', 'packaging/install.sh', 'packaging/install-macos.sh', 'packaging/install.ps1']
     blocked = [p for p in paths if mode != 'full' and any(p.startswith(prefix) for prefix in protected)]
     # This publisher never replaces identity; changing it needs a dedicated coordinated release.
-    blocked += [p for p in paths if p.startswith('apps/identity/')]
+    if not with_identity:
+        blocked += [p for p in paths if p.startswith('apps/identity/')]
     if blocked:
         raise RuntimeError(f'{mode} build would retain changed components: ' + ', '.join(blocked[:8]))
 
@@ -116,7 +125,7 @@ def image_build(image):
     return next((v.split('=', 1)[1] for v in image['Config'].get('Env', []) if v.startswith('AGENTFLEET_BUILD_SHA=')), None)
 
 
-def validate_candidate(root, image, runtime):
+def validate_candidate(root, image, runtime, *, identity_runtime=None, identity_image=None):
     """Call under the publication lock, and again immediately before switching."""
     candidate = read_receipt(root, image['Id'])
     if candidate.get('kind') != 'prepared':
@@ -126,7 +135,23 @@ def validate_candidate(root, image, runtime):
     require_ancestor(root, live['source'], sha)
     if candidate.get('baseImage') != runtime['Image']:
         raise RuntimeError('Live image changed after preparation; rebuild on the current live image')
-    require_mode_covers_changes(root, live['source'], sha, candidate['mode'])
+    paired = candidate.get('identityImage')
+    if paired:
+        if identity_runtime is None or identity_image is None:
+            raise RuntimeError('Paired release requires the coordinated identity publisher')
+        identity = read_receipt(root, paired)
+        if (identity.get('kind') != 'prepared-identity' or identity.get('source') != sha
+                or identity.get('baseImage') != identity_runtime['Image']
+                or candidate.get('baseIdentityImage') != identity_runtime['Image']
+                or identity_image['Id'] != paired):
+            raise RuntimeError('Identity changed or its paired build receipt does not match; rebuild both images')
+        labels = identity_image['Config'].get('Labels') or {}
+        if (image_build(identity_image) != sha or labels.get(SOURCE_LABEL) != sha
+                or labels.get(BASE_LABEL) != identity_runtime['Image'] or labels.get(MODE_LABEL) != 'identity'):
+            raise RuntimeError('Identity image metadata does not match its build receipt')
+    elif identity_runtime is not None or identity_image is not None:
+        raise RuntimeError('Coordinated publication requires a paired identity build receipt')
+    require_mode_covers_changes(root, live['source'], sha, candidate['mode'], with_identity=bool(paired))
     labels = image['Config'].get('Labels') or {}
     if image_build(image) != sha or labels.get(SOURCE_LABEL) != sha or labels.get(BASE_LABEL) != runtime['Image'] or labels.get(MODE_LABEL) != candidate['mode']:
         raise RuntimeError('Image metadata does not match its verified build receipt')

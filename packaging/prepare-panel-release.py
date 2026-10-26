@@ -15,14 +15,17 @@ from deployment_provenance import (BASE_LABEL, MODE_LABEL, POLICY_VERSION, SOURC
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def prepare(root, mode):
+def prepare(root, mode, with_identity=False):
     require_active_host(root)
     sha = require_clean_main(root)
     live = json.loads(subprocess.check_output(['docker', 'inspect', 'agentfleet-control-plane']))[0]
     base_id = live['Image']
     baseline = read_receipt(root, base_id)
     require_ancestor(root, baseline['source'], sha)
-    require_mode_covers_changes(root, baseline['source'], sha, mode)
+    if with_identity and mode == 'web':
+        raise RuntimeError('Paired identity builds require control-plane or full mode')
+    identity_live = json.loads(subprocess.check_output(['docker', 'inspect', 'agentfleets-identity-1']))[0] if with_identity else None
+    require_mode_covers_changes(root, baseline['source'], sha, mode, with_identity=with_identity)
     suffix = uuid.uuid4().hex
     base_tag = 'agentfleet:build-base-' + suffix
     target = 'agentfleet:prepared-' + sha[:12] + '-' + suffix[:8]
@@ -38,6 +41,12 @@ def prepare(root, mode):
                 '--build-arg', 'BASE_IMAGE=' + base_tag, '--build-arg', 'AGENTFLEET_BUILD_SHA=' + sha,
                 '--label', SOURCE_LABEL + '=' + sha, '--label', BASE_LABEL + '=' + base_id,
                 '--label', MODE_LABEL + '=' + mode, '-t', target, directory], check=True)
+            if with_identity:
+                identity_tag = target + '-identity'
+                subprocess.run(['docker', 'build', '-f', str(Path(directory) / 'apps/identity/Dockerfile'),
+                    '--build-arg', 'AGENTFLEET_BUILD_SHA=' + sha,
+                    '--label', SOURCE_LABEL + '=' + sha, '--label', BASE_LABEL + '=' + identity_live['Image'],
+                    '--label', MODE_LABEL + '=identity', '-t', identity_tag, directory], check=True)
         # A concurrent commit or dirty edit invalidates this attempt; no receipt is issued.
         require_clean_main(root, sha)
         current = json.loads(subprocess.check_output(['docker', 'inspect', 'agentfleet-control-plane']))[0]
@@ -47,6 +56,14 @@ def prepare(root, mode):
         record = {'policyVersion': POLICY_VERSION, 'kind': 'prepared', 'source': sha,
                   'tree': git(root, 'rev-parse', sha + '^{tree}'), 'image': image['Id'],
                   'baseImage': base_id, 'mode': mode}
+        if with_identity:
+            current_identity = json.loads(subprocess.check_output(['docker', 'inspect', 'agentfleets-identity-1']))[0]
+            if current_identity['Image'] != identity_live['Image']:
+                raise RuntimeError('Live identity changed during build; rebuild both images')
+            identity = json.loads(subprocess.check_output(['docker', 'image', 'inspect', identity_tag]))[0]
+            write_receipt(root, {'policyVersion': POLICY_VERSION, 'kind': 'prepared-identity', 'source': sha,
+                'tree': record['tree'], 'image': identity['Id'], 'baseImage': identity_live['Image'], 'mode': 'identity'})
+            record.update(identityImage=identity['Id'], baseIdentityImage=identity_live['Image'])
         write_receipt(root, record)
         print(json.dumps({'phase': 'prepared', 'tag': target, **record}), flush=True)
         return record
@@ -57,5 +74,6 @@ def prepare(root, mode):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=['web', 'control-plane', 'full'], required=True)
+    parser.add_argument('--with-identity', action='store_true', help='Build both services from the same commit for coordinated publication')
     args = parser.parse_args()
-    prepare(ROOT, args.mode)
+    prepare(ROOT, args.mode, args.with_identity)

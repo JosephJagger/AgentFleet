@@ -24,6 +24,7 @@ services:
       # Only Django needs the email-provider key and signing secret.
       RESEND_API_KEY: ""
       DJANGO_SECRET_KEY: ""
+      DJANGO_DATABASE_URL: ""
     depends_on:
       runtime-validator:
         condition: service_started

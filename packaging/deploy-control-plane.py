@@ -20,7 +20,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from deployment_provenance import validate_candidate, require_active_host
+from deployment_provenance import validate_candidate, require_active_host, require_current_sqlite
 from postgres_publication import PostgresPublication, postgres_database
 
 SCHEMA = json.loads((ROOT / 'apps/control-plane/src/voice-deployment-schema.json').read_text())
@@ -156,7 +156,16 @@ def main():
     parser.add_argument('--release', action='store_true', help='Explicitly release an abandoned fence after checking service health')
     parser.add_argument('--migration-config', help='Private, reviewed host migration inventory JSON')
     parser.add_argument('--migration-phase', choices=('prepare-engine', 'preflight', 'rehearse', 'cutover', 'abort-before-traffic'))
+    parser.add_argument('--engine-config', help='Private inventory for the initial SQLite-to-PostgreSQL cutover')
+    parser.add_argument('--engine-phase', choices=('check', 'cutover', 'abort-before-traffic'))
     args = parser.parse_args()
+    if args.database:
+        require_current_sqlite(ROOT, args.database)
+    if args.engine_config or args.engine_phase:
+        if not (args.engine_config and args.engine_phase and args.image and args.database) or any((args.migration_config, args.migration_phase, args.check, args.release, args.with_validator)):
+            parser.error('Engine cutover requires --database, --image, --engine-config and --engine-phase only')
+        from postgres_cutover import run_cutover
+        return run_cutover(ROOT, args, sys.modules[__name__])
     if args.migration_config or args.migration_phase:
         if args.postgres_config:
             parser.error('Host migration currently requires SQLite; PostgreSQL engine cutover is a separate coordinated operation')
