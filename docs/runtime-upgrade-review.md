@@ -67,3 +67,116 @@ Isolated Linux checks with the official binary (temporary root-owned directory, 
 ## Codex 0.163.0 兼容性评审（2026-10-17）
 
 协议与 0.162.1 相比只有新增：无删除、无新增必填字段。官方 Linux 安装包摘要核对一致，版本与协议哈希已写入已验证清单；Linux 隔离测试（会话互斥/恢复、历史读取、图片）全部通过，未使用账号或真实模型请求。新增的语音名称暂不开放。验证器仍须校验四平台文件后才晋升，主机照旧空闲、本地验证后才升级。
+
+## Codex 0.164.0 pre-upgrade compatibility review (2026-10-26)
+
+**Result: the tested existing Linux adapter paths pass; rollout has not been enabled.**
+This is the requested compatibility assessment before upgrading AgentFleets, based
+on source commit `3f1f8e790bbf5b8596da3fca28fc0a71256f9174` (Agent 0.30.148).
+No reviewed-version list, voice gate, managed target, installer baseline or live
+service was changed by this assessment.
+
+Sources: [official Codex changelog](https://developers.openai.com/codex/changelog),
+[official release](https://github.com/openai/codex/releases/tag/rust-v0.164.0).
+GitHub's latest-release endpoint returned `rust-v0.164.0`, published
+`2026-10-23T04:48:10Z`, with both `draft` and `prerelease` false.
+
+### Artifact and protocol evidence
+
+- All nine release archives required by the current promoter were downloaded,
+  checked against the official size and SHA-256, and checked for the expected
+  sole archive entry: four Codex binaries, four Code Mode hosts, and Linux bwrap.
+- Linux Codex archive SHA-256:
+  `90dd0b03b28afcb7fa733a4f73b413db2916a47347efd43fb669cc1c774ee8e4`.
+- Linux Code Mode archive SHA-256:
+  `feade7026436baa4e82e898050c7ef82a8adbd98163dc504771275b5ef224f2f`.
+- Linux bwrap archive SHA-256:
+  `60cd1c139823eabac2e4544cc75081d02af5100cfd276efa378dd48a123e109d`.
+- The executable reports `codex-cli 0.164.0`. Generated ordinary App Server v2
+  schema SHA-256:
+  `705a08b903fecb9457a6c888040b16ff20be4bc74682ee3896c61cb27ce43060`.
+- A freshly downloaded 0.163.0 control reproduced the archive/schema hashes
+  recorded above. Both ordinary and `--experimental` schemas were compared.
+
+No existing request method or definition was removed, and no required field was
+added to an existing request. Ordinary request methods increase from 105 to 106
+(`feedback/save`); experimental methods increase from 172 to 175 (also
+`thread/sample` and `thread/sample/cancel`). Other additions include application
+storage requirements, pre/post-model-request hooks, optional MCP tool-list
+metadata, and `sci`/`sci_plus` plan enum values. Experimental turn requests gain
+an optional client-metadata patch; prediction forks gain an optional MCP flag.
+
+This is **not an entirely additive response change**: `imageGeneration` now
+accepts either `fileId` or inline `result`, and adds optional `inputImages`.
+AgentFleets' current `sanitizeThreadItem` returns `null` for both old inline and
+new file-backed generated-image fixtures. Thus this is an existing generated
+image display gap, not a newly broken supported display path. The image-input
+test below verifies uploaded images, not generated-image rendering. Supporting
+file-backed generated images requires attachment retrieval and panel rendering
+work with separate regression coverage.
+
+Ordinary realtime definitions are unchanged. The experimental
+`ThreadRealtimeStartParams` gains only optional `voiceSessionId`, distinct from
+the existing `realtimeSessionId`. Existing voice choices and requests remain
+schema-compatible; an actual microphone/backend call was not tested.
+
+### Execution and regression results
+
+All runtime probes used temporary homes and synthetic sessions, without account
+credentials, real model requests or existing user sessions. The image turn used
+a local HTTP Responses fixture. Tests exercised the actual 0.164.0 executable.
+
+- Production `validateRuntime`: exact version/schema, initialize/initialized,
+  config/read and empty thread/list passed.
+- Production `probeCodeModeHost`: protocol-v1 session open and no-tool arithmetic
+  execution passed. `checkSandbox`: project write succeeded and outside-project
+  write was blocked.
+- Native test group: **12/12 passed, none skipped**, comprising 7 real-runtime
+  cases and 5 daemon-discovery/transport guard cases. Files: `writer-native`,
+  `conversation-history-native`, `image-native`, `session-daemon-native`,
+  `daemon-transport`, and `app-server-config`. Coverage includes legacy/paginated
+  writer exclusion, same-ID release/resume, permission profiles, archive/restore,
+  descendant deletion protections, unrelated-history retention, Desktop config
+  overrides, and attaching to an existing isolated daemon without stopping it.
+- Local-agent regression group: **85/85 passed, none skipped** (`app-server-policy`,
+  `managed-runtime-update`, `schema-01540`, `native-voice`, `codex-gap`,
+  `conversation-history`, `images`, `session-app-server`, `daemon-app-server`,
+  `update-network`). Control-plane group: **31/31 passed, none skipped**
+  (`runtime-promotion`, `runtime-channel-api`, `native-voice`, `session-history`,
+  `images`, `provider-runtime-policy`). Both TypeScript builds passed on Node 24.
+- The first native attempt correctly refused the executable under `/tmp` because
+  a root service requires every executable parent to be root-controlled. The
+  verified executable was copied into a private root-owned directory, then the
+  entire native group passed. No path-ownership guard was disabled.
+
+macOS/Windows archive integrity was verified; those binaries were not executed.
+Real-account MCP authentication, Windows enterprise proxy authentication and
+live voice remain outside this Linux verification.
+
+### Required upgrade work and current gate
+
+An isolated run of the existing promoter with official 0.164.0 metadata confirmed
+that it stops before artifact preparation. The current schema lookup returns
+`unreviewed`, and `supportsNativeVoice("0.164.0")` returns false. Installing the CLI
+alone therefore does not complete AgentFleets support.
+
+To ship support, register the reviewed hash in **both** compatibility lists, add
+0.164.0 to the native-voice gate with regression coverage, and release the matching
+Agent/control plane. Preserve unknown-version rejection, host idle/local health
+checks and rollback. The 0.154.0 bundled installer baseline is separate from the
+reviewed managed-update channel; it need not be mechanically replaced to promote
+0.164.0. Production preparation/publication must follow release provenance rules.
+
+### User-facing changes from 0.163.0
+
+The official release lists ten reusable `/presets` slots; inline `/model` and
+`/permissions` arguments; fullscreen terminal image previews on Kitty/Sixel;
+enterprise MCP sign-in improvements; credential masking for supported remote
+Bash/Zsh sessions and custom providers; and a default-enabled Bedrock setup wizard.
+These CLI features do not automatically become AgentFleets web controls.
+
+Relevant fixes include failed/background compaction recovery, compressed-history
+resume and preservation of saved thread settings, Windows Negotiate/NTLM proxy
+authentication, config overrides across subcommand levels, prompts waiting for
+pending permission selection, sandbox path/symlink hardening, installation/cache/
+daemon-log cleanup, and embedded JavaScript Array.sort safety checks.
