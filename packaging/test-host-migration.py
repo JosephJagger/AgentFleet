@@ -46,13 +46,14 @@ class MigrationTests(unittest.TestCase):
                     'HostConfig': {'PortBindings': ports or {}, 'ReadonlyRootfs': True, 'CapDrop': ['ALL']},
                     'Mounts': [{'Type': 'volume', 'Name': 'data', 'Destination': '/app/data', 'RW': True}]}
         containers = [service('agentfleet-control-plane', {'3000/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '3215'}]}),
-                      service('agentfleet-runtime-validator'), service('agentfleets-identity-1')]
+                      service('agentfleet-runtime-validator'), service('agentfleets-identity-1'), service('agentfleet-www')]
         result = m.compose_spec({'containers': containers, 'networkSubnet': '172.30.0.0/16'}, 'sha256:new', 'full-sha')
         cp = result['services']['control-plane']
         self.assertEqual(cp['image'], 'sha256:new')
         self.assertEqual(cp['environment'], {'SECRET': 'preserve', 'AGENTFLEET_BUILD_SHA': 'full-sha'})
         self.assertEqual(cp['ports'], ['127.0.0.1:3215:3000/tcp'])
         self.assertEqual(result['services']['identity']['image'], 'sha256:old')
+        self.assertTrue(result['services']['website']['init'])
         self.assertTrue(result['volumes']['data']['external'])
         containers[0]['HostConfig']['PortBindings']['3000/tcp'][0]['HostIp'] = '0.0.0.0'
         with self.assertRaisesRegex(RuntimeError, 'loopback'):

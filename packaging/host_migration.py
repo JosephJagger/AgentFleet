@@ -101,6 +101,8 @@ def compose_spec(plan, image, revision):
         service = {'container_name': name, 'image': image if panel else container['Image'],
                    'restart': 'unless-stopped', 'environment': env,
                    'read_only': host.get('ReadonlyRootfs', False)}
+        if name in ('agentfleet-www', 'applefleets-renderer'):
+            service['init'] = True
         for source, dest in [('Cmd', 'command'), ('Entrypoint', 'entrypoint'), ('User', 'user'), ('WorkingDir', 'working_dir')]:
             if config.get(source):
                 service[dest] = config[source]
@@ -322,6 +324,15 @@ print(run('docker','info','--format','{{.Driver}} {{json .DriverStatus}}'))
 
     def graceful_stop(self, remote=False):
         run = self.remote if remote else lambda *args: execute(list(args))
+        # These legacy HTTP-only Node PID 1 services lack application shutdown
+        # handlers. Install a temporary drain handler through their container-local
+        # inspector, then disable the inspector before sending SIGTERM. Never use
+        # this for the control plane, voice/SSH services, or database processes.
+        for name in self.names:
+            if name in ('agentfleet-www', 'applefleets-renderer'):
+                run('docker', 'kill', '--signal=SIGUSR1', name)
+                script = (self.root / 'packaging/migration-http-drain.mjs').read_text()
+                run('docker', 'exec', name, 'node', '--input-type=module', '-e', script)
         run('docker', 'update', '--restart=no', *self.names)
         # SIGTERM only. Never let a timeout escalate into SIGKILL.
         run('docker', 'kill', '--signal=SIGTERM', *self.names)
