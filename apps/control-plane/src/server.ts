@@ -1,3 +1,4 @@
+import { generatedImageAccess } from "./generated-image-access.js";
 import { dismissPendingCommit } from "./pending-commits.js";
 import { projectCatalog } from "./project-catalog.js";
 import { VideoStorage, readVideoStorageConfig } from "./video-storage.js";
@@ -85,6 +86,7 @@ interface AgentSocketState {
   reconciliationReady: boolean;
   dispatchPaused?: boolean;
   projectFiles?: boolean;
+  generatedImageStreaming?: boolean;
   nativeSubagents?: boolean;
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
@@ -97,6 +99,9 @@ interface AgentSocketState {
 }
 
 interface PendingProjectFile {
+  generated?: boolean;
+  waitingForDrain?: boolean;
+  checkAccess?: () => void;
   machineId: string;
   transportGeneration: number;
   stream: PassThrough;
@@ -458,6 +463,10 @@ export async function buildControlPlane(
     if (!transfer) return;
     projectFiles.delete(requestId);
     clearTimeout(transfer.timer);
+    if (transfer.generated) {
+      const agent = agents.get(transfer.machineId);
+      if (agent?.identity.transportGeneration === transfer.transportGeneration) sendJson(agent.socket,{type:"file.cancel",requestId});
+    }
     if (transfer.metadata) transfer.stream.destroy(error);
     else transfer.rejectStart(error);
   };
@@ -1508,7 +1517,9 @@ export async function buildControlPlane(
     const principal = request.principal as Principal;
     const logicalSessionId = routeId(request);
     const query = request.query as Record<string, unknown>;
-    const path = requiredString(query.path, "path", 8_192);
+    const generatedEvent = query.generatedEvent === undefined ? undefined : requiredString(query.generatedEvent,"generatedEvent",200);
+    const path = generatedEvent ? undefined : requiredString(query.path, "path", 8_192);
+    const generatedImage = generatedEvent ? generatedImageAccess(db,principal,logicalSessionId,generatedEvent) : undefined;
     invariant(query.download === undefined || query.download === "1", 400, "FILE_MODE_INVALID", "download must be 1 when provided");
     const binding = db.get<{ machine_id: string; external_id: string }>(
       `SELECT s.machine_id,p.external_id FROM logical_sessions s JOIN projects p ON p.project_id=s.project_id
@@ -1519,6 +1530,7 @@ export async function buildControlPlane(
     invariant(binding, 404, "SESSION_NOT_FOUND", "Logical Session was not found");
     const agent = agents.get(binding.machine_id);
     invariant(agent?.reconciliationReady && agent.socket.readyState === WebSocket.OPEN, 409, "FILE_HOST_UNAVAILABLE", "Host must be online and synchronized to read files");
+    invariant(!generatedImage || agent.generatedImageStreaming === true,409,"FILE_AGENT_UPDATE_REQUIRED","Update the host Agent to display large generated images");
     invariant(agent.projectFiles === true, 409, "FILE_AGENT_UPDATE_REQUIRED", "Update the host Agent before previewing or downloading files");
     limiter.check(`project-file:${principal.userId}:${binding.machine_id}`, 30, 60_000);
     invariant([...projectFiles.values()].filter((item) => item.machineId === binding.machine_id).length < 3, 429, "FILE_TRANSFER_BUSY", "Too many file transfers are active on this host");
@@ -1533,6 +1545,7 @@ export async function buildControlPlane(
       rejectStart = reject;
     });
     const transfer: PendingProjectFile = {
+      ...(generatedEvent ? {generated:true,checkAccess:()=>{generatedImageAccess(db,principal,logicalSessionId,generatedEvent);}} : {}),
       machineId: binding.machine_id,
       transportGeneration: agent.identity.transportGeneration,
       stream,
@@ -1545,7 +1558,7 @@ export async function buildControlPlane(
     };
     transfer.timer.unref();
     projectFiles.set(requestId, transfer);
-    if (!sendJson(agent.socket, { type: "file.read", requestId, logicalSessionId, projectExternalId: binding.external_id, path: deliveredPath(db,principal,logicalSessionId,path,id=>coordination.getCommand(principal,id)) ?? path })) {
+    if (!sendJson(agent.socket, { type: "file.read", requestId, logicalSessionId, projectExternalId: binding.external_id, ...(generatedImage ? {generatedImage} : {path: deliveredPath(db,principal,logicalSessionId,path!,id=>coordination.getCommand(principal,id)) ?? path}) })) {
       failProjectFile(requestId, new AppError(503, "FILE_TRANSPORT_LOST", "Host connection was lost before file transfer"));
     }
     const metadata = await started;
@@ -2041,6 +2054,7 @@ export async function buildControlPlane(
           if (message.type === "hello") {
             state.reconciliationReady = false;
             state.projectFiles = message.capabilities?.projectFiles === true;
+            state.generatedImageStreaming = message.capabilities?.generatedImageStreaming === true;
             state.nativeSubagents = message.capabilities?.nativeSubagents === true;
             state.realtimeVoice = message.capabilities?.realtimeVoice === true;
             state.conversationHistory = message.capabilities?.conversationHistory === true;
@@ -2122,7 +2136,7 @@ export async function buildControlPlane(
             const transfer = projectFiles.get(requestId);
             if (!transfer || transfer.machineId !== identity.machineId || transfer.transportGeneration !== identity.transportGeneration) return;
             const filename = typeof message.filename === "string" ? message.filename : "";
-            if (transfer.metadata || !filename || filename.length > 512 || filename.includes("/") || filename.includes("\\") || !Number.isSafeInteger(message.size) || message.size < 0 || message.size > MAX_PROJECT_FILE_BYTES) {
+            if (transfer.metadata || !filename || filename.length > 512 || filename.includes("/") || filename.includes("\\") || !Number.isSafeInteger(message.size) || message.size < 0 || (!transfer.generated && message.size > MAX_PROJECT_FILE_BYTES) || (transfer.generated && !["generated-image.png","generated-image.jpg","generated-image.webp"].includes(filename))) {
               failProjectFile(requestId, new AppError(502, "FILE_METADATA_INVALID", "Host returned invalid file metadata"));
               return;
             }
@@ -2134,7 +2148,7 @@ export async function buildControlPlane(
             const transfer = projectFiles.get(requestId);
             if (!transfer || transfer.machineId !== identity.machineId || transfer.transportGeneration !== identity.transportGeneration) return;
             const encoded = typeof message.data === "string" ? message.data : "";
-            if (!transfer.metadata || !Number.isSafeInteger(message.sequence) || message.sequence !== transfer.expectedSequence || !encoded || encoded.length > 300_000 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(encoded)) {
+            if (transfer.waitingForDrain || !transfer.metadata || !Number.isSafeInteger(message.sequence) || message.sequence !== transfer.expectedSequence || !encoded || encoded.length > 300_000 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(encoded)) {
               failProjectFile(requestId, new AppError(502, "FILE_CHUNK_INVALID", "Host returned an invalid file chunk"));
               return;
             }
@@ -2143,10 +2157,18 @@ export async function buildControlPlane(
               failProjectFile(requestId, new AppError(502, "FILE_CHUNK_INVALID", "Host returned an invalid file chunk length"));
               return;
             }
+            try { transfer.checkAccess?.(); } catch (error) { failProjectFile(requestId,error as Error); return; }
             transfer.hash.update(chunk);
             transfer.received += chunk.length;
             transfer.expectedSequence += 1;
-            transfer.stream.write(chunk);
+            const writable = transfer.stream.write(chunk);
+            if (transfer.generated) {
+              const ack = () => { if (projectFiles.get(requestId) === transfer) sendJson(socket,{type:"file.chunk.ack",requestId,sequence:message.sequence}); };
+              if (writable) ack(); else {
+                transfer.waitingForDrain = true;
+                transfer.stream.once("drain",()=>{transfer.waitingForDrain=false;ack();});
+              }
+            }
             refreshProjectFileTimeout(requestId, transfer);
           } else if (message.type === "file.end") {
             const requestId = requiredString(message.requestId, "requestId", 256);

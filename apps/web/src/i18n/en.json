@@ -4228,5 +4228,7 @@
   "放大生成的图片": "Enlarge generated image",
   "生成的图片": "Generated image",
   "下载图片": "Download image",
-  "图片生成": "Image generation"
+  "图片生成": "Image generation",
+  "原图暂不可用，请确认主机在线且原图仍在。": "Original image is unavailable. Check that the host is online and the original file still exists.",
+  "图片暂不可用，原图可能已移动或清理。": "Image unavailable. The original may have been moved or removed."
 }

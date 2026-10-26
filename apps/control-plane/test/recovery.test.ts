@@ -6,9 +6,10 @@ import { join } from "node:path";
 import type { ControlPlaneConfig } from "../src/config.js";
 import { ControlPlaneDatabase } from "../src/db.js";
 import { CoordinationService } from "../src/coordination.js";
+import { createHash } from "node:crypto";
 import { payloadHash, sha256 } from "../src/crypto.js";
 import { MaintenanceService } from "../src/maintenance.js";
-import type { Principal } from "../src/auth.js";
+import { AuthService, type Principal } from "../src/auth.js";
 import { AppError } from "../src/errors.js";
 import { RegistryService, type AgentConnectionIdentity } from "../src/registry.js";
 import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
@@ -1180,7 +1181,7 @@ test("generated image replay above 1 MB completes reconciliation and restores he
   const send = (value: unknown) => socket.send(JSON.stringify(value));
   await next("welcome");
   const streams = [{producerEpoch:"image-producer",throughHostSeq:1}];
-  send({type:"hello",producerEpoch:"image-producer",appServerEpoch:"image-runtime",agentVersion:"0.30.149",codexVersion:"0.163.0",schemaHash:"d204b96d8560d56600127423b89df9db471b3e22338e8809bb91d5a952998978",credentialProtectionLevel:"software_protected",platform:"linux",platformRelease:"24.04",architecture:"x64",capacity:"idle",
+  send({type:"hello",capabilities:{projectFiles:true,generatedImageStreaming:true},producerEpoch:"image-producer",appServerEpoch:"image-runtime",agentVersion:"0.30.149",codexVersion:"0.163.0",schemaHash:"d204b96d8560d56600127423b89df9db471b3e22338e8809bb91d5a952998978",credentialProtectionLevel:"software_protected",platform:"linux",platformRelease:"24.04",architecture:"x64",capacity:"idle",
     projects:[{externalId:"image-project",alias:"Images",canonicalRoot:"/images",identityHash:"image-root",leaseVersion:1}],
     sessions:[{externalId:"image-session",projectExternalId:"image-project",executionSegmentExternalId:"image-segment",nativeThreadId:"native-image-thread",managed:false,executionState:"completed",threadControlVersion:1}],reconciliationStreams:streams});
   const hello = await next("hello.ack");
@@ -1201,6 +1202,38 @@ test("generated image replay above 1 MB completes reconciliation and restores he
   assert.equal(db.get<{data_url:string}>("SELECT data_url FROM cloud_images WHERE machine_id='image-host'")!.data_url,url);
   send(frame); await next("event.ack");
   assert.equal(db.get<{n:number}>("SELECT count(*) n FROM durable_events")!.n,1);
+  // A larger original stays out of the durable envelope and uses acknowledged chunks.
+  const streamedPayload = {item:{id:"large-item",type:"imageGeneration",status:"completed",imageState:"streamed",imageBytes:53*1024*1024}};
+  send({...frame,event:{...frame.event,eventId:"large-image-event",nativeItemId:"large-item",hostSeq:2,payload:streamedPayload,payloadHash:payloadHash(streamedPayload)}});
+  await next("event.ack");
+  const login = new AuthService(db,config(":memory:")).login("admin@example.test","correct horse battery staple","127.0.0.1","test");
+  const headers = {cookie:`agentfleet_test=${login.sessionToken}`};
+  const urlPath = `/api/sessions/${session.logical_session_id}/files?generatedEvent=large-image-event`;
+  assert.equal((await app.inject({method:"GET",url:urlPath})).statusCode,401);
+  const response = app.inject({method:"GET",url:urlPath,headers});
+  const read = await next("file.read");
+  assert.deepEqual(read.generatedImage,{nativeThreadId:"native-image-thread",itemId:"large-item"});
+  assert.equal(read.path,undefined);
+  const total=53*1024*1024,hash=createHash("sha256");let position=0,sequence=0;
+  send({type:"file.start",requestId:read.requestId,filename:"generated-image.png",size:total});
+  while(position<total){
+    const chunk=Buffer.alloc(Math.min(192*1024,total-position));
+    if(!position)Buffer.from([137,80,78,71,13,10,26,10]).copy(chunk);
+    hash.update(chunk);
+    send({type:"file.chunk",requestId:read.requestId,sequence,data:chunk.toString("base64")});
+    assert.equal((await next("file.chunk.ack")).sequence,sequence++);position+=chunk.length;
+    if(sequence===2){send({type:"heartbeat",capacity:"idle",activeTurns:0});await next("heartbeat.ack");}
+  }
+  send({type:"file.end",requestId:read.requestId,size:total,chunks:sequence,sha256:hash.digest("hex")});
+  const downloaded=await response;
+  assert.equal(downloaded.statusCode,200);assert.equal(downloaded.rawPayload.length,total);
+  assert.equal(downloaded.headers["content-type"],"image/png");
+  assert.equal(db.get<{n:number}>("SELECT count(*) n FROM cloud_images")!.n,1,"large stream is never copied into cloud image storage");
+  db.run("UPDATE projects SET sync_content=0");
+  assert.equal((await app.inject({method:"GET",url:urlPath,headers})).statusCode,404);
+  db.run("UPDATE projects SET sync_content=1");
+  db.run("UPDATE content_blobs SET deleted_at=? WHERE payload_ref=(SELECT payload_ref FROM durable_events WHERE event_id='large-image-event')",now);
+  assert.equal((await app.inject({method:"GET",url:urlPath,headers})).statusCode,404);
   // The transport ceiling is still enforced, and oversize frames never enter storage.
   const closed = new Promise<number>(resolve => socket.once("close", code => resolve(code)));
   socket.send(" ".repeat(49_000_000));

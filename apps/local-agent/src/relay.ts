@@ -11,6 +11,7 @@ import type { PairingCredential } from "./types.js";
 import { obtainConnectionTicket } from "./ticket.js";
 import { delay, isRecord } from "./util.js";
 import { renewCredential, shouldRenewCredential } from "./credentials.js";
+import { streamGeneratedImage } from "./generated-image-stream.js";
 import { streamProjectFile } from "./project-files.js";
 
 // The WHATWG client (Node's global WebSocket) accepts only 1000 or
@@ -119,6 +120,7 @@ export class RelayConnection {
   private readonly onReady: (() => void) | undefined;
   private renewing = false;
   private readonly fileTransfers = new Map<string, AbortController>();
+  private readonly fileChunkAcks = new Map<string, {sequence:number; resolve:()=>void}>();
 
   constructor(options: {
     runtime: AgentRuntime;
@@ -539,12 +541,21 @@ export class RelayConnection {
         if (this.reconciliationReady) void this.runtime.refreshQuota().catch(error => this.logger.warn(`quota refresh failed: ${errorMessage(error)}`));
         return;
       }
+      case "file.chunk.ack": {
+        if (typeof value.requestId === "string") {
+          const ack = this.fileChunkAcks.get(value.requestId);
+          if (ack && ack.sequence === value.sequence) ack.resolve();
+        }
+        return;
+      }
       case "file.read": {
         const requestId = typeof value.requestId === "string" && value.requestId.length <= 256 ? value.requestId : undefined;
         const logicalSessionId = typeof value.logicalSessionId === "string" && value.logicalSessionId.length <= 256 ? value.logicalSessionId : undefined;
         const projectId = typeof value.projectExternalId === "string" && value.projectExternalId.length <= 256 ? value.projectExternalId : undefined;
         const path = typeof value.path === "string" && value.path.length <= 8_192 ? value.path : undefined;
-        if (!requestId || !logicalSessionId || !projectId || !path) {
+        const generated = isRecord(value.generatedImage) && typeof value.generatedImage.nativeThreadId === "string" && typeof value.generatedImage.itemId === "string"
+          ? {nativeThreadId:value.generatedImage.nativeThreadId,itemId:value.generatedImage.itemId} : undefined;
+        if (!requestId || !logicalSessionId || !projectId || (!path && !generated)) {
           this.protocolError("file request is malformed");
           return;
         }
@@ -555,7 +566,10 @@ export class RelayConnection {
         const controller = new AbortController();
         const sourceSocket = this.socket;
         this.fileTransfers.set(requestId, controller);
-        void streamProjectFile(this.store, { logicalSessionId, projectId, path }, {
+        const reader = (callbacks: Parameters<typeof streamProjectFile>[2]) => generated
+          ? streamGeneratedImage(this.store, {logicalSessionId,projectId,...generated}, callbacks)
+          : streamProjectFile(this.store, {logicalSessionId,projectId,path:path!}, callbacks);
+        void reader({
           signal: controller.signal,
           onStart: (metadata) => {
             if (this.socket !== sourceSocket || !this.send({ type: "file.start", requestId, ...metadata })) {
@@ -563,9 +577,21 @@ export class RelayConnection {
             }
           },
           onChunk: async (chunk, sequence) => {
+            // Generated images wait for the browser stream to drain before reading another chunk.
+            let settled = false;
+            const acknowledged = generated ? new Promise<void>((resolve, reject) => {
+              const cleanup = () => { settled = true; clearTimeout(timer); controller.signal.removeEventListener("abort", abort); this.fileChunkAcks.delete(requestId); };
+              const abort = () => { cleanup(); reject(new AgentError("FILE_TRANSFER_CANCELLED", "Image transfer cancelled")); };
+              const timer = setTimeout(abort,60_000); timer.unref();
+              controller.signal.addEventListener("abort",abort,{once:true});
+              this.fileChunkAcks.set(requestId,{sequence,resolve:()=>{cleanup();resolve();}});
+            }) : undefined;
+            acknowledged?.catch(() => undefined);
             if (this.socket !== sourceSocket || !this.send({ type: "file.chunk", requestId, sequence, data: chunk.toString("base64") })) {
+              if (generated && !settled) controller.abort();
               throw new AgentError("FILE_TRANSPORT_LOST", "File transfer connection was lost");
             }
+            if (acknowledged) await acknowledged;
             while (sourceSocket && sourceSocket.bufferedAmount > MAX_WS_FRAME_BYTES && sourceSocket.readyState === WebSocket.OPEN) {
               await yieldToIO();
             }

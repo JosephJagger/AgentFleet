@@ -49,3 +49,18 @@ it("never restores cleared, suppressed or deleted pixels or loads remote/SVG ima
   const event = { ...mapEvent(raw), body: "云端图片已清理" }; render(<GeneratedImage event={event} />);
   expect(screen.getByRole("status").textContent).toContain("已清理");
 });
+it("renders arbitrarily large originals through an authenticated URL without embedding image bytes", () => {
+  const raw = {...native("completed", ""),logicalSessionId:"session-large"};
+  Object.assign(raw.payload.item,{imageState:"streamed",imageBytes:500_000_000});
+  const event = mapEvent(raw);
+  const url = "/api/sessions/session-large/files?generatedEvent=event";
+  expect(event.images).toEqual([url]);
+  const view=render(<GeneratedImage event={event} />);
+  expect(screen.getByRole("img",{name:"生成的图片"}).getAttribute("src")).toBe(url);
+  expect(screen.getByRole("link",{name:"下载图片"}).getAttribute("href")).toBe(url+"&download=1");
+  fireEvent.error(screen.getByRole("img",{name:"生成的图片"}));
+  expect(screen.getByRole("status").textContent).toContain("主机在线");
+  view.unmount();
+  expect(mapEvent({...raw,payloadState:"deleted"}).images).toEqual([]);
+  expect(mapEvent({...raw,logicalSessionId:"other/path"}).images).toEqual([]);
+});

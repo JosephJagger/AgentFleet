@@ -776,6 +776,7 @@ export class AgentRuntime {
         commandTypes: this.isWritable() ? [...ALLOWED_COMMAND_TYPES] : this.support.providerHostSupported && this.appServer ? ["thread.claim","thread.release","turn.start","turn.queue","turn.cancel","approval.decide_once","input.respond"] : [],
         maintenanceTypes: ["provider.runtime","connection.repair", "catalog.refresh", "agent.update", "runtime.reconnect", "diagnostics.collect", "session.reconcile", "commands.reconcile", "images.preview", "images.clean", "project.add", "codex.host", "versions.preview", "versions.clean", "worktree.create", "worktree.merge", "worktree.remove"],
         projectFiles: true,
+        generatedImageStreaming: true,
         nativeSubagents: true,
         sshAccess: sshAccess.supported,
         sshRoutes: sshAccess.supported,

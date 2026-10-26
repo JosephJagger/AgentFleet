@@ -250,3 +250,36 @@ Agent frames now accept strictly less than 49 decimal MB at both transport and
 JSON admission. Browser/voice JSON admission stays at 1 MB. A real WebSocket
 regression replays an 8 MiB image, verifies durable acknowledgement, cloud storage,
 reconciliation, heartbeat recovery, replay idempotency and rejection at 49 MB.
+
+### Generated-image streaming — Agent 0.30.150
+
+Native generated originals no longer have an application file-size ceiling.
+Images up to 8 MiB retain the existing cloud-cache path; larger native artifacts
+produce a small durable metadata item and are read on demand through an
+authenticated Session/event URL. The browser displays the original directly and
+can enlarge or download it. Large originals require the host to be online and
+the native file to remain available; they are not copied into cloud image storage.
+The existing cloud cache quota and uploaded-input limits remain separate.
+
+Each original is read in 192 KiB chunks. The Agent waits for a matching chunk
+acknowledgement before reading more; the server waits for the browser stream to
+drain and rejects senders that overrun that window. Cancellation, transport loss,
+inactivity and owner/policy changes terminate only that transfer. Heartbeats and
+commands are not gated on image completion. Native file binding, regular-file,
+symlink/hardlink, signature and mutation checks remain mandatory. Server access
+rechecks the workspace, Session, event, content epoch, retention and sharing
+policy on every chunk. Ordinary file downloads retain their prior 50 MiB limit;
+Agent JSON frames remain strictly below 49 decimal MB.
+
+Validation: 25 Agent tests, 36 control-plane tests and 40 web tests passed.
+A 53 MiB native artifact was streamed with bounded chunks; the HTTP/WebSocket
+integration returned the full 53 MiB original while acknowledging heartbeats.
+Replay, duplicate receipt, cancellation, stale acknowledgements, deleted content,
+project policy and 49 MB frame rejection were covered. Chromium decoded the
+stream URL, exercised enlargement/Escape and original download, then reloaded
+at a 390 px viewport without horizontal overflow. The browser fixture used a
+small valid PNG; the larger transport case used synthetic raster-signature bytes.
+
+The 0.164.0 production validator was updated through the guarded publisher and
+its official validation run promoted the runtime target successfully. B52H
+resumed reconciliation and heartbeats without deleting its pending events.

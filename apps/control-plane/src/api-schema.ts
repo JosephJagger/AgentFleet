@@ -203,6 +203,7 @@ export interface AgentCapabilities {
   paginatedHistory?: boolean;
   permissionProfiles?: boolean;
   projectFiles?: boolean;
+  generatedImageStreaming?: boolean;
   nativeSubagents?: boolean;
   realtimeVoice?: boolean;
   conversationHistory?: boolean;
@@ -430,7 +431,8 @@ export type ServerToAgentMessage =
       appServerEpoch: string;
       command: Record<string, unknown>;
     }
-  | { type: "file.read"; requestId: string; logicalSessionId: string; projectExternalId: string; path: string }
+  | { type: "file.read"; requestId: string; logicalSessionId: string; projectExternalId: string; path?: string; generatedImage?: {nativeThreadId:string;itemId:string} }
+  | { type: "file.chunk.ack"; requestId:string; sequence:number }
   | { type: "file.cancel"; requestId: string }
   | { type: "error"; code: string; message: string };
 
