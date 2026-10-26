@@ -1050,7 +1050,7 @@ test("WebSocket queue waits through repeated hello cycles and dispatches once af
 });
 
 
-test("dashboard shortcuts include old managed/running sessions beyond recent and paginated history", () => {
+test("dashboard counts history but only hydrates recent and all managed/active sessions", t => {
   const db = new ControlPlaneDatabase(":memory:");
   try {
     const owner = seedQueuedCommand(db);
@@ -1058,17 +1058,26 @@ test("dashboard shortcuts include old managed/running sessions beyond recent and
     const now=new Date().toISOString();
     for(let i=0;i<105;i++) {
       const id=`activity-${i}`;
-      db.run("INSERT INTO logical_sessions(logical_session_id,workspace_id,machine_id,project_id,external_id,title,managed,execution_state,reachability,created_at,updated_at) VALUES(?,?,'queue-host','queue-project',?,?,? ,?,'live',?,?)",id,owner.workspaceId,id,id,i===0?1:0,i===1?"running":"idle",now,i<2?"2020-01-01T00:00:00.000Z":now);
+      db.run("INSERT INTO logical_sessions(logical_session_id,workspace_id,machine_id,project_id,external_id,title,managed,execution_state,reachability,created_at,updated_at) VALUES(?,?,'queue-host','queue-project',?,?,? ,?,'live',?,?)",id,owner.workspaceId,id,id,i===0?1:0,i===1?"running":i===2?"awaiting_approval":"idle",now,i<3?"2020-01-01T00:00:00.000Z":now);
       db.run("INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,external_id,native_thread_id,created_at) VALUES(?,?,'queue-host','queue-project',?,?,?)",id+"-seg",id,id+"-seg",id+"-native",now);
     }
     db.run(`INSERT INTO durable_events(event_id,payload_hash,source_kind,workspace_id,logical_session_id,execution_segment_id,machine_id,project_id,session_seq,projection_epoch,type,schema_version,occurred_at,received_at,payload_state,content_epoch)
       VALUES('activity-terminal','hash','agent',?,'activity-0','activity-0-seg','queue-host','queue-project',1,1,'turn.completed','v1','2026-09-08T10:00:00.000Z','2026-09-08T10:00:00.000Z','suppressed',1)`,owner.workspaceId);
     const registry = new RegistryService(db,config(":memory:"));
+    const summarize = t.mock.method(registry,"getSession");
     const result=registry.dashboard(principal);
     const activity=result.activitySessions as Array<{logicalSessionId:string;lastTurnEndedAt:string|null}>;
-    assert.deepEqual(activity.map(s=>s.logicalSessionId).sort(),["activity-0","activity-1","queue-session"]);
+    assert.deepEqual(activity.map(s=>s.logicalSessionId).sort(),["activity-0","activity-1","activity-2","queue-session"]);
     assert.equal(activity.find(session=>session.logicalSessionId==="activity-0")?.lastTurnEndedAt,"2026-09-08T10:00:00.000Z");
-    assert.equal((result.recentSessions as unknown[]).length,20);
+    const recent=result.recentSessions as Array<{logicalSessionId:string}>;
+    assert.equal(recent.length,20);
+    assert.equal((result.counts as {sessions:number}).sessions,106,"total includes history omitted from summaries");
+    assert.equal((result.counts as {activeSessions:number}).activeSessions,2);
+    const returnedIds=new Set([...recent,...activity].map(session=>session.logicalSessionId));
+    assert.equal(summarize.mock.callCount(),returnedIds.size,"history must not trigger detail queries; overlapping rows are read once");
+    assert.deepEqual(new Set(summarize.mock.calls.map(call=>call.arguments[1])),returnedIds);
+    // Returned rows retain the same permissions, usage, lease and state fields.
+    for(const row of [...recent,...activity]) assert.deepEqual(row,registry.getSession(principal,row.logicalSessionId));
     assert.equal(registry.listSessionsPage(principal,{limit:100}).items.some(s=>s.logicalSessionId==="activity-0"),false);
   } finally {db.close();}
 });

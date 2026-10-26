@@ -2806,13 +2806,25 @@ export class RegistryService {
   }
 
   listSessions(principal: Principal): LogicalSessionSummary[] {
-    return this.db
-      .all<{ logical_session_id: string }>(
-        `SELECT s.logical_session_id FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id
+    const rows = this.db
+      .all<{ logical_session_id: string; project_id: string }>(
+        `SELECT s.logical_session_id,s.project_id FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id
          WHERE s.workspace_id=? AND m.identity_state='active' AND s.deleted_at IS NULL ORDER BY s.updated_at DESC`,
         principal.workspaceId,
-      )
-      .map((row) => this.getSession(principal, row.logical_session_id));
+      );
+    return this.summarizeSessions(principal, rows);
+  }
+
+  private summarizeSessions(principal: Principal, rows: Array<{ logical_session_id: string; project_id: string }>): LogicalSessionSummary[] {
+    const timestamp = nowIso();
+    const groups = new Map<string,string[]>();
+    for (const row of rows) {
+      const group = groups.get(row.project_id) ?? [];
+      group.push(row.logical_session_id);
+      groups.set(row.project_id, group);
+    }
+    return this.db.withReadBatch(rows.map(row => row.logical_session_id), () =>
+      rows.map(row => this.getSession(principal, row.logical_session_id, timestamp)), [...groups.values()]);
   }
 
   listSessionsPage(principal: Principal, options: ListOptions): { items: LogicalSessionSummary[]; nextCursor: string | null; total: number } {
@@ -2831,11 +2843,7 @@ export class RegistryService {
     if(cursor) { where.push("(s.updated_at<? OR (s.updated_at=? AND s.logical_session_id<?))"); params.push(cursor[0]!,cursor[0]!,cursor[1]!); }
     const rows = this.db.all<{ logical_session_id:string;updated_at:string;project_id:string }>(`SELECT s.logical_session_id,s.updated_at,s.project_id FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id JOIN projects p ON p.project_id=s.project_id WHERE ${where.join(" AND ")} ORDER BY s.updated_at DESC,s.logical_session_id DESC LIMIT ?`,...params,limit+1);
     const visible=rows.slice(0,limit); const last=visible.at(-1);
-    const timestamp = nowIso();
-    const groups = new Map<string,string[]>();
-    for (const row of visible) groups.set(row.project_id, [...(groups.get(row.project_id) ?? []), row.logical_session_id]);
-    const items = this.db.withReadBatch(visible.map(row => row.logical_session_id), () =>
-      visible.map(row => this.getSession(principal, row.logical_session_id, timestamp)), [...groups.values()]);
+    const items = this.summarizeSessions(principal, visible);
     return { items,nextCursor:rows.length>limit&&last?pageCursor(scope,[last.updated_at,last.logical_session_id]):null,total };
   }
 
@@ -3002,7 +3010,19 @@ export class RegistryService {
   dashboard(principal: Principal): Record<string, unknown> {
     const uncommitted = pendingCommits(this.db, principal);
     const machines = this.listMachines(principal);
-    const sessions = this.listSessions(principal);
+    // Count the catalog using inexpensive metadata, then hydrate only rows the
+    // dashboard returns. Full histories otherwise cause thousands of synchronous
+    // PostgreSQL round trips and block unrelated list/detail requests as well.
+    const rows = this.db.all<{
+      logical_session_id: string; project_id: string; managed: number; execution_state: string;
+    }>(
+      `SELECT s.logical_session_id,s.project_id,s.managed,s.execution_state
+       FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id
+       WHERE s.workspace_id=? AND m.identity_state='active' AND s.deleted_at IS NULL ORDER BY s.updated_at DESC`,
+      principal.workspaceId,
+    );
+    const active = (row: typeof rows[number]) => ["running", "awaiting_approval"].includes(row.execution_state);
+    const sessions = this.summarizeSessions(principal, rows.filter((row, index) => index < 20 || row.managed === 1 || active(row)));
     const pendingApprovals = this.db.get<{ count: number }>(
       `SELECT COUNT(*) AS count FROM approvals a JOIN logical_sessions s ON s.logical_session_id=a.logical_session_id
        JOIN machines m ON m.machine_id=s.machine_id
@@ -3017,8 +3037,8 @@ export class RegistryService {
       counts: {
         machines: machines.length,
         onlineMachines: machines.filter((machine) => machine.reachability === "online").length,
-        sessions: sessions.length,
-        activeSessions: sessions.filter((session) => ["running", "awaiting_approval"].includes(session.executionState)).length,
+        sessions: rows.length,
+        activeSessions: rows.filter(active).length,
         pendingApprovals,
         pendingCommits: uncommitted.length,
         unresolvedAlerts,
