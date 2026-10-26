@@ -63,6 +63,8 @@ export interface Machine {
   hostname: string;
   displayAlias?: string | null;
   os: string;
+  /** Stable runtime platform, separate from the human-readable OS release. */
+  platform?: string;
   arch: string;
   identity: MachineIdentity;
   reachability: MachineReachability;

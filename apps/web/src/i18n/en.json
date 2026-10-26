@@ -4303,5 +4303,13 @@
   "请求已接受，进度见智能体版本": "Request accepted; see agent versions for progress",
   "操作记录暂时无法读取": "Operation history is temporarily unavailable",
   "全站托管目标与发布记录请在「管理 → 托管升级」中查看。": "See Administration → Managed upgrades for global targets and release history.",
-  "Claude 与 Grok 可手动启用平台托管目标；其他智能体继续使用原安装方式。Claude 已启用的自动更新策略仍然有效。": "Claude and Grok can use a platform-managed target after manual confirmation. Other agents keep their existing installers. Previously enabled Claude automatic updates remain active."
+  "Claude 与 Grok 可手动启用平台托管目标；其他智能体继续使用原安装方式。Claude 已启用的自动更新策略仍然有效。": "Claude and Grok can use a platform-managed target after manual confirmation. Other agents keep their existing installers. Previously enabled Claude automatic updates remain active.",
+  "版本选项": "Version options",
+  "已开启 Claude 独立自动更新": "Independent Claude automatic updates are enabled",
+  "已固定当前托管版本": "The current managed version is pinned",
+  "切换回宿主机安装？": "Switch back to the host installation?",
+  "固定当前版本并停止自动更新？": "Pin the current version and stop automatic updates?",
+  "固定当前版本": "Pin current version",
+  "切回宿主机安装": "Use host installation",
+  "托管目标已保存，请在下方主机列表确认更新": "Managed target saved. Confirm updates in the host list below."
 }

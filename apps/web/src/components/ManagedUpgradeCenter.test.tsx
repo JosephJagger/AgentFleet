@@ -52,3 +52,27 @@ it('a host rejecting an accepted command releases the button and displays the ac
  await waitFor(()=>expect((screen.getByRole('button',{name:'更新到 1.0.70'}) as HTMLButtonElement).disabled).toBe(false));
  expect(screen.queryByText('更新完成')).toBeNull();
 });
+it('updates a real versioned Linux host directly in management without opening the host page',async()=>{
+ vi.mocked(api.managedHosts).mockResolvedValue([{...machine,os:'linux 26.04',platform:'linux',agentRuntimes:{grok:{...machine.agentRuntimes!.grok!,version:'grok 1.0.62 (1474f9cbdd91) [stable]'}}}]);
+ vi.mocked(api.managedReleases).mockResolvedValue({configured:true,channels:[{provider:'grok',revision:2,phase:'ready',target,candidate:target,history:[]}]});
+ render(<ManagedUpgradeCenter/>);await screen.findByText('Home');fireEvent.click(screen.getByRole('button',{name:/Grok Build/}));
+ expect(screen.queryByText('当前系统暂不支持')).toBeNull();fireEvent.click(screen.getByRole('button',{name:'更新到 1.0.70'}));
+ await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith(machine.id,{action:'install-managed',provider:'grok',releaseId:target.id,expectedRevision:0},expect.any(String)));
+ await screen.findByText('请求已提交，等待主机上报进度');
+});
+it('a newer host Claude is not mislabeled as unsupported and matching banner versions count as current',()=>{
+ const claudeTarget={...target,provider:'claude' as const,version:'2.1.308'};
+ const host={...machine,os:'linux 26.04',discovery:{...machine.discovery!,providerRuntimePolicy:{revision:3,mode:'host' as const}},agentRuntimes:{claude:{installed:true,version:'2.1.310 (Claude Code)'}}};
+ const view=render(<ManagedHostAction machine={host} provider="claude" target={claudeTarget}/>);
+ expect(screen.getByText('当前版本高于托管目标')).toBeTruthy();expect(screen.queryByText('当前系统暂不支持')).toBeNull();expect(screen.queryByRole('button')).toBeNull();
+ view.rerender(<ManagedHostAction machine={{...host,agentRuntimes:{claude:{installed:true,version:'2.1.308 (Claude Code)'}},discovery:{...host.discovery,providerRuntimePolicy:{revision:4,mode:'pinned'}}}} provider="claude" target={claudeTarget}/>);
+ expect(screen.getByText('已是托管目标')).toBeTruthy();
+});
+it('Claude source changes are confirmed inline, bind the policy revision and wait for its heartbeat',async()=>{
+ const host={...machine,discovery:{...machine.discovery!,providerRuntimePolicy:{revision:4,mode:'auto' as const}},agentRuntimes:{claude:{installed:true,version:'2.1.308 (Claude Code)'}}};
+ render(<ManagedHostAction machine={host} provider="claude" target={{...target,provider:'claude',version:'2.1.308'}}/>);
+ fireEvent.click(screen.getByText('版本选项'));fireEvent.click(screen.getByRole('button',{name:'固定当前版本'}));expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'确认'}));
+ await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith(machine.id,{action:'configure',provider:'claude',mode:'pinned',expectedRevision:4},expect.any(String)));
+ await screen.findByText('请求已提交，等待主机上报进度');
+});

@@ -101,3 +101,9 @@
 }
 
 .managed-rollback { display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:12px; }
+
+.managed-host-options { display:flex;flex-direction:column;max-width:100%;font-size:12px; }
+.managed-host-options summary { color:var(--muted);cursor:pointer;padding:4px 0; }
+.managed-host-options[open] > :not(summary) { display:flex;justify-content:flex-end;margin-top:6px; }
+.managed-host-options .managed-rollback { padding:8px;border:1px solid var(--line);border-radius:6px; }
+@media(max-width:760px) { .managed-host-options[open] > :not(summary) { justify-content:flex-start; } }

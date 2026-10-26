@@ -50,10 +50,10 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
       // Codex rollout and validation status belong to the platform administrator; everyone else only sees the version.
       const codexVisible=id!=='codex'||canConfirmCodex;
       const managedTarget=channels.find(c=>c.provider===id)?.target;
-      const managedAction=(id==='claude'||id==='grok')&&Boolean(managedTarget||machine.discovery?.managedUpdates?.[id]);
+      const managedAction=(id==='claude'||id==='grok')&&Boolean(machine.discovery?.managedProviderSupport||managedTarget||machine.discovery?.managedUpdates?.[id]);
       const offer=codexVisible&&!managedAction?providerUpdateOffer(id,machine,policy,id==='codex'?machine.codexVersion:version):undefined;
       const canAct=supported&&!pending&&machine.reachability==='live';
-      return <div className="provider-versions__row" key={id}><div><strong>{PROVIDER_NAMES[id]}</strong><span>{version|| (row?.installed===false?t('未安装'):t('尚未上报'))}</span></div>{codexVisible&&<div><span>{source==='managed'?t('独立托管'):source==='host'?t('宿主机安装'):t('尚未上报')}</span><small>{compatibility==='compatible'?t('已通过兼容验证'):compatibility==='protocol_checked'?t('协议检查通过'):t('待验证')}</small></div>}
+      return <div className="provider-versions__row" key={id}><div><strong>{PROVIDER_NAMES[id]}</strong><span className={version?undefined:"provider-versions__empty"}>{version|| (row?.installed===false?t('未安装'):t('尚未上报'))}</span></div>{codexVisible&&<div><span>{source==='managed'?t('独立托管'):source==='host'?t('宿主机安装'):t('尚未上报')}</span><small>{compatibility==='compatible'?t('已通过兼容验证'):compatibility==='protocol_checked'?t('协议检查通过'):t('待验证')}</small></div>}
         {managedAction&&(id==='claude'||id==='grok')&&<ManagedHostAction machine={machine} provider={id} target={managedTarget}/>}
         {offer&&<div className="provider-versions__offer" role="status">
           {offer.kind==='codex-confirm'?<><span>{t('{0} 已通过验证，确认后才会更新',offer.latest)}</span><button className="button button--primary" type="button" disabled={!canAct} onClick={()=>void operate({action:'confirm',provider:'codex',version:offer.latest})}>{t('确认更新到 {0}',offer.latest)}</button></>
@@ -63,7 +63,7 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
       </div>;
     })}</div>
     <div className="provider-versions__actions"><button className="button button--secondary" disabled={!supported||pending||machine.reachability!=='live'} onClick={()=>void operate({action:'check'})}><RefreshCw size={15}/>{pending?t('正在检查或应用…'):t('检查智能体版本')}</button>{report&&<small>{t('上次检查：{0}',new Date(report.checkedAt).toLocaleString())}</small>}</div>
-    {!supported?<p role="status">{t('更新连接服务后可管理智能体版本。')}</p>:<details className="provider-versions__settings"><summary>{t('Claude Code 托管设置')}</summary><form className="provider-versions__policy" onSubmit={e=>{e.preventDefault();if(policy)void operate({action:'configure',provider:'claude',mode,expectedRevision:policy.revision});}}>
+    {!supported?<p role="status">{t('更新连接服务后可管理智能体版本。')}</p>:!machine.discovery?.managedProviderSupport?<details className="provider-versions__settings"><summary>{t('Claude Code 托管设置')}</summary><form className="provider-versions__policy" onSubmit={e=>{e.preventDefault();if(policy)void operate({action:'configure',provider:'claude',mode,expectedRevision:policy.revision});}}>
       <label>{t('Claude Code 更新方式')}<select aria-label={t('Claude Code 更新方式')} value={mode} onChange={e=>setMode(e.target.value as ProviderRuntimeState['mode'])} disabled={pending}><option value="host">{t('沿用宿主机安装')}</option><option value="pinned">{t('托管 · 固定版本')}</option><option value="auto">{t('托管 · 自动更新稳定版')}</option></select></label>
       <p className="subtle">{t('托管会下载独立版本，不覆盖系统安装；先核验 SDK 与协议，任务和通话结束后才切换。失败保留原版本，回退后暂停自动更新。')}</p>
       {policy?.stableVersion&&<small>{t('官方稳定版：{0} · SDK：{1}',policy.stableVersion,checked?.sdkVersion??'—')}</small>}
@@ -73,7 +73,7 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
       {policy?.phase==='waiting_idle'&&<p role="status">{t('已验证目标，等待任务或通话结束后再应用。')}</p>}
       {policy?.error&&<p role="status">{systemText(policy.error)}</p>}
       <p className="subtle">{t('Claude 与 Grok 可手动启用平台托管目标；其他智能体继续使用原安装方式。Claude 已启用的自动更新策略仍然有效。')}</p>
-    </form></details>}
+    </form></details>:null}
     {error&&<p role="alert">{systemText(error)}</p>}
     {operation?.state==='unknown'&&<p role="status">{t('操作结果待核验，请勿重复提交。')}</p>}
   </HostDisclosure>;

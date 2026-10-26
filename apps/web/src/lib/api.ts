@@ -177,6 +177,7 @@ function mapMachine(rawValue: unknown, projects: Project[]): Machine {
     name: string(raw.name, t("未命名主机")),
     hostname: string(raw.hostname, string(raw.name, t("未上报主机名"))),
     displayAlias: typeof raw.displayAlias === "string" ? raw.displayAlias : null,
+    platform: string(raw.platform) || undefined,
     os: [string(raw.platform), string(raw.platformRelease)].filter(Boolean).join(" ") || t("未上报系统"),
     arch: string(raw.architecture, "unknown"),
     identity: raw.identityState === "revoked" ? "revoked" : "paired",

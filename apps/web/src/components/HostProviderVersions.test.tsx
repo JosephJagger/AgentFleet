@@ -81,3 +81,13 @@ it('shows what a long managed-Claude update is doing instead of an idle spinner'
  r.unmount();render(<HostProviderVersions machine={{...machine,discovery:{state:'ready',providerRuntimePolicy:policy({step:'verifying'})}} as unknown as Machine}/>);
  await screen.findByText('下载完成，正在校验文件并做兼容检查…');
 });
+it('new managed hosts use the published Claude target inline and do not retain the old settings form',async()=>{
+ vi.mocked(api.hostOperations).mockResolvedValue([report]);
+ const target={id:'c'.repeat(64),provider:'claude' as const,version:'2.1.308',checkedAt:'2026-10-26T00:00:00Z',artifacts:{'linux-x64':{integrity:'a'.repeat(64),size:10}}};
+ vi.mocked(api.managedReleases).mockResolvedValue({configured:true,channels:[{provider:'claude',revision:2,phase:'ready',target,history:[]}]});
+ vi.mocked(api.providerRuntimeOperation).mockResolvedValue({...report,id:'managed',result:{accepted:true}});
+ render(<HostProviderVersions machine={{...machine,os:'linux 26.04',discovery:{state:'ready',discoveredProjects:0,discoveredSessions:0,scannedPages:0,scannedCount:0,managedProviderSupport:true,providerRuntimePolicy:{revision:3,mode:'host'}}}}/>);
+ fireEvent.click(await screen.findByRole('button',{name:'启用托管 2.1.308'}));
+ await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith(machine.id,{action:'install-managed',provider:'claude',releaseId:target.id,expectedRevision:0},expect.any(String)));
+ expect(screen.queryByText('Claude Code 托管设置')).toBeNull();expect(screen.queryByText('应用更新方式')).toBeNull();expect(screen.queryByText(/官方稳定版：2.1.292/)).toBeNull();
+});

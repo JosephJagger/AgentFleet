@@ -17,3 +17,5 @@
 .provider-versions__offer span { color:var(--muted);font-size:12px; }
 .provider-versions .button { font-size:12px;min-height:34px;padding:7px 12px;border-radius:7px; }
 @media(max-width:480px) { .provider-versions__row { grid-template-columns:minmax(0,1fr);gap:8px; } .provider-versions__row > div:nth-child(2):not(.managed-host-action) { justify-content:flex-start; } .provider-versions__row > .managed-host-action { align-items:flex-start;text-align:left; } }
+
+.provider-versions__row > div:first-child > span.provider-versions__empty { font-family:inherit;color:var(--muted); }
