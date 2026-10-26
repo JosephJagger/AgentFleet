@@ -10,12 +10,13 @@ import tempfile
 import uuid
 
 from deployment_provenance import (BASE_LABEL, MODE_LABEL, POLICY_VERSION, SOURCE_LABEL, git,
-    read_receipt, require_ancestor, require_clean_main, require_mode_covers_changes, write_receipt)
+    read_receipt, require_ancestor, require_clean_main, require_mode_covers_changes, write_receipt, require_active_host)
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def prepare(root, mode):
+    require_active_host(root)
     sha = require_clean_main(root)
     live = json.loads(subprocess.check_output(['docker', 'inspect', 'agentfleet-control-plane']))[0]
     base_id = live['Image']

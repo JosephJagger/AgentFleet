@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import subprocess
 import tempfile
 
@@ -35,6 +36,15 @@ def require_clean_main(root, expected=None):
     if expected and sha != expected:
         raise RuntimeError('main changed after preparation; rebuild the latest main before publishing')
     return sha
+
+
+def require_active_host(root):
+    """A handed-off source must not publish or reopen its old database."""
+    path = registry(root) / 'host-owner.json'
+    if path.exists():
+        owner = json.loads(path.read_text())
+        if owner.get('activeHost') != socket.gethostname():
+            raise RuntimeError('This host has handed production to ' + str(owner.get('activeHost')))
 
 
 def registry(root):

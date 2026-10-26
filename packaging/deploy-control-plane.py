@@ -20,7 +20,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from deployment_provenance import validate_candidate
+from deployment_provenance import validate_candidate, require_active_host
 
 SCHEMA = json.loads((ROOT / 'apps/control-plane/src/voice-deployment-schema.json').read_text())
 
@@ -132,7 +132,16 @@ def main():
     parser.add_argument('--keep-backups', type=int, default=DEFAULT_KEEP_BACKUPS, help='Pre-deploy database backups to keep (default 5); older ones are deleted before a new one is written')
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--release', action='store_true', help='Explicitly release an abandoned fence after checking service health')
+    parser.add_argument('--migration-config', help='Private, reviewed host migration inventory JSON')
+    parser.add_argument('--migration-phase', choices=('preflight', 'rehearse', 'cutover', 'abort-before-traffic'))
     args = parser.parse_args()
+    if args.migration_config or args.migration_phase:
+        if not (args.migration_config and args.migration_phase and args.image) or args.check or args.release:
+            parser.error('Migration needs --image, --migration-config and --migration-phase')
+        from host_migration import run_migration
+        return run_migration(ROOT, args, sys.modules[__name__])
+    if not args.check:
+        require_active_host(ROOT)
     if args.keep_backups < 1:
         parser.error('--keep-backups must be at least 1')
     if not 0 <= args.wait_seconds <= 3600:
