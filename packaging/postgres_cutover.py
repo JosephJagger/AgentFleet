@@ -139,7 +139,9 @@ class EngineCutover:
         # SQLite's ordered checksum scan can spill well beyond the small /tmp
         # tmpfs. Keep its temporary files on the private, space-checked disk.
         (self.directory / 'sqlite-tmp').mkdir(mode=0o700, exist_ok=True)
-        argv = ['docker','run','--rm','--read-only','--user','0:0','--cap-drop','ALL',
+        # Service-owned package directories may be mode 0700 in the image.
+        # The root importer needs read access while the image stays read-only.
+        argv = ['docker','run','--rm','--read-only','--user','0:0','--cap-drop','ALL','--cap-add','DAC_OVERRIDE',
                 '--network',self.plan['postgresNetwork'],'--tmpfs','/tmp:size=64m',
                 '-e','SQLITE_TMPDIR=/migration/sqlite-tmp',
                 '-v',str(self.directory)+':/migration']
