@@ -76,6 +76,7 @@ class EngineCutover:
         self.identity_image = self.inspect(self.receipt['identityImage'], image=True)
         self.source = self.inspect('agentfleet-control-plane')
         self.identity_source = self.inspect('agentfleets-identity-1')
+        self.identity_path = source_database(self.identity_source, 'DJANGO_DATABASE_PATH')
 
     def inspect(self, name, image=False):
         return json.loads(self.publisher.run('docker', *(['image'] if image else []), 'inspect', name))[0]
