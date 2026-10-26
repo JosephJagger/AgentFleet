@@ -39,7 +39,8 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
     <div className="provider-versions__list">{order.map(id=>{
       const reported=report?.providers[id];const native=id==='codex'?{version:machine.codexVersion,installed:true}:machine.agentRuntimes?.[id];
       const row=reported??native;const source=id==='codex'?String(machine.codexProfile?.source??''):id==='claude'?policy?.mode==='host'||!policy?'host':'managed':'host';
-      const version=id==='claude'&&policy?.mode!=='host'&&policy?.current?policy.current.version:row?.version;
+      // Codex's active version is refreshed by heartbeats; inventory reports are historical snapshots.
+      const version=id==='codex'?machine.codexVersion||reported?.version:id==='claude'&&policy?.mode!=='host'&&policy?.current?policy.current.version:row?.version;
       const compatibility=id==='codex'?machine.compatibility:reported?.compatibility;
       // Codex rollout and validation status belong to the platform administrator; everyone else only sees the version.
       const codexVisible=id!=='codex'||canConfirmCodex;
