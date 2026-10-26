@@ -16,7 +16,7 @@ import subprocess
 import time
 import uuid
 
-from deployment_provenance import read_receipt, registry, require_active_host, validate_candidate
+from deployment_provenance import git, read_receipt, registry, require_active_host, require_ancestor, validate_candidate
 from host_migration import private_json, sha256, snapshot_database
 from postgres_publication import PostgresPublication
 
@@ -185,16 +185,25 @@ class EngineCutover:
         private_json(self.directory/'publication.json',config)
         return PostgresPublication(self.directory/'publication.json')
 
-    def open_traffic(self, pg):
+    def open_traffic(self, pg, *, resume=False):
         self.validate_images()
         for name in ('agentfleet-control-plane','agentfleets-identity-1'):
             if self.inspect(name)['State']['Running']: raise RuntimeError('A source writer restarted during migration')
         before=(self.directory/'environment.before').read_bytes()
+        if resume:
+            if sha256(self.root/'.env') != self.state.get('configuredEnvironment'):
+                raise RuntimeError('Production environment changed after the failed start; refusing to overwrite it')
+            before=(self.root/'.env').read_bytes()
+        compose=json.loads(self.publisher.run('docker','compose','config','--format','json'))
+        default_network=compose['networks']['default']['name']
+        if default_network not in self.source['NetworkSettings']['Networks']:
+            raise RuntimeError('Default Compose network differs from the source control plane')
         override=self.directory/'compose.postgres.json'
         private_json(override, {'services': {
             'control-plane': {'networks':['default','postgres']},
             'identity': {'image':self.identity_image['Id'],'networks':['default','postgres']}},
-            'networks': {'postgres': {'external':True,'name':self.plan['postgresNetwork']}}})
+            'networks': {'default': {'external':True,'name':default_network},
+                         'postgres': {'external':True,'name':self.plan['postgresNetwork']}}})
         atomic_env(self.root/'.env',before, {'DATABASE_URL':self.credentials('controlRuntimeConnection'),
             'DATABASE_SCHEMA':self.schema,'DJANGO_DATABASE_URL':self.plan['identityRuntimeUrl'],
             'COMPOSE_FILE':str(self.root/'docker-compose.yml')+':'+str(override)})
@@ -230,6 +239,32 @@ class EngineCutover:
         if status.get('voiceDeploymentToken') is not None or status.get('build')!=self.receipt['source']:
             raise RuntimeError('Admission reopening was not verified; inspect the live PostgreSQL service')
         self.record('published', ready=status)
+
+    def resume_stopped_import(self):
+        """Recover a failed first startup without reopening SQLite or reimporting."""
+        if self.state.get('phase') != 'traffic_starting' or not self.state.get('trafficAttempted'):
+            raise RuntimeError('Recovery requires a verified import and a failed traffic startup')
+        for key,name in [('sourceContainer','agentfleet-control-plane'),('identityContainer','agentfleets-identity-1')]:
+            runtime=self.inspect(name)
+            if runtime['Id'] != self.state[key] or runtime['State']['Running']:
+                raise RuntimeError('Recovery requires both original containers to remain stopped and unchanged')
+        self.validate_images()
+        require_ancestor(self.root,self.state['source'],self.receipt['source'])
+        if git(self.root,'diff','--name-only',self.state['source'],self.receipt['source'],'--','apps','docker-compose.yml'):
+            raise RuntimeError('Application sources changed after import; this recovery only permits publisher fixes')
+        owner=json.loads((registry(self.root)/'database-owner.json').read_text())
+        if owner.get('engine')!='postgresql' or owner.get('databaseIdentity')!=self.state['databaseIdentity']:
+            raise RuntimeError('Database ownership record does not match the imported database')
+        if any(sha256(self.path.parent/name)!=value for name,value in self.state['keys'].items()):
+            raise RuntimeError('An encryption key changed after import')
+        with contextlib.closing(PostgresPublication(self.directory/'publication.json')) as pg:
+            identity=pg.execute('SELECT identity FROM agentfleet_database_identity').fetchone()[0]
+            fence=pg.execute('SELECT token FROM voice_deployment_guard WHERE singleton=1').fetchone()
+            if identity!=self.state['databaseIdentity'] or not fence or fence[0]!=self.state['token']:
+                raise RuntimeError('Imported database identity or admission fence changed')
+            self.state.setdefault('importedSource',self.state['source'])
+            self.open_traffic(pg,resume=True)
+        return 0
 
     def cutover(self, db):
         if self.state: raise RuntimeError('Cutover journal already exists; inspect it or explicitly abort before traffic')
@@ -303,6 +338,7 @@ def run_cutover(root,args,publisher):
     with open(str(operation.path)+'.publish.lock','a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         with contextlib.closing(sqlite3.connect(operation.path.as_uri()+'?mode=rw',uri=True,timeout=10)) as db:
+            if args.engine_phase=='resume-stopped-import': return operation.resume_stopped_import()
             if args.engine_phase=='abort-before-traffic': return operation.abort(db)
             if args.engine_phase=='check':
                 operation.preflight(db)

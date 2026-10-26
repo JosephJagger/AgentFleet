@@ -4,7 +4,7 @@ import sqlite3
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from postgres_cutover import EngineCutover, active_work, atomic_env, source_database
 
@@ -54,6 +54,43 @@ class CutoverTests(unittest.TestCase):
         operation=self.operation();operation.state={'trafficAttempted':True}
         with self.assertRaisesRegex(RuntimeError,'never roll back'): operation.abort(self.db)
         operation.publisher.run.assert_not_called()
+
+    def test_failed_start_recovery_refuses_replaced_or_running_containers(self):
+        for runtime in ({'Id':'replaced','State':{'Running':False}}, {'Id':'original','State':{'Running':True}}):
+            operation=self.operation()
+            operation.state={'phase':'traffic_starting','trafficAttempted':True,'sourceContainer':'original'}
+            operation.inspect=Mock(return_value=runtime)
+            with self.assertRaisesRegex(RuntimeError,'stopped and unchanged'): operation.resume_stopped_import()
+            operation.publisher.run.assert_not_called()
+
+    def test_failed_start_recovery_refuses_application_changes_after_import(self):
+        operation=self.operation();operation.root=Path('/unused')
+        operation.state={'phase':'traffic_starting','trafficAttempted':True,'sourceContainer':'original','identityContainer':'original','source':'before'}
+        operation.receipt={'source':'after'}
+        operation.inspect=Mock(return_value={'Id':'original','State':{'Running':False}})
+        with patch('postgres_cutover.require_ancestor'), patch('postgres_cutover.git',return_value='apps/control-plane/src/db.ts'):
+            with self.assertRaisesRegex(RuntimeError,'Application sources changed'): operation.resume_stopped_import()
+        operation.publisher.run.assert_not_called()
+
+    def test_shared_existing_compose_network_is_preserved_as_external(self):
+        with tempfile.TemporaryDirectory() as directory:
+            operation=self.operation();operation.root=operation.directory=Path(directory)
+            (operation.root/'.env').write_text('EXISTING=keep\n')
+            (operation.directory/'environment.before').write_text('EXISTING=keep\n')
+            operation.source={'NetworkSettings':{'Networks':{'project_default':{}}}}
+            operation.inspect=Mock(return_value={'State':{'Running':False}})
+            operation.credentials=Mock(return_value='postgresql://control')
+            operation.schema='app';operation.plan={'identityRuntimeUrl':'postgresql://identity','postgresNetwork':'existing-postgres'}
+            operation.identity_image={'Id':'identity'}
+            def run(*args):
+                if args==('docker','compose','config','--format','json'):
+                    return json.dumps({'networks':{'default':{'name':'project_default'}}})
+                raise RuntimeError('stop before publication')
+            operation.publisher.run.side_effect=run
+            with self.assertRaisesRegex(RuntimeError,'stop before publication'): operation.open_traffic(None)
+            config=json.loads((operation.directory/'compose.postgres.json').read_text())
+            self.assertEqual(config['networks']['default'],{'external':True,'name':'project_default'})
+            self.assertEqual(config['networks']['postgres'],{'external':True,'name':'existing-postgres'})
 
     def test_source_database_is_derived_from_the_running_persistent_mount(self):
         runtime={'Config':{'Env':['DATABASE_PATH=/app/data/control.sqlite']},'Mounts':[{'Destination':'/app/data','Source':'/actual/data'}]}

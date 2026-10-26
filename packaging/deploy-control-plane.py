@@ -157,9 +157,9 @@ def main():
     parser.add_argument('--migration-config', help='Private, reviewed host migration inventory JSON')
     parser.add_argument('--migration-phase', choices=('prepare-engine', 'preflight', 'rehearse', 'cutover', 'abort-before-traffic'))
     parser.add_argument('--engine-config', help='Private inventory for the initial SQLite-to-PostgreSQL cutover')
-    parser.add_argument('--engine-phase', choices=('check', 'cutover', 'abort-before-traffic'))
+    parser.add_argument('--engine-phase', choices=('check', 'cutover', 'abort-before-traffic', 'resume-stopped-import'))
     args = parser.parse_args()
-    if args.database:
+    if args.database and args.engine_phase != 'resume-stopped-import':
         require_current_sqlite(ROOT, args.database)
     if args.engine_config or args.engine_phase:
         if not (args.engine_config and args.engine_phase and args.image and args.database) or any((args.migration_config, args.migration_phase, args.check, args.release, args.with_validator)):
