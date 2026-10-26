@@ -1,3 +1,5 @@
+import { ManagedProviderUpdates, fetchManagedTarget } from './managed-provider-updates.js';
+import { parseProviderRuntimeRequest } from './provider-runtime-policy.js';
 import { WorkspaceGitStatusSampler } from "./workspace-git-status.js";
 import {parseGrokOperation,grokOperations,grokLiveOperation} from './grok-operations.js';
 import { sshAccess } from "./ssh-access.js";
@@ -400,7 +402,7 @@ export class AgentRuntime {
     ];
     const readiness = checks.some(item => item.state === "failed") ? "action_required"
       : visibleState !== "ready" ? "checking" : this.isWritable() ? "ready" : "read_only";
-    return { ...this.discoveryStatus, state: visibleState, backgroundSync, providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {},
+    return { ...this.discoveryStatus, state: visibleState, backgroundSync, providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true, agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {},
       ...(serverUnavailable ? { error: "Codex 会话服务启动失败，项目和会话扫描暂不可用。连接服务会自动重试。" } : {}),
       syncMode: this.catalogWatcher?.mode ?? "fallback", reconcileIntervalSeconds: CATALOG_RECONCILE_MS / 1000,
       ...(completed ? { scannedCount: completed.scannedCount, discoveredCount: completed.discoveredCount, lastSuccessfulAt: completed.lastSuccessfulAt } : {}),
@@ -558,12 +560,20 @@ export class AgentRuntime {
   async refreshQuota(): Promise<void> { await this.appServer?.refreshQuota?.(); }
 
   private readonly providerRuntimeManager: ProviderRuntimeManager;
+  private readonly managedProviderUpdates: ManagedProviderUpdates;
   async manageProviderRuntime(value: unknown, operationId: string): Promise<Record<string, unknown>> {
+    const request=parseProviderRuntimeRequest(value);
+    if(request.action==='install-managed'||request.action==='cancel-managed'||request.action==='rollback-managed'){await this.managedProviderUpdates.request(request,operationId);this.notifyRegistryChanged();return {accepted:true,managedUpdates:this.managedProviderUpdates.status()};}
     await this.providerRuntimeManager.operate(value, operationId);
     return this.providerInventory();
   }
   async providerInventory(): Promise<Record<string, unknown>> {
     const report = await this.providerRuntimeManager.inventory(this.appServer?.getAgentRuntimes?.() ?? {}, {version:this.support.codexVersion, source:this.support.codexProfile?.source, compatibility:this.support.writable ? "compatible" : "unverified"});
+    if(this.store.snapshot().managedGrok){
+      const runtime=this.appServer?.getAgentRuntimes?.()?.grok as {version?:string;state?:string}|undefined;
+      let actual:Awaited<ReturnType<ManagedProviderUpdates['detectGrok']>>=null;try{actual=await this.managedProviderUpdates.detectGrok();}catch{/* Damaged managed files must not fall back to a host install. */}
+      (report.providers as Record<string,unknown>).grok={installed:Boolean(actual),version:actual?.version??null,source:'managed',managedSupported:true,compatibility:actual&&runtime?.version===actual.version&&runtime?.state==='ready'?'protocol_checked':'unverified'};
+    }
     this.notifyRegistryChanged();
     return report;
   }
@@ -671,7 +681,11 @@ export class AgentRuntime {
       if (this.shuttingDown || !this.appServer?.refreshManagedClaude) throw new AgentError("PROVIDER_RUNTIME_UNAVAILABLE", "Claude adapter is not ready");
       await this.appServer.refreshManagedClaude(); this.notifyRegistryChanged();
     });
-    this.appServerFactory = options.appServerFactory ?? ((callbacks) => createMultiRuntime(callbacks, {codexReadable: this.support.readable ?? this.support.writable, additionalAllowed: this.support.providerHostSupported ?? this.support.writable, detectClaude:()=>this.providerRuntimeManager.detectClaude()}));
+    this.managedProviderUpdates = new ManagedProviderUpdates(this.store,this.providerRuntimeManager,id=>fetchManagedTarget(this.pairing.controlPlaneUrl,id),async()=>{
+      if(!this.appServer?.refreshManagedGrok)throw new AgentError('PROVIDER_RUNTIME_UNAVAILABLE','Grok adapter is not ready');
+      await this.appServer.refreshManagedGrok();
+    },()=>this.notifyRegistryChanged());
+    this.appServerFactory = options.appServerFactory ?? ((callbacks) => createMultiRuntime(callbacks, {codexReadable: this.support.readable ?? this.support.writable, additionalAllowed: this.support.providerHostSupported ?? this.support.writable, detectClaude:()=>this.providerRuntimeManager.detectClaude(),detectGrok:()=>this.managedProviderUpdates.detectGrok()}));
     this.restartSleep = options.restartSleep ?? ((milliseconds, signal) => delay(milliseconds, signal));
     this.restartDelay = options.restartDelay ?? appServerRestartDelay;
     this.catalogSync = new CatalogSyncScheduler(async change => {
@@ -707,6 +721,7 @@ export class AgentRuntime {
         this.ensureRestartSupervisor();
       }
     }
+    await this.managedProviderUpdates.start();
   }
 
   setCallbacks(callbacks: RuntimeCallbacks): void {
@@ -792,7 +807,7 @@ export class AgentRuntime {
       },
       resumeStreams,
       capacity: this.capacityState(),
-      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true, agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       projects: this.projectSummaries(),
       sessions: [...Object.values(state.managedThreads).flatMap((thread) => {
@@ -892,7 +907,7 @@ export class AgentRuntime {
       activeTurns: Object.values(state.managedThreads).filter((thread) => thread.activeTurnId !== undefined).length,
       readOnly: !this.isWritable(),
       readOnlyReasons: this.readOnlyReasons(),
-      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true, agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       ...(this.support.codexProfile ? { codexProfile: this.support.codexProfile } : {}),
       ...(this.isWritable() ? {} : { unreachableReason: this.readOnlyReasons().join("; ") }),
@@ -1290,6 +1305,7 @@ export class AgentRuntime {
 
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
+    await this.managedProviderUpdates.stop();
     await this.providerRuntimeManager.stop();
     for(const id of this.workspaceWatches.keys())this.discardWorkspaceWatch(id);
     await this.panelVoice?.close();

@@ -1,3 +1,4 @@
+import { parseManagedUpdate, type ManagedChannel } from './managed-provider';
 export type VideoObject = { key:string; bytes:number; etag:string; modifiedAt:string|null; canDelete:boolean };
 export type VideoStoragePage = { configured:boolean; label?:string; quotaBytes?:number; items:VideoObject[]; nextCursor:string|null };
 import { parseProviderRuntimeState } from "./provider-runtime-policy";
@@ -196,7 +197,7 @@ function mapMachine(rawValue: unknown, projects: Project[]): Machine {
 function mapDiscovery(rawValue: unknown): DiscoveryProgress | undefined {
   const raw = record(rawValue);
   if (!["scanning", "ready", "error"].includes(string(raw.state))) return undefined;
-  return { providerRuntimePolicy: parseProviderRuntimeState(raw.providerRuntimePolicy), scanId: string(raw.scanId) || undefined, state: raw.state as DiscoveryProgress["state"], discoveredProjects: integer(raw.discoveredProjects), discoveredSessions: integer(raw.discoveredSessions), scannedPages: integer(raw.scannedPages), scannedCount: integer(raw.scannedCount), lastSuccessfulAt: string(raw.lastSuccessfulAt) || null, error: string(raw.error) || null, errorCode: string(raw.errorCode) || null,
+  return { managedProviderSupport:raw.managedProviderSupport===true,managedGrokVersion:string(raw.managedGrokVersion)||undefined,managedGrokPrevious:string(raw.managedGrokPrevious)||undefined,managedUpdates:Object.fromEntries(['claude','grok'].flatMap(id=>{const value=parseManagedUpdate(record(raw.managedUpdates)[id]);return value&&value.provider===id?[[id,value]]:[];})), providerRuntimePolicy: parseProviderRuntimeState(raw.providerRuntimePolicy), scanId: string(raw.scanId) || undefined, state: raw.state as DiscoveryProgress["state"], discoveredProjects: integer(raw.discoveredProjects), discoveredSessions: integer(raw.discoveredSessions), scannedPages: integer(raw.scannedPages), scannedCount: integer(raw.scannedCount), lastSuccessfulAt: string(raw.lastSuccessfulAt) || null, error: string(raw.error) || null, errorCode: string(raw.errorCode) || null,
     skippedCount: integer(raw.skippedCount),
     readiness: ["ready", "checking", "read_only", "action_required"].includes(string(raw.readiness)) ? raw.readiness as DiscoveryProgress["readiness"] : undefined,
     backgroundSync: raw.backgroundSync === true,
@@ -744,6 +745,9 @@ export const api = {
   adminUsers: (page: number, search: string, signal?: AbortSignal) => request<{ page: number; pages: number; total: number; users: AdminUser[] }>(`/api/admin/users?page=${page}&search=${encodeURIComponent(search)}`, { signal }),
   adminUserAction: (id: string, action: "disable" | "enable" | "revoke-sessions") => request<{ ok: boolean }>(`/api/admin/users/${encodeURIComponent(id)}/actions`, { method: "POST", body: JSON.stringify({ action }) }),
   adminSystem: () => request<{ authMode: string; registration: string }>("/api/admin/system"),
+  managedHosts: async(signal?:AbortSignal)=>{const result=await request<{machines:unknown[]}>('/api/machines',{signal});return result.machines.map(value=>mapMachine(value,[]));},
+  managedReleases: (signal?:AbortSignal)=>request<{configured:boolean;channels:ManagedChannel[]}>('/api/managed-releases',{signal}),
+  managedReleaseControl: (id:'claude'|'grok',body:{action:'check'}|{action:'publish'|'rollback';revision:number;releaseId:string})=>request<ManagedChannel>(`/api/managed-releases/${id}/control`,{method:'POST',body:JSON.stringify(body)}),
   runtimeRelease: (signal?: AbortSignal) => request<RuntimeReleaseStatus>("/api/runtime-release", { signal }),
   runtimeReleaseControl: (action: "check" | "pause" | "resume" | "rollback") => request<RuntimeReleaseStatus>("/api/runtime-release/control", { method: "POST", body: JSON.stringify({ action }) }),
   longTermPreferences: (signal?:AbortSignal)=>request<LongTermPreferenceList>('/api/long-term-preferences',{signal}),
@@ -988,8 +992,8 @@ export const api = {
   async removeWorktree(laneProjectId: string, input: { deleteBranch: boolean; force: boolean }, clientMutationId: string): Promise<HostOperation> {
     return mapHostOperation((await request<JsonObject>(`/api/projects/${encodeURIComponent(laneProjectId)}/worktrees/remove`, { method: "POST", body: JSON.stringify({ ...input, clientMutationId }) })).operation);
   },
-  async readHostOperation(operationId: string): Promise<HostOperation> {
-    return mapHostOperation((await request<JsonObject>(`/api/operations/${encodeURIComponent(operationId)}`)).operation);
+  async readHostOperation(operationId: string, signal?: AbortSignal): Promise<HostOperation> {
+    return mapHostOperation((await request<JsonObject>(`/api/operations/${encodeURIComponent(operationId)}`, {signal})).operation);
   },
   takeoverPolicy: (signal?: AbortSignal) => request<{idleDays:number;revision:number}>("/api/settings/takeover-policy", {signal}),
   saveTakeoverPolicy: (input:{idleDays:number;revision:number}) => request<{idleDays:number;revision:number}>("/api/settings/takeover-policy", {method:"PUT",body:JSON.stringify(input)}),

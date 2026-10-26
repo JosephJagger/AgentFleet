@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, readFile, readlink, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readlink, realpath, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -207,7 +207,7 @@ test("root service data directory cannot be redirected by argv or API callers", 
 
 test("root Codex resolution prefers the root-managed executable", { skip: process.platform !== "linux" }, async () => {
   assert.equal(ROOT_MANAGED_CODEX_EXECUTABLE, "/root/.local/share/agentfleet/codex/codex");
-  assert.equal(await resolveCodexExecutable(0, {}, "/bin/true"), resolve("/usr/bin/true"));
+  assert.equal(await resolveCodexExecutable(0, {}, "/bin/true"), await realpath("/bin/true"));
 });
 
 test("system service unit uses the boot target", () => {

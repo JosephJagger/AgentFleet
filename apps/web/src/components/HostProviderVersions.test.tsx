@@ -4,8 +4,8 @@ import {afterEach,it,expect,vi} from 'vitest';
 import {HostProviderVersions} from './HostProviderVersions';
 import {api} from '../lib/api';
 import type {Machine,HostOperation} from '../lib/types';
-vi.mock('../lib/api',()=>({api:{hostOperations:vi.fn(),providerRuntimeOperation:vi.fn(),readHostOperation:vi.fn()}}));
-afterEach(()=>{cleanup();vi.resetAllMocks();});
+vi.mock('../lib/api',()=>({api:{managedReleases:vi.fn().mockResolvedValue({channels:[]}),hostOperations:vi.fn(),providerRuntimeOperation:vi.fn(),readHostOperation:vi.fn()}}));
+afterEach(()=>{cleanup();vi.clearAllMocks();vi.mocked(api.managedReleases).mockResolvedValue({configured:true,channels:[]});});
 const machine={name:'Test host',hostname:'test',os:'linux',arch:'x64',identity:'paired',capacity:'idle',credentialProtectionLevel:'software_protected',agentVersion:'test',projects:[],id:'test-host',reachability:'live',codexVersion:'0.162.1',compatibility:'compatible',codexProfile:{source:'managed'},agentRuntimes:{claude:{installed:true,version:'2.1.290'}},maintenanceCapabilities:['provider.runtime']} as Machine;
 const report={createdAt:'2026-10-17T00:00:00Z',updatedAt:'2026-10-17T00:00:00Z',id:'checked',type:'provider.runtime',state:'succeeded',result:{checkedAt:'2026-10-17T00:00:00Z',providers:{claude:{version:'2.1.290',installed:true,mode:'host',revision:3,stableVersion:'2.1.292',sdkVersion:'0.3.285',compatibility:'protocol_checked'}}}} as HostOperation;
 it.each([false,true])('keeps the active Codex version after inventory loads and subsequent upgrades or rollbacks (admin=%s)',async canConfirmCodex=>{

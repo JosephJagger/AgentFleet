@@ -1,3 +1,4 @@
+import { ManagedChannels } from './managed-channels.js';
 import { generatedImageAccess } from "./generated-image-access.js";
 import { dismissPendingCommit } from "./pending-commits.js";
 import { projectCatalog } from "./project-catalog.js";
@@ -992,6 +993,31 @@ export async function buildControlPlane(
     agentManifest:{version:agentManifestVersion,status:manifestStatus},
     compatibilityProfile:channelProfile(config.runtimeReleaseDir),
   }); });
+
+  const managedChannels = config.runtimeReleaseDir ? new ManagedChannels(config.runtimeReleaseDir) : undefined;
+  const managedProvider = (value:unknown):'claude'|'grok' => {invariant(value==='claude'||value==='grok',400,'INVALID_PROVIDER','不支持此托管智能体');return value;};
+  app.get('/api/managed-releases',{preHandler:authenticate},async()=>({configured:Boolean(managedChannels),channels:managedChannels?['claude','grok'].map(id=>managedChannels.read(id as 'claude'|'grok')):[]}));
+  app.get('/api/managed-releases/:provider/target',async(request,reply)=>{
+    reply.header('cache-control','no-store');const id=managedProvider((request.params as {provider:string}).provider);
+    return {target:managedChannels?.read(id).target??null};
+  });
+  app.post('/api/managed-releases/:provider/control',{preHandler:mutate},async request=>{
+    auth.requirePlatformAdmin(request.principal as Principal);
+    invariant(managedChannels,409,'RUNTIME_CHANNEL_DISABLED','托管版本服务尚未配置');
+    const id=managedProvider((request.params as {provider:string}).provider),body=record(request.body);
+    invariant(['check','publish','rollback'].includes(String(body.action)),400,'INVALID_ACTION','无效的托管升级操作');
+    if(body.action==='check') {invariant(Object.keys(body).length===1,400,'INVALID_ACTION','检查请求无效');void managedChannels.check(id);}
+    else {
+      invariant(Object.keys(body).length===3&&Number.isSafeInteger(body.revision)&&Number(body.revision)>=0&&typeof body.releaseId==='string'&&/^[a-f0-9]{64}$/.test(body.releaseId),400,'INVALID_ACTION','请选择明确的托管版本');
+      managedChannels.control(id,body.action as 'publish'|'rollback',Number(body.revision),body.releaseId);
+    }
+    const principal=request.principal as Principal;
+    db.audit({workspaceId:principal.workspaceId,action:'runtime.channel.control',outcome:'accepted',metadata:{provider:id,action:body.action,userId:principal.userId}});
+    return managedChannels.read(id);
+  });
+  const managedCheckTimer=managedChannels?setInterval(()=>{for(const id of ['claude','grok'] as const)void managedChannels.check(id);},6*60*60_000):undefined;
+  managedCheckTimer?.unref();
+  app.addHook('onClose',async()=>{if(managedCheckTimer)clearInterval(managedCheckTimer);await managedChannels?.stop();});
 
   app.get("/api/runtime-release", { preHandler: authenticateAdmin }, async () => ({ ...channelStatus(config.runtimeReleaseDir), canControl: true }));
   app.post("/api/runtime-release/control", { preHandler: mutate }, async request => {

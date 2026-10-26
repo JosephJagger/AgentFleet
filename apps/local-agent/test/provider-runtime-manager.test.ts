@@ -187,3 +187,11 @@ test('managed Claude reports permissions from its verified binary; host mode use
  await f.configure('host');
  assert.deepEqual((await f.manager.detectClaude()).permissionModes,['default']);
 });
+test('explicit platform target binds the signed artifact, pins it and rechecks confirmation before switching',async t=>{
+ const f=await fixture(t);await f.configure('auto');f.setVersion('2.1.293');
+ const release={provider:'claude' as const,version:'2.1.293',id:'a'.repeat(64),checkedAt:new Date().toISOString(),artifacts:{[claudePlatform()]:{integrity:createHash('sha256').update('2.1.293').digest('hex'),size:'2.1.293'.length}}};
+ const phases:string[]=[];let current=false;
+ const apply=()=>f.manager.operate({action:'configure',provider:'claude',mode:'pinned',expectedRevision:f.manager.state().revision},'platform-target','manual',{release,signal:new AbortController().signal,phase:async p=>{phases.push(p);},assertCurrent:async()=>{if(!current)throw new AgentError('PROVIDER_TARGET_CHANGED','target changed');}});
+ await assert.rejects(apply(),/target changed/);assert.equal(f.manager.state().current?.version,'2.1.292');
+ current=true;await apply();assert.equal(f.manager.state().current?.version,release.version);assert.equal(f.manager.state().mode,'pinned');assert.ok(phases.includes('activating'));
+});

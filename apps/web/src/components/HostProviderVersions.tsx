@@ -1,3 +1,6 @@
+import { ManagedHostAction, managedVersion } from './ManagedHostAction';
+import type { ManagedChannel } from '../lib/managed-provider';
+import './ManagedUpgradeCenter.css';
 import { useEffect, useRef, useState } from 'react';
 import { Package, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
@@ -14,6 +17,8 @@ const order:ProviderId[]=['codex','claude','cursor','qwen','kimi','codebuddy','g
 function reportOf(o?:HostOperation):Report|undefined {const r=o?.result;return r&&typeof r.checkedAt==='string'&&r.providers&&typeof r.providers==='object'?r as Report:undefined;}
 export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Machine;canConfirmCodex?:boolean}) {
   const [operation,setOperation]=useState<HostOperation>();const [report,setReport]=useState<Report>();const [error,setError]=useState('');const [sending,setSending]=useState(false);const submitting=useRef(false);
+  const [channels,setChannels]=useState<ManagedChannel[]>([]);
+  useEffect(()=>{const c=new AbortController();const refresh=()=>void api.managedReleases(c.signal).then(r=>{if(!c.signal.aborted)setChannels(r.channels);}).catch(()=>{});refresh();const timer=setInterval(refresh,15000);return()=>{c.abort();clearInterval(timer);};},[machine.id]);
   const [mode,setMode]=useState<ProviderRuntimeState['mode']>('host');
   const supported=machine.maintenanceCapabilities?.includes('provider.runtime');
   const pending=sending||Boolean(operation&&['accepted','running','unknown'].includes(operation.state));
@@ -35,18 +40,21 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
     catch(e){setError((e as Error).message);}finally{submitting.current=false;setSending(false);}
   };
   return <HostDisclosure title={t('智能体版本管理')} description={t('查看实际版本、兼容状态与更新方式')} icon={<Package size={20}/>} className="provider-versions">
-    <p className="subtle">{t('默认沿用宿主机安装。协议检查不等于完整任务验证，账号和历史仍保留在原主机。')}</p>
+    <p className="subtle">{t('查看主机实际版本，按需更新独立托管程序。')}</p>
     <div className="provider-versions__list">{order.map(id=>{
       const reported=report?.providers[id];const native=id==='codex'?{version:machine.codexVersion,installed:true}:machine.agentRuntimes?.[id];
-      const row=reported??native;const source=id==='codex'?String(machine.codexProfile?.source??''):id==='claude'?policy?.mode==='host'||!policy?'host':'managed':'host';
+      const row=id==='codex'?native:machine.reachability==='live'&&native?native:reported??native;const source=id==='grok'&&machine.discovery?.managedGrokVersion?'managed':id==='codex'?String(machine.codexProfile?.source??''):id==='claude'?policy?.mode==='host'||!policy?'host':'managed':'host';
       // Codex's active version is refreshed by heartbeats; inventory reports are historical snapshots.
-      const version=id==='codex'?machine.codexVersion||reported?.version:id==='claude'&&policy?.mode!=='host'&&policy?.current?policy.current.version:row?.version;
+      const version=id==='codex'?machine.codexVersion||reported?.version:(id==='claude'||id==='grok')?managedVersion(machine,id)??row?.version:row?.version;
       const compatibility=id==='codex'?machine.compatibility:reported?.compatibility;
       // Codex rollout and validation status belong to the platform administrator; everyone else only sees the version.
       const codexVisible=id!=='codex'||canConfirmCodex;
-      const offer=codexVisible?providerUpdateOffer(id,machine,policy,id==='codex'?machine.codexVersion:version):undefined;
+      const managedTarget=channels.find(c=>c.provider===id)?.target;
+      const managedAction=(id==='claude'||id==='grok')&&Boolean(managedTarget||machine.discovery?.managedUpdates?.[id]);
+      const offer=codexVisible&&!managedAction?providerUpdateOffer(id,machine,policy,id==='codex'?machine.codexVersion:version):undefined;
       const canAct=supported&&!pending&&machine.reachability==='live';
       return <div className="provider-versions__row" key={id}><div><strong>{PROVIDER_NAMES[id]}</strong><span>{version|| (row?.installed===false?t('未安装'):t('尚未上报'))}</span></div>{codexVisible&&<div><span>{source==='managed'?t('独立托管'):source==='host'?t('宿主机安装'):t('尚未上报')}</span><small>{compatibility==='compatible'?t('已通过兼容验证'):compatibility==='protocol_checked'?t('协议检查通过'):t('待验证')}</small></div>}
+        {managedAction&&(id==='claude'||id==='grok')&&<ManagedHostAction machine={machine} provider={id} target={managedTarget}/>}
         {offer&&<div className="provider-versions__offer" role="status">
           {offer.kind==='codex-confirm'?<><span>{t('{0} 已通过验证，确认后才会更新',offer.latest)}</span><button className="button button--primary" type="button" disabled={!canAct} onClick={()=>void operate({action:'confirm',provider:'codex',version:offer.latest})}>{t('确认更新到 {0}',offer.latest)}</button></>
           :offer.kind==='claude-update'?<><span>{t('官方稳定版 {0} 可用',offer.latest)}</span><button className="button button--primary" type="button" disabled={!canAct||!policy} onClick={()=>{if(policy)void operate({action:'update',provider:'claude',expectedRevision:policy.revision});}}>{t('更新到 {0}',offer.latest)}</button></>
@@ -55,7 +63,7 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
       </div>;
     })}</div>
     <div className="provider-versions__actions"><button className="button button--secondary" disabled={!supported||pending||machine.reachability!=='live'} onClick={()=>void operate({action:'check'})}><RefreshCw size={15}/>{pending?t('正在检查或应用…'):t('检查智能体版本')}</button>{report&&<small>{t('上次检查：{0}',new Date(report.checkedAt).toLocaleString())}</small>}</div>
-    {!supported?<p role="status">{t('更新连接服务后可管理智能体版本。')}</p>:<form className="provider-versions__policy" onSubmit={e=>{e.preventDefault();if(policy)void operate({action:'configure',provider:'claude',mode,expectedRevision:policy.revision});}}>
+    {!supported?<p role="status">{t('更新连接服务后可管理智能体版本。')}</p>:<details className="provider-versions__settings"><summary>{t('Claude Code 托管设置')}</summary><form className="provider-versions__policy" onSubmit={e=>{e.preventDefault();if(policy)void operate({action:'configure',provider:'claude',mode,expectedRevision:policy.revision});}}>
       <label>{t('Claude Code 更新方式')}<select aria-label={t('Claude Code 更新方式')} value={mode} onChange={e=>setMode(e.target.value as ProviderRuntimeState['mode'])} disabled={pending}><option value="host">{t('沿用宿主机安装')}</option><option value="pinned">{t('托管 · 固定版本')}</option><option value="auto">{t('托管 · 自动更新稳定版')}</option></select></label>
       <p className="subtle">{t('托管会下载独立版本，不覆盖系统安装；先核验 SDK 与协议，任务和通话结束后才切换。失败保留原版本，回退后暂停自动更新。')}</p>
       {policy?.stableVersion&&<small>{t('官方稳定版：{0} · SDK：{1}',policy.stableVersion,checked?.sdkVersion??'—')}</small>}
@@ -64,8 +72,8 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
       {policy?.step==='verifying'&&<p role="status">{t('下载完成，正在校验文件并做兼容检查…')}</p>}
       {policy?.phase==='waiting_idle'&&<p role="status">{t('已验证目标，等待任务或通话结束后再应用。')}</p>}
       {policy?.error&&<p role="status">{systemText(policy.error)}</p>}
-      <p className="subtle">{t('发现新版本只作提示：Codex 与托管的 Claude Code 经你确认后才会更新；其他智能体仍由原安装方式更新，本页不会修改其安装或自动更新设置。')}</p>
-    </form>}
+      <p className="subtle">{t('Claude 与 Grok 可手动启用平台托管目标；其他智能体继续使用原安装方式。Claude 已启用的自动更新策略仍然有效。')}</p>
+    </form></details>}
     {error&&<p role="alert">{systemText(error)}</p>}
     {operation?.state==='unknown'&&<p role="status">{t('操作结果待核验，请勿重复提交。')}</p>}
   </HostDisclosure>;

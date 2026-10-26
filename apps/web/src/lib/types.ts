@@ -84,6 +84,10 @@ export interface Machine {
 }
 
 export interface DiscoveryProgress {
+  managedProviderSupport?: boolean;
+  managedUpdates?: Partial<Record<import('./managed-provider').ManagedProvider,import('./managed-provider').ManagedUpdate>>;
+  managedGrokVersion?: string;
+  managedGrokPrevious?: string;
   providerRuntimePolicy?: import("./provider-runtime-policy").ProviderRuntimeState;
   syncMode?: "events" | "fallback";
   reconcileIntervalSeconds?: number;

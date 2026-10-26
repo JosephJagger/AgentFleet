@@ -8,10 +8,13 @@ import { providerUpdateOffer } from "../lib/provider-updates";
 import type { Machine } from "../lib/types";
 import { t, systemText } from "../i18n";
 import { HostUpdateStatus, type AgentReleaseStatus } from "./HostUpdateStatus";
-import { RuntimeReleasePanel } from "./RuntimeReleasePanel";
+import { ManagedHostAction, managedVersion } from "./ManagedHostAction";
+import type {ManagedChannel} from "../lib/managed-provider";
+import "./ManagedUpgradeCenter.css";
 
 export function UpdateCenter({ dashboard }: { dashboard: Dashboard }) {
   const [release, setRelease] = useState<AgentReleaseStatus>();
+  const [channels,setChannels]=useState<ManagedChannel[]>([]);
   const [build, setBuild] = useState("");
   const [error, setError] = useState("");
   const [operations, setOperations] = useState<Record<string, HostOperation[]>>({});
@@ -36,10 +39,13 @@ export function UpdateCenter({ dashboard }: { dashboard: Dashboard }) {
       } catch (reason) { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : t("读取升级状态失败")); }
       finally { active = false; }
     };
+    const refreshChannels=()=>void api.managedReleases(controller.signal).then(value=>{if(!controller.signal.aborted)setChannels(value.channels);}).catch(()=>undefined);
+    refreshChannels();
+    const channelTimer=window.setInterval(refreshChannels,10_000);
     void refresh();
     const timer = window.setInterval(() => void refresh(), 10_000);
     if (dashboard.user.platformAdmin) void api.release().then(value => { if (!controller.signal.aborted) setBuild(value.build); }).catch(() => undefined);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    return () => { controller.abort(); window.clearInterval(timer);window.clearInterval(channelTimer); };
   }, [hostKey, dashboard.user.platformAdmin]);
   const codexOffer = (machine: Machine) => {
     const offer = providerUpdateOffer("codex", machine, undefined, machine.codexVersion);
@@ -94,11 +100,11 @@ export function UpdateCenter({ dashboard }: { dashboard: Dashboard }) {
         return <article key={machine.id} className="update-center__host">
           <header><strong>{displayName(machine.name)}</strong><span>{machine.os} · {t(machine.reachability === "live" ? "在线" : "离线")}</span><button type="button" className="button button--quiet" disabled={Boolean(submitting[machine.id]) || pending || machine.reachability !== "live" || !machine.maintenanceCapabilities?.includes("agent.update") || !dashboard.user.platformAdmin} title={dashboard.user.platformAdmin ? undefined : t("仅平台管理员可更新连接服务")} onClick={() => void check(machine.id)}><RefreshCw size={14}/>{pending ? t("等待主机核验") : t("检查并更新")}</button></header>
           <HostUpdateStatus machine={machine} operations={history} release={release} compact/><div className="update-center__components"><details><summary>{t("连接服务")} <strong>{machine.agentVersion}</strong></summary><HostUpdateStatus machine={machine} operations={history} release={release}/></details>
-          <div><p>Codex <strong>{machine.codexVersion || t("尚未上报")}</strong></p>{dashboard.user.platformAdmin && <><small>{runtime.label}</small>{runtime.error && <p className="catalog-error">{systemText(runtime.error)}</p>}{codexOffer(machine) && <button type="button" className="button button--quiet" disabled={confirming} onClick={() => void confirmCodex([machine])}>{t("确认更新到 {0}", codexOffer(machine)!.latest)}</button>}</>}</div></div>
+          <div><p>Codex <strong>{machine.codexVersion || t("尚未上报")}</strong></p>{dashboard.user.platformAdmin && <><small>{runtime.label}</small>{runtime.error && <p className="catalog-error">{systemText(runtime.error)}</p>}{codexOffer(machine) && <button type="button" className="button button--quiet" disabled={confirming} onClick={() => void confirmCodex([machine])}>{t("确认更新到 {0}", codexOffer(machine)!.latest)}</button>}</>}</div>{(["claude","grok"] as const).map(provider=><div key={provider}><p>{provider==="claude"?"Claude Code":"Grok Build"} <strong>{managedVersion(machine,provider)||t("尚未上报")}</strong></p><ManagedHostAction machine={machine} provider={provider} target={channels.find(c=>c.provider===provider)?.target}/></div>)}</div>
         </article>;
       })}
       {!hosts.length && <p>{t("添加主机并连接后，可在这里查看更新进度。")}</p>}
     </div>
-    {dashboard.user.platformAdmin && <RuntimeReleasePanel/>}
+    {dashboard.user.platformAdmin && <p className="subtle">{t("全站托管目标与发布记录请在「管理 → 托管升级」中查看。")}</p>}
   </section>;
 }

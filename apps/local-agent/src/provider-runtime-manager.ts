@@ -1,3 +1,4 @@
+import type { ManagedRelease, ManagedPhase } from './managed-provider.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createReadStream } from 'node:fs';
@@ -143,16 +144,17 @@ export class ProviderRuntimeManager {
     for(const id of ACP_PROVIDER_IDS){const r=runtimes[id] as {version?:string;state?:string;checkedAt?:string}|undefined;let found:Awaited<ReturnType<typeof detectAcp>>=null;try{found=await this.deps.acp(id);}catch{/* A broken optional runtime must not hide successful activation or other providers. */}providers[id]={installed:Boolean(found),version:found?.version??null,source:'host',policy:'host',managedSupported:false,compatibility:found&&r?.version===found.version&&r.state==='ready'?'protocol_checked':'unverified',checkedAt:r?.checkedAt??null};}
     return {checkedAt:new Date().toISOString(),providers};
   }
-  async operate(value:unknown,operationId:string,origin:'manual'|'automatic'='manual'):Promise<Record<string,unknown>> {
+  async operate(value:unknown,operationId:string,origin:'manual'|'automatic'='manual',target?:{release:ManagedRelease;signal:AbortSignal;phase:(phase:ManagedPhase)=>Promise<void>;assertCurrent:()=>Promise<void>}):Promise<Record<string,unknown>> {
     this.controller.signal.throwIfAborted();
     const parsed=parseProviderRuntimeRequest(value);
     // Codex confirmations belong to the connection-service updater, never to the Claude runtime manager.
-    if(parsed.action==='confirm')throw new AgentError('PROVIDER_REQUEST_UNSUPPORTED','此确认由连接服务更新器处理');
+    if(parsed.action==='confirm'||parsed.action==='install-managed'||parsed.action==='cancel-managed'||parsed.action==='rollback-managed')throw new AgentError('PROVIDER_REQUEST_UNSUPPORTED','此确认由连接服务更新器处理');
     let request:Exclude<typeof parsed,{action:'confirm'|'update'}>|{action:'update';provider:'claude';expectedRevision:number}=parsed;
-    let userConfirmedUpdate=false;
+    let userConfirmedUpdate=Boolean(target);
     if(this.busy)throw new AgentError('PROVIDER_UPDATE_BUSY','版本检查或更新正在进行');this.busy=true;
     let done!:()=>void;this.completion=new Promise(resolve=>{done=resolve;});
-    const signal=this.controller.signal;
+    const signal=target?AbortSignal.any([this.controller.signal,target.signal]):this.controller.signal;
+    const stable=()=>target?Promise.resolve(target.release.version):this.deps.stable(signal);
     let admitted=false;
     try {
       let state=this.state();
@@ -163,7 +165,7 @@ export class ProviderRuntimeManager {
         request={action:'configure',provider:'claude',mode:state.mode,expectedRevision:request.expectedRevision};userConfirmedUpdate=true;
       }
       if(request.action==='check') {
-        try {const version=await this.deps.stable(signal);await this.save({stableVersion:version,checkedAt:new Date().toISOString()});await this.deps.manifest(version,claudePlatform(),signal);await this.save({error:'',phase:state.mode==='host'?'idle':'ready'});}
+        try {const version=await stable();await this.save({stableVersion:version,checkedAt:new Date().toISOString()});await this.deps.manifest(version,claudePlatform(),signal);await this.save({error:'',phase:state.mode==='host'?'idle':'ready'});}
 
         catch(e){await this.save(isTransient(e)?{error:'官方版本服务暂时不可用，将自动重试'}:{phase:'blocked',error:e instanceof AgentError?e.message:'官方版本检查失败，保留当前版本'});}
         const host=await this.deps.host();const v=versionOf(host.version);
@@ -201,33 +203,40 @@ export class ProviderRuntimeManager {
         }
         await this.save({revision:state.revision+1,mode:'pinned',phase:'ready'});return {policy:this.state()};
       }
-      const version=await this.deps.stable(signal);
+      const version=await stable();
       if(origin==='automatic'&&this.failure?.version===version&&this.failure.count>=MAX_ATTEMPTS_PER_VERSION)throw new AgentError('PROVIDER_RETRY_LIMIT','该版本多次验证失败，等待新的稳定版本或手动重试');
-      if(!state.current) {
+      if(!state.current||state.mode==='host') {
         // Enabling managed mode must not replace a newer host installation with an older stable build.
         const hostVersion=versionOf((await this.deps.host().catch(()=>null))?.version);
         if(hostVersion&&newerVersion(hostVersion,version))throw new AgentError('PROVIDER_HOST_NEWER',`宿主机 Claude ${hostVersion} 比官方稳定版 ${version} 更新，未切换以避免降级；继续使用宿主机版本`);
       }
       // Auto channel never silently downgrades a pinned version newer than stable.
+      if(target&&state.current){const artifact=target.release.artifacts[claudePlatform()];if(state.current.version===version&&(!artifact||artifact.integrity!==state.current.sha256||artifact.size!==state.current.size))throw new AgentError('PROVIDER_TARGET_CHANGED','托管目标文件与已安装版本不同，请核验后重试');}
+      if(target&&state.current&&newerVersion(state.current.version,version))throw new AgentError('PROVIDER_HOST_NEWER','当前 Claude 比托管目标更新，未执行降级');
       if(state.current && !newerVersion(version,state.current.version)) {
+        await target?.assertCurrent();signal.throwIfAborted();
         await this.verify(state.current);
         if(state.mode===request.mode&&state.current.sdkVersion===CLAUDE_SDK_VERSION){await this.save({checkedAt:new Date().toISOString(),stableVersion:version,phase:'ready',error:''});return {policy:this.state()};}
         const reviewed=await this.deps.manifest(state.current.version,claudePlatform(),signal);
         if(reviewed.sha256!==state.current.sha256)throw new AgentError('PROVIDER_TARGET_CHANGED','同版本官方文件摘要已变化，请核验后重试');
         await this.deps.probe(this.file(state.current),state.current.version,signal);
+        await target?.assertCurrent();signal.throwIfAborted();
         admitted=await this.store.tryBeginUpdate(operationId);if(!admitted)throw new AgentError('PROVIDER_HOST_BUSY','任务或通话进行中，暂未切换');
-        await this.commit({...state,revision:state.revision+1,mode:request.mode,current:reviewed,phase:'ready',checkedAt:new Date().toISOString(),stableVersion:version,error:''},state);return {policy:this.state()};
+        await target?.phase('activating');signal.throwIfAborted();
+        await this.commit({...state,revision:state.revision+1,mode:request.mode,current:reviewed,phase:'ready',checkedAt:new Date().toISOString(),stableVersion:version,error:''},state,signal);return {policy:this.state()};
       }
       await this.save({phase:'checking',stableVersion:version,checkedAt:new Date().toISOString()});
-      const target=await this.deps.manifest(version,claudePlatform(),signal);
-      const file=this.file(target);try{await this.verify(target);}catch{await this.save({step:'downloading',progress:{received:0,total:target.size}});await this.deps.download(target,file,signal,this.progressReporter(target.size));await this.save({step:'verifying',progress:undefined});await this.verify(target);}
+      const release=await this.deps.manifest(version,claudePlatform(),signal);
+      if(target){const artifact=target.release.artifacts[claudePlatform()];if(!artifact||artifact.integrity!==release.sha256||artifact.size!==release.size)throw new AgentError('PROVIDER_TARGET_CHANGED','托管目标与官方签名清单不一致');}
+      const file=this.file(release);try{await this.verify(release);}catch{await target?.phase('downloading');await this.save({step:'downloading',progress:{received:0,total:release.size}});await this.deps.download(release,file,signal,this.progressReporter(release.size));await this.save({step:'verifying',progress:undefined});await this.verify(release);}
       await this.save({step:'verifying',progress:undefined});
-      await this.deps.probe(file,version,signal);
-      if(await this.deps.stable(signal)!==version)throw new AgentError('PROVIDER_TARGET_CHANGED','官方稳定目标已变化，请重新检查');
+      await target?.phase('verifying');await this.deps.probe(file,version,signal);await target?.assertCurrent();signal.throwIfAborted();
+      if(await stable()!==version)throw new AgentError('PROVIDER_TARGET_CHANGED','官方稳定目标已变化，请重新检查');
       admitted=await this.store.tryBeginUpdate(operationId);
       if(!admitted){await this.save({phase:'waiting_idle'});throw new AgentError('PROVIDER_HOST_BUSY','目标已下载并验证，当前任务或通话结束后可再次应用');}
+      await target?.phase('activating');signal.throwIfAborted();
       state=this.state();
-      await this.commit({...state,revision:state.revision+1,mode:request.mode,current:target,...(state.current?{previous:state.current}:{}),phase:'ready',error:'',failedVersion:''},state);
+      await this.commit({...state,revision:state.revision+1,mode:request.mode,current:release,...(state.current?{previous:state.current}:{}),phase:'ready',error:'',failedVersion:''},state,signal);
       return {policy:this.state()};
     } catch(e) {
       const code=e instanceof AgentError?e.code:'';
@@ -240,9 +249,9 @@ export class ProviderRuntimeManager {
       throw e instanceof AgentError ? e : new AgentError('PROVIDER_UPDATE_FAILED','版本验证或切换失败，保留原版本；请检查主机连接和运行环境');
     } finally {try{if(admitted)await this.store.finishUpdateAdmission(operationId);}finally{try{if(!signal.aborted){if(this.state().step||this.state().progress)await this.save({step:undefined,progress:undefined});await this.prune();}}catch{/* Cleanup is best effort; never mask the operation result. */}this.busy=false;done();}}
   }
-  private async commit(next:ProviderRuntimeState,previous:ProviderRuntimeState) {
+  private async commit(next:ProviderRuntimeState,previous:ProviderRuntimeState,signal=this.controller.signal) {
     this.controller.signal.throwIfAborted();
-    await this.store.update(s=>{s.providerRuntimeState=next;});
+    await this.store.update(s=>{signal.throwIfAborted();s.providerRuntimeState=next;});
     try{await this.activate();}
     catch(e){await this.store.update(s=>{s.providerRuntimeState={...previous,revision:next.revision,mode:previous.mode==='auto'?'pinned':previous.mode,phase:'blocked',error:'启用失败，已回退；自动更新暂停'};});await this.activate().catch(()=>{});throw e;}
   }

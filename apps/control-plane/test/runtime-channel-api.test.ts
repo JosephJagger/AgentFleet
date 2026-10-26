@@ -25,6 +25,17 @@ test("runtime channel controls require login and CSRF; absent targets never beco
   assert.equal((await app.inject({ ...base, headers, payload: { action: "resume" } })).statusCode, 200);
   assert.equal(channelControl(config.runtimeReleaseDir!).paused, false);
   assert.equal((await app.inject({ method: "GET", url: "/downloads/managed-codex/control.json" })).statusCode, 404);
+  assert.equal((await app.inject({method:'GET',url:'/api/managed-releases'})).statusCode,401);
+  assert.deepEqual((await app.inject({method:'GET',url:'/api/managed-releases/grok/target'})).json(),{target:null});
+  const candidate={provider:'grok',id:'a'.repeat(64),version:'1.0.70',checkedAt:new Date().toISOString(),artifacts:{'linux-x64':{size:100,integrity:'sha512-'+Buffer.alloc(64).toString('base64')}}};
+  await writeFile(join(config.runtimeReleaseDir!,'grok-channel.json'),JSON.stringify({provider:'grok',revision:0,phase:'ready',candidate,history:[]}));
+  const publish={method:'POST' as const,url:'/api/managed-releases/grok/control',payload:{action:'publish',revision:0,releaseId:candidate.id}};
+  assert.equal((await app.inject({...publish,headers:{origin:config.publicOrigin,cookie}})).statusCode,403);
+  assert.equal((await app.inject({...publish,headers,payload:{...publish.payload,releaseId:'b'.repeat(64)}})).statusCode,409);
+  assert.equal((await app.inject({...publish,headers})).statusCode,200);
+  assert.equal((await app.inject({...publish,headers})).statusCode,409);
+  assert.equal((await app.inject({method:'GET',url:'/api/managed-releases/grok/target'})).json().target.version,'1.0.70');
+  assert.equal((await app.inject({method:'POST',url:'/api/managed-releases/qwen/control',headers,payload:{action:'check'}})).statusCode,400);
   const artifact = "codex-code-mode-host-darwin-arm64-0.154.0-0123456789abcdef";
   await mkdir(join(config.runtimeReleaseDir!, "public"), { recursive: true });
   await writeFile(join(config.runtimeReleaseDir!, "public", artifact), "0123456789");

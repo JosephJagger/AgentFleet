@@ -211,6 +211,7 @@ export interface AppServerClient {
   manageHostCodex?(request: unknown, mutationId: string): Promise<CodexOperationResult>;
   manageGrok?(thread: ManagedThread, project: ProjectRecord, request: unknown): Promise<import("./grok-operations.js").GrokOperationResult>;
   manageCodex?(thread: ManagedThread, request: unknown, mutationId: string): Promise<CodexOperationResult>;
+  refreshManagedGrok?(): Promise<void>;
   refreshManagedClaude?(): Promise<void>;
   getAgentRuntimes?(): Record<string, unknown>;
   refreshQuota?(): Promise<void>;

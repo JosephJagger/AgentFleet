@@ -1,3 +1,4 @@
+import type { AcpExecutable } from './acp-providers.js';
 import { AcpRuntime } from "./acp-runtime.js";
 import { ACP_PROVIDER_IDS, isAcpProvider } from "./provider-catalog.js";
 import { decodeProviderThread } from "./provider-identity.js";
@@ -8,11 +9,11 @@ import { AgentError } from "./errors.js";
 import { isRecord } from "./util.js";
 
 /** Codex keeps its original client and defaults. Claude identities occupy a separate namespace. */
-export function createMultiRuntime(callbacks: AppServerCallbacks, options: {codexReadable?: boolean; additionalAllowed?: boolean; detectClaude?: typeof detectClaude} = {}): AppServerClient {
+export function createMultiRuntime(callbacks: AppServerCallbacks, options: {codexReadable?: boolean; additionalAllowed?: boolean; detectClaude?: typeof detectClaude; detectGrok?:()=>Promise<AcpExecutable|null>} = {}): AppServerClient {
   const codexReadable = options.codexReadable !== false;
   const codex = new SessionAppServer(callbacks);
   const claude = new ClaudeRuntime(callbacks, codex.appServerEpoch, options.detectClaude ? {detectClaude:options.detectClaude} : {});
-  const additional = new Map((options.additionalAllowed === false ? [] : ACP_PROVIDER_IDS).map(id => [id, new AcpRuntime(id, callbacks, codex.appServerEpoch)]));
+  const additional = new Map((options.additionalAllowed === false ? [] : ACP_PROVIDER_IDS).map(id => [id, new AcpRuntime(id, callbacks, codex.appServerEpoch,id==='grok'&&options.detectGrok?{detect:()=>options.detectGrok!()}: {})]));
   let lastAdditionalCatalog: Awaited<ReturnType<AcpRuntime['listThreads']>> = [];
   let additionalScan: Promise<void> | undefined;
   let nextAdditionalScan = 0;
@@ -43,6 +44,13 @@ export function createMultiRuntime(callbacks: AppServerCallbacks, options: {code
   const status = () => { if(codexReadable) void claude.refreshMetadata(); return { codex: { installed: codexReadable }, claude: claude.availability, ...Object.fromEntries([...additional].map(([id,runtime]) => [id,runtime.availability])) }; };
   return new Proxy(codex, {
     get(target, key) {
+      if (key === "refreshManagedGrok") return async () => {
+        const old=additional.get('grok');if(!old)throw new AgentError('PROVIDER_RUNTIME_UNAVAILABLE','Grok adapter is unavailable');
+        await additionalScan;await old.stop();
+        const next=new AcpRuntime('grok',callbacks,codex.appServerEpoch,options.detectGrok?{detect:()=>options.detectGrok!()}:{});
+        additional.set('grok',next);schedule.delete('grok');nextAdditionalScan=0;
+        await next.start();if(!next.availability.installed)throw new AgentError('PROVIDER_ACTIVATION_FAILED','Grok activation failed');
+      };
       if (key === "refreshManagedClaude") return async () => { await claude.stop(); await claude.start(); if(!claude.availability.installed)throw new AgentError("CLAUDE_ACTIVATION_FAILED","Claude runtime is not available"); };
       if (key === "getAgentRuntimes") return status;
       if (key === "start") return async () => { if(codexReadable) {await codex.start(); await claude.start();} if(codexReadable) {void Promise.all([...additional.values()].map(runtime => runtime.start()));} else await Promise.all([...additional.values()].map(runtime => runtime.start())); };

@@ -5,9 +5,9 @@ import { UpdateCenter } from './components/UpdateCenter';
 import { HostUpdateStatus } from './components/HostUpdateStatus';
 import { api } from './lib/api';
 import type { Dashboard, HostOperation } from './lib/types';
-vi.mock('./lib/api',()=>({api:{agentReleaseStatus:vi.fn(),hostOperations:vi.fn(),hostOperation:vi.fn(),release:vi.fn(),providerRuntimeOperation:vi.fn()}}));
+vi.mock('./lib/api',()=>({api:{managedReleases:vi.fn().mockResolvedValue({channels:[]}),agentReleaseStatus:vi.fn(),hostOperations:vi.fn(),hostOperation:vi.fn(),release:vi.fn(),providerRuntimeOperation:vi.fn()}}));
 vi.mock('./components/RuntimeReleasePanel',()=>({RuntimeReleasePanel:()=>null}));
-afterEach(()=>{cleanup();vi.useRealTimers();vi.resetAllMocks();});
+afterEach(()=>{cleanup();vi.useRealTimers();vi.resetAllMocks();vi.mocked(api.managedReleases).mockResolvedValue({configured:true,channels:[]});});
 it('does not certify a running version without its health receipt',()=>{
   render(<HostUpdateStatus compact machine={{agentVersion:'1.2.3',reachability:'live',codexProfile:{agentUpdateState:'restarting',agentUpdateTarget:'1.2.3'}}}/>);
   expect(screen.getByText('已运行目标版本，升级健康回执待核验')).toBeTruthy();

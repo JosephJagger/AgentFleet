@@ -1,5 +1,6 @@
 /** This request crosses a trust boundary; never accept paths, URLs or shell commands. */
-export type ProviderRuntimeRequest = { action: 'check' } | { action: 'configure'; provider: 'claude'; mode: 'host' | 'pinned' | 'auto'; expectedRevision: number } | { action: 'rollback'; provider: 'claude'; expectedRevision: number }
+export type ManagedProviderRequest = {action:'install-managed';provider:'claude'|'grok';releaseId:string;expectedRevision:number} | {action:'cancel-managed';provider:'claude'|'grok';expectedRevision:number} | {action:'rollback-managed';provider:'grok';expectedRevision:number};
+export type ProviderRuntimeRequest = ManagedProviderRequest | { action: 'check' } | { action: 'configure'; provider: 'claude'; mode: 'host' | 'pinned' | 'auto'; expectedRevision: number } | { action: 'rollback'; provider: 'claude'; expectedRevision: number }
   /** User-confirmed update of an already managed Claude build to the verified official stable release. */
   | { action: 'update'; provider: 'claude'; expectedRevision: number }
   /** User confirmation for one specific, already validated Codex managed-runtime upgrade. */
@@ -8,6 +9,11 @@ const STABLE = /^\d+\.\d+\.\d+$/;
 export function parseProviderRuntimeRequest(value: unknown): ProviderRuntimeRequest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid provider runtime request');
   const v = value as Record<string, unknown>;
+  if (['install-managed','cancel-managed','rollback-managed'].includes(String(v.action)) && ['claude','grok'].includes(String(v.provider)) && Number.isSafeInteger(v.expectedRevision) && Number(v.expectedRevision)>=0) {
+    if (v.action==='install-managed' && Object.keys(v).length===4 && typeof v.releaseId==='string' && /^[a-f0-9]{64}$/.test(v.releaseId)) return {action:v.action,provider:v.provider as 'claude'|'grok',releaseId:v.releaseId,expectedRevision:Number(v.expectedRevision)};
+    if (v.action==='rollback-managed' && v.provider==='grok' && Object.keys(v).length===3) return {action:v.action,provider:'grok',expectedRevision:Number(v.expectedRevision)};
+    if (v.action==='cancel-managed' && Object.keys(v).length===3) return {action:v.action,provider:v.provider as 'claude'|'grok',expectedRevision:Number(v.expectedRevision)};
+  }
   if (v.action === 'check' && Object.keys(v).length === 1) return {action:'check'};
   if (v.action === 'confirm' && Object.keys(v).length === 3 && v.provider === 'codex' && typeof v.version === 'string' && v.version.length <= 40 && STABLE.test(v.version)) return {action:'confirm',provider:'codex',version:v.version};
   if (v.provider !== 'claude' || !Number.isSafeInteger(v.expectedRevision) || Number(v.expectedRevision) < 0) throw new Error('Invalid provider runtime revision');

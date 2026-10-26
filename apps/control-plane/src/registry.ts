@@ -1,3 +1,4 @@
+import { parseManagedUpdate } from './managed-provider.js';
 import { pendingCommits, parseWorkspaceGitStatus } from "./pending-commits.js";
 import {grokNativeDiscovery} from "./grok-operations.js";
 import {parseCursorModels} from './cursor-settings.js';
@@ -2585,6 +2586,10 @@ export class RegistryService {
     safe.workspaceGitStatus = parseWorkspaceGitStatus(discovery.workspaceGitStatus);
     const providerPolicy=parseProviderRuntimeState(discovery.providerRuntimePolicy);
     if(providerPolicy)safe.providerRuntimePolicy=providerPolicy;
+    safe.managedProviderSupport=discovery.managedProviderSupport===true;
+    if(typeof discovery.managedGrokVersion==='string'&&/^\d+\.\d+\.\d+$/.test(discovery.managedGrokVersion))safe.managedGrokVersion=discovery.managedGrokVersion;
+    if(typeof discovery.managedGrokPrevious==='string'&&/^\d+\.\d+\.\d+$/.test(discovery.managedGrokPrevious))safe.managedGrokPrevious=discovery.managedGrokPrevious;
+    if(discovery.managedUpdates&&typeof discovery.managedUpdates==='object')safe.managedUpdates=Object.fromEntries(['claude','grok'].flatMap(id=>{const value=parseManagedUpdate((discovery.managedUpdates as Record<string,unknown>)[id]);return value&&value.provider===id?[[id,value]]:[];}));
     if (discovery.agentRuntimes && typeof discovery.agentRuntimes === "object" && !Array.isArray(discovery.agentRuntimes)) {
       const runtimes = discovery.agentRuntimes as Record<string, unknown>;
       const claude = runtimes.claude as Record<string, unknown> | undefined;

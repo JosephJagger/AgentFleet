@@ -256,6 +256,8 @@ export interface ProjectDiscoveryStatus {
 
 export interface AgentState {
   releasedCursorWorkers?: import("./acp-providers.js").ReleasedCursorWorker[];
+  managedUpdates?: Partial<Record<import('./managed-provider.js').ManagedProvider,import('./managed-provider-updates.js').ManagedJob>>;
+  managedGrok?: {current:import('./managed-grok.js').GrokInstallation;previous?:import('./managed-grok.js').GrokInstallation};
   providerRuntimeState?: import("./provider-runtime-policy.js").ProviderRuntimeState;
   /** Codex managed-runtime version the user explicitly approved on this host; cleared once it is activated. */
   confirmedRuntimeVersion?: string;

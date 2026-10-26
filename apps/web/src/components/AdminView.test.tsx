@@ -5,7 +5,7 @@ import { AdminView } from "./AdminView";
 import { api } from "../lib/api";
 import { setLocale } from "../i18n";
 
-vi.mock("./RuntimeReleasePanel", () => ({ RuntimeReleasePanel: () => <div>Runtime policy</div> }));
+vi.mock("./ManagedUpgradeCenter", () => ({ ManagedUpgradeCenter: () => <div>Runtime policy</div> }));
 vi.mock("../lib/api", () => ({ api: { adminUsers: vi.fn(), adminUserAction: vi.fn(), release: vi.fn(), adminSystem: vi.fn() } }));
 const guest = { id: "u2", email: "guest@example.test", platformAdmin: false, disabled: false, createdAt: "2026-09-01T00:00:00Z", lastLoginAt: null, machineCount: 2 };
 beforeEach(() => {

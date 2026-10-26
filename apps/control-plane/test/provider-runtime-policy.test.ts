@@ -13,3 +13,9 @@ test('discovered versions are bounded, typed and limited to known agents',()=>{
  assert.deepEqual(state?.latest,{qwen:{version:'0.25.2',checkedAt:at},claude:{version:'2.1.300',checkedAt:at}});
  assert.equal(parseProviderRuntimeState({revision:1,mode:'host',latest:[]})?.latest,undefined);
 });
+
+test('managed commands bind provider, release digest and revision and cannot supply installation paths',()=>{
+ const request={action:'install-managed',provider:'grok',releaseId:'a'.repeat(64),expectedRevision:0};
+ assert.deepEqual(parseProviderRuntimeRequest(request),request);
+ for(const bad of [{...request,provider:'qwen'},{...request,expectedRevision:-1},{...request,releaseId:'latest'},{...request,url:'https://example.com'},{action:'rollback-managed',provider:'claude',expectedRevision:0}])assert.throws(()=>parseProviderRuntimeRequest(bad));
+});
