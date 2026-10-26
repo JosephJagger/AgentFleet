@@ -1,5 +1,5 @@
 import { t } from "../i18n";
-import { useEffect, useRef, useState, type ClipboardEvent } from "react";
+import { useCallback, useSyncExternalStore, type ClipboardEvent } from "react";
 
 export const MAX_IMAGES = 4;
 const MAX_BYTES = 128 * 1024;
@@ -39,34 +39,76 @@ export async function prepareClipboardImage(file: File): Promise<string> {
   } finally { URL.revokeObjectURL(url); }
 }
 
+interface ImageSnapshot { images: string[]; processing: boolean; error: string }
+interface ImageEntry {
+  snapshot: ImageSnapshot;
+  listeners: Set<() => void>;
+  revision: number;
+  memoryOnly: boolean;
+}
+const emptySnapshot: ImageSnapshot = { images: [], processing: false, error: "" };
+// Processing and storage-failure fallbacks outlive the composer. Keys include both
+// account and session, so finishing an upload cannot attach it to another chat.
+const entries = new Map<string, ImageEntry>();
+function entryFor(key: string): ImageEntry {
+  const existing = entries.get(key);
+  if (existing) return existing;
+  let images: string[] = [];
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+    if (Array.isArray(value)) images = value.filter(isInlineImage).slice(0, MAX_IMAGES);
+  } catch { /* Memory remains available when storage is disabled. */ }
+  const entry: ImageEntry = { snapshot: { ...emptySnapshot, images }, listeners: new Set(), revision: 0, memoryOnly: false };
+  entries.set(key, entry);
+  return entry;
+}
+function releaseEntry(key: string, entry: ImageEntry) {
+  if (!entry.listeners.size && !entry.snapshot.processing && !entry.memoryOnly && entries.get(key) === entry) entries.delete(key);
+}
+function updateEntry(entry: ImageEntry, patch: Partial<ImageSnapshot>) {
+  entry.snapshot = { ...entry.snapshot, ...patch };
+  entry.listeners.forEach(listener => listener());
+}
+function saveImages(key: string, entry: ImageEntry, images: string[]) {
+  let error = "";
+  try {
+    if (images.length) localStorage.setItem(key, JSON.stringify(images)); else localStorage.removeItem(key);
+    entry.memoryOnly = false;
+  } catch {
+    entry.memoryOnly = true;
+    error = t("浏览器存储空间不足：图片暂存在此页面，发送前请不要刷新");
+  }
+  updateEntry(entry, { images, error });
+  releaseEntry(key, entry);
+}
+
 export function useImageDraft(owner: string, session?: string) {
   const key = session ? `agentfleet.images:${encodeURIComponent(owner)}:${encodeURIComponent(session)}` : "";
-  const [drafts, setDrafts] = useState<Record<string, string[]>>({});
-  const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState("");
-  const generation = useRef(0); const active = useRef(key); active.current = key;
-  const pending = useRef(false);
-  useEffect(() => { generation.current++; pending.current = false; setProcessing(false); setError(""); return () => { generation.current++; }; }, [key]);
-  let stored: string[] = [];
-  try { const value: unknown = key ? JSON.parse(localStorage.getItem(key) ?? "[]") : []; if (Array.isArray(value)) stored = value.filter(isInlineImage).slice(0, MAX_IMAGES); } catch { /* Drafts still work without storage. */ }
-  const images = drafts[key] ?? stored;
-  function save(next: string[]) {
-    if (!key) return;
-    setDrafts(current => ({ ...current, [key]: next }));
-    try { if (next.length) localStorage.setItem(key, JSON.stringify(next)); else localStorage.removeItem(key); }
-    catch { setError(t("浏览器存储空间不足：图片暂存在此页面，发送前请不要刷新")); }
-  }
+  const subscribe = useCallback((listener: () => void) => {
+    if (!key) return () => {};
+    const entry = entryFor(key);
+    entry.listeners.add(listener);
+    return () => { entry.listeners.delete(listener); releaseEntry(key, entry); };
+  }, [key]);
+  const getSnapshot = useCallback(() => key ? entryFor(key).snapshot : emptySnapshot, [key]);
+  const { images, processing, error } = useSyncExternalStore(subscribe, getSnapshot);
   async function addFiles(files: File[]) {
-    if (!files.length) return;
-    if (pending.current) { setError(t("正在处理上一张图片，请稍候再添加")); return; }
-    if (images.length + files.length > MAX_IMAGES) { setError(t("一条消息最多 4 张图片，请先移除多余图片")); return; }
-    const current = generation.current; pending.current = true; setProcessing(true); setError("");
+    if (!key || !files.length) return;
+    const entry = entryFor(key);
+    if (entry.snapshot.processing) { updateEntry(entry, { error: t("正在处理上一张图片，请稍候再添加") }); return; }
+    if (entry.snapshot.images.length + files.length > MAX_IMAGES) { updateEntry(entry, { error: t("一条消息最多 4 张图片，请先移除多余图片") }); return; }
+    const revision = entry.revision;
+    updateEntry(entry, { processing: true, error: "" });
     try {
       const next: string[] = [];
       for (const file of files) next.push(await prepareClipboardImage(file));
-      if (generation.current === current && active.current === key) save([...images, ...next]);
-    } catch (reason) { if (generation.current === current) setError(reason instanceof Error ? reason.message : t("图片处理失败，请重新选择或粘贴")); }
-    finally { if (generation.current === current) { pending.current = false; setProcessing(false); } }
+      if (entry.revision === revision) saveImages(key, entry, [...entry.snapshot.images, ...next]);
+    } catch (reason) {
+      if (entry.revision === revision) updateEntry(entry, { error: reason instanceof Error ? reason.message : t("图片处理失败，请重新选择或粘贴") });
+    } finally {
+      if (entry.revision === revision) updateEntry(entry, { processing: false });
+      releaseEntry(key, entry);
+    }
   }
   async function onPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
     const files = Array.from(event.clipboardData.items).filter(item => item.kind === "file" && item.type.startsWith("image/")).map(item => item.getAsFile()).filter((file): file is File => Boolean(file));
@@ -74,5 +116,19 @@ export function useImageDraft(owner: string, session?: string) {
     event.preventDefault();
     await addFiles(files);
   }
-  return { images, processing, error, addFiles, onPaste, remove: (index: number) => save(images.filter((_, i) => i !== index)), clear: () => save([]) };
+  return {
+    images, processing, error, addFiles, onPaste,
+    remove: (index: number) => {
+      if (!key) return;
+      const entry = entryFor(key);
+      saveImages(key, entry, entry.snapshot.images.filter((_, i) => i !== index));
+    },
+    clear: () => {
+      if (!key) return;
+      const entry = entryFor(key);
+      entry.revision++;
+      updateEntry(entry, { processing: false });
+      saveImages(key, entry, []);
+    },
+  };
 }
