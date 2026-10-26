@@ -1,7 +1,7 @@
 {
   "name": "AgentFleets",
   "short_name": "AgentFleets",
-  "description": "多主机、多智能体工作台",
+  "description": "连接 Codex、Claude Code 等智能体的多主机工作台",
   "lang": "zh-CN",
   "start_url": "/",
   "scope": "/",

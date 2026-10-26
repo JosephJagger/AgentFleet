@@ -261,7 +261,7 @@ function Login({ onLogin }: { onLogin: (dashboard: Dashboard) => void }) {
           <span>AgentFleets</span>
         </div>
         <h1>{t("你的代码留在主机。")}<br />{t("控制权跟你走。")}</h1>
-        <p>{t("统一连接 Linux、macOS 与 Windows 上的 AI 智能体。切换主机，接管会话，从任何地方继续你的开发任务。")}</p>
+        <p>{t("统一连接 Linux、macOS 与 Windows 上的 Codex、Claude Code 等 AI 智能体。切换主机，接管会话，从任何地方继续你的开发任务。")}</p>
         <div className="trust-line">
           <span><ShieldCheck size={16} /> {t("权限按需配置")}</span>
           <span><LockKeyhole size={16} /> {t("无入站端口")}</span>

@@ -2,7 +2,7 @@
   "name": "agentfleet",
   "version": "0.1.0",
   "private": true,
-  "description": "A hosted control plane for AI agent sessions across trusted Linux, macOS, and Windows machines.",
+  "description": "A hosted control plane for Codex, Claude Code and other AI agent sessions across trusted Linux, macOS, and Windows machines.",
   "engines": {
     "node": ">=24 <25"
   },

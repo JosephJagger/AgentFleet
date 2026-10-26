@@ -14,7 +14,7 @@
 </p>
 
 <p align="center"><strong>One browser workspace for AI work across your computers.</strong><br>
-Continue your AI agent conversations, delegate work by voice,<br>
+Continue conversations with Codex, Claude Code and other AI agents, delegate work by voice,<br>
 and follow projects running on Linux, macOS and Windows.</p>
 
 ![AgentFleets workspace with fictional hosts, conversations and usage data](docs/assets/workspace-en.png)

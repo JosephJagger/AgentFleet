@@ -1,7 +1,7 @@
 {
   "name": "AgentFleets",
   "short_name": "AgentFleets",
-  "description": "A workspace for AI agents across your hosts",
+  "description": "A multi-host workspace for Codex, Claude Code and other AI agents",
   "lang": "en",
   "start_url": "/",
   "scope": "/",

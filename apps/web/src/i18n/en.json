@@ -166,7 +166,7 @@
   "浏览器未允许复制，请手动选中命令": "Clipboard access is blocked. Select and copy the command manually.",
   "你的代码留在主机。": "Your code stays on your host.",
   "控制权跟你走。": "Stay in control, wherever you are.",
-  "统一连接 Linux、macOS 与 Windows 上的 AI 智能体。切换主机，接管会话，从任何地方继续你的开发任务。": "Connect to AI agents on Linux, macOS, and Windows. Switch hosts, take control of sessions, and keep working from anywhere.",
+  "统一连接 Linux、macOS 与 Windows 上的 Codex、Claude Code 等 AI 智能体。切换主机，接管会话，从任何地方继续你的开发任务。": "Connect to Codex, Claude Code and other AI agents on Linux, macOS, and Windows. Switch hosts, take control of sessions, and keep working from anywhere.",
   "权限按需配置": "Permissions on your terms",
   "无入站端口": "No inbound ports",
   "正文保留 1–30 天": "Content retained for 1–30 days",
