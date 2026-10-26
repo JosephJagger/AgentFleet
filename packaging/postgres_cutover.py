@@ -136,8 +136,12 @@ class EngineCutover:
         self.publisher.ensure_backup_space(self.path)
 
     def container_job(self, image, command, label, *, env_file=None):
+        # SQLite's ordered checksum scan can spill well beyond the small /tmp
+        # tmpfs. Keep its temporary files on the private, space-checked disk.
+        (self.directory / 'sqlite-tmp').mkdir(mode=0o700, exist_ok=True)
         argv = ['docker','run','--rm','--read-only','--user','0:0','--cap-drop','ALL',
                 '--network',self.plan['postgresNetwork'],'--tmpfs','/tmp:size=64m',
+                '-e','SQLITE_TMPDIR=/migration/sqlite-tmp',
                 '-v',str(self.directory)+':/migration']
         if env_file: argv += ['--env-file',str(env_file)]
         argv += ['--entrypoint',command[0],image,*command[1:]]
