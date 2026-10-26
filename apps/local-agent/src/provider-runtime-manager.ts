@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { detectClaude } from './claude-runtime.js';
+import { detectClaude, detectClaudePermissionModes } from './claude-runtime.js';
 import { detectAcp } from './acp-providers.js';
 import { ACP_PROVIDER_IDS } from './provider-catalog.js';
 import { AgentError } from './errors.js';
@@ -108,7 +108,7 @@ export class ProviderRuntimeManager {
   private failure?:{version:string;count:number};
   private prunedOnce=false;
   private latestAt=0;
-  constructor(private readonly store:StateStore,private readonly activate:()=>Promise<void>,private readonly deps:typeof defaults=defaults,private readonly now:()=>number=Date.now){}
+  constructor(private readonly store:StateStore,private readonly activate:()=>Promise<void>,private readonly deps:typeof defaults & {permissionModes?:typeof detectClaudePermissionModes}=defaults,private readonly now:()=>number=Date.now){}
   state():ProviderRuntimeState {return this.store.snapshot().providerRuntimeState??{revision:0,mode:'host'};}
   private file(r:ManagedProviderRelease){if(!stableVersion(r.version)||! /^[a-f0-9]{64}$/.test(r.sha256)||r.platform!==claudePlatform())throw new Error('Invalid managed runtime identity');return join(this.store.dataDir,'provider-runtimes','claude',`${r.version}-${r.sha256}`,process.platform==='win32'?'claude.exe':'claude');}
   private async verify(r:ManagedProviderRelease) {const file=this.file(r),s=await stat(file);const key=`${s.size}:${s.mtimeMs}:${s.ctimeMs}`;if(s.size!==r.size)throw new Error('Managed runtime size mismatch');if(this.verified.get(file)!==key){if(await digest(file)!==r.sha256)throw new Error('Managed runtime checksum mismatch');this.verified.set(file,key);}return file;}
@@ -116,7 +116,9 @@ export class ProviderRuntimeManager {
     const state=this.state();if(state.mode==='host')return {...await this.deps.host(),managed:false};
     if(!state.current)throw new AgentError('PROVIDER_MANAGED_MISSING','Claude 托管版本缺失，请检查版本或切回宿主机');
     if(state.current.sdkVersion!==CLAUDE_SDK_VERSION)throw new AgentError('PROVIDER_SDK_CHANGED','Claude SDK 已变更，请重新核验托管版本');
-    const path=await this.verify(state.current);return {installed:true,version:state.current.version,path,managed:true};
+    const path=await this.verify(state.current);
+    const permissionModes=await (this.deps.permissionModes ?? detectClaudePermissionModes)(path);
+    return {installed:true,version:state.current.version,path,managed:true,permissionModes};
   }
   /** A patch value of `undefined` removes the field. */
   private async save(patch:{[K in keyof ProviderRuntimeState]?:ProviderRuntimeState[K]|undefined}){

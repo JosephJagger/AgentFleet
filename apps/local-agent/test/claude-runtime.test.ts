@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ClaudeRuntime } from "../src/claude-runtime.js";
+import { sshAccess } from "../src/ssh-access.js";
 import type { AppServerCallbacks } from "../src/app-server.js";
 import type { ManagedThread, ProjectRecord } from "../src/types.js";
 import type { Options, Query } from "@anthropic-ai/claude-agent-sdk";
@@ -372,7 +373,8 @@ test("Claude native children are SDK-scoped to the verified parent project and l
   assert.equal(text, long);
 });
 
-test("Claude child stream and result cannot become parent reply or complete parent turn; native tasks stay visible", async () => {
+test("Claude child stream and result cannot become parent reply or complete parent turn; native tasks stay visible", async t => {
+  t.mock.method(sshAccess, "instructions", async () => undefined);
   const id = "claude_parent", thread = { nativeThreadId: id, projectId: project.id, sessionCwd: project.root } as ManagedThread;
   const events: Array<{ type: string; payload: Record<string, unknown>; nativeItemId?: string }> = [];
   let complete!: () => void; const completed = new Promise<void>(resolve => { complete = resolve; });

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
+import { act, renderHook, fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useImageDraft, isInlineImage, prepareClipboardImage } from "./lib/image-drafts";
 const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
@@ -38,18 +38,72 @@ it("falls back to JPEG when a mobile browser cannot encode WebP and PNG remains 
   expect(result.startsWith("data:image/jpeg;base64,")).toBe(true);
   expect(encoded).toEqual(["image/png","image/webp","image/jpeg"]);
 });
-it("a paste finishing after switching sessions cannot attach to the new conversation",async()=>{
+it("a paste finishing after switching sessions stays in its original conversation",async()=>{
   let finish!:()=>void;mocks(()=>new Promise(resolve=>{finish=resolve;}));
   const view=render(<Draft/>);fireEvent.paste(screen.getByRole("textbox"),{clipboardData:clipboard()});
-  view.rerender(<Draft session="b"/>);finish();
+  view.rerender(<Draft session="b"/>);await act(async()=>finish());
+  await waitFor(()=>expect(localStorage.getItem("agentfleet.images:user:a")).toContain(png));
   await waitFor(()=>expect(screen.getByText("ready")).toBeTruthy());
   expect(screen.getByRole("status").textContent).toBe("[]");expect(localStorage.getItem("agentfleet.images:user:b")).toBeNull();
+  view.rerender(<Draft/>);expect(screen.getByRole("status").textContent).toContain(png);
 });
 it("restored image drafts remain isolated and reject remote URLs or too many images",()=>{
   localStorage.setItem("agentfleet.images:user:a",JSON.stringify([png]));
   const view=render(<Draft/>);expect(screen.getByRole("status").textContent).toContain(png);
   view.rerender(<Draft session="b"/>);expect(screen.getByRole("status").textContent).toBe("[]");
   expect(isInlineImage("https://tracking.test/pixel.png")).toBe(false);
-  localStorage.setItem("agentfleet.images:user:b",JSON.stringify(Array(4).fill(png)));view.rerender(<Draft session="b"/>);
+  view.unmount();localStorage.setItem("agentfleet.images:user:b",JSON.stringify(Array(4).fill(png)));render(<Draft session="b"/>);
   fireEvent.paste(screen.getByRole("textbox"),{clipboardData:clipboard()});expect(screen.getByText(/最多 4 张/)).toBeTruthy();
+});
+
+const file = () => new File(["fixture"], "screenshot.png", { type: "image/png" });
+it("keeps two screenshots through loading gaps, other chats, and composer remounts", async () => {
+  mocks();
+  const first = renderHook(({session}: {session?: string}) => useImageDraft("roundtrip", session), {initialProps: {session: "worktree"} as {session?: string}});
+  await act(async () => first.result.current.addFiles([file(), file()]));
+  first.rerender({session: undefined});expect(first.result.current.images).toEqual([]);
+  first.rerender({session: "main"});expect(first.result.current.images).toEqual([]);
+  await act(async () => first.result.current.addFiles([file()]));
+  first.rerender({session: "worktree"});expect(first.result.current.images).toHaveLength(2);
+  first.unmount();
+  const restored = renderHook(() => useImageDraft("roundtrip", "worktree"));
+  expect(restored.result.current.images).toHaveLength(2);
+});
+it("finishes processing after unmount and restores to the original owner only", async () => {
+  let finish!: () => void; let first = true; mocks(() => { if (!first) return Promise.resolve(); first = false; return new Promise(resolve => { finish = resolve; }); });
+  const original = renderHook(() => useImageDraft("background", "worktree"));
+  let adding!: Promise<void>;
+  act(() => { adding = original.result.current.addFiles([file(), file()]); });
+  original.unmount();
+  const other = renderHook(() => useImageDraft("other-account", "worktree"));
+  const restored = renderHook(() => useImageDraft("background", "worktree"));
+  expect(restored.result.current.processing).toBe(true);
+  await act(async () => { finish(); await adding; });
+  expect(restored.result.current.images).toHaveLength(2);
+  expect(restored.result.current.processing).toBe(false);
+  expect(other.result.current.images).toEqual([]);
+});
+it("keeps a memory fallback across remounts when browser storage is full", async () => {
+  mocks();
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("full", "QuotaExceededError"); });
+  const original = renderHook(() => useImageDraft("quota", "worktree"));
+  await act(async () => original.result.current.addFiles([file(), file()]));
+  expect(original.result.current.error).toContain("不要刷新");
+  original.unmount();
+  const restored = renderHook(() => useImageDraft("quota", "worktree"));
+  expect(restored.result.current.images).toHaveLength(2);
+  expect(restored.result.current.error).toContain("不要刷新");
+  act(() => restored.result.current.remove(0));expect(restored.result.current.images).toHaveLength(1);
+  act(() => restored.result.current.clear());expect(restored.result.current.images).toEqual([]);
+});
+it("clearing a draft prevents unfinished processing from resurrecting it", async () => {
+  let finish!: () => void; mocks(() => new Promise(resolve => { finish = resolve; }));
+  const view = renderHook(() => useImageDraft("clear", "worktree"));
+  let adding!: Promise<void>;
+  act(() => { adding = view.result.current.addFiles([file()]); });
+  act(() => view.result.current.clear());
+  await act(async () => { finish(); await adding; });
+  expect(view.result.current.images).toEqual([]);
+  expect(view.result.current.processing).toBe(false);
+  expect(localStorage.getItem("agentfleet.images:clear:worktree")).toBeNull();
 });

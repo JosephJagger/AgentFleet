@@ -34,6 +34,16 @@ function supportsClaudeSteering(version: string | null): boolean {
 
 export interface ClaudeAvailability { steerSupported?: boolean; managed?: boolean; installed: boolean; version: string | null; error?: string; models?: ClaudeModel[]; quota?: ClaudeQuota; permissionModes?: string[]; }
 
+/** Probe the selected binary, including managed installations outside PATH. No prompt or settings writes. */
+export async function detectClaudePermissionModes(executable: string): Promise<string[]> {
+  try {
+    const nodeScript = /\.[cm]?js$/i.test(executable);
+    const help = await execFileAsync(nodeScript ? process.execPath : executable, nodeScript ? [executable, "--help"] : ["--help"], { timeout: 5000, maxBuffer: 256 * 1024, windowsHide: true });
+    const choices = /--permission-mode\s+<mode>[\s\S]*?choices:\s*([^)]*)/u.exec(help.stdout)?.[1] ?? "";
+    return ["default", "auto", "acceptEdits", "dontAsk"].filter(mode => choices.includes(`"${mode === "default" ? "manual" : mode}"`) || choices.includes(`"${mode}"`));
+  } catch { return []; } // Missing/unreadable capability metadata never grants permission.
+}
+
 export async function detectClaude(): Promise<ClaudeAvailability & { path?: string }> {
   const names = process.platform === "win32" ? ["claude.exe", "claude.cmd"] : ["claude"];
   const dirs = [...new Set([...(process.env.PATH ?? "").split(delimiter).filter(isAbsolute), join(homedir(), ".local", "bin"), join(homedir(), ".npm-global", "bin"), ...(process.platform === "win32" ? [join(homedir(), "AppData", "Roaming", "npm")] : ["/usr/local/bin", "/opt/homebrew/bin"])])];
@@ -43,12 +53,7 @@ export async function detectClaude(): Promise<ClaudeAvailability & { path?: stri
       await access(path);
       const executable = name.endsWith(".cmd") ? join(dir,"node_modules","@anthropic-ai","claude-code","cli.js") : path;
       const result = await execFileAsync(name.endsWith(".cmd") ? process.execPath : executable, name.endsWith(".cmd") ? [executable,"--version"] : ["--version"], { timeout: 5000, windowsHide: true });
-      let permissionModes:string[]=[];
-      try {
-        const help=await execFileAsync(name.endsWith(".cmd") ? process.execPath : executable,name.endsWith(".cmd")?[executable,"--help"]:["--help"],{timeout:5000,windowsHide:true});
-        const choices=/--permission-mode\s+<mode>[\s\S]*?choices:\s*([^)]*)/u.exec(help.stdout)?.[1] ?? "";
-        permissionModes=["default","auto","acceptEdits","dontAsk"].filter(mode=>choices.includes(`"${mode === "default" ? "manual" : mode}"`) || choices.includes(`"${mode}"`));
-      } catch { /* Older CLI stays usable with its existing permission behavior. */ }
+      const permissionModes = await detectClaudePermissionModes(executable);
       return { installed: true, version: result.stdout.trim().slice(0, 100), path: executable,permissionModes };
     } catch { /* Probe candidates without changing host auth or settings. */ }
   }

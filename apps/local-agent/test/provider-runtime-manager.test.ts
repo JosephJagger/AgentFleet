@@ -11,9 +11,10 @@ import {Readable,PassThrough} from 'node:stream';
 import {parseProviderRuntimeRequest} from '../src/provider-runtime-policy.js';
 async function fixture(t:test.TestContext) {
  const dir=await mkdtemp(join(tmpdir(),'provider-runtime-test-'));const store=new StateStore(dir);await store.initialize();t.after(async()=>{store.close();await rm(dir,{recursive:true,force:true});});
- let version='2.1.292',downloads=0,probes=0,activations=0,failProbe=false,failActivate=false,hostVersion='2.1.290 (Claude Code)',clock=Date.now(),stableError:Error|undefined,manifestError:Error|undefined;const latestVersions:Record<string,string>={};const files:string[]=[];
+ let version='2.1.292',downloads=0,probes=0,activations=0,failProbe=false,failActivate=false,hostVersion='2.1.290 (Claude Code)',clock=Date.now(),stableError:Error|undefined,manifestError:Error|undefined;const latestVersions:Record<string,string>={};const files:string[]=[];const permissionPaths:string[]=[];
  const manager=new ProviderRuntimeManager(store,async()=>{activations++;if(failActivate){failActivate=false;throw new Error('activation failed');}}, {
-  host:async()=>({installed:true,version:hostVersion,path:'/host/claude'}),acp:async()=>null,
+  host:async()=>({installed:true,version:hostVersion,path:'/host/claude',permissionModes:['default']}),acp:async()=>null,
+  permissionModes:async path=>{permissionPaths.push(path);return ['default','auto','acceptEdits','dontAsk'];},
   latest:async(id)=>latestVersions[id]??null,
   stable:async()=>{if(stableError)throw stableError;return version;},
   manifest:async(v,p)=>{if(manifestError)throw manifestError;return {version:v,platform:p,sha256:createHash('sha256').update(v).digest('hex'),size:v.length,sdkVersion:CLAUDE_SDK_VERSION,checkedAt:new Date().toISOString()};},
@@ -21,7 +22,7 @@ async function fixture(t:test.TestContext) {
   probe:async()=>{probes++;if(failProbe)throw new Error('probe failed');}
  },()=>clock);
  const configure=(mode:'host'|'pinned'|'auto')=>manager.operate({action:'configure',provider:'claude',mode,expectedRevision:manager.state().revision},'op-update');
- return {store,manager,configure,files,dir,setVersion:(v:string)=>{version=v;},setHost:(v:string)=>{hostVersion=v;},advance:(ms:number)=>{clock+=ms;},setLatest:(id:string,v:string)=>{latestVersions[id]=v;},setStableError:(e?:Error)=>{stableError=e;},setManifestError:(e?:Error)=>{manifestError=e;},failProbe:()=>{failProbe=true;},failActivate:()=>{failActivate=true;},counts:()=>({downloads,probes,activations})};
+ return {store,manager,configure,files,permissionPaths,dir,setVersion:(v:string)=>{version=v;},setHost:(v:string)=>{hostVersion=v;},advance:(ms:number)=>{clock+=ms;},setLatest:(id:string,v:string)=>{latestVersions[id]=v;},setStableError:(e?:Error)=>{stableError=e;},setManifestError:(e?:Error)=>{manifestError=e;},failProbe:()=>{failProbe=true;},failActivate:()=>{failActivate=true;},counts:()=>({downloads,probes,activations})};
 }
 test('request allowlist excludes shell paths, other providers, versions, unknown keys and missing conflict guard',()=>{
  for(const v of [{action:'check',url:'https://evil'}, {action:'configure',provider:'codex',mode:'auto',expectedRevision:0},{action:'configure',provider:'claude',mode:'auto'}, {action:'configure',provider:'claude',mode:'auto',expectedRevision:0,path:'/tmp/x'}])assert.throws(()=>parseProviderRuntimeRequest(v));
@@ -166,4 +167,23 @@ test('a long download publishes its step and progress, and clears them when fini
  const again=manager.operate({action:'configure',provider:'claude',mode:'auto',expectedRevision:manager.state().revision},'op-auto');
  await assert.rejects(again);assert.equal(manager.state().step,undefined);assert.equal(manager.state().progress,undefined);
  void f;
+});
+
+test('managed Claude reports permissions from its verified binary; host mode uses host metadata',async t=>{
+ const f=await fixture(t);
+ assert.deepEqual((await f.manager.detectClaude()).permissionModes,['default']);
+ assert.deepEqual(f.permissionPaths,[]);
+ await f.configure('auto');
+ const managed=await f.manager.detectClaude();
+ assert.equal(managed.managed,true);
+ assert.deepEqual(managed.permissionModes,['default','auto','acceptEdits','dontAsk']);
+ assert.equal(f.permissionPaths.at(-1),managed.path);
+ await f.configure('pinned');
+ assert.deepEqual((await f.manager.detectClaude()).permissionModes,managed.permissionModes);
+ const count=f.permissionPaths.length;
+ await writeFile(managed.path!,'tampered');
+ await assert.rejects(f.manager.detectClaude(),/mismatch/);
+ assert.equal(f.permissionPaths.length,count,'never execute an unverified binary to read capabilities');
+ await f.configure('host');
+ assert.deepEqual((await f.manager.detectClaude()).permissionModes,['default']);
 });
