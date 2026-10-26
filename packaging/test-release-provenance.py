@@ -220,6 +220,21 @@ class ProvenanceTests(unittest.TestCase):
                 prepare.prepare(self.root, 'web')
         self.assertEqual(len(list((p.registry(self.root) / 'images').glob('*.json'))), 2)
 
+    def test_failed_identity_build_never_registers_the_panel_as_publishable(self):
+        self.commit('apps/identity/app.py','paired change')
+        original_output,original_run=subprocess.check_output,subprocess.run
+        def output(args,**kwargs):
+            if args[0]=='docker': return json.dumps([{'Image':BASE}]).encode()
+            return original_output(args,**kwargs)
+        def run(args,**kwargs):
+            if args[0]!='docker': return original_run(args,**kwargs)
+            if args[1]=='build' and args[3].endswith('apps/identity/Dockerfile'):
+                raise subprocess.CalledProcessError(1,args)
+            return subprocess.CompletedProcess(args,0)
+        with patch.object(subprocess,'check_output',side_effect=output),patch.object(subprocess,'run',side_effect=run):
+            with self.assertRaises(subprocess.CalledProcessError): prepare.prepare(self.root,'control-plane',True)
+        self.assertEqual(len(list((p.registry(self.root)/'images').glob('*.json'))),2)
+
     def test_archive_build_excludes_ignored_files_and_records_digest(self):
         self.commit('.gitignore', 'secret.env\n')
         (self.root / 'secret.env').write_text('must not enter archive')

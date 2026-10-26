@@ -220,6 +220,9 @@ class EngineCutover:
             time.sleep(2)
         self.publisher.run('node',str(self.root/'packaging/verify-published-installers.mjs'),self.state['publicOrigin'],self.state['installerVersion'])
         self.publisher.release(pg,self.state['token'])
+        status=self.publisher.health(self.args.ready_url)
+        if status.get('voiceDeploymentToken') is not None or status.get('build')!=self.receipt['source']:
+            raise RuntimeError('Admission reopening was not verified; inspect the live PostgreSQL service')
         self.record('published', ready=status)
 
     def cutover(self, db):
