@@ -14,6 +14,8 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       DATABASE_PATH: /app/data/control-plane.sqlite
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_SCHEMA: ${DATABASE_SCHEMA:-public}
       WEB_DIST_DIR: /app/web
       AGENTFLEET_RELEASE_MANIFEST_URL: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN in .env}/downloads/manifest.json
       RUNTIME_RELEASE_DIR: /app/runtime-releases
@@ -49,6 +51,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
       DJANGO_AUTH_SERVICE_TOKEN: ${DJANGO_AUTH_SERVICE_TOKEN:?Set DJANGO_AUTH_SERVICE_TOKEN in .env}
       DJANGO_DATABASE_PATH: /data/identity.sqlite
+      DJANGO_DATABASE_URL: ${DJANGO_DATABASE_URL:-}
       RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY in .env}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
       RESEND_FROM_NAME: ${RESEND_FROM_NAME:-AgentFleets}

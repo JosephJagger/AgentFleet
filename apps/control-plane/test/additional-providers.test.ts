@@ -3,7 +3,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
-import {ControlPlaneDatabase} from '../src/db.js';
+import {ControlPlaneDatabase} from './database-fixture.js';
 import {loadConfig} from '../src/config.js';
 import {AuthService} from '../src/auth.js';
 import {RegistryService} from '../src/registry.js';

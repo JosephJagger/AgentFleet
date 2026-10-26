@@ -1,6 +1,6 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { buildControlPlane, csrfHeaders } from "../src/server.js";
+import { buildControlPlane, csrfHeaders } from "./server-fixture.js";
 import { loadConfig } from "../src/config.js";
 import { AuthService } from "../src/auth.js";
 import { RegistryService } from "../src/registry.js";

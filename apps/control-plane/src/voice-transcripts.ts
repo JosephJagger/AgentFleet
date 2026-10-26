@@ -43,7 +43,7 @@ export class VoiceTranscripts {
   if(!text.trim())return;
   const at=nowIso();
   const observed=modern&&typeof input.observedAt==='string'&&Number.isFinite(Date.parse(input.observedAt))&&Math.abs(Date.parse(input.observedAt)-Date.now())<86400000?new Date(input.observedAt).toISOString():at;
-  this.db.run(`INSERT INTO voice_transcripts VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(voice_id,utterance_id) DO UPDATE SET text=excluded.text,final=excluded.final,last_sequence=excluded.last_sequence,updated_at=excluded.updated_at`,call.voice_id,id,call.workspace_id,call.user_id,input.role,text,input.final?1:0,old?.sequence??(modern&&Number.isSafeInteger(input.utteranceSeq)&&Number(input.utteranceSeq)>0&&Number(input.utteranceSeq)<=seq?input.utteranceSeq!:seq),seq,old?.observed_at??observed,at,modern?'native':'compat_partial');
+  this.db.run(`INSERT INTO voice_transcripts(voice_id,utterance_id,workspace_id,user_id,role,text,final,sequence,last_sequence,observed_at,updated_at,source) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(voice_id,utterance_id) DO UPDATE SET text=excluded.text,final=excluded.final,last_sequence=excluded.last_sequence,updated_at=excluded.updated_at`,call.voice_id,id,call.workspace_id,call.user_id,input.role,text,input.final?1:0,old?.sequence??(modern&&Number.isSafeInteger(input.utteranceSeq)&&Number(input.utteranceSeq)>0&&Number(input.utteranceSeq)<=seq?input.utteranceSeq!:seq),seq,old?.observed_at??observed,at,modern?'native':'compat_partial');
   if(input.role==='user'){
    const request=this.db.get<{sequence:number;read_only:number}>('SELECT sequence,read_only FROM voice_transcript_requests WHERE voice_id=?',call.voice_id);
    if(!request||seq>request.sequence){

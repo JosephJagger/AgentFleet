@@ -129,7 +129,7 @@ export class UsageService {
           SUM(CASE WHEN d.input_tokens IS NULL OR d.cached_input_tokens IS NULL THEN 1 ELSE 0 END) AS detailsMissing
         FROM usage_intervals d JOIN logical_sessions s USING(logical_session_id) JOIN projects p ON p.project_id=s.project_id
         WHERE s.workspace_id=? AND s.${scopePredicate} AND s.deleted_at IS NULL${providerFilter.replace(" AND project_id", " AND s.project_id")} AND d.starts_at>=? AND d.ends_at<?
-        GROUP BY s.logical_session_id HAVING SUM(d.total_tokens)>0 ORDER BY totalTokens DESC,s.logical_session_id`,workspaceId,id,startsAt,resetsAt);
+        GROUP BY s.logical_session_id,p.alias HAVING SUM(d.total_tokens)>0 ORDER BY totalTokens DESC,s.logical_session_id`,workspaceId,id,startsAt,resetsAt);
       weeklySessions = weeklySessions.map(row=>({...row,inputTokens:row.detailsMissing?null:row.inputTokens,cachedInputTokens:row.detailsMissing?null:row.cachedInputTokens}));
 
     }

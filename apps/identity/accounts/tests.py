@@ -9,6 +9,46 @@ from django.utils import timezone
 from .email import DeliveryError, send_code
 from .models import EmailChallenge, RateEvent, User
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+from unittest import skipUnless
+from django.db import connection, connections
+from django.test import Client, TransactionTestCase
+from .views import code_digest
+
+
+@skipUnless(connection.vendor == "postgresql", "Real PostgreSQL concurrency test")
+@override_settings(RESEND_API_KEY="test-provider-key", RESEND_FROM_EMAIL="login@example.com")
+class PostgresConcurrencyTests(TransactionTestCase):
+    def parallel_posts(self, action, payload):
+        barrier = Barrier(2)
+
+        def request():
+            try:
+                barrier.wait(timeout=10)
+                return Client().post("/internal/auth/" + action, payload, content_type="application/json",
+                                     HTTP_AUTHORIZATION=f"Bearer {settings.SERVICE_TOKEN}").status_code
+            finally:
+                connections.close_all()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            return sorted(pool.map(lambda _: request(), range(2)))
+
+    def test_one_time_code_is_consumed_once_across_connections(self):
+        challenge_id = uuid.uuid4()
+        EmailChallenge.objects.create(id=challenge_id, email="parallel@example.test", sent=True,
+                                      code_digest=code_digest(challenge_id, "parallel@example.test", "123456"),
+                                      expires_at=timezone.now() + timedelta(minutes=10))
+        self.assertEqual(self.parallel_posts("verify-code", {"challengeId": str(challenge_id), "code": "123456", "clientIp": "192.0.2.2"}), [200, 401])
+        self.assertEqual(User.objects.count(), 1)
+        self.assertTrue(EmailChallenge.objects.get(pk=challenge_id).consumed)
+
+    @patch("accounts.views.send_code")
+    def test_first_send_rate_bucket_cannot_be_created_twice(self, sender):
+        self.assertEqual(self.parallel_posts("request-code", {"email": "parallel@example.test", "clientIp": "192.0.2.2"}), [200, 429])
+        self.assertEqual(EmailChallenge.objects.count(), 1)
+        self.assertEqual(sender.call_count, 1)
+
 
 @override_settings(RESEND_API_KEY="test-provider-key", RESEND_FROM_EMAIL="login@example.com")
 class EmailLoginTests(TestCase):

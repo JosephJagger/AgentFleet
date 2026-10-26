@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
+import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "./server-fixture.js";
 import { loadConfig } from "../src/config.js";
 import { requiresPlatformAdmin } from "../src/maintenance.js";
 

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import type { ControlPlaneDatabase } from "../src/db.js";
+import type { ControlPlaneDatabase } from "./database-fixture.js";
 import type { CoordinationService } from "../src/coordination.js";
 import type { Principal } from "../src/auth.js";
 import { editQueuedPrompt } from "../src/queue-edit.js";
@@ -10,7 +10,7 @@ test("queue edit replaces an immutable command atomically, preserves order, fenc
  sql.exec(`CREATE TABLE logical_sessions(logical_session_id TEXT,workspace_id TEXT,queue_version INTEGER,project_id TEXT,thread_control_version INTEGER,active_turn_id TEXT);
  CREATE TABLE projects(project_id TEXT,lease_version INTEGER); CREATE TABLE execution_segments(logical_session_id TEXT,execution_segment_id TEXT,ended_at TEXT);
  CREATE TABLE turn_queue(queue_item_id TEXT PRIMARY KEY,logical_session_id TEXT,workspace_id TEXT,command_id TEXT,position INTEGER,state TEXT,expires_at TEXT,updated_at TEXT,UNIQUE(logical_session_id,position));
- CREATE TABLE command_projection(command_id TEXT,state TEXT,updated_at TEXT); CREATE TABLE command_lifecycle(command_id TEXT,state TEXT,detail_json TEXT,created_at TEXT);
+ CREATE TABLE command_projection(command_id TEXT,state TEXT,updated_at TEXT); CREATE TABLE command_lifecycle(lifecycle_id INTEGER PRIMARY KEY,command_id TEXT,state TEXT,detail_json TEXT,created_at TEXT);
  INSERT INTO logical_sessions VALUES('s','w',3,'p',2,NULL); INSERT INTO projects VALUES('p',1); INSERT INTO execution_segments VALUES('s','seg',NULL);
  INSERT INTO command_projection VALUES('old','queued','');`);
  sql.prepare("INSERT INTO turn_queue VALUES('q','s','w','old',1,'queued',?,'')").run(expiry);

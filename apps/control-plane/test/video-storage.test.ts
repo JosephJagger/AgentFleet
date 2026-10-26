@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { VideoStorage, type VideoStorageConfig } from "../src/video-storage.js";
 import type { Principal } from "../src/auth.js";
-import type { ControlPlaneDatabase } from "../src/db.js";
+import type { ControlPlaneDatabase } from "./database-fixture.js";
 import type { S3Client } from "@aws-sdk/client-s3";
 
 const config: VideoStorageConfig = { workspaceId: "w", label: "host", endpoint: "https://storage.example", bucket: "video-output", region: "garage", prefix: "grok-videos/", quotaBytes: 5e9, accessKeyId: "private-key", secretAccessKey: "private-secret" };
@@ -52,7 +52,7 @@ test("storage failures are sanitized and never reported as deleted", async () =>
   await assert.rejects(service.remove(principal, item), { code: "VIDEO_STORAGE_FAILED" }); assert.equal(audit.length, 0);
 });
 test("video endpoints enforce existing authentication and CSRF", async t => {
-  const { buildControlPlane } = await import("../src/server.js");
+  const { buildControlPlane } = await import("./server-fixture.js");
   const { loadConfig } = await import("../src/config.js");
   const origin = "http://example.test";
   const { app } = await buildControlPlane({ ...loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL: "owner@example.test", ADMIN_PASSWORD: "correct horse battery staple", PUBLIC_ORIGIN: origin, COOKIE_SECURE: "false", LOG_LEVEL: "silent" }), databasePath: ":memory:" });

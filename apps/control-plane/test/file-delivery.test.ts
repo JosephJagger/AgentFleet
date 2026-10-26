@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import type { ControlPlaneDatabase } from '../src/db.js';
+import type { ControlPlaneDatabase } from './database-fixture.js';
 import type { Principal } from '../src/auth.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ControlPlaneDatabase } from "../src/db.js";
+import { ControlPlaneDatabase } from "./database-fixture.js";
 import { loadConfig } from "../src/config.js";
 import { TakeoverPolicy } from "../src/takeover-policy.js";
 import type { Principal } from "../src/auth.js";
@@ -28,7 +28,7 @@ test("independent takeover policy persists, isolates workspaces and rejects stal
 });
 
 test("policy HTTP routes require login and CSRF, and preserve stale-save conflicts", async t => {
-  const {buildControlPlane}=await import("../src/server.js");
+  const {buildControlPlane}=await import("./server-fixture.js");
   const origin="http://example.test";
   const {app}=await buildControlPlane({...loadConfig({AUTH_MODE:"password",ADMIN_EMAIL:"owner@example.test",ADMIN_PASSWORD:"correct horse battery staple",PUBLIC_ORIGIN:origin,COOKIE_SECURE:"false",LOG_LEVEL:"silent"}),databasePath:":memory:"});
   t.after(()=>app.close());

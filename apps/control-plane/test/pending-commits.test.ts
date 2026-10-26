@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
-import { ControlPlaneDatabase } from "../src/db.js";
+import { ControlPlaneDatabase } from "./database-fixture.js";
 import { loadConfig } from "../src/config.js";
 import type { Principal } from "../src/auth.js";
 import { RegistryService } from "../src/registry.js";
@@ -110,7 +110,7 @@ test("legacy, invalid, stale and busy samples cannot be dismissed", t => {
 });
 
 test("dismiss endpoint requires login and CSRF and validates the observed revision", async t => {
-  const { buildControlPlane, cookieFromSetCookie, csrfHeaders } = await import("../src/server.js");
+  const { buildControlPlane, cookieFromSetCookie, csrfHeaders } = await import("./server-fixture.js");
   const password = randomUUID(), origin = "http://test.local";
   const { app } = await buildControlPlane({ ...loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL: "pending@example.test", ADMIN_PASSWORD: password, DATABASE_PATH: ":memory:", PUBLIC_ORIGIN: origin, COOKIE_SECURE: "false", LOG_LEVEL: "silent" }), databasePath: ":memory:" });
   t.after(() => app.close());

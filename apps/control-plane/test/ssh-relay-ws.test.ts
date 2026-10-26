@@ -9,7 +9,7 @@ import type WebSocket from "ws";
 import { AuthService } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
 import { sha256 } from "../src/crypto.js";
-import { buildControlPlane } from "../src/server.js";
+import { buildControlPlane } from "./server-fixture.js";
 
 function keyPair() {
   const root = mkdtempSync(join(tmpdir(), "cp-relay-ws-")); const path = join(root, "key");

@@ -35,7 +35,7 @@ export function queryTranscripts(db:ControlPlaneDatabase,principal:Principal,voi
  const params:Array<string|number>=[principal.workspaceId,principal.userId,start,end,maxRow];
  const excluded=includeCurrent?'':' AND t.voice_id<>?';if(!includeCurrent)params.push(voiceId);
  // Choose latest calls before applying keywords, so "latest 2 + keyword" cannot silently search older calls.
- const candidates=cursor?[]:db.all<{id:string;started:string}>(`SELECT t.voice_id id,c.created_at started FROM voice_transcripts t JOIN panel_voice_calls c ON c.voice_id=t.voice_id WHERE ${base}${excluded} GROUP BY t.voice_id ORDER BY c.created_at DESC,t.voice_id DESC LIMIT ?`,...params,count+1);
+ const candidates=cursor?[]:db.all<{id:string;started:string}>(`SELECT t.voice_id id,c.created_at started FROM voice_transcripts t JOIN panel_voice_calls c ON c.voice_id=t.voice_id WHERE ${base}${excluded} GROUP BY t.voice_id,c.created_at ORDER BY c.created_at DESC,t.voice_id DESC LIMIT ?`,...params,count+1);
  const calls=cursor?.calls??candidates.slice(0,count).map(c=>c.id);
  const rows:Array<Row&{offset:number}>=[];let hasMore=false;let last:[number,number,number,number]|undefined;let budget=6500;
  for(let index=cursor?.after?.[0]??0;index<calls.length;index++){

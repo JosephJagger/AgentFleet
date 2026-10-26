@@ -10,7 +10,7 @@ export function editQueuedPrompt(db: ControlPlaneDatabase, coordination: Coordin
   return db.transaction(() => {
     const row = db.get<{ command_id: string; state: string; position: number; expires_at: string; queue_version: number; execution_segment_id: string; thread_control_version: number; active_turn_id: string | null; project_lease_version: number }>(`SELECT q.command_id,q.state,q.position,q.expires_at,s.queue_version,e.execution_segment_id,s.thread_control_version,s.active_turn_id,p.lease_version AS project_lease_version FROM turn_queue q JOIN logical_sessions s ON s.logical_session_id=q.logical_session_id JOIN projects p ON p.project_id=s.project_id JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL WHERE q.queue_item_id=? AND q.logical_session_id=? AND q.workspace_id=?`,itemId,sessionId,principal.workspaceId);
     invariant(row,404,"QUEUE_ITEM_NOT_FOUND","Queued turn was not found");
-    const previous = db.get<{ detail_json: string }>("SELECT detail_json FROM command_lifecycle WHERE command_id=? AND state='invalidated' ORDER BY rowid DESC LIMIT 1",row.command_id);
+    const previous = db.get<{ detail_json: string }>("SELECT detail_json FROM command_lifecycle WHERE command_id=? AND state='invalidated' ORDER BY lifecycle_id DESC LIMIT 1",row.command_id);
     const replacement = previous?.detail_json ? JSON.parse(previous.detail_json) as Record<string,unknown> : null;
     if (replacement && replacement.clientMutationId === input.clientMutationId && typeof replacement.replacementCommandId === "string") {
       const command = coordination.getCommand(principal,replacement.replacementCommandId);

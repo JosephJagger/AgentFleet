@@ -102,7 +102,7 @@ export class PanelVoiceService {
     if(!turnId) turnId=this.db.get<{native_turn_id:string}>("SELECT native_turn_id FROM durable_events e JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.type='turn.started' AND json_extract(b.body_json,'$.commandId')=? ORDER BY session_seq LIMIT 1",job.session_id,job.command_id)?.native_turn_id??null;
     // Command acknowledgments still identify the turn when project content sync is disabled,
     // or a very fast task completed before the synthetic turn.started event was emitted.
-    if(!turnId) turnId=this.db.get<{native_turn_id:string}>("SELECT COALESCE(json_extract(detail_json,'$.response.nativeTurnId'),json_extract(detail_json,'$.nativeTurnId')) AS native_turn_id FROM command_lifecycle WHERE command_id=? AND native_turn_id IS NOT NULL ORDER BY lifecycle_id DESC LIMIT 1",job.command_id)?.native_turn_id??null;
+    if(!turnId) turnId=this.db.get<{native_turn_id:string}>("SELECT COALESCE(json_extract(detail_json,'$.response.nativeTurnId'),json_extract(detail_json,'$.nativeTurnId')) AS native_turn_id FROM command_lifecycle WHERE command_id=? AND COALESCE(json_extract(detail_json,'$.response.nativeTurnId'),json_extract(detail_json,'$.nativeTurnId')) IS NOT NULL ORDER BY lifecycle_id DESC LIMIT 1",job.command_id)?.native_turn_id??null;
     if(turnId) {
       const end=this.db.get<{type:string;body_json:string|null}>("SELECT e.type,b.body_json FROM durable_events e LEFT JOIN content_blobs b USING(payload_ref) WHERE e.logical_session_id=? AND e.native_turn_id=? AND e.type IN ('turn.completed','turn.failed','turn.interrupted') ORDER BY session_seq DESC LIMIT 1",job.session_id,turnId);
       if(end) {const body=JSON.parse(end.body_json??'{}');state=['completed','failed','interrupted'].includes(body.turn?.status)?body.turn.status:end.type==='turn.failed'?'failed':end.type==='turn.interrupted'?'interrupted':alreadyTerminal?job.state:'completed';}
@@ -327,7 +327,7 @@ export class PanelVoiceService {
     // Persist the command and tracking job in one transaction, including rollback on insertion failure.
     const command=this.coordination.createCommand(principal,session.logicalSessionId,{type:queued?'turn.queue':'turn.start',...(lease?{controlLeaseId:lease.leaseId}:{}),clientMutationId:mutation,payload:{prompt:args.prompt},precondition:{executionSegmentId:session.executionSegmentId,threadControlVersion:session.threadControlVersion,expectedActiveTurnId:queued?session.activeTurnId:null,projectLeaseVersion:session.projectLeaseVersion,...(queued?{queueVersion:session.queueVersion}:{})}},true).command;
     const jobId=newId('pjob');
-    this.db.run("INSERT INTO panel_voice_jobs VALUES(?,?,?,?,?,?,?,NULL,'submitted',NULL,?)",jobId,principal.userId,principal.workspaceId,voiceId,requestId,session.logicalSessionId,String(command.commandId),nowIso());
+    this.db.run("INSERT INTO panel_voice_jobs(job_id,user_id,workspace_id,voice_id,request_id,session_id,command_id,native_turn_id,state,reported_call_id,created_at) VALUES(?,?,?,?,?,?,?,NULL,'submitted',NULL,?)",jobId,principal.userId,principal.workspaceId,voiceId,requestId,session.logicalSessionId,String(command.commandId),nowIso());
     const inserted=this.db.get<PanelJob>("SELECT * FROM panel_voice_jobs WHERE job_id=?",jobId)!;
     this.memory.link(todo!,inserted,session,args.prompt as string);
     return this.describe(principal,inserted);

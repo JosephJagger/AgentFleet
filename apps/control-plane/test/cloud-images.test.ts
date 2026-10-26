@@ -4,9 +4,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CloudImages, CLOUD_IMAGE_QUOTA } from "../src/cloud-images.js";
-import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
+import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "./server-fixture.js";
 import { loadConfig } from "../src/config.js";
-import { ControlPlaneDatabase } from "../src/db.js";
+import { ControlPlaneDatabase } from "./database-fixture.js";
 const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
 const second = "data:image/png;base64," + Buffer.concat([Buffer.from(png.split(",")[1]!, "base64"), Buffer.from([0])]).toString("base64");
 

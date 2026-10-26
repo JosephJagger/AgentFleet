@@ -5,13 +5,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { ControlPlaneDatabase } from "../src/db.js";
+import { ControlPlaneDatabase } from "./database-fixture.js";
 import { loadConfig } from "../src/config.js";
 import { CoordinationService } from "../src/coordination.js";
 import { payloadHash } from "../src/crypto.js";
 import { RegistryService } from "../src/registry.js";
 import { UsageService } from "../src/usage.js";
-import { buildControlPlane } from "../src/server.js";
+import { buildControlPlane } from "./server-fixture.js";
 const config=()=>({...loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL:"usage@example.test",ADMIN_PASSWORD:randomUUID(),DATABASE_PATH:":memory:",PUBLIC_ORIGIN:"http://usage.test",COOKIE_SECURE:"false"}),databasePath:":memory:"});
 function fixture(path=":memory:") {
   const db=new ControlPlaneDatabase(path);const {workspaceId}=db.bootstrap(config());const at=new Date().toISOString();

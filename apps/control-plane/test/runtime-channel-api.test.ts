@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { buildControlPlane } from "../src/server.js";
+import { buildControlPlane } from "./server-fixture.js";
 import { loadConfig } from "../src/config.js";
 import { channelControl } from "../src/runtime-channel.js";
 test("runtime channel controls require login and CSRF; absent targets never become a forced upgrade", async t => {

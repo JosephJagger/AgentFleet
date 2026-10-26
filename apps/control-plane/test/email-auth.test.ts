@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { loadConfig } from "../src/config.js";
-import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
+import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "./server-fixture.js";
 
 test("email mode is the default and requires the Django service, never a password fallback", () => {
   assert.throws(() => loadConfig({ ADMIN_EMAIL: "admin@example.com", ADMIN_PASSWORD: "legacy-admin-password" }), /DJANGO_AUTH/);

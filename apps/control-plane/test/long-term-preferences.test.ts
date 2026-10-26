@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {ControlPlaneDatabase} from '../src/db.js';
+import {ControlPlaneDatabase} from './database-fixture.js';
 import {loadConfig} from '../src/config.js';
 import {LongTermPreferences,supportsVoicePreferences} from '../src/long-term-preferences.js';
 import type {Principal} from '../src/auth.js';
@@ -51,7 +51,7 @@ test('capacity is atomic, no silent truncation; disabled and expired rules do no
 });
 
 test('HTTP management enforces login and CSRF and never creates task commands',async t=>{
- const {buildControlPlane,cookieFromSetCookie}=await import('../src/server.js');
+ const {buildControlPlane,cookieFromSetCookie}=await import('./server-fixture.js');
  const config={...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'preferences-api@test.example',ADMIN_PASSWORD:'test-api-passphrase',PUBLIC_ORIGIN:'http://preferences.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:'};
  const {app,db}=await buildControlPlane(config);t.after(async()=>app.close());
  const login=await app.inject({method:'POST',url:'/api/auth/login',headers:{origin:config.publicOrigin},payload:{email:config.adminEmail,password:config.adminPassword}});

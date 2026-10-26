@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { SessionReferences } from "../src/session-references.js";
 import type { Principal } from "../src/auth.js";
-import type { ControlPlaneDatabase } from "../src/db.js";
+import type { ControlPlaneDatabase } from "./database-fixture.js";
 import type { RegistryService } from "../src/registry.js";
 import type { CoordinationService } from "../src/coordination.js";
 import type { WritingAI } from "../src/writing-ai.js";

@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ControlPlaneConfig } from "../src/config.js";
-import { buildControlPlane } from "../src/server.js";
+import { buildControlPlane } from "./server-fixture.js";
 
 function config(webDistDir: string): ControlPlaneConfig {
   return {

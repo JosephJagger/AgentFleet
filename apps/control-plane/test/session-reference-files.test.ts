@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildReferenceFiles, parseReferences } from "../src/session-reference-files.js";
-import { ControlPlaneDatabase } from "../src/db.js";
+import { ControlPlaneDatabase } from "./database-fixture.js";
 import { CoordinationService } from "../src/coordination.js";
 import { loadConfig } from "../src/config.js";
 import type { Principal } from "../src/auth.js";

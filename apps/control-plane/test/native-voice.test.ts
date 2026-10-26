@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ControlPlaneDatabase } from "../src/db.js";
+import { ControlPlaneDatabase } from "./database-fixture.js";
 import { loadConfig } from "../src/config.js";
 import { AuthService } from "../src/auth.js";
 import { RegistryService, type AgentConnectionIdentity } from "../src/registry.js";
@@ -77,7 +77,7 @@ test("offers require bounded native audio SDP; unknown voice never unlocks from 
 });
 
 test("voice signaling requires the authenticated same-origin browser and never persists an invalid offer",async t=>{
-  const {buildControlPlane,cookieFromSetCookie}=await import('../src/server.js');
+  const {buildControlPlane,cookieFromSetCookie}=await import('./server-fixture.js');
   const config={...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'voice-ws@example.test',ADMIN_PASSWORD:'voice-socket-fixture-password',PUBLIC_ORIGIN:'http://voice.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:'};
   const {app,db}=await buildControlPlane(config);t.after(()=>app.close());await app.ready();
   const logged=await app.inject({method:'POST',url:'/api/auth/login',headers:{origin:'http://voice.test'},payload:{email:config.adminEmail,password:config.adminPassword}});

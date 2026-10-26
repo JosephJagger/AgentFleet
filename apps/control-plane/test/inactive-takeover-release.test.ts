@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ControlPlaneDatabase } from "../src/db.js";
+import { ControlPlaneDatabase } from "./database-fixture.js";
 import { CoordinationService } from "../src/coordination.js";
 import { loadConfig } from "../src/config.js";
 import { COMMAND_TYPES } from "../src/api-schema.js";

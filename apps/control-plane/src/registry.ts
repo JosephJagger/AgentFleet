@@ -292,16 +292,16 @@ export class RegistryService {
   // Presentation only: command admission and event reconciliation remain fenced.
   private readonly routineSync = new Map<string, { connectionId: string; until: number }>();
 
-  heartbeatPresentation(machineId: string): { hostOnline: boolean; runtimeSyncUntil: number | null } {
+  heartbeatPresentation(machineId: string, at = Date.now()): { hostOnline: boolean; runtimeSyncUntil: number | null } {
     const sync = this.routineSync.get(machineId);
-    if (sync && sync.until <= Date.now()) this.routineSync.delete(machineId);
+    if (sync && sync.until <= at) this.routineSync.delete(machineId);
     const host = this.db.get<{ reachability: string; healthy: number }>(
       `SELECT reachability,(identity_state='active' AND security_state='normal'
         AND compatibility='compatible' AND runtime_read_only=0 AND last_heartbeat_at>=?) AS healthy
        FROM machines WHERE machine_id=?`,
-      new Date(Date.now() - this.config.heartbeatOfflineSeconds * 1000).toISOString(), machineId,
+      new Date(at - this.config.heartbeatOfflineSeconds * 1000).toISOString(), machineId,
     );
-    const pending = sync && sync.until > Date.now() && host?.healthy === 1 && host.reachability === "reconnecting"
+    const pending = sync && sync.until > at && host?.healthy === 1 && host.reachability === "reconnecting"
       && this.db.get(`SELECT 1 FROM agent_connections c JOIN reconciliation_cycles r ON r.connection_id=c.connection_id
         WHERE c.connection_id=? AND c.machine_id=? AND c.disconnected_at IS NULL AND r.state='pending'`, sync.connectionId, machineId);
     return { hostOnline: host?.reachability === "online" && host.healthy === 1, runtimeSyncUntil: pending ? sync!.until : null };
@@ -1939,7 +1939,7 @@ export class RegistryService {
         }
         this.db.run(
           `UPDATE producer_streams SET max_declared_host_seq=?,
-            resume_through_host_seq=CASE WHEN ?=1 THEN NULL ELSE ? END,
+            resume_through_host_seq=CASE WHEN ?=1 THEN NULL ELSE CAST(? AS BIGINT) END,
             resume_connection_id=CASE WHEN ?=1 THEN NULL ELSE ? END,updated_at=?
            WHERE machine_id=? AND producer_epoch=?`,
           throughHostSeq,
@@ -2829,14 +2829,19 @@ export class RegistryService {
     if(options.managed!==undefined) { where.push("s.managed=?"); params.push(options.managed?1:0); }
     const total = this.db.get<{ count:number }>(`SELECT count(*) AS count FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id JOIN projects p ON p.project_id=s.project_id WHERE ${where.join(" AND ")}`, ...params)!.count;
     if(cursor) { where.push("(s.updated_at<? OR (s.updated_at=? AND s.logical_session_id<?))"); params.push(cursor[0]!,cursor[0]!,cursor[1]!); }
-    const rows = this.db.all<{ logical_session_id:string;updated_at:string }>(`SELECT s.logical_session_id,s.updated_at FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id JOIN projects p ON p.project_id=s.project_id WHERE ${where.join(" AND ")} ORDER BY s.updated_at DESC,s.logical_session_id DESC LIMIT ?`,...params,limit+1);
+    const rows = this.db.all<{ logical_session_id:string;updated_at:string;project_id:string }>(`SELECT s.logical_session_id,s.updated_at,s.project_id FROM logical_sessions s JOIN machines m ON m.machine_id=s.machine_id JOIN projects p ON p.project_id=s.project_id WHERE ${where.join(" AND ")} ORDER BY s.updated_at DESC,s.logical_session_id DESC LIMIT ?`,...params,limit+1);
     const visible=rows.slice(0,limit); const last=visible.at(-1);
-    return { items:visible.map((row)=>this.getSession(principal,row.logical_session_id)),nextCursor:rows.length>limit&&last?pageCursor(scope,[last.updated_at,last.logical_session_id]):null,total };
+    const timestamp = nowIso();
+    const groups = new Map<string,string[]>();
+    for (const row of visible) groups.set(row.project_id, [...(groups.get(row.project_id) ?? []), row.logical_session_id]);
+    const items = this.db.withReadBatch(visible.map(row => row.logical_session_id), () =>
+      visible.map(row => this.getSession(principal, row.logical_session_id, timestamp)), [...groups.values()]);
+    return { items,nextCursor:rows.length>limit&&last?pageCursor(scope,[last.updated_at,last.logical_session_id]):null,total };
   }
 
-  getSession(principal: Principal, logicalSessionId: string): LogicalSessionSummary {
+  getSession(principal: Principal, logicalSessionId: string, timestamp = nowIso()): LogicalSessionSummary {
     invariant(!this.db.get("SELECT 1 FROM logical_sessions WHERE logical_session_id=? AND workspace_id=? AND deleted_at IS NOT NULL",logicalSessionId,principal.workspaceId),410,"SESSION_DELETED","主机已确认永久删除此会话");
-    const lease = this.currentLease(principal, logicalSessionId);
+    const lease = this.currentLease(principal, logicalSessionId, timestamp);
     const row = this.db.get<{
       logical_session_id: string;
       machine_id: string;
@@ -2889,7 +2894,7 @@ export class RegistryService {
     const host=this.db.get<{codex_catalog_json:string|null;agent_version:string;discovery_json:string|null}>("SELECT codex_catalog_json,agent_version,discovery_json FROM machines WHERE machine_id=?",row.machine_id);
     const machineCatalog=parseCodexCatalog(JSON.parse(host?.codex_catalog_json ?? "null"));
     return {
-      ...this.heartbeatPresentation(row.machine_id),
+      ...this.heartbeatPresentation(row.machine_id, Date.parse(timestamp)),
       weeklyTokens: usageCycle?.recordedTokens ?? null,
       weeklyBoundaryIncomplete: usageCycle?.boundaryIncomplete ?? false,
       logicalSessionId: row.logical_session_id,
@@ -2938,8 +2943,7 @@ export class RegistryService {
     };
   }
 
-  currentLease(principal: Principal, logicalSessionId: string): ControlLeaseView | null {
-    const timestamp = nowIso();
+  currentLease(principal: Principal, logicalSessionId: string, timestamp = nowIso()): ControlLeaseView | null {
     const expired = this.db.get<{ control_lease_id: string; holder_client_session_id: string }>(
       `SELECT l.control_lease_id,l.holder_client_session_id FROM control_leases l
        JOIN logical_sessions s ON s.logical_session_id=l.logical_session_id

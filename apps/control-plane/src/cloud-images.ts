@@ -137,7 +137,7 @@ export class CloudImages {
       FROM refs r JOIN logical_sessions s ON s.logical_session_id=r.logical_session_id JOIN projects p USING(project_id)
       LEFT JOIN cloud_images i ON i.machine_id=s.machine_id AND i.image_hash=r.image_hash
       WHERE s.machine_id=? AND s.deleted_at IS NULL AND s.logical_session_id>?
-      GROUP BY s.logical_session_id ORDER BY s.logical_session_id LIMIT 51`, machineId,machineId,machineId,machineId,after);
+      GROUP BY s.logical_session_id,p.alias ORDER BY s.logical_session_id LIMIT 51`, machineId,machineId,machineId,machineId,after);
     type SessionUsage = {logicalSessionId:string;title:string;project:string;cloudBytes:number;imageCount:number;fileCount:number;fileBytes:number;files:Array<{relativePath:string;size:number}>};
     const merged=new Map<string,SessionUsage>(rows.map(row=>[row.logicalSessionId,{...row,fileCount:0,fileBytes:0,files:[]} ]));
     for(const upload of this.attachments(machineId)) { const row=merged.get(upload.logicalSessionId)??this.db.get<{logicalSessionId:string;title:string;project:string}>(`SELECT s.logical_session_id AS logicalSessionId,s.title,p.alias AS project FROM logical_sessions s JOIN projects p USING(project_id) WHERE s.logical_session_id=? AND s.machine_id=? AND s.deleted_at IS NULL`,upload.logicalSessionId,machineId);if(!row)continue;const value:SessionUsage=merged.get(upload.logicalSessionId)??{cloudBytes:0,imageCount:0,fileCount:0,fileBytes:0,files:[],...row};value.fileCount+=upload.files.length;value.fileBytes+=upload.totalBytes;value.files.push(...upload.files);merged.set(upload.logicalSessionId,value); }

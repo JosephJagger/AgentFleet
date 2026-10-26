@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {loadConfig} from '../src/config.js';
-import {buildControlPlane} from '../src/server.js';
+import {buildControlPlane} from './server-fixture.js';
 test('transcript settings require login/CSRF, reject stale saves and retire confirmation endpoints',async t=>{
  const origin='http://example.test';const {app}=await buildControlPlane({...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'owner@example.test',ADMIN_PASSWORD:'correct horse battery staple',PUBLIC_ORIGIN:origin,COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:'});t.after(()=>app.close());
  const url='/api/voice-transcript-settings';assert.equal((await app.inject({url})).statusCode,401);

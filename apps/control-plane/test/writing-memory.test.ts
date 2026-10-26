@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ControlPlaneDatabase } from "../src/db.js";
+import { ControlPlaneDatabase } from "./database-fixture.js";
 import { loadConfig } from "../src/config.js";
 import { WritingMemory, extractWritingCandidates, safeWritingText } from "../src/writing-memory.js";
 import { WritingAI, relevantWritingVocabulary } from "../src/writing-ai.js";
-import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
+import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "./server-fixture.js";
 
 const config = () => ({ ...loadConfig({ AUTH_MODE: "password", ADMIN_EMAIL:"writing@example.test", ADMIN_PASSWORD:"writing-test-password", PUBLIC_ORIGIN:"http://writing.test", COOKIE_SECURE:"false", LOG_LEVEL:"silent" }), databasePath: ":memory:" });
 function fixture() {

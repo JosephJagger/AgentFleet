@@ -5,6 +5,7 @@ import secrets
 import uuid
 from datetime import timedelta
 from functools import wraps
+from contextlib import contextmanager
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -53,8 +54,23 @@ def code_digest(challenge_id, email, code):
     return digest("agentfleets-otp", f"{challenge_id}:{email}:{code}")
 
 
+@contextmanager
+def identity_transaction():
+    """Preserve SQLite IMMEDIATE serialization across PostgreSQL/gunicorn workers.
+
+    The lock includes rate buckets which do not yet have a row, as well as OTPs.
+    Email delivery remains outside the transaction. PostgreSQL releases the lock
+    on commit, rollback, or connection loss.
+    """
+    with transaction.atomic():
+        if connection.vendor == "postgresql":
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':agentfleet-identity', 0))")
+        yield
+
+
 def rate_limit(rules):
-    """Called inside an IMMEDIATE transaction; all workers share durable limits."""
+    """Called inside identity_transaction; all workers share durable limits."""
     now = timezone.now()
     RateEvent.objects.filter(created_at__lt=now - timedelta(days=1)).delete()
     retry = 0
@@ -86,7 +102,7 @@ def request_code(body):
     if not settings.RESEND_API_KEY or not settings.RESEND_FROM_EMAIL:
         return error(503, "EMAIL_DELIVERY_UNAVAILABLE", "Email delivery is temporarily unavailable")
     now = timezone.now()
-    with transaction.atomic():
+    with identity_transaction():
         limited = rate_limit([
             ("send-cooldown", email, 1, settings.OTP_RESEND_SECONDS),
             ("send-email", email, 5, 3600), ("send-ip", ip, 20, 3600),
@@ -105,7 +121,7 @@ def request_code(body):
     except DeliveryError:
         EmailChallenge.objects.filter(pk=challenge.id).update(consumed=True)
         return error(503, "EMAIL_DELIVERY_UNAVAILABLE", "Email delivery is temporarily unavailable")
-    with transaction.atomic():
+    with identity_transaction():
         # A newer send invalidates every older code for this email.
         EmailChallenge.objects.filter(email=email, created_at__lt=challenge.created_at).update(consumed=True)
         EmailChallenge.objects.filter(pk=challenge.id).update(sent=True)
@@ -123,11 +139,11 @@ def verify_code(body):
     if not isinstance(code, str) or not re.fullmatch(r"[0-9]{6}", code) or not isinstance(ip, str) or not 1 <= len(ip) <= 100:
         return error(400, "INVALID_INPUT", "Enter a six-digit code")
     invalid = error(401, "INVALID_OR_EXPIRED_CODE", "The code is invalid or expired")
-    with transaction.atomic():
+    with identity_transaction():
         limited = rate_limit([("verify-ip", ip, 60, 3600)])
         if limited is not None:
             return limited
-        challenge = EmailChallenge.objects.filter(pk=challenge_id).first()
+        challenge = EmailChallenge.objects.select_for_update().filter(pk=challenge_id).first()
         if (not challenge or not challenge.sent or challenge.consumed
                 or challenge.expires_at <= timezone.now() or challenge.attempts >= settings.OTP_MAX_ATTEMPTS):
             return invalid

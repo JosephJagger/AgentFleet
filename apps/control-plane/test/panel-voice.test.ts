@@ -4,7 +4,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
-import {ControlPlaneDatabase} from '../src/db.js';
+import {ControlPlaneDatabase,rejectInsert} from './database-fixture.js';
 import {loadConfig} from '../src/config.js';
 import {AuthService} from '../src/auth.js';
 import {RegistryService} from '../src/registry.js';
@@ -41,7 +41,7 @@ test('panel dispatch persists one real command, survives hangup, and deduplicate
 
 test('panel job insertion failure rolls back the command and project reservation',t=>{
   const f=fixture();t.after(()=>f.db.close());
-  f.db.sqlite.exec("CREATE TRIGGER reject_job BEFORE INSERT ON panel_voice_jobs BEGIN SELECT RAISE(ABORT,'test rollback'); END;");
+  rejectInsert(f.db,'panel_voice_jobs','reject_job','test rollback');
   assert.throws(()=>f.dispatch(),/test rollback/);
   assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,0);
   assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM project_turn_reservations')?.n,0);
@@ -154,7 +154,7 @@ test('status is session-scoped, authorized, and never falls back to another sess
  assert.equal((f.service.tool(f.principal,next.voice_id,'status',{action:'status',sessionId:f.session.logicalSessionId}) as {jobId:string}).jobId,first.jobId);
  assert.equal(f.service.poll(f.principal,next.voice_id).task,null);
  const previous=f.service.current(f.principal)!;
- f.db.run("INSERT INTO panel_voice_jobs VALUES('other-job',?,?,?,?,?,?,NULL,'completed',NULL,?)",f.principal.userId,f.principal.workspaceId,next.voice_id,'other-request',other.logicalSessionId,previous.command_id,new Date().toISOString());
+ f.db.run("INSERT INTO panel_voice_jobs(job_id,user_id,workspace_id,voice_id,request_id,session_id,command_id,native_turn_id,state,reported_call_id,created_at) VALUES('other-job',?,?,?,?,?,?,NULL,'completed',NULL,?)",f.principal.userId,f.principal.workspaceId,next.voice_id,'other-request',other.logicalSessionId,previous.command_id,new Date().toISOString());
  assert.equal((f.service.tool(f.principal,next.voice_id,'status',{action:'status',sessionId:f.session.logicalSessionId}) as {jobId:string}).jobId,first.jobId);
  assert.equal((f.service.tool(f.principal,next.voice_id,'status',{action:'status',sessionId:other.logicalSessionId}) as {jobId:string}).jobId,'other-job');
 });
@@ -228,7 +228,7 @@ test('parallel results and progress remain turn-scoped; reports are independent 
  f.db.run("UPDATE panel_voice_jobs SET native_turn_id='turn-a',state='running' WHERE job_id=?",a.jobId);
  f.db.run("UPDATE panel_voice_jobs SET native_turn_id='turn-b',state='completed' WHERE job_id=?",b.jobId);
  // Many newer completed jobs must not evict outstanding work or unreported results.
- for(let i=0;i<25;i++) f.db.run("INSERT INTO panel_voice_jobs SELECT ?,user_id,workspace_id,voice_id,?,session_id,command_id,NULL,'completed',voice_id,'9999-01-01' FROM panel_voice_jobs WHERE job_id=?",`history-${i}`,`history-request-${i}`,b.jobId);
+ for(let i=0;i<25;i++) f.db.run("INSERT INTO panel_voice_jobs(job_id,user_id,workspace_id,voice_id,request_id,session_id,command_id,native_turn_id,state,reported_call_id,created_at) SELECT ?,user_id,workspace_id,voice_id,?,session_id,command_id,NULL,'completed',voice_id,'9999-01-01' FROM panel_voice_jobs WHERE job_id=?",`history-${i}`,`history-request-${i}`,b.jobId);
  const poll=f.service.poll(f.principal,f.call.voice_id);
  assert.ok(poll.tasks.some(j=>j.jobId===a.jobId&&j.progress.nativeTurnId==='turn-a'));
  assert.equal(poll.report?.reportId,b.jobId);assert.equal(poll.report?.result.progress.nativeTurnId,'turn-b');
@@ -241,7 +241,7 @@ test('parallel results and progress remain turn-scoped; reports are independent 
 });
 
 test('schema 49 migration preserves work and enables another host project after reopening',t=>{
- const f=fixture();t.after(()=>f.db.close());const original=f.dispatch() as {jobId:string};
+ const f=fixture(':sqlite-memory:');t.after(()=>f.db.close());const original=f.dispatch() as {jobId:string};
  const dir=mkdtempSync(join(tmpdir(),'panel-parallel-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'test.sqlite');
  f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
  let db=new ControlPlaneDatabase(path);
@@ -291,7 +291,7 @@ test('pending todo edits use revisions, cancellations cannot dispatch, and faile
  assert.throws(()=>f.service.memory.save(f.principal,{intent:'Different feature',key:'stable-key'}),/不同内容/);
  const updated=f.service.memory.update(f.principal,todo.todo_id,{revision:1,intent:'Draft clarified feature',sessionId:f.session.logicalSessionId});
  assert.throws(()=>f.service.memory.update(f.principal,todo.todo_id,{revision:1,state:'cancelled'}),/已变化/);
- f.db.sqlite.exec("CREATE TRIGGER reject_memory_job BEFORE INSERT ON panel_voice_jobs BEGIN SELECT RAISE(ABORT,'test failure'); END;");
+ const restoreInsert=rejectInsert(f.db,'panel_voice_jobs','reject_memory_job','test failure');
  assert.throws(()=>f.service.tool(f.principal,f.call.voice_id,'dispatch',{action:'dispatch',todoId:todo.todo_id,revision:updated.revision,confirmed:true}),/test failure/);
  assert.equal(f.service.memory.get(f.principal,todo.todo_id).state,'pending');
  assert.equal(f.db.get<{n:number}>('SELECT count(*) n FROM commands')?.n,0);
@@ -325,7 +325,7 @@ test('results persist after call closure; recovery does not acknowledge, speak o
 });
 
 test('schema 50 backfills existing jobs without execution and recovery paginates unbound pending intents',t=>{
- const f=fixture();t.after(()=>f.db.close());const old=f.dispatch() as {jobId:string};
+ const f=fixture(':sqlite-memory:');t.after(()=>f.db.close());const old=f.dispatch() as {jobId:string};
  const dir=mkdtempSync(join(tmpdir(),'voice-memory-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'test.sqlite');
  f.db.sqlite.exec(`VACUUM INTO '${path.replaceAll("'","''")}'`);
  let db=new ControlPlaneDatabase(path);db.sqlite.exec('DROP TABLE panel_voice_todo_resolutions; DROP TABLE panel_voice_task_records; DROP TABLE panel_voice_todos; PRAGMA user_version=50');db.close();
@@ -779,8 +779,8 @@ test('natural transcript requests and scoped new-save authorization never execut
 test('event memory refresh targets its turn and unbound jobs, including late historical results',t=>{
  const f=fixture();t.after(()=>f.db.close());const first=f.dispatch() as {jobId:string};
  f.db.run("UPDATE panel_voice_jobs SET native_turn_id='turn-current' WHERE job_id=?",first.jobId);
- f.db.run("INSERT INTO panel_voice_jobs SELECT 'old-job',user_id,workspace_id,voice_id,'old-request',session_id,command_id,'turn-old','completed',NULL,created_at FROM panel_voice_jobs WHERE job_id=?",first.jobId);
- f.db.run("INSERT INTO panel_voice_jobs SELECT 'unbound-job',user_id,workspace_id,voice_id,'unbound-request',session_id,command_id,NULL,'running',NULL,created_at FROM panel_voice_jobs WHERE job_id=?",first.jobId);
+ f.db.run("INSERT INTO panel_voice_jobs(job_id,user_id,workspace_id,voice_id,request_id,session_id,command_id,native_turn_id,state,reported_call_id,created_at) SELECT 'old-job',user_id,workspace_id,voice_id,'old-request',session_id,command_id,'turn-old','completed',NULL,created_at FROM panel_voice_jobs WHERE job_id=?",first.jobId);
+ f.db.run("INSERT INTO panel_voice_jobs(job_id,user_id,workspace_id,voice_id,request_id,session_id,command_id,native_turn_id,state,reported_call_id,created_at) SELECT 'unbound-job',user_id,workspace_id,voice_id,'unbound-request',session_id,command_id,NULL,'running',NULL,created_at FROM panel_voice_jobs WHERE job_id=?",first.jobId);
  const spy=t.mock.method(f.service as unknown as {refresh:(job:{job_id:string})=>unknown},'refresh');
  const seen=()=>spy.mock.calls.map(call=>call.arguments[0].job_id).sort();
  f.service.syncSessionMemory(f.session.logicalSessionId,'turn-current');

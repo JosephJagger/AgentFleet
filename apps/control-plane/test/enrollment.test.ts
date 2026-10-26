@@ -4,7 +4,7 @@ import { generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import type { ControlPlaneConfig } from "../src/config.js";
 import { loadConfig } from "../src/config.js";
 import { sha256 } from "../src/crypto.js";
-import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
+import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "./server-fixture.js";
 
 const origin = "http://control-plane.test";
 

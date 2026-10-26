@@ -4,7 +4,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {ControlPlaneDatabase} from '../src/db.js';
+import {ControlPlaneDatabase} from './database-fixture.js';
 import {loadConfig} from '../src/config.js';
 import type {Principal} from '../src/auth.js';
 import {CursorPreferencesService} from '../src/cursor-preferences.js';

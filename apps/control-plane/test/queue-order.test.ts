@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { reorderQueue } from "../src/queue-order.js";
-import type { ControlPlaneDatabase } from "../src/db.js";
+import type { ControlPlaneDatabase } from "./database-fixture.js";
 import type { Principal } from "../src/auth.js";
 
 test("queue reorder is atomic, workspace scoped and rejects stale or changed membership", t => {

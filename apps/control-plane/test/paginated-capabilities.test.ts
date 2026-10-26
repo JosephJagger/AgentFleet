@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { sessionActions } from "../src/capabilities.js";
-import type { ControlPlaneDatabase } from "../src/db.js";
+import type { ControlPlaneDatabase } from "./database-fixture.js";
 
 test("paginated claims require an explicit agent capability, preserving busy and read-only gates", () => {
   const row = { project_id: "project", managed: 0, execution_state: "idle", active_turn_id: null, reachability: "live", native_thread_id: "original-id",

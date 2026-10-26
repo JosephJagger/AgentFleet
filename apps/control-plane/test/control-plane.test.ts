@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import type { WebSocket, RawData } from "ws";
 import type { ControlPlaneConfig } from "../src/config.js";
-import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
+import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "./server-fixture.js";
 import { payloadHash } from "../src/crypto.js";
 import { CoordinationService } from "../src/coordination.js";
 import { AuthService } from "../src/auth.js";
@@ -1334,6 +1334,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
     payload: { prompt: mutation },
   });
   // Isolate native-command coverage from the reservation scenario below.
+  if (db.backend === "postgresql") db.sqlite.exec("BEGIN IMMEDIATE");
   const originalTransaction = db.transaction.bind(db);
   db.transaction = function<T>(operation: () => T): T {
     db.sqlite.exec("SAVEPOINT native_inner");
@@ -1574,6 +1575,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
     assert.equal((await app.inject({method:"GET",url:"/api/settings/permissions",headers:browserHeaders})).statusCode,200);
   } finally { db.sqlite.exec("ROLLBACK TO workspace_settings_test; RELEASE workspace_settings_test"); }
   db.transaction = originalTransaction;
+  if (db.backend === "postgresql") db.sqlite.exec("COMMIT");
   const concurrent = await Promise.all([
     app.inject({
       method: "POST",

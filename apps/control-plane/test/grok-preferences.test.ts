@@ -4,7 +4,7 @@ import {mkdtempSync,rmSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {randomUUID} from "node:crypto";
-import {ControlPlaneDatabase} from "../src/db.js";
+import {ControlPlaneDatabase} from "./database-fixture.js";
 import {loadConfig} from "../src/config.js";
 import {GrokPreferencesService} from "../src/grok-preferences.js";
 import {grokSettingsActive,parseGrokSettings,supportsGrokControls} from "../src/grok-settings.js";

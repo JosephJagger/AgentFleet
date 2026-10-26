@@ -6,6 +6,7 @@ import type { ControlPlaneConfig } from "./config.js";
 import { hashPassword, newId, nowIso } from "./crypto.js";
 import { CloudImages } from "./cloud-images.js";
 import { createHash } from "node:crypto";
+import { PostgresDatabase, type DatabaseConnection, type PostgresOptions } from "./postgres.js";
 
 const MIGRATION_1 = `
 CREATE TABLE workspaces (
@@ -787,10 +788,17 @@ CREATE TABLE session_creation_requests (
 export type DbRow = Record<string, SQLInputValue>;
 
 export class ControlPlaneDatabase {
-  readonly sqlite: DatabaseSync;
+  readonly sqlite: DatabaseConnection;
+  readonly backend: "sqlite" | "postgresql";
+  private readScope: { ids: string[]; groups: string[][]; cache: Map<string, unknown[]> } | undefined;
 
-  constructor(path: string) {
+  constructor(path: string, postgres?: PostgresOptions) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    this.backend = postgres ? "postgresql" : "sqlite";
+    if (postgres) {
+      this.sqlite = new PostgresDatabase(postgres);
+      return;
+    }
     this.sqlite = new DatabaseSync(path);
     this.sqlite.exec("PRAGMA foreign_keys = ON");
     this.sqlite.exec("PRAGMA busy_timeout = 5000");
@@ -1713,26 +1721,79 @@ export class ControlPlaneDatabase {
   }
 
   transaction<T>(operation: () => T): T {
+    this.readScope?.cache.clear();
     this.sqlite.exec("BEGIN IMMEDIATE");
     try {
       const result = operation();
+      if (result && typeof (result as { then?: unknown }).then === "function") throw new Error("Database transaction callbacks must be synchronous");
       this.sqlite.exec("COMMIT");
+      this.readScope?.cache.clear();
       return result;
     } catch (error) {
       this.sqlite.exec("ROLLBACK");
+      this.readScope?.cache.clear();
       throw error;
     }
   }
 
   get<T extends object>(sql: string, ...values: SQLInputValue[]): T | undefined {
-    return this.sqlite.prepare(sql).get(...values) as T | undefined;
+    if (!this.readScope) return this.sqlite.prepare(sql).get(...values) as T | undefined;
+    return this.read(sql, values)[0] as T | undefined;
   }
 
   all<T extends object>(sql: string, ...values: SQLInputValue[]): T[] {
-    return this.sqlite.prepare(sql).all(...values) as T[];
+    return this.read(sql, values) as T[];
+  }
+
+  /** A synchronous summary page has no interleaving application writers. Prefetch
+   * the same SELECT for its known session IDs in one round trip, using the full
+   * SQL/parameter tuple as the key. Writes invalidate every prefetched result.
+   * This keeps capability/lease decisions in their existing service methods.
+   */
+  withReadBatch<T>(ids: string[], operation: () => T, groups: string[][] = []): T {
+    if (!this.sqlite.readBatch || !ids.length) return operation();
+    const previous = this.readScope;
+    this.readScope = { ids: [...new Set(ids)], groups, cache: new Map() };
+    try {
+      const result = operation();
+      if (result && typeof (result as { then?: unknown }).then === "function") throw new Error("Read batch callbacks must be synchronous");
+      return result;
+    } finally { previous?.cache.clear(); this.readScope = previous; }
+  }
+
+  private read(sql: string, values: SQLInputValue[]): unknown[] {
+    const scope = this.readScope;
+    if (!scope || !/^SELECT\b/i.test(sql.trim())) {
+      if (scope) scope.cache.clear();
+      return this.sqlite.prepare(sql).all(...values);
+    }
+    const keyFor = (parameters: SQLInputValue[]) => JSON.stringify([sql, parameters], (_, value) => typeof value === "bigint" ? { bigint: String(value) } : value);
+    const key = keyFor(values);
+    let rows = scope.cache.get(key);
+    if (!rows) {
+      const id = values.find(value => typeof value === "string" && scope.ids.includes(value));
+      // Directory-specific predicates vary independently of the selected session.
+      // Do not prefetch their cross product with every ID on the page.
+      const directory = /\bproject_id\s+IN\s*\(\s*\?/i.test(sql);
+      const directSession = /\blogical_session_id\s*=\s*\?/i.test(sql);
+      const candidates = directory ? scope.groups.find(group => group.includes(id as string)) ?? [] : scope.ids;
+      if (id && (directSession || directory) && candidates.length > 1 && scope.cache.size < 4096) {
+        const start = candidates.indexOf(id as string);
+        const sets = candidates.slice(start, start + 32).map(next => values.map(value => value === id ? next : value));
+        const groups = this.sqlite.readBatch!(sql, sets);
+        sets.forEach((set, index) => scope.cache.set(keyFor(set), groups[index]!));
+        rows = scope.cache.get(key)!;
+      } else {
+        rows = this.sqlite.prepare(sql).all(...values);
+        if (scope.cache.size < 4096) scope.cache.set(key, rows);
+      }
+    }
+    // Several existing callers sort or edit rows. Never let that mutate the cache.
+    return structuredClone(rows);
   }
 
   run(sql: string, ...values: SQLInputValue[]): ReturnType<ReturnType<DatabaseSync["prepare"]>["run"]> {
+    this.readScope?.cache.clear();
     return this.sqlite.prepare(sql).run(...values);
   }
 
@@ -1861,6 +1922,7 @@ export class ControlPlaneDatabase {
   }
 
   close(): void {
+    this.readScope?.cache.clear();
     this.sqlite.close();
   }
 }

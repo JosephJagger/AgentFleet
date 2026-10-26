@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ControlPlaneDatabase} from '../src/db.js';
+import {ControlPlaneDatabase} from './database-fixture.js';
 import {loadConfig} from '../src/config.js';
 import {AuthService} from '../src/auth.js';
 import {RegistryService} from '../src/registry.js';
@@ -97,7 +97,7 @@ test('deleted blobs containing JSON null and native rereads cannot resurrect hid
  const synced=await service.read(f.principal,{sessionId:f.session.logicalSessionId,source:'synced'});assert.equal(synced.items.find(i=>i.id==='a')?.unavailableReason,'CONTENT_DELETED');
 });
 
-import {buildControlPlane} from '../src/server.js';
+import {buildControlPlane} from './server-fixture.js';
 test('authenticated HTTP history route uses the requested session and rejects anonymous or foreign users',async t=>{
  const config={...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'history@example.test',ADMIN_PASSWORD:'fixture-password',PUBLIC_ORIGIN:'http://fixture.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:'};
  const {app,db}=await buildControlPlane(config);t.after(()=>app.close());const auth=new AuthService(db,config);

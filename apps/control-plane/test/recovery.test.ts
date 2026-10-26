@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ControlPlaneConfig } from "../src/config.js";
-import { ControlPlaneDatabase } from "../src/db.js";
+import { ControlPlaneDatabase } from "./database-fixture.js";
 import { CoordinationService } from "../src/coordination.js";
 import { createHash } from "node:crypto";
 import { payloadHash, sha256 } from "../src/crypto.js";
@@ -12,7 +12,7 @@ import { MaintenanceService } from "../src/maintenance.js";
 import { AuthService, type Principal } from "../src/auth.js";
 import { AppError } from "../src/errors.js";
 import { RegistryService, type AgentConnectionIdentity } from "../src/registry.js";
-import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "../src/server.js";
+import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "./server-fixture.js";
 import { sessionActions } from "../src/capabilities.js";
 
 function config(databasePath: string): ControlPlaneConfig {

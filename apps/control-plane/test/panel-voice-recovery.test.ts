@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildControlPlane,cookieFromSetCookie} from '../src/server.js';
+import {buildControlPlane,cookieFromSetCookie} from './server-fixture.js';
 import {loadConfig} from '../src/config.js';
 import {sha256} from '../src/crypto.js';
 import {WebSocket} from 'ws';

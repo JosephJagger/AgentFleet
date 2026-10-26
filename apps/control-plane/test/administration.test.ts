@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { AuthService } from "../src/auth.js";
-import { buildControlPlane } from "../src/server.js";
+import { buildControlPlane } from "./server-fixture.js";
 import { loadConfig } from "../src/config.js";
 
 test("platform administration is isolated, paginated, CSRF protected and revokes disabled identities", async t => {

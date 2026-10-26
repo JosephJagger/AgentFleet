@@ -40,13 +40,13 @@ export function pendingCommits(db: ControlPlaneDatabase, principal: Principal, n
     const byRoot = new Map<string, GitStatus>();
     for (const status of statuses) if (!byRoot.has(status.root) || status.checkedAt > byRoot.get(status.root)!.checkedAt) byRoot.set(status.root, status);
     const sessions = db.all<{ logical_session_id: string; title: string; provider: ProviderId; alias: string; cwd: string; execution_state: string; active_turn_id: string | null; ended_at: string | null; updated_at: string }>(
-      `SELECT s.logical_session_id,s.title,p.provider,p.alias,COALESCE(s.session_cwd,p.canonical_root) AS cwd,
+      `SELECT * FROM (SELECT s.logical_session_id,s.title,p.provider,p.alias,COALESCE(s.session_cwd,p.canonical_root) AS cwd,
         s.execution_state,s.active_turn_id,s.updated_at,
         (SELECT MAX(e.occurred_at) FROM durable_events e WHERE e.logical_session_id=s.logical_session_id AND e.type IN ('turn.completed','turn.failed','turn.interrupted')) AS ended_at
        FROM logical_sessions s JOIN projects p ON p.project_id=s.project_id
        WHERE s.machine_id=? AND s.workspace_id=? AND s.deleted_at IS NULL AND p.worktree_removed=0
          AND COALESCE(json_extract(s.runtime_settings_json,'$.archived'),0)=0
-       ORDER BY COALESCE(ended_at,s.updated_at) DESC,s.logical_session_id`, machine.machine_id, principal.workspaceId);
+       ) recent ORDER BY COALESCE(ended_at,updated_at) DESC,logical_session_id`, machine.machine_id, principal.workspaceId);
     const busy = sessions.filter(s => s.active_turn_id || ["running", "awaiting_approval", "unknown"].includes(s.execution_state));
     const seen = new Set<string>();
     for (const session of sessions) {

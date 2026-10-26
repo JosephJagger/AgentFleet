@@ -241,9 +241,10 @@ function parseWsMessage(data: RawData, maxBytes = 1_000_000): unknown {
 
 export async function buildControlPlane(
   suppliedConfig?: ControlPlaneConfig,
+  suppliedDatabase?: ControlPlaneDatabase,
 ): Promise<ControlPlaneHandle> {
   const config = suppliedConfig ?? loadConfig();
-  const db = new ControlPlaneDatabase(config.databasePath);
+  const db = suppliedDatabase ?? new ControlPlaneDatabase(config.databasePath, config.databaseUrl ? { url: config.databaseUrl, ...(config.databaseSchema ? { schema: config.databaseSchema } : {}) } : undefined);
   db.bootstrap(config);
   const auth = new AuthService(db, config);
   const identity = new IdentityService(config);
@@ -905,6 +906,9 @@ export async function buildControlPlane(
       status: check?.ok === 1 ? "ok" : "degraded",
       service: "agentfleet-control-plane",
       schemaVersion: Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
+      databaseBackend: db.backend,
+      databaseIdentity: db.backend === "postgresql" ? db.get<{identity:string}>("SELECT identity FROM agentfleet_database_identity WHERE singleton=1")!.identity : null,
+      voiceDeploymentToken: db.get<{token:string}>("SELECT token FROM voice_deployment_guard WHERE singleton=1")?.token ?? null,
       serverTime: nowIso(),
       uptimeSeconds: Math.floor(process.uptime()),
       voiceDeploymentGuard: 1,
@@ -1940,7 +1944,7 @@ export async function buildControlPlane(
       if (!voiceId || !voiceOwners.get(voiceId)?.controlHeartbeat) return;
       try { refreshVoiceControl(voiceId); } catch { stopVoice(voiceId); }
     });
-    socket.on("close",(code:number)=>{if(voiceId?.startsWith("pvoice_")){
+    socket.on("close",(code:number)=>{if(closing)return;if(voiceId?.startsWith("pvoice_")){
       const owner=panelOwners.get(voiceId);
       // A socket that a resumed one superseded (or that belongs to an ended call) must not end the call.
       if(owner&&!owner.socket.isCurrent(socket))return;
@@ -2493,6 +2497,8 @@ export async function buildControlPlane(
     for(const row of nativeVoice.pending()) stopVoice(row.voice_id);
     for(const owner of voiceOwners.values()) owner.socket.terminate();
     voiceOwners.clear();
+    for (const owner of panelOwners.values()) owner.socket.terminate();
+    panelOwners.clear();
     for (const agent of agents.values()) agent.socket.terminate();
     for (const states of clients.values()) for (const state of states) state.socket.terminate();
     agents.clear();
