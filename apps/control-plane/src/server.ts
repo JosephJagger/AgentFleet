@@ -221,9 +221,12 @@ function sendJson(socket: JsonSocket, message: unknown): boolean {
   }
 }
 
-function parseWsMessage(data: RawData): unknown {
+// Authenticated Agents replay original image bytes before reconciliation can finish.
+// Keep the frame ceiling and JSON admission limit consistent (strictly below 49 MB).
+const MAX_AGENT_WS_MESSAGE_BYTES = 49_000_000 - 1;
+function parseWsMessage(data: RawData, maxBytes = 1_000_000): unknown {
   const text = typeof data === "string" ? data : Buffer.isBuffer(data) ? data.toString("utf8") : Buffer.concat(data as Buffer[]).toString("utf8");
-  invariant(Buffer.byteLength(text) <= 1_000_000, 413, "WS_MESSAGE_TOO_LARGE", "WebSocket message exceeds 1 MB");
+  invariant(Buffer.byteLength(text) <= maxBytes, 413, "WS_MESSAGE_TOO_LARGE", "WebSocket message exceeds the allowed size");
   try {
     return JSON.parse(text) as unknown;
   } catch {
@@ -481,7 +484,7 @@ export async function buildControlPlane(
   }
 
   await app.register(cookie);
-  await app.register(websocket, { options: { maxPayload: 16 * 1024 * 1024, perMessageDeflate: false } });
+  await app.register(websocket, { options: { maxPayload: MAX_AGENT_WS_MESSAGE_BYTES, perMessageDeflate: false } });
 
   app.addHook("onSend", async (request, reply, payload) => {
     reply.header("x-content-type-options", "nosniff");
@@ -2028,7 +2031,7 @@ export async function buildControlPlane(
         if (closing) return;
         let incomingType:string|undefined;
         try {
-          const message = record(parseWsMessage(data), "WebSocket message must be an object") as unknown as AgentToServerMessage;
+          const message = record(parseWsMessage(data, MAX_AGENT_WS_MESSAGE_BYTES), "WebSocket message must be an object") as unknown as AgentToServerMessage;
           incomingType=typeof message.type==='string'&&/^[a-zA-Z0-9_.]{1,48}$/.test(message.type)?message.type:undefined;
           if(message.type === "subagents.result"){subagentsBroker.receive(identity.machineId,socket,message);return;}
           if(message.type === "session.history.result"){historyBroker.receive(identity.machineId,socket,message);return;}

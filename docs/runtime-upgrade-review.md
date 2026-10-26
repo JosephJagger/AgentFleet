@@ -234,3 +234,19 @@ request was made. macOS/Windows execution and live voice remain unverified.
 
 Release mode must be `full` because the adapter, control plane and web UI change
 together. This implementation record does not assert that a build was published.
+
+### Publication recovery (2026-10-26)
+
+The first production switch updated the panel but omitted the independent runtime
+validator. Its older reviewed-version list continued to block 0.164.0. The recovery
+publication must include `--with-validator`, followed by a fresh channel check.
+Agent package publication and runtime-channel promotion are separate outcomes.
+
+B52H's new Agent replayed three generated images (1.9–2.3 MB encoded events).
+The transport accepted up to 16 MiB, but the shared JSON parser rejected messages
+above 1 MB. Those unacknowledged durable events blocked reconciliation and hence
+heartbeats; no history should be deleted to bypass this condition. Authenticated
+Agent frames now accept strictly less than 49 decimal MB at both transport and
+JSON admission. Browser/voice JSON admission stays at 1 MB. A real WebSocket
+regression replays an 8 MiB image, verifies durable acknowledgement, cloud storage,
+reconciliation, heartbeat recovery, replay idempotency and rejection at 49 MB.

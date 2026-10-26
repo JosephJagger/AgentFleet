@@ -1156,3 +1156,53 @@ test("routine same-runtime hello preserves presentation only, with bounded expir
   assert.equal(registry.heartbeatPresentation(machineId).runtimeSyncUntil, null);
   assert.equal(new RegistryService(db, cfg).heartbeatPresentation(machineId).runtimeSyncUntil, null, "panel restart cannot restore stale continuity");
 });
+
+test("generated image replay above 1 MB completes reconciliation and restores heartbeats", async t => {
+  const { app, db } = await buildControlPlane(config(":memory:"));
+  const owner = db.bootstrap(config(":memory:"));
+  const now = new Date().toISOString();
+  insertMachine(db, owner.workspaceId, "image-host", now);
+  await app.ready();
+  db.run("INSERT INTO agent_tickets(ticket_id,machine_id,token_hash,audience,transport_generation,created_at,expires_at) VALUES('image-ticket','image-host',?,'agent-ws',1,?,?)", sha256("image-ticket"), now, new Date(Date.now()+60000).toISOString());
+  const messages: Record<string, unknown>[] = [];
+  const socket = await app.injectWS("/ws/agent?ticket=image-ticket", {}, { onInit: ws => ws.on("message", raw => messages.push(JSON.parse(raw.toString()))) });
+  t.after(async () => { socket.terminate(); await new Promise(resolve => setImmediate(resolve)); await app.close(); });
+  const next = async (type: string) => {
+    for (let n=0; n<500; n++) {
+      const error = messages.find(message => message.type === "error");
+      if (error) throw new Error(JSON.stringify(error));
+      const i = messages.findIndex(message => message.type === type);
+      if (i>=0) return messages.splice(i,1)[0]!;
+      await new Promise(resolve => setTimeout(resolve,10));
+    }
+    throw new Error(`Missing ${type}`);
+  };
+  const send = (value: unknown) => socket.send(JSON.stringify(value));
+  await next("welcome");
+  const streams = [{producerEpoch:"image-producer",throughHostSeq:1}];
+  send({type:"hello",producerEpoch:"image-producer",appServerEpoch:"image-runtime",agentVersion:"0.30.149",codexVersion:"0.163.0",schemaHash:"d204b96d8560d56600127423b89df9db471b3e22338e8809bb91d5a952998978",credentialProtectionLevel:"software_protected",platform:"linux",platformRelease:"24.04",architecture:"x64",capacity:"idle",
+    projects:[{externalId:"image-project",alias:"Images",canonicalRoot:"/images",identityHash:"image-root",leaseVersion:1}],
+    sessions:[{externalId:"image-session",projectExternalId:"image-project",executionSegmentExternalId:"image-segment",nativeThreadId:"native-image-thread",managed:false,executionState:"completed",threadControlVersion:1}],reconciliationStreams:streams});
+  const hello = await next("hello.ack");
+  const session = db.get<{logical_session_id:string;execution_segment_id:string;project_id:string}>("SELECT logical_session_id,execution_segment_id,project_id FROM execution_segments WHERE external_id='image-segment'")!;
+  const bytes = Buffer.alloc(8*1024*1024);
+  Buffer.from([137,80,78,71,13,10,26,10]).copy(bytes);
+  const url = `data:image/png;base64,${bytes.toString("base64")}`;
+  const payload = {item:{id:"image-item",type:"imageGeneration",status:"completed",content:[{type:"image",url}]}};
+  const frame = {type:"event.append",event:{eventId:"image-replay-event",logicalSessionId:session.logical_session_id,executionSegmentId:session.execution_segment_id,projectId:session.project_id,producerEpoch:"image-producer",appServerEpoch:"image-runtime",hostSeq:1,nativeThreadId:"native-image-thread",nativeTurnId:"image-turn",nativeItemId:"image-item",type:"item.completed",schemaVersion:"1.0",occurredAt:now,payloadHash:payloadHash(payload),payload}};
+  assert.ok(Buffer.byteLength(JSON.stringify(frame))>1_000_000);
+  send(frame);
+  assert.equal((await next("event.ack")).eventId,"image-replay-event");
+  send({type:"reconciliation.complete",reconciliationId:hello.reconciliationId,reconciliationStreams:streams});
+  await next("reconciliation.ack");
+  send({type:"heartbeat",capacity:"idle",activeTurns:0});
+  await next("heartbeat.ack");
+  assert.equal(db.get<{reachability:string}>("SELECT reachability FROM machines WHERE machine_id='image-host'")!.reachability,"online");
+  assert.equal(db.get<{data_url:string}>("SELECT data_url FROM cloud_images WHERE machine_id='image-host'")!.data_url,url);
+  send(frame); await next("event.ack");
+  assert.equal(db.get<{n:number}>("SELECT count(*) n FROM durable_events")!.n,1);
+  // The transport ceiling is still enforced, and oversize frames never enter storage.
+  const closed = new Promise<number>(resolve => socket.once("close", code => resolve(code)));
+  socket.send(" ".repeat(49_000_000));
+  assert.equal(await closed,1009);
+});
