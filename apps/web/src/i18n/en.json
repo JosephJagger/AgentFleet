@@ -4311,5 +4311,11 @@
   "固定当前版本并停止自动更新？": "Pin the current version and stop automatic updates?",
   "固定当前版本": "Pin current version",
   "切回宿主机安装": "Use host installation",
-  "托管目标已保存，请在下方主机列表确认更新": "Managed target saved. Confirm updates in the host list below."
+  "托管目标已保存，请在下方主机列表确认更新": "Managed target saved. Confirm updates in the host list below.",
+  "请先在主机安装并完成登录授权": "Install and sign in on the host first",
+  "请先在主机完成登录授权": "Sign in on the host first",
+  "暂时无法核验授权，请重新检查": "Unable to verify sign-in. Check again.",
+  "请先更新连接服务以检查安装与授权": "Update the connection service to check installation and sign-in",
+  "暂时无法核验授权，请在主机检查登录状态后重试": "Unable to verify authorization. Check sign-in on the host and try again.",
+  "暂时无法核验授权，请先重新检查安装与登录状态": "Unable to verify authorization. Recheck installation and sign-in."
 }

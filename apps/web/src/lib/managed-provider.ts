@@ -41,3 +41,11 @@ export function parseManagedRelease(value: unknown): ManagedRelease {
   if (!Object.keys(artifacts).length || Object.keys(artifacts).length > 10) throw new Error('Missing managed artifacts');
   return {id:v.id,provider:v.provider,version:v.version,checkedAt:v.checkedAt,artifacts};
 }
+
+export interface ManagedEligibility {state:'ready'|'managed'|'not_installed'|'login_required'|'unverified';checkedAt:string;}
+export function parseManagedEligibility(value:unknown):ManagedEligibility|undefined {
+  if(!value||typeof value!=='object')return;
+  const v=value as ManagedEligibility;
+  if(!['ready','managed','not_installed','login_required','unverified'].includes(v.state)||typeof v.checkedAt!=='string'||v.checkedAt.length>40||!Number.isFinite(Date.parse(v.checkedAt))||Date.parse(v.checkedAt)>Date.now()+60000)return;
+  return {state:v.state,checkedAt:v.checkedAt};
+}

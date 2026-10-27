@@ -31,13 +31,21 @@ export function ManagedHostAction({machine,provider,target,onAccepted}:{machine:
   const [rollback,setRollback]=useState(false);
   const job=machine.discovery?.managedUpdates?.[provider];
   const active=Boolean(job&&['accepted','downloading','verifying','waiting_idle','activating'].includes(job.phase));
-  const managed=provider==='grok'?Boolean(machine.discovery?.managedGrokVersion):Boolean(machine.discovery?.providerRuntimePolicy&&machine.discovery.providerRuntimePolicy.mode!=='host');
+  const managed=provider==='grok'?Boolean(machine.discovery?.managedGrokVersion):Boolean(policy?.current&&policy.mode!=='host');
+  const eligibility=machine.discovery?.managedEligibility?.[provider];
+  const eligible=eligibility?.state==='ready'&&Date.now()-Date.parse(eligibility.checkedAt)<=6*60_000&&Date.parse(eligibility.checkedAt)<=Date.now()+60000;
+  const eligibilityLabel=machine.agentRuntimes?.[provider]?.installed===false||eligibility?.state==='not_installed'?t('请先在主机安装并完成登录授权'):eligibility?.state==='login_required'?t('请先在主机完成登录授权'):t('暂时无法核验授权，请重新检查');
   const version=managedVersion(machine,provider),current=managed&&target&&version===target.version;
   const platform=managedHostPlatform(machine);
   const supported=Boolean(target&&platform&&(target.artifacts[platform]||target.artifacts[`${platform}-musl`]));
   const submit=async(cancel=false,revert=false)=>{
     if(inFlight.current)return;inFlight.current=true;setSending(true);setError('');
     try{const operation=await api.providerRuntimeOperation(machine.id,revert?{action:'rollback-managed',provider:'grok',expectedRevision:job?.revision??0}:cancel?{action:'cancel-managed',provider,expectedRevision:job?.revision??0}:{action:'install-managed',provider,releaseId:target!.id,expectedRevision:job?.revision??0},crypto.randomUUID());setOperation(operation);setAccepted((job?.revision??0)+1);setRollback(false);onAccepted?.();}
+    catch(e){setError((e as Error).message);}finally{inFlight.current=false;setSending(false);}
+  };
+  const recheck=async()=>{
+    if(inFlight.current)return;inFlight.current=true;setSending(true);setError('');
+    try{setOperation(await api.providerRuntimeOperation(machine.id,{action:'check'},crypto.randomUUID()));onAccepted?.();}
     catch(e){setError((e as Error).message);}finally{inFlight.current=false;setSending(false);}
   };
   const submitClaude=async()=>{
@@ -57,7 +65,11 @@ export function ManagedHostAction({machine,provider,target,onAccepted}:{machine:
     :!target?<span className="managed-muted">{t('尚未发布托管版本')}</span>
     :!supported?<span className="managed-muted">{t('当前系统暂不支持')}</span>
     :isNewerVersion(version,target.version)?<span className="managed-muted">{t('当前版本高于托管目标')}</span>
+    :!managed&&machine.agentRuntimes?.[provider]?.installed===false?<span className="managed-muted">{t('请先在主机安装并完成登录授权')}</span>
+    :!managed&&!machine.discovery?.managedEligibilitySupport?<span className="managed-muted">{t('请先更新连接服务以检查安装与授权')}</span>
+    :!managed&&!eligible?<span className="managed-muted" role="status">{eligibilityLabel}</span>
     :<button className="button button--primary managed-install" disabled={disabled} onClick={()=>void submit()}><Download size={14}/>{sending?t('正在提交…'):managed?t('更新到 {0}',target.version):t('启用托管 {0}',target.version)}</button>}
+    {!managed&&!active&&target&&machine.discovery?.managedEligibilitySupport&&(!eligible||machine.agentRuntimes?.[provider]?.installed===false)&&machine.reachability==='live'&&<button className="managed-text-button" disabled={disabled} onClick={()=>void recheck()}>{sending||operationPending?t('正在检查…'):t('重新检查')}</button>}
     {(awaiting||operationPending)&&!active&&<small role="status">{t('请求已提交，等待主机上报进度')}</small>}
     {job&&!active&&['failed','unknown','cancelled'].includes(job.phase)&&<small className={job.phase==='failed'?'managed-error':'managed-muted'}>{job.error?systemText(job.error):managedPhaseLabel(job.phase)}</small>}
     {provider==='grok'&&machine.discovery?.managedGrokPrevious&&!active&&machine.reachability==='live'&&<>

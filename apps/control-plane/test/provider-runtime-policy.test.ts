@@ -19,3 +19,17 @@ test('managed commands bind provider, release digest and revision and cannot sup
  assert.deepEqual(parseProviderRuntimeRequest(request),request);
  for(const bad of [{...request,provider:'qwen'},{...request,expectedRevision:-1},{...request,releaseId:'latest'},{...request,url:'https://example.com'},{action:'rollback-managed',provider:'claude',expectedRevision:0}])assert.throws(()=>parseProviderRuntimeRequest(bad));
 });
+
+test('first managed admission rejects missing, stale or failed proof on both routes; retained runtimes remain usable',async()=>{
+ const {requireFirstManagedAdmission}=await import('../src/maintenance.js');
+ const checkedAt=new Date().toISOString();
+ const requests=[{action:'configure',provider:'claude',mode:'auto',expectedRevision:0},{action:'install-managed',provider:'claude',releaseId:'a'.repeat(64),expectedRevision:0},{action:'install-managed',provider:'grok',releaseId:'a'.repeat(64),expectedRevision:0}].map(parseProviderRuntimeRequest);
+ for(const request of requests){
+  assert.throws(()=>requireFirstManagedAdmission({},request));
+  for(const state of ['not_installed','login_required','unverified','managed'])assert.throws(()=>requireFirstManagedAdmission({managedEligibilitySupport:true,managedEligibility:{claude:{state,checkedAt},grok:{state,checkedAt}}},request));
+  assert.throws(()=>requireFirstManagedAdmission({managedEligibilitySupport:true,managedEligibility:{claude:{state:'ready',checkedAt:'2020-01-01T00:00:00Z'},grok:{state:'ready',checkedAt:'2020-01-01T00:00:00Z'}}},request));
+  assert.doesNotThrow(()=>requireFirstManagedAdmission({managedEligibilitySupport:true,managedEligibility:{claude:{state:'ready',checkedAt},grok:{state:'ready',checkedAt}}},request));
+ }
+ assert.doesNotThrow(()=>requireFirstManagedAdmission({managedGrokVersion:'1.0.70'},requests[2]!));
+ assert.doesNotThrow(()=>requireFirstManagedAdmission({providerRuntimePolicy:{revision:1,mode:'pinned',current:{version:'2.1.308',sha256:'a'.repeat(64),size:10,platform:'linux-x64',checkedAt,sdkVersion:'0.3.285'}}},requests[1]!));
+});

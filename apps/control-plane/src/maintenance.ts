@@ -1,4 +1,5 @@
-import { parseProviderRuntimeRequest } from "./provider-runtime-policy.js";
+import { parseManagedEligibility } from "./managed-provider.js";
+import { parseProviderRuntimeRequest,parseProviderRuntimeState } from "./provider-runtime-policy.js";
 import type { ProviderId } from "./provider-catalog.js";
 import { parseHostCodexOperation, sanitizeCodexResult } from "./codex-operations.js";
 import { CloudImages } from "./cloud-images.js";
@@ -19,6 +20,21 @@ export function requiresPlatformAdmin(type: string, nativeRequest: unknown): boo
   if (type === "agent.update") return true;
   if (type !== "provider.runtime") return false;
   try { return parseProviderRuntimeRequest(nativeRequest).action === "confirm"; } catch { return false; }
+}
+
+/** Reject first-time takeovers before dispatch, including the legacy Claude configuration route. */
+export function requireFirstManagedAdmission(discovery:Record<string,unknown>,request:ReturnType<typeof parseProviderRuntimeRequest>) {
+  const provider=request.action==='install-managed'?request.provider:request.action==='configure'&&request.mode!=='host'?'claude':undefined;
+  if(!provider)return;
+  const policy=parseProviderRuntimeState(discovery.providerRuntimePolicy);
+  const managed=provider==='grok'?typeof discovery.managedGrokVersion==='string'&&/^\d+\.\d+\.\d+$/.test(discovery.managedGrokVersion):Boolean(policy?.current&&policy.mode!=='host');
+  if(managed)return;
+  invariant(discovery.managedEligibilitySupport===true,409,'AGENT_CAPABILITY_UNAVAILABLE','请先更新连接服务以检查安装与授权');
+  const checks=discovery.managedEligibility as Record<string,unknown>|undefined;
+  const check=parseManagedEligibility(checks?.[provider]);
+  invariant(check?.state!=='not_installed',409,'PROVIDER_NOT_INSTALLED','请先在主机安装并完成登录授权');
+  invariant(check?.state!=='login_required',409,'PROVIDER_LOGIN_REQUIRED','请先在主机完成登录授权');
+  invariant(check?.state==='ready'&&Date.now()-Date.parse(check.checkedAt)<=6*60_000,409,'PROVIDER_AUTH_UNVERIFIED','暂时无法核验授权，请先重新检查安装与登录状态');
 }
 
 export class MaintenanceService {
@@ -52,6 +68,7 @@ export class MaintenanceService {
         invariant(logicalSessionId === undefined && previewOperationId === undefined && projectTarget === undefined,400,"INVALID_OPERATION_TARGET","Runtime management does not accept session or project targets");
         invariant(!this.db.get("SELECT 1 FROM machine_operations WHERE machine_id=? AND type IN ('provider.runtime','agent.update','versions.clean') AND state IN ('accepted','running','unknown') LIMIT 1",machineId),409,"PROVIDER_OPERATION_PENDING","Wait for the previous runtime operation to finish");
         if(providerRequest?.action==='install-managed'||providerRequest?.action==='cancel-managed'||providerRequest?.action==='rollback-managed')invariant(JSON.parse(machine.discovery_json??'{}').managedProviderSupport===true,409,'AGENT_CAPABILITY_UNAVAILABLE','请先更新主机连接服务以管理托管版本');
+        requireFirstManagedAdmission(JSON.parse(machine.discovery_json??'{}'),providerRequest!);
         target={...providerRequest!};
       } else if(type === "versions.preview" || type === "versions.clean") {
         invariant(logicalSessionId === undefined && previewOperationId === undefined && nativeRequest === undefined && projectTarget === undefined,400,"INVALID_OPERATION_TARGET","版本清理不接受目录或会话参数");

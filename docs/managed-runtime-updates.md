@@ -37,3 +37,11 @@ Codex 0.159.2 is the subsequent stable patch with the same App Server v2 schema 
 面板在检查服务离线时会将版本标记为「上次获取的官方稳定版」，不再将已过期的检查时间显示为即将执行。恢复后会重新检查，但未通过兼容验证的新版本不会直接晋升。
 
 The runtime-validator is a persistent service, not a disposable test container. Restore it with `docker compose up -d runtime-validator`. A checker outage preserves the existing managed target; the panel labels the last known release as cached until checks resume. Compatibility validation remains required before promotion.
+
+## First managed takeover (connection service 0.30.153+)
+
+Claude and Grok must already be installed on the host and report a recognized signed-in state before the first managed download. The native service performs a fresh check when accepting the request, before download and again before activation, including after an idle wait. The legacy Claude `configure` route has the same requirement. An absent CLI, logged-out response or unverifiable status leaves the host installation selected and does not start a download. Existing managed installations can still upgrade or roll back after the original native installation is removed.
+
+The panel preserves the existing version rows and controls. It shows a short installation/sign-in reason and an inline recheck action when takeover is unavailable. The API requires a fresh (six-minute) public eligibility report before dispatching a first takeover. Older connection services must be upgraded before first takeover; their existing managed installations remain updatable. A fresh panel report is only admission evidence: the host always rechecks before acting.
+
+Claude uses its native `auth status --json` command ([CLI reference](https://code.claude.com/docs/en/cli-reference)); Grok uses the read-only `_x.ai/auth/check_subscription` ACP extension ([official implementation](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/src/extensions/auth.rs)). Protocol negotiation, credential-file presence and token fields alone are not authentication evidence. Unknown responses fail closed. These checks never start login, request a prompt, export credentials or upload account details. Discovery contains only the bounded status and check timestamp; status is not a guarantee that authorization cannot expire later.

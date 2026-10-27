@@ -1,4 +1,4 @@
-import { parseManagedUpdate } from './managed-provider.js';
+import { parseManagedUpdate,parseManagedEligibility } from './managed-provider.js';
 import { pendingCommits, parseWorkspaceGitStatus } from "./pending-commits.js";
 import {grokNativeDiscovery} from "./grok-operations.js";
 import {parseCursorModels} from './cursor-settings.js';
@@ -2587,6 +2587,8 @@ export class RegistryService {
     const providerPolicy=parseProviderRuntimeState(discovery.providerRuntimePolicy);
     if(providerPolicy)safe.providerRuntimePolicy=providerPolicy;
     safe.managedProviderSupport=discovery.managedProviderSupport===true;
+    safe.managedEligibilitySupport=discovery.managedEligibilitySupport===true;
+    if(discovery.managedEligibility&&typeof discovery.managedEligibility==='object')safe.managedEligibility=Object.fromEntries(['claude','grok'].flatMap(id=>{const value=parseManagedEligibility((discovery.managedEligibility as Record<string,unknown>)[id]);return value?[[id,value]]:[];}));
     if(typeof discovery.managedGrokVersion==='string'&&/^\d+\.\d+\.\d+$/.test(discovery.managedGrokVersion))safe.managedGrokVersion=discovery.managedGrokVersion;
     if(typeof discovery.managedGrokPrevious==='string'&&/^\d+\.\d+\.\d+$/.test(discovery.managedGrokPrevious))safe.managedGrokPrevious=discovery.managedGrokPrevious;
     if(discovery.managedUpdates&&typeof discovery.managedUpdates==='object')safe.managedUpdates=Object.fromEntries(['claude','grok'].flatMap(id=>{const value=parseManagedUpdate((discovery.managedUpdates as Record<string,unknown>)[id]);return value&&value.provider===id?[[id,value]]:[];}));

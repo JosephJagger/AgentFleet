@@ -65,7 +65,7 @@ it('a newer host Claude is not mislabeled as unsupported and matching banner ver
  const host={...machine,os:'linux 26.04',discovery:{...machine.discovery!,providerRuntimePolicy:{revision:3,mode:'host' as const}},agentRuntimes:{claude:{installed:true,version:'2.1.310 (Claude Code)'}}};
  const view=render(<ManagedHostAction machine={host} provider="claude" target={claudeTarget}/>);
  expect(screen.getByText('当前版本高于托管目标')).toBeTruthy();expect(screen.queryByText('当前系统暂不支持')).toBeNull();expect(screen.queryByRole('button')).toBeNull();
- view.rerender(<ManagedHostAction machine={{...host,agentRuntimes:{claude:{installed:true,version:'2.1.308 (Claude Code)'}},discovery:{...host.discovery,providerRuntimePolicy:{revision:4,mode:'pinned'}}}} provider="claude" target={claudeTarget}/>);
+ view.rerender(<ManagedHostAction machine={{...host,agentRuntimes:{claude:{installed:true,version:'2.1.308 (Claude Code)'}},discovery:{...host.discovery,providerRuntimePolicy:{revision:4,mode:'pinned',current:{version:'2.1.308',sha256:'b'.repeat(64),size:100,platform:'linux-x64',sdkVersion:'0.3.285',checkedAt:target.checkedAt}}}}} provider="claude" target={claudeTarget}/>);
  expect(screen.getByText('已是托管目标')).toBeTruthy();
 });
 it('Claude source changes are confirmed inline, bind the policy revision and wait for its heartbeat',async()=>{
@@ -75,4 +75,24 @@ it('Claude source changes are confirmed inline, bind the policy revision and wai
  fireEvent.click(screen.getByRole('button',{name:'确认'}));
  await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith(machine.id,{action:'configure',provider:'claude',mode:'pinned',expectedRevision:4},expect.any(String)));
  await screen.findByText('请求已提交，等待主机上报进度');
+});
+
+it.each(['not_installed','login_required','unverified'] as const)('blocks first takeover for %s and offers an inline read-only recheck',async state=>{
+ const host:Machine={...machine,discovery:{...machine.discovery!,managedGrokVersion:undefined,managedEligibilitySupport:true,managedEligibility:{grok:{state,checkedAt:new Date().toISOString()}}},agentRuntimes:{grok:{...machine.agentRuntimes!.grok!,installed:state!=='not_installed',version:'1.0.62'}}};
+ render(<ManagedHostAction machine={host} provider="grok" target={target}/>);
+ expect(screen.queryByRole('button',{name:/启用托管/})).toBeNull();expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'重新检查'}));
+ await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith(machine.id,{action:'check'},expect.any(String)));
+});
+it('first takeover requires fresh authorization and an upgraded connection service',()=>{
+ const host={...machine,discovery:{...machine.discovery!,managedGrokVersion:undefined}};
+ const r=render(<ManagedHostAction machine={host} provider="grok" target={target}/>);expect(screen.getByText('请先更新连接服务以检查安装与授权')).toBeTruthy();
+ r.rerender(<ManagedHostAction machine={{...host,discovery:{...host.discovery!,managedEligibilitySupport:true,managedEligibility:{grok:{state:'ready',checkedAt:'2020-01-01T00:00:00Z'}}}}} provider="grok" target={target}/>);
+ expect(screen.queryByRole('button',{name:/启用托管/})).toBeNull();
+ r.rerender(<ManagedHostAction machine={{...host,discovery:{...host.discovery!,managedEligibilitySupport:true,managedEligibility:{grok:{state:'ready',checkedAt:new Date().toISOString()}}}}} provider="grok" target={target}/>);
+ expect(screen.getByRole('button',{name:'启用托管 1.0.70'})).toBeTruthy();
+});
+it('existing managed hosts can upgrade without native installation or fresh first-takeover proof',()=>{
+ render(<ManagedHostAction machine={{...machine,agentRuntimes:{grok:{...machine.agentRuntimes!.grok!,installed:false}},discovery:{...machine.discovery!,managedEligibilitySupport:true,managedEligibility:{grok:{state:'unverified',checkedAt:new Date().toISOString()}}}}} provider="grok" target={target}/>);
+ expect(screen.getByRole('button',{name:'更新到 1.0.70'})).toBeTruthy();expect(screen.queryByText('重新检查')).toBeNull();
 });

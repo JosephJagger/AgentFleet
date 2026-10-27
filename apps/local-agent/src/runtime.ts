@@ -402,7 +402,7 @@ export class AgentRuntime {
     ];
     const readiness = checks.some(item => item.state === "failed") ? "action_required"
       : visibleState !== "ready" ? "checking" : this.isWritable() ? "ready" : "read_only";
-    return { ...this.discoveryStatus, state: visibleState, backgroundSync, providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true, agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {},
+    return { ...this.discoveryStatus, state: visibleState, backgroundSync, providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {},
       ...(serverUnavailable ? { error: "Codex 会话服务启动失败，项目和会话扫描暂不可用。连接服务会自动重试。" } : {}),
       syncMode: this.catalogWatcher?.mode ?? "fallback", reconcileIntervalSeconds: CATALOG_RECONCILE_MS / 1000,
       ...(completed ? { scannedCount: completed.scannedCount, discoveredCount: completed.discoveredCount, lastSuccessfulAt: completed.lastSuccessfulAt } : {}),
@@ -564,6 +564,7 @@ export class AgentRuntime {
   async manageProviderRuntime(value: unknown, operationId: string): Promise<Record<string, unknown>> {
     const request=parseProviderRuntimeRequest(value);
     if(request.action==='install-managed'||request.action==='cancel-managed'||request.action==='rollback-managed'){await this.managedProviderUpdates.request(request,operationId);this.notifyRegistryChanged();return {accepted:true,managedUpdates:this.managedProviderUpdates.status()};}
+    if(request.action==='check')await this.managedProviderUpdates.refreshEligibility();
     await this.providerRuntimeManager.operate(value, operationId);
     return this.providerInventory();
   }
@@ -578,6 +579,7 @@ export class AgentRuntime {
     return report;
   }
   async automaticProviderUpdate(): Promise<void> {
+    await this.managedProviderUpdates.refreshEligibility();
     await this.providerRuntimeManager.automatic();
   }
 
@@ -722,6 +724,7 @@ export class AgentRuntime {
       }
     }
     await this.managedProviderUpdates.start();
+    void this.managedProviderUpdates.refreshEligibility();
   }
 
   setCallbacks(callbacks: RuntimeCallbacks): void {
@@ -807,7 +810,7 @@ export class AgentRuntime {
       },
       resumeStreams,
       capacity: this.capacityState(),
-      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true, agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       projects: this.projectSummaries(),
       sessions: [...Object.values(state.managedThreads).flatMap((thread) => {
@@ -907,7 +910,7 @@ export class AgentRuntime {
       activeTurns: Object.values(state.managedThreads).filter((thread) => thread.activeTurnId !== undefined).length,
       readOnly: !this.isWritable(),
       readOnlyReasons: this.readOnlyReasons(),
-      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true, agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       ...(this.support.codexProfile ? { codexProfile: this.support.codexProfile } : {}),
       ...(this.isWritable() ? {} : { unreachableReason: this.readOnlyReasons().join("; ") }),

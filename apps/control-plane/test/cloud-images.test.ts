@@ -234,6 +234,8 @@ test('provider runtime operations use auth/CSRF, workspace scope, strict argumen
  const {MaintenanceService}=await import('../src/maintenance.js');const service=new MaintenanceService(db);
  assert.deepEqual(service.offers('image-a')[0]?.recoveryTarget,{action:'check'});
  service.result('image-a',first.json().operation.operationId,'succeeded',{checkedAt:new Date().toISOString(),providers:{}},undefined);
+ assert.equal((await start({...payload,clientMutationId:'unverified-request',nativeRequest:{action:'configure',provider:'claude',mode:'auto',expectedRevision:0} as never})).statusCode,409);
+ db.run("UPDATE machines SET discovery_json=? WHERE machine_id='image-a'",JSON.stringify({managedEligibilitySupport:true,managedEligibility:{claude:{state:'ready',checkedAt:new Date().toISOString()}}}));
  const next=await start({...payload,clientMutationId:'second-request',nativeRequest:{action:'configure',provider:'claude',mode:'auto',expectedRevision:0} as never});assert.equal(next.statusCode,202,next.body);
  assert.ok(db.get("SELECT 1 FROM audit_entries WHERE action='machine.operation.request' AND machine_id='image-a'"));
 });

@@ -12,14 +12,14 @@ import type {ManagedRelease,ManagedPhase} from '../src/managed-provider.js';
 import {grokBinary} from '../src/managed-grok.js';
 const release:ManagedRelease={provider:'grok',version:'1.0.70',id:'a'.repeat(64),checkedAt:new Date().toISOString(),artifacts:{'linux-x64':{size:100,integrity:'sha512-'+Buffer.alloc(64).toString('base64')}}};
 async function fixture(t:test.TestContext){
- const dir=await mkdtemp(join(tmpdir(),'managed-jobs-')),store=new StateStore(dir);await store.initialize();let installs=0,activations=0,fail=false;let target=release;
+ const dir=await mkdtemp(join(tmpdir(),'managed-jobs-')),store=new StateStore(dir);await store.initialize();let installs=0,activations=0,fail=false;let target=release;let installed=true,auth:'ready'|'login_required'|'unverified'='ready';
  const manager=new ManagedProviderUpdates(store,new ProviderRuntimeManager(store,async()=>{}),async()=>target,async()=>{activations++;if(fail)throw new Error('activation failed');},()=>{},{
-  prepareGrok:async(_root,r)=>{installs++;return {release:r,sha256:'b'.repeat(64)};},verifyGrok:async()=>'/managed/grok',probeGrok:async()=>{},detectAcp:async()=>null,
+  prepareGrok:async(_root,r)=>{installs++;return {release:r,sha256:'b'.repeat(64)};},verifyGrok:async()=>'/managed/grok',probeGrok:async()=>{},detectAcp:async()=>installed?{executable:'/host/grok',prefix:[],version:'1.0.62'}:null,authorizeGrok:async()=>auth,
  });
  t.after(async()=>{await manager.stop();store.close();await rm(dir,{recursive:true,force:true});});
  const wait=async(phase:ManagedPhase)=>{for(let i=0;i<100;i++){if(store.snapshot().managedUpdates?.grok?.phase===phase)return;await new Promise(r=>setTimeout(r,10));}assert.equal(store.snapshot().managedUpdates?.grok?.phase,phase);};
  const install=()=>manager.request({action:'install-managed',provider:'grok',releaseId:target.id,expectedRevision:store.snapshot().managedUpdates?.grok?.revision??0},'op');
- return {store,manager,wait,install,counts:()=>({installs,activations}),change:()=>{target={...release,version:'1.0.71',id:'c'.repeat(64)};},fail:()=>{fail=true;}};
+ return {setInstalled:(v:boolean)=>{installed=v;},setAuth:(v:typeof auth)=>{auth=v;},store,manager,wait,install,counts:()=>({installs,activations}),change:()=>{target={...release,version:'1.0.71',id:'c'.repeat(64)};},fail:()=>{fail=true;}};
 }
 test('manual update reports success only after activation; stale confirmation does not install',async t=>{
  const f=await fixture(t);await assert.rejects(f.manager.request({action:'install-managed',provider:'grok',releaseId:'e'.repeat(64),expectedRevision:0},'op'));
@@ -56,4 +56,13 @@ test('package extraction handles the official Brotli wrapper and refuses links o
  const entry=(type='0')=>{const header=Buffer.alloc(512);header.write('package/bin/grok.br');header.write(compressed.length.toString(8).padStart(11,'0')+'\0',124);header[156]=type.charCodeAt(0);header.fill(32,148,156);const sum=header.reduce((a,b)=>a+b,0);header.write(sum.toString(8).padStart(6,'0')+'\0 ',148);return Buffer.concat([header,compressed,Buffer.alloc(512-compressed.length%512)]);};
  const extract=(tar:Buffer)=>{const archive=gzipSync(tar);return grokBinary(archive,'sha512-'+createHash('sha512').update(archive).digest('base64'),4096);};
  assert.deepEqual(extract(entry()),payload);assert.throws(()=>extract(entry('2')),/Invalid package binary/);assert.throws(()=>extract(Buffer.concat([entry(),entry()])),/Invalid package binary/);
+});
+
+for(const state of ['not_installed','login_required','unverified'] as const)test(`first Grok takeover refuses ${state} before accepting or downloading`,async t=>{
+ const f=await fixture(t);await f.manager.refreshEligibility();if(state==='not_installed')f.setInstalled(false);else f.setAuth(state);
+ await assert.rejects(f.install());assert.deepEqual(f.counts(),{installs:0,activations:0});assert.equal(f.store.snapshot().managedUpdates?.grok,undefined);
+});
+test('Grok rechecks login after waiting for idle; existing managed upgrades survive removal of native CLI',async t=>{
+ const f=await fixture(t);await f.store.setPanelVoiceRuntime({voiceId:'voice'});await f.install();await f.wait('waiting_idle');f.setAuth('login_required');await f.store.setPanelVoiceRuntime(undefined);await f.manager.start();await f.wait('failed');assert.equal(f.counts().activations,0);
+ const existing=await fixture(t);await existing.install();await existing.wait('succeeded');existing.setInstalled(false);existing.setAuth('unverified');existing.change();await existing.install();await existing.wait('succeeded');assert.equal(existing.store.snapshot().managedGrok?.current.release.version,'1.0.71');
 });

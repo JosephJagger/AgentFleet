@@ -1,3 +1,5 @@
+import {authorizeGrok,requireManagedEligibility} from './provider-authorization.js';
+import type {ManagedEligibility} from './managed-provider.js';
 import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -11,16 +13,32 @@ import {prepareGrok,probeGrok,verifyGrok,type GrokInstallation} from './managed-
 
 export interface ManagedJob extends ManagedUpdate {release:ManagedRelease;createdAt:string;rollback?:boolean;policyRevision?:number;prepared?:GrokInstallation;}
 const pending=(phase:ManagedPhase)=>['accepted','downloading','verifying','waiting_idle','activating'].includes(phase);
-const defaults={prepareGrok,probeGrok,verifyGrok,detectAcp};
+const defaults={prepareGrok,probeGrok,verifyGrok,detectAcp,authorizeGrok};
 /** Durable manual intent. Idle waits resume; interrupted activation never reports success or silently replays. */
 export class ManagedProviderUpdates {
   private readonly active=new Map<ManagedProvider,{controller:AbortController;work:Promise<void>}>();
   private readonly submitting=new Set<ManagedProvider>();
   private timer:ReturnType<typeof setInterval>|undefined;
   private stopped=false;
+  private grokEligibility:ManagedEligibility|undefined;
+  private eligibilityWork:Promise<void>|undefined;
+  private readonly eligibilityAbort=new AbortController();
   constructor(private readonly store:StateStore,private readonly claude:ProviderRuntimeManager,
     private readonly target:(provider:ManagedProvider)=>Promise<ManagedRelease>,private readonly activateGrok:()=>Promise<void>,
     private readonly changed:()=>void,private readonly deps=defaults) {}
+  eligibility(){return {claude:this.claude.eligibility,grok:this.grokEligibility};}
+  async checkGrokEligibility(signal?:AbortSignal):Promise<ManagedEligibility> {
+    let state:ManagedEligibility['state']='unverified';
+    if(this.store.snapshot().managedGrok?.current)state='managed';
+    else try {const found=await this.deps.detectAcp('grok');state=found?await this.deps.authorizeGrok(found,signal?AbortSignal.any([signal,this.eligibilityAbort.signal]):this.eligibilityAbort.signal):'not_installed';}catch{}
+    const value=this.grokEligibility={state,checkedAt:new Date().toISOString()};this.changed();return value;
+  }
+  async refreshEligibility(){
+    if(this.stopped)return;
+    if(this.eligibilityWork)return this.eligibilityWork;
+    this.eligibilityWork=Promise.allSettled([this.claude.checkEligibility(this.eligibilityAbort.signal),this.checkGrokEligibility()]).then(()=>{this.changed();}).finally(()=>{this.eligibilityWork=undefined;});
+    return this.eligibilityWork;
+  }
   status(){return Object.fromEntries(Object.entries(this.store.snapshot().managedUpdates??{}).map(([id,job])=>{
     const {release:_,prepared:__,createdAt:___,rollback:____,policyRevision:_____,...status}=job;return [id,status];
   }));}
@@ -31,13 +49,14 @@ export class ManagedProviderUpdates {
     }});
     this.timer=setInterval(()=>this.tick(),5000);this.timer.unref();this.tick();
   }
-  async stop(){this.stopped=true;if(this.timer)clearInterval(this.timer);for(const a of this.active.values())a.controller.abort();await Promise.allSettled([...this.active.values()].map(a=>a.work));}
+  async stop(){this.stopped=true;this.eligibilityAbort.abort();if(this.timer)clearInterval(this.timer);for(const a of this.active.values())a.controller.abort();await Promise.allSettled([this.eligibilityWork,...[...this.active.values()].map(a=>a.work)]);}
   async detectGrok():Promise<AcpExecutable|null>{
     const installed=this.store.snapshot().managedGrok?.current;
     if(!installed)return this.deps.detectAcp('grok');
     return {executable:await this.deps.verifyGrok(this.store.dataDir,installed),prefix:[],version:installed.release.version};
   }
   async request(request:ManagedProviderRequest,operationId:string) {
+    this.eligibilityAbort.signal.throwIfAborted();
     const provider=request.provider;
     if(this.submitting.has(provider))throw new AgentError('PROVIDER_UPDATE_BUSY','更新请求正在提交');
     this.submitting.add(provider);
@@ -50,15 +69,16 @@ export class ManagedProviderUpdates {
         await this.patch(provider,{phase:'cancelled',revision:previous.revision+1,error:''});return;
       }
       if(this.active.has(provider)||(previous&&pending(previous.phase)))throw new AgentError('PROVIDER_UPDATE_BUSY','此智能体已有更新正在进行');
+      if(request.action==='install-managed'){if(provider==='claude')await this.claude.requireEligibility();else requireManagedEligibility(await this.checkGrokEligibility());this.changed();}
       const rollback=request.action==='rollback-managed';
       const retained=rollback?this.store.snapshot().managedGrok?.previous:undefined;
       if(rollback&&!retained)throw new AgentError('PROVIDER_NO_ROLLBACK','没有保留的 Grok 托管版本');
       const release=retained?.release??await this.target(provider);
       if(request.action==='install-managed'&&release.id!==request.releaseId)throw new AgentError('PROVIDER_TARGET_CHANGED','托管目标已变化，请重新确认');
-      const at=new Date().toISOString();
-      await this.store.update(s=>{s.managedUpdates??={};s.managedUpdates[provider]={provider,release,releaseId:release.id,targetVersion:release.version,revision:request.expectedRevision+1,operationId,phase:'accepted',createdAt:at,updatedAt:at,rollback,policyRevision:this.claude.state().revision,...(retained?{prepared:retained}:{})};});
+      this.eligibilityAbort.signal.throwIfAborted();const at=new Date().toISOString();
+      await this.store.update(s=>{this.eligibilityAbort.signal.throwIfAborted();s.managedUpdates??={};s.managedUpdates[provider]={provider,release,releaseId:release.id,targetVersion:release.version,revision:request.expectedRevision+1,operationId,phase:'accepted',createdAt:at,updatedAt:at,rollback,policyRevision:this.claude.state().revision,...(retained?{prepared:retained}:{})};});
       this.changed();this.launch(provider);
-    } finally {this.submitting.delete(provider);}
+    } finally {this.submitting.delete(provider);this.changed();}
   }
   private async pruneGrok(){
     const state=this.store.snapshot();const keep=new Set([state.managedGrok?.current,state.managedGrok?.previous,state.managedUpdates?.grok?.prepared].flatMap(i=>i?[`${i.release.version}-${i.release.id}`]:[]));
@@ -88,7 +108,8 @@ export class ManagedProviderUpdates {
         });
         if(this.claude.state().current?.version!==job.targetVersion||this.claude.state().mode==='host')throw new AgentError('PROVIDER_VERSION_MISMATCH','当前 Claude 版本尚未切换到目标');
       } else {
-        const prior=this.store.snapshot().managedGrok;
+        if(!job.rollback)requireManagedEligibility(await this.checkGrokEligibility(signal));
+        signal.throwIfAborted();const prior=this.store.snapshot().managedGrok;
         const installed=prior?.current?.release.version??(await this.deps.detectAcp('grok'))?.version?.match(/\d+\.\d+\.\d+/)?.[0];
         if(!job.rollback&&installed&&newerVersion(installed,job.targetVersion))throw new AgentError('PROVIDER_HOST_NEWER','当前 Grok 比托管目标更新，未执行降级');
         let prepared=job.prepared;
@@ -97,6 +118,7 @@ export class ManagedProviderUpdates {
         await this.patch(provider,{phase:'verifying'});
         const binary=await this.deps.verifyGrok(this.store.dataDir,prepared);
         await this.deps.probeGrok(binary,job.targetVersion,signal);await assertCurrent();
+        if(!job.rollback)requireManagedEligibility(await this.checkGrokEligibility(signal));signal.throwIfAborted();
         admitted=await this.store.tryBeginUpdate(job.operationId);
         if(!admitted){await this.patch(provider,{phase:'waiting_idle'});return;}
         signal.throwIfAborted();await this.patch(provider,{phase:'activating'});

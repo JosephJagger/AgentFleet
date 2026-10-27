@@ -1,3 +1,5 @@
+import {authorizeClaude,requireManagedEligibility} from './provider-authorization.js';
+import type {ManagedEligibility} from './managed-provider.js';
 import type { ManagedRelease, ManagedPhase } from './managed-provider.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
@@ -32,7 +34,7 @@ async function npmLatest(pkg:string,signal?:AbortSignal):Promise<string> {
 }
 const MAX_ATTEMPTS_PER_VERSION=3,TRANSIENT_RETRY_MS=30*60_000,BLOCKED_RETRY_MS=6*60*60_000;
 /** Outcomes that are not a failure of the target release and must not mark the channel blocked. */
-const PASSIVE_CODES=new Set(['PROVIDER_HOST_BUSY','PROVIDER_POLICY_CONFLICT','PROVIDER_HOST_NEWER','PROVIDER_RETRY_LIMIT']);
+const PASSIVE_CODES=new Set(['PROVIDER_NOT_INSTALLED','PROVIDER_LOGIN_REQUIRED','PROVIDER_AUTH_UNVERIFIED','PROVIDER_HOST_BUSY','PROVIDER_POLICY_CONFLICT','PROVIDER_HOST_NEWER','PROVIDER_RETRY_LIMIT']);
 const isTransient=(e:unknown)=>e instanceof AgentError?e.code==='PROVIDER_RELEASE_UNAVAILABLE':e instanceof TypeError||(e instanceof Error&&(e.name==='TimeoutError'||e.name==='AbortError'));
 const stableVersion = (s:unknown):s is string => typeof s === 'string' && /^\d+\.\d+\.\d+$/.test(s);
 const versionOf = (s:string|null|undefined) => s?.match(/\d+\.\d+\.\d+/)?.[0];
@@ -108,9 +110,18 @@ export class ProviderRuntimeManager {
   private retryAfter=0;
   private failure?:{version:string;count:number};
   private prunedOnce=false;
+  eligibility:ManagedEligibility|undefined;
   private latestAt=0;
-  constructor(private readonly store:StateStore,private readonly activate:()=>Promise<void>,private readonly deps:typeof defaults & {permissionModes?:typeof detectClaudePermissionModes}=defaults,private readonly now:()=>number=Date.now){}
+  constructor(private readonly store:StateStore,private readonly activate:()=>Promise<void>,private readonly deps:typeof defaults & {permissionModes?:typeof detectClaudePermissionModes;authorize?:typeof authorizeClaude}=defaults,private readonly now:()=>number=Date.now){}
   state():ProviderRuntimeState {return this.store.snapshot().providerRuntimeState??{revision:0,mode:'host'};}
+  async checkEligibility(signal?:AbortSignal):Promise<ManagedEligibility> {
+    let state:ManagedEligibility['state']='unverified';
+    const policy=this.state();
+    if(policy.mode!=='host'&&policy.current)state='managed';
+    else try {const host=await this.deps.host();state=!host.installed||!host.path?'not_installed':await (this.deps.authorize??authorizeClaude)(host.path,signal?AbortSignal.any([signal,this.controller.signal]):this.controller.signal);}catch{}
+    return this.eligibility={state,checkedAt:new Date().toISOString()};
+  }
+  async requireEligibility(signal?:AbortSignal){const value=await this.checkEligibility(signal);signal?.throwIfAborted();this.controller.signal.throwIfAborted();requireManagedEligibility(value);}
   private file(r:ManagedProviderRelease){if(!stableVersion(r.version)||! /^[a-f0-9]{64}$/.test(r.sha256)||r.platform!==claudePlatform())throw new Error('Invalid managed runtime identity');return join(this.store.dataDir,'provider-runtimes','claude',`${r.version}-${r.sha256}`,process.platform==='win32'?'claude.exe':'claude');}
   private async verify(r:ManagedProviderRelease) {const file=this.file(r),s=await stat(file);const key=`${s.size}:${s.mtimeMs}:${s.ctimeMs}`;if(s.size!==r.size)throw new Error('Managed runtime size mismatch');if(this.verified.get(file)!==key){if(await digest(file)!==r.sha256)throw new Error('Managed runtime checksum mismatch');this.verified.set(file,key);}return file;}
   async detectClaude():ReturnType<typeof detectClaude> {
@@ -165,6 +176,7 @@ export class ProviderRuntimeManager {
         request={action:'configure',provider:'claude',mode:state.mode,expectedRevision:request.expectedRevision};userConfirmedUpdate=true;
       }
       if(request.action==='check') {
+        await this.checkEligibility();
         try {const version=await stable();await this.save({stableVersion:version,checkedAt:new Date().toISOString()});await this.deps.manifest(version,claudePlatform(),signal);await this.save({error:'',phase:state.mode==='host'?'idle':'ready'});}
 
         catch(e){await this.save(isTransient(e)?{error:'官方版本服务暂时不可用，将自动重试'}:{phase:'blocked',error:e instanceof AgentError?e.message:'官方版本检查失败，保留当前版本'});}
@@ -192,6 +204,8 @@ export class ProviderRuntimeManager {
         await this.commit({...state,revision:state.revision+1,mode:'pinned',current:previous,...(state.current?{previous:state.current}:{}),phase:'ready',error:'',failedVersion:''},state);
         return {policy:this.state()};
       }
+      if(state.mode==='host'||!state.current)await this.requireEligibility(signal);
+      signal.throwIfAborted();
       if(request.mode==='pinned' && state.mode!=='host' && state.current && !userConfirmedUpdate) {
         await this.verify(state.current);
         if(state.current.sdkVersion!==CLAUDE_SDK_VERSION){
@@ -221,7 +235,8 @@ export class ProviderRuntimeManager {
         if(reviewed.sha256!==state.current.sha256)throw new AgentError('PROVIDER_TARGET_CHANGED','同版本官方文件摘要已变化，请核验后重试');
         await this.deps.probe(this.file(state.current),state.current.version,signal);
         await target?.assertCurrent();signal.throwIfAborted();
-        admitted=await this.store.tryBeginUpdate(operationId);if(!admitted)throw new AgentError('PROVIDER_HOST_BUSY','任务或通话进行中，暂未切换');
+        if(state.mode==='host')await this.requireEligibility(signal);
+        signal.throwIfAborted();admitted=await this.store.tryBeginUpdate(operationId);if(!admitted)throw new AgentError('PROVIDER_HOST_BUSY','任务或通话进行中，暂未切换');
         await target?.phase('activating');signal.throwIfAborted();
         await this.commit({...state,revision:state.revision+1,mode:request.mode,current:reviewed,phase:'ready',checkedAt:new Date().toISOString(),stableVersion:version,error:''},state,signal);return {policy:this.state()};
       }
@@ -232,7 +247,8 @@ export class ProviderRuntimeManager {
       await this.save({step:'verifying',progress:undefined});
       await target?.phase('verifying');await this.deps.probe(file,version,signal);await target?.assertCurrent();signal.throwIfAborted();
       if(await stable()!==version)throw new AgentError('PROVIDER_TARGET_CHANGED','官方稳定目标已变化，请重新检查');
-      admitted=await this.store.tryBeginUpdate(operationId);
+      if(state.mode==='host'||!state.current)await this.requireEligibility(signal);
+      signal.throwIfAborted();admitted=await this.store.tryBeginUpdate(operationId);
       if(!admitted){await this.save({phase:'waiting_idle'});throw new AgentError('PROVIDER_HOST_BUSY','目标已下载并验证，当前任务或通话结束后可再次应用');}
       await target?.phase('activating');signal.throwIfAborted();
       state=this.state();

@@ -30,11 +30,11 @@ it('shows all providers, distinguishes handshake from full compatibility, never 
  await screen.findByText('2.1.290');for(const name of ['Codex','Claude Code','Cursor','Qwen Code','Kimi Code','CodeBuddy Code','Grok Build'])expect(screen.getByText(name)).toBeTruthy();
  await screen.findByText('协议检查通过');expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
 });
-it('explicit save carries host, policy and conflict revision; old hosts cannot mutate',async()=>{
+it('old hosts cannot enable managed mode without installation and authorization checks',async()=>{
  vi.mocked(api.hostOperations).mockResolvedValue([report]);vi.mocked(api.providerRuntimeOperation).mockResolvedValue({...report,id:'saved'});
  const r=render(<HostProviderVersions machine={machine}/>);await screen.findByText('协议检查通过');
  fireEvent.change(screen.getByLabelText('Claude Code 更新方式'),{target:{value:'auto'}});fireEvent.click(screen.getByText('应用更新方式'));
- await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith('test-host',{action:'configure',provider:'claude',mode:'auto',expectedRevision:3},expect.any(String)));
+ expect((screen.getByText('应用更新方式') as HTMLButtonElement).disabled).toBe(true);expect(api.providerRuntimeOperation).not.toHaveBeenCalled();
  r.unmount();render(<HostProviderVersions machine={{...machine,maintenanceCapabilities:[]}}/>);expect((screen.getByText('检查智能体版本').closest('button') as HTMLButtonElement).disabled).toBe(true);expect(screen.queryByText('应用更新方式')).toBeNull();
 });
 it('unknown mutation result blocks resubmission and newer heartbeat policy wins over old report',async()=>{
@@ -86,7 +86,7 @@ it('new managed hosts use the published Claude target inline and do not retain t
  const target={id:'c'.repeat(64),provider:'claude' as const,version:'2.1.308',checkedAt:'2026-10-26T00:00:00Z',artifacts:{'linux-x64':{integrity:'a'.repeat(64),size:10}}};
  vi.mocked(api.managedReleases).mockResolvedValue({configured:true,channels:[{provider:'claude',revision:2,phase:'ready',target,history:[]}]});
  vi.mocked(api.providerRuntimeOperation).mockResolvedValue({...report,id:'managed',result:{accepted:true}});
- render(<HostProviderVersions machine={{...machine,os:'linux 26.04',discovery:{state:'ready',discoveredProjects:0,discoveredSessions:0,scannedPages:0,scannedCount:0,managedProviderSupport:true,providerRuntimePolicy:{revision:3,mode:'host'}}}}/>);
+ render(<HostProviderVersions machine={{...machine,os:'linux 26.04',discovery:{state:'ready',discoveredProjects:0,discoveredSessions:0,scannedPages:0,scannedCount:0,managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:{claude:{state:'ready',checkedAt:new Date().toISOString()}},providerRuntimePolicy:{revision:3,mode:'host'}}}}/>);
  fireEvent.click(await screen.findByRole('button',{name:'启用托管 2.1.308'}));
  await waitFor(()=>expect(api.providerRuntimeOperation).toHaveBeenCalledWith(machine.id,{action:'install-managed',provider:'claude',releaseId:target.id,expectedRevision:0},expect.any(String)));
  expect(screen.queryByText('Claude Code 托管设置')).toBeNull();expect(screen.queryByText('应用更新方式')).toBeNull();expect(screen.queryByText(/官方稳定版：2.1.292/)).toBeNull();

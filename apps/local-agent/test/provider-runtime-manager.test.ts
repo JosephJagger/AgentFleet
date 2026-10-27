@@ -11,18 +11,19 @@ import {Readable,PassThrough} from 'node:stream';
 import {parseProviderRuntimeRequest} from '../src/provider-runtime-policy.js';
 async function fixture(t:test.TestContext) {
  const dir=await mkdtemp(join(tmpdir(),'provider-runtime-test-'));const store=new StateStore(dir);await store.initialize();t.after(async()=>{store.close();await rm(dir,{recursive:true,force:true});});
+ let installed=true,auth:'ready'|'login_required'|'unverified'='ready';let revokeOnProbe=false;
  let version='2.1.292',downloads=0,probes=0,activations=0,failProbe=false,failActivate=false,hostVersion='2.1.290 (Claude Code)',clock=Date.now(),stableError:Error|undefined,manifestError:Error|undefined;const latestVersions:Record<string,string>={};const files:string[]=[];const permissionPaths:string[]=[];
  const manager=new ProviderRuntimeManager(store,async()=>{activations++;if(failActivate){failActivate=false;throw new Error('activation failed');}}, {
-  host:async()=>({installed:true,version:hostVersion,path:'/host/claude',permissionModes:['default']}),acp:async()=>null,
+  authorize:async()=>auth,host:async()=>({installed,version:hostVersion,path:'/host/claude',permissionModes:['default']}),acp:async()=>null,
   permissionModes:async path=>{permissionPaths.push(path);return ['default','auto','acceptEdits','dontAsk'];},
   latest:async(id)=>latestVersions[id]??null,
   stable:async()=>{if(stableError)throw stableError;return version;},
   manifest:async(v,p)=>{if(manifestError)throw manifestError;return {version:v,platform:p,sha256:createHash('sha256').update(v).digest('hex'),size:v.length,sdkVersion:CLAUDE_SDK_VERSION,checkedAt:new Date().toISOString()};},
   download:async(r,file,_signal,onProgress)=>{downloads++;files.push(file);await mkdir(dirname(file),{recursive:true});onProgress?.(r.size);await writeFile(file,r.version);},
-  probe:async()=>{probes++;if(failProbe)throw new Error('probe failed');}
+  probe:async()=>{probes++;if(revokeOnProbe)auth='login_required';if(failProbe)throw new Error('probe failed');}
  },()=>clock);
  const configure=(mode:'host'|'pinned'|'auto')=>manager.operate({action:'configure',provider:'claude',mode,expectedRevision:manager.state().revision},'op-update');
- return {store,manager,configure,files,permissionPaths,dir,setVersion:(v:string)=>{version=v;},setHost:(v:string)=>{hostVersion=v;},advance:(ms:number)=>{clock+=ms;},setLatest:(id:string,v:string)=>{latestVersions[id]=v;},setStableError:(e?:Error)=>{stableError=e;},setManifestError:(e?:Error)=>{manifestError=e;},failProbe:()=>{failProbe=true;},failActivate:()=>{failActivate=true;},counts:()=>({downloads,probes,activations})};
+ return {setInstalled:(v:boolean)=>{installed=v;},setAuth:(v:typeof auth)=>{auth=v;},revokeOnProbe:()=>{revokeOnProbe=true;},store,manager,configure,files,permissionPaths,dir,setVersion:(v:string)=>{version=v;},setHost:(v:string)=>{hostVersion=v;},advance:(ms:number)=>{clock+=ms;},setLatest:(id:string,v:string)=>{latestVersions[id]=v;},setStableError:(e?:Error)=>{stableError=e;},setManifestError:(e?:Error)=>{manifestError=e;},failProbe:()=>{failProbe=true;},failActivate:()=>{failActivate=true;},counts:()=>({downloads,probes,activations})};
 }
 test('request allowlist excludes shell paths, other providers, versions, unknown keys and missing conflict guard',()=>{
  for(const v of [{action:'check',url:'https://evil'}, {action:'configure',provider:'codex',mode:'auto',expectedRevision:0},{action:'configure',provider:'claude',mode:'auto'}, {action:'configure',provider:'claude',mode:'auto',expectedRevision:0,path:'/tmp/x'}])assert.throws(()=>parseProviderRuntimeRequest(v));
@@ -71,7 +72,7 @@ test('unchanged stable channel does not restart Claude, and persisted policy sur
 test('shutdown aborts a pending release check and never activates or leaves admission fenced',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'provider-shutdown-'));const store=new StateStore(dir);await store.initialize();t.after(async()=>{store.close();await rm(dir,{recursive:true,force:true});});
  let entered!:()=>void;const waiting=new Promise<void>(r=>{entered=r;});let activated=0;
- const manager=new ProviderRuntimeManager(store,async()=>{activated++;},{host:async()=>({installed:false,version:null}),acp:async()=>null,latest:async()=>null,
+ const manager=new ProviderRuntimeManager(store,async()=>{activated++;},{authorize:async()=>'ready',host:async()=>({installed:true,version:'2.1.290',path:'/host/claude'}),acp:async()=>null,latest:async()=>null,
   stable:async signal=>new Promise<string>((_resolve,reject)=>{signal!.addEventListener('abort',()=>reject(signal!.reason),{once:true});entered();}),
   manifest:async()=>{throw new Error('must not fetch');},download:async()=>{throw new Error('must not download');},probe:async()=>{throw new Error('must not probe');}});
  const work=manager.operate({action:'configure',provider:'claude',mode:'auto',expectedRevision:0},'shutdown-test');const rejected=assert.rejects(work);
@@ -152,7 +153,7 @@ test('a long download publishes its step and progress, and clears them when fini
  const store=new StateStore(dir);await store.initialize();t.after(()=>store.close());
  let release!:()=>void;const gate=new Promise<void>(r=>{release=r;});let midway:unknown;let fail=false;
  const manager=new ProviderRuntimeManager(store,async()=>undefined,{
-  host:async()=>({installed:true,version:'2.1.290 (Claude Code)',path:'/host/claude'}),acp:async()=>null,latest:async()=>null,stable:async()=>'2.1.292',
+  authorize:async()=>'ready',host:async()=>({installed:true,version:'2.1.290 (Claude Code)',path:'/host/claude'}),acp:async()=>null,latest:async()=>null,stable:async()=>'2.1.292',
   manifest:async(v,p)=>({version:v,platform:p,sha256:createHash('sha256').update(v).digest('hex'),size:v.length,sdkVersion:CLAUDE_SDK_VERSION,checkedAt:new Date().toISOString()}),
   download:async(r,file,_s,onProgress)=>{onProgress?.(3);await new Promise(resolve=>setTimeout(resolve,20));midway=store.snapshot().providerRuntimeState;await gate;if(fail)throw new Error('connection reset');await mkdir(dirname(file),{recursive:true});await writeFile(file,r.version);},
   probe:async()=>undefined});
@@ -194,4 +195,14 @@ test('explicit platform target binds the signed artifact, pins it and rechecks c
  const apply=()=>f.manager.operate({action:'configure',provider:'claude',mode:'pinned',expectedRevision:f.manager.state().revision},'platform-target','manual',{release,signal:new AbortController().signal,phase:async p=>{phases.push(p);},assertCurrent:async()=>{if(!current)throw new AgentError('PROVIDER_TARGET_CHANGED','target changed');}});
  await assert.rejects(apply(),/target changed/);assert.equal(f.manager.state().current?.version,'2.1.292');
  current=true;await apply();assert.equal(f.manager.state().current?.version,release.version);assert.equal(f.manager.state().mode,'pinned');assert.ok(phases.includes('activating'));
+});
+
+for(const state of ['not_installed','login_required','unverified'] as const)test(`first Claude takeover refuses ${state} before download on legacy and managed paths`,async t=>{
+ const f=await fixture(t);if(state==='not_installed')f.setInstalled(false);else f.setAuth(state);
+ await assert.rejects(f.configure('pinned'));await assert.rejects(f.configure('auto'));
+ assert.equal(f.counts().downloads,0);assert.equal(f.counts().activations,0);assert.equal(f.manager.state().mode,'host');assert.notEqual(f.manager.state().phase,'blocked');
+});
+test('Claude authorization is checked again before first activation; existing managed upgrades need no native install',async t=>{
+ const f=await fixture(t);f.revokeOnProbe();await assert.rejects(f.configure('pinned'),/登录授权/);assert.equal(f.counts().activations,0);assert.equal(f.manager.state().mode,'host');
+ const existing=await fixture(t);await existing.configure('auto');existing.setInstalled(false);existing.setAuth('unverified');existing.setVersion('2.1.293');await existing.configure('auto');assert.equal(existing.manager.state().current?.version,'2.1.293');
 });

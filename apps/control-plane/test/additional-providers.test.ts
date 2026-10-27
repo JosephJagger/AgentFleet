@@ -113,8 +113,9 @@ test('saved Grok settings inject only after the host can apply them',t=>{
 });
 
 test('provider policy heartbeat preserves newest revision without exposing arbitrary host fields',t=>{
- const f=fixture();t.after(()=>f.db.close());f.registry.updateDiscovery('m',{state:'ready',providerRuntimePolicy:{revision:7,mode:'auto',phase:'waiting_idle',stableVersion:'2.1.292',token:'secret',binaryPath:'/private/claude'}});
+ const f=fixture();t.after(()=>f.db.close());f.registry.updateDiscovery('m',{state:'ready',managedEligibilitySupport:true,managedEligibility:{claude:{state:'ready',checkedAt:'2026-10-01T00:00:00Z',email:'private',token:'secret'},grok:{state:'unknown',checkedAt:'2026-10-01T00:00:00Z'},evil:{state:'ready',checkedAt:'2026-10-01T00:00:00Z'}},providerRuntimePolicy:{revision:7,mode:'auto',phase:'waiting_idle',stableVersion:'2.1.292',token:'secret',binaryPath:'/private/claude'}});
  const discovery=JSON.parse(f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json);
+ assert.equal(discovery.managedEligibilitySupport,true);assert.deepEqual(discovery.managedEligibility,{claude:{state:'ready',checkedAt:'2026-10-01T00:00:00Z'}});
  assert.deepEqual(discovery.providerRuntimePolicy,{revision:7,mode:'auto',phase:'waiting_idle',stableVersion:'2.1.292'});
  f.registry.updateDiscovery('m',{state:'ready',providerRuntimePolicy:{revision:-1,mode:'evil'}});assert.equal(JSON.parse(f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='m'")!.discovery_json).providerRuntimePolicy,undefined);
 });

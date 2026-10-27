@@ -87,6 +87,8 @@ export interface Machine {
 
 export interface DiscoveryProgress {
   managedProviderSupport?: boolean;
+  managedEligibilitySupport?:boolean;
+  managedEligibility?:Partial<Record<import('./managed-provider').ManagedProvider,import('./managed-provider').ManagedEligibility>>;
   managedUpdates?: Partial<Record<import('./managed-provider').ManagedProvider,import('./managed-provider').ManagedUpdate>>;
   managedGrokVersion?: string;
   managedGrokPrevious?: string;
