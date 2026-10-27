@@ -7,6 +7,56 @@ import { AGENT_VERSION } from "../src/constants.js";
 import { installationStep, agentUpdateDiagnostics, recordUpdateProgress } from "../src/installation.js";
 import { readUpdateTransaction, writeUpdateTransaction, type UpdateTransaction } from "../src/supervisor.js";
 import { AgentAutoUpdater, eligibleForAgentRollout, retryableUpdateFailure } from "../src/updater.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+test("the downloaded installer admits a legacy claim history timeout without clearing its receipt, but blocks tasks", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "claim-installer-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  // Isolate the simulated home in a child; never touch the real service launcher.
+  const script = `
+    import assert from 'node:assert/strict';
+    import os from 'node:os';
+    import { syncBuiltinESMExports } from 'node:module';
+    import { mkdir, symlink } from 'node:fs/promises';
+    import { join } from 'node:path';
+    os.homedir = () => process.argv[1]; syncBuiltinESMExports();
+    const { StateStore } = await import(${JSON.stringify(new URL("../src/store.js", import.meta.url).href)});
+    const { installationStep } = await import(${JSON.stringify(new URL("../src/installation.js", import.meta.url).href)});
+    const { readUpdateTransaction } = await import(${JSON.stringify(new URL("../src/supervisor.js", import.meta.url).href)});
+    await mkdir(join(os.homedir(), '.local/bin'), { recursive: true });
+    const oldTarget = join(os.homedir(), '.local/share/agentfleet/bin/0.30.153/agentfleet');
+    await symlink(oldTarget, join(os.homedir(), '.local/bin/agentfleet'));
+    for (const variant of ['history-claim', 'unknown-task', 'active-task', 'voice']) {
+      const dataDir = join(os.homedir(), variant);
+      const store = new StateStore(dataDir); await store.initialize();
+      const error = { code: 'APP_SERVER_TIMEOUT', message: 'thread/items/list did not respond in time' };
+      const request = { attemptId: 'attempt', commandId: 'command', type: variant === 'unknown-task' ? 'turn.start' : 'thread.claim',
+        projectId: 'project', logicalSessionId: 'session', executionSegmentId: 'segment', contentEpoch: 1,
+        payload: {}, precondition: {}, transportGeneration: 1, appServerEpoch: 'old', expiresAt: new Date(Date.now() + 60000).toISOString() };
+      await store.claimCommand(request, 'hash');
+      await store.reserveProjectCommand({ projectId: 'project', commandId: 'command', attemptId: 'attempt', envelopeHash: 'hash', appServerEpoch: 'old' });
+      await store.transitionCommand('attempt', 'claimed', 'invoking');
+      await store.markCommandUnknown('attempt', error);
+      if (variant === 'active-task') await store.setManagedThread({ nativeThreadId: 'native', projectId: 'project', appServerEpoch: 'old', activeTurnId: 'running', createdAt: new Date().toISOString() });
+      if (variant === 'voice') await store.setPanelVoiceRuntime({ voiceId: 'voice', pid: process.pid });
+      if (variant === 'history-claim') {
+        await installationStep(dataDir, 'prepare');
+        assert.equal((await readUpdateTransaction(dataDir)).phase, 'preparing');
+        assert.ok(store.snapshot().maintenanceDrain);
+      } else {
+        await assert.rejects(installationStep(dataDir, 'prepare'), { code: 'UPDATE_HOST_BUSY' });
+        assert.equal(await readUpdateTransaction(dataDir), undefined);
+        assert.equal(store.snapshot().maintenanceDrain, undefined);
+      }
+      assert.equal(store.snapshot().commandJournal.command.state, 'unknown');
+      assert.deepEqual(store.snapshot().commandJournal.command.error, error);
+      assert.ok(store.snapshot().projectReservations.project);
+      store.close();
+    }
+  `;
+  await promisify(execFile)(process.execPath, ["--input-type=module", "-e", script, dir]);
+});
 
 test("an interrupted activation remains durable and cannot be mistaken for a healthy install", async t => {
   const dir = await mkdtemp(join(tmpdir(), "activation-state-")); t.after(() => rm(dir,{recursive:true,force:true}));
