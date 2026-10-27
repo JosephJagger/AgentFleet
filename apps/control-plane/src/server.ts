@@ -1,3 +1,4 @@
+import { SessionSearchService } from './session-search.js';
 import { ManagedChannels } from './managed-channels.js';
 import { generatedImageAccess } from "./generated-image-access.js";
 import { dismissPendingCommit } from "./pending-commits.js";
@@ -254,6 +255,7 @@ export async function buildControlPlane(
   const writingMemory = new WritingMemory(db);
   const writingHistory = new WritingHistory(db, writingMemory);
   const writingSemantic = new WritingSemantic();
+  const sessionSearch = new SessionSearchService(db, config.databaseUrl && !suppliedDatabase ? {url:config.databaseUrl,...(config.databaseSchema?{schema:config.databaseSchema}:{})}:undefined);
   const writingAI = new WritingAI(db, config.databasePath, writingMemory);
   const startupMachineReconciliation = registry.reconcileControlPlaneRestart();
   const coordination = new CoordinationService(db, config);
@@ -276,6 +278,7 @@ export async function buildControlPlane(
   });
   app.addHook("onReady", async () => resetRadar.start());
   app.addHook("onClose", async () => writingSemantic.close());
+  app.addHook("onClose", async () => sessionSearch.close());
   const agents = new Map<string, AgentSocketState>();
   const clients = new Map<string, Set<ClientSocketState>>();
   const nativeVoice = new NativeVoiceService(db,registry);
@@ -1415,6 +1418,20 @@ export async function buildControlPlane(
     if (agent?.reconciliationReady) for (const offer of machineMaintenance.offers(machineId)) sendJson(agent.socket, offer);
     reply.code(202);
     return { operation };
+  });
+
+  app.get('/api/session-search',{preHandler:authenticate},async(request,reply)=>{
+    const principal=request.principal as Principal;
+    limiter.check(`session-search:${principal.workspaceId}:${principal.userId}`,90,60000);
+    reply.header('cache-control','no-store');
+    const controller=new AbortController();
+    const disconnected=()=>{if(!reply.raw.writableFinished)controller.abort();};
+    reply.raw.on('close',disconnected);
+    try {
+      const result=await sessionSearch.search(principal,request.query as Record<string,unknown>,controller.signal);
+      auth.authenticateRequest(request);
+      return result;
+    } finally {reply.raw.off('close',disconnected);}
   });
 
   app.get("/api/sessions", { preHandler: authenticate }, async (request) => {
