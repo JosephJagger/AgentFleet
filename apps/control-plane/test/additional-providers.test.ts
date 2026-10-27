@@ -98,11 +98,14 @@ test('saved Grok settings inject only after the host can apply them',t=>{
  const idle=f.registry.createSession(f.principal,'m','grok',undefined,'grok-inactive-session');
  assert.throws(()=>preferences.write(f.principal,idle.logicalSessionId,{settings:{permissionMode:'default'},revision:0}),{code:'GROK_AGENT_UPDATE_REQUIRED'});
  f.db.run("UPDATE machines SET agent_version='0.30.117' WHERE machine_id='m'");
+ assert.throws(()=>preferences.write(f.principal,idle.logicalSessionId,{settings:{permissionMode:'default'},revision:0}),{code:'GROK_PERMISSION_UNAVAILABLE'});
+ f.db.run("UPDATE machines SET discovery_json=json_set(discovery_json,'$.agentRuntimes.grok.nativeManagement',json('true'),'$.agentRuntimes.grok.grokControls',json('{\"permissionSync\":true}')) WHERE machine_id='m'");
  assert.deepEqual(preferences.write(f.principal,idle.logicalSessionId,{settings:{permissionMode:'default'},revision:0}).settings,{permissionMode:'default'});
  const lease=f.coordination.acquireLease(f.principal,idle.logicalSessionId);
  f.coordination.createCommand(f.principal,idle.logicalSessionId,{type:'turn.start',controlLeaseId:lease.leaseId,clientMutationId:'start-grok-off',payload:{prompt:'Inactive settings stay native'},precondition:{executionSegmentId:idle.executionSegmentId,threadControlVersion:idle.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:idle.projectLeaseVersion}});
  const stored=(mutation:string)=>JSON.parse(f.db.get<{body_json:string}>('SELECT cc.body_json FROM commands c JOIN command_contents cc USING(command_id) WHERE c.client_mutation_id=?',mutation)!.body_json).settings;
- assert.equal(stored('start-grok-off'),undefined);
+ assert.deepEqual(stored('start-grok-off'),{permissionMode:'default'});
+ f.db.run("UPDATE machines SET discovery_json=json_set(discovery_json,'$.agentRuntimes.grok.nativeManagement',json('true'),'$.agentRuntimes.grok.grokControls',json('{\"planMode\":true,\"permissionSync\":true}')) WHERE machine_id='m'");
  const at=new Date().toISOString();
  f.db.run(`INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,created_at,last_reported_at,provider) VALUES('grok-2',?,'m','grok-2','grok-2','/fixture/grok-2','grok-2-hash',?,?,'grok')`,f.principal.workspaceId,at,at);
  const active=f.registry.createSession(f.principal,'m','grok-2',undefined,'grok-active-session');
@@ -274,4 +277,13 @@ test('extended Grok settings follow live capabilities and startup options lock a
  assert.throws(()=>prefs.write(f.principal,s.logicalSessionId,{revision:1,settings:{...settings,rules:'Replace previous'}}),{code:'GROK_STARTUP_LOCKED'});
  assert.equal(prefs.write(f.principal,s.logicalSessionId,{revision:1,settings:{...settings,contextWindow:256000}}).revision,2);
  assert.throws(()=>prefs.write(f.principal,s.logicalSessionId,{revision:1,settings}),{code:'SETTINGS_REVISION_CONFLICT'});
+});
+
+test('direct Grok turn payloads cannot bypass native plan or permission capability checks',t=>{
+ const f=fixture();t.after(()=>f.db.close());f.db.run("UPDATE machines SET agent_version='0.30.153' WHERE machine_id='m'");
+ const s=f.registry.createSession(f.principal,'m','grok',undefined,'grok-direct-controls');const lease=f.coordination.acquireLease(f.principal,s.logicalSessionId);
+ for(const [settings,code] of [[{mode:'plan'},'GROK_MODE_UNAVAILABLE'],[{permissionMode:'auto'},'GROK_PERMISSION_UNAVAILABLE'],[{permissionMode:'default'},'GROK_PERMISSION_UNAVAILABLE']] as const){
+  assert.throws(()=>f.coordination.createCommand(f.principal,s.logicalSessionId,{type:'turn.start',controlLeaseId:lease.leaseId,clientMutationId:code,payload:{prompt:'must not run',settings},precondition:{executionSegmentId:s.executionSegmentId,threadControlVersion:s.threadControlVersion,expectedActiveTurnId:null,projectLeaseVersion:s.projectLeaseVersion}}),{code});
+ }
+ assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,0);
 });

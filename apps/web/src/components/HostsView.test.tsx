@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { HostsView } from "./HostsView";
 import type { Machine } from "../lib/types";
 
-vi.mock("../lib/api", () => ({ api: { hostOperations: vi.fn().mockResolvedValue([]) } }));
+vi.mock("../lib/api", () => ({ api: { managedReleases: vi.fn().mockResolvedValue({configured:false,channels:[]}), hostOperations: vi.fn().mockResolvedValue([]) } }));
 vi.mock("./CodexSettingsPanel", () => ({ CodexSettingsPanel: () => <div>Settings</div> }));
 vi.mock("./PermissionPanel", () => ({ PermissionPanel: () => null }));
 vi.mock("./HostImageStorage", () => ({ HostImageStorage: () => null }));

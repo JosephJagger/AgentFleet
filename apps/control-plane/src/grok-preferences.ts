@@ -31,13 +31,24 @@ export class GrokPreferencesService {
     }
     return options;
   }
+  private observed(principal:Principal,id:string){
+    const row=this.db.get<{body_json:string;occurred_at:string}>(`SELECT b.body_json,e.occurred_at FROM durable_events e JOIN content_blobs b USING(payload_ref)
+      WHERE e.logical_session_id=? AND e.workspace_id=? AND e.type='turn.completed' AND e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      ORDER BY e.session_seq DESC LIMIT 1`,id,principal.workspaceId);
+    if(!row)return;
+    let value:unknown;try{value=JSON.parse(row.body_json)?.grokState;}catch{return;}
+    if(!value||typeof value!=='object')return;
+    const state=value as Record<string,unknown>;
+    return {observedAt:row.occurred_at,...(state.mode==='plan'||state.mode==='default'?{mode:state.mode}:{}),...(['default','always','auto'].includes(String(state.permissionRequested))&&state.permissionStatus==='requested'?{permissionRequested:String(state.permissionRequested),permissionStatus:'requested'}:{})};
+  }
   read(principal:Principal,id:string){
     const host=this.host(principal,id);
     const native=JSON.parse(host.discovery_json??"{}").agentRuntimes?.grok;
     const models=parseGrokModels(native?.models);
     const commands=Array.isArray(native?.commands)?native.commands.filter((c:unknown):c is {name:string;description:string;hint?:string}=>!!c&&typeof c==='object'&&typeof (c as {name:unknown}).name==='string'&&/^[a-z0-9-]{1,80}$/.test((c as {name:string}).name)).slice(0,80).map((c:{name:string;description:string;hint?:string})=>({name:c.name,description:String(c.description??'').slice(0,500),hint:String(c.hint??'').slice(0,200)})):[];
     const row=this.db.get<{settings_json:string;revision:number}>("SELECT settings_json,revision FROM grok_preferences WHERE workspace_id=? AND logical_session_id=?",principal.workspaceId,id);
-    return {...(native?.nativeManagement===true?{nativeManagement:true,commands,xSearchSupported:Array.isArray(native?.grokTools)&&['x_keyword_search','x_semantic_search'].every(k=>native.grokTools.includes(k)),canConfigureStartup:!host.has_native}:{}),settings:row?parseGrokSettings(JSON.parse(row.settings_json))??null:null,revision:row?.revision??0,options:mergeConfigOptions(this.options(principal,id),grokModelOptions(models)),...(models.length?{models}:{})};
+    const observed=this.observed(principal,id);
+    return {...(observed?{observed}:{}),...(native?.nativeManagement===true?{nativeManagement:true,commands,xSearchSupported:Array.isArray(native?.grokTools)&&['x_keyword_search','x_semantic_search'].every(k=>native.grokTools.includes(k)),canConfigureStartup:!host.has_native,grokControls:{planMode:native.grokControls?.planMode===true,permissionSync:native.grokControls?.permissionSync===true}}:{}),settings:row?parseGrokSettings(JSON.parse(row.settings_json))??null:null,revision:row?.revision??0,options:mergeConfigOptions(this.options(principal,id),grokModelOptions(models)),...(models.length?{models}:{})};
   }
   write(principal:Principal,id:string,input:Record<string,unknown>){
     return this.db.transaction(()=>{
@@ -55,6 +66,8 @@ export class GrokPreferencesService {
         invariant(option.values.includes(value)||value===stored,409,"GROK_OPTION_UNAVAILABLE","Select a value reported by the native session");
       };
       allow(settings.model,"model",current.settings?.model);
+      if(settings.mode!==undefined)invariant(current.grokControls?.planMode,409,'GROK_MODE_UNAVAILABLE','当前主机未提供可验证的 Grok 模式切换，请更新连接服务和原生运行时');
+      if(settings.permissionMode==='auto'||settings.permissionMode==='default')invariant(current.grokControls?.permissionSync,409,'GROK_PERMISSION_UNAVAILABLE','当前主机未验证恢复后的 Grok 权限同步，请更新原生运行时或沿用原生设置');
       for(const key of ['rules','systemPromptOverride','agentProfile'] as const){
         if(settings[key])invariant(current.nativeManagement,409,'GROK_AGENT_UPDATE_REQUIRED','Update the host before using native startup settings');
         if(host.has_native)invariant(settings[key]===current.settings?.[key],409,'GROK_STARTUP_LOCKED','Startup settings can only be changed before creating the native session');

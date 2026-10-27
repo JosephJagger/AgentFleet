@@ -5,5 +5,5 @@
   {"id":"kimi","name":"Kimi Code","transport":"acp","command":"kimi","args":["acp"]},
   {"id":"cursor","name":"Cursor","transport":"acp","command":"agent","args":["acp"]},
   {"id":"codebuddy","name":"CodeBuddy Code","transport":"acp","command":"codebuddy","args":["--acp"]},
-  {"id":"grok","name":"Grok Build","transport":"acp","command":"grok","args":["--no-auto-update","agent","stdio"]}
+  {"id":"grok","name":"Grok Build","transport":"acp","command":"grok","args":["--no-auto-update","agent","--no-leader","stdio"]}
 ]

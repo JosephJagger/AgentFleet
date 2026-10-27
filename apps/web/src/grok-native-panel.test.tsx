@@ -48,3 +48,22 @@ it('media URLs are revoked when the preview is removed',async()=>{
  await waitFor(()=>expect(document.querySelector('video')?.getAttribute('src')).toBe('blob:test-media'));expect(document.querySelector('video')?.autoplay).toBe(false);
  view.unmount();expect(revoke).toHaveBeenCalledWith('blob:test-media');
 });
+
+it('MCP tool controls submit only the explicit names and require confirmation',async()=>{
+ render(<GrokNativePanel session={session} commands={[]} supported onChanged={()=>{}}/>);
+ fireEvent.click(screen.getByText('Grok 原生工具'));
+ fireEvent.change(screen.getByLabelText('操作'),{target:{value:'mcp.tool.disable'}});
+ fireEvent.change(screen.getByLabelText('MCP 服务器名称'),{target:{value:'search'}});
+ fireEvent.change(screen.getByLabelText('MCP 工具名称'),{target:{value:'lookup'}});
+ expect((screen.getByRole('button',{name:'执行'}) as HTMLButtonElement).disabled).toBe(true);
+ fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'执行'}));
+ await waitFor(()=>expect(api.command).toHaveBeenCalledWith('s',expect.objectContaining({payload:{operation:'mcp.tool.disable',arguments:{serverName:'search',toolName:'lookup'},confirmed:true}})));
+});
+it('file inspection uses numeric offsets and remains an explicit read',async()=>{
+ render(<GrokNativePanel session={session} commands={[]} supported onChanged={()=>{}}/>);
+ fireEvent.click(screen.getByText('Grok 原生工具'));fireEvent.change(screen.getByLabelText('操作'),{target:{value:'files.list'}});
+ fireEvent.change(screen.getByLabelText('项目内相对文件路径'),{target:{value:'.'}});
+ fireEvent.change(screen.getByLabelText('读取起点（目录条目或文件字节）'),{target:{value:'50'}});
+ fireEvent.click(screen.getByRole('button',{name:'读取'}));
+ await waitFor(()=>expect(api.command).toHaveBeenCalledWith('s',expect.objectContaining({payload:{operation:'files.list',arguments:{filePath:'.',offset:50}}})));
+});

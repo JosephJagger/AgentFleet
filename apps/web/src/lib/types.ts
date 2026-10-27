@@ -258,6 +258,7 @@ export interface TimelineEvent {
 }
 
 export interface Approval {
+  grokPlan?: string;
   planExit?: { plan: string; executionPermissionMode?: string };
   grantScope?: "turn";
   networkTarget?: string;

@@ -36,7 +36,7 @@ it('an older background response cannot overwrite a successfully saved model',as
 it('native model choices are usable before a first turn; incompatible effort is cleared on model change',async()=>{
  const onSave=vi.fn().mockResolvedValue(undefined);
  render(<GrokControls options={catalog.options} models={catalog.models} settings={{model:'grok-full',effort:'high'}} ready error="" onReload={()=>{}} onSave={onSave} disabled={false}/>);
- expect(screen.getByRole('button',{name:'Grok Build 设置'}).textContent).toContain('grok-full · high · 逐项确认');
+ expect(screen.getByRole('button',{name:'Grok Build 设置'}).textContent).toContain('grok-full · high · 沿用原生');
  expect(screen.getByRole('button',{name:'Grok Build 设置'}).textContent).not.toContain('Grok Build ·');
  fireEvent.click(screen.getByRole('button',{name:'Grok Build 设置'}));
  const select=screen.getByLabelText('Grok Build 模型') as HTMLSelectElement;
@@ -56,4 +56,25 @@ it('context windows remain native numeric values and startup fields lock on an e
  expect((screen.getByLabelText('附加规则') as HTMLTextAreaElement).disabled).toBe(true);
  fireEvent.click(screen.getByRole('button',{name:'保存'}));
  await waitFor(()=>expect(onSave).toHaveBeenCalledWith({model:'grok-full',contextWindow:500000}));
+});
+
+it('plan mode uses native capability, explicit default stays active, and native observations are separate',async()=>{
+ const onSave=vi.fn().mockResolvedValue(undefined);
+ render(<GrokControls controls={{planMode:true,permissionSync:true}} observed={{mode:'default',observedAt:'2026-10-27T00:00:00Z'}} options={catalog.options} settings={{mode:'plan'}} ready error="" onReload={()=>{}} onSave={onSave} disabled={false}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Grok Build 设置'}));
+ expect(screen.getByText(/上一轮原生任务模式/).textContent).toContain('默认模式');
+ fireEvent.change(screen.getByLabelText('Grok Build 任务模式'),{target:{value:'default'}});
+ fireEvent.click(screen.getByRole('button',{name:'保存'}));
+ await waitFor(()=>expect(onSave).toHaveBeenCalledWith({mode:'default'}));
+});
+it('unsupported plan and auto modes cannot be newly selected, but a stale plan preference can be cleared',async()=>{
+ const onSave=vi.fn().mockResolvedValue(undefined);
+ render(<GrokControls options={catalog.options} settings={{mode:'plan'}} ready error="" onReload={()=>{}} onSave={onSave} disabled={false}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Grok Build 设置'}));
+ expect((screen.getByRole('option',{name:'计划模式'}) as HTMLOptionElement).disabled).toBe(true);
+ expect((screen.getByRole('option',{name:'自动审核'}) as HTMLOptionElement).disabled).toBe(true);
+ expect((screen.getByRole('option',{name:'逐项确认'}) as HTMLOptionElement).disabled).toBe(true);
+ fireEvent.change(screen.getByLabelText('Grok Build 任务模式'),{target:{value:''}});
+ fireEvent.click(screen.getByRole('button',{name:'保存'}));
+ await waitFor(()=>expect(onSave).toHaveBeenCalledWith({mode:undefined}));
 });

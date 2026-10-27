@@ -12,7 +12,7 @@ import { ApiError } from "./lib/types";
 import type { Approval, Dashboard, FleetSession, SessionDetail } from "./lib/types";
 
 vi.mock("./lib/api", () => ({
-  api: { dismissPendingCommit:vi.fn(), decideApproval:vi.fn(), createSession:vi.fn(),saveClaudePreferences:vi.fn(),saveGrokPreferences:vi.fn(),saveRuntimePreferences:vi.fn(), claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
+  api: { managedReleases:vi.fn(), dismissPendingCommit:vi.fn(), decideApproval:vi.fn(), createSession:vi.fn(),saveClaudePreferences:vi.fn(),saveGrokPreferences:vi.fn(),saveRuntimePreferences:vi.fn(), claudePreferences:vi.fn().mockResolvedValue({settings:null,revision:0}), grokPreferences:vi.fn(),cursorPreferences:vi.fn(),saveCursorPreferences:vi.fn(), sessionProgress:vi.fn().mockResolvedValue(undefined), writingPreferences:vi.fn(),saveWritingPreferences:vi.fn(),writingNLP: vi.fn(), command: vi.fn(), commandReceipts: vi.fn(), permissions: vi.fn(), dashboard: vi.fn(), requestLoginCode: vi.fn(), verifyLoginCode: vi.fn(), clientSessions: vi.fn(), session: vi.fn(), projects: vi.fn(), sessions: vi.fn(), release: vi.fn(), hostOperations: vi.fn(), codexPreferences: vi.fn(), machineCodexPreferences: vi.fn(), usage:vi.fn(), refreshQuota:vi.fn(), createSessionReference:vi.fn(), sessionReferenceIdentity:vi.fn(), sessionReference:vi.fn(), cancelSessionReference:vi.fn() },
   subscribeToFleet: vi.fn(() => () => undefined),
 }));
 
@@ -161,6 +161,7 @@ beforeEach(() => {
   vi.mocked(api.commandReceipts).mockResolvedValue([]);
   vi.mocked(api.release).mockRejectedValue(new Error("测试不读取发布信息"));
   vi.mocked(api.hostOperations).mockResolvedValue([]);
+  vi.mocked(api.managedReleases).mockResolvedValue({configured:false,channels:[]});
   vi.mocked(api.machineCodexPreferences).mockRejectedValue(new Error("未提供模型目录"));
   vi.mocked(api.projects).mockImplementation(async ({ machineId }) => ({ items: dashboard().machines.find((machine) => machine.id === machineId)?.projects ?? [], nextCursor: null }));
   vi.mocked(api.sessions).mockImplementation(async ({ projectId }) => ({ items: sessions.filter((session) => session.projectId === projectId), nextCursor: null }));

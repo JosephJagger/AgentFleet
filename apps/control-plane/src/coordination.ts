@@ -600,7 +600,10 @@ export class CoordinationService {
         invariant(input.type === "turn.start" || input.type === "turn.queue", 400, "CODEX_SETTINGS_ACTION_DENIED", "Settings can only apply when starting a new turn");
         const machine = this.db.get<{ codex_catalog_json: string | null; agent_version:string;discovery_json:string|null }>("SELECT codex_catalog_json,agent_version,discovery_json FROM machines WHERE machine_id=?", session.machine_id);
         if(session.provider === "claude") { invariant(supportsClaudeControls(machine?.agent_version),409,"CLAUDE_AGENT_UPDATE_REQUIRED","Claude Code 原生控制需要 Agent 0.30.57 或更新版本"); try {parseClaudeSettings(payload.settings);} catch {invariant(false,400,"CLAUDE_SETTINGS_INVALID","Unsupported Claude Code settings");} }
-        else if(session.provider === "grok") { invariant(supportsGrokControls(machine?.agent_version),409,"GROK_AGENT_UPDATE_REQUIRED","Update the host Agent before configuring Grok Build"); invariant(parseGrokSettings(payload.settings),400,"GROK_SETTINGS_INVALID","Unsupported Grok Build settings"); }
+        else if(session.provider === "grok") { invariant(supportsGrokControls(machine?.agent_version),409,"GROK_AGENT_UPDATE_REQUIRED","Update the host Agent before configuring Grok Build"); const settings=parseGrokSettings(payload.settings); invariant(settings,400,"GROK_SETTINGS_INVALID","Unsupported Grok Build settings");
+          const controls=JSON.parse(machine?.discovery_json??'{}').agentRuntimes?.grok?.grokControls;
+          invariant(settings.mode===undefined||controls?.planMode===true,409,'GROK_MODE_UNAVAILABLE','Update the host before using native Grok mode switching');
+          invariant(!['auto','default'].includes(settings.permissionMode??'')||controls?.permissionSync===true,409,'GROK_PERMISSION_UNAVAILABLE','Native Grok permission synchronization has not been verified'); }
         else if(session.provider==='cursor') { invariant(parseCursorSettings(payload.settings),400,'CURSOR_SETTINGS_INVALID','Unsupported Cursor settings');new CursorPreferencesService(this.db).validate(principal,logicalSessionId,payload.settings); }
         else validateCodexSettings(payload.settings, machine?.codex_catalog_json ? parseCodexCatalog(JSON.parse(machine.codex_catalog_json)) : null);
         if(session.provider === "claude") {
