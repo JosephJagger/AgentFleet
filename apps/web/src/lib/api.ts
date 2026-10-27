@@ -1,3 +1,4 @@
+import type { SessionSearchPage } from '../components/GlobalSessionSearch';
 import { parseManagedUpdate,parseManagedEligibility, type ManagedChannel } from './managed-provider';
 export type VideoObject = { key:string; bytes:number; etag:string; modifiedAt:string|null; canDelete:boolean };
 export type VideoStoragePage = { configured:boolean; label?:string; quotaBytes?:number; items:VideoObject[]; nextCursor:string|null };
@@ -804,6 +805,13 @@ export const api = {
     for (const [key, value] of Object.entries(options)) if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
     const raw = await request<JsonObject>(`/api/projects?${query}`, { signal });
     return { items: list(raw.items ?? raw.projects).map(mapProject), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null, total: integer(raw.total) };
+  },
+  searchSessions: (options: {q:string;machineId?:string;provider?:string;managed?:boolean;offset?:number},signal?:AbortSignal) => {
+    const query=new URLSearchParams({q:options.q,limit:'20',offset:String(options.offset??0)});
+    if(options.machineId)query.set('machineId',options.machineId);
+    if(options.provider)query.set('provider',options.provider);
+    if(options.managed)query.set('managed','true');
+    return request<SessionSearchPage>(`/api/session-search?${query}`,{signal});
   },
   async sessions(options: { provider?: ProviderId; machineId?: string; projectId?: string; cursor?: string | null; q?: string; executionState?: string; managed?: boolean; limit?: number }, signal?: AbortSignal): Promise<Page<FleetSession>> {
     const query = new URLSearchParams({ limit: String(options.limit ?? 30) });

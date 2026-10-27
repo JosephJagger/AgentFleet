@@ -558,7 +558,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--cobalt); }
   .fleet-layout { grid-template-columns: 200px minmax(0, 1fr); height: auto; min-height: calc(100dvh - 64px); }
   .fleet-main { padding: 20px 20px 100px; overflow: visible; }
   .fleet-catalog-content { padding: 0; }
-  .catalog-toggle-bar { display: none; }
+  .catalog-toggle-bar { padding: 0 0 12px; }
   .inspector { display: none; }
   .app-shell--conversation .inspector:not(.inspector--empty) { display: flex; position: fixed; inset: auto 0 auto; top: var(--visible-top, 0px); height: var(--visible-height, 100dvh); width: 100%; z-index: 40; border: 0; transform: none; box-shadow: none; }
   .app-shell--conversation { height: 100dvh; overflow: hidden; }

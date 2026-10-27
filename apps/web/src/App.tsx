@@ -1,3 +1,4 @@
+import { GlobalSessionSearch } from './components/GlobalSessionSearch';
 import { TurnUsage } from "./components/TurnUsage";
 import { isWorktree, sessionLocation } from "./lib/project-tree";
 import {GrokNativePanel} from "./components/GrokNativePanel";
@@ -95,6 +96,7 @@ import {
   RefreshCw,
   Radio,
   Send,
+  Search,
   Server,
   Settings2,
   Share2,
@@ -1562,6 +1564,12 @@ function App() {
   const [detail, setDetail] = useState<SessionDetail>();
   const [detailLoading, setDetailLoading] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState<string>();
+  useEffect(()=>{
+    if(!dashboard)return;
+    const open=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'&&!event.isComposing&&!event.altKey){event.preventDefault();setGlobalSearch(current=>current===undefined?'':undefined);}};
+    window.addEventListener('keydown',open);return()=>window.removeEventListener('keydown',open);
+  },[Boolean(dashboard)]);
   const [pairOpen, setPairOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createProject, setCreateProject] = useState<Project>();
@@ -1933,12 +1941,12 @@ function App() {
           {dashboard.user.platformAdmin === true && <button aria-current={view === "admin" ? "page" : undefined} aria-label={t("管理")} className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><ShieldCheck size={16} /><NavText full="管理" compact="管理" /></button>}
         </nav>
         <WorldClocks side="right" />
-        <div className="topbar-actions">{buzhouDesktop && view === "fleet" && <BuzhoushanBroadcastControl enabled={broadcastCanvas} onChange={setBroadcastCanvas}/>} {buzhouDesktop && view === "fleet" && <button type="button" className="buzhou-focus-toggle" aria-pressed={streamFocus} title={t("聚焦任务与过程；不会隐藏对话和输出中的敏感内容")} onClick={()=>setStreamFocus(!streamFocus)}>{streamFocus?t("退出直播聚焦"):t("直播聚焦")}</button>}<PanelVoiceControl liveInteractions={liveTheme} machines={dashboard.machines} onOpenSession={id=>{setView("fleet");selectSession(id);}}/><LanguageSwitcher compact /><span className="account-label">{displayName(dashboard.user.displayName)}</span><IconButton label={t("退出登录")} onClick={async () => { window.dispatchEvent(new Event("agentfleet:logout")); await api.logout(); setDashboard(undefined); setConnected(false); }}><LogOut size={16} /></IconButton></div>
+        <div className="topbar-actions"><button type="button" className="global-search-trigger" aria-label={t("全局会话搜索")} title={t("全局会话搜索")+" (Ctrl / ⌘ K)"} onClick={()=>setGlobalSearch('')}><Search size={17}/><span>{t("搜索")}</span><kbd>⌘ / Ctrl K</kbd></button>{buzhouDesktop && view === "fleet" && <BuzhoushanBroadcastControl enabled={broadcastCanvas} onChange={setBroadcastCanvas}/>} {buzhouDesktop && view === "fleet" && <button type="button" className="buzhou-focus-toggle" aria-pressed={streamFocus} title={t("聚焦任务与过程；不会隐藏对话和输出中的敏感内容")} onClick={()=>setStreamFocus(!streamFocus)}>{streamFocus?t("退出直播聚焦"):t("直播聚焦")}</button>}<PanelVoiceControl liveInteractions={liveTheme} machines={dashboard.machines} onOpenSession={id=>{setView("fleet");selectSession(id);}}/><LanguageSwitcher compact /><span className="account-label">{displayName(dashboard.user.displayName)}</span><IconButton label={t("退出登录")} onClick={async () => { window.dispatchEvent(new Event("agentfleet:logout")); await api.logout(); setDashboard(undefined); setConnected(false); }}><LogOut size={16} /></IconButton></div>
       </header>
       {view === "fleet" ? <div className={`fleet-layout${catalogCollapsed ? " fleet-layout--catalog-collapsed" : ""}`}>
         <MachineRail machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} selectedId={selectedMachineId} onSession={selectSession} onHost={id => navigate({ view: "hosts", machineId: id })} onSelect={selectMachine} onPair={() => setPairOpen(true)} />
         <main className="fleet-main">
-          <div className="catalog-toggle-bar"><button type="button" className="catalog-toggle" aria-label={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话")} title={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话，让对话更宽")} aria-expanded={!catalogCollapsed} aria-controls="workbench-catalog" onClick={() => setCatalogCollapsed((value) => !value)}>{catalogCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}<span>{catalogCollapsed ? t("展开") : t("收起列表")}</span></button></div>
+          <div className="catalog-toggle-bar"><button type="button" className="catalog-search-trigger" title={t("跨主机搜索会话与正文")} aria-label={t("跨主机搜索会话与正文")} aria-haspopup="dialog" onClick={()=>setGlobalSearch('')}><Search size={17} aria-hidden="true"/><span>{t("跨主机搜索会话与正文")}</span></button><button type="button" className="catalog-toggle" aria-label={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话")} title={catalogCollapsed ? t("展开项目与会话") : t("收起项目与会话，让对话更宽")} aria-expanded={!catalogCollapsed} aria-controls="workbench-catalog" onClick={() => setCatalogCollapsed((value) => !value)}>{catalogCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}<span>{catalogCollapsed ? t("展开") : t("收起列表")}</span></button></div>
           <div id="workbench-catalog" className="fleet-catalog-content" role="region" aria-label={t("项目与会话列表")} tabIndex={0}>
           {selectedMachine && <><MachineSummaryHeader machine={selectedMachine} onAliasChange={updateMachineAlias} provider={selectedProvider} onProviderChange={selectProvider} /><button className="catalog-more" type="button" onClick={() => setView("hosts")}>{t("主机设置")}</button>{selectedMachine.discovery?.state !== "ready" && <DiscoveryStatus discovery={selectedMachine.discovery} />}</>}
           {route.machineId && !selectedMachine ? <section role="status"><h1>{t("该主机不存在或已移除")}</h1><p>{t("请从左侧选择其他主机，或添加新主机。")}</p></section> : <WorkspaceCatalog key={`${selectedMachineId}:${selectedProvider}`} provider={selectedProvider} machineId={selectedMachineId} selectedSession={displayedSession} refreshKey={dashboard.serverTime} onSelect={selectSession} onCreate={openCreate} onCreateProject={() => setCreateProjectOpen(true)} onSchedule={project => openScheduled(project.id)} />}
@@ -1954,6 +1962,7 @@ function App() {
         {buzhouDesktop && <BuzhoushanScreensaver detail={detail} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onRefresh={loadDashboard}/>}
         {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong>{broadcastCanvas&&<BuzhoushanBroadcastStatus/>}<FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayName(displayedSession?.projectAlias)}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}
       </div> : view === "hosts" ? <HostsView canManageVersions={dashboard.user.platformAdmin === true} onConfigure={id => { setSettingsMachineId(id); setView("security"); }} machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} pendingCommits={dashboard.pendingCommits} onDismiss={dismissCommit} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView initialMachineId={settingsMachineId} dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
+      {globalSearch!==undefined&&<GlobalSessionSearch initialQuery={globalSearch} machines={dashboard.machines} onClose={()=>setGlobalSearch(undefined)} onSelect={item=>{setMachineProviders(current=>({...current,[item.machineId]:item.provider as ProviderId}));navigate({view:'fleet',sessionId:item.id});}}/>}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />
       <CreateSessionDialog open={createOpen} provider={selectedProvider} machines={providerMachines} selectedMachineId={selectedMachineId} initialProject={createProject} onClose={() => setCreateOpen(false)} onToast={toast} onCreate={async (machineId, projectId, title, worktree) => {
