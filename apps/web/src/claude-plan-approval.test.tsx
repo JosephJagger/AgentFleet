@@ -47,3 +47,9 @@ it("localizes plan consent and disables both decisions while delivery is in prog
  fireEvent.click(screen.getByRole("button",{name:"Keep planning"}));
  expect(decide).not.toHaveBeenCalled();
 });
+
+it("maps Grok native plan reviews only from the explicit structured request",()=>{
+ const raw={approvalId:"approval",logicalSessionId:"session",context:{action:{kind:"user_input",toolName:"exit_plan_mode",planContent:"# Grok plan"}}};
+ expect(mapApproval(raw,[{...session,provider:"grok"} as FleetSession],[],[]).grokPlan).toBe("# Grok plan");
+ expect(mapApproval(raw,[session],[],[]).grokPlan).toBeUndefined();
+});

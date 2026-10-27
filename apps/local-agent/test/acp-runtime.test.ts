@@ -1,7 +1,7 @@
-import {acpImageInput,acpImageBlocks} from '../src/acp-images.js';
+import {acpImageInput,acpImageBlocks,grokImageInterjection} from '../src/acp-images.js';
 import test,{type TestContext} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,rm,mkdir} from 'node:fs/promises';
+import {mkdtemp,writeFile,rm,mkdir,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {AcpRuntime} from '../src/acp-runtime.js';
@@ -24,6 +24,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line);
  if(m.id===991 && !m.method) { send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:JSON.stringify(m.result)}}}});send({id:promptId,result:{stopReason:'end_turn'}});return; }
  switch(m.method) {
+ case '_test/control':globalThis.control=m.params;send({id:m.id,result:{}});break;
  case '_test/background':globalThis.background=m.params.active;send({id:m.id,result:{}});break;
  case 'initialize':send({id:m.id,result:{_meta:{availableCommands:[{name:'goal',description:'Native goal'}],modelState:{currentModelId:'grok-4',availableModels:[{modelId:'grok-4',name:'Grok test',_meta:{contextWindows:[256000,500000],reasoningEfforts:[{value:'low'},{value:'high'}]}}]}},protocolVersion:1,agentCapabilities:{_meta:{'x.ai/capabilities':{toolOverrides:{x_keyword_search:true,x_semantic_search:true}}},loadSession:true,promptCapabilities:{image:process.env.ACP_TEST_IMAGES==='yes'},sessionCapabilities:{list:{}}}}});break;
  case '_x.ai/interject':
@@ -42,6 +43,11 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  case '_x.ai/task/list':send({id:m.id,result:{result:{tasks:[{task_id:'owned-task',completed:!globalThis.background}]}}});break;
  case '_x.ai/subagent/list_running':send({id:m.id,result:{result:{subagents:globalThis.background?[{subagentId:'owned-child',parentSessionId:sessionId},{subagentId:'other-child',parentSessionId:'other-session'}]:[]}}});break;
  case '_x.ai/task/kill':case '_x.ai/subagent/cancel':send({id:m.id,result:{result:{outcome:'cancelled'}}});break;
+ case '_x.ai/skills/list':send({id:m.id,result:{skills:[{name:'owned-skill'}]}});break;
+ case '_x.ai/skills/toggle':case '_x.ai/mcp/toggle':case '_x.ai/mcp/toggle_tool':case '_x.ai/git/stage':case '_x.ai/git/unstage':send({id:m.id,result:{result:{ok:true}}});break;
+ case '_x.ai/mcp/list':send({id:m.id,result:{result:{servers:[{name:'owned-server',session:{tools:[{name:'owned-tool'}]}}]}}});break;
+ case '_x.ai/workflows/list':send({id:m.id,result:{workflows:[{name:'review'}]}});break;
+ case '_x.ai/fs/list':send({id:m.id,result:{result:{entries:[{name:'example.txt'}]}}});break;
  case '_x.ai/memory/list':send({id:m.id,result:{files:[{path:'/native-memory.md',generated:false}]}});break;
  case '_x.ai/fs/read_file':send({id:m.id,result:{result:{content:'note',size:4,type:'text'}}});break;
  case '_x.ai/memory/forget':send({id:m.id,result:{outcome:'forgotten'}});break;
@@ -54,8 +60,12 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  case 'session/new':send({id:m.id,result:{sessionId,configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'},...(process.env.ACP_TEST_PROVIDER==='cursor'?[{id:'mode',options:['agent','plan','ask'],currentValue:'agent'}]:[])]}});break;
  case 'session/load':if(process.env.ACP_TEST_IMAGES==='yes')send({method:'session/update',params:{sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='}}}});send({method:'session/update',params:{sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Retained history'}}}});send({id:m.id,result:{configOptions:[{id:'model',options:['grok-4.6','grok-4'],currentValue:'grok-4'},{id:'reasoning_effort',options:['low','high'],currentValue:'low'},...(process.env.ACP_TEST_PROVIDER==='cursor'?[{id:'mode',options:['agent','plan','ask'],currentValue:'agent'}]:[])]}});break;
  case 'cursor/list_available_models':send({id:m.id,result:{models:[{value:'grok-4',name:'Cursor test model',configOptions:[]}]}});break;
+ case 'session/set_mode':if(globalThis.control?.deferredMode){send({id:m.id,result:{}});setTimeout(()=>send({method:'session/update',params:{sessionId,update:{sessionUpdate:'current_mode_update',currentModeId:m.params.modeId}}}),20);break;}if(globalThis.control?.invalidMode){send({id:m.id,result:null});break;}if(globalThis.control?.rejectMode){send({id:m.id,error:{code:-32601}});break;}if(!m.params.sessionId){send({id:m.id,error:{code:-32602}});break;}send({method:'session/update',params:{sessionId,update:{sessionUpdate:'current_mode_update',currentModeId:m.params.modeId}}});send({id:m.id,result:{}});break;
+ case '_x.ai/yolo_mode_changed':break;
+ case '_x.ai/session/info':send({id:m.id,result:{result:{sessionId,model:'grok-4'}}});break;
  case 'session/set_model':send({id:m.id,result:{}});break;
  case 'session/set_config_option':
+   if(globalThis.control?.ignoreConfig){send({id:m.id,result:{configOptions:[]}});break;}
    if(typeof m.params.value!=='string'||!['model','reasoning_effort','mode'].includes(m.params.configId)){process.exit(9);return;}
    if(process.env.ACP_TEST_PROVIDER==='cursor'){if(m.params.configId==='model')cursorModel=m.params.value;if(m.params.configId==='mode')cursorMode=m.params.value;send({id:m.id,result:{configOptions:[{id:'model',currentValue:cursorModel,options:['grok-4','grok-4.6']},{id:'mode',currentValue:cursorMode,options:['agent','plan','ask']}]}});break;}
    send({id:m.id,result:{configOptions:[{id:m.params.configId,currentValue:m.params.value,options:[m.params.value]}]}});break;
@@ -66,6 +76,8 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
    if(requestKind==='disconnect'){process.exit(7);return;}
    if(requestKind==='wait')return;
    if(requestKind==='permission'){send({id:991,method:'session/request_permission',params:{sessionId,toolCall:{title:'Synthetic write'},options:[{optionId:'one',kind:'allow_once'},{optionId:'all',kind:'allow_always'},{optionId:'no',kind:'reject_once'}]}});return;}
+   if(requestKind.startsWith('grok-plan')){send({id:991,method:'_x.ai/exit_plan_mode',params:{sessionId,toolCallId:'plan-1',planContent:requestKind==='grok-plan-large'?'x'.repeat(64001):requestKind==='grok-plan-empty'?null:'# Proposed plan\n\nCreate hello.txt only after approval.'}});return;}
+   if(requestKind==='grok-question'){send({id:991,method:'_x.ai/ask_user_question',params:{sessionId,toolCallId:'question-1',mode:'plan',questions:[{question:'Which database?',options:[{label:'SQLite',description:'Local'}]}]}});return;}
    if(requestKind==='grok-form'){send({id:991,method:'_x.ai/mcp/elicit',params:{sessionId,serverName:'test-mcp',toolCallId:'form-1',mode:'form',message:'Confirm choice',requestedSchema:{type:'object',properties:{enabled:{type:'boolean'}},required:['enabled']}}});return;}
    if(requestKind==='question'){send({id:991,method:'cursor/ask_question',params:{toolCallId:'q',questions:[{id:'q1',prompt:'Choose',options:[{id:'a',label:'Alpha'},{id:'b',label:'Beta'}]}]}});return;}
    if(requestKind==='burst'){
@@ -101,7 +113,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  case 'session/cancel':send({id:promptId,result:{stopReason:'cancelled'}});break;
  }
 });`;
-async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]='qwen',images=false,exitDelay=0) {
+async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]='qwen',images=false,exitDelay=0,grokVersion='grok 1.0.70 (synthetic)') {
  const dir=await mkdtemp(join(tmpdir(),'acp-test-'));const file=join(dir,'peer.cjs');await writeFile(file,peer);
  const events:AppEvent[]=[];const batches:AppEvent[][]=[];const volatiles:VolatileAppEvent[]=[];const approvals:ApprovalRecord[]=[];const exits:string[]=[];const launches:string[][]=[];const batchWatchers:Array<()=>void>=[];
  const project:ProjectRecord={id:'project-test',alias:'synthetic',provider,root:dir,device:'test',inode:'test',identityVersion:1,addedAt:new Date().toISOString()};
@@ -111,14 +123,14 @@ async function fixture(t: TestContext,provider: typeof ACP_PROVIDER_IDS[number]=
  let terminalRows:import('../src/cursor-sessions.js').CursorTerminalSession[]=[];const prepared:string[]=[];const environments:Array<NodeJS.ProcessEnv|undefined>=[];
  let ownershipFailure:AgentError|undefined;
  const children:AcpConnection[]=[];
- const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{cursorSessions:async()=>terminalRows,prepareCursor:async row=>{prepared.push(row.id);},readGrokUsage:async()=>undefined,readCursorQuota:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:'synthetic-1.0.0'}),unoccupied:async(_provider,owned)=>{
+ const runtime=new AcpRuntime(provider,callbacks,'epoch-test',{cursorSessions:async()=>terminalRows,prepareCursor:async row=>{prepared.push(row.id);},readGrokUsage:async()=>undefined,readCursorQuota:async()=>undefined,detect:async()=>({executable:process.execPath,prefix:[file],version:provider==='grok'?grokVersion:'synthetic-1.0.0'}),unoccupied:async(_provider,owned)=>{
    if(ownershipFailure)throw ownershipFailure;
    // Model the actual OS process scan, including children still exiting.
    for(const connection of children)if(connection.pid&&!owned.has(connection.pid)){
      let alive=false;try{process.kill(connection.pid,0);alive=true;}catch{}
      if(alive)throw new AgentError('PROVIDER_NATIVE_BUSY','Owned child was forgotten before process exit');
    }
- },connection:options=>{environments.push(options.env);counts.connections++;launches.push(options.args);const child=new AcpConnection({...options,env:{...process.env,ACP_TEST_PROVIDER:provider,ACP_TEST_CWD:project.root,ACP_TEST_IMAGES:images?'yes':'no',ACP_TEST_EXIT_DELAY:String(exitDelay)}});const original=child.call.bind(child);child.call=(method,params,timeout)=>{requests.push({method,params});return original(method,params,timeout);};children.push(child);return child;}});
+ },connection:options=>{environments.push(options.env);counts.connections++;launches.push(options.args);const child=new AcpConnection({...options,env:{...process.env,ACP_TEST_PROVIDER:provider,ACP_TEST_CWD:project.root,ACP_TEST_IMAGES:images?'yes':'no',ACP_TEST_EXIT_DELAY:String(exitDelay)}});const originalNotify=child.notify.bind(child);child.notify=(method,params)=>{requests.push({method,params});originalNotify(method,params);};const original=child.call.bind(child);child.call=(method,params,timeout)=>{requests.push({method,params});return original(method,params,timeout);};children.push(child);return child;}});
  t.after(async()=>{await runtime.stop();await rm(dir,{recursive:true,force:true});});
  await runtime.start();const created=await runtime.createThread(project);
  thread={nativeThreadId:created.nativeThreadId,projectId:project.id,appServerEpoch:'epoch-test',policyVersion:'remote-restricted-v1',policyVerified:true,contentEpoch:1,createdAt:new Date().toISOString(),historyMode:'legacy'} as ManagedThread;
@@ -222,7 +234,7 @@ test('a large completion flush yields to timers and keeps the terminal event las
  assert.equal(f.events.at(-1)?.type,'turn.completed');
  assert.equal(f.launches.length,1);
 });
-test('grok reapplies a reported model and always-approve without inventing a task-mode option',async t=>{
+test('grok confirms model and switches real task mode without inventing a config option',async t=>{
  const f=await fixture(t,'grok');
  await f.runtime.startTurn(f.thread,f.project,'hello',undefined,{model:'grok-4.6',effort:'high',permissionMode:'always',mode:'plan'});
  await until(()=>f.events.some(e=>e.type==='turn.completed'));
@@ -233,6 +245,9 @@ test('grok reapplies a reported model and always-approve without inventing a tas
  assert.equal(options.find(o=>o.id==='model')?.current,'grok-4.6');
  assert.equal(options.find(o=>o.id==='reasoning_effort')?.current,'high');
  assert.equal(options.some(o=>o.id==='mode'),false);
+ assert.ok(f.requests.some(r=>r.method==='session/set_mode'&&r.params.modeId==='plan'));
+ assert.equal((f.events.find(e=>e.type==='turn.completed')?.payload.grokState as {mode:string}).mode,'plan');
+ assert.ok(args.includes('--no-leader'));
  await assert.rejects(f.runtime.startTurn(f.thread,f.project,'hello',undefined,{model:'grok-4.6',sandbox:'danger'} as never),/plain text/);
  await assert.rejects(f.runtime.startTurn(f.thread,f.project,'hello',undefined,{model:'grok-4.6'},['data:image/png;base64,aaaa']),/图片格式或大小无效/);
 });
@@ -534,4 +549,127 @@ test('Grok prompts preserve native search defaults unless the user explicitly ch
  assert.equal(params[0]!._meta,undefined);
  assert.deepEqual(params[1]!._meta,{toolOverrides:{xSearch:{dateBound:{fromDate:'2026-10-01'}}}});
  assert.deepEqual(params[2]!._meta,{toolOverrides:{xSearch:null}});
+});
+
+
+test('Grok restores auto permissions on each new connection and explicit default clears them',async t=>{
+ const f=await fixture(t,'grok');
+ for(const mode of ['auto','default'] as const){
+  await f.runtime.unsubscribeThread(f.thread.nativeThreadId);
+  await f.runtime.startTurn(f.thread,f.project,'hello',undefined,{permissionMode:mode,mode:'default'});
+  await until(()=>f.events.filter(e=>e.type==='turn.completed').length===(mode==='auto'?1:2));
+  const request=f.requests.filter(r=>r.method==='_x.ai/yolo_mode_changed').at(-1)!;
+  assert.deepEqual(request.params,{yolo_mode:false,auto_mode:mode==='auto',permission_mode:mode==='auto'?'auto':'ask'});
+  assert.ok(f.launches.at(-1)?.includes('--no-leader'));
+  const state=f.events.filter(e=>e.type==='turn.completed').at(-1)?.payload.grokState as Record<string,unknown>;
+  assert.equal(state.permissionRequested,mode);assert.equal(state.permissionStatus,'requested');assert.equal(state.mode,'default');
+ }
+ assert.ok(f.requests.filter(r=>r.method==='session/load').every(r=>!r.params._meta));
+});
+test('Grok never sends a prompt after an unconfirmed model or rejected plan switch',async t=>{
+ const f=await fixture(t,'grok');
+ await f.children[0]!.call('_test/control',{ignoreConfig:true});
+ await assert.rejects(f.runtime.startTurn(f.thread,f.project,'hello',undefined,{model:'grok-4.6'}),{code:'GROK_CONFIG_UNCONFIRMED'});
+ await f.children[0]!.call('_test/control',{invalidMode:true});
+ await assert.rejects(f.runtime.startTurn(f.thread,f.project,'hello',undefined,{mode:'plan'}),{code:'GROK_CONFIG_UNCONFIRMED'});
+ await f.children[0]!.call('_test/control',{rejectMode:true});
+ await assert.rejects(f.runtime.startTurn(f.thread,f.project,'hello',undefined,{mode:'plan'}),{code:'ACP_REMOTE_ERROR'});
+ assert.equal(f.requests.some(r=>r.method==='session/prompt'),false);
+});
+test('Grok extended controls bind listed skills, MCP servers and tools to the owned session',async t=>{
+ const f=await fixture(t,'grok');
+ const manage=(operation:string,args:Record<string,string>)=>f.runtime.manageGrok(f.thread,f.project,{operation,arguments:args,confirmed:true});
+ await manage('skills.disable',{skillName:'owned-skill'});
+ assert.deepEqual(f.requests.find(r=>r.method==='_x.ai/skills/toggle')?.params,{cwd:f.project.root,name:'owned-skill',enabled:false});
+ await assert.rejects(manage('skills.enable',{skillName:'foreign'}),{code:'GROK_TARGET_CHANGED'});
+ await manage('mcp.disable',{serverName:'owned-server'});
+ assert.deepEqual(f.requests.find(r=>r.method==='_x.ai/mcp/toggle')?.params,{session_id:'synthetic-session',server_name:'owned-server',enabled:false});
+ await manage('mcp.tool.enable',{serverName:'owned-server',toolName:'owned-tool'});
+ assert.deepEqual(f.requests.find(r=>r.method==='_x.ai/mcp/toggle_tool')?.params,{session_id:'synthetic-session',server_name:'owned-server',tool_name:'owned-tool',enabled:true});
+ await assert.rejects(manage('mcp.tool.disable',{serverName:'owned-server',toolName:'foreign'}),{code:'GROK_TARGET_CHANGED'});
+ await assert.rejects(manage('mcp.disable',{serverName:'foreign'}),{code:'GROK_TARGET_CHANGED'});
+ const workflows=await f.runtime.manageGrok(f.thread,f.project,{operation:'workflows.list',arguments:{}});
+ assert.ok(workflows.rows.some(r=>r.name==='review'));
+});
+test('Grok staging never stages a directory or an implicit whole repository',async t=>{
+ const f=await fixture(t,'grok');await writeFile(join(f.project.root,'one.txt'),'one');await mkdir(join(f.project.root,'directory'));
+ await f.runtime.manageGrok(f.thread,f.project,{operation:'git.stage',arguments:{filePath:'one.txt'},confirmed:true});
+ assert.deepEqual(f.requests.find(r=>r.method==='_x.ai/git/stage')?.params,{sessionId:'synthetic-session',gitRoot:f.project.root,paths:['one.txt']});
+ await assert.rejects(f.runtime.manageGrok(f.thread,f.project,{operation:'git.stage',arguments:{filePath:'directory'},confirmed:true}),{code:'GROK_TARGET_CHANGED'});
+});
+test('Grok file inspection bounds native pages and rejects symlinks outside the workspace',{skip:process.platform==='win32'},async t=>{
+ const f=await fixture(t,'grok');await writeFile(join(f.project.root,'note.txt'),'note');
+ await symlink(tmpdir(),join(f.project.root,'outside'));
+ await f.runtime.manageGrok(f.thread,f.project,{operation:'files.list',arguments:{filePath:'.',offset:50}});
+ assert.deepEqual(f.requests.find(r=>r.method==='_x.ai/fs/list')?.params,{sessionId:'synthetic-session',path:f.project.root,offset:50,depth:1,limit:50,followSymlinks:false,respectGitIgnore:true});
+ await f.runtime.manageGrok(f.thread,f.project,{operation:'files.read',arguments:{filePath:'note.txt',offset:0}});
+ assert.equal(f.requests.find(r=>r.method==='_x.ai/fs/read_file')?.params.maxBytes,4000);
+ await assert.rejects(f.runtime.manageGrok(f.thread,f.project,{operation:'files.list',arguments:{filePath:'outside',offset:0}}),{code:'GROK_TARGET_CHANGED'});
+});
+
+test('image interjections are verified for 1.0.70 without enabling unknown versions',async t=>{
+ assert.equal(grokImageInterjection('grok 1.0.70 (build)',true),true);
+ assert.equal(grokImageInterjection('grok 1.0.62 (build)',true),true);
+ assert.equal(grokImageInterjection('grok 1.0.71 (build)',true),false);
+ assert.equal(grokImageInterjection('grok 1.0.70 (build)',false),false);
+ const f=await fixture(t,'grok',true);
+ const turn=await f.runtime.startTurn(f.thread,f.project,'wait');
+ const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
+ await f.runtime.steerTurn(f.thread,turn.nativeTurnId,'image','image-message',[image]);
+ assert.equal((f.requests.filter(r=>r.method==='_x.ai/interject').at(-1)?.params.content as {type:string}[])[1]?.type,'image');
+ await f.runtime.steerTurn(f.thread,turn.nativeTurnId,'finish');await until(()=>f.events.some(e=>e.type==='turn.completed'));
+});
+
+for(const [answer,result] of [
+ ['批准计划并开始执行',{outcome:'approved'}],['暂不执行，继续计划',{outcome:'cancelled'}],
+ ['放弃本次计划',{outcome:'abandoned'}],['Add error handling',{outcome:'cancelled',feedback:'Add error handling'}],
+] as const)test(`Grok plan review requires explicit consent: ${answer}`,async t=>{
+ const f=await fixture(t,'grok');
+ await f.runtime.startTurn(f.thread,f.project,'grok-plan',undefined,{mode:'plan',permissionMode:'always'});
+ await until(()=>f.approvals.length===1);
+ const approval=f.approvals[0]!;
+ assert.equal(approval.method,'item/tool/requestUserInput');assert.match(String(approval.params.planContent),/Create hello.txt/);
+ assert.equal(f.events.some(e=>e.type==='turn.completed'),false,'Always-approve must not approve implementation');
+ await assert.rejects(f.runtime.respondApproval(approval,'accept'),{code:'INPUT_REQUIRED'});
+ await assert.rejects(f.runtime.respondInput({...approval,actionHash:'changed'},{grok_plan_review:{answers:[answer]}}),{code:'APPROVAL_STALE'});
+ await f.runtime.respondInput(approval,{grok_plan_review:{answers:[answer]}});
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.ok(f.events.some(e=>e.type==='item.completed'&&(e.payload.item as {text?:string}|undefined)?.text===JSON.stringify(result)));
+ await assert.rejects(f.runtime.respondInput(approval,{grok_plan_review:{answers:[answer]}}),{code:'APPROVAL_STALE'});
+});
+for(const prompt of ['grok-plan-large','grok-plan-empty'])test(`Grok refuses approval without a complete bounded plan: ${prompt}`,async t=>{
+ const f=await fixture(t,'grok');await f.runtime.startTurn(f.thread,f.project,prompt);
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.equal(f.approvals.length,0);
+ assert.ok(f.events.some(e=>e.type==='item.completed'&&String((e.payload.item as {text?:string}|undefined)?.text).includes('"outcome":"cancelled"')));
+});
+test('Grok plan cancellation returns native cancelled and invalidates pending consent',async t=>{
+ const f=await fixture(t,'grok');const turn=await f.runtime.startTurn(f.thread,f.project,'grok-plan');
+ await until(()=>f.approvals.length===1);await f.runtime.interruptTurn(f.thread.nativeThreadId,turn.nativeTurnId);
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ await assert.rejects(f.runtime.respondInput(f.approvals[0]!,{grok_plan_review:{answers:['批准计划并开始执行']}}),{code:'APPROVAL_STALE'});
+});
+
+for(const [answer,result] of [['SQLite',{outcome:'accepted',answers:{'Which database?':['SQLite']}}],['Postgres',{outcome:'accepted',answers:{'Which database?':['Other']},annotations:{'Which database?':{notes:'Postgres'}}}]] as const)test(`Grok interview preserves native question keys and freeform annotations: ${answer}`,async t=>{
+ const f=await fixture(t,'grok');await f.runtime.startTurn(f.thread,f.project,'grok-question',undefined,{permissionMode:'auto'});
+ await until(()=>f.approvals.length===1);
+ await f.runtime.respondInput(f.approvals[0]!,{grok_question_0:{answers:[answer]}});
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.ok(f.events.some(e=>e.type==='item.completed'&&(e.payload.item as {text?:string})?.text===JSON.stringify(result)));
+});
+
+test('unverified Grok versions cannot silently ignore explicit auto or ask-mode requests',async t=>{
+ const f=await fixture(t,'grok',false,0,'grok 1.0.71 (unverified)');
+ for(const permissionMode of ['default','auto'] as const)await assert.rejects(f.runtime.startTurn(f.thread,f.project,'must not run',undefined,{permissionMode}),{code:'GROK_PERMISSION_UNAVAILABLE'});
+ assert.equal(f.requests.some(r=>r.method==='session/prompt'),false);
+ await f.runtime.startTurn(f.thread,f.project,'hello');await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.equal(f.requests.some(r=>r.method==='_x.ai/yolo_mode_changed'),false,'No native-setting override is inferred');
+});
+
+test('Grok accepts a successful mode acknowledgement before its asynchronous mode notification',async t=>{
+ const f=await fixture(t,'grok');await f.children[0]!.call('_test/control',{deferredMode:true});
+ await f.runtime.startTurn(f.thread,f.project,'hello',undefined,{mode:'default'});
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.ok(f.requests.some(r=>r.method==='session/set_mode'&&r.params.modeId==='default'));
+ assert.equal((f.events.find(e=>e.type==='turn.completed')?.payload.grokState as {mode:string}).mode,'default');
 });

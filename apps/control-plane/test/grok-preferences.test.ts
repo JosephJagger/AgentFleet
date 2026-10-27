@@ -18,7 +18,7 @@ test("Grok settings persist after reopening and only accept reported model ids",
  assert.equal(parseGrokSettings(undefined),undefined);
  assert.deepEqual(parseGrokSettings({}),{});
  assert.equal(grokSettingsActive({}),false);
- assert.equal(grokSettingsActive({permissionMode:"default"}),false);
+ assert.equal(grokSettingsActive({permissionMode:"default"}),true);
  assert.equal(grokSettingsActive({permissionMode:"always",mode:"plan"}),true);
  assert.equal(parseGrokSettings({model:"grok-4.6",sandbox:"danger"}),undefined);
  const dir=mkdtempSync(join(tmpdir(),"grok-prefs-"));t.after(()=>rmSync(dir,{recursive:true,force:true}));
@@ -45,13 +45,18 @@ test("Grok settings persist after reopening and only accept reported model ids",
  const reported=service.read(principal,"s1");
  assert.deepEqual(reported.options.find(option=>option.id==="model"),{id:"model",current:"grok-4.6",values:["grok-4.6"]});
  assert.throws(()=>service.write(principal,"s1",{settings:{model:"grok-other",permissionMode:"always"},revision:1}),{code:"GROK_OPTION_UNAVAILABLE"});
+ assert.throws(()=>service.write(principal,"s1",{settings:{mode:'plan'},revision:1}),{code:'GROK_MODE_UNAVAILABLE'});
+ assert.throws(()=>service.write(principal,"s1",{settings:{permissionMode:'auto'},revision:1}),{code:'GROK_PERMISSION_UNAVAILABLE'});
+ db.run("UPDATE machines SET discovery_json=? WHERE machine_id='m'",JSON.stringify({agentRuntimes:{grok:{nativeManagement:true,grokControls:{planMode:true,permissionSync:true}}}}));
  const saved={model:"grok-4.6",effort:"high",permissionMode:"always" as const,mode:"plan" as const};
  assert.deepEqual(service.write(principal,"s1",{settings:saved,revision:1}).settings,saved);
- event(2,"turn.completed",{configOptions:[{id:"model",options:["grok-4.7"],currentValue:"grok-4.7"}]});
+ event(2,"turn.completed",{grokState:{mode:"plan",permissionRequested:"auto",permissionStatus:"requested"},configOptions:[{id:"model",options:["grok-4.7"],currentValue:"grok-4.7"}]});
  assert.deepEqual(service.read(principal,"s1").options.find(option=>option.id==="model")?.values,["grok-4.7"]);
  assert.equal(service.write(principal,"s1",{settings:saved,revision:2}).settings?.model,"grok-4.6");
  assert.throws(()=>service.write(principal,"s1",{settings:{...saved,model:"grok-missing"},revision:3}),{code:"GROK_OPTION_UNAVAILABLE"});
- assert.deepEqual(service.read(principal,"s2"),{settings:null,revision:0,options:[]});
+ assert.equal(service.read(principal,"s2").settings,null);
+ assert.equal(service.read(principal,"s1").observed?.mode,"plan");
+ assert.equal(service.read(principal,"s1").observed?.permissionStatus,"requested");
  assert.throws(()=>service.read({...principal,workspaceId:"other"},"s1"),{code:"SESSION_NOT_FOUND"});
 
  db.run("UPDATE machines SET discovery_json=? WHERE machine_id='m'",JSON.stringify({agentRuntimes:{grok:{models:[{id:'grok-current',name:'Native model',efforts:['low']}]}}}));

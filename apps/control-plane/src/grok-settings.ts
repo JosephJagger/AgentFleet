@@ -11,6 +11,8 @@ export interface GrokSettings {
 }
 export interface ConfigOption {id:string;name?:string;current?:string;values:string[];}
 const idText=(value:string)=>/^[A-Za-z0-9._:-]{1,120}$/.test(value);
+// Parameterized selectors are accepted only when the native catalog/config options offer them.
+const modelText=(value:string)=>value.length<=240&&/^[A-Za-z0-9._:-]+(?:\[[A-Za-z][A-Za-z0-9_]*=[A-Za-z0-9._:-]+(?:,[A-Za-z][A-Za-z0-9_]*=[A-Za-z0-9._:-]+)*\])?$/.test(value);
 const isRecord=(value:unknown):value is Record<string,unknown>=>Boolean(value)&&typeof value==="object"&&!Array.isArray(value);
 
 /** Undefined input stays absent. An invalid object stays undefined so the caller can reject it. */
@@ -31,14 +33,14 @@ export function parseGrokSettings(value:unknown):GrokSettings|undefined {
   }
   if(value.contextWindow!==undefined){if(!Number.isSafeInteger(value.contextWindow)||Number(value.contextWindow)<1||Number(value.contextWindow)>10_000_000)return undefined;settings.contextWindow=Number(value.contextWindow);}
 
-  if(value.model!==undefined){if(typeof value.model!=="string"||!idText(value.model))return undefined;settings.model=value.model;}
+  if(value.model!==undefined){if(typeof value.model!=="string"||!modelText(value.model))return undefined;settings.model=value.model;}
   if(value.effort!==undefined){if(typeof value.effort!=="string"||!idText(value.effort))return undefined;settings.effort=value.effort;}
   if(value.permissionMode!==undefined){if(value.permissionMode!=="default"&&value.permissionMode!=="always"&&value.permissionMode!=="auto")return undefined;settings.permissionMode=value.permissionMode;}
   if(value.mode!==undefined){if(value.mode!=="default"&&value.mode!=="plan")return undefined;settings.mode=value.mode;}
   return settings;
 }
 export function grokSettingsActive(settings?:GrokSettings|null):boolean {
-  return Boolean(settings&&(settings.xSearch!==undefined||settings.rules||settings.systemPromptOverride||settings.agentProfile||settings.model||settings.effort||settings.contextWindow||(settings.permissionMode&&settings.permissionMode!=="default")||settings.mode==="plan"));
+  return Boolean(settings&&Object.keys(settings).length);
 }
 export function supportsGrokControls(version?:string):boolean {
   const match=/^(\d+)\.(\d+)\.(\d+)$/.exec(version??"");
@@ -47,9 +49,9 @@ export function supportsGrokControls(version?:string):boolean {
   return major!>0||minor!>30||(minor===30&&patch!>=117);
 }
 function optionValue(value:unknown):string|undefined {
-  if(typeof value==="string"&&idText(value))return value;
-  if(isRecord(value)&&typeof value.value==="string"&&idText(value.value))return value.value;
-  if(isRecord(value)&&typeof value.id==="string"&&idText(value.id))return value.id;
+  if(typeof value==="string"&&modelText(value))return value;
+  if(isRecord(value)&&typeof value.value==="string"&&modelText(value.value))return value.value;
+  if(isRecord(value)&&typeof value.id==="string"&&modelText(value.id))return value.id;
   return undefined;
 }
 export function parseConfigOptions(value:unknown):ConfigOption[] {

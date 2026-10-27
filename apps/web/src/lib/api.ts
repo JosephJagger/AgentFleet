@@ -540,6 +540,7 @@ export function mapApproval(rawValue: unknown, sessions: FleetSession[], machine
   return {
     id: string(raw.approvalId),
     planExit,
+    grokPlan: session?.provider === "grok" && action.kind === "user_input" && action.toolName === "exit_plan_mode" && typeof action.planContent === "string" && action.planContent.length <= 64000 ? action.planContent : undefined,
     networkTarget: string(network.host) ? `${string(network.protocol, "network")} · ${string(network.host)}` : undefined,
     additionalPermissions: action.kind === "permissions" ? JSON.stringify(action.permissions, null, 2) : string(action.additionalPermissions) || undefined,
     grantScope: action.kind === "permissions" ? "turn" : undefined,

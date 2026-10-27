@@ -5,6 +5,10 @@ import {grokOperations,type GrokOperation} from '../lib/grok-operations';
 import {t} from '../i18n';
 
 const labels:Record<GrokOperation,string>={
+ 'files.list':'浏览项目目录','files.read':'读取项目文件',
+ 'session.info':'会话信息与上下文','workflows.list':'查看 Workflow','skills.config':'技能来源','skills.enable':'启用技能','skills.disable':'停用技能',
+ 'mcp.enable':'启用 MCP 服务器','mcp.disable':'停用 MCP 服务器','mcp.tool.enable':'启用 MCP 工具','mcp.tool.disable':'停用 MCP 工具',
+ 'git.stage':'暂存指定文件','git.unstage':'取消暂存指定文件',
  'git.commit':'提交已暂存的改动','worktrees.diff':'查看工作树差异','worktrees.apply':'合并工作树改动','subagent.get':'查看子智能体结果',
  'git.status':'Git 状态','git.diff':'查看 Git 差异','search.content':'搜索项目内容','mcp.authStatus':'MCP 授权状态',
  'marketplace.list':'读取插件市场','plugins.install':'安装插件','plugins.update':'更新插件','plugins.uninstall':'卸载插件',
@@ -15,7 +19,7 @@ const labels:Record<GrokOperation,string>={
  'worktrees.list':'查看工作树','task.stop':'停止后台任务','subagent.stop':'停止子智能体','memory.flush':'保存原生记忆',
  'memory.dream':'整理原生记忆','memory.forget':'删除原生记忆','session.rename':'重命名会话','rewind.execute':'回退会话','btw.ask':'随口问',
 };
-const fields:Record<string,string>={message:'提交说明',worktreePath:'工作树路径',pattern:'搜索文字',source:'插件 HTTPS 仓库',pluginId:'插件 ID',hookName:'钩子名称',mode:'回退范围',taskId:'任务 ID',subagentId:'子智能体 ID',path:'记忆文件路径',expectedContentHash:'预览内容校验值',title:'会话名称',targetPromptIndex:'检查点序号',question:'问题'};
+const fields:Record<string,string>={offset:'读取起点（目录条目或文件字节）',skillName:'技能名称',serverName:'MCP 服务器名称',toolName:'MCP 工具名称',filePath:'项目内相对文件路径',message:'提交说明',worktreePath:'工作树路径',pattern:'搜索文字',source:'插件 HTTPS 仓库',pluginId:'插件 ID',hookName:'钩子名称',mode:'回退范围',taskId:'任务 ID',subagentId:'子智能体 ID',path:'记忆文件路径',expectedContentHash:'预览内容校验值',title:'会话名称',targetPromptIndex:'检查点序号',question:'问题'};
 const taskDrafts=[
  ['生成图片','请生成图片。主题、风格与尺寸：'],
  ['生成视频','请生成视频。内容、时长、画幅与参考素材：'],
@@ -32,7 +36,7 @@ export function GrokNativePanel({session,commands,supported,onChanged,onCompose}
  async function run(){
   if(busy||pending||!supported||!hasNative||spec.write&&!confirmed)return;
   setBusy(true);setNotice('');
-  const values=Object.fromEntries(spec.fields.map(k=>[k,k==='targetPromptIndex'?Number(args[k]):k==='mode'?(args[k]??'conversation_only'):args[k]]));
+  const values=Object.fromEntries(spec.fields.map(k=>[k,k==='targetPromptIndex'||k==='offset'?Number(args[k]??0):k==='mode'?(args[k]??'conversation_only'):args[k]]));
   try{
    const response=await api.command(session.id,{type:'grok.manage',clientMutationId:crypto.randomUUID(),payload:{operation,arguments:values,...(spec.write?{confirmed:true}:{})},precondition:{nativeThreadId:session.nativeThreadId,executionSegmentId:session.executionSegmentId,threadControlVersion:session.threadControlVersion,expectedActiveTurnId:session.activeTurnId??null,projectLeaseVersion:session.projectLeaseVersion}});
    setSubmitted(response.command.id);setNotice(t('请求已提交，正在等待宿主机回执。'));setConfirmed(false);onChanged();
@@ -46,12 +50,13 @@ export function GrokNativePanel({session,commands,supported,onChanged,onCompose}
   {supported&&!hasNative&&<p role="status">{t('先发送一条消息或接管原生会话，再使用原生工具。')}</p>}
   <form className="stack-form" onSubmit={e=>{e.preventDefault();void run();}}>
    <label>{t('操作')}<select value={operation} disabled={busy||pending} onChange={e=>{setOperation(e.target.value as GrokOperation);setArgs({});setConfirmed(false);setSubmitted(undefined);setNotice('');}}>{Object.entries(labels).map(([key,label])=><option key={key} value={key}>{t(label)}</option>)}</select></label>
-   {spec.fields.map(key=>key==='mode'?<label key={key}>{t('回退范围')}<select required value={args.mode??'conversation_only'} onChange={e=>{setArgs({...args,mode:e.target.value});setConfirmed(false);}}><option value="conversation_only">{t('仅会话上下文')}</option><option value="files_only">{t('仅文件')}</option><option value="all">{t('会话上下文和文件')}</option></select></label>:<label key={key}>{t(fields[key])}<input required type={key==='targetPromptIndex'?'number':'text'} min={key==='targetPromptIndex'?0:undefined} value={args[key]??''} maxLength={key==='question'||key==='message'?4000:key==='path'||key==='worktreePath'?4096:256} onChange={e=>{setArgs({...args,[key]:e.target.value});setConfirmed(false);}}/></label>)}
-   {spec.write&&<label className="checkbox-row"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>{t(operation==='git.commit'?'确认提交当前仓库已暂存的改动，不自动暂存、推送或改写提交。':operation==='worktrees.apply'?'确认合并此会话工作树到当前项目。原生接口可能应用部分文件后报告冲突，不会强制覆盖冲突。':operation==='rewind.execute'?'确认按所选范围回退。面板保留原有审计记录；不会强制中断任务。':operation==='memory.forget'?'确认永久删除已预览且校验值一致的原生记忆。':'确认对当前原生目标执行此操作。记忆操作可能影响此主机的其他会话；原生处理可能消耗额度。')}</label>}
+   {operation.startsWith('files.')&&<p className="subtle">{t('路径相对于当前会话目录。目录每页 50 条；文本每次最多读取 4000 字节，可调整读取起点。不会跟随指向项目外的路径。')}</p>}
+   {spec.fields.map(key=>key==='mode'?<label key={key}>{t('回退范围')}<select required value={args.mode??'conversation_only'} onChange={e=>{setArgs({...args,mode:e.target.value});setConfirmed(false);}}><option value="conversation_only">{t('仅会话上下文')}</option><option value="files_only">{t('仅文件')}</option><option value="all">{t('会话上下文和文件')}</option></select></label>:<label key={key}>{t(fields[key])}<input required type={key==='targetPromptIndex'||key==='offset'?'number':'text'} min={key==='targetPromptIndex'||key==='offset'?0:undefined} value={args[key]??(key==='offset'?'0':'')} maxLength={key==='question'||key==='message'?4000:key==='path'||key==='worktreePath'||key==='filePath'?4096:256} onChange={e=>{setArgs({...args,[key]:e.target.value});setConfirmed(false);}}/></label>)}
+   {spec.write&&<label className="checkbox-row"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>{t(operation.startsWith('skills.')?'确认修改此主机上的技能启用设置，可能影响其他会话。':operation.startsWith('mcp.')?'确认修改指定 MCP 服务器或工具的启用设置，原生配置可能影响其他会话。':operation==='git.stage'?'确认仅暂存指定文件的当前改动。':operation==='git.unstage'?'确认仅取消暂存指定文件，保留工作区内容。':operation==='git.commit'?'确认提交当前仓库已暂存的改动，不自动暂存、推送或改写提交。':operation==='worktrees.apply'?'确认合并此会话工作树到当前项目。原生接口可能应用部分文件后报告冲突，不会强制覆盖冲突。':operation==='rewind.execute'?'确认按所选范围回退。面板保留原有审计记录；不会强制中断任务。':operation==='memory.forget'?'确认永久删除已预览且校验值一致的原生记忆。':'确认对当前原生目标执行此操作。记忆操作可能影响此主机的其他会话；原生处理可能消耗额度。')}</label>}
    <button type="submit" className="button button--secondary" disabled={!supported||!hasNative||busy||pending||spec.write&&!confirmed}>{t(busy||pending?'正在处理…':spec.write?'执行':'读取')}</button>
   </form>
   {notice&&<p role="status">{notice}</p>}
   {receipt?.message&&<p role="status">{receipt.message}</p>}
-  {result&&<section aria-label={t('原生操作结果')}><p>{t('原生返回状态')}：{result.status}{receipt?.createdAt&&<> · <time dateTime={receipt.createdAt}>{new Date(receipt.createdAt).toLocaleString()}</time></>}</p>{!result.rows.length&&<p>{t('原生未返回可展示的条目。')}</p>}{result.rows.map((row,index)=><details key={index}><summary>{row.name}{row.status?' · '+row.status:''}</summary><pre className="grok-native-result">{row.detail}</pre></details>)}</section>}
+  {result&&<section aria-label={t('原生操作结果')}><button type="button" className="button button--quiet" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({observedAt:receipt?.createdAt,...result},null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='grok-'+result.operation+'.json';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);}}>{t('导出当前结果')}</button><p>{t('原生返回状态')}：{result.status}{receipt?.createdAt&&<> · <time dateTime={receipt.createdAt}>{new Date(receipt.createdAt).toLocaleString()}</time></>}</p>{!result.rows.length&&<p>{t('原生未返回可展示的条目。')}</p>}{result.rows.map((row,index)=><details key={index}><summary>{row.name}{row.status?' · '+row.status:''}</summary><pre className="grok-native-result">{row.detail}</pre></details>)}</section>}
  </div></details>;
 }

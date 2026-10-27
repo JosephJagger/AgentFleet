@@ -1,3 +1,4 @@
+import {grokQuestions,grokQuestionAnswer} from '../src/grok-questions.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -54,4 +55,35 @@ test('X search inheritance differs from explicit clearing and validates calendar
  assert.deepEqual(parseGrokSettings({xSearch:null}),{xSearch:null});assert.equal(grokSettingsActive({xSearch:null}),true);
  assert.equal(parseGrokSettings({xSearch:{fromDate:'2026-02-31'}}),undefined);
  assert.deepEqual(parseGrokSettings({xSearch:{fromDate:'2026-10-01'}}),{xSearch:{fromDate:'2026-10-01'}});
+});
+
+
+test('MCP optional fields can be explicitly omitted without coercing false, zero or a missing required answer',()=>{
+ const form=grokForm({mode:'form',requestedSchema:{type:'object',properties:{required:{type:'string'},count:{type:'number'},enabled:{type:'boolean'}},required:['required']}});
+ const omit=form.questions.find(q=>q.id==='count')!.options[0]!.label;
+ assert.deepEqual(grokFormAnswer(form,{required:{answers:['yes']},count:{answers:[omit]},enabled:{answers:['false']}}),{required:'yes',enabled:false});
+ assert.deepEqual(grokFormAnswer(form,{required:{answers:['yes']},count:{answers:['0']},enabled:{answers:[omit]}}),{required:'yes',count:0});
+ assert.throws(()=>grokFormAnswer(form,{count:{answers:[omit]},enabled:{answers:[omit]}}));
+ for(const required of [['unknown'],['required','required'],[1]])assert.throws(()=>grokForm({mode:'form',requestedSchema:{type:'object',properties:{required:{type:'string'}},required}}));
+});
+test('literal file operations reject traversal, git pathspecs and invalid paging',()=>{
+ for(const filePath of ['../secret','/etc/passwd','a/../b','a\\b','*.ts',':(glob)**','-A','a//b'])assert.throws(()=>parseGrokOperation({operation:'git.stage',arguments:{filePath},confirmed:true}));
+ for(const offset of [-1,0.5,Infinity,'0'])assert.throws(()=>parseGrokOperation({operation:'files.list',arguments:{filePath:'.',offset}}));
+ assert.equal(parseGrokOperation({operation:'git.stage',arguments:{filePath:'src/a b.ts'},confirmed:true}).arguments.filePath,'src/a b.ts');
+});
+test('catalog accepts parameterized model selectors without allowing arbitrary command strings',()=>{
+ const id='grok-4.7[fast=true]';
+ assert.equal(parseGrokSettings({model:id})?.model,id);
+ assert.equal(parseGrokModels([{modelId:id,name:'Fast'}])[0]?.id,id);
+ for(const model of ['grok --yolo','grok[x=$(cmd)]','grok[x=true][y=true]','grok[fast=true;]'])assert.equal(parseGrokSettings({model}),undefined);
+ assert.equal(grokSettingsActive({mode:'default'}),true);
+ assert.equal(grokSettingsActive({permissionMode:'default'}),true);
+});
+
+test('Grok interviews reject ambiguous, secret and unsupported multi-select or preview questions',()=>{
+ const question={question:'Pick one',options:[{label:'A',description:'First'}]};
+ for(const questions of [[question,question],[{...question,multiSelect:true}],[{...question,multi_select:true}],[{...question,isSecret:true}],[{...question,options:[{label:'A'},{label:'A'}]}],[{...question,options:[{label:'A',preview:'<script>bad</script>'}]}],[{...question,question:'__proto__'}]])assert.throws(()=>grokQuestions({questions}));
+ const questions=grokQuestions({questions:[question]});
+ assert.throws(()=>grokQuestionAnswer(questions,{wrong:{answers:['A']}}));
+ assert.deepEqual(grokQuestionAnswer(questions,{grok_question_0:{answers:['A']}}),{outcome:'accepted',answers:{'Pick one':['A']}});
 });

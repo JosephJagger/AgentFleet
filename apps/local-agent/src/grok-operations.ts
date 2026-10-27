@@ -1,5 +1,18 @@
 /** Reviewed Grok ACP surface. Browser callers never supply a method, session id or cwd. */
 export const grokOperations = {
+  "files.list": {method:"fs/list",write:false,fields:["filePath","offset"]},
+  "files.read": {method:"fs/read_file",write:false,fields:["filePath","offset"]},
+  "session.info": {method:"session/info",write:false,fields:[]},
+  "workflows.list": {method:"workflows/list",write:false,fields:[]},
+  "skills.config": {method:"skills/config",write:false,fields:[]},
+  "skills.enable": {method:"skills/toggle",write:true,fields:["skillName"]},
+  "skills.disable": {method:"skills/toggle",write:true,fields:["skillName"]},
+  "mcp.enable": {method:"mcp/toggle",write:true,fields:["serverName"]},
+  "mcp.disable": {method:"mcp/toggle",write:true,fields:["serverName"]},
+  "mcp.tool.enable": {method:"mcp/toggle_tool",write:true,fields:["serverName","toolName"]},
+  "mcp.tool.disable": {method:"mcp/toggle_tool",write:true,fields:["serverName","toolName"]},
+  "git.stage": {method:"git/stage",write:true,fields:["filePath"]},
+  "git.unstage": {method:"git/unstage",write:true,fields:["filePath"]},
   "git.commit": {method:"git/commit",write:true,fields:["message"]},
   "worktrees.diff": {method:"git/diffs",write:false,fields:["worktreePath"]},
   "worktrees.apply": {method:"git/worktree/apply",write:true,fields:["worktreePath"]},
@@ -53,8 +66,9 @@ export function parseGrokOperation(value:unknown):GrokOperationRequest {
   const operation=value.operation as GrokOperation, spec=grokOperations[operation], args=value.arguments;
   if(Object.keys(args).some(k=>!(spec.fields as readonly string[]).includes(k))||spec.fields.some(k=>!(k in args)))throw Error('Invalid operation fields');
   for(const [key,v] of Object.entries(args)){
-    if(key==='targetPromptIndex'){if(!Number.isSafeInteger(v)||Number(v)<0)throw Error('Invalid checkpoint');}
-    else if(typeof v!=='string'||!v.trim()||v.length>(key==='question'||key==='message'?4000:key==='path'||key==='worktreePath'?4096:256)||v.includes('\0'))throw Error('Invalid text');
+    if(key==='targetPromptIndex'||key==='offset'){if(!Number.isSafeInteger(v)||Number(v)<0)throw Error('Invalid checkpoint');}
+    else if(typeof v!=='string'||!v.trim()||v.length>(key==='question'||key==='message'?4000:key==='path'||key==='worktreePath'||key==='filePath'?4096:256)||v.includes('\0'))throw Error('Invalid text');
+    if(key==='filePath'&&!(operation==='files.list'&&v==='.')&&(!/^[^\\/:*?\[\]\r\n]+(?:\/[^\\:*?\[\]\r\n]+)*$/.test(String(v))||String(v).split('/').some(p=>!p||p==='.'||p==='..')||String(v).startsWith('-')))throw Error('Use one literal project-relative file path');
     if(key==='source'&&!/^https:\/\/[^\s/@:]+(?:\.[^\s/@:]+)+\/[A-Za-z0-9._/-]+$/.test(String(v)))throw Error('Use an explicit HTTPS plugin repository');
     if(key==='mode'&&!['conversation_only','files_only','all'].includes(String(v)))throw Error('Invalid rewind mode');
     if(key==='expectedContentHash'&&(typeof v!=='string'||! /^[a-f0-9]{64}$/.test(v)))throw Error('Invalid hash');
@@ -68,7 +82,7 @@ export interface GrokOperationResult {operation:string;status:string;rows:{name:
 export function grokResult(operation:string,raw:unknown):GrokOperationResult {
   const value=record(raw)&&'result' in raw?raw.result:raw;
   const rows:GrokOperationResult['rows']=[];
-  const labels=['completed','exit_code','task_id','display_command','kind','output','turnCount','toolCallCount','contextUsagePct','errorCount','childSessionId','worktreePath','source_repo','session_id','head_commit','commitHash','warning','pushStatus','failureError','cancelReason','line','patch','gitRoot','headCommit','isClean','changeType','additions','deletions','totalMatches','totalFiles','message','disposition','flushed','observation_count','topics_affected','requiresReload','requiresRestart','source','size_bytes','modified_epoch_secs','generated','capture_enabled','dream_enabled','worktreePath','sourceGitRoot','deleted','newSessionId','newCwd','chatMessagesCopied','parentSessionId','prompt_index','prompt_preview','created_at','has_file_changes','success','error','conflict_type','content','truncated','sourceName','sourceKind','pluginRelativePath','version','scope','disabled','pinned','removable','event','handlerType','configSource','toolCount','skillCount','agentCount','hookStatus','mcpStatus','name','title','id','taskId','subagentId','path','serverName','server_name','command','description','text','answer','summary','status','outcome','enabled','contentHash','expectedContentHash','promptIndex','targetPromptIndex','durationMs','tokensUsed','model','branch'];
+  const labels=['type','size','offset','nextOffset','totalEntries','hasMore','isDirectory','agentName','modelDisplayName','used','total','systemPromptTokens','toolDefinitionsCount','toolDefinitionsTokens','compactionCount','messageCount','messageTokens','freeTokens','usagePct','autoCompactThresholdPercent','label','tokens','detail','authRequired','setupRequired','blockedReason','ok','agent_name','model_display_name','resolved_model_id','turns','turn_index','used_tokens','max_tokens','context_window','total_tokens','auto_compact_threshold_percent','completed','exit_code','task_id','display_command','kind','output','turnCount','toolCallCount','contextUsagePct','errorCount','childSessionId','worktreePath','source_repo','session_id','head_commit','commitHash','warning','pushStatus','failureError','cancelReason','line','patch','gitRoot','headCommit','isClean','changeType','additions','deletions','totalMatches','totalFiles','message','disposition','flushed','observation_count','topics_affected','requiresReload','requiresRestart','source','size_bytes','modified_epoch_secs','generated','capture_enabled','dream_enabled','worktreePath','sourceGitRoot','deleted','newSessionId','newCwd','chatMessagesCopied','parentSessionId','prompt_index','prompt_preview','created_at','has_file_changes','success','error','conflict_type','content','truncated','sourceName','sourceKind','pluginRelativePath','version','scope','disabled','pinned','removable','event','handlerType','configSource','toolCount','skillCount','agentCount','hookStatus','mcpStatus','name','title','id','taskId','subagentId','path','serverName','server_name','command','description','text','answer','summary','status','outcome','enabled','contentHash','expectedContentHash','promptIndex','targetPromptIndex','durationMs','tokensUsed','model','branch'];
   function visit(v:unknown,group:string,depth:number){
     if(depth>4||rows.length>=100)return;
     if(Array.isArray(v)){for(const x of v.slice(0,100))visit(x,group,depth+1);return;}
@@ -76,18 +90,18 @@ export function grokResult(operation:string,raw:unknown):GrokOperationResult {
     if(!record(v))return;
     const fields=labels.filter(k=>['string','boolean','number'].includes(typeof v[k]));
     if(fields.length)rows.push({name:String(v.name??v.title??v.id??v.taskId??v.task_id??v.subagentId??v.path??group).slice(0,500),status:String(v.status??v.outcome??'').slice(0,80),detail:fields.map(k=>k+': '+String(v[k])).join('\n').slice(0,6000)});
-    for(const k of ['tasks','subagents','commands','files','hooks','plugins','skills','servers','tools','sources','worktrees','points','prompts','entries','data','rewind_points','reverted_files','clean_files','conflicts','outcome','loadErrors','snapshot','matches','diffs','staged','unstaged','untracked'])if(k in v)visit(v[k],k,depth+1);
+    for(const k of ['tasks','subagents','commands','files','hooks','plugins','skills','servers','tools','sources','worktrees','points','prompts','entries','data','context','usageCategories','session','workflows','rewind_points','reverted_files','clean_files','conflicts','outcome','loadErrors','snapshot','matches','diffs','staged','unstaged','untracked'])if(k in v)visit(v[k],k,depth+1);
   }
   visit(value,operation,0);
   const v=record(value)?value:{};
-  const status=String(v.disposition??v.status??(typeof v.outcome==='string'?v.outcome:undefined)??(v.success===false||record(raw)&&raw.success===false?'failed':'received')).slice(0,80);
+  const status=String(v.disposition??v.status??(typeof v.outcome==='string'?v.outcome:undefined)??(v.success===false||v.ok===false||record(raw)&&raw.success===false?'failed':'received')).slice(0,80);
   return sanitizeGrokResult({operation,status,rows})!;
 }
 
 export function grokNativeDiscovery(raw:unknown){
  if(!record(raw)||raw.nativeManagement!==true)return {};
  const commands=(Array.isArray(raw.commands)?raw.commands:[]).filter(record).filter(c=>typeof c.name==='string'&&/^[a-z0-9-]{1,80}$/.test(c.name)&&typeof c.description==='string').slice(0,80).map(c=>({name:String(c.name),description:String(c.description).slice(0,500),...(typeof c.hint==='string'?{hint:c.hint.slice(0,200)}:{})}));
- return {nativeManagement:true,commands,grokTools:(Array.isArray(raw.grokTools)?raw.grokTools:[]).filter(v=>v==='x_keyword_search'||v==='x_semantic_search')};
+ return {nativeManagement:true,commands,...(record(raw.grokControls)?{grokControls:{planMode:raw.grokControls.planMode===true,permissionSync:raw.grokControls.permissionSync===true}}:{}),grokTools:(Array.isArray(raw.grokTools)?raw.grokTools:[]).filter(v=>v==='x_keyword_search'||v==='x_semantic_search')};
 }
 
 /** The host and control plane independently enforce the same relay size budget. */

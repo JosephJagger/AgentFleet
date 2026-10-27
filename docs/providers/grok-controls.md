@@ -1,5 +1,7 @@
 # Grok controls and live output (Agent 0.30.117)
 
+> Updated implementation and remaining boundaries: [2026-10-27 ACP alignment](grok-acp-20261027.md). This document retains the original release evidence.
+
 Grok sessions created on earlier Agents have no `configOptions` in their durable
 receipts. Reading only those receipts left the model selector empty until another
 turn finished. In addition, the adapter sent `value: {value: "…"}` to

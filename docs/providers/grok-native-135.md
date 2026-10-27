@@ -1,5 +1,7 @@
 # Grok native workbench — Agent 0.30.135
 
+> Updated implementation and remaining boundaries: [2026-10-27 ACP alignment](grok-acp-20261027.md). This document retains the original release evidence.
+
 Status: published on 2026-10-20 at 05:47 UTC, application commit `840b623b3407c479bc98a5383f3f31c81f1f27d5`. The matching server/web build is healthy with schema 66. Old hosts cannot use `grok.manage`; they receive Agent 0.30.135 through the existing safe idle update path. Development validation and subsequent protected production publication are documented separately below.
 
 ## Verified contracts

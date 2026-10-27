@@ -13,6 +13,12 @@ export function acpImageInput(provider:AcpProviderId, version:string, initialize
     && isRecord(initialize._meta) && initialize._meta.grokShell === true;
 }
 
+/** A prompt image capability does not promise interjection support. These exact
+ * releases accepted an image interjection and identified its content in isolation. */
+export function grokImageInterjection(version:string,imageInput:boolean):boolean {
+  return imageInput && /^grok 1\.0\.(?:62|70)(?:\s|$)/.test(version);
+}
+
 export function acpImageBlocks(images:unknown):Array<{type:'image';mimeType:string;data:string}> {
   return parseImages(images).map(url => {
     const comma=url.indexOf(',');

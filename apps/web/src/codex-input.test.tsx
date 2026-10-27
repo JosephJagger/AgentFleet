@@ -29,3 +29,14 @@ it("expired questions cannot be answered", () => {
   expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button")); expect(api.command).not.toHaveBeenCalled();
 });
+
+it("shows the complete Grok plan before collecting explicit approval or feedback",async()=>{
+ vi.mocked(api.command).mockResolvedValue({command:{id:"cmd",type:"input.respond",state:"accepted",createdAt:"now"}});
+ render(<CodexInputCard request={{...request,grokPlan:"# Proposed plan\n\nCreate hello.txt after approval.",questions:[{id:"grok_plan_review",header:"计划审批",question:"Review the plan",options:[{label:"批准计划并开始执行",description:"Start implementation"}]}]}} onChanged={vi.fn()} agent="Grok"/>);
+ expect(screen.getByText("Create hello.txt after approval.")).toBeTruthy();
+ expect(api.command).not.toHaveBeenCalled();
+ expect((screen.getByRole("button",{name:"提交回答"}) as HTMLButtonElement).disabled).toBe(true);
+ fireEvent.change(screen.getByLabelText("计划审批 的回答"),{target:{value:"Please add tests"}});
+ fireEvent.click(screen.getByRole("button",{name:"提交回答"}));
+ await waitFor(()=>expect(api.command).toHaveBeenCalledWith("session-a",expect.objectContaining({payload:{answers:{grok_plan_review:{answers:["Please add tests"]}}}})));
+});

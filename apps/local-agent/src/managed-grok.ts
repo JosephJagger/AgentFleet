@@ -59,7 +59,7 @@ export async function probeGrok(file:string,version:string,signal:AbortSignal) {
   const result=await exec(file,['--version'],{timeout:10000,maxBuffer:8192,windowsHide:true,signal});
   if(result.stdout.match(/\d+\.\d+\.\d+/)?.[0]!==version)throw new AgentError('PROVIDER_VERSION_MISMATCH','Grok 实际版本与目标不一致');
   const cwd=await mkdtemp(join(tmpdir(),'agentfleet-grok-probe-'));
-  const connection=new AcpConnection({executable:file,args:['--no-auto-update','agent','stdio'],cwd,notification:()=>{},request:async()=>{throw new Error('Probe does not authorize requests');},exit:()=>{}});
+  const connection=new AcpConnection({executable:file,args:['--no-auto-update','agent','--no-leader','stdio'],cwd,notification:()=>{},request:async()=>{throw new Error('Probe does not authorize requests');},exit:()=>{}});
   const abort=()=>connection.close();signal.addEventListener('abort',abort,{once:true});
   try{signal.throwIfAborted();connection.start();const value=await connection.call('initialize',{protocolVersion:1,clientCapabilities:{},clientInfo:{name:'agentfleets-validation',version:'1.0.0'}},15000) as {protocolVersion?:number;agentCapabilities?:unknown};if(value.protocolVersion!==1||!value.agentCapabilities)throw new AgentError('ACP_INCOMPATIBLE','Grok 协议检查未通过');signal.throwIfAborted();}
   finally{signal.removeEventListener('abort',abort);await connection.closeAndWait();await rm(cwd,{recursive:true,force:true});}
