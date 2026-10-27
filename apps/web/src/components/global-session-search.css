@@ -1,7 +1,5 @@
 .global-search-trigger { display:inline-flex; align-items:center; gap:7px; flex-shrink:0; min-height:40px; padding:8px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); color:var(--ink); background:var(--paper); font:inherit; cursor:pointer; }
 .global-search-trigger kbd { color:var(--muted); font-size:11px; margin-left:8px; }
-.catalog-global-search { display:flex; justify-content:flex-end; padding:0 24px 14px; }
-.catalog-global-search button { display:inline-flex; align-items:center; gap:6px; color:var(--cobalt-deep); background:transparent; border:0; font:inherit; font-size:var(--text-caption); cursor:pointer; padding:6px 0; }
 dialog.global-session-search { box-sizing:border-box; width:min(740px,calc(100vw - 32px)); max-width:calc(100vw - 24px); height:min(780px,calc(100dvh - 64px)); max-height:calc(100dvh - 32px); margin:auto; padding:0; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--paper-solid); color:var(--ink); box-shadow:var(--shadow); overflow:hidden; }
 dialog.global-session-search[open] { display:flex; flex-direction:column; }
 .global-session-search::backdrop { background:rgb(0 0 0 / .46); }
@@ -39,7 +37,7 @@ dialog.global-session-search[open] { display:flex; flex-direction:column; }
 .global-search-empty p { margin:0; font-size:var(--text-caption); line-height:1.65; }
 .global-search-more { flex-shrink:0; margin:0 24px 12px; padding:10px; border:1px solid var(--line); background:var(--paper); color:var(--ink); border-radius:8px; cursor:pointer; }
 .global-search-footer { flex-shrink:0; display:flex; flex-wrap:wrap; gap:8px 16px; justify-content:space-between; padding:12px 24px; border-top:1px solid var(--line); color:var(--muted); font-size:.76rem; line-height:1.5; }
-.global-session-search button:focus-visible,.global-session-search select:focus-visible,.global-search-trigger:focus-visible,.catalog-global-search button:focus-visible { outline:2px solid var(--cobalt); outline-offset:2px; }
+.global-session-search button:focus-visible,.global-session-search select:focus-visible,.global-search-trigger:focus-visible { outline:2px solid var(--cobalt); outline-offset:2px; }
 @media(max-width:640px) {
   .global-search-trigger { padding:8px; }
   .global-search-trigger kbd { display:none; }
