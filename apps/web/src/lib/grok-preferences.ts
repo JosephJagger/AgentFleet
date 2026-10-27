@@ -58,10 +58,12 @@ export function useGrokPreferences(sessionId:string|undefined,sessionSeq?:number
     const epoch=generation.current;
     const run=chain.current.then(async()=>{
       if(generation.current!==epoch||active.current!==sessionId||!readyRef.current)throw new Error("会话配置尚未读取，请重试。");
+      const savedAt=sequence.current;
       const result=await api.saveGrokPreferences(sessionId,{settings,revision:revision.current});
-      if(generation.current!==epoch||active.current!==sessionId)return result;
+      // A delayed receipt must not roll the known revision backward or look fresh for a later sequence.
+      if(generation.current!==epoch||active.current!==sessionId||!(result.revision>revision.current))return result;
       revision.current=result.revision;readyRef.current=true;
-      setState({id:sessionId,data:result,ready:true,error:"",readSeq:sequence.current});
+      setState({id:sessionId,data:result,ready:true,error:"",readSeq:savedAt});
       return result;
     });
     chain.current=run.then(()=>undefined,()=>undefined);
