@@ -28,6 +28,14 @@ import { canonicalJson, identifier, isRecord, nowIso, sha256 } from "./util.js";
 
 const execFileAsync = promisify(execFile);
 
+/** A claim never sends a task. Old agents also fenced history paging timeouts
+ * after binding the thread; both cases still require proven writer release. */
+function recoverableClaimTimeout(journal: AgentState["commandJournal"][string] | undefined): boolean {
+  return journal?.state === "unknown" && journal.commandType === "thread.claim" &&
+    journal.error?.code === "APP_SERVER_TIMEOUT" &&
+    ["thread/resume did not respond in time", "thread/items/list did not respond in time"].includes(journal.error.message);
+}
+
 function emptyState(): AgentState {
   return {
     nativeDeletionTombstones: {},
@@ -739,11 +747,7 @@ export class StateStore {
 
   canSafelyRestart(recoverableClaims: readonly string[] = []): boolean {
     const state = this.snapshot();
-    const ignored = new Set(recoverableClaims.filter(id => {
-      const journal = state.commandJournal[id];
-      return journal?.state === "unknown" && journal.commandType === "thread.claim" &&
-        journal.error?.code === "APP_SERVER_TIMEOUT" && journal.error.message === "thread/resume did not respond in time";
-    }));
+    const ignored = new Set(recoverableClaims.filter(id => recoverableClaimTimeout(state.commandJournal[id])));
     return this.auxiliaryActivities.size === 0 && !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean", "versions.clean", "worktree.create", "worktree.merge", "worktree.remove"].includes(operation.operationType)) &&
       !Object.values(state.managedThreads).some((thread) => thread.activeTurnId !== undefined || thread.realtimeSessionId !== undefined) &&
       !Object.values(state.approvals).some((approval) => approval.state === "pending" || approval.state === "delivery_unknown") &&
@@ -759,8 +763,7 @@ export class StateStore {
       let count = 0;
       for (const id of commandIds) {
         const journal = state.commandJournal[id];
-        if (journal?.state !== "unknown" || journal.commandType !== "thread.claim" ||
-            journal.error?.code !== "APP_SERVER_TIMEOUT" || journal.error.message !== "thread/resume did not respond in time") continue;
+        if (!journal || !recoverableClaimTimeout(journal)) continue;
         const error = { code: "THREAD_CLAIM_ABORTED", message: "接管超时；已确认会话执行连接释放。原会话和历史保留，可以重新接管。" };
         journal.state = "applied";
         journal.error = error;

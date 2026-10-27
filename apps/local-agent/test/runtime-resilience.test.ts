@@ -1695,6 +1695,87 @@ test("paged history bounds each pass, checkpoints across reopen and deduplicates
   assert.equal(reads.at(-1),"600","incremental read resumes at bounded tail page");
 });
 
+test("claim history timeout preserves binding and checkpoint without freezing or resending a task", async t => {
+  const { store, projects } = await fixture(); const project = projects[0]!; const id = "slow-claim-history";
+  let server!: FakeAppServer; let fail = true;
+  const cursors: (string | null)[] = [];
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: callbacks => {
+    server = new FakeAppServer("history-timeout", callbacks);
+    server.listThreadsHook = async () => [{ nativeThreadId: id, cwd: project.root, title: "Original", executionState: "idle", historyMode: "paginated" }];
+    server.histories.set(id, { nativeThreadId: id, cwd: project.root, executionState: "idle", historyMode: "paginated", updatedAt: 1, items: [], paged: true });
+    return Object.assign(server, { readHistoryPage: async (_id: string, cursor: string | null) => {
+      cursors.push(cursor);
+      if (cursor === "next" && fail) throw new AgentError("APP_SERVER_TIMEOUT", "thread/items/list did not respond in time");
+      const itemId = cursor === null ? "first-item" : "last-item";
+      return { items: [{ nativeTurnId: "original-turn", nativeItemId: itemId, item: { id: itemId, type: "agentMessage", text: "original history" } }], nextCursor: cursor === null ? "next" : null };
+    } });
+  } });
+  t.after(async () => { await runtime.shutdown(); store.close(); });
+  runtime.setTransportGeneration(1); await runtime.initialize();
+  const request = claimCommand(project, id, "slow-history-session", server.appServerEpoch);
+  await runtime.handleCommand(request, 1);
+  const state = store.snapshot();
+  assert.equal(state.commandJournal[request.commandId]?.state, "applied");
+  assert.equal(state.commandJournal[request.commandId]?.error, undefined);
+  assert.equal((state.commandJournal[request.commandId]?.response as Record<string, unknown>)?.historySyncPending, true);
+  assert.equal(state.managedThreads[id]?.logicalSessionId, request.logicalSessionId);
+  assert.equal(state.managedThreads[id]?.historyPage?.cursor, "next");
+  assert.equal(state.managedThreads[id]?.subscribed, false);
+  assert.equal(store.canSafelyRestart(), true);
+  assert.equal(server.unsubscribeCount, 1);
+  assert.equal(state.outbox.filter(e => e.payload.code === "HISTORY_SYNC_PENDING").length, 1);
+  fail = false;
+  await runtime.refreshCatalog(false);
+  assert.equal(cursors.at(-1), "next");
+  assert.equal(store.snapshot().managedThreads[id]?.historyPage?.complete, true);
+  assert.equal(store.snapshot().outbox.filter(e => e.type === "item.completed").length, 2);
+  await runtime.handleCommand({ ...request, attemptId: "retry-history-claim" }, 1);
+  assert.equal(server.resumeCount, 1);
+  assert.equal(server.startTurnCount, 0);
+});
+
+for (const releaseFails of [false, true]) test(`repair legacy history timeout requires writer release: ${releaseFails}`, async t => {
+  const { store, projects } = await fixture(); const project = projects[0]!;
+  const servers: FakeAppServer[] = []; let releases = 0;
+  const runtime = new AgentRuntime({ store, identity, pairing, support, appServerFactory: callbacks => {
+    const server = new FakeAppServer(`repair-${servers.length}`, callbacks); servers.push(server);
+    return Object.assign(server, { releaseIdleWriters: async () => { releases++; if (releaseFails) throw new Error("exit unproven"); } });
+  } });
+  t.after(async () => { await runtime.shutdown(); store.close(); });
+  runtime.setTransportGeneration(1); await runtime.initialize();
+  const request = claimCommand(project, "old-history", "old-session", servers[0]!.appServerEpoch);
+  await store.claimCommand(request, "original-hash");
+  await store.reserveProjectCommand({ projectId: project.id, commandId: request.commandId, attemptId: request.attemptId, envelopeHash: "original-hash", appServerEpoch: servers[0]!.appServerEpoch });
+  await store.transitionCommand(request.attemptId, "claimed", "invoking");
+  await store.markCommandUnknown(request.attemptId, { code: "APP_SERVER_TIMEOUT", message: "thread/items/list did not respond in time" });
+  await store.setManagedThread({ nativeThreadId: "old-history", projectId: project.id, logicalSessionId: request.logicalSessionId, executionSegmentId: request.executionSegmentId, contentEpoch: 1, createdAt: new Date().toISOString(), appServerEpoch: servers[0]!.appServerEpoch, policyVersion: "remote-restricted-v1", policyVerified: true, subscribed: false });
+  await store.setMaintenanceDrain("repair-operation");
+  const target = { commands: [request.commandId], sessions: [] };
+  store.setAuxiliaryActivity("relay", true);
+  assert.equal((await runtime.repairConnection(target)).repaired, false);
+  assert.equal(releases, 0, "active auxiliary work must prevent writer release");
+  store.setAuxiliaryActivity("relay", false);
+  if (releaseFails) {
+    await assert.rejects(runtime.repairConnection(target), /exit unproven/);
+    assert.equal(store.snapshot().commandJournal[request.commandId]?.state, "unknown");
+    assert.ok(store.snapshot().projectReservations[project.id]);
+    assert.equal(servers[0]!.stopCount, 0);
+  } else {
+    const result = await runtime.repairConnection(target);
+    assert.equal(result.repaired, true); assert.equal(result.recoveredClaims, 1);
+    const receipts = result.commandReceipts as { commands: { commandId: string; attemptId: string; error: { code: string } }[] };
+    assert.equal(receipts.commands[0]?.commandId, request.commandId);
+    assert.equal(receipts.commands[0]?.attemptId, request.attemptId);
+    assert.equal(receipts.commands[0]?.error.code, "THREAD_CLAIM_ABORTED");
+    assert.equal(store.snapshot().commandJournal[request.commandId]?.state, "applied");
+    assert.equal(store.snapshot().projectReservations[project.id], undefined);
+    assert.ok(store.snapshot().managedThreads["old-history"], "original session survives recovery");
+  }
+  assert.equal(releases, 1);
+  assert.equal(servers.reduce((n, server) => n + server.startTurnCount, 0), 0);
+  assert.equal(servers.reduce((n, server) => n + server.resumeCount, 0), 0);
+});
+
 for (const mode of ["skip-existing","legacy-anchor"] as const) test(`paged baseline never reimports skipped prefixes: ${mode}`,async t=>{
  const {store,projects}=await fixture();const project=projects[0]!;const id="baseline-pages";
  const items=Array.from({length:220},(_,i)=>({nativeTurnId:"turn",nativeItemId:`item-${i}`,item:{id:`item-${i}`,type:"agentMessage",text:`history ${i}`}}));

@@ -1925,7 +1925,18 @@ export class AgentRuntime {
             ...(project.provider==="cursor"?{effectivePolicy:resumed.rawSummary}:{}),
           },
         });
-        const importedItems = await this.syncManagedHistory(thread, resumed.history, true);
+        let importedItems: number;
+        try { importedItems = await this.syncManagedHistory(thread, resumed.history, true); }
+        catch (error) {
+          if (!(error instanceof AgentError) || error.code !== "APP_SERVER_TIMEOUT" || error.message !== "thread/items/list did not respond in time") throw error;
+          // Binding is durable and its writer has already been released. Only
+          // read-only history paging is pending, not the outcome of a task.
+          // Preserve the checkpoint so the next catalog pass can continue.
+          await this.emitForThread(thread, { type: "agent.warning", nativeThreadId,
+            payload: { code: "HISTORY_SYNC_PENDING", detail: "会话已接管，历史读取超时；已保留同步进度，后续扫描会继续读取。" } });
+          this.notifyRegistryChanged();
+          return { nativeThreadId, claimed: true, historyCompleteness: "partial", historySyncPending: true };
+        }
         this.notifyRegistryChanged();
         return { nativeThreadId, claimed: true, importedItems, historyCompleteness: "partial" };
       }

@@ -264,7 +264,7 @@ for (const variant of ["missing", "queued", "cwd", "timeout", "active", "hash", 
  }else assert.ok(state.projectReservations[command.projectId]);
 });
 
-test("released claim timeout recovery is narrow, durable and never treats failure as success", async t => {
+for (const method of ["thread/resume", "thread/items/list"]) test(`released claim timeout recovery is narrow and durable: ${method}`, async t => {
   const directory = await mkdtemp(join(tmpdir(), "claim-recovery-"));
   const store = new StateStore(directory); await store.initialize();
   t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
@@ -272,23 +272,38 @@ test("released claim timeout recovery is narrow, durable and never treats failur
   await store.claimCommand(request, "claim-hash");
   await store.reserveProjectCommand({ projectId: request.projectId, commandId: request.commandId, attemptId: request.attemptId, envelopeHash: "claim-hash", appServerEpoch: "old" });
   await store.transitionCommand(request.attemptId, "claimed", "invoking");
-  await store.markCommandUnknown(request.attemptId, { code: "APP_SERVER_TIMEOUT", message: "thread/resume did not respond in time" });
+  await store.markCommandUnknown(request.attemptId, { code: "APP_SERVER_TIMEOUT", message: `${method} did not respond in time` });
   const ids = [request.commandId];
   assert.equal(store.canSafelyRestart(), false);
   assert.equal(store.canSafelyRestart(ids), true);
   assert.equal(await store.settleReleasedClaimTimeouts(ids), 0, "maintenance fence required");
   await store.setMaintenanceDrain("repair");
+  for (const message of ["turn/start did not respond in time", "thread/delete did not respond in time", "thread/items/list timed out"]) {
+    await store.markCommandUnknown(request.attemptId, { code: "APP_SERVER_TIMEOUT", message });
+    assert.equal(store.canSafelyRestart(ids), false);
+    assert.equal(await store.settleReleasedClaimTimeouts(ids), 0);
+  }
+  await store.markCommandUnknown(request.attemptId, { code: "APP_SERVER_RPC_ERROR", message: `${method} did not respond in time` });
+  assert.equal(store.canSafelyRestart(ids), false);
+  await store.markCommandUnknown(request.attemptId, { code: "APP_SERVER_TIMEOUT", message: `${method} did not respond in time` });
   store.setAuxiliaryActivity("voice", true);
   assert.equal(await store.settleReleasedClaimTimeouts(ids), 0);
   store.setAuxiliaryActivity("voice", false);
   const turn = testCommand("turn-attempt", "turn-command");
   await store.claimCommand(turn, "turn-hash");
   await store.transitionCommand(turn.attemptId, "claimed", "invoking");
-  await store.markCommandUnknown(turn.attemptId, { code: "APP_SERVER_TIMEOUT", message: "thread/resume did not respond in time" });
+  await store.markCommandUnknown(turn.attemptId, { code: "APP_SERVER_TIMEOUT", message: `${method} did not respond in time` });
   assert.equal(store.canSafelyRestart([...ids, turn.commandId]), false, "unknown task must never be ignored");
   await store.update(state => { delete state.commandJournal[turn.commandId]; delete state.inbox[turn.attemptId]; });
   assert.equal(await store.settleReleasedClaimTimeouts(ids), 1);
   assert.equal(store.canSafelyRestart(), true);
   assert.equal(store.snapshot().commandJournal[request.commandId]?.error?.code, "THREAD_CLAIM_ABORTED");
   assert.equal(await store.settleReleasedClaimTimeouts(ids), 0);
+  const reopened = new StateStore(directory); await reopened.initialize();
+  t.after(() => reopened.close());
+  assert.equal(reopened.snapshot().commandJournal[request.commandId]?.error?.code, "THREAD_CLAIM_ABORTED");
+  const replay = await reopened.claimCommand({ ...request, attemptId: "replayed-claim" }, "claim-hash");
+  assert.equal(replay.isNew, false);
+  assert.equal(replay.entry.state, "applied");
+  assert.equal(replay.entry.error?.code, "THREAD_CLAIM_ABORTED");
 });
