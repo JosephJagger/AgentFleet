@@ -267,7 +267,7 @@ export interface Approval {
   logicalSessionId: string;
   approvalVersion: number;
   type: "command" | "file_change" | "user_input";
-  questions?: { id: string; header: string; question: string; options: { label: string; description: string }[] }[];
+  questions?: { id: string; header: string; question: string; multi?: boolean; options: { label: string; description: string }[] }[];
   status: "pending" | "decided" | "delivery_in_progress" | "delivery_unknown" | "request_resolved" | "completed" | "expired" | "cancelled" | "invalidated";
   machineName: string;
   projectAlias: string;

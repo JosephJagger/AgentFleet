@@ -29,7 +29,7 @@ import type {TurnExtras} from './attachments.js';
 import {inputAnswers,inputQuestions,type InputAnswers,type InputQuestion} from './user-input.js';
 import {grokProgressText,grokModelOptions,parseGrokModels,acpPlanText,acpToolItem,acpUsage,grokLaunchArgs,grokSessionMeta,mergeConfigOptions,parseConfigOptions,parseGrokSettings,type ConfigOption,type GrokSettings} from './acp-updates.js';
 import type {CodexSettings} from './codex-settings.js';
-interface Session {grokMode?:'default'|'plan';grokModeSupported?:boolean;permissionRequested?:'default'|'always'|'auto';id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode:'default'|'always'|'auto';configOptions:ConfigOption[];cursorOptions:CursorOption[];published:Map<string,string>;completed:Set<string>;itemSizes:Map<string,number>;historyBytes:number;textPublishedAt:number;usageTotals?:import('./acp-updates.js').TokenCounts;}
+interface Session {grokMode?:'default'|'plan';grokModeSupported?:boolean;permissionRequested?:'default'|'always'|'auto';id:string;cwd:string;connection:AcpConnection;items:ThreadHistoryItem[];turnId?:string;cancelled:boolean;loading:boolean;lost:boolean;imageInput:boolean;permissionMode?:'default'|'always'|'auto';configOptions:ConfigOption[];cursorOptions:CursorOption[];published:Map<string,string>;completed:Set<string>;itemSizes:Map<string,number>;historyBytes:number;textPublishedAt:number;usageTotals?:import('./acp-updates.js').TokenCounts;}
 interface Pending {session:Session;request:ApprovalRecord;options:Array<Record<string,unknown>>;resolve:(v:unknown)=>void;timer:NodeJS.Timeout;kind:'permission'|'question'|'plan'|'grokForm'|'grokPlan'|'grokQuestion';form?:GrokForm;questions?:InputQuestion[]|undefined;nativeQuestions?:Array<Record<string,unknown>>|undefined;}
 function clipUtf8(value:string,max=24000){if(Buffer.byteLength(value)<=max)return {text:value,truncated:false};let text=Buffer.from(value).subarray(0,max).toString('utf8');if(text.endsWith('\uFFFD'))text=text.slice(0,-1);return {text,truncated:true};}
 const dependencies={cursorSessions:listCursorTerminalSessions,prepareCursor:prepareCursorTerminalSession,detect:detectAcp,unoccupied:assertAcpUnoccupied,readGrokUsage,readCursorQuota,connection:(o:ConstructorParameters<typeof AcpConnection>[0])=>new AcpConnection(o)};
@@ -188,7 +188,7 @@ export class AcpRuntime {
     // closing children owned, and confirm their exit before opening a replacement.
     await Promise.all([...this.connections].filter(connection=>connection.closing).map(connection=>connection.closeAndWait()));
     await this.deps.unoccupied(this.provider,this.owned);
-    const session={id,cwd,items:[],cancelled:false,loading:true,lost:false,permissionMode:settings?.permissionMode??'default',configOptions:[],cursorOptions:[],published:new Map<string,string>(),completed:new Set<string>(),itemSizes:new Map<string,number>(),historyBytes:0,textPublishedAt:0} as unknown as Session;
+    const session={id,cwd,items:[],cancelled:false,loading:true,lost:false,permissionMode:this.provider==='grok'?settings?.permissionMode:(settings?.permissionMode??'default'),configOptions:[],cursorOptions:[],published:new Map<string,string>(),completed:new Set<string>(),itemSizes:new Map<string,number>(),historyBytes:0,textPublishedAt:0} as unknown as Session;
     let env:NodeJS.ProcessEnv|undefined;
     if(this.provider==='cursor'&&!fresh) {
       const row=(await this.deps.cursorSessions()).find(row=>row.id===this.native(id));
@@ -276,6 +276,7 @@ export class AcpRuntime {
     // Native policy may clamp the request; there is no effective-permission acknowledgement.
     session.connection.notify('_x.ai/yolo_mode_changed',{yolo_mode:mode==='always',auto_mode:mode==='auto',permission_mode:mode==='always'?'always-approve':mode==='auto'?'auto':'ask'});
     await session.connection.call('_x.ai/session/info',{sessionId:this.native(session.id)},10000);
+    session.permissionMode=mode;
     session.permissionRequested=mode;
   }
   private async applyCursorConfig(session:Session,settings:CursorSettings){
@@ -316,9 +317,11 @@ export class AcpRuntime {
     const settingsRejected=this.provider==='grok'?Boolean(settings)&&!grok:this.provider==='cursor'?settings!==undefined&&!cursor:Boolean(settings&&Object.keys(settings).length);
     if(blocked||settingsRejected)throw new AgentError('PROVIDER_INPUT_UNAVAILABLE','This provider currently accepts plain text with native settings only');
     const imageBlocks=acpImageBlocks(images);
-    const desired=grok?.permissionMode??'default';
+    // --always-approve is fixed at process start. Other verified modes stay in-process.
+    // An unset choice is not explicit ask mode and must not send that notification.
+    const desired=grok?.permissionMode;
     const known=this.sessions.get(thread.nativeThreadId);
-    if(this.provider==='grok'&&known&&!known.lost&&known.permissionMode!==desired)await this.unsubscribeThread(known.id);
+    if(this.provider==='grok'&&known&&!known.lost&&(known.permissionMode==='always')!==(desired==='always'))await this.unsubscribeThread(known.id);
     await this.deps.unoccupied(this.provider,this.owned);
     const session=await this.open(thread.nativeThreadId,thread.sessionCwd??project.root,false,grok);
     if(extras?.goal&&this.provider==='grok'){if(!this.availability.commands?.some(c=>c.name==='goal'))throw new AgentError('GROK_OPTION_UNAVAILABLE','Native goal command is unavailable');prompt='/goal '+extras.goal.trim()+'\n'+prompt;}
@@ -653,7 +656,9 @@ export class AcpRuntime {
     const p=this.pending.get(String(approval.nativeRequestId));
     if((p?.kind==='grokPlan'||p?.kind==='grokQuestion')&&p.questions){
       if(p.session.lost||p.session.turnId!==approval.nativeTurnId||p.request.actionHash!==approval.actionHash||approval.appServerEpoch!==this.appServerEpoch)throw new AgentError('APPROVAL_STALE','Plan review is no longer current');
-      const result=p.kind==='grokPlan'?grokPlanAnswer(p.questions,answers):grokQuestionAnswer(p.questions,answers);clearTimeout(p.timer);this.pending.delete(String(approval.nativeRequestId));p.resolve(result);await this.callbacks.onApprovalResolved(approval.nativeRequestId,this.appServerEpoch);return;
+      const result=p.kind==='grokPlan'?grokPlanAnswer(p.questions,answers):grokQuestionAnswer(p.questions,answers);
+      if(p.kind==='grokPlan'&&(result.outcome==='approved'||result.outcome==='abandoned'))p.session.grokMode='default';
+      clearTimeout(p.timer);this.pending.delete(String(approval.nativeRequestId));p.resolve(result);await this.callbacks.onApprovalResolved(approval.nativeRequestId,this.appServerEpoch);return;
     }
     if(p?.kind==='grokForm'&&p.form){
       if(p.session.lost||p.session.turnId!==approval.nativeTurnId||p.request.actionHash!==approval.actionHash||approval.appServerEpoch!==this.appServerEpoch)throw new AgentError('APPROVAL_STALE','MCP form is no longer current');

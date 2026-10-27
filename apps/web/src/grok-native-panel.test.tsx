@@ -59,6 +59,28 @@ it('MCP tool controls submit only the explicit names and require confirmation',a
  fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'执行'}));
  await waitFor(()=>expect(api.command).toHaveBeenCalledWith('s',expect.objectContaining({payload:{operation:'mcp.tool.disable',arguments:{serverName:'search',toolName:'lookup'},confirmed:true}})));
 });
+it('a workflow result fills the composer and does not send',()=>{
+ const compose=vi.fn();
+ const long='a'.repeat(65);
+ const commands=[{id:'wf',type:'grok.manage',grokResult:{operation:'workflows.list',status:'received',rows:[
+  {name:'review',status:'',detail:'workflow'},
+  {name:'Bad Name',status:'',detail:'space'},
+  {name:'Review',status:'',detail:'uppercase'},
+  {name:long,status:'',detail:'long'},
+ ]}} as CommandReceipt];
+ render(<GrokNativePanel session={session} commands={commands} supported onChanged={()=>{}} onCompose={compose}/>);
+ fireEvent.click(screen.getByText('Grok 原生工具'));
+ expect(screen.queryByRole('button',{name:'填入输入框'})).toBeNull();
+ fireEvent.change(screen.getByLabelText('操作'),{target:{value:'workflows.list'}});
+ expect(screen.getAllByRole('button',{name:'填入输入框'})).toHaveLength(1);
+ expect(screen.getByText('Bad Name')).toBeTruthy();
+ expect(screen.getByText('Review')).toBeTruthy();
+ expect(screen.getByText(long)).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'填入输入框'}));
+ expect(compose).toHaveBeenCalledOnce();
+ expect(compose).toHaveBeenCalledWith('/workflow review');
+ expect(api.command).not.toHaveBeenCalled();
+});
 it('file inspection uses numeric offsets and remains an explicit read',async()=>{
  render(<GrokNativePanel session={session} commands={[]} supported onChanged={()=>{}}/>);
  fireEvent.click(screen.getByText('Grok 原生工具'));fireEvent.change(screen.getByLabelText('操作'),{target:{value:'files.list'}});

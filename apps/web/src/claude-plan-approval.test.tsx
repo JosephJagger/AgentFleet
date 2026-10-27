@@ -48,6 +48,12 @@ it("localizes plan consent and disables both decisions while delivery is in prog
  expect(decide).not.toHaveBeenCalled();
 });
 
+it("keeps multi-select only when the native question marks it",()=>{
+ const raw=(multi:boolean)=>({approvalId:"approval",logicalSessionId:"session",context:{action:{kind:"user_input",questions:[{id:"q",header:"H",question:"Q",multi,options:[{label:"A",description:""}]}]}}});
+ const grok=[{...session,provider:"grok"} as FleetSession];
+ expect(mapApproval(raw(true),grok,[],[]).questions?.[0]?.multi).toBe(true);
+ expect(mapApproval(raw(false),grok,[],[]).questions?.[0]?.multi).toBeUndefined();
+});
 it("maps Grok native plan reviews only from the explicit structured request",()=>{
  const raw={approvalId:"approval",logicalSessionId:"session",context:{action:{kind:"user_input",toolName:"exit_plan_mode",planContent:"# Grok plan"}}};
  expect(mapApproval(raw,[{...session,provider:"grok"} as FleetSession],[],[]).grokPlan).toBe("# Grok plan");

@@ -30,6 +30,19 @@ it("expired questions cannot be answered", () => {
   fireEvent.click(screen.getByRole("button")); expect(api.command).not.toHaveBeenCalled();
 });
 
+it("sends every selected multi-select label plus one note, while a radio answer stays one element",async()=>{
+ vi.mocked(api.command).mockResolvedValue({command:{id:"cmd",type:"input.respond",state:"accepted",createdAt:"now"}});
+ render(<CodexInputCard request={{...request,questions:[{id:"db",header:"数据库",question:"使用哪些？",multi:true,options:[{label:"SQLite",description:"本地"},{label:"Postgres",description:"服务器"}]}]}} onChanged={vi.fn()}/>);
+ expect(screen.getByText("可多选，至少选择一项或填写补充。")).toBeTruthy();
+ expect(screen.queryByRole("radio")).toBeNull();
+ expect((screen.getByRole("button",{name:"提交回答"}) as HTMLButtonElement).disabled).toBe(true);
+ fireEvent.change(screen.getByLabelText("数据库 的回答"),{target:{value:"我的库"}});
+ expect((screen.getByRole("button",{name:"提交回答"}) as HTMLButtonElement).disabled).toBe(false);
+ fireEvent.click(screen.getAllByRole("checkbox")[0]!);
+ fireEvent.click(screen.getAllByRole("checkbox")[1]!);
+ fireEvent.click(screen.getByRole("button",{name:"提交回答"}));
+ await waitFor(()=>expect(api.command).toHaveBeenCalledWith("session-a",expect.objectContaining({payload:{answers:{db:{answers:["SQLite","Postgres","我的库"]}}}})));
+});
 it("shows the complete Grok plan before collecting explicit approval or feedback",async()=>{
  vi.mocked(api.command).mockResolvedValue({command:{id:"cmd",type:"input.respond",state:"accepted",createdAt:"now"}});
  render(<CodexInputCard request={{...request,grokPlan:"# Proposed plan\n\nCreate hello.txt after approval.",questions:[{id:"grok_plan_review",header:"计划审批",question:"Review the plan",options:[{label:"批准计划并开始执行",description:"Start implementation"}]}]}} onChanged={vi.fn()} agent="Grok"/>);

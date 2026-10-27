@@ -549,7 +549,7 @@ export function mapApproval(rawValue: unknown, sessions: FleetSession[], machine
     type: action.kind === "user_input" ? "user_input" : command ? "command" : "file_change",
     questions: action.kind === "user_input" ? list(action.questions).map((value) => {
       const question = record(value);
-      return { id: string(question.id), header: string(question.header), question: string(question.question), options: list(question.options).map((v) => { const o = record(v); return { label: string(o.label), description: string(o.description) }; }) };
+      return { id: string(question.id), header: string(question.header), question: string(question.question), ...(question.multi === true ? { multi: true } : {}), options: list(question.options).map((v) => { const o = record(v); return { label: string(o.label), description: string(o.description) }; }) };
     }) : undefined,
     status,
     machineName: machine?.name ?? session?.machineName ?? t("未知主机"),

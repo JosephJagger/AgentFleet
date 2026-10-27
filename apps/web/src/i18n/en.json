@@ -4334,6 +4334,8 @@
   "当前原生版本尚未验证权限同步，请沿用原生设置或更新 Grok。": "Permission synchronization has not been verified for this native version. Keep native settings or update Grok.",
   "会话信息与上下文": "Session information and context",
   "查看 Workflow": "View workflows",
+  "填入输入框": "Fill the composer",
+  "可多选，至少选择一项或填写补充。": "Select one or more options, or add a note.",
   "技能来源": "Skill sources",
   "启用技能": "Enable skill",
   "停用技能": "Disable skill",

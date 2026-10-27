@@ -78,6 +78,8 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
    if(requestKind==='permission'){send({id:991,method:'session/request_permission',params:{sessionId,toolCall:{title:'Synthetic write'},options:[{optionId:'one',kind:'allow_once'},{optionId:'all',kind:'allow_always'},{optionId:'no',kind:'reject_once'}]}});return;}
    if(requestKind.startsWith('grok-plan')){send({id:991,method:'_x.ai/exit_plan_mode',params:{sessionId,toolCallId:'plan-1',planContent:requestKind==='grok-plan-large'?'x'.repeat(64001):requestKind==='grok-plan-empty'?null:'# Proposed plan\n\nCreate hello.txt only after approval.'}});return;}
    if(requestKind==='grok-question'){send({id:991,method:'_x.ai/ask_user_question',params:{sessionId,toolCallId:'question-1',mode:'plan',questions:[{question:'Which database?',options:[{label:'SQLite',description:'Local'}]}]}});return;}
+   if(requestKind==='grok-question-multi'){send({id:991,method:'_x.ai/ask_user_question',params:{sessionId,toolCallId:'question-2',questions:[{question:'Which databases?',multi_select:true,options:[{label:'SQLite',description:'Local'},{label:'Postgres',description:'Server'}]}]}});return;}
+   if(requestKind==='grok-question-preview'){send({id:991,method:'_x.ai/ask_user_question',params:{sessionId,toolCallId:'question-3',questions:[{question:'Preview?',options:[{label:'A',preview:'hidden'}]}]}});return;}
    if(requestKind==='grok-form'){send({id:991,method:'_x.ai/mcp/elicit',params:{sessionId,serverName:'test-mcp',toolCallId:'form-1',mode:'form',message:'Confirm choice',requestedSchema:{type:'object',properties:{enabled:{type:'boolean'}},required:['enabled']}}});return;}
    if(requestKind==='question'){send({id:991,method:'cursor/ask_question',params:{toolCallId:'q',questions:[{id:'q1',prompt:'Choose',options:[{id:'a',label:'Alpha'},{id:'b',label:'Beta'}]}]}});return;}
    if(requestKind==='burst'){
@@ -566,6 +568,34 @@ test('Grok restores auto permissions on each new connection and explicit default
  }
  assert.ok(f.requests.filter(r=>r.method==='session/load').every(r=>!r.params._meta));
 });
+test('verified Grok permission changes reconnect only when crossing always-allow',async t=>{
+ const f=await fixture(t,'grok');
+ const base=f.counts.connections;
+ await f.runtime.startTurn(f.thread,f.project,'hello',undefined,{permissionMode:'auto'});
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ const kept=f.counts.connections;
+ await f.runtime.startTurn(f.thread,f.project,'hello',undefined,{permissionMode:'default'});
+ await until(()=>f.events.filter(e=>e.type==='turn.completed').length===2);
+ assert.equal(f.counts.connections,kept);
+ assert.equal(f.counts.connections,base);
+ const notices=f.requests.filter(r=>r.method==='_x.ai/yolo_mode_changed');
+ assert.deepEqual(notices.map(r=>r.params.permission_mode),['auto','ask']);
+ const beforeAlways=f.counts.connections;
+ await f.runtime.startTurn(f.thread,f.project,'hello',undefined,{permissionMode:'always'});
+ await until(()=>f.events.filter(e=>e.type==='turn.completed').length===3);
+ assert.ok(f.counts.connections>beforeAlways);
+ assert.ok(f.launches.at(-1)?.includes('--always-approve'));
+ const beforeUnset=f.counts.connections;
+ await f.runtime.startTurn(f.thread,f.project,'hello',undefined,{mode:'default'});
+ await until(()=>f.events.filter(e=>e.type==='turn.completed').length===4);
+ assert.ok(f.counts.connections>beforeUnset);
+ assert.equal(f.launches.at(-1)?.includes('--always-approve'),false);
+ const notified=f.requests.filter(r=>r.method==='_x.ai/yolo_mode_changed').length;
+ await f.runtime.startTurn(f.thread,f.project,'hello');
+ await until(()=>f.events.filter(e=>e.type==='turn.completed').length===5);
+ assert.equal(f.requests.filter(r=>r.method==='_x.ai/yolo_mode_changed').length,notified);
+ assert.equal(f.counts.connections,beforeUnset+1);
+});
 test('Grok never sends a prompt after an unconfirmed model or rejected plan switch',async t=>{
  const f=await fixture(t,'grok');
  await f.children[0]!.call('_test/control',{ignoreConfig:true});
@@ -635,6 +665,7 @@ for(const [answer,result] of [
  await f.runtime.respondInput(approval,{grok_plan_review:{answers:[answer]}});
  await until(()=>f.events.some(e=>e.type==='turn.completed'));
  assert.ok(f.events.some(e=>e.type==='item.completed'&&(e.payload.item as {text?:string}|undefined)?.text===JSON.stringify(result)));
+ assert.equal((f.events.find(e=>e.type==='turn.completed')?.payload.grokState as {mode?:string}).mode,answer==='批准计划并开始执行'||answer==='放弃本次计划'?'default':'plan');
  await assert.rejects(f.runtime.respondInput(approval,{grok_plan_review:{answers:[answer]}}),{code:'APPROVAL_STALE'});
 });
 for(const prompt of ['grok-plan-large','grok-plan-empty'])test(`Grok refuses approval without a complete bounded plan: ${prompt}`,async t=>{
@@ -656,6 +687,20 @@ for(const [answer,result] of [['SQLite',{outcome:'accepted',answers:{'Which data
  await f.runtime.respondInput(f.approvals[0]!,{grok_question_0:{answers:[answer]}});
  await until(()=>f.events.some(e=>e.type==='turn.completed'));
  assert.ok(f.events.some(e=>e.type==='item.completed'&&(e.payload.item as {text?:string})?.text===JSON.stringify(result)));
+});
+test('Grok multi-select interview returns chosen labels and one free-text note',async t=>{
+ const f=await fixture(t,'grok');await f.runtime.startTurn(f.thread,f.project,'grok-question-multi');
+ await until(()=>f.approvals.length===1);
+ assert.equal((f.approvals[0]!.params.questions as Array<{multi?:boolean}>)[0]?.multi,true);
+ await f.runtime.respondInput(f.approvals[0]!,{grok_question_0:{answers:['SQLite','Postgres','My own database']}});
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.ok(f.events.some(e=>e.type==='item.completed'&&(e.payload.item as {text?:string})?.text===JSON.stringify({outcome:'accepted',answers:{'Which databases?':['SQLite','Postgres','Other']},annotations:{'Which databases?':{notes:'My own database'}}})));
+});
+test('Grok interview option previews are cancelled instead of answered',async t=>{
+ const f=await fixture(t,'grok');await f.runtime.startTurn(f.thread,f.project,'grok-question-preview');
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.equal(f.approvals.length,0);
+ assert.ok(f.events.some(e=>e.type==='item.completed'&&String((e.payload.item as {text?:string}|undefined)?.text).includes('"outcome":"cancelled"')));
 });
 
 test('unverified Grok versions cannot silently ignore explicit auto or ask-mode requests',async t=>{

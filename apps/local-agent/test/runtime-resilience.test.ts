@@ -2065,3 +2065,44 @@ test("heartbeats report background Git dirtiness without waiting for a model tur
   }, "Git status should arrive on a later heartbeat");
   assert.equal(Object.keys(store.snapshot().commandJournal).length, 0);
 });
+
+test("a completed Grok session fork requests a catalog scan without failing when the scan cannot start", async (t) => {
+  const { store, projects } = await fixture();
+  const grok = { ...(await resolveProject(projects[0]!.root, "grok-lane")), provider: "grok" as const };
+  await store.addProject(grok);
+  const calls: string[] = [];
+  let server!: FakeAppServer;
+  const runtime = new AgentRuntime({
+    store, identity, pairing, support,
+    appServerFactory: (callbacks) => (server = Object.assign(new FakeAppServer("epoch-grok-fork", callbacks), {
+      getAgentRuntimes: () => ({ grok: { installed: true, version: "grok 1.0.70", state: "ready", checkedAt: new Date().toISOString(), nativeManagement: true } }),
+      manageGrok: async (_thread: ManagedThread, _project: ProjectRecord, request: { operation: string }) => {
+        calls.push(request.operation);
+        return { operation: request.operation, status: "ok", rows: [] };
+      },
+    })),
+  });
+  runtime.setTransportGeneration(1);
+  const { acks } = captureCallbacks(runtime);
+  await runtime.initialize();
+  t.after(() => runtime.shutdown());
+  await store.setManagedThread({ nativeThreadId: "thread-fork", projectId: grok.id, logicalSessionId: "session-fork", executionSegmentId: "segment-session-fork", appServerEpoch: server.appServerEpoch, policyVerified: true, policyVersion: "remote-restricted-v1", contentEpoch: 1, createdAt: new Date().toISOString() });
+  const scans: string[] = [];
+  const sync = (runtime as unknown as { catalogSync: { request: (change: string) => void } }).catalogSync;
+  sync.request = (change) => { scans.push(change); };
+  const manage = (attemptId: string, operation: string, confirmed = false) => runtime.handleCommand({
+    ...command(grok, attemptId, attemptId, "session-fork", server.appServerEpoch),
+    type: "grok.manage",
+    payload: { operation, arguments: {}, ...(confirmed ? { confirmed: true } : {}) },
+    precondition: { nativeThreadId: "thread-fork", expectedActiveTurnId: null, projectLeaseVersion: grok.identityVersion },
+  }, 1);
+  await manage("fork-read", "tasks.list");
+  assert.deepEqual([...scans], []);
+  await manage("fork-ok", "session.fork", true);
+  assert.deepEqual([...scans], ["full"]);
+  assert.deepEqual(calls, ["tasks.list", "session.fork"]);
+  sync.request = () => { throw new Error("catalog unavailable"); };
+  await manage("fork-scan-down", "session.fork", true);
+  assert.deepEqual(ackStates(acks, "fork-scan-down"), ["claimed", "invoking", "responded", "applied"]);
+  assert.deepEqual(calls, ["tasks.list", "session.fork", "session.fork"]);
+});

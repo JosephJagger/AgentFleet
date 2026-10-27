@@ -1765,7 +1765,12 @@ export class AgentRuntime {
         if(!server.manageGrok||this.store.snapshot().projectContentPolicies[project.id]?.syncContent===false)throw new AgentError('AGENT_CAPABILITY_UNAVAILABLE','Native Grok management or content sync is unavailable');
         const request=parseGrokOperation(command.payload);
         if(grokOperations[request.operation].write&&!grokLiveOperation(request.operation)&&(this.store.snapshot().panelVoiceRuntime||Object.values(this.store.snapshot().managedThreads).some(t=>t.activeTurnId||t.realtimeSessionId)))throw new AgentError('HOST_BUSY','Finish active host work before changing native state');
-        return {grokResult:await server.manageGrok(boundThread,project,request)};
+        const grokResult=await server.manageGrok(boundThread,project,request);
+        if(request.operation==='session.fork'){
+          try{this.catalogSync.request('full');}
+          catch{/* A catalog scan failure must not turn a completed fork into a failed mutation. */}
+        }
+        return {grokResult};
       }
       case "codex.manage": {
         if (project.provider && project.provider !== "codex") throw new AgentError("AGENT_CAPABILITY_UNAVAILABLE", "Codex operations require a Codex project");

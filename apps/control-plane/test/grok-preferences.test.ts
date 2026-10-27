@@ -6,7 +6,7 @@ import {join} from "node:path";
 import {randomUUID} from "node:crypto";
 import {ControlPlaneDatabase} from "./database-fixture.js";
 import {loadConfig} from "../src/config.js";
-import {GrokPreferencesService} from "../src/grok-preferences.js";
+import {GrokPreferencesService,grokPlanExitLeaves} from "../src/grok-preferences.js";
 import {grokSettingsActive,parseGrokSettings,supportsGrokControls} from "../src/grok-settings.js";
 import type {Principal} from "../src/auth.js";
 test("Grok settings persist after reopening and only accept reported model ids",t=>{
@@ -72,4 +72,35 @@ test("Grok settings persist after reopening and only accept reported model ids",
  db.run("UPDATE machines SET agent_version='0.30.117' WHERE machine_id='m'");
  db.run("UPDATE projects SET provider='codex' WHERE project_id='p'");
  assert.throws(()=>service.write(principal,"s1",{settings:saved,revision:3}),{code:"GROK_SESSION_REQUIRED"});
+});
+
+test("approving or abandoning a plan stores explicit default and leaves the other Grok settings",t=>{
+ assert.equal(grokPlanExitLeaves({grok_plan_review:{answers:["批准计划并开始执行"]}}),true);
+ assert.equal(grokPlanExitLeaves({grok_plan_review:{answers:["放弃本次计划"]}}),true);
+ assert.equal(grokPlanExitLeaves({grok_plan_review:{answers:["暂不执行，继续计划"]}}),false);
+ assert.equal(grokPlanExitLeaves({grok_plan_review:{answers:["Please add tests"]}}),false);
+ assert.equal(grokPlanExitLeaves({grok_plan_review:{answers:["批准计划并开始执行","extra"]}}),false);
+ const dir=mkdtempSync(join(tmpdir(),"grok-plan-exit-"));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const db=new ControlPlaneDatabase(join(dir,"db.sqlite"));t.after(()=>db.close());
+ const cfg=loadConfig({AUTH_MODE:"password",ADMIN_EMAIL:"plan-exit@example.test",ADMIN_PASSWORD:randomUUID(),DATABASE_PATH:join(dir,"db.sqlite"),PUBLIC_ORIGIN:"http://test",COOKIE_SECURE:"false"});
+ const {workspaceId}=db.bootstrap(cfg);const at=new Date().toISOString();
+ const user=db.get<{user_id:string}>("SELECT user_id FROM users LIMIT 1")!;
+ const principal={workspaceId,userId:user.user_id} as Principal;
+ db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,agent_version,identity_state,security_state,reachability,compatibility,capacity,created_at,updated_at) VALUES('m',?,'key','fingerprint','host','linux','24','x64','0.30.154','active','normal','online','compatible','idle',?,?)`,workspaceId,at,at);
+ db.run(`INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,provider,created_at,last_reported_at) VALUES('p',?,'m','p','project','/work','hash','grok',?,?)`,workspaceId,at,at);
+ db.run(`INSERT INTO logical_sessions(logical_session_id,workspace_id,machine_id,project_id,title,managed,execution_state,reachability,created_at,updated_at) VALUES('s1',?,'m','p','session',1,'idle','live',?,?)`,workspaceId,at,at);
+ const service=new GrokPreferencesService(db);
+ const stored={mode:"plan",model:"grok-4.6",effort:"high",permissionMode:"always",rules:"Keep the plan",xSearch:{fromDate:"2026-10-01"}};
+ db.run("INSERT INTO grok_preferences(workspace_id,logical_session_id,settings_json,revision,updated_at) VALUES(?,?,?,?,?)",workspaceId,"s1",JSON.stringify(stored),4,at);
+ service.leavePlan(principal,"s1");
+ assert.equal(service.read(principal,"s1").revision,4);
+ assert.equal(service.read(principal,"s1").settings?.mode,"plan");
+ db.run("UPDATE machines SET discovery_json=? WHERE machine_id='m'",JSON.stringify({agentRuntimes:{grok:{grokControls:{planMode:true}}}}));
+ service.leavePlan(principal,"s1");
+ assert.equal(service.read(principal,"s1").revision,5);
+ assert.deepEqual(service.read(principal,"s1").settings,{...stored,mode:"default"});
+ service.leavePlan(principal,"s1");
+ assert.equal(service.read(principal,"s1").revision,5);
+ assert.equal(db.get<{n:number}>("SELECT count(*) AS n FROM audit_entries WHERE action='grok.preferences.plan_exit'")?.n,1);
+ assert.equal(db.get<{logical_session_id:string}>("SELECT logical_session_id FROM audit_entries WHERE action='grok.preferences.plan_exit'")?.logical_session_id,"s1");
 });

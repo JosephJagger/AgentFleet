@@ -14,6 +14,8 @@ export function useGrokPreferences(sessionId:string|undefined,sessionSeq?:number
   const active=useRef(sessionId);active.current=sessionId;
   const revision=useRef(0);const readyRef=useRef(false);const chain=useRef(Promise.resolve());const generation=useRef(0);
   const sequence=useRef(sessionSeq);sequence.current=sessionSeq;
+  const fetchNow=useRef<(()=>void)|undefined>(undefined);
+  const observedSeq=useRef<{id?:string;seq?:number}>({});
   useEffect(()=>{
     if(!sessionId)return;
     const controller=new AbortController();
@@ -33,10 +35,18 @@ export function useGrokPreferences(sessionId:string|undefined,sessionSeq?:number
       }).finally(()=>{pending=false;});
     };
     // Token/event traffic must neither abort the initial read nor postpone it forever.
+    fetchNow.current=fetch;
     const timer=window.setTimeout(fetch,0);
     const poll=window.setInterval(()=>{if(sequence.current!==lastSequence||!readyRef.current||Date.now()-lastRead>=30000)fetch();},5000);
-    return()=>{controller.abort();window.clearTimeout(timer);window.clearInterval(poll);};
+    return()=>{fetchNow.current=undefined;controller.abort();window.clearTimeout(timer);window.clearInterval(poll);};
   },[sessionId,retry]);
+  useEffect(()=>{
+    if(!sessionId){observedSeq.current={};return;}
+    if(observedSeq.current.id!==sessionId){observedSeq.current={id:sessionId,seq:sessionSeq};return;}
+    if(observedSeq.current.seq===sessionSeq)return;
+    observedSeq.current.seq=sessionSeq;
+    fetchNow.current?.();
+  },[sessionId,sessionSeq]);
   const current=state.id===sessionId?state:undefined;
   async function save(settings:GrokSettings){
     if(!sessionId)throw new Error("会话配置尚未读取，请重试。");

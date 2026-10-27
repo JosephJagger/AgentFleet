@@ -4,6 +4,17 @@ import {invariant} from "./errors.js";
 import {nowIso} from "./crypto.js";
 import {parseGrokModels,grokModelOptions,mergeConfigOptions,parseConfigOptions,parseGrokSettings,supportsGrokControls,type ConfigOption,type GrokSettings} from "./grok-settings.js";
 
+const approvePlan="批准计划并开始执行";
+const abandonPlan="放弃本次计划";
+/** Exact native plan-consent labels that leave plan mode. Keep and free-text revision do not. */
+export function grokPlanExitLeaves(answers:unknown):boolean {
+  if(!answers||typeof answers!=="object"||Array.isArray(answers))return false;
+  return Object.values(answers as Record<string,unknown>).some(entry=>{
+    if(!entry||typeof entry!=="object"||Array.isArray(entry))return false;
+    const list=(entry as {answers?:unknown}).answers;
+    return Array.isArray(list)&&list.length===1&&(list[0]===approvePlan||list[0]===abandonPlan);
+  });
+}
 export class GrokPreferencesService {
   constructor(private readonly db:ControlPlaneDatabase){}
   private host(principal:Principal,id:string){
@@ -87,6 +98,21 @@ export class GrokPreferencesService {
       this.db.audit({workspaceId:principal.workspaceId,actorUserId:principal.userId,action:"grok.preferences.save",metadata:{sessionId:id,revision:current.revision+1}});
       return this.read(principal,id);
     });
+  }
+  /** After the user approves or abandons a plan, the next request must not switch back to plan. */
+  leavePlan(principal:Principal,id:string):void {
+    const host=this.host(principal,id);
+    const native=JSON.parse(host.discovery_json??"{}").agentRuntimes?.grok;
+    if(native?.grokControls?.planMode!==true)return;
+    const row=this.db.get<{settings_json:string;revision:number}>("SELECT settings_json,revision FROM grok_preferences WHERE workspace_id=? AND logical_session_id=?",principal.workspaceId,id);
+    if(!row)return;
+    let parsed:unknown;try{parsed=JSON.parse(row.settings_json);}catch{return;}
+    const settings=parseGrokSettings(parsed);
+    if(!settings||settings.mode!=="plan")return;
+    const next={...settings,mode:"default" as const};
+    const revision=row.revision+1;
+    this.db.run(`INSERT INTO grok_preferences(workspace_id,logical_session_id,settings_json,revision,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(workspace_id,logical_session_id) DO UPDATE SET settings_json=excluded.settings_json,revision=excluded.revision,updated_at=excluded.updated_at`,principal.workspaceId,id,JSON.stringify(next),revision,nowIso());
+    this.db.audit({workspaceId:principal.workspaceId,actorUserId:principal.userId,action:"grok.preferences.plan_exit",logicalSessionId:id,metadata:{sessionId:id,revision}});
   }
 }
 export type {GrokSettings};

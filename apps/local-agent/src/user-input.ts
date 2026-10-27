@@ -3,6 +3,8 @@ import { isRecord } from "./util.js";
 
 export interface InputQuestion {
   id: string; header: string; question: string; isOther: boolean;
+  /** Optional. Absent or false keeps the original one-answer contract. */
+  multi?: boolean;
   options: { label: string; description: string }[];
 }
 export type InputAnswers = Record<string, { answers: string[] }>;
@@ -23,7 +25,7 @@ export function inputQuestions(value: unknown): InputQuestion[] {
       if (!isRecord(option)) return fail();
       return { label: string(option.label, 512), description: typeof option.description === "string" ? option.description.slice(0, 4000) : "" };
     });
-    return { id, header: string(entry.header, 512), question: string(entry.question, 8000), isOther: entry.isOther === true, options };
+    return { id, header: string(entry.header, 512), question: string(entry.question, 8000), isOther: entry.isOther === true, ...(entry.multi === true ? { multi: true } : {}), options };
   });
 }
 
@@ -33,10 +35,15 @@ export function inputAnswers(value: unknown, questions: InputQuestion[]): InputA
   const result: InputAnswers = {};
   for (const question of questions) {
     const entry = Object.hasOwn(value, question.id) ? value[question.id] : undefined;
-    if (!isRecord(entry) || Object.keys(entry).length !== 1 || !Array.isArray(entry.answers) || entry.answers.length !== 1) return fail();
-    const answer = entry.answers[0];
-    if (typeof answer !== "string" || !answer.trim() || answer.length > 8000) return fail();
-    result[question.id] = { answers: [answer] };
+    // One free-text note may accompany up to 20 selected option labels.
+    const limit = question.multi === true ? 21 : 1;
+    if (!isRecord(entry) || Object.keys(entry).length !== 1 || !Array.isArray(entry.answers) || entry.answers.length < 1 || entry.answers.length > limit) return fail();
+    const answers: string[] = [];
+    for (const answer of entry.answers) {
+      if (typeof answer !== "string" || !answer.trim() || answer.length > 8000 || answers.includes(answer)) return fail();
+      answers.push(answer);
+    }
+    result[question.id] = { answers };
   }
   return result;
 }

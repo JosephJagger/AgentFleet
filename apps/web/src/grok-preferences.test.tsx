@@ -33,6 +33,21 @@ it('an older background response cannot overwrite a successfully saved model',as
  await act(async()=>stale(catalog));
  expect(view.result.current.settings.model).toBe('grok-full');
 });
+it('a newer session sequence refetches saved mode immediately and does not repeat that read on the short poll',async()=>{
+ vi.useFakeTimers();
+ vi.mocked(api.grokPreferences).mockResolvedValueOnce({...catalog,revision:2,settings:{mode:'plan',model:'grok-full'}});
+ const view=renderHook(({seq})=>useGrokPreferences('session',seq),{initialProps:{seq:1}});
+ await act(async()=>{await vi.advanceTimersByTimeAsync(1);});
+ expect(view.result.current.settings).toEqual({mode:'plan',model:'grok-full'});
+ expect(api.grokPreferences).toHaveBeenCalledTimes(1);
+ vi.mocked(api.grokPreferences).mockResolvedValueOnce({...catalog,revision:3,settings:{mode:'default',model:'grok-full'}});
+ view.rerender({seq:2});
+ await act(async()=>{await Promise.resolve();});
+ expect(api.grokPreferences).toHaveBeenCalledTimes(2);
+ expect(view.result.current.settings).toEqual({mode:'default',model:'grok-full'});
+ await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});
+ expect(api.grokPreferences).toHaveBeenCalledTimes(2);
+});
 it('native model choices are usable before a first turn; incompatible effort is cleared on model change',async()=>{
  const onSave=vi.fn().mockResolvedValue(undefined);
  render(<GrokControls options={catalog.options} models={catalog.models} settings={{model:'grok-full',effort:'high'}} ready error="" onReload={()=>{}} onSave={onSave} disabled={false}/>);

@@ -10,7 +10,7 @@ import {parseClaudeMetadata} from "./claude-metadata.js";
 import { parseClaudeSettings, supportsClaudeControls } from "./claude-settings.js";
 import {CursorPreferencesService} from "./cursor-preferences.js";
 import {parseCursorSettings} from "./cursor-settings.js";
-import { GrokPreferencesService } from "./grok-preferences.js";
+import { GrokPreferencesService, grokPlanExitLeaves } from "./grok-preferences.js";
 import { grokSettingsActive, parseGrokSettings, supportsGrokControls } from "./grok-settings.js";
 import { UsageService } from "./usage.js";
 import type { ControlPlaneConfig } from "./config.js";
@@ -841,6 +841,9 @@ export class CoordinationService {
         invariant(precondition.actionHash === approval.action_hash, 409, "APPROVAL_ACTION_CONFLICT", "actionHash changed");
         invariant(precondition.appServerEpoch === approval.app_server_epoch, 409, "APP_SERVER_EPOCH_CONFLICT", "appServerEpoch changed");
         executionSegmentId = approval.execution_segment_id;
+        if (input.type === "input.respond" && session.provider === "grok" && action.toolName === "exit_plan_mode" && grokPlanExitLeaves(payload.answers)) {
+          new GrokPreferencesService(this.db).leavePlan(principal, logicalSessionId);
+        }
       }
 
       // Snapshot inheritance only for NEW commands. Retries retain the accepted

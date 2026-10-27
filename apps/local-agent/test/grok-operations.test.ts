@@ -80,10 +80,16 @@ test('catalog accepts parameterized model selectors without allowing arbitrary c
  assert.equal(grokSettingsActive({permissionMode:'default'}),true);
 });
 
-test('Grok interviews reject ambiguous, secret and unsupported multi-select or preview questions',()=>{
- const question={question:'Pick one',options:[{label:'A',description:'First'}]};
- for(const questions of [[question,question],[{...question,multiSelect:true}],[{...question,multi_select:true}],[{...question,isSecret:true}],[{...question,options:[{label:'A'},{label:'A'}]}],[{...question,options:[{label:'A',preview:'<script>bad</script>'}]}],[{...question,question:'__proto__'}]])assert.throws(()=>grokQuestions({questions}));
+test('Grok interviews accept multi-select labels and one free-text note, and still reject preview or secret questions',()=>{
+ const question={question:'Pick one',options:[{label:'A',description:'First'},{label:'B',description:'Second'}]};
+ for(const questions of [[question,question],[{...question,isSecret:true}],[{...question,multiSelect:true,multi_select:false}],[{...question,options:[{label:'A'},{label:'A'}]}],[{...question,options:[{label:'A',preview:'<script>bad</script>'}]}],[{...question,question:'__proto__'}]])assert.throws(()=>grokQuestions({questions}));
  const questions=grokQuestions({questions:[question]});
+ assert.equal(questions[0]?.multi,undefined);
  assert.throws(()=>grokQuestionAnswer(questions,{wrong:{answers:['A']}}));
  assert.deepEqual(grokQuestionAnswer(questions,{grok_question_0:{answers:['A']}}),{outcome:'accepted',answers:{'Pick one':['A']}});
+ const multi=grokQuestions({questions:[{...question,question:'Pick any',multi_select:true},{question:'Also',multiSelect:true,options:[{label:'C'}]}]});
+ assert.equal(multi[0]?.multi,true);
+ assert.deepEqual(grokQuestionAnswer(multi,{grok_question_0:{answers:['A','B']},grok_question_1:{answers:['C','plain note']}}),{outcome:'accepted',answers:{'Pick any':['A','B'],Also:['C','Other']},annotations:{Also:{notes:'plain note'}}});
+ assert.deepEqual(grokQuestionAnswer(multi,{grok_question_0:{answers:['typed only']},grok_question_1:{answers:['C']}}),{outcome:'accepted',answers:{'Pick any':['Other'],Also:['C']},annotations:{'Pick any':{notes:'typed only'}}});
+ assert.throws(()=>grokQuestionAnswer(multi,{grok_question_0:{answers:['A','one','two']},grok_question_1:{answers:['C']}}));
 });

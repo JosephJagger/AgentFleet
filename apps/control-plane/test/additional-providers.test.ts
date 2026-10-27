@@ -287,3 +287,47 @@ test('direct Grok turn payloads cannot bypass native plan or permission capabili
  }
  assert.equal(f.db.get<{n:number}>('SELECT count(*) AS n FROM commands')?.n,0);
 });
+
+test('approving or abandoning a Grok plan stores the next request as default inside the command',t=>{
+ const f=fixture();t.after(()=>f.db.close());
+ f.db.run("UPDATE machines SET agent_version='0.30.154' WHERE machine_id='m'");
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{grok:{...ready,nativeManagement:true,grokControls:{planMode:true,permissionSync:true}}}});
+ const preferences=new GrokPreferencesService(f.db);
+ const session=f.registry.createSession(f.principal,'m','grok',undefined,'plan-exit-session');
+ const saved={mode:'plan' as const,model:'grok-4.6',effort:'high',permissionMode:'always' as const,rules:'Keep the plan'};
+ assert.equal(preferences.write(f.principal,session.logicalSessionId,{revision:0,settings:saved}).revision,1);
+ const read=()=>preferences.read(f.principal,session.logicalSessionId);
+ const respond=(suffix:string,answer:string)=>{
+  const approvalId=`plan-exit-${suffix}`;
+  f.db.run(`INSERT INTO approvals(approval_id,logical_session_id,execution_segment_id,action_hash,app_server_epoch,version,context_json,state,created_at) VALUES(?,?,?,?,'epoch',1,?,'pending',?)`,approvalId,session.logicalSessionId,session.executionSegmentId,`hash-${suffix}`,JSON.stringify({expiresAt:new Date(Date.now()+60_000).toISOString(),action:{kind:'user_input',toolName:'exit_plan_mode',questions:[{id:'grok_plan_review'}]}}),new Date().toISOString());
+  const input={type:'input.respond' as const,clientMutationId:`plan-exit-${suffix}`,precondition:{approvalId,approvalVersion:1,actionHash:`hash-${suffix}`,appServerEpoch:'epoch'},payload:{answers:{grok_plan_review:{answers:[answer]}}}};
+  f.coordination.createCommand(f.principal,session.logicalSessionId,input);
+  return input;
+ };
+ respond('keep','暂不执行，继续计划');
+ respond('note','Please add tests');
+ assert.equal(read().revision,1);
+ assert.equal(read().settings?.mode,'plan');
+ const approved=respond('approve','批准计划并开始执行');
+ assert.equal(read().revision,2);
+ assert.deepEqual(read().settings,{...saved,mode:'default'});
+ assert.equal(f.coordination.createCommand(f.principal,session.logicalSessionId,approved).duplicate,true);
+ assert.equal(read().revision,2);
+ respond('already-default','放弃本次计划');
+ assert.equal(read().revision,2);
+ assert.equal(preferences.write(f.principal,session.logicalSessionId,{revision:2,settings:saved}).revision,3);
+ const abandoned=respond('abandon','放弃本次计划');
+ assert.equal(read().revision,4);
+ assert.equal(read().settings?.mode,'default');
+ assert.equal(read().settings?.rules,'Keep the plan');
+ assert.equal(f.coordination.createCommand(f.principal,session.logicalSessionId,abandoned).duplicate,true);
+ assert.equal(read().revision,4);
+ assert.equal(f.db.get<{n:number}>("SELECT count(*) AS n FROM audit_entries WHERE action='grok.preferences.plan_exit'")?.n,2);
+ f.registry.updateDiscovery('m',{state:'ready',agentRuntimes:{grok:{...ready,nativeManagement:true,grokControls:{planMode:false,permissionSync:true}}}});
+ const other=f.registry.createSession(f.principal,'m','grok',undefined,'plan-exit-unavailable');
+ f.db.run("INSERT INTO grok_preferences(workspace_id,logical_session_id,settings_json,revision,updated_at) VALUES(?,?,?,?,?)",f.principal.workspaceId,other.logicalSessionId,JSON.stringify(saved),1,new Date().toISOString());
+ f.db.run(`INSERT INTO approvals(approval_id,logical_session_id,execution_segment_id,action_hash,app_server_epoch,version,context_json,state,created_at) VALUES('plan-exit-unavailable',?,?, 'hash-unavailable','epoch',1,?,'pending',?)`,other.logicalSessionId,other.executionSegmentId,JSON.stringify({expiresAt:new Date(Date.now()+60_000).toISOString(),action:{kind:'user_input',toolName:'exit_plan_mode',questions:[{id:'grok_plan_review'}]}}),new Date().toISOString());
+ f.coordination.createCommand(f.principal,other.logicalSessionId,{type:'input.respond',clientMutationId:'plan-exit-unavailable',precondition:{approvalId:'plan-exit-unavailable',approvalVersion:1,actionHash:'hash-unavailable',appServerEpoch:'epoch'},payload:{answers:{grok_plan_review:{answers:['批准计划并开始执行']}}}});
+ assert.equal(preferences.read(f.principal,other.logicalSessionId).revision,1);
+ assert.equal(preferences.read(f.principal,other.logicalSessionId).settings?.mode,'plan');
+});
