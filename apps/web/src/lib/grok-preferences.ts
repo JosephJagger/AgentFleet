@@ -8,8 +8,12 @@ const empty:GrokPreferences={settings:null,revision:0,options:[]};
 export function grokSettingsActive(settings?:GrokSettings|null){
   return Boolean(settings&&Object.keys(settings).length);
 }
+/** A snapshot read before the latest session sequence is stale. Omit it so the server applies its saved row. */
+export function grokTurnSettings(prefs:{ready:boolean;fresh:boolean;settings:GrokSettings}):GrokSettings|undefined{
+  return prefs.ready&&prefs.fresh&&grokSettingsActive(prefs.settings)?prefs.settings:undefined;
+}
 export function useGrokPreferences(sessionId:string|undefined,sessionSeq?:number){
-  const [state,setState]=useState<{id:string|undefined;data:GrokPreferences;ready:boolean;error:string}>({id:undefined,data:empty,ready:false,error:""});
+  const [state,setState]=useState<{id:string|undefined;data:GrokPreferences;ready:boolean;error:string;readSeq:number|undefined}>({id:undefined,data:empty,ready:false,error:"",readSeq:undefined});
   const [retry,setRetry]=useState(0);
   const active=useRef(sessionId);active.current=sessionId;
   const revision=useRef(0);const readyRef=useRef(false);const chain=useRef(Promise.resolve());const generation=useRef(0);
@@ -21,18 +25,19 @@ export function useGrokPreferences(sessionId:string|undefined,sessionSeq?:number
     const controller=new AbortController();
     revision.current=0;readyRef.current=false;chain.current=Promise.resolve();
     const epoch=++generation.current;
-    let pending=false,lastSequence:number|undefined,lastRead=0;
+    let pending=false,queued=false,lastSequence:number|undefined,lastRead=0;
     const fetch=()=>{
-      if(pending)return;
-      pending=true;lastSequence=sequence.current;lastRead=Date.now();
+      if(pending){queued=true;return;}
+      pending=true;queued=false;
+      const readSeq=sequence.current;lastSequence=readSeq;lastRead=Date.now();
       api.grokPreferences(sessionId,controller.signal).then(data=>{
         if(controller.signal.aborted||generation.current!==epoch||active.current!==sessionId||data.revision<revision.current)return;
         revision.current=data.revision;readyRef.current=true;
-        setState({id:sessionId,data,ready:true,error:""});
+        setState({id:sessionId,data,ready:true,error:"",readSeq});
       }).catch(()=>{
         if(!controller.signal.aborted&&active.current===sessionId&&!readyRef.current)
-          setState({id:sessionId,data:empty,ready:false,error:"会话配置读取失败，请重试。"});
-      }).finally(()=>{pending=false;});
+          setState({id:sessionId,data:empty,ready:false,error:"会话配置读取失败，请重试。",readSeq:undefined});
+      }).finally(()=>{pending=false;if(queued||sequence.current!==readSeq)fetch();});
     };
     // Token/event traffic must neither abort the initial read nor postpone it forever.
     fetchNow.current=fetch;
@@ -56,11 +61,11 @@ export function useGrokPreferences(sessionId:string|undefined,sessionSeq?:number
       const result=await api.saveGrokPreferences(sessionId,{settings,revision:revision.current});
       if(generation.current!==epoch||active.current!==sessionId)return result;
       revision.current=result.revision;readyRef.current=true;
-      setState({id:sessionId,data:result,ready:true,error:""});
+      setState({id:sessionId,data:result,ready:true,error:"",readSeq:sequence.current});
       return result;
     });
     chain.current=run.then(()=>undefined,()=>undefined);
     await run;
   }
-  return {observed:current?.data.observed,grokControls:current?.data.grokControls,xSearchSupported:current?.data.xSearchSupported===true,canConfigureStartup:current?.data.canConfigureStartup===true,nativeManagement:current?.data.nativeManagement===true,commands:current?.data.commands??[],settings:current?.data.settings??{},options:current?.data.options??[],models:current?.data.models??[],ready:current?.ready===true,error:current?.error??"",save,reload:()=>setRetry(n=>n+1)};
+  return {observed:current?.data.observed,grokControls:current?.data.grokControls,xSearchSupported:current?.data.xSearchSupported===true,canConfigureStartup:current?.data.canConfigureStartup===true,nativeManagement:current?.data.nativeManagement===true,commands:current?.data.commands??[],settings:current?.data.settings??{},options:current?.data.options??[],models:current?.data.models??[],ready:current?.ready===true,fresh:current?.ready===true&&current.readSeq===sessionSeq,error:current?.error??"",save,reload:()=>setRetry(n=>n+1)};
 }

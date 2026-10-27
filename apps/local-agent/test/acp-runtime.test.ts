@@ -78,6 +78,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
    if(requestKind==='permission'){send({id:991,method:'session/request_permission',params:{sessionId,toolCall:{title:'Synthetic write'},options:[{optionId:'one',kind:'allow_once'},{optionId:'all',kind:'allow_always'},{optionId:'no',kind:'reject_once'}]}});return;}
    if(requestKind.startsWith('grok-plan')){send({id:991,method:'_x.ai/exit_plan_mode',params:{sessionId,toolCallId:'plan-1',planContent:requestKind==='grok-plan-large'?'x'.repeat(64001):requestKind==='grok-plan-empty'?null:'# Proposed plan\n\nCreate hello.txt only after approval.'}});return;}
    if(requestKind==='grok-question'){send({id:991,method:'_x.ai/ask_user_question',params:{sessionId,toolCallId:'question-1',mode:'plan',questions:[{question:'Which database?',options:[{label:'SQLite',description:'Local'}]}]}});return;}
+   if(requestKind==='grok-question-null'){send({id:991,method:'_x.ai/ask_user_question',params:{sessionId,toolCallId:'question-null',questions:[{question:'Which database?',multi_select:null,multiSelect:null,options:[{label:'SQLite',description:'Local'}]}]}});return;}
    if(requestKind==='grok-question-multi'){send({id:991,method:'_x.ai/ask_user_question',params:{sessionId,toolCallId:'question-2',questions:[{question:'Which databases?',multi_select:true,options:[{label:'SQLite',description:'Local'},{label:'Postgres',description:'Server'}]}]}});return;}
    if(requestKind==='grok-question-preview'){send({id:991,method:'_x.ai/ask_user_question',params:{sessionId,toolCallId:'question-3',questions:[{question:'Preview?',options:[{label:'A',preview:'hidden'}]}]}});return;}
    if(requestKind==='grok-form'){send({id:991,method:'_x.ai/mcp/elicit',params:{sessionId,serverName:'test-mcp',toolCallId:'form-1',mode:'form',message:'Confirm choice',requestedSchema:{type:'object',properties:{enabled:{type:'boolean'}},required:['enabled']}}});return;}
@@ -687,6 +688,14 @@ for(const [answer,result] of [['SQLite',{outcome:'accepted',answers:{'Which data
  await f.runtime.respondInput(f.approvals[0]!,{grok_question_0:{answers:[answer]}});
  await until(()=>f.events.some(e=>e.type==='turn.completed'));
  assert.ok(f.events.some(e=>e.type==='item.completed'&&(e.payload.item as {text?:string})?.text===JSON.stringify(result)));
+});
+test('Grok interview treats a null multi-select flag as unset and still shows the question',async t=>{
+ const f=await fixture(t,'grok');await f.runtime.startTurn(f.thread,f.project,'grok-question-null');
+ await until(()=>f.approvals.length===1);
+ assert.equal((f.approvals[0]!.params.questions as Array<{multi?:boolean}>)[0]?.multi,undefined);
+ await f.runtime.respondInput(f.approvals[0]!,{grok_question_0:{answers:['SQLite']}});
+ await until(()=>f.events.some(e=>e.type==='turn.completed'));
+ assert.ok(f.events.some(e=>e.type==='item.completed'&&(e.payload.item as {text?:string})?.text===JSON.stringify({outcome:'accepted',answers:{'Which database?':['SQLite']}})));
 });
 test('Grok multi-select interview returns chosen labels and one free-text note',async t=>{
  const f=await fixture(t,'grok');await f.runtime.startTurn(f.thread,f.project,'grok-question-multi');

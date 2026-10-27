@@ -85,6 +85,10 @@ test('Grok interviews accept multi-select labels and one free-text note, and sti
  for(const questions of [[question,question],[{...question,isSecret:true}],[{...question,multiSelect:true,multi_select:false}],[{...question,options:[{label:'A'},{label:'A'}]}],[{...question,options:[{label:'A',preview:'<script>bad</script>'}]}],[{...question,question:'__proto__'}]])assert.throws(()=>grokQuestions({questions}));
  const questions=grokQuestions({questions:[question]});
  assert.equal(questions[0]?.multi,undefined);
+ assert.equal(grokQuestions({questions:[{...question,multiSelect:null,multi_select:null}]})[0]?.multi,undefined);
+ assert.equal(grokQuestions({questions:[{...question,multi_select:null}]})[0]?.multi,undefined);
+ assert.equal(grokQuestions({questions:[{...question,multiSelect:null,multi_select:true}]})[0]?.multi,true);
+ assert.throws(()=>grokQuestions({questions:[{...question,multiSelect:null,multi_select:'yes'}]}));
  assert.throws(()=>grokQuestionAnswer(questions,{wrong:{answers:['A']}}));
  assert.deepEqual(grokQuestionAnswer(questions,{grok_question_0:{answers:['A']}}),{outcome:'accepted',answers:{'Pick one':['A']}});
  const multi=grokQuestions({questions:[{...question,question:'Pick any',multi_select:true},{question:'Also',multiSelect:true,options:[{label:'C'}]}]});

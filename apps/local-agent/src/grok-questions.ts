@@ -9,7 +9,8 @@ export function grokQuestions(params:Record<string,unknown>):InputQuestion[] {
   const seen=new Set<string>();
   return inputQuestions(params.questions.map((q,index)=>{
     if(!isRecord(q)||q.isSecret===true||!Array.isArray(q.options)||typeof q.question!=='string'||seen.has(q.question)||['__proto__','constructor','prototype'].includes(q.question))return fail();
-    const flags=[q.multiSelect,q.multi_select].filter(flag=>flag!==undefined);
+    // Native Option<bool> is omitted or JSON null when unset. Only a real boolean selects multi.
+    const flags=[q.multiSelect,q.multi_select].filter(flag=>flag!=null);
     if(flags.some(flag=>flag!==true&&flag!==false)||(q.multiSelect===true&&q.multi_select===false)||(q.multiSelect===false&&q.multi_select===true))return fail();
     seen.add(q.question);
     const options=(q.options as unknown[]).map(o=>{

@@ -31,7 +31,7 @@ import { WorktreeFields, worktreeBranchError, worktreeBranchInput } from "./comp
 import { ProjectWorktrees } from "./components/ProjectWorktrees";
 import { startLaneSession } from "./lib/worktrees";
 import { useClaudePreferences, type ClaudeSettings } from "./lib/claude-preferences";
-import { grokSettingsActive, useGrokPreferences, type GrokSettings } from "./lib/grok-preferences";
+import { grokTurnSettings, useGrokPreferences, type GrokSettings } from "./lib/grok-preferences";
 import { ClaudeControls } from "./components/ClaudeControls";
 import { GrokControls } from "./components/GrokControls";
 import { agentName } from "./lib/agent-provider";
@@ -945,7 +945,7 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
   const sendText = () => prompt.trim();
   const hasInput = Boolean(prompt.trim() || imageDraft.images.length || fileDraft.files.length || selectedPlugins.length);
   const imageBlocked = imageDraft.processing || fileDraft.processing || (imageDraft.images.length > 0 && (!session.imageInputSupported || Boolean(slashCommand))) || (fileDraft.files.length > 0 && (!session.fileInputSupported || Boolean(slashCommand)));
-  const sendSettings = session.provider === "claude" && claudePrefs.ready && session.collaborationModes?.includes("plan") ? claudePrefs.settings : session.provider === "grok" && grokPrefs.ready && grokSettingsActive(grokPrefs.settings) ? grokPrefs.settings : undefined;
+  const sendSettings = session.provider === "claude" && claudePrefs.ready && session.collaborationModes?.includes("plan") ? claudePrefs.settings : session.provider === "grok" ? grokTurnSettings(grokPrefs) : undefined;
   const modeBlocked = (session.provider === "claude" && !claudePrefs.ready) || (session.provider === "grok" && !grokPrefs.ready);
   const modeHint = session.provider === "grok" ? t("请先读取 Grok 会话配置") : t("计划模式需要先确认模型配置");
   const inputStatusHint = modeBlocked ? modeHint : referencesBlocked ? t("请写明任务并等待引用核验；失败时重试或删除卡片") : composerHint;
