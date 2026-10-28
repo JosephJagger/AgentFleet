@@ -150,6 +150,7 @@ def main():
     parser.add_argument('--wait-seconds', type=int, default=0, help='On timeout keep old service, reopen admission, exit 75')
     parser.add_argument('--ready-url', default='http://127.0.0.1:3215/ready')
     parser.add_argument('--public-origin', help='Public panel origin; defaults to running service PUBLIC_ORIGIN')
+    parser.add_argument('--with-identity', action='store_true', help='Publish paired identity email templates on existing PostgreSQL; no schema changes')
     parser.add_argument('--with-validator', action='store_true', help='Also update the idle Codex validation worker; defer while validation is running')
     parser.add_argument('--keep-backups', type=int, default=DEFAULT_KEEP_BACKUPS, help='Pre-deploy database backups to keep (default 5); older ones are deleted before a new one is written')
     parser.add_argument('--check', action='store_true')
@@ -159,6 +160,8 @@ def main():
     parser.add_argument('--engine-config', help='Private inventory for the initial SQLite-to-PostgreSQL cutover')
     parser.add_argument('--engine-phase', choices=('check', 'cutover', 'abort-before-traffic', 'resume-stopped-import'))
     args = parser.parse_args()
+    if args.with_identity and (not args.postgres_config or not args.image or args.check or args.release or args.engine_phase or args.migration_phase):
+        parser.error('--with-identity requires a prepared --image and existing --postgres-config')
     if args.database and args.engine_phase != 'resume-stopped-import':
         require_current_sqlite(ROOT, args.database)
     if args.engine_config or args.engine_phase:
@@ -197,7 +200,12 @@ def main():
             return 0
         image = json.loads(run('docker', 'image', 'inspect', args.image))[0]
         runtime = json.loads(run('docker', 'inspect', 'agentfleet-control-plane'))[0]
-        validate_candidate(ROOT, image, runtime)
+        paired = None
+        if args.with_identity:
+            from identity_publication import IdentityPublication
+            paired = IdentityPublication(ROOT, image, runtime, run)
+        else:
+            validate_candidate(ROOT, image, runtime)
         if isinstance(db, PostgresPublication):
             db.verify_runtime(runtime, health(args.ready_url))
         elif any(value.startswith('DATABASE_URL=postgres') for value in runtime['Config'].get('Env', [])):
@@ -237,29 +245,35 @@ def main():
                 print(json.dumps({'phase': 'pruned_backups', 'removed': len(pruned)}), flush=True)
             db.ensure_space() if isinstance(db, PostgresPublication) else ensure_backup_space(path)
             backup_database(db, backup_path)
+            if paired:
+                paired.prepare(db, token)
             # Recheck after draining and backup: another release or main commit may have arrived.
             runtime = json.loads(run('docker', 'inspect', 'agentfleet-control-plane'))[0]
-            validate_candidate(ROOT, image, runtime)
+            paired.recheck(image, runtime) if paired else validate_candidate(ROOT, image, runtime)
             if isinstance(db, PostgresPublication):
                 db.verify_runtime(runtime, health(args.ready_url))
             # Fence remains in the shared DB throughout recreation and startup.
             switching = True
+            if paired:
+                paired.activate()
             run('docker', 'tag', image_id, 'agentfleet:local')
             services = ['control-plane', 'runtime-validator'] if args.with_validator else ['control-plane']
+            if paired:
+                services.insert(0, 'identity')
             run('docker', 'compose', 'up', '-d', '--no-deps', '--no-build', *services)
             deadline = time.monotonic() + 90
             while time.monotonic() < deadline:
                 try:
                     status = health(args.ready_url)
                     pg_ready = not isinstance(db, PostgresPublication) or (status.get('databaseBackend') == 'postgresql' and status.get('databaseIdentity') == db.config.get('databaseIdentity') and status.get('voiceDeploymentToken') == token)
-                    if status.get('status') == 'ok' and status.get('build') == build and status.get('voiceDeploymentGuard') == 1 and pg_ready:
+                    if status.get('status') == 'ok' and status.get('build') == build and status.get('voiceDeploymentGuard') == 1 and pg_ready and (not paired or paired.ready(build)):
                         release(db, token)
                         acquired = False
                         try:
                             run('node', str(ROOT / 'packaging/verify-published-installers.mjs'), public_origin, expected_version)
                         except Exception as error:
                             raise RuntimeError(f'Panel is healthy, but public release verification failed: {error}. No rollback performed; verify public routes before reporting publication.') from error
-                        print(json.dumps({'phase': 'published', 'build': build, 'schema': status.get('schemaVersion'), 'backup': backup_path}))
+                        print(json.dumps({'phase': 'published', 'build': build, 'schema': status.get('schemaVersion'), 'backup': backup_path, 'identityBuild': build if paired else None}))
                         return 0
                 except (OSError, ValueError):
                     pass

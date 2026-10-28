@@ -12,7 +12,7 @@ A worktree protects source edits from another worktree. It does not protect a sh
    # Or --mode control-plane for backend + web, --mode full for a full application build.
    ```
 
-   This requires a completely clean main worktree (including untracked files), exports the exact full commit with `git archive` into a temporary build directory, pins the current live image, and writes a receipt only after a successful build and recheck. Ignored local secrets and generated files never enter the archive. The receipt binds the source SHA/tree, base image, build mode and resulting immutable image digest. Full builds preserve the pinned live image’s versioned downloads, reject conflicting immutable filenames, and replace only the two mutable manifests (`manifest.json` and `codex-manifest.json`). Application changes outside the chosen build mode are rejected. For the initial PostgreSQL cutover, `--with-identity` builds both services from that same archive and records both immutable images and live base images; ordinary publication refuses these paired artifacts.
+   This requires a completely clean main worktree (including untracked files), exports the exact full commit with `git archive` into a temporary build directory, pins the current live image, and writes a receipt only after a successful build and recheck. Ignored local secrets and generated files never enter the archive. The receipt binds the source SHA/tree, base image, build mode and resulting immutable image digest. Full builds preserve the pinned live image’s versioned downloads, reject conflicting immutable filenames, and replace only the two mutable manifests (`manifest.json` and `codex-manifest.json`). Application changes outside the chosen build mode are rejected. For the initial PostgreSQL cutover, `--with-identity` builds both services from that same archive and records both immutable images and live base images; ordinary publication refuses these paired artifacts unless explicitly using the PostgreSQL template-only `--with-identity` workflow below.
 
 3. Publish the printed image tag/digest from the same canonical worktree:
 
@@ -71,3 +71,19 @@ python3 packaging/deploy-control-plane.py --database /actual/control-plane.sqlit
 Active work returns exit 75 without stopping services or installing a fence. The cutover repeats the task/voice/SSH checks under a SQLite writer lock before stopping both source services, closing the check/stop race. It snapshots both databases, preserves encryption keys and identity secrets, imports and verifies every application record using the prepared images, writes a PostgreSQL backup, and rechecks both image receipts. A private Compose override adds the database network and pins the identity image; the existing volumes remain mounted. The canonical environment switches atomically. Both services must report the prepared commit and PostgreSQL readiness before public installer verification and voice-admission reopening.
 
 Every phase is recorded in `cutover.json`. A failure leaves the sources stopped and admission fenced. `--engine-phase abort-before-traffic` can explicitly restart the unchanged original containers only before either new service was started, with an unchanged or recognized cutover environment. Once `trafficAttempted` is recorded, no SQLite rollback is allowed. Repair PostgreSQL or reconcile its new writes. The shared `database-owner.json` marker prevents normal publishers from reopening retired SQLite files; use the generated `publication.json` for future panel releases. Never clear the journal or owner marker to bypass a failed check.
+
+## Identity email-template updates on PostgreSQL
+
+For an existing PostgreSQL deployment, prepare with `--mode control-plane
+--with-identity` and publish with `--postgres-config /private/publication.json
+--image PREPARED_TAG --with-identity --wait-seconds 60`. This is limited to
+`accounts/email.py` and its tests since the live identity commit. Identity schema,
+settings and runtime changes still require a coordinated maintenance workflow.
+
+The canonical publisher validates both receipts and live base images, drains voice
+and SSH streams under the shared fence, backs up both databases and the private
+Compose environment, preserves the database URL and authentication secrets, and
+persists an immutable identity-image Compose override for future panel releases.
+It reopens admission only after both services report the prepared commit and
+PostgreSQL readiness. Failure during switching retains the fence; inspect both
+services before explicit recovery. Never manually retag or restart to bypass it.
