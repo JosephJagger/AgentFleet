@@ -49,12 +49,21 @@ export async function probeCodexDaemon(threadId: string, home: string, uid: numb
     const codexHome = await io.real(home);
     const daemonDir = join(codexHome, "app-server-daemon");
     const controlDir = join(codexHome, "app-server-control");
-    const pidPath = join(daemonDir, "app-server.pid");
     for (const path of [daemonDir, controlDir]) {
       const info = await io.metadata(path, false);
       if (!info.directory || info.uid !== uid || (info.mode & 0o077) !== 0) return null;
     }
-    const pidInfo = await io.metadata(pidPath, false);
+    // Native CLI-managed daemons publish daemon.pid. Older integrations used
+    // app-server.pid; consult that name only when the native record is absent.
+    // Invalid/insecure native records must fail closed, not select another PID.
+    let pidPath = join(daemonDir, "daemon.pid");
+    let pidInfo;
+    try { pidInfo = await io.metadata(pidPath, false); }
+    catch (error) {
+      if (!record(error) || error.code !== "ENOENT") throw error;
+      pidPath = join(daemonDir, "app-server.pid");
+      pidInfo = await io.metadata(pidPath, false);
+    }
     if (!pidInfo.file || pidInfo.uid !== uid || (pidInfo.mode & 0o022) !== 0) return null;
     const raw = await io.read(pidPath);
     if (raw.length > 16_384) return null;

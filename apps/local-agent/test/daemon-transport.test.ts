@@ -14,7 +14,7 @@ function fixture() {
   const alias = `${home}/app-server-control/app-server-control.sock`;
   const socket = `/tmp/codex-daemon-${uid}/${createHash("sha256").update(alias).digest("hex")}`;
   const texts = new Map<string, string>([
-    [`${home}/app-server-daemon/app-server.pid`, JSON.stringify({ pid, processIdentity: { bootId: "boot", startTicks: 42 } })],
+    [`${home}/app-server-daemon/daemon.pid`, JSON.stringify({ pid, processIdentity: { bootId: "boot", startTicks: 42 } })],
     ["/proc/sys/kernel/random/boot_id", "boot\n"],
     [`/proc/${pid}/stat`, `${pid} (codex worker (nested)) S ${Array(18).fill("0").join(" ")} 42 0`],
     [`/proc/${pid}/cmdline`, "/fixture/codex\0app-server\0--listen\0unix://\0--managed-daemon\0"],
@@ -25,13 +25,13 @@ function fixture() {
     ({ uid, mode, ino, dev: 2049n, directory: kind === "directory", file: kind === "file", socket: kind === "socket" });
   const metadata = new Map([
     [`${home}/app-server-daemon`, meta("directory")], [`${home}/app-server-control`, meta("directory")],
-    [`${home}/app-server-daemon/app-server.pid`, meta("file", 1n, 0o644)], [`/proc/${pid}`, meta("directory")],
+    [`${home}/app-server-daemon/daemon.pid`, meta("file", 1n, 0o644)], [`/proc/${pid}`, meta("directory")],
     [`/proc/${pid}/root/tmp/codex-daemon-${uid}`, meta("directory")], [`/proc/${pid}/root${socket}`, meta("socket", 300n, 0o600)],
     [`${home}/thread-writer-locks/${threadId}.lock`, meta("file", 200n, 0o600)],
   ]);
   const links = new Map([[`/proc/${pid}/exe`, "/fixture/codex"], [`/proc/${pid}/fd/9`, "socket:[300]"], [alias, socket]]);
   const real = new Map([[home, home], [alias, socket]]);
-  const must = <T>(value: T | undefined): T => { if (value === undefined) throw new Error("fixture missing"); return value; };
+  const must = <T>(value: T | undefined): T => { if (value === undefined) throw Object.assign(new Error("fixture missing"), { code: "ENOENT" }); return value; };
   const io: Parameters<typeof probeCodexDaemon>[3] = {
     read: async path => must(texts.get(path)), link: async path => must(links.get(path)),
     real: async path => must(real.get(path)), entries: async () => ["9"], metadata: async path => must(metadata.get(path)),
@@ -44,6 +44,28 @@ test("daemon discovery binds exact thread lock, process generation, and secure l
   assert.deepEqual(await probeCodexDaemon(threadId, f.home, f.uid, f.io), { pid: f.pid, startTicks: "42", socketPath: `/proc/${f.pid}/root${f.socket}`, threadId });
   assert.equal(await probeCodexDaemon("../../other", f.home, f.uid, f.io), null);
   assert.equal(await probeCodexDaemon(randomUUID(), f.home, f.uid, f.io), null);
+});
+
+test("daemon discovery supports the legacy name only when daemon.pid is absent", async () => {
+  const f = fixture(), current = `${f.home}/app-server-daemon/daemon.pid`, legacy = `${f.home}/app-server-daemon/app-server.pid`;
+  f.texts.set(legacy, f.texts.get(current)!); f.metadata.set(legacy, f.metadata.get(current)!);
+  f.texts.delete(current); f.metadata.delete(current);
+  assert.equal((await probeCodexDaemon(threadId, f.home, f.uid, f.io))?.pid, f.pid);
+  // A stale or malformed native identity must never fall through to a legacy one.
+  f.metadata.set(current, f.metadata.get(legacy)!); f.texts.set(current, '{"pid":9999}');
+  assert.equal(await probeCodexDaemon(threadId, f.home, f.uid, f.io), null);
+  f.texts.set(current, f.texts.get(legacy)!);
+  f.metadata.set(current, { ...f.metadata.get(current)!, mode: 0o777 });
+  assert.equal(await probeCodexDaemon(threadId, f.home, f.uid, f.io), null);
+});
+
+test("daemon discovery prefers the native record and does not fall back on permission errors", async () => {
+  const f = fixture(), current = `${f.home}/app-server-daemon/daemon.pid`, legacy = `${f.home}/app-server-daemon/app-server.pid`;
+  f.texts.set(legacy, '{"pid":9999}'); f.metadata.set(legacy, f.metadata.get(current)!);
+  assert.equal((await probeCodexDaemon(threadId, f.home, f.uid, f.io))?.pid, f.pid);
+  const metadata = f.io.metadata;
+  f.io.metadata = async (path, follow) => { if (path === current) throw Object.assign(new Error('denied'), {code:'EACCES'}); return metadata(path, follow); };
+  assert.equal(await probeCodexDaemon(threadId, f.home, f.uid, f.io), null);
 });
 
 test("daemon discovery refuses stale PID identity and foreign writer", async () => {
@@ -72,7 +94,7 @@ test("daemon discovery rejects arbitrary socket aliases and writable or foreign 
   for (const change of ["socket", "directory", "owner", "pidFile"] as const) {
     const f = fixture();
     if (change === "socket") f.links.set(f.alias, "/tmp/untrusted.sock");
-    const path = change === "pidFile" ? `${f.home}/app-server-daemon/app-server.pid` : `/proc/${f.pid}/root/tmp/codex-daemon-${f.uid}`;
+    const path = change === "pidFile" ? `${f.home}/app-server-daemon/daemon.pid` : `/proc/${f.pid}/root/tmp/codex-daemon-${f.uid}`;
     const meta = f.metadata.get(path)!;
     if (change === "directory" || change === "pidFile") f.metadata.set(path, { ...meta, mode: 0o777 });
     if (change === "owner") f.metadata.set(path, { ...meta, uid: 9999 });
@@ -143,7 +165,7 @@ test("native daemon transport rejoins the same loaded thread and closes only its
   await rpc(nativeSend, "initialize", init); nativeSend(JSON.stringify({ method: "initialized" }));
   await rpc(nativeSend, "thread/resume", { threadId: id, excludeTurns: true, cwd, approvalPolicy: "on-request", sandbox: "workspace-write" });
   const startTicks = (await readFile(`/proc/${daemon.pid}/stat`, "utf8")).split(") ")[1]!.split(" ")[19]!;
-  await writeFile(join(home, "app-server-daemon", "app-server.pid"), JSON.stringify({ pid: daemon.pid,
+  await writeFile(join(home, "app-server-daemon", "daemon.pid"), JSON.stringify({ pid: daemon.pid,
     processIdentity: { bootId: (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim(), startTicks: Number(startTicks) } }));
   const endpoint = await discoverCodexDaemon(id, environment);
   assert.ok(endpoint, "precise daemon and native thread lock discovered");

@@ -67,7 +67,7 @@ test("native session fallback rejoins the exact daemon writer, preserves permiss
   const original = await rpc("thread/resume", { threadId: id, excludeTurns: true, cwd, ...threadPermissionParams(cwd, "project") });
   const proc = await readFile(`/proc/${daemon.pid}/stat`, "utf8");
   const startTicks = proc.slice(proc.lastIndexOf(")") + 2).split(" ")[19]!;
-  await writeFile(join(home, "app-server-daemon", "app-server.pid"), JSON.stringify({ pid: daemon.pid,
+  await writeFile(join(home, "app-server-daemon", "daemon.pid"), JSON.stringify({ pid: daemon.pid,
     processIdentity: { bootId: (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim(), startTicks: Number(startTicks) } }));
   const project = await resolveProject(cwd, "isolated-native-daemon");
   const callbacks: AppServerCallbacks = { findManagedThread: () => undefined, findProject: () => project,
