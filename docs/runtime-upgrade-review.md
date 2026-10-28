@@ -283,3 +283,67 @@ small valid PNG; the larger transport case used synthetic raster-signature bytes
 The 0.164.0 production validator was updated through the guarded publisher and
 its official validation run promoted the runtime target successfully. B52H
 resumed reconciliation and heartbeats without deleting its pending events.
+
+
+## Codex 0.165.0 review — Agent 0.30.158 (2026-10-28)
+
+Sources: [official changelog](https://developers.openai.com/codex/changelog),
+[official release](https://github.com/openai/codex/releases/tag/rust-v0.165.0).
+The latest-release endpoint returned `rust-v0.165.0`, published
+`2026-10-27T20:09:38Z`, with both draft and prerelease false.
+
+The official Linux musl archive matches SHA-256
+`be635d3486a5bd060d0fff582ae6d30160280c31344dd85719707fa920e187f0`.
+The executable reports `codex-cli 0.165.0`; the ordinary v2 schema is
+`38027ec8a6fffc2422b674cab13dc1a05c26e13a48349c46a274609d52090e35`.
+The experimental schema is
+`9f10e93ecf140c44a50b602e64ebaf52876e9022d10f20295d8f190e1d10853e`.
+A fresh 0.164.0 download reproduced the preceding review's archive and schema
+hashes and served as the comparison control.
+
+The ordinary protocol retains all 668 definitions and 106 request methods.
+Structural changes are additive: the `gcp` account variant, `modelNotFound` error,
+and optional `NetworkRequirements.reviewDomains`. Experimental definitions rise
+from 818 to 820 and methods from 175 to 176 (`thread/memory/read`); optional fields
+are added to thread fork, list and sample requests. No existing request method,
+definition or required request field was removed or made mandatory. All 22
+ordinary and 34 experimental realtime definitions are unchanged.
+
+Both reviewed-schema lists and the native-voice gate now accept exactly 0.165.0.
+Unknown releases and wrong schemas remain rejected; rollback to 0.164.0 remains
+supported. The bundled installer baseline is unchanged. Native history cleanup
+adapters are unchanged. New upstream CLI features do not imply new web controls.
+
+Validation used temporary homes, synthetic sessions and a local Responses fixture,
+without user credentials or real model requests:
+
+- Native group: **15/15 passed, none skipped** (`writer-native`,
+  `conversation-history-native`, `image-native`, `generated-images-native`,
+  `session-daemon-native`, `daemon-transport`, `app-server-config`). It covers
+  legacy/paginated writer exclusion, same-ID release/resume, permissions,
+  archive/restore, descendant deletion protection, unrelated-history retention,
+  uploaded/generated images, Desktop configuration and existing-daemon attachment.
+- Agent regression group: **96/96 passed, none skipped**, covering managed update
+  gates, rollback, schemas, voice, history, images, daemon/session adapters,
+  permission policy, download retries and preflight checks.
+- Control-plane group: **33/33 passed, none skipped**, covering runtime promotion,
+  channel APIs, voice, history, images and provider runtime policy.
+- Both TypeScript builds passed on Node 24. The actual sandbox probe passed:
+  project writes succeeded and writes outside the project were blocked.
+- The complete production promoter passed in a disposable directory: official
+  size/digest verification for all nine archives (four binaries, four Code Mode
+  hosts, Linux bwrap), exact version/schema and isolated initialize/config/history
+  probes, plus Code Mode arithmetic execution. It produced a 0.165.0 test target.
+
+The initial daemon test used the upstream archive's long executable filename and
+was correctly rejected by the existing daemon identity check. Retesting with the
+installed `codex` filename passed; no identity check was relaxed. The final native
+run explicitly enabled all opt-in tests. macOS/Windows artifacts were verified but
+not executed; live voice and real-account provider/MCP authentication were not
+exercised.
+
+Publication must use a full clean-main release with the guarded publisher's
+`--with-validator` option so both the Agent artifacts and singleton validator
+receive this review. The live worker must independently verify and promote the
+release. Hosts retain administrator confirmation, idle-time activation, local
+validation and rollback health acknowledgement.
