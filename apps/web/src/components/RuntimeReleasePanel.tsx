@@ -1,5 +1,5 @@
 import { displayName } from "../lib/display-name";
-import { t, locale, localized, systemText } from "../i18n";
+import { wordSpace, t, locale, localized, systemText } from "../i18n";
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
 import { api, type RuntimeReleaseStatus } from "../lib/api";
@@ -38,7 +38,7 @@ export function RuntimeReleasePanel({ machine }: { machine?: Machine }) {
       <div className="runtime-release-versions"><div><span>{t("当前托管目标")}</span><strong>{target ?? t("正在准备基线")}</strong></div><ArrowRight aria-hidden="true" size={20} /><div><span>{t(data.workerOnline ? "官方最新稳定版" : "上次获取的官方稳定版")}</span><strong>{data.latestVersion ?? t("尚未发现")}</strong></div></div>
       {!data.configured ? <p role="status">{t("自动验证服务尚未配置，继续使用内置托管版本。")}</p> : !data.workerOnline && <p className="catalog-error" role="status">{t("验证服务未连接，暂不能自动验证或晋升；已发布目标不变。")}</p>}
       <p className="runtime-release-message" role="status">{systemText(data.message)}</p>
-      <div className="runtime-release-times"><span>{t("上次检查：")}{locale() === "en" ? " " : ""}{date(data.lastCheckedAt)}</span><span>{t("下次检查：")}{locale() === "en" ? " " : ""}{!data.workerOnline ? t("检查服务离线，等待恢复") : data.paused ? t("恢复晋升后继续") : date(data.nextCheckAt)}</span></div>
+      <div className="runtime-release-times"><span>{t("上次检查：")}{wordSpace()}{date(data.lastCheckedAt)}</span><span>{t("下次检查：")}{wordSpace()}{!data.workerOnline ? t("检查服务离线，等待恢复") : data.paused ? t("恢复晋升后继续") : date(data.nextCheckAt)}</span></div>
       <ul className="runtime-release-checks">{data.checks.map((check, index) => <li key={`${systemText(check.name)}:${index}`} data-state={check.state}><CheckCircle2 size={16} aria-hidden="true" /><div><strong>{systemText(check.name)}</strong><p>{systemText(check.detail)}</p></div></li>)}</ul>
       {machine && rollout && <div className="runtime-release-host"><p><strong>{displayName(machine.name)}</strong> · {rollout.label}</p>{rollout.error && <p className="catalog-error">{systemText(rollout.error)}</p>}</div>}
       <p className="host-help">{t("约每 6 小时检查官方版本；支持自动更新的连接服务约每 15 分钟检查托管目标。Linux 中心验证通过后，各平台主机还会校验版本、SHA-256、schema 与启动健康。不兼容的协议需要开发适配，不会强制晋升。")}</p>
@@ -48,7 +48,7 @@ export function RuntimeReleasePanel({ machine }: { machine?: Machine }) {
         <button type="button" className="button button--quiet" disabled={busy || !data.configured} onClick={() => void control(data.paused ? "resume" : "pause")}>{data.paused ? t("恢复自动晋升") : t("暂停自动晋升")}</button>
         {data.previous && <button type="button" className="button button--quiet" disabled={busy || !data.workerOnline} onClick={() => setConfirm(true)}>{t("回退托管目标")}</button>}
       </div>}
-      {data.canControl === true && confirm && <div className="runtime-release-confirm" role="group" aria-label={t("确认回退托管目标")}><p>{t("将所有托管主机的目标回退到")}{locale() === "en" ? " " : ""}{data.previous?.version}{locale() === "en" ? " " : ""}{t("，并暂停自动晋升。等待任务结束后切换，不中断正在运行的任务。")}</p><button type="button" className="button button--danger" disabled={busy} onClick={() => void control("rollback")}>{t("确认回退并暂停晋升")}</button><button type="button" className="button button--quiet" disabled={busy} onClick={() => setConfirm(false)}>{t("取消")}</button></div>}
+      {data.canControl === true && confirm && <div className="runtime-release-confirm" role="group" aria-label={t("确认回退托管目标")}><p>{t("将所有托管主机的目标回退到")}{wordSpace()}{data.previous?.version}{wordSpace()}{t("，并暂停自动晋升。等待任务结束后切换，不中断正在运行的任务。")}</p><button type="button" className="button button--danger" disabled={busy} onClick={() => void control("rollback")}>{t("确认回退并暂停晋升")}</button><button type="button" className="button button--quiet" disabled={busy} onClick={() => setConfirm(false)}>{t("取消")}</button></div>}
       {data.history.length > 0 && <details className="runtime-release-history"><summary>{t("验证与晋升记录")}</summary>{data.history.map((item, index) => <article key={`${item.at}:${index}`}><strong>{item.version} · {item.result === "promoted" ? t("已晋升") : item.result === "rollback" ? t("已回退") : t("未晋升")}</strong><time>{date(item.at)}</time><p>{systemText(item.message)}</p></article>)}</details>}
     </>}
     {notice && <p role="status">{systemText(notice)}</p>}{error && <p role="alert" className="catalog-error">{systemText(error)}</p>}

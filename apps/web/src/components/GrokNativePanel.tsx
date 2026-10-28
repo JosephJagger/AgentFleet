@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {api} from '../lib/api';
 import type {FleetSession,CommandReceipt} from '../lib/types';
 import {grokOperations,type GrokOperation} from '../lib/grok-operations';
-import {t} from '../i18n';
+import { locale,t} from '../i18n';
 
 const labels:Record<GrokOperation,string>={
  'files.list':'浏览项目目录','files.read':'读取项目文件',
@@ -57,6 +57,6 @@ export function GrokNativePanel({session,commands,supported,onChanged,onCompose}
   </form>
   {notice&&<p role="status">{notice}</p>}
   {receipt?.message&&<p role="status">{receipt.message}</p>}
-  {result&&<section aria-label={t('原生操作结果')}><button type="button" className="button button--quiet" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({observedAt:receipt?.createdAt,...result},null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='grok-'+result.operation+'.json';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);}}>{t('导出当前结果')}</button><p>{t('原生返回状态')}：{result.status}{receipt?.createdAt&&<> · <time dateTime={receipt.createdAt}>{new Date(receipt.createdAt).toLocaleString()}</time></>}</p>{!result.rows.length&&<p>{t('原生未返回可展示的条目。')}</p>}{result.rows.map((row,index)=>{const workflow=result.operation==='workflows.list'&&onCompose&&/^[a-z0-9-]{1,64}$/.test(row.name)?onCompose:undefined;return <details key={index}><summary>{row.name}{row.status?' · '+row.status:''}{workflow&&<button type="button" className="button button--secondary" onClick={event=>{event.preventDefault();event.stopPropagation();workflow('/workflow '+row.name);}}>{t('填入输入框')}</button>}</summary><pre className="grok-native-result">{row.detail}</pre></details>;})}</section>}
+  {result&&<section aria-label={t('原生操作结果')}><button type="button" className="button button--quiet" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify({observedAt:receipt?.createdAt,...result},null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='grok-'+result.operation+'.json';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);}}>{t('导出当前结果')}</button><p>{t('原生返回状态')}：{result.status}{receipt?.createdAt&&<> · <time dateTime={receipt.createdAt}>{new Date(receipt.createdAt).toLocaleString(locale())}</time></>}</p>{!result.rows.length&&<p>{t('原生未返回可展示的条目。')}</p>}{result.rows.map((row,index)=>{const workflow=result.operation==='workflows.list'&&onCompose&&/^[a-z0-9-]{1,64}$/.test(row.name)?onCompose:undefined;return <details key={index}><summary>{row.name}{row.status?' · '+row.status:''}{workflow&&<button type="button" className="button button--secondary" onClick={event=>{event.preventDefault();event.stopPropagation();workflow('/workflow '+row.name);}}>{t('填入输入框')}</button>}</summary><pre className="grok-native-result">{row.detail}</pre></details>;})}</section>}
  </div></details>;
 }

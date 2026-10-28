@@ -1,7 +1,7 @@
 import { LoaderCircle, PlugZap } from "lucide-react";
 import { useId } from "react";
 import { displayName } from "../lib/display-name";
-import { t } from "../i18n";
+import { locale, t } from "../i18n";
 import type { SshLinkMatrix, SshMatrixSource } from "../lib/types";
 
 const REASONS: Record<string, string> = {
@@ -20,7 +20,7 @@ const REASONS: Record<string, string> = {
 const reasonText = (reason?: string) => (reason && REASONS[reason] ? t(REASONS[reason]!) : "");
 
 function Cell({ source, route }: { source: SshMatrixSource; route: string }) {
-  const detail = [reasonText(source.reason), source.error, source.testedAt && t("测试于 {0}", new Date(source.testedAt).toLocaleString())].filter(Boolean).join(" · ");
+  const detail = [reasonText(source.reason), source.error, source.testedAt && t("测试于 {0}", new Date(source.testedAt).toLocaleString(locale()))].filter(Boolean).join(" · ");
   if (source.state === "ok") return <td><span className="ssh-check ssh-check--ok" title={detail}>{source.path === "proxyjump" ? t("经跳板 ✓") : source.path === "relay" ? t("经中转 ✓") : t("直连 ✓")}</span></td>;
   if (source.state === "failed") return <td><span className="ssh-check ssh-check--bad" title={detail}>{t("连接失败")}</span>{source.error && <small>{source.error}</small>}</td>;
   if (source.state === "untested") return <td><span className="ssh-check ssh-check--unknown">{source.via ? t("未测试（经跳板）") : route === "relay" ? t("未测试（经中转）") : route === "auto" ? t("未测试（直连或中转）") : t("未测试")}</span>{source.agent === "offline" && <small>{t("主机离线")}</small>}</td>;

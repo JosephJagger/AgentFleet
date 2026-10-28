@@ -1,0 +1,19 @@
+{
+  "name": "AgentFleets",
+  "short_name": "AgentFleets",
+  "description": "여러 호스트에서 Codex, Claude Code 등 AI 에이전트를 연결하는 작업 공간",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#f5f5f7",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

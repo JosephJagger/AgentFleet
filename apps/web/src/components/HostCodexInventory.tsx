@@ -1,4 +1,4 @@
-import { t, locale } from "../i18n";
+import { wordSpace, t, locale } from "../i18n";
 import type { Machine } from "../lib/types";
 
 export function HostCodexInventory({ machine }: { machine: Machine }) {
@@ -16,7 +16,7 @@ export function HostCodexInventory({ machine }: { machine: Machine }) {
     <p className="host-help">{detected ? t("展示常见安装位置中检测到的最高稳定版本，不代表终端当前选用的版本，也不会切换面板运行时。") : t("此版本来自连接服务的程序搜索路径，可能与终端不同；更新连接服务后支持多安装位置检测。")}</p>
     {text("hostCodexPath") && <p className="host-help">{t("检测路径：")}<code>{text("hostCodexPath")}</code></p>}
     {recorded && text("hostCodexMetadataPath") && <p className="host-help">{t("安装记录：")}<code>{text("hostCodexMetadataPath")}</code></p>}
-    {defaultVersion && defaultVersion !== version && <p className="host-help">{t("另有旧安装：服务 PATH 默认 Codex")}{locale() === "en" ? " " : ""}{defaultVersion}（{text("hostCodexDefaultPath")}{locale() === "en" ? " " : ""}{t("）。终端可能使用不同路径。")}</p>}
-    {checkedAt && Number.isFinite(Date.parse(checkedAt)) && <p className="host-help">{t("最近检测：")}{locale() === "en" ? " " : ""}{new Date(checkedAt).toLocaleString(locale())}{locale() === "en" ? " " : ""}{t("。在线时约每 5 分钟自动检测，也可点击「检查连接」立即检测。")}</p>}
+    {defaultVersion && defaultVersion !== version && <p className="host-help">{t("另有旧安装：服务 PATH 默认 Codex")}{wordSpace()}{defaultVersion}（{text("hostCodexDefaultPath")}{wordSpace()}{t("）。终端可能使用不同路径。")}</p>}
+    {checkedAt && Number.isFinite(Date.parse(checkedAt)) && <p className="host-help">{t("最近检测：")}{wordSpace()}{new Date(checkedAt).toLocaleString(locale())}{t("。在线时约每 5 分钟自动检测，也可点击「检查连接」立即检测。")}</p>}
   </section>;
 }

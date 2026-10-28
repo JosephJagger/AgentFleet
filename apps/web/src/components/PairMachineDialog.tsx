@@ -1,5 +1,5 @@
 import { displayName } from "../lib/display-name";
-import { t, locale, localized } from "../i18n";
+import { wordSpace, t, locale, localized } from "../i18n";
 import {
   AlertTriangle,
   ArrowRight,
@@ -345,7 +345,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
       <section ref={dialogRef} className="modal modal--pair" role="dialog" aria-modal="true" aria-labelledby="pair-title" aria-describedby="pair-description" tabIndex={-1}>
         <div className="modal-head">
           <div>
-            <div className="eyebrow">Secure host enrollment</div>
+
             <h2 id="pair-title">{t("连接 Codex 主机")}</h2>
             <p id="pair-description">{t("选择要连接的主机系统，在装有 Codex 的那台主机运行命令；连接后自动发现已有项目和会话。")}</p>
           </div>
@@ -374,7 +374,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
               </div>
             </div>}
             {enrollment?.machineReady ? (
-              <section className="pair-complete"><CircleCheck size={28} /><h3>{displayName(enrollment.machineName)} {locale() === "en" ? " " : ""}{t("已连接")}</h3><DiscoveryStatus discovery={enrollment.discovery} /><form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!enrollment.machineId) return; setBusy(true); try { if (alias.trim() !== enrollment.machineName) await api.updateMachineAlias(enrollment.machineId, alias.trim() || null); onPaired(enrollment.machineId); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机显示名称")}</span><input aria-label={t("新主机显示名称")} value={alias} maxLength={80} onChange={(event) => setAlias(event.target.value)} /></label><button type="submit" className="button button--primary" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <ArrowRight size={16} />}{locale() === "en" ? " " : ""}{t("查看项目")}</button></form></section>
+              <section className="pair-complete"><CircleCheck size={28} /><h3>{displayName(enrollment.machineName)} {wordSpace()}{t("已连接")}</h3><DiscoveryStatus discovery={enrollment.discovery} /><form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!enrollment.machineId) return; setBusy(true); try { if (alias.trim() !== enrollment.machineName) await api.updateMachineAlias(enrollment.machineId, alias.trim() || null); onPaired(enrollment.machineId); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机显示名称")}</span><input aria-label={t("新主机显示名称")} value={alias} maxLength={80} onChange={(event) => setAlias(event.target.value)} /></label><button type="submit" className="button button--primary" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <ArrowRight size={16} />}{wordSpace()}{t("查看项目")}</button></form></section>
             ) : creating ? (
               <div className="pair-loading" aria-live="polite"><LoaderCircle className="spin" size={19} /><div><strong>{t("正在签发一次性票据")}</strong><span>{t("票据只保存在当前窗口，有效期很短。")}</span></div></div>
             ) : createError ? (
@@ -390,7 +390,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
                 <section className={`connection-receipt${claimed ? " connection-receipt--claimed" : ""}`} aria-label={t("主机连接回执")}>
                   <header>
                     <span className="terminal-lights" aria-hidden="true"><i /><i /><i /></span>
-                    <code>agentfleet / secure enrollment</code>
+                    <code>AgentFleets</code>
                     <span className="receipt-expiry">{remainingLabel(enrollment.expiresAt, now)}</span>
                   </header>
                   {npm && <div className="receipt-command">
@@ -468,7 +468,7 @@ export function PairMachineDialog({ open, onClose, onPaired, onToast }: PairMach
                 </div>
 
                 {pollError && (
-                  <div className="pair-inline-error" role="alert"><AlertTriangle size={15} /><span>{t("连接状态读取中断：")}{locale() === "en" ? " " : ""}{pollError}</span><button type="button" onClick={() => { setPollError(""); setPollRevision((value) => value + 1); }}>{t("继续检测")}</button></div>
+                  <div className="pair-inline-error" role="alert"><AlertTriangle size={15} /><span>{t("连接状态读取中断：")}{wordSpace()}{pollError}</span><button type="button" onClick={() => { setPollError(""); setPollRevision((value) => value + 1); }}>{t("继续检测")}</button></div>
                 )}
 
                 {guidedExpired ? (

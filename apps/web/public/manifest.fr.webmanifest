@@ -1,0 +1,19 @@
+{
+  "name": "AgentFleets",
+  "short_name": "AgentFleets",
+  "description": "Un espace de travail pour Codex, Claude Code et vos agents IA sur plusieurs hôtes",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#f5f5f7",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

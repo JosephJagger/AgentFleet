@@ -1,5 +1,5 @@
 import { displayName } from "../lib/display-name";
-import { t, locale, localized, systemText } from "../i18n";
+import { wordSpace, t, locale, localized, systemText } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { CommandReceipt, FleetSession } from "../lib/types";
@@ -25,8 +25,8 @@ export function CodexInspectionPanel({ session, commands, request, onChanged }: 
     <label>{t("查看")}<select aria-label={t("Codex 环境分类")} value={section} onChange={(e) => setSection(e.target.value)}>{Object.entries(sections).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
     <button type="button" className="button button--quiet" disabled={busy || pending || !session.actions?.inspect?.allowed} onClick={() => void refresh()}>{busy || pending ? t("正在读取…") : t("从宿主机读取")}</button>
     {!session.actions?.inspect?.allowed && <p>{session.actions?.inspect?.message ?? t("此主机尚未报告查询能力，请更新连接服务。")}</p>}
-    {snapshot && <p>{t("读取于")}{locale() === "en" ? " " : ""}{new Date(snapshot.observedAt).toLocaleString(locale())} · {snapshot.cwd}</p>}
-    {data ? !data.available ? <p>{t("此项读取失败或当前 Codex 不支持（")}{locale() === "en" ? " " : ""}{data.errorCode}{locale() === "en" ? " " : ""}{t("）。不会将读取失败显示为“未安装”。")}</p> : <>
+    {snapshot && <p>{t("读取于")}{wordSpace()}{new Date(snapshot.observedAt).toLocaleString(locale())} · {snapshot.cwd}</p>}
+    {data ? !data.available ? <p>{t("此项读取失败或当前 Codex 不支持（")}{wordSpace()}{data.errorCode}{wordSpace()}{t("）。不会将读取失败显示为“未安装”。")}</p> : <>
       {data.rows.length ? <dl>{data.rows.map((row, i) => <div key={i}><dt>{displayName(row.name)}<small>{systemText(row.status)}</small></dt><dd>{row.detail}</dd></div>)}</dl> : <p>{t("本次查询没有返回条目。")}</p>}
       {data.truncated && <p>{t("结果较多，仅显示部分条目，不代表完整清单。")}</p>}
     </> : <p>{t("尚无这类环境快照，请读取宿主机。")}</p>}

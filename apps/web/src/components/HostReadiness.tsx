@@ -1,4 +1,4 @@
-import { t, locale, localized, systemText } from "../i18n";
+import { wordSpace, t, locale, localized, systemText } from "../i18n";
 import { AlertTriangle, Check, Circle, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DiscoveryProgress, MaintenanceType } from "../lib/types";
@@ -19,6 +19,6 @@ export function HostReadiness({ discovery, online, onAction, disabled, capabilit
       <div><strong>{titles[item.id] ?? item.id}<span>{item.state === "passed" ? t("已通过") : item.state === "failed" ? t("需处理") : item.state === "checking" ? t("检查中") : t("待检查")}</span></strong><p>{systemText(item.message)}</p>{item.state === "failed" && <small>{item.code}</small>}</div>
       {item.state === "failed" && item.action && onAction && <button type="button" className="button button--quiet" disabled={disabled || !online || !capabilities?.includes(item.action)} onClick={() => onAction(item.action!)}>{actions[item.action]}</button>}
     </li>)}</ul></details>}
-    {checks[0]?.checkedAt && <small>{t("环境检查时间")}{locale() === "en" ? " " : ""}{new Date(checks[0].checkedAt).toLocaleString(locale())}</small>}
+    {checks[0]?.checkedAt && <small>{t("环境检查时间")}{wordSpace()}{new Date(checks[0].checkedAt).toLocaleString(locale())}</small>}
   </section>;
 }

@@ -1,4 +1,4 @@
-import { t, locale, systemText } from "../i18n";
+import { wordSpace, t, locale, systemText } from "../i18n";
 import { AlertTriangle, Check, LoaderCircle, FolderGit2 } from "lucide-react";
 import type { DiscoveryProgress } from "../lib/types";
 
@@ -9,7 +9,7 @@ export function DiscoveryStatus({ discovery }: { discovery?: DiscoveryProgress }
       {discovery && <span>{t("{0} 个项目 · {1} 个会话", discovery.discoveredProjects, discovery.discoveredSessions)}{discovery.state === "scanning" ? t(" · 已读取 {0} 页", discovery.scannedPages) : ""}</span>}
       {discovery?.error && <p>{systemText(discovery.error)}</p>}
       {!!discovery?.skippedCount && <p>{t("有 {0} 个会话的项目目录已不存在或无法读取，暂未加入可用项目。原始会话不会被删除。", discovery.skippedCount)}</p>}
-      {discovery?.lastSuccessfulAt && <small>{t("最近成功同步")}{locale() === "en" ? " " : ""}{new Date(discovery.lastSuccessfulAt).toLocaleString(locale())}</small>}
+      {discovery?.lastSuccessfulAt && <small>{t("最近成功同步")}{wordSpace()}{new Date(discovery.lastSuccessfulAt).toLocaleString(locale())}</small>}
       {discovery?.state === "ready" && <small>{discovery.syncMode === "events" ? t("事件驱动同步 · 有变化时自动更新，每 5 分钟后台校准。") : discovery.syncMode === "fallback" ? t("文件监听暂不可用 · 已启用定时校准，可手动刷新。") : t("后续变化自动在后台同步，无需重复扫描。")}</small>}
     </div>
   </div>;

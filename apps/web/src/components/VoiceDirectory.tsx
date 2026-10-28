@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {api,type VoiceDirectoryPage} from '../lib/api';
 import {displayName} from '../lib/display-name';
-import {t} from '../i18n';
+import { locale,t} from '../i18n';
 
 export function VoiceDirectory({onOpenSession}:{onOpenSession:(id:string)=>void}) {
  const [open,setOpen]=useState(false),[status,setStatus]=useState('active'),[provider,setProvider]=useState(''),[query,setQuery]=useState(''),[host,setHost]=useState(''),[project,setProject]=useState(''),[sessionName,setSessionName]=useState('');
@@ -27,7 +27,7 @@ export function VoiceDirectory({onOpenSession}:{onOpenSession:(id:string)=>void}
   {open&&<div className="voice-directory__body">
    <div className="voice-directory__filters">
     <label>{t('状态')}<select value={status} onChange={e=>setStatus(e.target.value)}><option value="active">{t('已接管及运行中')}</option><option value="running">{t('运行中')}</option><option value="managed">{t('已接管')}</option><option value="online">{t('在线主机的会话')}</option><option value="all">{t('全部授权会话')}</option></select></label>
-    <label>Provider<select value={provider} onChange={e=>setProvider(e.target.value)}><option value="">{t('全部')}</option><option value="codex">Codex</option><option value="claude">Claude Code</option></select></label>
+    <label>{t('智能体')}<select value={provider} onChange={e=>setProvider(e.target.value)}><option value="">{t('全部')}</option><option value="codex">Codex</option><option value="claude">Claude Code</option></select></label>
    </div>
    <input aria-label={t('组合搜索')} placeholder={t('主机 项目 会话，空格组合搜索')} value={query} onChange={e=>setQuery(e.target.value)}/>
    <details><summary>{t('按名称缩小范围')}</summary><div className="voice-directory__filters">
@@ -35,7 +35,7 @@ export function VoiceDirectory({onOpenSession}:{onOpenSession:(id:string)=>void}
     <label>{t('项目')}<input value={project} onChange={e=>setProject(e.target.value)}/></label>
     <label>{t('会话')}<input value={sessionName} onChange={e=>setSessionName(e.target.value)}/></label>
    </div></details>
-   <div className="voice-directory__refresh"><button className="button button--secondary" type="button" onClick={()=>{setCursor('');setRefresh(v=>v+1);}}>{t('刷新目录')}</button><small>{loading?t('读取中…'):page?`${t('更新于')} ${new Date(page.generatedAt).toLocaleTimeString()}`:''}</small></div>
+   <div className="voice-directory__refresh"><button className="button button--secondary" type="button" onClick={()=>{setCursor('');setRefresh(v=>v+1);}}>{t('刷新目录')}</button><small>{loading?t('读取中…'):page?`${t('更新于')} ${new Date(page.generatedAt).toLocaleTimeString(locale())}`:''}</small></div>
    {error&&<p role="alert">{t('目录可能已过期，请刷新后核实。')} {error}</p>}
    {page&&<>
     <p className="panel-voice-control__hint">{t('在线主机')} {page.hostTotal} · {page.hosts.map(h=>displayName(h.name)).join(' · ')}{page.hostsTruncated?' …':''}</p>

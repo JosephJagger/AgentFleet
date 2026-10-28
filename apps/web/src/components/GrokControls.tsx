@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, Settings2, X } from "lucide-react";
 import type { GrokModel, GrokConfigOption, GrokSettings, GrokPreferences } from "../lib/grok-preferences";
-import { t } from "../i18n";
+import { locale, t } from "../i18n";
 
 export function GrokControls({options,models=[],controls,observed,settings,ready,error,onReload,onSave,onEditingChange,disabled,allowStartup=false,xSearchSupported=false,openRequest=0}:{observed?:GrokPreferences["observed"];controls?:{planMode:boolean;permissionSync:boolean};models?:GrokModel[];options:GrokConfigOption[];settings:GrokSettings;ready:boolean;error:string;onReload:()=>void;onSave:(settings:GrokSettings)=>Promise<void>;onEditingChange?:(editing:boolean)=>void;disabled:boolean;allowStartup?:boolean;xSearchSupported?:boolean;openRequest?:number}) {
   const [draft,setDraft]=useState(settings);
@@ -55,7 +55,7 @@ export function GrokControls({options,models=[],controls,observed,settings,ready
       <div className="claude-settings-fields">
         <label>{t("模型")}<select aria-label={t("Grok Build 模型")} value={model} disabled={disabled} onChange={event=>{const model=event.target.value||undefined;const available=models.find(item=>item.id===model)?.efforts;edit({model,contextWindow:undefined,...(available&&draft.effort&&!available.includes(draft.effort)?{effort:undefined}:{})});}}><option value="">{t("沿用原生")}</option>{choices(model,modelOption?.values??[]).map(value=><option key={value} value={value}>{models.find(item=>item.id===value)?.name??value}</option>)}</select></label>
         <label>{t("思考强度")}<select aria-label={t("Grok Build 思考强度")} value={effort} disabled={disabled} onChange={event=>edit({effort:event.target.value||undefined})}><option value="">{t("沿用原生")}</option>{choices(effort,effortValues).map(value=><option key={value} value={value}>{value}</option>)}</select></label>
-        {!!selectedModel?.contextWindows?.length&&<label>{t("上下文窗口")}<select aria-label={t("上下文窗口")} value={draft.contextWindow??""} disabled={disabled} onChange={event=>edit({contextWindow:event.target.value?Number(event.target.value):undefined})}><option value="">{t("沿用原生")}</option>{selectedModel.contextWindows.map(n=><option key={n} value={n}>{n.toLocaleString()} tokens</option>)}</select></label>}
+        {!!selectedModel?.contextWindows?.length&&<label>{t("上下文窗口")}<select aria-label={t("上下文窗口")} value={draft.contextWindow??""} disabled={disabled} onChange={event=>edit({contextWindow:event.target.value?Number(event.target.value):undefined})}><option value="">{t("沿用原生")}</option>{selectedModel.contextWindows.map(n=><option key={n} value={n}>{n.toLocaleString(locale())} tokens</option>)}</select></label>}
         <label>{t("任务模式")}<select aria-label={t("Grok Build 任务模式")} value={mode} disabled={disabled} onChange={event=>edit({mode:(event.target.value||undefined) as GrokSettings["mode"]})}><option value="">{t("沿用原生")}</option><option value="default" disabled={!controls?.planMode}>{t("默认模式")}</option><option value="plan" disabled={!controls?.planMode}>{t("计划模式")}</option></select></label>
       </div>
       {xSearchSupported&&<details className="config-disclosure"><summary>{t("X 搜索日期范围")}</summary><div className="claude-settings-fields"><p>{t("仅限制原生 X 搜索的日期范围，不会主动搜索。结束日期不包含当天，按 UTC 计算。")}</p>{(['fromDate','toDate'] as const).map(key=><label key={key}>{t(key==='fromDate'?'开始日期':'结束日期')}<input type="date" disabled={disabled} value={draft.xSearch?.[key]??""} onChange={e=>{const bounds={...draft.xSearch,[key]:e.target.value||undefined};edit({xSearch:bounds.fromDate||bounds.toDate?bounds:null});}}/></label>)}</div></details>}
@@ -64,7 +64,7 @@ export function GrokControls({options,models=[],controls,observed,settings,ready
         <label>{t("替换系统提示词")}<textarea value={draft.systemPromptOverride??""} maxLength={8000} disabled={disabled||!allowStartup||!!draft.rules} onChange={e=>edit({systemPromptOverride:e.target.value||undefined})}/></label>
         <label>{t("原生智能体配置名称")}<input value={draft.agentProfile??""} maxLength={120} disabled={disabled||!allowStartup} onChange={e=>edit({agentProfile:e.target.value||undefined})}/></label>
       </div></details>
-      {observed?.mode&&<p className="subtle">{t("上一轮原生任务模式")}：{t(observed.mode==='plan'?'计划模式':'默认模式')} · <time dateTime={observed.observedAt}>{new Date(observed.observedAt).toLocaleString()}</time></p>}
+      {observed?.mode&&<p className="subtle">{t("上一轮原生任务模式")}：{t(observed.mode==='plan'?'计划模式':'默认模式')} · <time dateTime={observed.observedAt}>{new Date(observed.observedAt).toLocaleString(locale())}</time></p>}
       {!controls?.planMode&&<p role="status">{t("当前主机未提供可验证的计划模式，请更新连接服务和 Grok。已保存的计划请求不会静默降级执行。")}</p>}
       {controls?.planMode&&<p className="subtle">{t("计划模式在下一轮通过原生接口切换。它限制原生编辑工具，不等同于只读沙箱。")}</p>}
       {!controls?.permissionSync&&<p role="status">{t("当前原生版本尚未验证权限同步，请沿用原生设置或更新 Grok。")}</p>}

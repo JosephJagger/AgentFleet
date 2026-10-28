@@ -6,7 +6,7 @@ from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from .email import DeliveryError, send_code
+from .email import DeliveryError, MESSAGES, send_code
 from .models import EmailChallenge, RateEvent, User
 
 from concurrent.futures import ThreadPoolExecutor
@@ -145,6 +145,19 @@ class EmailLoginTests(TestCase):
     def test_missing_sender_fails_without_creating_a_challenge(self):
         self.assertEqual(self.post("request-code", {"email": "owner@example.com", "clientIp": "192.0.2.1"}).status_code, 503)
         self.assertEqual(EmailChallenge.objects.count(), 0)
+
+    @patch("accounts.email.httpx.post")
+    def test_login_email_uses_requested_language_without_changing_the_code(self, post):
+        post.return_value.json.return_value = {"id": "message-id"}
+        for locale in [*MESSAGES, "zh-CN", "unsupported"]:
+            with self.subTest(locale=locale):
+                send_code("recipient@example.com", "012345", "challenge", locale)
+                payload = post.call_args.kwargs["json"]
+                expected = MESSAGES.get("zh" if locale == "zh-CN" else locale, MESSAGES["en"])
+                self.assertEqual(payload["subject"], expected[0])
+                self.assertIn(expected[1], payload["text"])
+                self.assertIn("012345", payload["text"])
+                self.assertIn("012345", payload["html"])
 
     @patch("accounts.email.httpx.post")
     def test_resend_request_is_server_side_and_provider_response_is_not_exposed(self, post):

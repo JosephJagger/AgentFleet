@@ -1,5 +1,5 @@
 import { displayName } from "../lib/display-name";
-import { count, t, locale, systemText } from "../i18n";
+import { wordSpace, count, t, locale, systemText } from "../i18n";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { HostOperation, ImageSessionUsage } from "../lib/types";
@@ -70,12 +70,12 @@ export function SessionImageStorage({ machineId }: { machineId: string }) {
         const usage = result?.tokenUsage as {last_token_usage?: {input_tokens?: number; output_tokens?: number; cached_input_tokens?: number}} | undefined;
         return <article key={row.logicalSessionId}>
           <label><input type="checkbox" aria-label={displayName(t("选择 {0}", row.title))} checked={selected.includes(row.logicalSessionId)} disabled={busy} onChange={e => { setSelected(ids => e.target.checked ? [...ids, row.logicalSessionId] : ids.filter(id => id !== row.logicalSessionId)); setConfirm(false); }} /><span><strong>{displayName(row.title)}</strong><small>{row.project}</small></span></label>
-          <div className="session-image-storage__metrics"><span>{row.imageCount} {locale() === "en" ? " " : ""}{t("张图片 · 云端引用")}{locale() === "en" ? " " : ""}{imageSpace(row.cloudBytes)}</span><span>{row.fileCount??0} {locale() === "en" ? " " : ""}{t("个文件 · 主机暂存")}{locale() === "en" ? " " : ""}{imageSpace(row.fileBytes??0)}</span>
+          <div className="session-image-storage__metrics"><span>{row.imageCount} {wordSpace()}{t("张图片 · 云端引用")}{wordSpace()}{imageSpace(row.cloudBytes)}</span><span>{row.fileCount??0} {wordSpace()}{t("个文件 · 主机暂存")}{wordSpace()}{imageSpace(row.fileBytes??0)}</span>
             {!!row.fileTypes?.length && <span className="attachment-type-summary">{row.fileTypes.map(item => <small key={item.type}><b>{item.type}</b> {item.count} · {imageSpace(item.bytes)}</small>)}</span>}
-            <span>{t("历史文件：")}{locale() === "en" ? " " : ""}{typeof result?.rolloutBytes === "number" ? imageSpace(result.rolloutBytes) : t("预览后核验")}</span>
-            {typeof result?.imageContentBytes === "number" && <small>{t("此次图片内容：")}{locale() === "en" ? " " : ""}{imageSpace(result.imageContentBytes)}{locale() === "en" ? " " : ""}{t("（含历史重复副本）")}</small>}
-            {usage?.last_token_usage && <small>{t("最近原生用量：输入")}{locale() === "en" ? " " : ""}{usage.last_token_usage.input_tokens ?? t("未知")} {locale() === "en" ? " " : ""}{t("/ 输出")}{locale() === "en" ? " " : ""}{usage.last_token_usage.output_tokens ?? t("未知")} {locale() === "en" ? " " : ""}{t("token（历史报告）")}</small>}
-            {typeof result?.measuredAt === "string" && <small>{t("核验于")}{locale() === "en" ? " " : ""}{new Date(result.measuredAt).toLocaleString(locale())}</small>}</div>
+            <span>{t("历史文件：")}{wordSpace()}{typeof result?.rolloutBytes === "number" ? imageSpace(result.rolloutBytes) : t("预览后核验")}</span>
+            {typeof result?.imageContentBytes === "number" && <small>{t("此次图片内容：")}{wordSpace()}{imageSpace(result.imageContentBytes)}{wordSpace()}{t("（含历史重复副本）")}</small>}
+            {usage?.last_token_usage && <small>{t("最近原生用量：输入")}{wordSpace()}{usage.last_token_usage.input_tokens ?? t("未知")} {wordSpace()}{t("/ 输出")}{wordSpace()}{usage.last_token_usage.output_tokens ?? t("未知")} {wordSpace()}{t("token（历史报告）")}</small>}
+            {typeof result?.measuredAt === "string" && <small>{t("核验于")}{wordSpace()}{new Date(result.measuredAt).toLocaleString(locale())}</small>}</div>
           {errors[row.logicalSessionId] ? <p role="alert">{systemText(errors[row.logicalSessionId])}</p> : operation && <p role="status">{operation.state === "succeeded" ? operation.type === "images.clean" ? result?.imageCleanupSupported===false ? t("已清理 {0} 个主机暂存文件；此系统暂不支持原生历史图片清理，图片保持不变。", Number(result?.filesCleaned??0)) : t("附件已清理：{0} 个主机暂存文件，云端图片释放 {1}；文字和会话 ID 保留。", Number(result?.filesCleaned??0), imageSpace(Number(result?.releasedCloudBytes ?? 0))) : result?.imageCleanupSupported===false ? t("文件已核验；此系统暂不支持原生历史图片清理，确认后只清理主机暂存文件。") : t("预览完成，可确认清理。") : ["accepted", "running"].includes(operation.state) ? t("等待宿主机核验…") : systemText(operation.error?.message) || t("结果待核验")}</p>}
         </article>;
       })}</div>
@@ -83,7 +83,7 @@ export function SessionImageStorage({ machineId }: { machineId: string }) {
       {filtered.length > 10 && <div className="session-image-storage__tools"><button disabled={page === 0 || busy} onClick={() => setPage(p => p - 1)}>{t("上一页")}</button><span>{page + 1} / {Math.ceil(filtered.length / 10)}</span><button disabled={(page + 1) * 10 >= filtered.length || busy} onClick={() => setPage(p => p + 1)}>{t("下一页")}</button></div>}
     </>}
     <p className="subtle">{t("共享图片在未选会话中保留，因此各会话云端引用之和可能大于主机配额用量。为保证恢复安全，首版保留历史文件的字节位置，清理图片内容后文件大小不会立即缩小。历史文件大小不等于 token 消耗。")}</p>
-    <div className="session-image-storage__tools"><span>{t("已选")}{locale() === "en" ? " " : ""}{count(selected.length, "个会话")} </span><button className="button button--quiet" disabled={busy || loading || !selected.length} onClick={() => void run(false)}>{busy ? t("处理中…") : t("预览所选会话")}</button><button className="button button--danger" disabled={busy || !eligible.length} onClick={() => setConfirm(true)}>{t("清理已通过预览的 {0} 个会话", eligible.length)}</button></div>
+    <div className="session-image-storage__tools"><span>{t("已选")}{wordSpace()}{count(selected.length, "个会话")} </span><button className="button button--quiet" disabled={busy || loading || !selected.length} onClick={() => void run(false)}>{busy ? t("处理中…") : t("预览所选会话")}</button><button className="button button--danger" disabled={busy || !eligible.length} onClick={() => setConfirm(true)}>{t("清理已通过预览的 {0} 个会话", eligible.length)}</button></div>
     {confirm && <div className="host-image-storage__confirm" role="group" aria-label={t("确认附件清理")}><h3>{t("确认清理 {0} 个会话的附件？", eligible.length)}</h3><p>{t("将移除所选范围的主机暂存文件、宿主机原生历史图片及云端图片引用。文字、会话 ID 和未选会话保留；附件内容不可恢复。无法核验的会话跳过，断线不会自动重试。")}</p><button className="button button--quiet" onClick={() => setConfirm(false)}>{t("取消")}</button><button className="button button--danger" onClick={() => void run(true)}>{t("确认清理附件")}</button></div>}
     {error && <p role="alert">{systemText(error)}</p>}
   </section>;

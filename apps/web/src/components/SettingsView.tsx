@@ -5,7 +5,7 @@ import { displayName } from "../lib/display-name";
 import {LongTermPreferencesPanel} from './LongTermPreferencesPanel';
 import { SettingsSections } from "./SettingsSections";
 import { Settings2, MessageSquare, Palette, Database } from "lucide-react";
-import { count, t, locale } from "../i18n";
+import { wordSpace, count, t, locale } from "../i18n";
 import { useEffect, useState } from "react";
 import { Laptop, LoaderCircle, ShieldCheck, SunMoon } from "lucide-react";
 import { api } from "../lib/api";
@@ -135,7 +135,7 @@ export function SettingsView({ dashboard, onUpdated, onToast, initialMachineId }
       </div><div className="settings-category" hidden={category !== "security"}>
       <section className="settings-block browser-settings-block"><h2>{t("已登录浏览器")}</h2><p className="subtle">{t("退出不再使用的浏览器登录。")}</p>
         {loadingSessions ? <div className="loading-line"><LoaderCircle className="spin" size={17} />{t("读取中")}</div> : sessionError ? <p className="catalog-error" role="alert">{sessionError} <button type="button" className="button button--quiet" onClick={() => setReloadSessions(value => value + 1)}>{t("重试")}</button></p> : sessions.slice(visibleSessionPage * 3, visibleSessionPage * 3 + 3).map((session, offset) => { const index = visibleSessionPage * 3 + offset; return <div className="client-session-row" key={session.id}>
-          <span className="client-icon"><Laptop size={17} /></span><div><strong>{session.current ? t("当前浏览器") : t("其他浏览器 {0}", index + 1)}</strong><span>{t("登录于")}{locale() === "en" ? " " : ""}{date(session.createdAt)}</span><span>{t("最近活动")}{locale() === "en" ? " " : ""}{date(session.lastSeenAt)}</span></div>
+          <span className="client-icon"><Laptop size={17} /></span><div><strong>{session.current ? t("当前浏览器") : t("其他浏览器 {0}", index + 1)}</strong><span>{t("登录于")}{wordSpace()}{date(session.createdAt)}</span><span>{t("最近活动")}{wordSpace()}{date(session.lastSeenAt)}</span></div>
           {session.current ? <span className="current-label">{t("当前")}</span> : <button type="button" aria-label={t("退出浏览器 {0}", index + 1)} disabled={Boolean(revoking)} onClick={() => void revoke(session.id)}>{revoking === session.id ? t("正在退出…") : t("退出登录")}</button>}
         </div>; })}
         {!loadingSessions && !sessionError && <SettingsPagination page={visibleSessionPage} pages={sessionPages} onChange={setSessionPage} label={t("浏览器登录分页")} />}

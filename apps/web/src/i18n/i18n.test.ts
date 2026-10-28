@@ -1,11 +1,46 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { count, locale, setLocale, systemText, t } from "./index";
+import { count, locale, localeOptions, resolveLocale, setLocale, systemText, t } from "./index";
 import english from "./en.json";
 import { codexCommands, coverageLabels } from "../lib/codex-commands";
 import { permissionNames } from "../lib/permissions";
 
 describe("application localization", () => {
+  it("matches region and script preferences without losing traditional Chinese", () => {
+    expect(resolveLocale(["zh-Hant-HK"])).toBe("zh-TW");
+    expect(resolveLocale(["zh-Hans-SG"])).toBe("zh-CN");
+    expect(resolveLocale(["xx-YY", "ja-JP", "en-US"])).toBe("ja");
+    expect(resolveLocale(["pt-PT"])).toBe("pt-BR");
+    expect(resolveLocale(["fr-CA"])).toBe("fr");
+    expect(resolveLocale(["unsupported"])).toBe("en");
+  });
+  it("keeps the newest selection while an earlier catalog is still loading", async () => {
+    setLocale("en");
+    const pending = setLocale("de");
+    setLocale("zh-CN");
+    await pending;
+    expect(locale()).toBe("zh-CN");
+    expect(document.documentElement.lang).toBe("zh-CN");
+  });
+  it("loads each language, preserves native content and uses local count grammar", async () => {
+    for (const { value } of localeOptions) {
+      await setLocale(value);
+      expect(locale()).toBe(value);
+      expect(document.documentElement.lang).toBe(value);
+      expect(t("发送")).not.toBe("");
+      expect(systemText("native output: /srv/用户项目 --resume gpt-5")).toBe("native output: /srv/用户项目 --resume gpt-5");
+    }
+    await setLocale("fr");
+    expect(count(1, "个项目")).toBe("1 projet");
+    expect(count(2, "个项目")).toBe("2 projets");
+    await setLocale("ko");
+    expect(count(2, "个文件")).toBe("파일 2개");
+    await setLocale("zh-TW");
+    expect(t("新项目")).toBe("新增專案");
+    await setLocale("en");
+    await expect(setLocale("invalid" as never)).rejects.toThrow("LOCALE_UNAVAILABLE");
+    expect(locale()).toBe("en");
+  });
   it("persists language, updates document language, and refreshes static catalogs", () => {
     setLocale("en");
     expect(locale()).toBe("en");

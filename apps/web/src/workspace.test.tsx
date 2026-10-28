@@ -140,6 +140,9 @@ it("移动端选择插件或计划模式后立即收起添加菜单", () => {
 function inspectorProps(id: string) { return { detail: detail(id), loading: false, draftOwner: "user-1", onRefresh: noop, onClaim: noop, onContinueManaged: noop, onReleaseManagement: noop, onSend: noop, onQueue: noop, onSteer: noop, onCancelQueued: noop, onCancel: noop, onApproval: noop }; }
 
 beforeEach(() => {
+  // jsdom lacks dialog methods; every case must work without an earlier test.
+  HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  HTMLDialogElement.prototype.close = function () { this.open = false; };
   vi.mocked(api.cursorPreferences).mockResolvedValue({settings:null,revision:0,options:[],models:[],observedAt:null,supported:true});
   vi.mocked(api.claudePreferences).mockResolvedValue({settings:null,revision:0});
   vi.mocked(api.saveClaudePreferences).mockImplementation(async(_id,body)=>({settings:body.settings,revision:body.revision+1}));
@@ -328,8 +331,6 @@ describe("会话工作区", () => {
     expect(screen.getByRole("option", { name: /TypeScript 类型安全/ })).toBeTruthy();
   });
   it("输入辅助开关分别生效，按会话保存并跨刷新保留", async () => {
-    HTMLDialogElement.prototype.showModal = function () { this.open = true; };
-    HTMLDialogElement.prototype.close = function () { this.open = false; };
     const view = render(<SessionInspector {...inspectorProps("A")} />);
     fireEvent.click(screen.getByRole("button", { name: "会话配置" }));
     fireEvent.click(screen.getByLabelText("输入辅助").querySelector("summary")!);
@@ -427,20 +428,26 @@ describe("会话工作区", () => {
     } finally { window.matchMedia = original; }
   });
   it("中文合成结束后请求后端建议，关闭中文分词开关会移除候选", async () => {
-    const draft="登录之后过一会儿就自己退出来了";
-    vi.mocked(api.writingNLP).mockResolvedValue({suggestions:[{label:`排查登录会话意外失效：${draft}`,insertText:`排查登录会话意外失效：${draft}`,replaceStart:0,replaceEnd:draft.length,intent:"session-expiry"}]});
-    render(<SessionInspector {...inspectorProps("A")} />);
-    const input=screen.getByLabelText("发送给 Codex 的消息");
-    fireEvent.compositionStart(input);
-    fireEvent.change(input,{target:{value:draft}});
-    expect(api.writingNLP).not.toHaveBeenCalled();
-    fireEvent.compositionEnd(input);
-    expect(await screen.findByRole("option",{name:/排查登录会话意外失效/})).toBeTruthy();
-    fireEvent.click(screen.getByRole("button",{name:"会话配置"}));
-    fireEvent.click(screen.getByLabelText("输入辅助").querySelector("summary")!);
-    fireEvent.click(screen.getByRole("checkbox",{name:/本地 NLP 建议/}));
-    fireEvent.click(screen.getByRole("button", { name: "保存为此会话配置" }));
-    await waitFor(()=>expect(screen.queryByRole("option",{name:/排查登录会话意外失效/})).toBeNull());
+    // Exercise the debounce without racing a one-second DOM lookup deadline.
+    vi.useFakeTimers();
+    try {
+      const draft="登录之后过一会儿就自己退出来了";
+      vi.mocked(api.writingNLP).mockResolvedValue({suggestions:[{label:`排查登录会话意外失效：${draft}`,insertText:`排查登录会话意外失效：${draft}`,replaceStart:0,replaceEnd:draft.length,intent:"session-expiry"}]});
+      render(<SessionInspector {...inspectorProps("A")} />);
+      const input=screen.getByLabelText("发送给 Codex 的消息");
+      fireEvent.compositionStart(input);
+      fireEvent.change(input,{target:{value:draft}});
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(api.writingNLP).not.toHaveBeenCalled();
+      fireEvent.compositionEnd(input);
+      await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+      expect(screen.getByRole("option",{name:/排查登录会话意外失效/})).toBeTruthy();
+      fireEvent.click(screen.getByRole("button",{name:"会话配置"}));
+      fireEvent.click(screen.getByLabelText("输入辅助").querySelector("summary")!);
+      fireEvent.click(screen.getByRole("checkbox",{name:/本地 NLP 建议/}));
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "保存为此会话配置" })); });
+      expect(screen.queryByRole("option",{name:/排查登录会话意外失效/})).toBeNull();
+    } finally { vi.useRealTimers(); }
   });
   it("中文输入法确认时不触发快捷键提交", () => {
     const send = vi.fn(noop);
@@ -606,7 +613,7 @@ describe("会话工作区", () => {
     vi.mocked(api.requestLoginCode).mockResolvedValue({ challengeId: "challenge", expiresIn: 600, resendAfter: 60 });
     vi.mocked(api.verifyLoginCode).mockResolvedValue({ dashboard: dashboard() });
     render(<App />);
-    await screen.findByRole("heading", { name: "进入控制面" });
+    await screen.findByRole("heading", { name: "登录你的工作区" });
     fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: "a@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "发送验证码" }));
     fireEvent.change(await screen.findByLabelText("6 位验证码"), { target: { value: "123456" } });

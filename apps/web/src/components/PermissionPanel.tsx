@@ -1,4 +1,4 @@
-import { t, locale, localized, systemText } from "../i18n";
+import { wordSpace, t, locale, localized, systemText } from "../i18n";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { permissionNames, permissionSources, type PermissionPreferences, type PermissionProfile, type PermissionScope } from "../lib/permissions";
@@ -43,7 +43,7 @@ export function PermissionPanel({ machineId, projectId, workspace = false, sessi
   const content = <>
     <p className="permission-chain">{t("统一默认")}<span>→</span> {t("主机默认")}<span>→</span> {t("项目")}<span>→</span> {t("会话")}<small>{t("下级默认继承，可单独覆盖")}</small></p>
     {data && <p className="permission-effective">{t("下一任务：")}<strong>{permissionNames[data.profile]}</strong><span>{machineId ? permissionSources[data.source] : effective}</span></p>}
-    {observed?.permissions && <p className="subtle">{t("最近任务实际采用：")}{locale() === "en" ? " " : ""}{permissionNames[observed.permissions.profile]} · {permissionSources[observed.permissions.source] ?? observed.permissions.source} · {new Date(observed.permissions.acceptedAt).toLocaleString(locale())}</p>}
+    {observed?.permissions && <p className="subtle">{t("最近任务实际采用：")}{wordSpace()}{permissionNames[observed.permissions.profile]} · {permissionSources[observed.permissions.source] ?? observed.permissions.source} · {new Date(observed.permissions.acceptedAt).toLocaleString(locale())}</p>}
     {!fixedScope && <label className="permission-scope">{t("设置范围")}<select aria-label={t("权限设置范围")} disabled={busy} value={scope} onChange={event => { setScope(event.target.value as PermissionScope); setConfirmed(false); }}><option value="session">{t("此会话")}</option><option value="project">{t("此项目的所有会话")}</option><option value="machine">{t("此主机的所有项目")}</option></select></label>}
     {data && <fieldset className="permission-options" disabled={busy}>
       <legend>{t("任务执行权限")}</legend>
@@ -51,7 +51,7 @@ export function PermissionPanel({ machineId, projectId, workspace = false, sessi
       <div className="permission-cards">{(["project", "network", "full"] as const).map(profile => <label key={profile} className={`permission-card${choice === profile ? " is-selected" : ""}`}>
         <span><input type="radio" name={`permission-${id}`} value={profile} checked={choice === profile} disabled={!data.supported && profile !== "project"} onChange={() => { setChoice(profile); setConfirmed(false); }} /><strong>{permissionNames[profile]}</strong></span><small>{descriptions[profile]}</small>
       </label>)}</div>
-      {choice === "full" && <label className="permission-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />{t("我确认允许")}{locale() === "en" ? " " : ""}{scope === "workspace" ? t("当前工作区中继承统一默认的会话") : scope === "machine" ? t("继承此主机配置的项目和会话") : scope === "project" ? t("继承此项目配置的会话") : t("此会话")}{locale() === "en" ? " " : ""}{t("使用安装账号的完整权限，包括修改项目外文件和执行部署。")}</label>}
+      {choice === "full" && <label className="permission-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />{t("我确认允许")}{wordSpace()}{scope === "workspace" ? t("当前工作区中继承统一默认的会话") : scope === "machine" ? t("继承此主机配置的项目和会话") : scope === "project" ? t("继承此项目配置的会话") : t("此会话")}{wordSpace()}{t("使用安装账号的完整权限，包括修改项目外文件和执行部署。")}</label>}
     </fieldset>}
     {data && !data.supported && <p className="subtle">{t("请先在主机页更新连接服务，才能使用联网开发或主机完整访问。")}</p>}
     <div className="permission-actions"><button className="button button--primary" type="button" disabled={!data || busy || (choice === "full" && !confirmed)} onClick={() => void save()}>{busy ? t("保存中…") : t("保存权限")}</button><button className="button button--quiet" type="button" disabled={busy} onClick={() => setReload(value => value + 1)}>{t("刷新配置")}</button></div>

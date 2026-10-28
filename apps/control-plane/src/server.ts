@@ -1088,7 +1088,7 @@ export async function buildControlPlane(
     limiter.check(`email-send:${clientIp(request)}`, 10, 5 * 60_000);
     const body = record(request.body);
     reply.header("cache-control", "no-store");
-    return identity.requestCode(requiredString(body.email, "email", 254), clientIp(request), body.locale === "zh" ? "zh" : "en");
+    return identity.requestCode(requiredString(body.email, "email", 254), clientIp(request), typeof body.locale === "string" ? body.locale : "en");
   });
 
   app.post("/api/auth/verify-code", { schema: apiSchemas.verifyCode }, async (request, reply) => {

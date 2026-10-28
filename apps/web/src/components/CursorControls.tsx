@@ -46,21 +46,21 @@ export function CursorControls({sessionId,settings,options,models,ready,supporte
       <small>{t('Cursor 原生切换也会记住主机端的默认模型；其他面板会话仍优先使用各自保存的模型。')}</small>
       {!options.some(o=>o.id==='mode')&&<p>{t('接管并同步原生会话后可读取任务模式及当前模型参数。')}</p>}
       {!displayOptions.some(o=>o.id==='model')&&<p>{t('主机尚未提供 Cursor 模型列表，可重新读取；不会使用其他智能体的模型列表。')}</p>}
-      {observedAt&&<small>{t('原生配置更新于 {0}',new Date(observedAt).toLocaleString())}</small>}
+      {observedAt&&<small>{t('原生配置更新于 {0}',new Date(observedAt).toLocaleString(locale()))}</small>}
       <div className="claude-settings-footer"><button type="button" className="button button--quiet" onClick={onReload}>{t('重新读取')}</button><button type="button" className="button button--quiet" disabled={saving||!dirty} onClick={()=>{setDraft(settings);setDirty(false);setMessage('');}}>{t('取消修改')}</button><button type="button" className="button button--primary" disabled={locked||!dirty} onClick={()=>void save()}>{t(saving?'保存中…':'保存')}</button></div>
       {message&&<p role="status">{message}</p>}
     </details>
     <details className="session-config-section" open><summary>{t('会话消耗与剩余额度')}</summary>
       {usageError?<p role="alert">{t('用量读取失败，请重新打开会话配置。')}</p>:!usage?<p>{t('正在读取用量…')}</p>:<>
-        <p>{t('已记录消耗')}：{usage.recorded?`${usage.recorded.totalTokens.toLocaleString()} tokens`:t('原生未上报')}</p>
-        {usage.last&&<p>{t('最近一轮消耗')}：{usage.last.totalTokens.toLocaleString()} tokens</p>}
+        <p>{t('已记录消耗')}：{usage.recorded?`${usage.recorded.totalTokens.toLocaleString(locale())} tokens`:t('原生未上报')}</p>
+        {usage.last&&<p>{t('最近一轮消耗')}：{usage.last.totalTokens.toLocaleString(locale())} tokens</p>}
         {usage.accounts?.map((a,i)=><div className="usage-account" key={i}>
           <p>{a.subscriptionType?`${a.subscriptionType} · `:''}{t('账号额度 · 来源：Cursor 账号接口。')}</p>
-          {a.windows.map(w=><div key={w.window}><p>{t('已用 {0}% · 剩余 {1}%',formatQuotaPercent(w.usedPercent,locale()),formatQuotaPercent(w.remainingPercent,locale()))}</p><progress max={100} value={w.usedPercent} aria-label={t('额度已用比例')}/><p>{w.resetsAt?t('重置于 {0}',new Date(w.resetsAt*1000).toLocaleString()):t('重置时间未上报')}</p></div>)}
-          <small>{a.sourceMachine} · {t('更新于 {0}',new Date(a.observedAt).toLocaleString())}{a.stale&&<strong> · {t('数据已过期')}</strong>}</small>
+          {a.windows.map(w=><div key={w.window}><p>{t('已用 {0}% · 剩余 {1}%',formatQuotaPercent(w.usedPercent,locale()),formatQuotaPercent(w.remainingPercent,locale()))}</p><progress max={100} value={w.usedPercent} aria-label={t('额度已用比例')}/><p>{w.resetsAt?t('重置于 {0}',new Date(w.resetsAt*1000).toLocaleString(locale())):t('重置时间未上报')}</p></div>)}
+          <small>{a.sourceMachine} · {t('更新于 {0}',new Date(a.observedAt).toLocaleString(locale()))}{a.stale&&<strong> · {t('数据已过期')}</strong>}</small>
         </div>)}
         {!usage.accounts?.length&&<p>{t('账号剩余额度')}：{t('未读取到 Cursor 账号额度；请确认主机已用 Cursor 账号登录（未使用自定义密钥或接口地址）。')}</p>}
-        {usage.lastObservedAt&&<small>{t('用量更新于 {0}',new Date(usage.lastObservedAt).toLocaleString())}</small>}
+        {usage.lastObservedAt&&<small>{t('用量更新于 {0}',new Date(usage.lastObservedAt).toLocaleString(locale()))}</small>}
         <p>{t('用量只统计实际收到的原生数据，不估算未上报的历史，也不将上下文占用视为计费消耗。额度是账号共享数据，不能在会话中修改。')}</p>
       </>}
     </details>

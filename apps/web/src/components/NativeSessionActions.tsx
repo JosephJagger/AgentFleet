@@ -1,4 +1,4 @@
-import { t, locale, localized, systemText } from "../i18n";
+import { wordSpace, t, locale, localized, systemText } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { FleetSession } from "../lib/types";
@@ -41,14 +41,14 @@ export function NativeSessionActions({ session, request, pending, onChanged }: {
     finally { setBusy(false); }
   }
   return <details ref={panel} className="codex-settings-panel">
-    <summary>{t("宿主机会话操作")}{locale() === "en" ? " " : ""}{session.runtimeSettings?.archived ? t(" · 已归档") : ""}</summary>
+    <summary>{t("宿主机会话操作")}{wordSpace()}{session.runtimeSettings?.archived ? t(" · 已归档") : ""}</summary>
     <label>{t("操作")}<select aria-label={t("宿主机会话操作")} value={action} disabled={busy} onChange={(e) => { setAction(e.target.value as NativeOperation); setMessage(""); }}>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     <p>{descriptions[action]}</p>
     {action === "rename" && <label>{t("新标题")}<input aria-label={t("宿主机会话新标题")} maxLength={200} value={name} onChange={(e) => setName(e.target.value)} /></label>}
     {action === "fork" && session.actions?.manage?.allowed && <><label>{t("分支历史范围")}<select value={forkRange} onChange={e => setForkRange(e.target.value)}><option value="all">{t("全部已保存历史")}</option><option value="before">{t("指定任务之前（不含该任务）")}</option><option value="through">{t("截至指定任务（包含该任务）")}</option></select></label>{forkRange !== "all" && <label>{t("原生任务 Turn ID")}<input maxLength={256} value={forkTurn} onChange={e => setForkTurn(e.target.value)} /></label>}<p>{t("原会话和文件保持原样；新分支不会自动继续继承的目标，需要明确发送任务。")}</p></>}
     {action === "review" && session.actions?.manage?.allowed && <><label>{t("审查范围")}<select value={reviewType} onChange={e => { setReviewType(e.target.value); setReviewValue(""); }}><option value="uncommittedChanges">{t("未提交修改")}</option><option value="baseBranch">{t("与目标分支比较")}</option><option value="commit">{t("指定提交")}</option><option value="custom">{t("自定义审查要求")}</option></select></label>{reviewType !== "uncommittedChanges" && <label>{t(reviewType === "baseBranch" ? "目标分支" : reviewType === "commit" ? "提交 SHA" : "审查要求")}<input maxLength={reviewType === "custom" ? 4000 : 256} value={reviewValue} onChange={e => setReviewValue(e.target.value)} /></label>}</>}
     {!availability?.allowed && <p>{systemText(availability?.message) || t("此主机尚未报告支持此操作，请更新连接服务。")}</p>}
-    <button type="button" className="button button--quiet" disabled={!enabled || advanced && (action === "fork" && forkRange !== "all" && !forkTurn.trim() || action === "review" && reviewType !== "uncommittedChanges" && !reviewValue.trim())} onClick={() => void execute()}>{t("确认")}{locale() === "en" ? " " : ""}{labels[action]}</button>
+    <button type="button" className="button button--quiet" disabled={!enabled || advanced && (action === "fork" && forkRange !== "all" && !forkTurn.trim() || action === "review" && reviewType !== "uncommittedChanges" && !reviewValue.trim())} onClick={() => void execute()}>{t("确认")}{wordSpace()}{labels[action]}</button>
     {message && <p role="status">{systemText(message)}</p>}
   </details>;
 }

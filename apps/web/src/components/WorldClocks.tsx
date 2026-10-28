@@ -12,7 +12,7 @@ export const clockCities = [
   {id:"sydney",country:"au",label:"悉尼",zone:"Australia/Sydney"},
 ];
 export function cityTime(date: Date, zone: string, language: Locale = "zh-CN") {
-  return {weekday:new Intl.DateTimeFormat(language,{timeZone:zone,weekday:"short"}).format(date),time:new Intl.DateTimeFormat("en-GB",{timeZone:zone,hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(date),date:new Intl.DateTimeFormat("en-CA",{timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit"}).format(date)};
+  return {weekday:new Intl.DateTimeFormat(language,{timeZone:zone,weekday:"short"}).format(date),time:new Intl.DateTimeFormat(language,{timeZone:zone,hour:"2-digit",minute:"2-digit"}).format(date),date:new Intl.DateTimeFormat("en-CA",{timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit"}).format(date)};
 }
 function weatherLabel(code:number) { return code===0?"晴":code<=3?"多云":[45,48].includes(code)?"雾":code>=95?"雷雨":[71,73,75,77,85,86].includes(code)?"雪":[56,57,66,67].includes(code)?"冻雨":code>=51?"雨":"天气"; }
 type Forecast={date:string;min:number;max:number;code:number};

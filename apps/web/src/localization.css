@@ -1,0 +1,70 @@
+/* Use the reader's glyph conventions before falling back to the shared fonts. */
+:root { --locale-font: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC Variable", sans-serif; }
+:root:lang(zh-TW) { --locale-font: "Inter Variable", "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", sans-serif; }
+:root:lang(ja) { --locale-font: "Inter Variable", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", "Noto Sans CJK JP", sans-serif; }
+:root:lang(ko) { --locale-font: "Inter Variable", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", sans-serif; }
+:root:is(:lang(zh-TW), :lang(ja), :lang(ko)) { --font: var(--locale-font); font-family: var(--locale-font); }
+:root:is(:lang(zh-TW), :lang(ja), :lang(ko)) :is(input, select, textarea, button) { font-family: inherit; }
+:root:lang(ko) :is(h1, h2, h3, label, .button) { word-break: keep-all; overflow-wrap: anywhere; }
+:root:not(:lang(zh)):not(:lang(ja)):not(:lang(ko)) :is(h1, h2, h3) { letter-spacing: -.012em; }
+/* Actions may be longer in German/French. Keep them readable without shrinking. */
+:root:not(:lang(zh)):not(:lang(ja)) :is(.button, .permission-card, .settings-tab) { white-space: normal; overflow-wrap: anywhere; }
+.language-control { display: inline-flex; flex-direction: column; gap: 6px; min-width: 0; position: relative; }
+.language-control__error { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-size: 12px; line-height: 1.5; max-width: 260px; padding: 8px 10px; }
+.language-switcher select { max-width: 100%; }
+@media (max-width: 900px), (pointer: coarse) {
+  .language-switcher select { font-size: 16px; }
+}
+
+/* Reserve real space for translated header actions rather than overflowing the grid. */
+.topbar > .primary-nav { min-width: 0; }
+.topbar > .topbar-actions { min-width: 0; }
+.topbar-actions .account-label { max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (min-width: 901px) and (max-width: 2199px) {
+  :root:not([data-theme="buzhoushan"]) .topbar {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    column-gap: 12px;
+  }
+  :root:not([data-theme="buzhoushan"]) .topbar > .primary-nav { flex-wrap: wrap; gap: 2px; }
+  :root:not([data-theme="buzhoushan"]) .topbar > .primary-nav button { padding-inline: 8px; }
+}
+@media (min-width: 901px) and (max-width: 1199px) {
+  :root:not([data-theme="buzhoushan"]) .topbar > .topbar-actions { grid-column: 2 / -1; }
+  :root:not([data-theme="buzhoushan"]) .topbar > .primary-nav { grid-column: 1 / -1; grid-row: 2; }
+  :root:not([data-theme="buzhoushan"]) .topbar .world-clocks { display: none; }
+}
+/* Narrow layouts use short navigation labels and keep full native locale names. */
+.settings-sections > button > span { min-width: 0; }
+@media (max-width: 900px) {
+  :root .primary-nav button {
+    font-size: .6875rem;
+    line-height: 1.35;
+    padding-inline: 2px;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: normal;
+    hyphens: auto;
+    text-align: center;
+  }
+  .primary-nav button > span:not(.nav-count) { max-width: 100%; }
+}
+@media (max-width: 700px) {
+  .topbar-actions .global-search-trigger { width: 40px; min-width: 40px; justify-content: center; padding-inline: 8px; }
+  .topbar-actions .global-search-trigger > span { display: none; }
+  .topbar-actions .language-control { flex-shrink: 0; }
+  .topbar-actions .language-switcher select { width: 112px; max-width: 112px; }
+  .settings-view .settings-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-sections > button { height: auto; }
+  .settings-sections strong { white-space: normal; word-break: normal; overflow-wrap: normal; hyphens: auto; line-height: 1.35; }
+}
+@media (max-width: 480px) {
+  /* Keep the emblem, accessible brand name and full native language names. */
+  .topbar .brand-lockup > span:last-child {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .topbar .brand-lockup { gap: 0; }
+}
+@media (max-width: 340px) {
+  .settings-view .settings-sections { grid-template-columns: minmax(0, 1fr); }
+}

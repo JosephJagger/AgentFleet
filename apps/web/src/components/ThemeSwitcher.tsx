@@ -1,4 +1,4 @@
-import { Mountain, Box, Check, Radio, Snowflake, SunMoon, Wand2, Orbit, Flower2, Leaf, Gamepad2, Zap, Cloud, Shield, TreePine, Heart } from "lucide-react";
+import { ChevronDown, Mountain, Box, Check, Radio, Snowflake, SunMoon, Wand2, Orbit, Flower2, Leaf, Gamepad2, Zap, Cloud, Shield, TreePine, Heart } from "lucide-react";
 import { t } from "../i18n";
 import { setTheme, useTheme, type Theme } from "../lib/theme";
 import { useEffect, useState } from "react";
@@ -10,11 +10,12 @@ export function ThemeEmblem() {
   return <Icon size={18} aria-hidden="true" />;
 }
 
-export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
+export function ThemeSwitcher({ onChange, nameOnly = false }: { onChange?: () => void; nameOnly?: boolean } = {}) {
   const selected = useTheme();
   return (
-    <label className="theme-switcher">
+    <label className={`theme-switcher${nameOnly ? " theme-switcher--name" : ""}`}>
       <SunMoon size={15} aria-hidden="true" />
+      {nameOnly && <span className="theme-switcher__value" aria-hidden="true"><span>{t(themeOptions.find(option => option.value === selected)!.label)}</span><ChevronDown size={14} /></span>}
       <select aria-label={t("界面主题")} value={selected} onChange={event => { setTheme(event.target.value as Theme); onChange?.(); }}>
         <option value="official">{t("澄蓝")}</option>
         <option value="cyber">{t("赛博朋克")}</option>
@@ -34,7 +35,7 @@ export function ThemeSwitcher({ onChange }: { onChange?: () => void } = {}) {
         <option value="whitesnake">{t("白蛇传说")}</option>
         <option value="qingming">{t("清明上河")}</option>
         <option value="jiangshan">{t("千里江山")}</option>
-        <option value="buzhoushan">{t("不周山")} · {t("仅限桌面直播")}</option>
+        <option value="buzhoushan">{t("不周山")}{!nameOnly && <> · {t("仅限桌面直播")}</>}</option>
       </select>
     </label>
   );

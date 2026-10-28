@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { localeReady } from "./i18n";
 import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/noto-sans-sc";
 import "./styles.css";
@@ -28,12 +29,14 @@ import "./panel-polish.css";
 import "./usage-clarity.css";
 import "./theme-clarity.css";
 import "./mobile-clarity.css";
+import "./localization.css";
+import "./login-page.css";
 
-createRoot(document.getElementById("root")!).render(
+void localeReady.then(() => createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
   </StrictMode>,
-);
+));
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {

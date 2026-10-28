@@ -69,7 +69,7 @@ export function CodexSettingsPanel({ sessionId = "", machineId, projectId, works
   const supportedModels = catalogs.flatMap(c => c.models.filter(m => m.model === modelId));
   const unique = (values: string[]) => [...new Set(values)];
   const options: Record<typeof fields[number], { value: string; label: string }[]> = {
-    summary: [["auto", "自动"], ["concise", "简短"], ["detailed", "详细"], ["none", "不显示"]].map(([value, label]) => ({ value, label: t(label) })),
+    summary: [{ value: "auto", label: t("自动") }, { value: "concise", label: t("简短") }, { value: "detailed", label: t("详细") }, { value: "none", label: t("不显示") }],
     multiAgentMode: [{ value: "explicitRequestOnly", label: t("明确要求时才使用子代理") }, { value: "proactive", label: t("允许主动委派子代理") }],
     model: models.map(m => ({ value: m.model, label: m.displayName })),
     effort: unique(supportedModels.flatMap(m => m.efforts)).map(value => ({ value, label: value })),

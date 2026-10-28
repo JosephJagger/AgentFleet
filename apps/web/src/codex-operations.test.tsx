@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NativeSessionActions } from "./components/NativeSessionActions";
 import { CodexOperationsPanel } from "./components/CodexOperationsPanel";
 import { api } from "./lib/api";
+import { setLocale, t } from "./i18n";
 import type { CommandReceipt, FleetSession, Machine, HostOperation } from "./lib/types";
 vi.mock("./lib/api", () => ({ api: { hostCodexOperation: vi.fn(), command: vi.fn() } }));
 afterEach(cleanup); beforeEach(() => vi.clearAllMocks());
@@ -102,4 +103,22 @@ it("host account management needs only a host and preserves explicit confirmatio
  fireEvent.click(screen.getByRole("button",{name:"退出原生账号"}));
  await waitFor(()=>expect(api.hostCodexOperation).toHaveBeenCalledWith("host",{operation:"account.logout",arguments:{confirmed:true}},expect.any(String)));
  expect(api.command).not.toHaveBeenCalled();
+});
+
+
+it.each(["sections.read", "plugin.catalog", "mcp.catalog"] as const)("preserves native and user row names in %s across UI languages", async operation => {
+  await setLocale("en");
+  try {
+    vi.mocked(api.command).mockResolvedValue({ command: { id: "names" } as CommandReceipt });
+    const changed = vi.fn();
+    const view = render(<CodexOperationsPanel session={session} commands={[]} onChanged={changed} initialOperation={operation} />);
+    fireEvent.click(screen.getByText(t("Codex 工具与账号"), { selector: "summary > span" }));
+    fireEvent.submit(view.container.querySelector("form")!);
+    await waitFor(() => expect(changed).toHaveBeenCalledOnce());
+    view.rerender(<CodexOperationsPanel session={session} commands={[{ id: "names", type: "codex.manage", createdAt: "now", state: "applied", codexResult: { operation, status: "available", rows: [{ name: "保存", status: "计划模式", detail: "用户原文：保存" }] } } as CommandReceipt]} onChanged={changed} initialOperation={operation} />);
+    expect(view.container.querySelector("dt")?.firstChild?.textContent).toBe("保存");
+    expect(view.container.querySelector("dt small")?.textContent).toBe("计划模式");
+    expect(view.container.querySelector("dd")?.textContent).toBe("用户原文：保存");
+    expect(screen.getByText(t("宿主机返回") + ": " + t("已读取"))).toBeTruthy();
+  } finally { await setLocale("zh-CN"); }
 });

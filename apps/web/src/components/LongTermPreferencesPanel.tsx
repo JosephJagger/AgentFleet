@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {Brain,Plus,Pencil,Trash2} from 'lucide-react';
 import {api,type LongTermPreference,type LongTermPreferenceList} from '../lib/api';
-import {t} from '../i18n';
+import { locale,t} from '../i18n';
 export function LongTermPreferencesPanel(){
  const [data,setData]=useState<LongTermPreferenceList>(),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const [editing,setEditing]=useState<LongTermPreference|null|undefined>(),[body,setBody]=useState(''),[conditions,setConditions]=useState(''),[expires,setExpires]=useState(''),[key,setKey]=useState(''),[deleting,setDeleting]=useState<string>();
@@ -28,7 +28,7 @@ export function LongTermPreferencesPanel(){
   </form>}
   <div>{items.slice(current*5,current*5+5).map(item=><article key={item.id} className="long-term-preferences__entry">
     <p>{item.body}</p>{item.conditions&&<p className="subtle">{t('适用条件')}：{item.conditions}</p>}
-    <small>{t(!item.enabled?'已停用':item.expiresAt&&Date.parse(item.expiresAt)<=Date.now()?'已过期':'已启用')}{item.expiresAt?' · '+new Date(item.expiresAt).toLocaleDateString():''}</small>
+    <small>{t(!item.enabled?'已停用':item.expiresAt&&Date.parse(item.expiresAt)<=Date.now()?'已过期':'已启用')}{item.expiresAt?' · '+new Date(item.expiresAt).toLocaleDateString(locale()):''}</small>
     <div className="long-term-preferences__actions"><button type="button" className="button button--secondary" disabled={busy} onClick={()=>edit(item)}><Pencil size={15}/>{t('编辑')}</button><button type="button" className="button button--secondary" disabled={busy} onClick={()=>void run(()=>api.saveLongTermPreference({revision:item.revision,enabled:!item.enabled},item.id))}>{t(item.enabled?'停用':'启用')}</button><button type="button" className="button button--secondary" disabled={busy} onClick={()=>setDeleting(item.id)}><Trash2 size={15}/>{t('删除')}</button></div>
     {deleting===item.id&&<div role="alert"><p>{t('删除后不会从旧历史自动恢复。当前通话需重连以清除旧上下文。')}</p><button type="button" className="button button--primary" disabled={busy} onClick={()=>void run(()=>api.deleteLongTermPreference(item.id,item.revision))}>{t('确认删除')}</button><button type="button" className="button button--secondary" onClick={()=>setDeleting(undefined)}>{t('取消')}</button></div>}
   </article>)}</div>

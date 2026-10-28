@@ -38,7 +38,7 @@ import { GrokControls } from "./components/GrokControls";
 import { agentName } from "./lib/agent-provider";
 import { AgentPicker } from "./components/AgentPicker";
 import { AdminView } from "./components/AdminView";
-import { EmailLoginForm } from "./components/EmailLoginForm";
+import { LoginPage } from "./components/LoginPage";
 import { writingAIErrorMessage } from "./lib/writing-assistance";
 import { WorldClocks } from "./components/WorldClocks";
 import { hasLiveTransport, onlineFirst } from "./lib/machine-order";
@@ -52,7 +52,7 @@ import type { RuntimeSummary } from "./components/CodexSettingsPanel";
 import { UsageButton } from "./components/UsageButton";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { ThemeEmblem, ThemeSwitcher } from "./components/ThemeSwitcher";
-import { count, t, locale, systemText, useLocale } from "./i18n";
+import { wordSpace, count, t, locale, systemText, useLocale } from "./i18n";
 import { SessionConfiguration, type ConfigurationRequest } from "./components/SessionConfiguration";
 import { FleetStatus } from "./components/FleetStatus";
 import { SettingsView } from "./components/SettingsView";
@@ -248,38 +248,6 @@ function NavText({ full, compact }: { full: string; compact: string }) {
   return <><span className="nav-label-full">{t(full)}</span><span className="nav-label-compact" aria-hidden="true">{t(compact)}</span></>;
 }
 
-function Login({ onLogin }: { onLogin: (dashboard: Dashboard) => void }) {
-  return (
-    <main className="login-shell">
-      <div className="login-mark" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
-      <section className="login-copy">
-        <div className="login-preferences"><LanguageSwitcher /><ThemeSwitcher /></div>
-        <div className="brand-lockup brand-lockup--large">
-          <span className="brand-glyph"><ThemeEmblem /></span>
-          <span>AgentFleets</span>
-        </div>
-        <h1>{t("你的代码留在主机。")}<br />{t("控制权跟你走。")}</h1>
-        <p>{t("统一连接 Linux、macOS 与 Windows 上的 Codex、Claude Code 等 AI 智能体。切换主机，接管会话，从任何地方继续你的开发任务。")}</p>
-        <div className="trust-line">
-          <span><ShieldCheck size={16} /> {t("权限按需配置")}</span>
-          <span><LockKeyhole size={16} /> {t("无入站端口")}</span>
-          <span><Clock3 size={16} /> {t("正文保留 1–30 天")}</span>
-        </div>
-      </section>
-      <section className="login-panel" aria-labelledby="login-title">
-        <div className="eyebrow">{t("多智能体 · 多主机工作台")}</div>
-        <h2 id="login-title">{t("进入控制面")}</h2>
-        <p className="subtle">{t("输入邮箱接收验证码，首次登录自动创建独立工作区。")}</p>
-        <EmailLoginForm onLogin={onLogin} />
-        <div className="login-foot"><StatusDot tone="live" /> {t("受控登录 · 会话可单独撤销")}</div>
-      </section>
-    </main>
-  );
-}
 
 export function MachineRail({ machines, sessions, connected, selectedId, onSelect, onPair, onSession, onHost }: { machines: Machine[]; sessions: FleetSession[]; connected: boolean; selectedId?: string; onSelect: (id: string) => void; onPair: () => void; onSession: (id: string) => void; onHost: (id: string) => void }) {
   const track = useRef<HTMLDivElement>(null);
@@ -553,7 +521,7 @@ export function SessionList({ sessions, projects, selectedId, machineId, onSelec
     <section className="session-list-panel">
       <div className="section-heading">
         <div>
-          <div className="eyebrow">Codex workspace</div>
+
           <h2>{machineId ? t("项目与会话") : t("所有项目与会话")}</h2>
         </div>
         <button className="button button--quiet" type="button" onClick={onCreate}><Plus size={15} />{t("新会话")}</button>
@@ -667,7 +635,7 @@ export function ApprovalCard({ approval, provider, onDecide, busy }: { approval:
       <dl className="approval-context">
         <div><dt>{t("主机 / 项目")}</dt><dd>{displayName(approval.machineName)} / {displayName(approval.projectAlias)}</dd></div>
         <div><dt>{t("工作目录")}</dt><dd title={approval.cwd}>{approval.cwd}</dd></div>
-        <div><dt>{t("操作范围")}</dt><dd>{approval.planExit ? t("退出计划阶段，允许按计划修改文件和执行命令") : approval.grantScope === "turn" ? t("授权持续到本轮任务结束") : t("本次请求所列操作")}{locale() === "en" ? " " : ""}{t("，不更改主机默认权限")}</dd></div>
+        <div><dt>{t("操作范围")}</dt><dd>{approval.planExit ? t("退出计划阶段，允许按计划修改文件和执行命令") : approval.grantScope === "turn" ? t("授权持续到本轮任务结束") : t("本次请求所列操作")}{t("，不更改主机默认权限")}</dd></div>
         {approval.networkTarget && <div><dt>{t("联网目标")}</dt><dd>{approval.networkTarget}</dd></div>}
         {!!approval.paths?.length && <div><dt>{t("访问路径")}</dt><dd>{approval.paths.join("、")}</dd></div>}
       </dl>
@@ -1072,7 +1040,7 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
             <strong>{session.historyMode !== "unknown" ? t("宿主机共享会话") : t("仅可查看的宿主机会话")}</strong>
             <span>{canClaim ? t("同步主机上的历史，继续原来的 {0} 会话", agentName(session.provider)) : systemText(session.actions?.claim?.message) || (session.state.threadRuntime === "active" ? t("请先结束宿主机正在运行的任务") : t("正在检查这个会话是否支持继续操作"))}</span>
           </div>
-            <button className="button button--share" type="button" disabled={!canClaim || busy} onClick={async () => { setBusy(true); try { await onClaim(); } finally { setBusy(false); } }}>{busy ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />}{locale() === "en" ? " " : ""}{t("接管并同步")}</button>
+            <button className="button button--share" type="button" disabled={!canClaim || busy} onClick={async () => { setBusy(true); try { await onClaim(); } finally { setBusy(false); } }}>{busy ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />}{wordSpace()}{t("接管并同步")}</button>
         </div>
       )}
 
@@ -1094,7 +1062,7 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
             {detail.releaseManagementSupported && (releaseConfirming ? (
               <>
                 <button type="button" disabled={busy} onClick={() => setReleaseConfirming(false)}>{t("保留接管")}</button>
-                <button className="release-management" type="button" disabled={!canReleaseManagement || busy} onClick={async () => { setBusy(true); try { await onReleaseManagement(); setReleaseConfirming(false); } finally { setBusy(false); } }}>{busy ? <LoaderCircle className="spin" size={14} /> : <Unplug size={14} />}{locale() === "en" ? " " : ""}{t("确认取消")}</button>
+                <button className="release-management" type="button" disabled={!canReleaseManagement || busy} onClick={async () => { setBusy(true); try { await onReleaseManagement(); setReleaseConfirming(false); } finally { setBusy(false); } }}>{busy ? <LoaderCircle className="spin" size={14} /> : <Unplug size={14} />}{wordSpace()}{t("确认取消")}</button>
               </>
             ) : (
               <button className="release-management" type="button" title={!canReleaseManagement ? detail.releaseManagementBlockedReason ?? t("请先等待当前操作结束") : t("退出面板接管，保留两端会话与历史")} disabled={!canReleaseManagement || busy} onClick={() => setReleaseConfirming(true)}><Unplug size={14} />{t("取消接管")}</button>
@@ -1301,7 +1269,7 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
           ) : <div className="composer-primary-pair">{aiOptimizeButton}{canCancel ? (
             <button className="button button--stop" type="button" aria-label={t("停止任务")} disabled={busy} onClick={async () => { setBusy(true); try { await onCancel(); } finally { setBusy(false); } }}><Square size={14} fill="currentColor" /><span className="composer-action-label composer-action-label--full" aria-hidden="true">{t("停止任务")}</span><span className="composer-action-label composer-action-label--compact" aria-hidden="true">{t("停止")}</span></button>
           ) : (
-            <button className="button button--primary" disabled={busy || (!paletteActive && (!canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError))}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{locale() === "en" ? " " : ""}{t("发送")}</button>
+            <button className="button button--primary" disabled={busy || (!paletteActive && (!canSend || !hasInput || imageBlocked || referencesBlocked || modeBlocked || outputSchemaError))}>{busy ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />}{wordSpace()}{t("发送")}</button>
           )}</div>}
           </div>
         </div>
@@ -1385,19 +1353,19 @@ export function RemoveMachineDialog({ machine, onClose, onRemoved, onToast }: {
     <div className="modal-backdrop" role="presentation">
       <section className="modal remove-machine-modal" role="dialog" aria-modal="true" aria-labelledby="remove-machine-title">
         <div className="modal-head">
-          <div><div className="eyebrow">Host removal</div><h2 id="remove-machine-title">{removed ? t("控制面已移除主机") : t("移除主机")}</h2></div>
+          <div><h2 id="remove-machine-title">{removed ? t("控制面已移除主机") : t("移除主机")}</h2></div>
           <button className="icon-button" aria-label={t("关闭")} title={t("关闭")} onClick={onClose} disabled={busy} type="button"><X size={18} /></button>
         </div>
         {removed ? (
           <>
-            <div className="remove-machine-result"><Check size={18} /><div><strong>{displayName(machine.name)} {locale() === "en" ? " " : ""}{t("已断开并隐藏")}</strong><span>{t("在该主机执行下面命令，可停止服务并删除 AgentFleets 程序、身份和连接数据。Codex 会话与项目文件不会被删除。")}</span></div></div>
+            <div className="remove-machine-result"><Check size={18} /><div><strong>{displayName(machine.name)} {wordSpace()}{t("已断开并隐藏")}</strong><span>{t("在该主机执行下面命令，可停止服务并删除 AgentFleets 程序、身份和连接数据。Codex 会话与项目文件不会被删除。")}</span></div></div>
             <div className="uninstall-command"><code>{uninstallCommand}</code><button className="button button--quiet" type="button" onClick={async () => { try { await copyText(uninstallCommand); setCopied(true); } catch (error) { onToast("danger", errorMessage(error)); } }}><Copy size={15} />{copied ? t("已复制") : t("复制卸载命令")}</button></div>
             <div className="modal-actions"><button className="button button--primary" type="button" onClick={onClose}>{t("完成")}</button></div>
           </>
         ) : (
           <>
-            <div className="remove-machine-warning"><AlertTriangle size={19} /><div><strong>{t("将立即吊销")}{locale() === "en" ? " " : ""}{displayName(machine.name)}</strong><span>{t("Agent 会断开，相关项目、会话和待审批项将从活动面板隐藏。云端审计记录仍会保留。")}</span></div></div>
-            <div className="remove-machine-facts"><span>{t("主机")}</span><strong>{displayName(machine.name)}</strong><span>{t("系统")}</span><strong>{machine.os} · {machine.arch}</strong><span>{t("项目")}</span><strong>{machine.projects.length} {locale() === "en" ? " " : ""}{t("个")}</strong></div>
+            <div className="remove-machine-warning"><AlertTriangle size={19} /><div><strong>{t("将立即吊销")}{wordSpace()}{displayName(machine.name)}</strong><span>{t("Agent 会断开，相关项目、会话和待审批项将从活动面板隐藏。云端审计记录仍会保留。")}</span></div></div>
+            <div className="remove-machine-facts"><span>{t("主机")}</span><strong>{displayName(machine.name)}</strong><span>{t("系统")}</span><strong>{machine.os} · {machine.arch}</strong><span>{t("项目")}</span><strong>{machine.projects.length} {wordSpace()}{t("个")}</strong></div>
             <div className="modal-actions"><button className="button button--quiet" type="button" onClick={onClose} disabled={busy}>{t("取消")}</button><button className="button button--danger" type="button" onClick={() => void remove()} disabled={busy}>{busy ? <LoaderCircle className="spin" size={15} /> : <Trash2 size={15} />}{busy ? t("正在移除") : t("确认移除主机")}</button></div>
           </>
         )}
@@ -1465,7 +1433,7 @@ export function CreateSessionDialog({ open, machines, selectedMachineId, initial
   const selectableProjects = projectOptions.filter(project => project.machineId === machineId && (project.provider ?? "codex") === provider);
   const selectedProject = selectableProjects.find(project => project.id === projectId);
   if (!open) return null;
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-session-title"><div className="modal-head"><div><div className="eyebrow">New conversation</div><h2 id="new-session-title">{t("创建会话")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有可用主机")}</h3><p>{t("连接在线主机并完成项目发现后，可以创建会话。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !selectedProject || !title.trim() || busy || (worktree && (!worktreeInfo || !worktreeBase || worktreeBranchError(worktreeInfo, worktreeBranch)))) return; setBusy(true); try { await onCreate(machineId, projectId, title.trim(), worktree ? { provider, base: worktreeBase, setup: worktreeSetup, ...worktreeBranchInput(worktreeInfo!, worktreeBranch) } : undefined); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { setMachineId(event.target.value); setProjectId(""); setProjectOptions([]); }}>{writableMachines.map((item) => <option key={item.id} value={item.id}>{displayName(item.name)}</option>)}</select></label><label><span>{t("项目")}</span><select value={projectId} title={selectedProject?.pathHint} onChange={(event) => setProjectId(event.target.value)} required>{selectableProjects.map((project) => <option key={project.id} value={project.id}>{displayName(project.alias)} · {isWorktree(project) ? t("工作树") : t("主目录")}{isWorktree(project) && project.gitBranch ? ` · ${project.gitBranch}` : ""} · {displayName(project.pathHint)}</option>)}</select></label><label><span>{t("会话名称")}</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("例如：修复结算页测试")} required autoFocus /></label>
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-session-title"><div className="modal-head"><div><h2 id="new-session-title">{t("创建会话")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有可用主机")}</h3><p>{t("连接在线主机并完成项目发现后，可以创建会话。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !selectedProject || !title.trim() || busy || (worktree && (!worktreeInfo || !worktreeBase || worktreeBranchError(worktreeInfo, worktreeBranch)))) return; setBusy(true); try { await onCreate(machineId, projectId, title.trim(), worktree ? { provider, base: worktreeBase, setup: worktreeSetup, ...worktreeBranchInput(worktreeInfo!, worktreeBranch) } : undefined); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { setMachineId(event.target.value); setProjectId(""); setProjectOptions([]); }}>{writableMachines.map((item) => <option key={item.id} value={item.id}>{displayName(item.name)}</option>)}</select></label><label><span>{t("项目")}</span><select value={projectId} title={selectedProject?.pathHint} onChange={(event) => setProjectId(event.target.value)} required>{selectableProjects.map((project) => <option key={project.id} value={project.id}>{displayName(project.alias)} · {isWorktree(project) ? t("工作树") : t("主目录")}{isWorktree(project) && project.gitBranch ? ` · ${project.gitBranch}` : ""} · {displayName(project.pathHint)}</option>)}</select></label><label><span>{t("会话名称")}</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("例如：修复结算页测试")} required autoFocus /></label>
           <fieldset className="worktree-toggle"><legend>{t("工作目录")}</legend>
             <label className="checkbox-row"><input type="checkbox" checked={worktree} onChange={(event) => setWorktree(event.target.checked)} /><span>{t("使用独立工作目录（新建工作树）")}</span></label>
             <p className="subtle">{t("适合并行开发：新会话使用独立目录和新分支，原项目保留。")}</p>
@@ -1473,7 +1441,7 @@ export function CreateSessionDialog({ open, machines, selectedMachineId, initial
               <WorktreeFields overview={worktreeInfo} disabled={busy} value={{ base: worktreeBase, branch: worktreeBranch, setup: worktreeSetup }} onChange={value => { setWorktreeBase(value.base); setWorktreeBranch(value.branch); setWorktreeSetup(value.setup); }} />
             </>)}
           </fieldset>
-          <p className="subtle">{worktree ? t("将从所选分支新建独立的工作树和分支，会话在其中执行，不与其他会话排队。") : t("会话在所选主机和项目中执行。")}</p><button className="button button--primary button--full" disabled={busy || !selectedProject || (worktree && (!worktreeInfo || !worktreeBase || Boolean(worktreeBranchError(worktreeInfo, worktreeBranch))))}>{busy ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}{locale() === "en" ? " " : ""}{busy && worktree ? t("正在创建工作树…") : worktree ? t("创建工作树和新会话") : t("创建会话")}</button></form>}</section></div>;
+          <p className="subtle">{worktree ? t("将从所选分支新建独立的工作树和分支，会话在其中执行，不与其他会话排队。") : t("会话在所选主机和项目中执行。")}</p><button className="button button--primary button--full" disabled={busy || !selectedProject || (worktree && (!worktreeInfo || !worktreeBase || Boolean(worktreeBranchError(worktreeInfo, worktreeBranch))))}>{busy ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}{wordSpace()}{busy && worktree ? t("正在创建工作树…") : worktree ? t("创建工作树和新会话") : t("创建会话")}</button></form>}</section></div>;
 }
 
 function projectAliasFromPath(path: string): string {
@@ -1532,7 +1500,7 @@ function CreateProjectDialog({ open, machines, selectedMachineId, onClose, onCre
     setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true);
   }, [open, selectedMachineId]);
   if (!open) return null;
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><div className="modal-head"><div><div className="eyebrow">New project</div><h2 id="new-project-title">{t("创建项目")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有支持创建项目的在线主机")}</h3><p>{t("请先更新并连接主机上的 Agent。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !effectivePath || !alias.trim()) return; setBusy(true); try { await onCreate(machineId, effectivePath, alias.trim(), location === CUSTOM_PROJECT_LOCATION ? createDirectory : true); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { const nextMachine = writableMachines.find((machine) => machine.id === event.target.value); setMachineId(event.target.value); setLocation(projectLocationOptions(nextMachine)[0]?.path ?? CUSTOM_PROJECT_LOCATION); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{writableMachines.map((machine) => <option key={machine.id} value={machine.id}>{displayName(machine.name)}</option>)}</select></label><label><span>{t("创建位置")}</span><select value={location} title={location === CUSTOM_PROJECT_LOCATION ? t("自定义完整路径") : location} onChange={(event) => { setLocation(event.target.value); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{locations.map((choice) => <option key={choice.path} value={choice.path}>{t("{0}（与{1}同级）", choice.path, choice.projects.length === 1 ? choice.projects[0] : count(choice.projects.length, "个项目"))}</option>)}<option value={CUSTOM_PROJECT_LOCATION}>{t("自定义完整路径")}</option></select></label>{location === CUSTOM_PROJECT_LOCATION ? <label><span>{t("项目路径")}</span><input value={path} onChange={(event) => { const next = event.target.value; setPath(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} placeholder={t("例如：/home/me/projects/my-app")} required autoFocus /></label> : <><label><span>{t("新项目文件夹")}</span><input value={folderName} onChange={(event) => { const next = event.target.value; setFolderName(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,63}" placeholder="my-app" required autoFocus /></label><div className="project-path-preview" aria-live="polite"><span>{t("将创建在")}</span><code>{effectivePath || projectPathAt(location, "my-app")}</code></div></>}<label><span>{t("项目名称")}</span><input value={alias} onChange={(event) => { setAlias(event.target.value); setAliasEdited(true); }} pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,63}" placeholder="my-app" required /></label>{location === CUSTOM_PROJECT_LOCATION && <label className="checkbox-row"><input type="checkbox" checked={createDirectory} onChange={(event) => setCreateDirectory(event.target.checked)} /><span>{t("路径不存在时创建目录")}</span></label>}<p className="subtle">{location === CUSTOM_PROJECT_LOCATION ? t("路径必须是主机上的绝对路径；只会创建最后一级目录。") : t("新项目会创建在所选目录中，与现有项目位于同一层级。")}</p><button className="button button--primary button--full" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <FolderGit2 size={16} />}{busy ? t("正在创建") : t("创建项目")}</button></form>}</section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}><section className="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="new-project-title"><div className="modal-head"><div><h2 id="new-project-title">{t("创建项目")}</h2></div><IconButton label={t("关闭")} disabled={busy} onClick={onClose}><X size={18} /></IconButton></div>{writableMachines.length === 0 ? <div className="modal-empty"><Unplug size={24} /><h3>{t("没有支持创建项目的在线主机")}</h3><p>{t("请先更新并连接主机上的 Agent。")}</p></div> : <form className="stack-form" onSubmit={async (event) => { event.preventDefault(); if (!machineId || !effectivePath || !alias.trim()) return; setBusy(true); try { await onCreate(machineId, effectivePath, alias.trim(), location === CUSTOM_PROJECT_LOCATION ? createDirectory : true); onClose(); } catch (error) { onToast("danger", errorMessage(error)); } finally { setBusy(false); } }}><label><span>{t("主机")}</span><select value={machineId} onChange={(event) => { const nextMachine = writableMachines.find((machine) => machine.id === event.target.value); setMachineId(event.target.value); setLocation(projectLocationOptions(nextMachine)[0]?.path ?? CUSTOM_PROJECT_LOCATION); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{writableMachines.map((machine) => <option key={machine.id} value={machine.id}>{displayName(machine.name)}</option>)}</select></label><label><span>{t("创建位置")}</span><select value={location} title={location === CUSTOM_PROJECT_LOCATION ? t("自定义完整路径") : location} onChange={(event) => { setLocation(event.target.value); setFolderName(""); setPath(""); setAlias(""); setAliasEdited(false); setCreateDirectory(true); }}>{locations.map((choice) => <option key={choice.path} value={choice.path}>{t("{0}（与{1}同级）", choice.path, choice.projects.length === 1 ? choice.projects[0] : count(choice.projects.length, "个项目"))}</option>)}<option value={CUSTOM_PROJECT_LOCATION}>{t("自定义完整路径")}</option></select></label>{location === CUSTOM_PROJECT_LOCATION ? <label><span>{t("项目路径")}</span><input value={path} onChange={(event) => { const next = event.target.value; setPath(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} placeholder={t("例如：/home/me/projects/my-app")} required autoFocus /></label> : <><label><span>{t("新项目文件夹")}</span><input value={folderName} onChange={(event) => { const next = event.target.value; setFolderName(next); if (!aliasEdited) setAlias(projectAliasFromPath(next)); }} pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,63}" placeholder="my-app" required autoFocus /></label><div className="project-path-preview" aria-live="polite"><span>{t("将创建在")}</span><code>{effectivePath || projectPathAt(location, "my-app")}</code></div></>}<label><span>{t("项目名称")}</span><input value={alias} onChange={(event) => { setAlias(event.target.value); setAliasEdited(true); }} pattern="[A-Za-z0-9](?:[A-Za-z0-9._]|-){0,63}" placeholder="my-app" required /></label>{location === CUSTOM_PROJECT_LOCATION && <label className="checkbox-row"><input type="checkbox" checked={createDirectory} onChange={(event) => setCreateDirectory(event.target.checked)} /><span>{t("路径不存在时创建目录")}</span></label>}<p className="subtle">{location === CUSTOM_PROJECT_LOCATION ? t("路径必须是主机上的绝对路径；只会创建最后一级目录。") : t("新项目会创建在所选目录中，与现有项目位于同一层级。")}</p><button className="button button--primary button--full" disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <FolderGit2 size={16} />}{busy ? t("正在创建") : t("创建项目")}</button></form>}</section></div>;
 }
 
 function App() {
@@ -1812,7 +1780,7 @@ function App() {
   }, [displayedSession?.id, displayedSession?.provider]);
 
   if (!authKnown) return <main className="boot-screen"><span className="brand-glyph"><Radio size={19} /></span><LoaderCircle className="spin" size={22} /><span>{t("正在接入 Control Plane")}</span></main>;
-  if (!dashboard) return <Login onLogin={(next) => { setDashboard(next); const session = next.sessions.find((item) => item.id === selectedSessionRef.current); setSelectedMachineId(routeRef.current.machineId ?? session?.machineId ?? next.machines[0]?.id); }} />;
+  if (!dashboard) return <LoginPage onLogin={(next) => { setDashboard(next); const session = next.sessions.find((item) => item.id === selectedSessionRef.current); setSelectedMachineId(routeRef.current.machineId ?? session?.machineId ?? next.machines[0]?.id); }} />;
 
   // A mutation receipt confirms submission; refreshing history must not hold the composer or dialog open.
   async function refreshAll() { await Promise.all([loadDashboard(true), loadDetail(selectedSessionId, true)]); }

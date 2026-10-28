@@ -4,7 +4,7 @@ import {LiveChatUpload} from '../lib/live-chat-upload';
 import {useEffect,useId,useRef,useState,type RefObject} from 'react';
 import {createPortal} from 'react-dom';
 import {Heart,ArrowDown,MessagesSquare,MessageCircle,Radio,Settings2,UserRound,Volume2,X} from 'lucide-react';
-import {t} from '../i18n';
+import { locale,t} from '../i18n';
 import {displayName} from '../lib/display-name';
 import {useDraggablePanel} from '../lib/use-draggable-panel';
 import {savedWelcomeText,normalizeWelcomeText,LIVE_WELCOME_STORAGE_KEY,LIVE_WELCOME_INTERVAL_MS,LIVE_WELCOME_MAX_AGE_MS,LiveEventLedger,LiveCollectorStream,emptyCollectorDiagnostics,localCollectorUrl,type LiveEvent,type WelcomeBridge} from '../lib/live-interactions';
@@ -184,7 +184,7 @@ export function LiveInteractions({voice,supported=true}:{voice:RefObject<Welcome
         <p className="live-interactions__hint">{t('连接 HomeDouyinCollector，接收入场、聊天和互动事件；无需确认或固定房间。')}</p>
       {connection==='open'&&<div className="live-interactions__diagnostics" aria-label={t('采集诊断')}>
         <p>{t('收到数据包')} {diagnostics.packets} · {t('聊天事件')} {diagnostics.chat} · {t('独立入场事件')} {diagnostics.enter} · {t('其他互动')} {diagnostics.interaction}</p>
-        {diagnostics.packets===0?<p>{t('连接成功，但尚未收到任何数据。请先查看采集器窗口是否有消息；不要重启正在直播的伴侣。')}</p>:<p>{t('最后收到数据')} {new Date(diagnostics.lastPacketAt).toLocaleTimeString()}</p>}
+        {diagnostics.packets===0?<p>{t('连接成功，但尚未收到任何数据。请先查看采集器窗口是否有消息；不要重启正在直播的伴侣。')}</p>:<p>{t('最后收到数据')} {new Date(diagnostics.lastPacketAt).toLocaleTimeString(locale())}</p>}
         {diagnostics.enter===0&&<p>{t('尚未收到独立入场事件，聊天不会触发欢迎')}</p>}
         {diagnostics.rejected>0&&<details><summary>{t('查看接收诊断')}</summary>
           <p>{t('拒收数据包')} {diagnostics.rejected}</p>

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { EmailLoginForm } from "./EmailLoginForm";
 import { api } from "../lib/api";
 import { ApiError, type Dashboard } from "../lib/types";
-import { setLocale } from "../i18n";
+import { setLocale, t } from "../i18n";
 
 vi.mock("../lib/api", () => ({ api: { requestLoginCode: vi.fn(), verifyLoginCode: vi.fn() } }));
 beforeEach(() => {
@@ -23,7 +23,7 @@ it("sends a code then logs in with the challenge, supports paste and change emai
   const code = await screen.findByLabelText("6 位验证码");
   expect(api.requestLoginCode).toHaveBeenCalledWith("user@example.com", "zh");
   expect((screen.getByRole("button", { name: /重新发送验证码/ }) as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.change(code, { target: { value: "12 34 56" } });
+  fireEvent.change(code, { target: { value: "１２ ３４ ５６" } });
   fireEvent.click(screen.getByRole("button", { name: "验证并登录" }));
   await waitFor(() => expect(onLogin).toHaveBeenCalledWith(dashboard));
   expect(api.verifyLoginCode).toHaveBeenCalledWith("challenge", "123456");
@@ -55,4 +55,9 @@ it("keeps the code step on a wrong code and shows a localized error", async () =
   expect((await screen.findByRole("alert")).textContent).toContain("验证码无效或已过期");
   expect(onLogin).not.toHaveBeenCalled();
   expect(screen.getByLabelText("6 位验证码")).toBeTruthy();
+  await act(async () => { await setLocale("fr"); });
+  expect(screen.getByRole("alert").textContent).toContain(t("验证码无效或已过期，请检查后重试。"));
+  expect((screen.getByLabelText(t("6 位验证码")) as HTMLInputElement).value).toBe("111111");
+  expect(screen.getByText("u@example.com")).toBeTruthy();
+  expect(api.requestLoginCode).toHaveBeenCalledTimes(1);
 });

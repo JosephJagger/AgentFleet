@@ -1,4 +1,4 @@
-import { t, locale, localized, systemText } from "../i18n";
+import { wordSpace, t, locale, localized, systemText } from "../i18n";
 import { Check, Clock3, AlertTriangle, LoaderCircle } from "lucide-react";
 import type { CommandReceipt } from "../lib/types";
 
@@ -48,6 +48,6 @@ export function OperationReceipts({ commands, mode = "all" }: { commands: Comman
   if (mode === "outstanding" && !outstanding.length) return null;
   return <section className="operation-receipts" aria-label={mode === "recent" ? t("最近操作") : t("操作进度")} aria-live="polite">
     {mode !== "recent" && outstanding.length > 0 && <><h3><Clock3 size={14} />{t("操作进度")}</h3><ol>{outstanding.map(receipt)}</ol></>}
-    {mode !== "outstanding" && (recent.length > 0 || mode === "recent") && <details className={`operation-history${mode === "recent" ? " session-config-section" : ""}`}><summary>{mode === "recent" ? <span>{t("最近操作")}<small>{t("最近 {0} 项已完成的操作", recent.length)}</small></span> : <>{t("最近操作 ·")}{locale() === "en" ? " " : ""}{recent.length}</>}</summary>{recent.length ? <ol>{recent.map(receipt)}</ol> : <p>{t("暂无已完成的操作。")}</p>}</details>}
+    {mode !== "outstanding" && (recent.length > 0 || mode === "recent") && <details className={`operation-history${mode === "recent" ? " session-config-section" : ""}`}><summary>{mode === "recent" ? <span>{t("最近操作")}<small>{t("最近 {0} 项已完成的操作", recent.length)}</small></span> : <>{t("最近操作 ·")}{wordSpace()}{recent.length}</>}</summary>{recent.length ? <ol>{recent.map(receipt)}</ol> : <p>{t("暂无已完成的操作。")}</p>}</details>}
   </section>;
 }

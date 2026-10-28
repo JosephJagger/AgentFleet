@@ -1,6 +1,6 @@
 import { displayName } from "../lib/display-name";
 import { agentName } from "../lib/agent-provider";
-import { count, t, locale, systemText } from "../i18n";
+import { wordSpace, count, t, locale, systemText } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Trash2, X } from "lucide-react";
@@ -62,7 +62,7 @@ export function NativeSessionDeletion({session,commands,pending,onChanged}:{sess
     <button type="button" className="button button--quiet" disabled={busy||pending||!session.actions?.deletePreview?.allowed} onClick={()=>void preview()}>{t("读取主机删除范围")}</button>
     {!session.actions?.deletePreview?.allowed&&<p>{systemText(session.actions?.deletePreview?.message)||t("请更新主机连接服务后使用删除预览。")}</p>}
     {previewId&&!plan&&<p>{systemText(receipt?.message)||t("正在等待主机返回删除范围…")}</p>}
-    {plan&&<><p>{t("主机核验范围：")}{locale() === "en" ? " " : ""}{count(plan.threads.length, "个会话")} </p><ul>{plan.threads.map(thread=><li key={thread.id}>{displayName(thread.title)} · {thread.id}<br/>{thread.cwd}</li>)}</ul>
+    {plan&&<><p>{t("主机核验范围：")}{wordSpace()}{count(plan.threads.length, "个会话")} </p><ul>{plan.threads.map(thread=><li key={thread.id}>{displayName(thread.title)} · {thread.id}<br/>{thread.cwd}</li>)}</ul>
       {!valid&&<p>{t("预览已过期，请重新读取主机删除范围。")}</p>}
       <label><input type="checkbox" checked={confirmed} disabled={busy||pending||!valid} onChange={e=>setConfirmed(e.target.checked)}/>{t("我确认永久删除以上会话及历史")}</label>
       <button type="button" className="button button--danger-quiet" disabled={busy||pending||!valid||!confirmed||!session.actions?.delete?.allowed} onClick={()=>void remove()}>{t("确认永久删除")}</button></>}

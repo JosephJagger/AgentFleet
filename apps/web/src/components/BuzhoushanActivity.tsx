@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronUp, Terminal, RotateCcw } from "lucide-react";
 import { useSessionProgress } from "./RuntimeProgress";
 import type { SessionDetail, SessionProgress } from "../lib/types";
-import { t } from "../i18n";
+import { locale, t } from "../i18n";
 
 type ActivityItem = SessionProgress["items"][number];
 const HEIGHT_KEY = "agentfleet.buzhoushan.dock-height";
@@ -81,7 +81,7 @@ export function BuzhoushanActivity({detail, conversation}: {detail: SessionDetai
         {!visible.length&&<p>{scoped?.contentAvailable===false?t("未开启内容同步，仅显示运行状态"):t("尚无可展示的代码活动")}</p>}
       </div>
       <div className="buzhou-dock__output">
-        <div className="buzhou-dock__caption"><span>{current ? stateLabel(current.status) : t("等待过程事件")}{current?.updatedAt&&` · ${new Date(current.updatedAt).toLocaleTimeString()}`}</span><button type="button" aria-pressed={following} onClick={()=>setFollowing(!following)}>{following?t("跟随最新"):t("查看最新活动")}</button></div>
+        <div className="buzhou-dock__caption"><span>{current ? stateLabel(current.status) : t("等待过程事件")}{current?.updatedAt&&` · ${new Date(current.updatedAt).toLocaleTimeString(locale())}`}</span><button type="button" aria-pressed={following} onClick={()=>setFollowing(!following)}>{following?t("跟随最新"):t("查看最新活动")}</button></div>
         {current?<pre key={current.id} ref={output} onWheel={event=>{if(event.deltaY<0){setSelected(current.id);setFollowing(false);}}}><code>{itemTitle(current).slice(0,4000)}{"\n\n"}{current.output?.slice(-16000)||t("暂无输出正文；完整内容见会话记录")}</code></pre>:<p>{!following?t("所选活动已离开最近记录，可查看最新活动"):t("任务执行时，在这里查看命令与推理摘要")}</p>}
         <small className="buzhou-dock__limit">{t("最近 60 条活动 · 输出最多 16000 字符 · 完整记录见会话")}</small>
       </div>

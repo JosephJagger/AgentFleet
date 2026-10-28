@@ -469,7 +469,7 @@ export const apiSchemas = {
       type: "object", additionalProperties: false, required: ["email"],
       properties: {
         email: { type: "string", minLength: 3, maxLength: 254 },
-        locale: { type: "string", enum: ["en", "zh"] },
+        locale: { type: "string", enum: ["en", "zh", "zh-CN", "zh-TW", "ja", "ko", "de", "fr", "es", "it", "nl", "pt-BR"] },
       },
     },
   },

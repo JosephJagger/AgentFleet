@@ -12,6 +12,35 @@ test("email mode is the default and requires the Django service, never a passwor
   assert.equal(config.adminPassword, "");
 });
 
+test("login forwards supported locales to identity instead of reducing them to English", async t => {
+  const origin = "http://locale.test";
+  const forwarded: string[] = [];
+  const server = createServer(async (req, res) => {
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    forwarded.push(JSON.parse(raw).locale);
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ challengeId: randomUUID(), expiresIn: 600, resendAfter: 60 }));
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
+  const config = loadConfig({ ADMIN_EMAIL: "owner@example.com", DJANGO_AUTH_URL: `http://127.0.0.1:${(server.address() as { port: number }).port}`,
+    DJANGO_AUTH_SERVICE_TOKEN: "s".repeat(48), DATABASE_PATH: ":memory:", PUBLIC_ORIGIN: origin, COOKIE_SECURE: "false", LOG_LEVEL: "silent" });
+  config.databasePath = ":memory:";
+  const { app } = await buildControlPlane(config);
+  t.after(() => app.close());
+  const languages = ["en", "zh", "zh-CN", "zh-TW", "ja", "ko", "de", "fr", "es", "it", "nl", "pt-BR"];
+  for (const [index, language] of languages.entries()) {
+    const response = await app.inject({ method: "POST", url: "/api/auth/request-code", remoteAddress: `192.0.2.${index + 1}`,
+      headers: { origin }, payload: { email: "reader@example.com", locale: language } });
+    assert.equal(response.statusCode, 200, response.body);
+    assert.equal(forwarded.at(-1), language);
+  }
+  const invalid = await app.inject({ method: "POST", url: "/api/auth/request-code", headers: { origin }, payload: { email: "reader@example.com", locale: "not-supported" } });
+  assert.equal(invalid.statusCode, 400);
+  assert.deepEqual(forwarded, languages);
+});
+
 test("Django-verified identities preserve the owner and isolate new users, sessions and resources", async t => {
   const origin = "http://email.test", serviceToken = "s".repeat(48);
   const identities = new Map<string, { id: string; email: string }>();

@@ -14,7 +14,7 @@ import type { CompletionPreferences, WritingPreferencesState } from "./completio
 import type { TokenCounts, UsageSummary } from "./usage";
 import type { WritingAISettings, WritingMemoryState } from "./writing-assistance";
 import type { NLPSuggestion } from "./writing-nlp";
-import { t } from "../i18n";
+import { t, type Locale } from "../i18n";
 import type { SessionReferenceIdentity, SessionReferenceJob } from "./session-references";
 import type {
   Approval,
@@ -794,7 +794,7 @@ export const api = {
   grokPreferences: (id:string,signal?:AbortSignal)=>request<import("./grok-preferences").GrokPreferences>(`/api/sessions/${encodeURIComponent(id)}/grok-settings`,{signal}),
   saveGrokPreferences: (id:string,input:{settings:import("./grok-preferences").GrokSettings;revision:number})=>request<import("./grok-preferences").GrokPreferences>(`/api/sessions/${encodeURIComponent(id)}/grok-settings`,{method:"PUT",body:JSON.stringify(input)}),
   saveCodexPreferences: (id: string, input: { scope: string; settings: import("./codex-settings").CodexSettings | null; revision: number }) => request<import("./codex-settings").CodexPreferences>(`/api/sessions/${encodeURIComponent(id)}/codex-settings`, { method: "PUT", body: JSON.stringify(input) }),
-  requestLoginCode: (email: string, locale: "zh" | "en") => request<{ challengeId: string; expiresIn: number; resendAfter: number }>(
+  requestLoginCode: (email: string, locale: Locale | "zh") => request<{ challengeId: string; expiresIn: number; resendAfter: number }>(
     "/api/auth/request-code", { method: "POST", body: JSON.stringify({ email, locale }) }),
   async verifyLoginCode(challengeId: string, code: string) {
     dashboardCache = undefined;

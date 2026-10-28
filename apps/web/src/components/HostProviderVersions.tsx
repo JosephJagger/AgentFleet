@@ -8,7 +8,7 @@ import { PROVIDER_NAMES, type ProviderId } from '../lib/provider-catalog';
 import type { ProviderRuntimeRequest, ProviderRuntimeState } from '../lib/provider-runtime-policy';
 import { providerUpdateOffer } from '../lib/provider-updates';
 import type { HostOperation, Machine } from '../lib/types';
-import { t, systemText } from '../i18n';
+import { locale, t, systemText } from '../i18n';
 import { HostDisclosure } from './HostDisclosure';
 import './HostProviderVersions.css';
 type VersionRow={version?:string|null;hostVersion?:string|null;source?:string;compatibility?:string;sdkVersion?:string;installed?:boolean};
@@ -62,7 +62,7 @@ export function HostProviderVersions({machine,canConfirmCodex=false}:{machine:Ma
         </div>}
       </div>;
     })}</div>
-    <div className="provider-versions__actions"><button className="button button--secondary" disabled={!supported||pending||machine.reachability!=='live'} onClick={()=>void operate({action:'check'})}><RefreshCw size={15}/>{pending?t('正在检查或应用…'):t('检查智能体版本')}</button>{report&&<small>{t('上次检查：{0}',new Date(report.checkedAt).toLocaleString())}</small>}</div>
+    <div className="provider-versions__actions"><button className="button button--secondary" disabled={!supported||pending||machine.reachability!=='live'} onClick={()=>void operate({action:'check'})}><RefreshCw size={15}/>{pending?t('正在检查或应用…'):t('检查智能体版本')}</button>{report&&<small>{t('上次检查：{0}',new Date(report.checkedAt).toLocaleString(locale()))}</small>}</div>
     {!supported?<p role="status">{t('更新连接服务后可管理智能体版本。')}</p>:!machine.discovery?.managedProviderSupport?<details className="provider-versions__settings"><summary>{t('Claude Code 托管设置')}</summary><form className="provider-versions__policy" onSubmit={e=>{e.preventDefault();if(policy)void operate({action:'configure',provider:'claude',mode,expectedRevision:policy.revision});}}>
       {policy?.mode==='host'&&<p className="subtle">{t('请先更新连接服务以检查安装与授权')}</p>}
       <label>{t('Claude Code 更新方式')}<select aria-label={t('Claude Code 更新方式')} value={mode} onChange={e=>setMode(e.target.value as ProviderRuntimeState['mode'])} disabled={pending}><option value="host">{t('沿用宿主机安装')}</option><option value="pinned">{t('托管 · 固定版本')}</option><option value="auto">{t('托管 · 自动更新稳定版')}</option></select></label>
