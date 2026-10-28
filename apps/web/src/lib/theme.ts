@@ -16,7 +16,7 @@ function initialTheme(): Theme {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (isTheme(saved)) return saved;
   } catch { /* The default theme remains available when storage is blocked. */ }
-  return "daylight";
+  return "eyecare";
 }
 
 let current = initialTheme();
@@ -73,7 +73,7 @@ export function useTheme() {
   return useSyncExternalStore(listener => {
     listeners.add(listener);
     return () => listeners.delete(listener);
-  }, theme, () => "daylight" as Theme);
+  }, theme, () => "eyecare" as Theme);
 }
 
 updateDocument();
