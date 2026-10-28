@@ -18,17 +18,25 @@ test("the downloaded installer admits a legacy claim history timeout without cle
     import assert from 'node:assert/strict';
     import os from 'node:os';
     import { syncBuiltinESMExports } from 'node:module';
-    import { mkdir, symlink } from 'node:fs/promises';
+    import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
     import { join } from 'node:path';
     os.homedir = () => process.argv[1]; syncBuiltinESMExports();
     const { StateStore } = await import(${JSON.stringify(new URL("../src/store.js", import.meta.url).href)});
     const { installationStep } = await import(${JSON.stringify(new URL("../src/installation.js", import.meta.url).href)});
     const { readUpdateTransaction } = await import(${JSON.stringify(new URL("../src/supervisor.js", import.meta.url).href)});
-    await mkdir(join(os.homedir(), '.local/bin'), { recursive: true });
     const oldTarget = join(os.homedir(), '.local/share/agentfleet/bin/0.30.153/agentfleet');
-    await symlink(oldTarget, join(os.homedir(), '.local/bin/agentfleet'));
+    if (process.platform !== 'win32') {
+      await mkdir(join(os.homedir(), '.local/bin'), { recursive: true });
+      await symlink(oldTarget, join(os.homedir(), '.local/bin/agentfleet'));
+    }
     for (const variant of ['history-claim', 'unknown-task', 'active-task', 'voice']) {
       const dataDir = join(os.homedir(), variant);
+      // Windows selects the installed release with a per-installation pointer,
+      // not the POSIX launcher symlink. Keep both fixtures inside the fake home.
+      if (process.platform === 'win32') {
+        await mkdir(join(dataDir, 'bin'), { recursive: true });
+        await writeFile(join(dataDir, 'bin/current.txt'), '0.30.153');
+      }
       const store = new StateStore(dataDir); await store.initialize();
       const error = { code: 'APP_SERVER_TIMEOUT', message: 'thread/items/list did not respond in time' };
       const request = { attemptId: 'attempt', commandId: 'command', type: variant === 'unknown-task' ? 'turn.start' : 'thread.claim',
@@ -42,7 +50,10 @@ test("the downloaded installer admits a legacy claim history timeout without cle
       if (variant === 'voice') await store.setPanelVoiceRuntime({ voiceId: 'voice', pid: process.pid });
       if (variant === 'history-claim') {
         await installationStep(dataDir, 'prepare');
-        assert.equal((await readUpdateTransaction(dataDir)).phase, 'preparing');
+        const transaction = await readUpdateTransaction(dataDir);
+        assert.equal(transaction.phase, 'preparing');
+        assert.equal(transaction.previousVersion, '0.30.153');
+        assert.equal(transaction.previousTarget, process.platform === 'win32' ? '0.30.153' : oldTarget);
         assert.ok(store.snapshot().maintenanceDrain);
       } else {
         await assert.rejects(installationStep(dataDir, 'prepare'), { code: 'UPDATE_HOST_BUSY' });
@@ -52,6 +63,7 @@ test("the downloaded installer admits a legacy claim history timeout without cle
       assert.equal(store.snapshot().commandJournal.command.state, 'unknown');
       assert.deepEqual(store.snapshot().commandJournal.command.error, error);
       assert.ok(store.snapshot().projectReservations.project);
+      if (process.platform === 'win32') assert.equal(await readFile(join(dataDir, 'bin/current.txt'), 'utf8'), '0.30.153');
       store.close();
     }
   `;
