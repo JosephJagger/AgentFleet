@@ -11,9 +11,9 @@ import {ManagedProviderUpdates} from '../src/managed-provider-updates.js';
 import type {ManagedRelease,ManagedPhase} from '../src/managed-provider.js';
 import {grokBinary} from '../src/managed-grok.js';
 const release:ManagedRelease={provider:'grok',version:'1.0.70',id:'a'.repeat(64),checkedAt:new Date().toISOString(),artifacts:{'linux-x64':{size:100,integrity:'sha512-'+Buffer.alloc(64).toString('base64')}}};
-async function fixture(t:test.TestContext){
+async function fixture(t:test.TestContext,changed:()=>void=()=>{}){
  const dir=await mkdtemp(join(tmpdir(),'managed-jobs-')),store=new StateStore(dir);await store.initialize();let installs=0,activations=0,fail=false;let target=release;let installed=true,auth:'ready'|'login_required'|'unverified'='ready';
- const manager=new ManagedProviderUpdates(store,new ProviderRuntimeManager(store,async()=>{}),async()=>target,async()=>{activations++;if(fail)throw new Error('activation failed');},()=>{},{
+ const manager=new ManagedProviderUpdates(store,new ProviderRuntimeManager(store,async()=>{}),async()=>target,async()=>{activations++;if(fail)throw new Error('activation failed');},changed,{
   prepareGrok:async(_root,r)=>{installs++;return {release:r,sha256:'b'.repeat(64)};},verifyGrok:async()=>'/managed/grok',probeGrok:async()=>{},detectAcp:async()=>installed?{executable:'/host/grok',prefix:[],version:'1.0.62'}:null,authorizeGrok:async()=>auth,
  });
  t.after(async()=>{await manager.stop();store.close();await rm(dir,{recursive:true,force:true});});
@@ -34,6 +34,34 @@ test('busy host retains prepared update, cancel cannot be mistaken for a complet
 test('activation failure restores the last working binary and interrupted work becomes unknown',async t=>{
  const f=await fixture(t);await f.install();await f.wait('succeeded');f.change();f.fail();await f.install();await f.wait('failed');assert.equal(f.store.snapshot().managedGrok?.current.release.version,'1.0.70');assert.equal(f.store.snapshot().maintenanceDrain,undefined);
  await f.store.update(s=>{s.managedUpdates!.grok!.phase='activating';});await f.manager.start();assert.equal(f.store.snapshot().managedUpdates?.grok?.phase,'unknown');
+});
+test('completion releases maintenance before notifying and immediately accepts the next confirmed update', {timeout:5000},async t=>{
+ let resolveNext!:()=>void,rejectNext!:(error:unknown)=>void;
+ const next=new Promise<void>((resolve,reject)=>{resolveNext=resolve;rejectNext=reject;});
+ void next.catch(()=>{});
+ let requested=false;
+ const f=await fixture(t,()=>{
+  const job=f.store.snapshot().managedUpdates?.grok;
+  if(job?.phase==='succeeded'&&job.revision===1&&!requested){
+   requested=true;f.change();void f.install().then(resolveNext,rejectNext);
+  }
+ });
+ let entered!:()=>void,release!:()=>void;
+ const cleanupStarted=new Promise<void>(resolve=>{entered=resolve;});
+ const cleanupGate=new Promise<void>(resolve=>{release=resolve;});
+ const finish=f.store.finishUpdateAdmission.bind(f.store);
+ f.store.finishUpdateAdmission=async id=>{entered();await cleanupGate;await finish(id);};
+ try {
+  await f.install();await cleanupStarted;
+  assert.equal(f.store.snapshot().managedUpdates?.grok?.phase,'activating');
+  assert.ok(f.store.snapshot().maintenanceDrain);
+  await assert.rejects(f.install(),{code:'PROVIDER_UPDATE_BUSY'});
+ } finally {release();}
+ await next;await f.wait('succeeded');
+ assert.equal(f.store.snapshot().managedUpdates?.grok?.revision,2);
+ assert.equal(f.store.snapshot().managedGrok?.current.release.version,'1.0.71');
+ assert.equal(f.store.snapshot().maintenanceDrain,undefined);
+ assert.deepEqual(f.counts(),{installs:2,activations:2});
 });
 test('package integrity is checked before attempting to execute or unpack content',()=>{
  assert.throws(()=>grokBinary(Buffer.from('not an archive'),'sha512-'+Buffer.alloc(64).toString('base64'),100),/校验失败/);

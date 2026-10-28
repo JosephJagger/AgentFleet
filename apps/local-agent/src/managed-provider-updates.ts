@@ -61,12 +61,21 @@ export class ManagedProviderUpdates {
     if(this.submitting.has(provider))throw new AgentError('PROVIDER_UPDATE_BUSY','更新请求正在提交');
     this.submitting.add(provider);
     try {
-      const previous=this.store.snapshot().managedUpdates?.[provider];
+      let previous=this.store.snapshot().managedUpdates?.[provider];
       if((previous?.revision??0)!==request.expectedRevision)throw new AgentError('PROVIDER_POLICY_CONFLICT','更新状态已变化，请刷新后重试');
       if(request.action==='cancel-managed') {
         if(!previous||!pending(previous.phase)||previous.phase==='activating')throw new AgentError('PROVIDER_CANCEL_UNAVAILABLE','当前阶段不能取消');
         this.active.get(provider)?.controller.abort();
         await this.patch(provider,{phase:'cancelled',revision:previous.revision+1,error:''});return;
+      }
+      // A terminal status can be observed before the worker's final promise
+      // settles. Join that finalization before admitting a subsequent request.
+      const finishing=this.active.get(provider);
+      if(finishing&&previous&&!pending(previous.phase)) {
+        await finishing.work;
+        this.eligibilityAbort.signal.throwIfAborted();
+        previous=this.store.snapshot().managedUpdates?.[provider];
+        if((previous?.revision??0)!==request.expectedRevision)throw new AgentError('PROVIDER_POLICY_CONFLICT','更新状态已变化，请刷新后重试');
       }
       if(this.active.has(provider)||(previous&&pending(previous.phase)))throw new AgentError('PROVIDER_UPDATE_BUSY','此智能体已有更新正在进行');
       if(request.action==='install-managed'){if(provider==='claude')await this.claude.requireEligibility();else requireManagedEligibility(await this.checkGrokEligibility());this.changed();}
@@ -98,6 +107,7 @@ export class ManagedProviderUpdates {
     const job=this.store.snapshot().managedUpdates?.[provider];if(!job||!pending(job.phase))return;
     const assertCurrent=async()=>{signal.throwIfAborted();if((job.rollback?this.store.snapshot().managedGrok?.previous?.release.id:(await this.target(provider)).id)!==job.releaseId)throw new AgentError('PROVIDER_TARGET_CHANGED','托管目标已变化，请重新确认');signal.throwIfAborted();};
     let admitted=false;
+    let completion:Partial<ManagedJob>|undefined;
     try {
       if(Date.now()-Date.parse(job.createdAt)>24*60*60_000)throw new AgentError('PROVIDER_CONFIRM_EXPIRED','更新确认已过期，请重新确认');
       await assertCurrent();
@@ -126,13 +136,16 @@ export class ManagedProviderUpdates {
         try{await this.activateGrok();}
         catch(error){await this.store.update(s=>{if(prior)s.managedGrok=prior;else delete s.managedGrok;});await this.activateGrok().catch(()=>undefined);throw error;}
       }
-      await this.patch(provider,{phase:'succeeded',error:''});
       if(provider==='grok')await this.pruneGrok().catch(()=>undefined);
+      completion={phase:'succeeded',error:''};
     } catch(error) {
       if(this.store.snapshot().managedUpdates?.[provider]?.phase==='cancelled')return;
       const waiting=error instanceof AgentError&&error.code==='PROVIDER_HOST_BUSY';
-      await this.patch(provider,{phase:this.stopped?'unknown':waiting?'waiting_idle':'failed',error:waiting?'':error instanceof AgentError?error.message:'版本校验或启用失败，保留原版本'});
-    } finally {if(admitted)await this.store.finishUpdateAdmission(job.operationId);}
+      completion={phase:this.stopped?'unknown':waiting?'waiting_idle':'failed',error:waiting?'':error instanceof AgentError?error.message:'版本校验或启用失败，保留原版本'};
+    } finally {
+      if(admitted)await this.store.finishUpdateAdmission(job.operationId);
+      if(completion)await this.patch(provider,completion);
+    }
   }
 }
 export async function fetchManagedTarget(origin:string,provider:ManagedProvider):Promise<ManagedRelease>{
