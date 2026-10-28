@@ -1,4 +1,5 @@
 import type { FastifyRequest } from "fastify";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { ControlPlaneConfig } from "./config.js";
 import { newId, futureIso, nowIso, randomToken, sha256, verifyPassword } from "./crypto.js";
 import type { ControlPlaneDatabase } from "./db.js";
@@ -206,7 +207,19 @@ export class AuthService {
   requireCsrf(request: FastifyRequest, principal: Principal): void {
     this.requireOrigin(request);
     const token = request.headers["x-csrf-token"];
-    invariant(typeof token === "string" && sha256(token) === principal.csrfHash, 403, "CSRF_INVALID", "CSRF token is missing or invalid");
+    const supplied = typeof token === "string" ? sha256(token) : "";
+    const matches = (expected: string) => supplied.length > 0 && supplied.length === expected.length && timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
+    // Keep legacy tokens valid while allowing a lost browser token to be recovered.
+    invariant(matches(principal.csrfHash) || matches(sha256(this.sessionCsrfToken(request, principal))),
+      403, "CSRF_INVALID", "CSRF token is missing or invalid");
+  }
+
+  sessionCsrfToken(request: FastifyRequest, principal: Principal): string {
+    const cookie = request.cookies[this.config.cookieName];
+    invariant(cookie, 401, "AUTH_REQUIRED", "Authentication is required");
+    // Authenticated callers only. Stable across reloads/tabs/restarts; never rotate
+    // the stored hash on a status read or expose the HttpOnly session credential.
+    return createHmac("sha256", cookie).update(`agentfleet:csrf:v1:${principal.clientSessionId}`).digest("base64url");
   }
 
   listSessions(principal: Principal): Array<Record<string, unknown>> {

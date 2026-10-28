@@ -40,7 +40,16 @@ import { ApiError } from "./types";
 import { isInlineImage } from "./image-drafts";
 
 const CSRF_STORAGE_KEY = "agentfleet.csrf";
-let csrfToken = localStorage.getItem(CSRF_STORAGE_KEY) ?? "";
+let csrfToken = "";
+try { csrfToken = localStorage.getItem(CSRF_STORAGE_KEY) ?? ""; } catch { /* Cookie login still works without browser storage. */ }
+let csrfSessionId = "";
+function rememberCsrf(value: string) {
+  csrfToken = value;
+  try {
+    if (value) localStorage.setItem(CSRF_STORAGE_KEY, value);
+    else localStorage.removeItem(CSRF_STORAGE_KEY);
+  } catch { /* Retain the token in memory when storage is blocked. */ }
+}
 let dashboardCache: Dashboard | undefined;
 
 type JsonObject = Record<string, unknown>;
@@ -72,12 +81,14 @@ function timeoutSignal(signal: AbortSignal | undefined, milliseconds: number): A
   return signal === undefined ? timeout : AbortSignal.any([signal, timeout]);
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, recoverCsrf = true): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
+  const mutation = !["GET", "HEAD", "OPTIONS"].includes(method);
+  const requestSessionId = csrfSessionId;
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  if (!["GET", "HEAD", "OPTIONS"].includes(method) && csrfToken) {
+  if (mutation && csrfToken) {
     headers.set("x-csrf-token", csrfToken);
   }
 
@@ -104,6 +115,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const error = record(body.error);
+    if (recoverCsrf && mutation && response.status === 403 && error.code === "CSRF_INVALID") {
+      // This exact failure is emitted before the mutation handler runs. Retry only
+      // once, with the original body/mutation ID and the same authenticated session.
+      const status = await request<JsonObject>("/api/auth/status", { cache: "no-store", signal: init.signal }, false);
+      if (status.authenticated !== true) throw new ApiError(t("登录已失效，请重新登录"), 401, "AUTH_REQUIRED");
+      if (!requestSessionId || requestSessionId !== status.clientSessionId) {
+        throw new ApiError(t("登录状态已变化，请确认当前账号后重试。"), 409, "AUTH_SESSION_CHANGED");
+      }
+      if (typeof status.csrfToken === "string" && status.csrfToken) return request<T>(path, init, false);
+    }
     throw new ApiError(
       string(error.message, string(body.message, t("请求未完成"))),
       response.status,
@@ -112,8 +133,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   }
   if (typeof body.csrfToken === "string") {
-    csrfToken = body.csrfToken;
-    localStorage.setItem(CSRF_STORAGE_KEY, csrfToken);
+    rememberCsrf(body.csrfToken);
+  }
+  if (["/api/auth/status", "/api/auth/login", "/api/auth/verify-code"].includes(path)) {
+    if (typeof body.clientSessionId === "string") csrfSessionId = body.clientSessionId;
+    if (body.authenticated === false) { csrfSessionId = ""; rememberCsrf(""); }
   }
   return body as T;
 }
@@ -783,11 +807,14 @@ export const api = {
   async logout() {
     try {
       await request<JsonObject>("/api/auth/logout", { method: "POST" });
-    } finally {
-      csrfToken = "";
-      dashboardCache = undefined;
-      localStorage.removeItem(CSRF_STORAGE_KEY);
+    } catch (error) {
+      // An expired cookie is already logged out. A failed live-session logout must
+      // keep its credentials so the user can retry instead of becoming stuck.
+      if (!(error instanceof ApiError && error.status === 401)) throw error;
     }
+    rememberCsrf("");
+    csrfSessionId = "";
+    dashboardCache = undefined;
   },
   dashboard: loadDashboard,
   permissions(kind: "workspace" | "machines" | "projects" | "sessions", id: string, signal?: AbortSignal) {

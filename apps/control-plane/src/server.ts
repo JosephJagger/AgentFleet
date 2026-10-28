@@ -1116,13 +1116,17 @@ export async function buildControlPlane(
     return { ok: true };
   });
 
-  app.get("/api/auth/status", async (request) => {
+  app.get("/api/auth/status", async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    if (request.headers.origin) auth.requireOrigin(request);
+    invariant(request.headers["sec-fetch-site"] !== "cross-site", 403, "ORIGIN_DENIED", "Origin is not allowed");
     try {
       const principal = auth.authenticateRequest(request);
       return {
         authenticated: true,
         user: { userId: principal.userId, email: principal.email, workspaceId: principal.workspaceId, platformAdmin: auth.isPlatformAdmin(principal) },
         clientSessionId: principal.clientSessionId,
+        csrfToken: auth.sessionCsrfToken(request, principal),
         expiresAt: principal.expiresAt,
       };
     } catch (error) {

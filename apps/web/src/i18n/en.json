@@ -4398,5 +4398,7 @@
   "将清理 {0} 的 {1} 张云端图片，释放 {2}。这些图片将从面板历史中移除，无法从面板恢复。": "Clear {1} cloud images for {0}, freeing {2}. These images will be removed from panel history and cannot be restored from the panel.",
   "图片用量或待处理消息已变化，请取消后重新预览。": "Image usage or pending messages changed. Cancel and preview again.",
   "我确认清理这台主机所有会话的云端图片副本": "I confirm clearing cloud image copies across all sessions on this host",
-  "确认仅清理云端图片": "Confirm cloud-only image cleanup"
+  "确认仅清理云端图片": "Confirm cloud-only image cleanup",
+  "登录已失效，请重新登录": "Your sign-in has expired. Please sign in again.",
+  "登录状态已变化，请确认当前账号后重试。": "Your sign-in has changed. Confirm the current account and try again."
 }
