@@ -645,15 +645,20 @@ export function mapEnrollment(rawValue: unknown): Enrollment {
 }
 
 async function loadDashboard(): Promise<Dashboard> {
-  const rawStatus = await request<JsonObject>("/api/auth/status");
-  if (!boolean(rawStatus.authenticated)) {
+  const signal = timeoutSignal(undefined, 30_000);
+  const read = { cache: "no-store" as const, signal };
+  const rawStatus = await request<JsonObject>("/api/auth/status", read);
+  if (typeof rawStatus.authenticated !== "boolean") {
+    throw new ApiError(t("控制面返回了无效响应，请重试"), 502, "INVALID_RESPONSE");
+  }
+  if (!rawStatus.authenticated) {
     throw new ApiError("Authentication is required", 401, "AUTH_REQUIRED");
   }
   const [rawDashboard, rawProjects, rawSessions, rawApprovals] = await Promise.all([
-    request<JsonObject>("/api/dashboard"),
-    request<JsonObject>("/api/projects?limit=100"),
-    request<JsonObject>("/api/sessions?limit=100"),
-    request<JsonObject>("/api/approvals?state=pending"),
+    request<JsonObject>("/api/dashboard", read),
+    request<JsonObject>("/api/projects?limit=100", read),
+    request<JsonObject>("/api/sessions?limit=100", read),
+    request<JsonObject>("/api/approvals?state=pending", read),
   ]);
   const me = record(rawStatus.user);
   const clientSessionId = string(rawStatus.clientSessionId);

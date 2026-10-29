@@ -607,6 +607,24 @@ describe("会话工作区", () => {
     expect(location.pathname).toBe("/workbench/2");
     expect(screen.getByText("选择一个会话")).toBeTruthy();
   });
+  it.each([new TypeError("Failed to fetch"), new ApiError("Gateway unavailable", 502, "INVALID_RESPONSE")])("启动断网不会误显示登录页，网络恢复后保留会话深链 (%s)", async (error) => {
+    history.replaceState(null, "", "/sessions/B");
+    vi.mocked(api.dashboard).mockRejectedValueOnce(error);
+    render(<App />);
+    await screen.findByRole("button", { name: "重试" });
+    expect(screen.queryByRole("heading", { name: "登录你的工作区" })).toBeNull();
+    expect(location.pathname).toBe("/sessions/B");
+    fireEvent(window, new Event("online"));
+    await screen.findByRole("heading", { name: "会话B" });
+    expect(api.requestLoginCode).not.toHaveBeenCalled();
+  });
+  it("连接失败可手动重试；真实未登录仍显示登录页", async () => {
+    vi.mocked(api.dashboard).mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(new ApiError("请登录", 401, "AUTH_REQUIRED"));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "重试" }));
+    await screen.findByRole("heading", { name: "登录你的工作区" });
+  });
   it("未登录打开第二台主机深链，登录后仍进入指定主机", async () => {
     history.replaceState(null, "", "/hosts/2");
     vi.mocked(api.dashboard).mockRejectedValueOnce(new ApiError("请登录", 401, "UNAUTHORIZED"));

@@ -53,3 +53,22 @@ it('refreshing dashboard restores a missing token without a write or re-login',a
  fetch.mockImplementation(async path=>json(path==='/api/auth/status'?status('restored'):{}));await api.dashboard();expect(localStorage.getItem('agentfleet.csrf')).toBe('restored');
  expect(fetch.mock.calls.every(([,options])=>!options || !('method' in options))).toBe(true);
 });
+it('reads current login state without cache and bounds dashboard requests',async()=>{
+ const {api,fetch}=await setup();
+ fetch.mockImplementation(async path=>json(path==='/api/auth/status'?status():{}));
+ await api.dashboard();
+ for(const [,options] of fetch.mock.calls){
+  expect(options?.cache).toBe('no-store');
+  expect(options?.signal).toBeDefined();
+ }
+});
+it.each([{}, {authenticated:'false'}])('invalid status payload is a connection error, not a logout: %j',async payload=>{
+ const {api,fetch}=await setup();fetch.mockResolvedValueOnce(json(payload));
+ await expect(api.dashboard()).rejects.toMatchObject({status:502,code:'INVALID_RESPONSE'});
+ expect(localStorage.getItem('agentfleet.csrf')).toBe('old');
+});
+it('explicit unauthenticated status still requires sign-in',async()=>{
+ const {api,fetch}=await setup();fetch.mockResolvedValueOnce(json({authenticated:false}));
+ await expect(api.dashboard()).rejects.toMatchObject({status:401,code:'AUTH_REQUIRED'});
+ expect(localStorage.getItem('agentfleet.csrf')).toBeNull();
+});

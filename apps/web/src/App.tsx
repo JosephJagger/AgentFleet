@@ -1522,6 +1522,7 @@ function App() {
   const [dashboard, setDashboard] = useState<Dashboard>();
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [authKnown, setAuthKnown] = useState(false);
+  const [connectionFailed, setConnectionFailed] = useState(false);
   const [route, setRoute] = useState(() => routeFromPath(location.pathname));
   const view = route.view;
   const routeRef = useRef(route);
@@ -1619,13 +1620,23 @@ function App() {
       const next = await api.dashboard();
       if (generation !== dashboardRequest.current) return;
       setDashboard(next);
+      setAuthKnown(true);
+      setConnectionFailed(false);
       const selected = (next.activitySessions ?? next.sessions).find((session) => session.id === selectedSessionRef.current);
       setSelectedMachineId((current) => routeRef.current.machineId ?? selected?.machineId ?? (current && next.machines.some((machine) => machine.id === current) ? current : next.machines[0]?.id));
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) setDashboard(undefined);
-      else if (!silent) toast("danger", errorMessage(error));
+      if (generation !== dashboardRequest.current) return;
+      if (error instanceof ApiError && error.status === 401) {
+        setDashboard(undefined);
+        setAuthKnown(true);
+        setConnectionFailed(false);
+      } else {
+        // Network failures do not establish an unauthenticated state. In
+        // particular, refreshing during a VPN switch must not show sign-in.
+        setConnectionFailed(true);
+        if (!silent && dashboardRef.current) toast("danger", errorMessage(error));
+      }
     } finally {
-      setAuthKnown(true);
       dashboardRefresh.current.running = false;
       if (dashboardRefresh.current.queued) {
         dashboardRefresh.current.queued = false;
@@ -1714,6 +1725,14 @@ function App() {
 
   useEffect(() => { void loadDashboard(); }, [loadDashboard]);
   useEffect(() => {
+    if (!connectionFailed) return;
+    const reconnect = () => { if (document.visibilityState !== "hidden") void loadDashboard(true); };
+    const timer = window.setInterval(reconnect, 5_000);
+    window.addEventListener("online", reconnect);
+    window.addEventListener("focus", reconnect);
+    return () => { window.clearInterval(timer); window.removeEventListener("online", reconnect); window.removeEventListener("focus", reconnect); };
+  }, [connectionFailed, loadDashboard]);
+  useEffect(() => {
     // The collection URL selects a default once, then records its stable ID.
     // Explicit missing/deleted IDs stay visible instead of silently selecting another host.
     if (dashboard && selectedMachineId && !route.machineId && !route.sessionId && ["fleet", "hosts", "usage"].includes(route.view) && /^\/(hosts|workbench|usage)\/?$/.test(location.pathname)) {
@@ -1779,7 +1798,7 @@ function App() {
     setMachineProviders(current => current[displayedSession.machineId] === provider ? current : { ...current, [displayedSession.machineId]: provider });
   }, [displayedSession?.id, displayedSession?.provider]);
 
-  if (!authKnown) return <main className="boot-screen"><span className="brand-glyph"><Radio size={19} /></span><LoaderCircle className="spin" size={22} /><span>{t("正在接入 Control Plane")}</span></main>;
+  if (!authKnown) return <main className="boot-screen"><span className="brand-glyph"><Radio size={19} /></span><LoaderCircle className="spin" size={22} /><span role="status">{t(connectionFailed ? "正在重新连接" : "正在接入 Control Plane")}</span>{connectionFailed && <button type="button" onClick={() => void loadDashboard(true)}>{t("重试")}</button>}</main>;
   if (!dashboard) return <LoginPage onLogin={(next) => { setDashboard(next); const session = next.sessions.find((item) => item.id === selectedSessionRef.current); setSelectedMachineId(routeRef.current.machineId ?? session?.machineId ?? next.machines[0]?.id); }} />;
 
   // A mutation receipt confirms submission; refreshing history must not hold the composer or dialog open.
