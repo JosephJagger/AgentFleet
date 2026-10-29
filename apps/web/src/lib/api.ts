@@ -1160,39 +1160,97 @@ export function subscribeToFleet(
 ): () => void {
   let socket: WebSocket | null = null;
   let stopped = false;
+  let offline = navigator.onLine === false;
   let retry = 500;
   let reconnectTimer: number | undefined;
+  let connectTimer: number | undefined;
+  let pongTimer: number | undefined;
   let pingTimer: number | undefined;
   let subscriptionTimer: number | undefined;
   const subscribed = new Set<string>();
+
+  function clearSocketTimers() {
+    window.clearTimeout(connectTimer);
+    window.clearTimeout(pongTimer);
+    window.clearInterval(pingTimer);
+    window.clearInterval(subscriptionTimer);
+    connectTimer = pongTimer = pingTimer = subscriptionTimer = undefined;
+  }
+
+  function scheduleReconnect(immediate = false) {
+    window.clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+    if (stopped || offline) return;
+    reconnectTimer = window.setTimeout(connect, immediate ? 0 : retry);
+    if (!immediate) retry = Math.min(retry * 2, 15_000);
+  }
+
+  function disconnect(current: WebSocket, immediate = false) {
+    if (stopped || socket !== current) return;
+    // Detach first: a delayed close/error from this transport must not retire
+    // its replacement, even when close() itself waits on a broken network.
+    socket = null;
+    clearSocketTimers();
+    onConnection(false);
+    try { current.close(); } catch { /* Already detached. */ }
+    scheduleReconnect(immediate);
+  }
+
+  function send(current: WebSocket, message: object): boolean {
+    if (socket !== current || current.readyState !== WebSocket.OPEN) return false;
+    try { current.send(JSON.stringify(message)); return true; }
+    catch { disconnect(current); return false; }
+  }
+
   function syncSubscriptions() {
-    if (socket?.readyState !== WebSocket.OPEN) return;
+    const current = socket;
+    if (!current || current.readyState !== WebSocket.OPEN) return;
     for (const session of typeof sessions === "function" ? sessions() : sessions) {
       if (subscribed.has(session.id)) continue;
-      socket.send(JSON.stringify({ type: "subscribe", logicalSessionId: session.id, lastAppliedSeq: session.sessionSeq, projectionEpoch: session.projectionEpoch }));
+      if (!send(current, { type: "subscribe", logicalSessionId: session.id, lastAppliedSeq: session.sessionSeq, projectionEpoch: session.projectionEpoch })) return;
       subscribed.add(session.id);
     }
   }
 
-  const connect = () => {
-    if (stopped) return;
+  function probe() {
+    const current = socket;
+    if (!current || current.readyState !== WebSocket.OPEN || pongTimer !== undefined) return;
+    // TCP can remain OPEN after VPN changes; require an application reply.
+    pongTimer = window.setTimeout(() => disconnect(current, true), 10_000);
+    send(current, { type: "ping" });
+  }
+
+  function connect() {
+    reconnectTimer = undefined;
+    if (stopped || offline || socket) return;
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    socket = new WebSocket(`${protocol}//${location.host}/ws/client`);
-    socket.addEventListener("open", () => {
+    let current: WebSocket;
+    try { current = new WebSocket(`${protocol}//${location.host}/ws/client`); }
+    catch { onConnection(false); scheduleReconnect(); return; }
+    socket = current;
+    connectTimer = window.setTimeout(() => disconnect(current), 10_000);
+    current.addEventListener("open", () => {
+      if (stopped || socket !== current) return;
+      window.clearTimeout(connectTimer);
+      connectTimer = undefined;
       retry = 500;
       onConnection(true);
       subscribed.clear();
       syncSubscriptions();
+      if (socket !== current) return;
       onChange();
       subscriptionTimer = window.setInterval(syncSubscriptions, 1_000);
-      pingTimer = window.setInterval(() => {
-        if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "ping" }));
-      }, 25_000);
+      pingTimer = window.setInterval(probe, 25_000);
+      probe();
     });
-    socket.addEventListener("message", (event) => {
+    current.addEventListener("message", (event) => {
+      if (stopped || socket !== current) return;
       try {
         const message = record(JSON.parse(String(event.data)));
-        if (message.type === "volatile") {
+        if (message.type === "pong") {
+          window.clearTimeout(pongTimer);
+          pongTimer = undefined;
+        } else if (message.type === "volatile") {
           const eventType = string(message.eventType);
           const logicalSessionId = string(message.logicalSessionId);
           const nativeTurnId = string(message.nativeTurnId);
@@ -1216,25 +1274,39 @@ export function subscribeToFleet(
         // Unknown frames never mutate UI state.
       }
     });
-    socket.addEventListener("close", () => {
-      onConnection(false);
-      if (pingTimer) window.clearInterval(pingTimer);
-      if (subscriptionTimer) window.clearInterval(subscriptionTimer);
-      if (!stopped) {
-        reconnectTimer = window.setTimeout(connect, retry);
-        retry = Math.min(retry * 2, 15_000);
-      }
-    });
-    socket.addEventListener("error", () => socket?.close());
-  };
+    current.addEventListener("close", () => disconnect(current));
+    current.addEventListener("error", () => disconnect(current));
+  }
 
-  connect();
+  function resume() {
+    if (stopped || offline || document.visibilityState === "hidden") return;
+    if (!socket) scheduleReconnect(true);
+    else probe();
+  }
+  function onOffline() {
+    offline = true;
+    window.clearTimeout(reconnectTimer);
+    if (socket) disconnect(socket);
+    else onConnection(false);
+  }
+  function onOnline() { offline = false; resume(); }
+  window.addEventListener("online", onOnline);
+  window.addEventListener("offline", onOffline);
+  window.addEventListener("focus", resume);
+  document.addEventListener("visibilitychange", resume);
+  if (offline) onConnection(false);
+  else connect();
   return () => {
     stopped = true;
-    if (reconnectTimer) window.clearTimeout(reconnectTimer);
-    if (pingTimer) window.clearInterval(pingTimer);
-    if (subscriptionTimer) window.clearInterval(subscriptionTimer);
-    socket?.close();
+    window.clearTimeout(reconnectTimer);
+    clearSocketTimers();
+    window.removeEventListener("online", onOnline);
+    window.removeEventListener("offline", onOffline);
+    window.removeEventListener("focus", resume);
+    document.removeEventListener("visibilitychange", resume);
+    const current = socket;
+    socket = null;
+    try { current?.close(); } catch { /* Cleanup never reconnects. */ }
   };
 }
 

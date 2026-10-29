@@ -618,6 +618,23 @@ describe("会话工作区", () => {
     await screen.findByRole("heading", { name: "会话B" });
     expect(api.requestLoginCode).not.toHaveBeenCalled();
   });
+  it("已登录时网络中断保留当前会话和草稿，恢复后只同步状态", async () => {
+    history.replaceState(null, "", "/sessions/B");
+    render(<App />);
+    await screen.findByRole("heading", { name: "会话B" });
+    const input = screen.getByRole("textbox", { name: "发送给 Codex 的消息" });
+    fireEvent.change(input, { target: { value: "尚未发送的任务" } });
+    vi.mocked(api.dashboard).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await act(async () => { fireEvent(window, new Event("focus")); });
+    await waitFor(() => expect(api.dashboard).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("heading", { name: "登录你的工作区" })).toBeNull();
+    expect((input as HTMLTextAreaElement).value).toBe("尚未发送的任务");
+    await act(async () => { fireEvent(window, new Event("online")); });
+    await waitFor(() => expect(api.dashboard).toHaveBeenCalledTimes(3));
+    expect(location.pathname).toBe("/sessions/B");
+    expect((screen.getByRole("textbox", { name: "发送给 Codex 的消息" }) as HTMLTextAreaElement).value).toBe("尚未发送的任务");
+    expect(api.command).not.toHaveBeenCalled();
+  });
   it("连接失败可手动重试；真实未登录仍显示登录页", async () => {
     vi.mocked(api.dashboard).mockRejectedValueOnce(new TypeError("Failed to fetch"))
       .mockRejectedValueOnce(new ApiError("请登录", 401, "AUTH_REQUIRED"));
