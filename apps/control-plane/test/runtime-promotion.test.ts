@@ -79,6 +79,8 @@ test("unknown releases wait for adapter review before downloading and retain the
   assert.equal(validatedCodexSchemaHash("0.162.1"), "0bf5254bede109d4ae03ce2e81372e4c93a30b359c0749ec7dce7a9382a7f857");
   assert.equal(validatedCodexSchemaHash("0.162.2"), "unreviewed");
   assert.equal(validatedCodexSchemaHash("0.163.0"), "d204b96d8560d56600127423b89df9db471b3e22338e8809bb91d5a952998978");
+  assert.equal(validatedCodexSchemaHash("0.166.0"), "e025e54fb11354eb82767ea040b40efa17b34dfc706c9433a6115b5f4771c465");
+  assert.equal(validatedCodexSchemaHash("0.166.1"), "unreviewed");
   assert.equal(validatedCodexSchemaHash("0.164.0"), "705a08b903fecb9457a6c888040b16ff20be4bc74682ee3896c61cb27ce43060");
   assert.equal(validatedCodexSchemaHash("0.164.1"), "unreviewed");
   assert.equal(validatedCodexSchemaHash("0.165.0"), "38027ec8a6fffc2422b674cab13dc1a05c26e13a48349c46a274609d52090e35");

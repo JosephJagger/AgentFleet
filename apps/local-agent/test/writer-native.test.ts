@@ -83,7 +83,9 @@ for (const historyMode of ["legacy", "paginated"] as const) test(`native ${histo
     const deletion = new CodexAppServer(callbacks,undefined,environment);
     try {
       await deletion.start();
-      await panel.threadAction({...archiveTarget,nativeThreadId:childId},project,"unarchive");
+      // 0.166 restores descendants with their parent; older runtimes leave them archived.
+      if ((await panel.listThreads()).find(thread => thread.nativeThreadId === childId)?.archived)
+        await panel.threadAction({...archiveTarget,nativeThreadId:childId},project,"unarchive");
       const plan = await panel.previewDeletion(archiveTarget,project);
       assert.deepEqual(new Set(plan.threads.map(t=>t.id)),new Set([id,childId,grandchildId]),"Preview includes every spawned descendant");
       const external = new CodexAppServer(callbacks,undefined,environment);

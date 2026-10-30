@@ -347,3 +347,29 @@ Publication must use a full clean-main release with the guarded publisher's
 receive this review. The live worker must independently verify and promote the
 release. Hosts retain administrator confirmation, idle-time activation, local
 validation and rollback health acknowledgement.
+
+## Codex 0.166.0 — Agent 0.30.160 (2026-10-30)
+
+Official stable tag `rust-v0.166.0` was published 2026-10-29T19:47:53Z.
+The Linux archive matched its official SHA-256. Generated standard v2 schema:
+`e025e54fb11354eb82767ea040b40efa17b34dfc706c9433a6115b5f4771c465`.
+Compared with 0.164.0, no existing schema definition or required-field list was
+removed/changed; ReviewDelivery removes `detached`, which this adapter does not
+send. Additions include account-session/workspace and provider-error definitions,
+telemetry requirements and item lifecycle/usage metadata. Both reviewed-schema
+lists and the native-voice version gate admit this exact version; unknown patch
+versions remain rejected.
+
+Sixteen Agent tests passed with the real 0.166.0 executable (none skipped),
+including legacy/paginated writer handoff, permission profiles, descendant
+archive/deletion, daemon fallback, history, images and persisted generated images.
+Seven runtime-promotion tests passed. The writer fixture now checks whether a
+child is archived before restoring it: 0.166.0 restores descendants with their
+parent, and unarchiving an already-restored child correctly fails. The daemon
+probe retains its executable-identity check; the verified test binary is named
+`codex`, not an archive entry name. No account/model requests or live voice calls
+were used; macOS/Windows execution remains subject to host-local validation.
+
+Release requires a full build and guarded publication with `--with-validator`.
+Runtime promotion is separate from Agent publication; host installation remains
+an explicit action in Settings → Update Center, as requested by the user.
