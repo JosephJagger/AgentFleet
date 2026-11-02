@@ -38,6 +38,11 @@ BEGIN
 END $$;
 `;
 
+/** Additive, idempotent performance indexes. They are outside the baseline checksum so existing databases can gain them without a schema-version change. */
+const ADDITIVE_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS content_blobs_live_expiry_idx ON content_blobs(expires_at) WHERE deleted_at IS NULL",
+];
+
 export async function migratePostgres(client: Client, ownTransaction = true): Promise<void> {
   const checksum = createHash("sha256").update(FUNCTIONS + JSON.stringify(baseline)).digest("hex");
   if (ownTransaction) await client.query("BEGIN");
@@ -63,6 +68,7 @@ export async function migratePostgres(client: Client, ownTransaction = true): Pr
       await client.query("CREATE TABLE agentfleet_database_identity(singleton integer PRIMARY KEY CHECK(singleton=1),identity text NOT NULL UNIQUE)");
       await client.query("INSERT INTO agentfleet_database_identity VALUES(1,$1)", [randomUUID()]);
     }
+    for (const sql of ADDITIVE_INDEXES) await client.query(sql);
     if (ownTransaction) await client.query("COMMIT");
   } catch (error) {
     if (ownTransaction) await client.query("ROLLBACK");

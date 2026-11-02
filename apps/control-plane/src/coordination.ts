@@ -3258,9 +3258,11 @@ export class CoordinationService {
         payload_ref: string | null;
         content_epoch: number;
       }>(
-        `SELECT e.event_id,e.workspace_id,e.logical_session_id,e.payload_hash,e.payload_ref,e.content_epoch
-         FROM durable_events e JOIN content_blobs b ON b.payload_ref=e.payload_ref
-         WHERE e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at<=?
+        // Find expired blobs through the partial index first; otherwise the planner scans every event.
+        `WITH b AS MATERIALIZED (SELECT payload_ref,expires_at FROM content_blobs WHERE deleted_at IS NULL AND expires_at<=?)
+         SELECT e.event_id,e.workspace_id,e.logical_session_id,e.payload_hash,e.payload_ref,e.content_epoch
+         FROM b JOIN durable_events e ON e.payload_ref=b.payload_ref
+         WHERE e.payload_state='present'
          ORDER BY b.expires_at LIMIT ?`,
         timestamp,
         limit,
