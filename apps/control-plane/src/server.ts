@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 const gzipResponse = promisify(gzip);
 import { SessionSearchService } from './session-search.js';
 import { ManagedChannels } from './managed-channels.js';
+import { readEventImage } from "./cloud-image-delivery.js";
 import { generatedImageAccess } from "./generated-image-access.js";
 import { dismissPendingCommit } from "./pending-commits.js";
 import { projectCatalog } from "./project-catalog.js";
@@ -518,7 +519,9 @@ export async function buildControlPlane(
       request.url.startsWith("/ws/") ||
       ["/live", "/ready", "/healthz"].includes(request.url)
     ) {
-      reply.header("cache-control", "no-store");
+      const validatedImage = request.routeOptions.url === "/api/sessions/:id/images/:eventId/:hash"
+        && (reply.statusCode === 200 || reply.statusCode === 304);
+      if (!validatedImage) reply.header("cache-control", "no-store");
     }
     // Compress read-only JSON responses; never buffer files or websocket streams.
     if (request.method === "GET" && request.url.startsWith("/api/") && !request.url.startsWith("/api/auth/")
@@ -1586,6 +1589,17 @@ export async function buildControlPlane(
     broadcastSession(sessionId,{type:"command.changed",logicalSessionId:sessionId,command:result.command});
     return {...result,path:plan.path};
   });
+  app.get("/api/sessions/:id/images/:eventId/:hash", { preHandler: authenticate }, async (request, reply) => {
+    const params = request.params as { id: string; eventId: string; hash: string };
+    const image = readEventImage(db, request.principal as Principal, params.id, params.eventId, params.hash, String(request.headers["if-none-match"] ?? ""));
+    reply.header("cache-control", "private, no-cache");
+    reply.header("etag", image.etag);
+    reply.header("content-type", image.mime);
+    const extension = image.mime === "image/jpeg" ? "jpg" : image.mime === "image/webp" ? "webp" : "png";
+    reply.header("content-disposition", `inline; filename="image.${extension}"`);
+    if (!image.bytes) return reply.code(304).send();
+    return reply.header("content-length", image.bytes.length).send(image.bytes);
+  });
   app.get("/api/sessions/:id/files", { preHandler: authenticate }, async (request, reply) => {
     const principal = request.principal as Principal;
     const logicalSessionId = routeId(request);
@@ -1748,11 +1762,11 @@ export async function buildControlPlane(
   app.get("/api/sessions/:id/events", { preHandler: authenticate }, async (request) => {
     const query = request.query as Record<string, unknown>;
     if (query.compact === "1" && query.afterSeq !== undefined) return coordination.historyAfter(request.principal as Principal, routeId(request), {
-      afterSeq: Number(query.afterSeq), limit: pageLimit(query.limit), projectionEpoch: Number(query.projectionEpoch), contentEpoch: Number(query.contentEpoch),
+      imageLinks: query.images === "links", afterSeq: Number(query.afterSeq), limit: pageLimit(query.limit), projectionEpoch: Number(query.projectionEpoch), contentEpoch: Number(query.contentEpoch),
     });
     if(query.limit!==undefined || query.beforeSeq!==undefined) {
       const page = coordination.historyPage(request.principal as Principal,routeId(request),{
-        limit:pageLimit(query.limit),
+        imageLinks: query.images === "links", limit:pageLimit(query.limit),
         ...(query.beforeSeq===undefined?{}:{beforeSeq:Number(query.beforeSeq)}),
         ...(query.projectionEpoch===undefined?{}:{projectionEpoch:Number(query.projectionEpoch)}),
         ...(query.contentEpoch===undefined?{}:{contentEpoch:Number(query.contentEpoch)}),

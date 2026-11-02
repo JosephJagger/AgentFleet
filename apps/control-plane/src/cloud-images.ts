@@ -98,6 +98,24 @@ export class CloudImages {
     }, true);
   }
 
+  /** Browser history only. Keep native hydrate() and command dispatch unchanged. */
+  displayEvent(machineId: string, payloadRef: string, value: unknown, sessionId: string, eventId: string): unknown {
+    return this.walk(value, url => {
+      if (typeof url !== "string" || !url.startsWith(PREFIX)) return url;
+      const hash = url.slice(PREFIX.length);
+      const cleaned = this.db.get(`SELECT 1 FROM durable_events e JOIN image_cleaned_turns t
+        ON t.machine_id=e.machine_id AND t.logical_session_id=e.logical_session_id
+        AND t.native_thread_id=e.native_thread_id AND t.native_turn_id=e.native_turn_id
+        WHERE e.payload_ref=? AND e.machine_id=? AND t.image_hash=?`, payloadRef, machineId, hash);
+      if (cleaned) return "[图片已按会话清理，文字保留]";
+      const available = this.db.get(`SELECT 1 FROM cloud_images i JOIN cloud_image_refs r
+        ON r.machine_id=i.machine_id AND r.image_hash=i.image_hash
+        WHERE r.owner_type='event' AND r.owner_id=? AND i.machine_id=? AND i.image_hash=?
+          AND i.data_url IS NOT NULL AND i.deleted_at IS NULL`, payloadRef, machineId, hash);
+      return available ? `/api/sessions/${encodeURIComponent(sessionId)}/images/${encodeURIComponent(eventId)}/${hash}` : MISSING;
+    }, true);
+  }
+
   private walk(value: unknown, image: (url: unknown) => unknown, display = false): unknown {
     if (Array.isArray(value)) return value.map(entry => this.walk(entry, image, display));
     if (!value || typeof value !== "object") return value;

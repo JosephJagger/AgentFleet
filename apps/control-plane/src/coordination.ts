@@ -2977,7 +2977,7 @@ export class CoordinationService {
     );
   }
 
-  private getEventRecord(eventId: string): Record<string, unknown> {
+  private getEventRecord(eventId: string, imageLinks = false): Record<string, unknown> {
     const row = this.db.get<{
       event_id: string;
       payload_hash: string;
@@ -3034,11 +3034,13 @@ export class CoordinationService {
       payloadRef: row.payload_ref,
       payloadState: row.body_json ? row.payload_state : row.payload_state === "present" ? "deleted" : row.payload_state,
       contentEpoch: row.content_epoch,
-      ...(row.body_json ? { payload: new CloudImages(this.db).hydrate(row.machine_id, "event", row.payload_ref!, parseJson(row.body_json)) } : {}),
+      ...(row.body_json ? { payload: imageLinks
+        ? new CloudImages(this.db).displayEvent(row.machine_id, row.payload_ref!, parseJson(row.body_json), row.logical_session_id, row.event_id)
+        : new CloudImages(this.db).hydrate(row.machine_id, "event", row.payload_ref!, parseJson(row.body_json)) } : {}),
     };
   }
 
-  historyPage(principal: Principal, logicalSessionId: string, options: { limit: number; beforeSeq?: number; projectionEpoch?: number; contentEpoch?: number }): Record<string, unknown> {
+  historyPage(principal: Principal, logicalSessionId: string, options: { imageLinks?: boolean; limit: number; beforeSeq?: number; projectionEpoch?: number; contentEpoch?: number }): Record<string, unknown> {
     invariant(Number.isSafeInteger(options.limit) && options.limit >= 1 && options.limit <= 200, 400, "INVALID_LIMIT", "limit must be between 1 and 200");
     invariant(options.beforeSeq === undefined || (Number.isSafeInteger(options.beforeSeq) && options.beforeSeq >= 1), 400, "INVALID_CURSOR", "beforeSeq must be positive");
     const session = this.db.get<{ projection_epoch: number; content_epoch: number; next_session_seq: number }>(
@@ -3051,7 +3053,7 @@ export class CoordinationService {
       logicalSessionId,session.projection_epoch,options.beforeSeq??session.next_session_seq,options.limit+1);
     const visible: typeof rows = []; const items: Record<string, unknown>[] = []; let bytes = 0;
     for (const row of rows.slice(0,options.limit)) {
-      const item = this.getEventRecord(row.event_id); const size = Buffer.byteLength(JSON.stringify(item));
+      const item = this.getEventRecord(row.event_id, options.imageLinks); const size = Buffer.byteLength(JSON.stringify(item));
       if (items.length && bytes + size > 2_000_000) break;
       visible.push(row); items.push(item); bytes += size;
     }
@@ -3060,7 +3062,7 @@ export class CoordinationService {
       throughSeq:session.next_session_seq-1,projectionEpoch:session.projection_epoch,contentEpoch:session.content_epoch};
   }
 
-  historyAfter(principal: Principal, logicalSessionId: string, options: { afterSeq: number; limit: number; projectionEpoch: number; contentEpoch: number }): Record<string, unknown> {
+  historyAfter(principal: Principal, logicalSessionId: string, options: { imageLinks?: boolean; afterSeq: number; limit: number; projectionEpoch: number; contentEpoch: number }): Record<string, unknown> {
     invariant(Number.isSafeInteger(options.limit) && options.limit >= 1 && options.limit <= 200, 400, "INVALID_LIMIT", "Invalid page size");
     const session = this.db.get<{ projection_epoch: number; content_epoch: number; next_session_seq: number }>(
       "SELECT projection_epoch,content_epoch,next_session_seq FROM logical_sessions WHERE logical_session_id=? AND workspace_id=?", logicalSessionId, principal.workspaceId);
@@ -3073,7 +3075,7 @@ export class CoordinationService {
       logicalSessionId, session.projection_epoch, options.afterSeq, session.next_session_seq, options.limit + 1);
     const items: Record<string, unknown>[] = []; let bytes = 0; let cursor = options.afterSeq;
     for (const row of rows.slice(0, options.limit)) {
-      const item = this.getEventRecord(row.event_id); const size = Buffer.byteLength(JSON.stringify(item));
+      const item = this.getEventRecord(row.event_id, options.imageLinks); const size = Buffer.byteLength(JSON.stringify(item));
       if (items.length && bytes + size > 2_000_000) break;
       items.push(item); bytes += size; cursor = row.session_seq;
     }

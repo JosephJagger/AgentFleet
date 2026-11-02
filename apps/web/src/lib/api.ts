@@ -5,7 +5,7 @@ export type VideoStoragePage = { configured:boolean; label?:string; quotaBytes?:
 import { parseProviderRuntimeState } from "./provider-runtime-policy";
 import { isProviderId, type ProviderId } from "./provider-catalog";
 import { agentName } from "./agent-provider";
-import { isGeneratedImage, isStreamedGeneratedImage } from "./generated-images";
+import { isGeneratedImage, isStreamedGeneratedImage, isStoredEventImage } from "./generated-images";
 export type VoiceDirectoryPage={generatedAt:string;hostTotal:number;hostsTruncated:boolean;hosts:{id:string;name:string;heartbeatAt:string|null}[];total:number;nextCursor:string|null;sessions:{id:string;title:string;provider:string;host:string;project:string;managed:boolean;executionState:string;freshness:string;hostHeartbeatAt:string|null;sessionUpdatedAt:string}[]};
 export type LongTermPreference={id:string;body:string;conditions:string;enabled:boolean;expiresAt:string|null;revision:number};
 export type LongTermPreferenceList={revision:number;items:LongTermPreference[];bytes:number;budget:number};
@@ -512,7 +512,7 @@ export function mapEvent(rawValue: unknown): TimelineEvent {
     ...(item.source === "workspace_snapshot" ? {changeSource:"workspace_snapshot",changeLimited:item.limited===true,changeSupported:item.supported===true}:{}),
     title: commandFailure ? t("请求未执行成功") : eventTitle(type, item),
     ...(type === "thread.history.order" ? {historyOrder:list(payload.items).map(record).filter(x=>typeof x.itemId === "string" && Number.isSafeInteger(x.index)).map(x=>({itemId:String(x.itemId),index:Number(x.index),...(typeof x.occurredAt === "string" ? {occurredAt:x.occurredAt} : {})}))} : {}),
-    images: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? [] : streamedImage ? [streamedImage] : list(item.content).map(record).filter(entry => entry.type === "image" && (itemType === "imageGeneration" ? isGeneratedImage(entry.url) : isInlineImage(entry.url))).slice(0, 4).map(entry => entry.url as string),
+    images: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? [] : streamedImage ? [streamedImage] : list(item.content).map(record).filter(entry => entry.type === "image" && (itemType === "imageGeneration" ? isGeneratedImage(entry.url) : (isInlineImage(entry.url) || isStoredEventImage(entry.url)))).slice(0, 4).map(entry => entry.url as string),
     body: commandFailureBody ?? eventBody(type, item, payload),
     payloadState: raw.payloadState === "deleted" || raw.payloadState === "suppressed" ? raw.payloadState : "present",
     status: commandFailure ? (payload.state === "unknown" ? "unknown" : "failed") : string(item.status, string(record(payload.turn).status)) || null,
@@ -853,7 +853,7 @@ export const api = {
     return { items: list(raw.items ?? raw.sessions).map((item) => mapSession(item, cached?.machines ?? [], cached?.machines.flatMap((machine) => machine.projects) ?? [], cached?.user.clientSessionId ?? "")), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null, total: integer(raw.total) };
   },
   async history(id: string, beforeSeq?: number | null, signal?: AbortSignal) {
-    const query = new URLSearchParams({ limit: "100", compact: "1" });
+    const query = new URLSearchParams({ limit: "100", compact: "1", images: "links" });
     if (beforeSeq !== undefined && beforeSeq !== null) query.set("beforeSeq", String(beforeSeq));
     const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}/events?${query}`, { signal });
     return { events: list(raw.items ?? raw.events).map(mapEvent), nextBeforeSeq: typeof raw.nextBeforeSeq === "number" ? raw.nextBeforeSeq : null, projectionEpoch: integer(raw.projectionEpoch), contentEpoch: integer(raw.contentEpoch), throughSeq: integer(raw.throughSeq) };
@@ -887,7 +887,7 @@ export const api = {
         let cursor = page.throughSeq;
         const events = previous!.events.filter(event => !event.id.startsWith("volatile-"));
         for (let count = 0; count < 20; count++) {
-          const query = new URLSearchParams({ limit: "100", compact: "1", afterSeq: String(cursor), projectionEpoch: String(page.projectionEpoch), contentEpoch: String(page.contentEpoch) });
+          const query = new URLSearchParams({ limit: "100", compact: "1", images: "links", afterSeq: String(cursor), projectionEpoch: String(page.projectionEpoch), contentEpoch: String(page.contentEpoch) });
           const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}/events?${query}`, { signal });
           events.push(...list(raw.items).map(mapEvent));
           const next = typeof raw.nextAfterSeq === "number" ? raw.nextAfterSeq : null;

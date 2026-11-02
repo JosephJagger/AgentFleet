@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { AuthService } from "../src/auth.js";
+import { CoordinationService } from "../src/coordination.js";
+import { readEventImage } from "../src/cloud-image-delivery.js";
+import { parseImages } from "../src/images.js";
 import { CloudImages, CLOUD_IMAGE_QUOTA } from "../src/cloud-images.js";
 import { buildControlPlane, cookieFromSetCookie, csrfHeaders } from "./server-fixture.js";
 import { loadConfig } from "../src/config.js";
@@ -187,7 +191,7 @@ test("image session list covers all pages and enforces host ownership and pendin
 });
 
 test("attachment storage reports host and session files by actual extension", async t => {
-  const { app, db, headers, store, add } = await imageSessionFixture(t);
+  const { app, db, headers, store, add, config } = await imageSessionFixture(t);
   const session = await add("typed-files");
   for (const [path, size, hash] of [["reports/guide.pdf", 1200, "a".repeat(64)], ["books/data.xlsx", 3400, "b".repeat(64)], ["src/main.ts", 200, "c".repeat(64)] ] as const) {
     db.run("INSERT INTO attachment_uploads(machine_id,logical_session_id,execution_segment_id,command_id,relative_path,size_bytes,content_hash) VALUES('image-a',?,?,?,?,?,?)", session.logicalSessionId, session.executionSegmentId, "typed-files", path, size, hash);
@@ -238,4 +242,74 @@ test('provider runtime operations use auth/CSRF, workspace scope, strict argumen
  db.run("UPDATE machines SET discovery_json=? WHERE machine_id='image-a'",JSON.stringify({managedEligibilitySupport:true,managedEligibility:{claude:{state:'ready',checkedAt:new Date().toISOString()}}}));
  const next=await start({...payload,clientMutationId:'second-request',nativeRequest:{action:'configure',provider:'claude',mode:'auto',expectedRevision:0} as never});assert.equal(next.statusCode,202,next.body);
  assert.ok(db.get("SELECT 1 FROM audit_entries WHERE action='machine.operation.request' AND machine_id='image-a'"));
+});
+
+
+test("browser image links preserve native inputs and original pixels; conditional reads recheck ownership and cleanup", async t => {
+  const { app, db, headers, store, add, config } = await imageSessionFixture(t);
+  const session = await add("delivery");
+  const other = await add("other-delivery");
+  const workspaceId = db.get<{workspace_id:string}>("SELECT workspace_id FROM workspaces")!.workspace_id;
+  const now = new Date().toISOString();
+  const generated = "data:image/png;base64," + Buffer.concat([Buffer.from(png.split(",")[1]!, "base64"), Buffer.alloc(500_000)]).toString("base64");
+  for (const [index, image, type] of [[1, png, "userMessage"], [2, generated, "imageGeneration"]] as const) {
+    const content = {item:{id:`image-${index}`,type,status:"completed",content:[{type:"text",text:"Keep all context"},{type:"image",url:image}]}};
+    const ref = `delivery-ref-${index}`;
+    const stored = store.store("image-a", "event", ref, content, "sync");
+    db.run("INSERT INTO content_blobs VALUES(?,?,?,?,?,?,NULL)", ref, workspaceId, JSON.stringify(stored), "hash", now, "2099-01-01");
+    db.run(`INSERT INTO durable_events(event_id,payload_hash,source_kind,workspace_id,logical_session_id,execution_segment_id,machine_id,project_id,session_seq,projection_epoch,native_thread_id,native_turn_id,native_item_id,type,schema_version,occurred_at,received_at,payload_ref,payload_state)
+      VALUES(?,'hash','agent',?,?,?,'image-a','p',?,1,?,'delivery-turn',?,'item.completed','1',?,?,?,'present')`,
+      `delivery-event-${index}`, workspaceId, session.logicalSessionId, session.executionSegmentId, index, session.native, `image-${index}`, now, now, ref);
+    assert.deepEqual(store.hydrate("image-a", "event", ref, stored), content);
+  }
+  db.run("UPDATE logical_sessions SET next_session_seq=3 WHERE logical_session_id=?", session.logicalSessionId);
+  const history = `/api/sessions/${session.logicalSessionId}/events?limit=100&compact=1`;
+  const legacy = await app.inject({url:history,headers});
+  const compact = await app.inject({url:history+"&images=links",headers});
+  assert.equal(compact.statusCode,200,compact.body);
+  assert.ok(legacy.body.includes(generated));
+  assert.equal(compact.body.includes("base64"),false);
+  assert.ok(compact.body.length < legacy.body.length / 100);
+  assert.equal(compact.json().items[0].payload.item.content[0].text,"Keep all context");
+  const delta = await app.inject({url:history+"&images=links&afterSeq=1&projectionEpoch=1&contentEpoch=1",headers});
+  assert.equal(delta.statusCode,200,delta.body);
+  assert.deepEqual(delta.json().items,[compact.json().items[1]]);
+  const url = compact.json().items[1].payload.item.content[1].url;
+  const first = await app.inject({url,headers});
+  assert.equal(first.statusCode,200,first.body.slice(0,100));
+  assert.equal(first.headers["cache-control"],"private, no-cache");
+  assert.equal(first.headers["content-type"],"image/png");
+  assert.deepEqual(first.rawPayload,Buffer.from(generated.split(",")[1]!,"base64"));
+  const conditional = {...headers,"if-none-match":first.headers.etag as string};
+  const cached = await app.inject({url,headers:conditional});
+  assert.equal(cached.statusCode,304); assert.equal(cached.rawPayload.length,0);
+  assert.equal((await app.inject({url,headers:{"if-none-match":first.headers.etag as string}})).statusCode,401);
+  assert.equal((await app.inject({url:url.replace(session.logicalSessionId,other.logicalSessionId),headers:conditional})).statusCode,404);
+  assert.equal((await app.inject({url:url.replace("delivery-event-2","delivery-event-1"),headers:conditional})).statusCode,404,"hash must belong to the specific event");
+  for (const [change,restore] of [
+    ["UPDATE projects SET sync_content=0", "UPDATE projects SET sync_content=1"],
+    ["UPDATE content_blobs SET expires_at='2000-01-01'", "UPDATE content_blobs SET expires_at='2099-01-01'"],
+    ["UPDATE content_blobs SET deleted_at='2000-01-01'", "UPDATE content_blobs SET deleted_at=NULL"],
+    ["UPDATE logical_sessions SET deleted_at='2000-01-01'", "UPDATE logical_sessions SET deleted_at=NULL"],
+    ["UPDATE logical_sessions SET content_epoch=2", "UPDATE logical_sessions SET content_epoch=1"],
+    ["UPDATE durable_events SET payload_state='suppressed'", "UPDATE durable_events SET payload_state='present'"],
+  ]) {
+    db.run(change!); const denied = await app.inject({url,headers:conditional});
+    assert.equal(denied.statusCode,404,change); assert.equal(denied.headers["cache-control"],"no-store"); db.run(restore!);
+  }
+  // Reading the panel never rewrites image records or native command payloads.
+  const principal = new AuthService(db,config).servicePrincipal("image-delivery-test");
+  const command = new CoordinationService(db,config).getCommand(principal,"delivery");
+  assert.deepEqual(command.payload,{prompt:"保留文字",images:[png]});
+  assert.throws(() => parseImages([url]), /图片格式/);
+  assert.throws(() => readEventImage(db,{...principal,workspaceId:"foreign"},session.logicalSessionId,"delivery-event-2",url.split("/").at(-1)!),{code:"IMAGE_UNAVAILABLE"});
+  assert.deepEqual(store.hydrate("image-a","command","delivery",session.body),{prompt:"保留文字",images:[png]});
+  const hash = url.split("/").at(-1)!;
+  db.run("INSERT INTO image_cleaned_turns(machine_id,logical_session_id,native_thread_id,native_turn_id,image_hash) VALUES(?,?,?,?,?)","image-a",session.logicalSessionId,session.native,"delivery-turn",hash);
+  assert.equal((await app.inject({url,headers:conditional})).statusCode,404);
+  db.run("DELETE FROM image_cleaned_turns");
+  const cleared = await app.inject({method:"POST",url:"/api/machines/image-a/images/clear",headers,payload:{revision:store.stats("image-a").revision,confirmCloudOnly:true}});
+  assert.equal(cleared.statusCode,200,cleared.body);
+  assert.equal((await app.inject({url,headers:conditional})).statusCode,404);
+  assert.equal((await app.inject({url:history+"&images=links",headers})).body.includes("/images/"),false);
 });

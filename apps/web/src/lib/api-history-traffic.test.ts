@@ -28,7 +28,7 @@ it.each(['codex','claude','grok','cursor','gemini'])('%s refreshes append only n
  const deleted=await api.session('s',undefined,next);
  expect(deleted.events).toEqual([]);
  expect(urls.at(-1)).not.toContain('afterSeq');
- expect(urls.filter(u=>u.includes('/events')).every(u=>u.includes('compact=1'))).toBe(true);
+ expect(urls.filter(u=>u.includes('/events')).every(u=>u.includes('compact=1') && u.includes('images=links'))).toBe(true);
 });
 it('reconnect drains paginated deltas without skipping the cursor between pages',async()=>{
  const cursors:string[]=[];

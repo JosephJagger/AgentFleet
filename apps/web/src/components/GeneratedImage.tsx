@@ -1,12 +1,13 @@
 import { useRef, useState } from "react";
 import { Download, X } from "lucide-react";
 import { t } from "../i18n";
-import { isGeneratedImage, isStreamedGeneratedImage } from "../lib/generated-images";
+import { isGeneratedImage, isStreamedGeneratedImage, isStoredEventImage } from "../lib/generated-images";
 import type { TimelineEvent } from "../lib/types";
 import "./generated-image.css";
 
 export function GeneratedImage({ event }: { event: TimelineEvent }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const [preview, setPreview] = useState<string>();
   const [failedSource, setFailedSource] = useState<string>();
   if (event.payloadState === "deleted" || event.payloadState === "suppressed") return null;
   const url = event.images?.find(isGeneratedImage);
@@ -18,13 +19,13 @@ export function GeneratedImage({ event }: { event: TimelineEvent }) {
       : event.body || (isStreamedGeneratedImage(url) ? t("原图暂不可用，请确认主机在线且原图仍在。") : t("图片暂不可用，原图可能已移动或清理。"))
   }</p>;
   return <figure className="generated-image">
-    <button className="generated-image__open" type="button" aria-label={t("放大生成的图片")} onClick={() => dialog.current?.showModal()}>
+    <button className="generated-image__open" type="button" aria-label={t("放大生成的图片")} onClick={() => { setPreview(url); dialog.current?.showModal(); }}>
       <img src={url} alt={t("生成的图片")} loading="lazy" onError={() => setFailedSource(url)} />
     </button>
-    <figcaption><span>{t("生成的图片")}</span><a href={isStreamedGeneratedImage(url) ? `${url}&download=1` : url} download={`generated-image.${extension}`}><Download size={14} aria-hidden="true" />{t("下载图片")}</a></figcaption>
-    <dialog ref={dialog} className="image-lightbox" aria-label={t("图片预览")} onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
+    <figcaption><span>{t("生成的图片")}</span><a href={isStreamedGeneratedImage(url) ? `${url}&download=1` : url} download={isStoredEventImage(url) ? "" : `generated-image.${extension}`}><Download size={14} aria-hidden="true" />{t("下载图片")}</a></figcaption>
+    <dialog onClose={() => setPreview(undefined)} ref={dialog} className="image-lightbox" aria-label={t("图片预览")} onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
       <button type="button" className="button" aria-label={t("关闭图片预览")} onClick={() => dialog.current?.close()}><X size={18} /></button>
-      <img src={url} alt={t("图片放大预览")} />
+      {preview === url && <img src={preview} alt={t("图片放大预览")} />}
     </dialog>
   </figure>;
 }

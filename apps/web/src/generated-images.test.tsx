@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { mapEvent } from "./lib/api";
 import { timelineItems } from "./lib/timeline-items";
 import { GeneratedImage } from "./components/GeneratedImage";
+import { MessageImages } from "./components/MessageImages";
 import { isInlineImage } from "./lib/image-drafts";
 const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
 const native = (status = "completed", image = png) => ({ eventId: "event", sessionSeq: 2, type: "item.completed", nativeThreadId: "thread", nativeTurnId: "turn", nativeItemId: "image", payload: { item: { id: "image", type: "imageGeneration", status, content: image ? [{ type: "image", url: image }] : [] } } });
@@ -18,7 +19,12 @@ it("displays generated pixels directly in the conversation with enlarge and orig
   expect(screen.getByRole("img", { name: "生成的图片" }).getAttribute("src")).toBe(png);
   expect(container.querySelector("figure > button > img")).toBeTruthy();
   expect(screen.getByRole("link", { name: "下载图片" }).getAttribute("href")).toBe(png);
-  fireEvent.click(screen.getByRole("button", { name: "放大生成的图片" })); expect(showModal).toHaveBeenCalledOnce();
+  expect(container.querySelector("dialog img")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "放大生成的图片" }));
+  expect(container.querySelector("dialog img")?.getAttribute("src")).toBe(png);
+  fireEvent(container.querySelector("dialog")!, new Event("close"));
+  expect(container.querySelector("dialog img")).toBeNull();
+  expect(showModal).toHaveBeenCalledOnce();
 });
 it("retains large output images without expanding pasted image limits", () => {
   const image = png.slice(0, -4) + "AAAA".repeat(50_000);
@@ -63,4 +69,23 @@ it("renders arbitrarily large originals through an authenticated URL without emb
   view.unmount();
   expect(mapEvent({...raw,payloadState:"deleted"}).images).toEqual([]);
   expect(mapEvent({...raw,logicalSessionId:"other/path"}).images).toEqual([]);
+});
+
+it("displays stored image URLs as history only, preserving input validation", () => {
+  const url = "/api/sessions/session/images/event/" + "a".repeat(64);
+  expect(isInlineImage(url)).toBe(false);
+  const event = mapEvent(native("completed", url));
+  expect(event.images).toEqual([url]);
+  const view = render(<GeneratedImage event={event} />);
+  expect(view.container.querySelector("figure img")?.getAttribute("src")).toBe(url);
+  expect(view.container.querySelector("dialog img")).toBeNull();
+  view.unmount();
+  const raw = native("completed", url); raw.payload.item.type = "userMessage";
+  expect(mapEvent(raw).images).toEqual([url]);
+  const user = render(<MessageImages images={[url]} />);
+  expect(user.container.querySelector("img")?.getAttribute("src")).toBe(url);
+  user.rerender(<MessageImages images={[url]} onRemove={() => undefined} />);
+  expect(user.container.querySelector("img")).toBeNull();
+  for (const invalid of ["https://example.com"+url, "//example.com"+url, url+"?redirect=evil", url.replace("session", "../session")])
+    expect(mapEvent(native("completed", invalid)).images).toEqual([]);
 });
