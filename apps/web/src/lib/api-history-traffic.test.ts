@@ -43,3 +43,34 @@ it('reconnect drains paginated deltas without skipping the cursor between pages'
  const first=await api.session('s');const next=await api.session('s',undefined,first);
  expect(cursors).toEqual(['snapshot','1','2']);expect(next.events.map(e=>e.id)).toEqual(['event-1','event-2','event-3']);
 });
+it('opens history alongside details, without waiting for a slow receipt response', async()=>{
+ let release!: (value: Response)=>void;const urls:string[]=[];
+ vi.stubGlobal('fetch',vi.fn((url:string)=>{
+  urls.push(url);
+  if(url==='/api/sessions/s')return new Promise<Response>(resolve=>{release=resolve;});
+  return Promise.resolve(new Response(JSON.stringify(url.includes('/events')?{items:[event(1)],throughSeq:1,projectionEpoch:1,contentEpoch:1}:{approvals:[]})));
+ }));
+ const pending=api.session('s');
+ await vi.waitFor(()=>expect(urls.some(url=>url.includes('/events'))).toBe(true));
+ release(new Response(JSON.stringify({session:{logicalSessionId:'s',projectionEpoch:1,contentEpoch:1},commands:[]})));
+ expect((await pending).events.map(event=>event.id)).toEqual(['event-1']);
+});
+it('discards speculative history when deletion changes the content epoch',async()=>{
+ let reads=0;
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/events')
+  ? ++reads===1 ? {items:[event(1)],throughSeq:1,projectionEpoch:1,contentEpoch:1} : {items:[],throughSeq:1,projectionEpoch:1,contentEpoch:2}
+  : url.includes('/approvals')?{approvals:[]}:{session:{logicalSessionId:'s',projectionEpoch:1,contentEpoch:2},commands:[]}
+ ))));
+ expect((await api.session('s')).events).toEqual([]);expect(reads).toBe(2);
+});
+it('uses recent and active dashboard sessions once, instead of another global 100-session request',async()=>{
+ const urls:string[]=[];const row=(id:string)=>({logicalSessionId:id,title:id});
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>{
+  urls.push(url);return new Response(JSON.stringify(url==='/api/auth/status'?{authenticated:true,user:{userId:'owner'}}
+    :url==='/api/dashboard'?{machines:[],recentSessions:[row('recent')],activitySessions:[row('recent'),row('older-active')]}
+    :{}));
+ }));
+ const result=await api.dashboard();
+ expect(result.sessions.map(session=>session.id)).toEqual(['recent','older-active']);
+ expect(urls.some(url=>url.startsWith('/api/sessions'))).toBe(false);
+});

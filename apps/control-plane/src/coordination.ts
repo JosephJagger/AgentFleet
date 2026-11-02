@@ -1205,7 +1205,7 @@ export class CoordinationService {
   listCommands(principal: Principal, logicalSessionId: string): Record<string, unknown>[] {
     const session = this.db.get("SELECT 1 FROM logical_sessions WHERE logical_session_id=? AND workspace_id=?", logicalSessionId, principal.workspaceId);
     invariant(session, 404, "SESSION_NOT_FOUND", "Logical Session was not found");
-    return this.db
+    const rows = this.db
       .all<{ command_id: string }>(
         `SELECT c.command_id FROM commands c JOIN command_projection p ON p.command_id=c.command_id
          WHERE c.logical_session_id=? AND (p.state IN ('accepted','dispatching','unknown') OR c.command_id IN (
@@ -1213,14 +1213,14 @@ export class CoordinationService {
          )) ORDER BY c.created_at DESC`,
         logicalSessionId,
         logicalSessionId,
-      )
-      .map((row) => {
+      );
+    return this.db.withReadBatch(rows.map(row => row.command_id), () => rows.map((row) => {
         const command = this.getCommand(principal, row.command_id);
         const payload = command.payload as Record<string, unknown> | null;
         // Receipts don't render attachments. History remains their authoritative display.
         if (payload?.images) { const { images, ...rest } = payload; command.payload = { ...rest, imageCount: Array.isArray(images) ? images.length : 0 }; }
         return command;
-      });
+      }), [], "command_id");
   }
 
   listQueue(principal: Principal, logicalSessionId: string): Record<string, unknown>[] {
@@ -2978,7 +2978,7 @@ export class CoordinationService {
     );
   }
 
-  private getEventRecord(eventId: string, imageLinks = false): Record<string, unknown> {
+  private getEventRecord(eventId: string, imageLinks = false, timestamp = nowIso()): Record<string, unknown> {
     const row = this.db.get<{
       event_id: string;
       payload_hash: string;
@@ -3007,7 +3007,7 @@ export class CoordinationService {
     }>(
       `SELECT e.*,b.body_json FROM durable_events e LEFT JOIN content_blobs b ON b.payload_ref=e.payload_ref
        AND b.deleted_at IS NULL AND b.expires_at>? WHERE e.event_id=?`,
-      nowIso(),
+      timestamp,
       eventId,
     );
     invariant(row, 404, "EVENT_NOT_FOUND", "Event was not found");
@@ -3053,11 +3053,14 @@ export class CoordinationService {
       "SELECT event_id,session_seq FROM durable_events WHERE logical_session_id=? AND projection_epoch=? AND session_seq<? ORDER BY session_seq DESC LIMIT ?",
       logicalSessionId,session.projection_epoch,options.beforeSeq??session.next_session_seq,options.limit+1);
     const visible: typeof rows = []; const items: Record<string, unknown>[] = []; let bytes = 0;
-    for (const row of rows.slice(0,options.limit)) {
-      const item = this.getEventRecord(row.event_id, options.imageLinks); const size = Buffer.byteLength(JSON.stringify(item));
-      if (items.length && bytes + size > 2_000_000) break;
-      visible.push(row); items.push(item); bytes += size;
-    }
+    const snapshotAt = nowIso();
+    this.db.withReadBatch(rows.slice(0,options.limit).map(row => row.event_id), () => {
+      for (const row of rows.slice(0,options.limit)) {
+        const item = this.getEventRecord(row.event_id, options.imageLinks, snapshotAt); const size = Buffer.byteLength(JSON.stringify(item));
+        if (items.length && bytes + size > 2_000_000) break;
+        visible.push(row); items.push(item); bytes += size;
+      }
+    }, [], "event_id");
     items.reverse();
     return {items,events:items,nextBeforeSeq:rows.length>visible.length?visible.at(-1)?.session_seq??null:null,
       throughSeq:session.next_session_seq-1,projectionEpoch:session.projection_epoch,contentEpoch:session.content_epoch};
@@ -3075,11 +3078,14 @@ export class CoordinationService {
       "SELECT event_id,session_seq FROM durable_events WHERE logical_session_id=? AND projection_epoch=? AND session_seq>? AND session_seq<? ORDER BY session_seq LIMIT ?",
       logicalSessionId, session.projection_epoch, options.afterSeq, session.next_session_seq, options.limit + 1);
     const items: Record<string, unknown>[] = []; let bytes = 0; let cursor = options.afterSeq;
-    for (const row of rows.slice(0, options.limit)) {
-      const item = this.getEventRecord(row.event_id, options.imageLinks); const size = Buffer.byteLength(JSON.stringify(item));
-      if (items.length && bytes + size > 2_000_000) break;
-      items.push(item); bytes += size; cursor = row.session_seq;
-    }
+    const snapshotAt = nowIso();
+    this.db.withReadBatch(rows.slice(0,options.limit).map(row => row.event_id), () => {
+      for (const row of rows.slice(0, options.limit)) {
+        const item = this.getEventRecord(row.event_id, options.imageLinks, snapshotAt); const size = Buffer.byteLength(JSON.stringify(item));
+        if (items.length && bytes + size > 2_000_000) break;
+        items.push(item); bytes += size; cursor = row.session_seq;
+      }
+    }, [], "event_id");
     return { items, nextAfterSeq: rows.length > items.length ? cursor : null, throughSeq: session.next_session_seq - 1,
       projectionEpoch: session.projection_epoch, contentEpoch: session.content_epoch };
   }

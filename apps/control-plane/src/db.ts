@@ -790,7 +790,7 @@ export type DbRow = Record<string, SQLInputValue>;
 export class ControlPlaneDatabase {
   readonly sqlite: DatabaseConnection;
   readonly backend: "sqlite" | "postgresql";
-  private readScope: { ids: string[]; groups: string[][]; cache: Map<string, unknown[]> } | undefined;
+  private readScope: { ids: string[]; groups: string[][]; keyColumn: "logical_session_id" | "command_id" | "event_id"; cache: Map<string, unknown[]> } | undefined;
 
   constructor(path: string, postgres?: PostgresOptions) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
@@ -1750,10 +1750,10 @@ export class ControlPlaneDatabase {
    * SQL/parameter tuple as the key. Writes invalidate every prefetched result.
    * This keeps capability/lease decisions in their existing service methods.
    */
-  withReadBatch<T>(ids: string[], operation: () => T, groups: string[][] = []): T {
+  withReadBatch<T>(ids: string[], operation: () => T, groups: string[][] = [], keyColumn: "logical_session_id" | "command_id" | "event_id" = "logical_session_id"): T {
     if (!this.sqlite.readBatch || !ids.length) return operation();
     const previous = this.readScope;
-    this.readScope = { ids: [...new Set(ids)], groups, cache: new Map() };
+    this.readScope = { ids: [...new Set(ids)], groups, keyColumn, cache: new Map() };
     try {
       const result = operation();
       if (result && typeof (result as { then?: unknown }).then === "function") throw new Error("Read batch callbacks must be synchronous");
@@ -1775,9 +1775,9 @@ export class ControlPlaneDatabase {
       // Directory-specific predicates vary independently of the selected session.
       // Do not prefetch their cross product with every ID on the page.
       const directory = /\bproject_id\s+IN\s*\(\s*\?/i.test(sql);
-      const directSession = /\blogical_session_id\s*=\s*\?/i.test(sql);
+      const directKey = new RegExp(`\\b${scope.keyColumn}\\s*=\\s*\\?`, "i").test(sql);
       const candidates = directory ? scope.groups.find(group => group.includes(id as string)) ?? [] : scope.ids;
-      if (id && (directSession || directory) && candidates.length > 1 && scope.cache.size < 4096) {
+      if (id && (directKey || directory) && candidates.length > 1 && scope.cache.size < 4096) {
         const start = candidates.indexOf(id as string);
         const sets = candidates.slice(start, start + 32).map(next => values.map(value => value === id ? next : value));
         const groups = this.sqlite.readBatch!(sql, sets);

@@ -654,12 +654,17 @@ async function loadDashboard(): Promise<Dashboard> {
   if (!rawStatus.authenticated) {
     throw new ApiError("Authentication is required", 401, "AUTH_REQUIRED");
   }
-  const [rawDashboard, rawProjects, rawSessions, rawApprovals] = await Promise.all([
+  const [rawDashboard, rawProjects, rawApprovals] = await Promise.all([
     request<JsonObject>("/api/dashboard", read),
     request<JsonObject>("/api/projects?limit=100", read),
-    request<JsonObject>("/api/sessions?limit=100", read),
     request<JsonObject>("/api/approvals?state=pending", read),
   ]);
+  // The dashboard already contains recent and active session summaries. Do not
+  // repeat their expensive reads in a second global 100-session request.
+  const rawSessions = Array.isArray(rawDashboard.recentSessions)
+    ? { items: [...new Map([...list(rawDashboard.recentSessions), ...list(rawDashboard.activitySessions)]
+      .map(value => [string(record(value).logicalSessionId), value])).values()] }
+    : await request<JsonObject>("/api/sessions?limit=100", read);
   const me = record(rawStatus.user);
   const clientSessionId = string(rawStatus.clientSessionId);
   const projects = list(rawProjects.items ?? rawProjects.projects).map(mapProject);
@@ -868,9 +873,11 @@ export const api = {
     return list(raw.commands).map(mapCommandReceipt);
   },
   async session(id: string, signal?: AbortSignal, previous?: SessionDetail): Promise<SessionDetail> {
-    const [rawDetail, rawApprovals] = await Promise.all([
+    const initialHistory = previous?.session.id !== id;
+    const [rawDetail, rawApprovals, firstHistory] = await Promise.all([
       request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}`, { signal }),
       request<JsonObject>("/api/approvals?state=pending", { signal }),
+      initialHistory ? api.history(id, undefined, signal) : Promise.resolve(undefined),
     ]);
     const cached = dashboardCache;
     const machines = cached?.machines ?? [];
@@ -879,7 +886,8 @@ export const api = {
     const rawSession = record(rawDetail.session);
     const session = mapSession(rawSession, machines, projects, clientSessionId);
     // Keep the cursor of persisted history, never the session summary's newer sequence.
-    let history;
+    // A concurrent deletion/reprojection invalidates the speculative snapshot.
+    let history = firstHistory?.projectionEpoch === session.projectionEpoch && firstHistory?.contentEpoch === session.contentEpoch ? firstHistory : undefined;
     const page = previous?.session.id === id ? previous.historyPage : undefined;
     if (page && page.projectionEpoch === session.projectionEpoch && page.contentEpoch === session.contentEpoch
       && previous?.session.cloudImageRevision === session.cloudImageRevision) {
