@@ -437,7 +437,7 @@ export type ServerToAgentMessage =
   | { type: "error"; code: string; message: string };
 
 export type ClientToServerMessage =
-  | { type: "subscribe"; logicalSessionId: string; lastAppliedSeq?: number; projectionEpoch?: number }
+  | { type: "subscribe"; logicalSessionId: string; lastAppliedSeq?: number; projectionEpoch?: number; notificationsOnly?: boolean }
   | { type: "unsubscribe"; logicalSessionId: string }
   | { type: "ping" };
 

@@ -33,6 +33,8 @@ test("static hosting preserves SPA routes without masking missing assets", async
   await writeFile(join(webDistDir, "index.html"), "<!doctype html><title>AgentFleet test shell</title>");
   await writeFile(join(webDistDir, "manifest.webmanifest"), "{}\n");
   await writeFile(join(webDistDir, "install"), "#!/bin/sh\nset -eu\n");
+  await mkdir(join(webDistDir, "assets"));
+  await writeFile(join(webDistDir, "assets", "index-aBc12345.js"), "export default 1;");
   await mkdir(join(webDistDir, "downloads"));
   await writeFile(join(webDistDir, "downloads", "manifest.json"), '{"schemaVersion":1}\n');
   await writeFile(join(webDistDir, "downloads", "agentfleet-linux-x64-0.1.0"), "release bytes");
@@ -50,6 +52,10 @@ test("static hosting preserves SPA routes without masking missing assets", async
   assert.match(spaRoute.body, /AgentFleet test shell/);
   assert.match(spaRoute.headers["content-security-policy"] ?? "", /base-uri 'none'/);
   assert.match(spaRoute.headers["content-security-policy"] ?? "", /frame-ancestors 'none'/);
+
+  const asset = await app.inject({ method: "GET", url: "/assets/index-aBc12345.js" });
+  assert.equal(asset.headers["cache-control"], "public, max-age=31536000, immutable");
+  assert.equal(spaRoute.headers["cache-control"], "no-cache");
 
   const manifest = await app.inject({ method: "GET", url: "/manifest.webmanifest" });
   assert.equal(manifest.statusCode, 200);
@@ -96,4 +102,26 @@ test("static hosting preserves SPA routes without masking missing assets", async
   const missingApi = await app.inject({ method: "GET", url: "/api/not-a-route" });
   assert.equal(missingApi.statusCode, 404);
   assert.equal(JSON.parse(missingApi.body).error.code, "ROUTE_NOT_FOUND");
+});
+
+test('JSON read compression respects negotiation and keeps identity responses uncompressed', async t => {
+  const webDistDir = await mkdtemp(join(tmpdir(), 'agentfleet-compress-'));
+  await writeFile(join(webDistDir, 'index.html'), '<!doctype html>');
+  const { app } = await buildControlPlane(config(webDistDir));
+  t.after(()=>app.close());
+  const data = { items: Array.from({length:100},(_,n)=>({id:n,text:'retained command output '.repeat(100)})) };
+  app.get('/api/traffic-test',()=>data);
+  app.get('/api/auth/traffic-test',()=>data);
+  const plain=await app.inject({method:'GET',url:'/api/traffic-test'});
+  const zipped=await app.inject({method:'GET',url:'/api/traffic-test',headers:{'accept-encoding':'br, gzip'}});
+  const {gunzipSync}=await import('node:zlib');
+  assert.equal(zipped.headers['content-encoding'],'gzip');
+  assert.equal(zipped.headers['cache-control'],'no-store');
+  assert.equal(zipped.headers.vary,'Accept-Encoding');
+  assert.deepEqual(JSON.parse(gunzipSync(zipped.rawPayload).toString()),data);
+  assert.ok(zipped.rawPayload.length < plain.rawPayload.length / 10);
+  const denied=await app.inject({method:'GET',url:'/api/traffic-test',headers:{'accept-encoding':'gzip;q=0, br'}});
+  assert.equal(denied.headers['content-encoding'],undefined);
+  const auth=await app.inject({method:'GET',url:'/api/auth/traffic-test',headers:{'accept-encoding':'gzip'}});
+  assert.equal(auth.headers['content-encoding'],undefined);
 });

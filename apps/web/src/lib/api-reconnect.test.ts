@@ -81,3 +81,22 @@ it('unsubscribe removes all retry timers and browser event listeners', () => {
   document.dispatchEvent(new Event('visibilitychange'));vi.advanceTimersByTime(120_000);
   expect(Socket.instances).toHaveLength(1);expect(state.onConnection).not.toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
 });
+it('switching focus unsubscribes the previous session and hidden pages stop history subscriptions', () => {
+  let id = 'a';
+  stop = subscribeToFleet(() => [{id,sessionSeq:3,projectionEpoch:1} as FleetSession], vi.fn(), vi.fn());
+  const socket = Socket.instances[0]; socket.open(); socket.message({type:'pong'});
+  id = 'b'; vi.advanceTimersByTime(1000);
+  expect(socket.sent).toContainEqual({type:'unsubscribe',logicalSessionId:'a'});
+  expect(socket.sent).toContainEqual({type:'subscribe',logicalSessionId:'b',lastAppliedSeq:3,projectionEpoch:1,notificationsOnly:true});
+  vi.spyOn(document,'visibilityState','get').mockReturnValue('hidden');
+  document.dispatchEvent(new Event('visibilitychange'));
+  expect(socket.sent.at(-1)).toEqual({type:'unsubscribe',logicalSessionId:'b'});
+});
+it('machine notifications carry state without masquerading as history refreshes', () => {
+  const {onChange} = start(); const socket=Socket.instances[0];socket.open();socket.message({type:'pong'});
+  socket.message({type:'machine.changed',machine:{machineId:'host',reachability:'online'}});
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({type:'machine.changed',machine:expect.objectContaining({id:'host'})}));
+  const calls=onChange.mock.calls.length;
+  socket.message({type:'event',event:{logicalSessionId:'not-focused'}});
+  expect(onChange).toHaveBeenCalledTimes(calls);
+});

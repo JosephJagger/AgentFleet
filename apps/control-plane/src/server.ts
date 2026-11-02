@@ -1,3 +1,6 @@
+import { gzip } from 'node:zlib';
+import { promisify } from 'node:util';
+const gzipResponse = promisify(gzip);
 import { SessionSearchService } from './session-search.js';
 import { ManagedChannels } from './managed-channels.js';
 import { generatedImageAccess } from "./generated-image-access.js";
@@ -143,6 +146,7 @@ interface ClientSocketState {
   principal: Principal;
   sessionToken: string;
   subscriptions: Set<string>;
+  notificationsOnly: Set<string>;
 }
 
 export interface ControlPlaneHandle {
@@ -516,6 +520,20 @@ export async function buildControlPlane(
     ) {
       reply.header("cache-control", "no-store");
     }
+    // Compress read-only JSON responses; never buffer files or websocket streams.
+    if (request.method === "GET" && request.url.startsWith("/api/") && !request.url.startsWith("/api/auth/")
+      && typeof payload === "string" && payload.length >= 1024 && !reply.hasHeader("content-encoding")) {
+      reply.header("vary", "Accept-Encoding");
+      const accepted = String(request.headers["accept-encoding"] ?? "").split(",").some(value => {
+        const [encoding, ...params] = value.trim().split(";");
+        return encoding === "gzip" && !params.some(param => /^\s*q=0(?:\.0*)?\s*$/.test(param));
+      });
+      if (accepted) {
+        const compressed = await gzipResponse(payload, { level: 4 });
+        reply.header("content-encoding", "gzip"); reply.header("content-length", compressed.length);
+        return compressed;
+      }
+    }
     return payload;
   });
 
@@ -558,7 +576,11 @@ export async function buildControlPlane(
   const broadcastSession = (logicalSessionId: string, message: unknown): void => {
     for (const states of clients.values()) {
       for (const state of states) {
-        if (state.subscriptions.has(logicalSessionId)) sendJson(state.socket, message);
+        if (state.subscriptions.has(logicalSessionId)) {
+          const type = (message as { type?: string })?.type;
+          sendJson(state.socket, state.notificationsOnly.has(logicalSessionId) && type && type !== "volatile"
+            ? { type, logicalSessionId } : message);
+        }
       }
     }
   };
@@ -1725,13 +1747,18 @@ export async function buildControlPlane(
   });
   app.get("/api/sessions/:id/events", { preHandler: authenticate }, async (request) => {
     const query = request.query as Record<string, unknown>;
+    if (query.compact === "1" && query.afterSeq !== undefined) return coordination.historyAfter(request.principal as Principal, routeId(request), {
+      afterSeq: Number(query.afterSeq), limit: pageLimit(query.limit), projectionEpoch: Number(query.projectionEpoch), contentEpoch: Number(query.contentEpoch),
+    });
     if(query.limit!==undefined || query.beforeSeq!==undefined) {
-      return coordination.historyPage(request.principal as Principal,routeId(request),{
+      const page = coordination.historyPage(request.principal as Principal,routeId(request),{
         limit:pageLimit(query.limit),
         ...(query.beforeSeq===undefined?{}:{beforeSeq:Number(query.beforeSeq)}),
         ...(query.projectionEpoch===undefined?{}:{projectionEpoch:Number(query.projectionEpoch)}),
         ...(query.contentEpoch===undefined?{}:{contentEpoch:Number(query.contentEpoch)}),
       });
+      if (query.compact === "1") { const { events, ...singleCopy } = page; return singleCopy; }
+      return page;
     }
     return {
       events: coordination.replayEvents(
@@ -2013,7 +2040,7 @@ export async function buildControlPlane(
     (socket, request) => {
       const principal = request.principal as Principal;
       const sessionToken = request.cookies[config.cookieName] as string;
-      const state: ClientSocketState = { socket, principal, sessionToken, subscriptions: new Set() };
+      const state: ClientSocketState = { socket, principal, sessionToken, subscriptions: new Set(), notificationsOnly: new Set() };
       let set = clients.get(principal.clientSessionId);
       if (!set) {
         set = new Set();
@@ -2033,16 +2060,19 @@ export async function buildControlPlane(
           } else if (message.type === "subscribe") {
             const logicalSessionId = requiredString(message.logicalSessionId, "logicalSessionId", 200);
             const session = registry.getSession(current, logicalSessionId);
-            const events = coordination.replayEvents(
+            const events = message.notificationsOnly === true ? [] : coordination.replayEvents(
               current,
               logicalSessionId,
               message.lastAppliedSeq ?? 0,
               message.projectionEpoch,
             );
             state.subscriptions.add(logicalSessionId);
+            if (message.notificationsOnly === true) state.notificationsOnly.add(logicalSessionId);
+            else state.notificationsOnly.delete(logicalSessionId);
             sendJson(socket, { type: "snapshot", session, events });
           } else if (message.type === "unsubscribe") {
             state.subscriptions.delete(requiredString(message.logicalSessionId, "logicalSessionId", 200));
+            state.notificationsOnly.delete(message.logicalSessionId);
           } else {
             throw new AppError(400, "WS_MESSAGE_TYPE_DENIED", "Client WebSocket only accepts subscribe, unsubscribe, and ping");
           }
@@ -2620,7 +2650,7 @@ export async function buildControlPlane(
       reply.header("content-length", stat.size);
       reply.header(
         "cache-control",
-        immutableReleasePath.test(relativePath)
+        immutableReleasePath.test(relativePath) || /^assets\/[^/]+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?)$/.test(relativePath)
           ? "public, max-age=31536000, immutable"
           : "no-cache",
       );

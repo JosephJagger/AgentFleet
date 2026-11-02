@@ -853,7 +853,7 @@ export const api = {
     return { items: list(raw.items ?? raw.sessions).map((item) => mapSession(item, cached?.machines ?? [], cached?.machines.flatMap((machine) => machine.projects) ?? [], cached?.user.clientSessionId ?? "")), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null, total: integer(raw.total) };
   },
   async history(id: string, beforeSeq?: number | null, signal?: AbortSignal) {
-    const query = new URLSearchParams({ limit: "100" });
+    const query = new URLSearchParams({ limit: "100", compact: "1" });
     if (beforeSeq !== undefined && beforeSeq !== null) query.set("beforeSeq", String(beforeSeq));
     const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}/events?${query}`, { signal });
     return { events: list(raw.items ?? raw.events).map(mapEvent), nextBeforeSeq: typeof raw.nextBeforeSeq === "number" ? raw.nextBeforeSeq : null, projectionEpoch: integer(raw.projectionEpoch), contentEpoch: integer(raw.contentEpoch), throughSeq: integer(raw.throughSeq) };
@@ -867,11 +867,10 @@ export const api = {
     const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}`, { signal: timeoutSignal(signal, 15_000) });
     return list(raw.commands).map(mapCommandReceipt);
   },
-  async session(id: string, signal?: AbortSignal): Promise<SessionDetail> {
-    const [rawDetail, rawApprovals, history] = await Promise.all([
+  async session(id: string, signal?: AbortSignal, previous?: SessionDetail): Promise<SessionDetail> {
+    const [rawDetail, rawApprovals] = await Promise.all([
       request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}`, { signal }),
       request<JsonObject>("/api/approvals?state=pending", { signal }),
-      api.history(id, undefined, signal),
     ]);
     const cached = dashboardCache;
     const machines = cached?.machines ?? [];
@@ -879,6 +878,29 @@ export const api = {
     const clientSessionId = cached?.user.clientSessionId ?? "";
     const rawSession = record(rawDetail.session);
     const session = mapSession(rawSession, machines, projects, clientSessionId);
+    // Keep the cursor of persisted history, never the session summary's newer sequence.
+    let history;
+    const page = previous?.session.id === id ? previous.historyPage : undefined;
+    if (page && page.projectionEpoch === session.projectionEpoch && page.contentEpoch === session.contentEpoch
+      && previous?.session.cloudImageRevision === session.cloudImageRevision) {
+      try {
+        let cursor = page.throughSeq;
+        const events = previous!.events.filter(event => !event.id.startsWith("volatile-"));
+        for (let count = 0; count < 20; count++) {
+          const query = new URLSearchParams({ limit: "100", compact: "1", afterSeq: String(cursor), projectionEpoch: String(page.projectionEpoch), contentEpoch: String(page.contentEpoch) });
+          const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}/events?${query}`, { signal });
+          events.push(...list(raw.items).map(mapEvent));
+          const next = typeof raw.nextAfterSeq === "number" ? raw.nextAfterSeq : null;
+          if (next === null) { history = { ...page, events, throughSeq: integer(raw.throughSeq) }; break; }
+          if (next <= cursor) break;
+          cursor = next;
+        }
+      } catch (error) {
+        if (!(error instanceof ApiError && ["PROJECTION_EPOCH_CHANGED", "CONTENT_EPOCH_CHANGED", "INVALID_CURSOR"].includes(error.code ?? ""))) throw error;
+      }
+    }
+    history ??= await api.history(id, undefined, signal);
+
     const approvals = list(rawApprovals.approvals).map((approval) => mapApproval(approval, [session], machines, projects));
     const machine = machines.find((item) => item.id === session.machineId);
     const releaseManagementSupported = session.actions?.release?.reasonCode !== "UNSUPPORTED_COMMAND" && (session.actions?.release !== undefined || versionAtLeast(machine?.agentVersion, "0.16.2"));
@@ -1154,7 +1176,7 @@ export interface VolatileUpdate {
 
 export function subscribeToFleet(
   sessions: FleetSession[] | (() => FleetSession[]),
-  onChange: () => void,
+  onChange: (change?: { type: string; machine?: Machine; logicalSessionId?: string }) => void,
   onConnection: (connected: boolean) => void,
   onVolatile?: (update: VolatileUpdate) => void,
 ): () => void {
@@ -1205,9 +1227,14 @@ export function subscribeToFleet(
   function syncSubscriptions() {
     const current = socket;
     if (!current || current.readyState !== WebSocket.OPEN) return;
-    for (const session of typeof sessions === "function" ? sessions() : sessions) {
+    const focused = document.visibilityState === "hidden" ? [] : typeof sessions === "function" ? sessions() : sessions;
+    const ids = new Set(focused.map(session => session.id));
+    for (const id of subscribed) {
+      if (!ids.has(id)) { if (!send(current, { type: "unsubscribe", logicalSessionId: id })) return; subscribed.delete(id); }
+    }
+    for (const session of focused) {
       if (subscribed.has(session.id)) continue;
-      if (!send(current, { type: "subscribe", logicalSessionId: session.id, lastAppliedSeq: session.sessionSeq, projectionEpoch: session.projectionEpoch })) return;
+      if (!send(current, { type: "subscribe", logicalSessionId: session.id, lastAppliedSeq: session.sessionSeq, projectionEpoch: session.projectionEpoch, notificationsOnly: true })) return;
       subscribed.add(session.id);
     }
   }
@@ -1255,7 +1282,8 @@ export function subscribeToFleet(
           const logicalSessionId = string(message.logicalSessionId);
           const nativeTurnId = string(message.nativeTurnId);
           if (
-            logicalSessionId
+            document.visibilityState !== "hidden" && subscribed.has(logicalSessionId)
+            && logicalSessionId
             && nativeTurnId
             && ["agent_message.delta", "command_output.delta", "turn_diff.delta"].includes(eventType)
           ) {
@@ -1268,7 +1296,17 @@ export function subscribeToFleet(
             });
           }
         } else if (["snapshot", "event", "session.changed", "lease.changed", "queue.changed", "machine.changed", "command.changed", "approval.changed", "content.deleted"].includes(string(message.type))) {
-          onChange();
+          const type = string(message.type);
+          if (document.visibilityState === "hidden") return;
+          if (type === "machine.changed") {
+            const machine = mapMachine(message.machine, dashboardCache?.machines.flatMap(m => m.projects) ?? []);
+            if (dashboardCache) dashboardCache = { ...dashboardCache, machines: dashboardCache.machines.map(m => m.id === machine.id ? machine : m) };
+            onChange({ type, machine });
+          } else {
+            const id = string(message.logicalSessionId, string(record(message.event).logicalSessionId, string(record(message.session).logicalSessionId)));
+            if (id && !subscribed.has(id)) return;
+            onChange({ type, logicalSessionId: id || undefined });
+          }
         }
       } catch {
         // Unknown frames never mutate UI state.
@@ -1279,7 +1317,9 @@ export function subscribeToFleet(
   }
 
   function resume() {
-    if (stopped || offline || document.visibilityState === "hidden") return;
+    if (stopped || offline) return;
+    syncSubscriptions();
+    if (document.visibilityState === "hidden") return;
     if (!socket) scheduleReconnect(true);
     else probe();
   }

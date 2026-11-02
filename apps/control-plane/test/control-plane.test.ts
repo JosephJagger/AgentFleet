@@ -622,6 +622,12 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   clientSocket.send(JSON.stringify({ type: "subscribe", logicalSessionId: session.logicalSessionId }));
   await clientInbox.next("snapshot");
 
+  const compactInbox = new WsInbox();
+  const compactSocket = await app.injectWS("/ws/client", { headers: { cookie, origin } }, {onInit: socket => compactInbox.attach(socket)});
+  sockets.push(compactSocket); await compactInbox.next("welcome");
+  compactSocket.send(JSON.stringify({type:"subscribe",logicalSessionId:session.logicalSessionId,notificationsOnly:true}));
+  assert.deepEqual((await compactInbox.next("snapshot")).events,[]);
+
   agentSocket.send(JSON.stringify({
     type: "volatile",
     eventType: "agent_message.delta",
@@ -635,6 +641,7 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
     nativeItemId: "native-item-1",
     payload: { delta: "streamed, never persisted" },
   }));
+  assert.equal(((await compactInbox.next("volatile")).payload as Record<string,unknown>).delta,"streamed, never persisted");
   const volatile = await clientInbox.next("volatile");
   assert.equal((volatile.payload as Record<string, unknown>).delta, "streamed, never persisted");
   assert.equal(db.get<{ count: number }>("SELECT COUNT(*) AS count FROM durable_events")?.count, 0);
@@ -673,6 +680,13 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   assert.equal(eventOneAck.sessionSeq, 1);
   await homeInbox.next("machine.changed");
   await clientInbox.next("event");
+  assert.deepEqual(await compactInbox.next("event"),{type:"event",logicalSessionId:session.logicalSessionId});
+  compactSocket.send(JSON.stringify({type:"subscribe",logicalSessionId:session.logicalSessionId,notificationsOnly:true,lastAppliedSeq:0}));
+  assert.deepEqual((await compactInbox.next("snapshot")).events,[]);
+  const compactHistory = await app.inject({method:"GET",url:`/api/sessions/${session.logicalSessionId}/events?limit=100&compact=1`,headers:browserHeaders});
+  assert.equal(compactHistory.statusCode,200); assert.equal(JSON.parse(compactHistory.body).events,undefined);
+  assert.equal(JSON.parse(compactHistory.body).items.length,1);
+
 
   // The native stream is readable before completion, without replaying any host command.
   const liveProgress = await app.inject({ method: "GET", url: `/api/sessions/${session.logicalSessionId}/progress`, headers: browserHeaders });

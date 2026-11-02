@@ -1662,7 +1662,8 @@ function App() {
     inFlightDetail.current = pending;
     pending.promise = (async () => {
       try {
-        const incoming = await api.session(id, controller.signal);
+        const previous = detailRef.current;
+        const incoming = previous?.session.id === id ? await api.session(id, controller.signal, previous) : await api.session(id, controller.signal);
         if (generation === detailRequest.current.generation && id === selectedSessionRef.current) {
           setSelectedMachineId(incoming.session.machineId);
           setDetail((current) => {
@@ -1743,12 +1744,22 @@ function App() {
   useEffect(() => {
     if (!dashboard) return;
     let refreshTimer: number | undefined;
-    const unsubscribe = subscribeToFleet(() => { const focused = detailRef.current?.session ?? dashboardRef.current?.sessions.find((session) => session.id === selectedSessionRef.current); return focused ? [focused] : []; }, () => {
-      // Coalesce bursts without indefinitely postponing refresh during streaming.
+    const unsubscribe = subscribeToFleet(() => { const focused = detailRef.current?.session ?? dashboardRef.current?.sessions.find((session) => session.id === selectedSessionRef.current); return focused ? [focused] : []; }, (change) => {
+      if (document.visibilityState === "hidden") return;
+      if (change?.type === "machine.changed") {
+        const machine = change.machine;
+        if (machine) setDashboard(current => current ? { ...current, machines: current.machines.map(m => m.id === machine.id ? machine : m) } : current);
+        return;
+      }
+      // Persisted events refresh only the focused detail. Deltas render immediately.
+      if (!change) void loadDashboard(true);
       if (refreshTimer !== undefined) return;
-      refreshTimer = window.setTimeout(() => { refreshTimer = undefined; void loadDashboard(true); void loadDetail(selectedSessionRef.current, true); }, 120);
+      refreshTimer = window.setTimeout(() => { refreshTimer = undefined; void loadDetail(selectedSessionRef.current, true); }, 750);
     }, setConnected, applyVolatile);
-    return () => { window.clearTimeout(refreshTimer); unsubscribe(); };
+    const reconcile = window.setInterval(() => {
+      if (document.visibilityState !== "hidden") { void loadDashboard(true); void loadDetail(selectedSessionRef.current, true); }
+    }, 30_000);
+    return () => { window.clearTimeout(refreshTimer); window.clearInterval(reconcile); unsubscribe(); };
   }, [dashboard?.user.id, loadDashboard, loadDetail, applyVolatile]);
   useEffect(() => {
     if (!dashboard) return;
@@ -1763,7 +1774,7 @@ function App() {
     const controller = new AbortController();
     let checking = false;
     const refresh = async () => {
-      if (checking) return;
+      if (checking || document.visibilityState === "hidden") return;
       checking = true;
       try {
         // Receipts must settle even if history is slow, unavailable, or streaming.
@@ -1772,7 +1783,7 @@ function App() {
           ? { ...current, commands: mergeCommandReceipts(current.commands ?? [], commands) } : current);
       } catch { /* Keep the actual pending state and retry this read, never resend. */ }
       finally { checking = false; }
-      if (!controller.signal.aborted && selectedSessionRef.current === id) { void loadDetail(id, true); void loadDashboard(true); }
+      if (!controller.signal.aborted && selectedSessionRef.current === id) { void loadDetail(id, true); }
     };
     void refresh();
     const timer = window.setInterval(() => { void refresh(); }, 3_000);

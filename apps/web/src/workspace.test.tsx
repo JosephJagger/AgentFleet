@@ -768,6 +768,17 @@ describe("会话工作区", () => {
     expect(screen.getByText(/不是退出面板账号.*未向宿主机发送/)).toBeTruthy();
     expect(send).not.toHaveBeenCalled();
   });
+  it("所有智能体的主机心跳不再触发总览和历史重读", async () => {
+    history.replaceState(null, "", "/sessions/A");
+    render(<App />); await screen.findByRole("heading", { name: "会话A" });
+    const onUpdate = vi.mocked(subscribeToFleet).mock.calls[0][1];
+    vi.mocked(api.dashboard).mockClear(); vi.mocked(api.session).mockClear();
+    await act(async () => {
+      for (let index=0;index<20;index++) onUpdate({type:"machine.changed",machine:dashboard().machines[0]});
+      await new Promise(resolve=>setTimeout(resolve,850));
+    });
+    expect(api.dashboard).not.toHaveBeenCalled(); expect(api.session).not.toHaveBeenCalled();
+  });
   it("普通刷新不选会话，项目保持收起", async () => {
     render(<App />);
     await screen.findByText("选择一个会话");

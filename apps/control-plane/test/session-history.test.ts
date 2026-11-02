@@ -122,3 +122,19 @@ test('failed native reads cannot fall back after content sharing is revoked',asy
  const service=new SessionHistoryService(f.db,f.registry,async()=>{f.db.run('UPDATE projects SET sync_content=0');throw new AppError(504,'HISTORY_TIMEOUT','fixture');});
  await assert.rejects(service.read(f.principal,{sessionId:f.session.logicalSessionId}),{code:'HISTORY_TARGET_CHANGED'});
 });
+test('incremental history is bounded, cursor ordered, single-copy, and rejects stale epochs or another workspace', t=>{
+ const f=fixture();t.after(()=>f.db.close());dialogue(f);
+ f.db.run('UPDATE logical_sessions SET next_session_seq=5 WHERE logical_session_id=?',f.session.logicalSessionId);
+ const service=new CoordinationService(f.db,f.config);
+ const options={afterSeq:1,limit:2,projectionEpoch:1,contentEpoch:1};
+ const first=service.historyAfter(f.principal,f.session.logicalSessionId,options);
+ assert.deepEqual((first.items as {sessionSeq:number}[]).map(e=>e.sessionSeq),[2,3]);
+ assert.equal(first.nextAfterSeq,3);assert.equal(first.events,undefined);
+ const second=service.historyAfter(f.principal,f.session.logicalSessionId,{...options,afterSeq:3});
+ assert.deepEqual((second.items as {sessionSeq:number}[]).map(e=>e.sessionSeq),[4]);assert.equal(second.nextAfterSeq,null);
+ const idle=service.historyAfter(f.principal,f.session.logicalSessionId,{...options,afterSeq:4});assert.deepEqual(idle.items,[]);
+ assert.throws(()=>service.historyAfter(f.principal,f.session.logicalSessionId,{...options,contentEpoch:2}),{code:'CONTENT_EPOCH_CHANGED'});
+ assert.throws(()=>service.historyAfter(f.principal,f.session.logicalSessionId,{...options,projectionEpoch:2}),{code:'PROJECTION_EPOCH_CHANGED'});
+ assert.throws(()=>service.historyAfter({...f.principal,workspaceId:'other'},f.session.logicalSessionId,options),{code:'SESSION_NOT_FOUND'});
+ assert.throws(()=>service.historyAfter(f.principal,f.session.logicalSessionId,{...options,afterSeq:50}),{code:'INVALID_CURSOR'});
+});
