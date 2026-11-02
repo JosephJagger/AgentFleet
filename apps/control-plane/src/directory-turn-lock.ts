@@ -16,6 +16,25 @@ export function directoryProjectIds(db: ControlPlaneDatabase, projectId: string)
     .filter(project => normalize(project.canonical_root) === root).map(project => project.project_id);
 }
 
+/** Both directory verdicts (own active voice allowed / not allowed) from one pass. Equivalent to two directoryTurnConflict calls. */
+export function directoryTurnConflicts(db: ControlPlaneDatabase, projectId: string, sessionId: string):
+  { start: ReturnType<typeof directoryTurnConflict>; directory: ReturnType<typeof directoryTurnConflict> } {
+  const ids = directoryProjectIds(db, projectId);
+  const placeholders = ids.map(() => "?").join(",");
+  const reservation = db.get<{ project_id: string; logical_session_id: string; state: string; [key: string]: unknown }>(
+    `SELECT * FROM project_turn_reservations WHERE project_id IN (${placeholders}) LIMIT 1`, ...ids);
+  if (reservation) return { start: reservation, directory: reservation };
+  const running = db.get<{ project_id: string; logical_session_id: string; state: string }>(
+    `SELECT project_id,logical_session_id,execution_state AS state FROM logical_sessions
+     WHERE project_id IN (${placeholders}) AND logical_session_id<>?
+       AND (active_turn_id IS NOT NULL OR execution_state IN ('running','awaiting_approval')
+         OR (execution_state='unknown' AND (managed=1 OR reachability<>'unreachable'))) LIMIT 1`, ...ids, sessionId);
+  if (running) return { start: running, directory: running };
+  const voices = db.all<{ project_id: string; logical_session_id: string; state: string }>(
+    `SELECT project_id,logical_session_id,state FROM voice_sessions WHERE project_id IN (${placeholders}) AND state<>'closed'`, ...ids);
+  return { directory: voices[0], start: voices.find(voice => !(voice.logical_session_id === sessionId && voice.state === "active")) };
+}
+
 /** Called within the same BEGIN IMMEDIATE transaction that inserts a reservation. */
 export function directoryTurnConflict(db: ControlPlaneDatabase, projectId: string, sessionId: string,
   allowOwnVoice = false): { project_id: string; logical_session_id: string; state: string; [key: string]: unknown } | undefined {

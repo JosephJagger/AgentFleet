@@ -1,5 +1,5 @@
 import {isAcpProvider,supportsProviderCommand} from "./provider-catalog.js";
-import { directoryTurnConflict } from "./directory-turn-lock.js";
+import { directoryTurnConflicts } from "./directory-turn-lock.js";
 import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
@@ -59,8 +59,11 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     JOIN projects p ON p.project_id=s.project_id
     JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL
     WHERE s.logical_session_id=? ORDER BY e.created_at DESC LIMIT 1`, sessionId);
-  const startConflict = row && directoryTurnConflict(db, row.project_id, sessionId, true);
-  const directoryConflict = row && directoryTurnConflict(db, row.project_id, sessionId);
+  // Most rows are blocked before the directory check, so resolve it only when reached.
+  let conflicts: ReturnType<typeof directoryTurnConflicts> | undefined;
+  const directoryVerdict = (own: boolean) => row ? (conflicts ??= directoryTurnConflicts(db, row.project_id, sessionId))[own ? "start" : "directory"] : undefined;
+  let discovery: Record<string, any> | undefined;
+  const discoveryOf = () => discovery ??= JSON.parse(row?.discovery_json ?? "{}") ?? {};
   const actions = {} as SessionActions;
   const heldElsewhere = row?.holder && !sameLeaseAccount(db, row.holder, clientSessionId);
   actions.read = allowed;
@@ -68,10 +71,10 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     const action = actionName as Exclude<SessionAction, "read">;
     let availability = allowed;
     if (!row) availability = blocked("SESSION_NOT_FOUND", "会话不存在");
-    else if (isAcpProvider(row.provider) && !supportsProviderCommand(JSON.parse(row.discovery_json ?? '{}')?.agentRuntimes?.[row.provider],command,Boolean(row.native_thread_id))) availability = blocked('AGENT_CAPABILITY_UNAVAILABLE','原生智能体尚未报告支持此操作');
+    else if (isAcpProvider(row.provider) && !supportsProviderCommand(discoveryOf()?.agentRuntimes?.[row.provider],command,Boolean(row.native_thread_id))) availability = blocked('AGENT_CAPABILITY_UNAVAILABLE','原生智能体尚未报告支持此操作');
     else if (row.provider === "claude" && ["deletePreview", "delete", "rename", "archive", "unarchive", "fork", "compact", "review", "inspect", "manage", "stop"].includes(action)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "Claude Code 尚不支持此操作");
-    else if (row.provider === "claude" && action === "steer" && !(row.discovery_json && JSON.parse(row.discovery_json)?.agentRuntimes?.claude?.steerSupported === true)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "Claude Code 尚未上报原生追加支持，请更新连接服务或加入队列");
-    else if (row.provider === "claude" && !(row.discovery_json && JSON.parse(row.discovery_json)?.agentRuntimes?.claude?.installed === true)) availability = blocked("CLAUDE_NOT_INSTALLED", "宿主机未安装 Claude Code");
+    else if (row.provider === "claude" && action === "steer" && !(row.discovery_json && discoveryOf()?.agentRuntimes?.claude?.steerSupported === true)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "Claude Code 尚未上报原生追加支持，请更新连接服务或加入队列");
+    else if (row.provider === "claude" && !(row.discovery_json && discoveryOf()?.agentRuntimes?.claude?.installed === true)) availability = blocked("CLAUDE_NOT_INSTALLED", "宿主机未安装 Claude Code");
     else if (!supportsCommand(row.command_types_json, command)) availability = blocked("AGENT_CAPABILITY_UNAVAILABLE", "主机尚未报告支持此操作，请更新连接服务");
     else if (row.identity_state !== "active") availability = blocked("MACHINE_REVOKED", "主机连接已移除");
     else if (row.machine_reachability !== "online") availability = blocked("MACHINE_OFFLINE", "等待主机重新连接");
@@ -93,7 +96,7 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     else if (["deletePreview", "delete", "release", "rename", "archive", "unarchive", "fork"].includes(action) && (row.pending_approvals || row.queued)) availability = blocked("SESSION_HAS_PENDING_WORK", "请先处理待审批与排队任务");
     else if (["deletePreview", "delete", "rename", "archive", "unarchive", "fork", "compact", "review", "stop"].includes(action) && !row.native_thread_id) availability = blocked("THREAD_NOT_AVAILABLE", "先发送一条消息建立宿主机会话");
     else if (["claim", "start", "queue", "release", "archive", "fork", "compact", "review"].includes(action) && row.runtime_settings_json && JSON.parse(row.runtime_settings_json)?.archived === true) availability = blocked("THREAD_ARCHIVED", row.managed ? "先恢复宿主机归档会话" : "请先在宿主机恢复归档，再接管原会话");
-    else if (["claim", "start", "compact", "review"].includes(action) && (action === "start" ? startConflict : directoryConflict)) availability = blocked("PROJECT_TURN_RESERVED", "此目录已有执行中或待核验任务，请等待完成；Codex 与 Claude Code 共用目录时不能并行执行");
+    else if (["claim", "start", "compact", "review"].includes(action) && directoryVerdict(action === "start")) availability = blocked("PROJECT_TURN_RESERVED", "此目录已有执行中或待核验任务，请等待完成；Codex 与 Claude Code 共用目录时不能并行执行");
     else if (action === "approve" && !row.pending_approvals) availability = blocked("NO_PENDING_APPROVAL", "当前没有待审批操作");
     actions[action] = availability;
   }
