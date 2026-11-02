@@ -122,3 +122,26 @@ it.each(["sections.read", "plugin.catalog", "mcp.catalog"] as const)("preserves 
     expect(screen.getByText(t("宿主机返回") + ": " + t("已读取"))).toBeTruthy();
   } finally { await setLocale("zh-CN"); }
 });
+
+it('expired host reset-card read shows a localized auth error instead of a stale waiting notice', async () => {
+ const machine={id:'host',reachability:'live',maintenanceCapabilities:['codex.host']} as Machine;
+ const changed=vi.fn();vi.mocked(api.hostCodexOperation).mockResolvedValue({id:'cards',state:'accepted'} as HostOperation);
+ const view=render(<CodexOperationsPanel machine={machine} initialOperation="resetCards.read" onChanged={changed}/>);
+ fireEvent.click(screen.getByText('Codex 工具与账号',{selector:'summary > span'}));
+ fireEvent.click(screen.getByRole('button',{name:'查看重置卡'}));
+ await waitFor(()=>expect(changed).toHaveBeenCalledOnce());
+ expect(screen.getByText('请求已提交，正在等待宿主机回执。')).toBeTruthy();
+ view.rerender(<CodexOperationsPanel machine={machine} initialOperation="resetCards.read" onChanged={changed} hostOperations={[{id:'cards',type:'codex.host',state:'failed',error:{code:'APP_SERVER_RPC_ERROR',message:'401 Unauthorized {"code":"token_expired"}'}} as HostOperation]}/>);
+ expect(screen.getByRole('alert').textContent).toBe(t('Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。'));
+ expect(screen.queryByText('请求已提交，正在等待宿主机回执。')).toBeNull();
+ expect((screen.getByRole('button',{name:'查看重置卡'}) as HTMLButtonElement).disabled).toBe(false);
+});
+it('a completed host operation without result does not keep a waiting notice', async () => {
+ const machine={id:'host',reachability:'live',maintenanceCapabilities:['codex.host']} as Machine;
+ const changed=vi.fn();vi.mocked(api.hostCodexOperation).mockResolvedValue({id:'cards',state:'accepted'} as HostOperation);
+ const view=render(<CodexOperationsPanel machine={machine} initialOperation="resetCards.read" onChanged={changed}/>);
+ fireEvent.click(screen.getByText('Codex 工具与账号',{selector:'summary > span'}));fireEvent.click(screen.getByRole('button',{name:'查看重置卡'}));
+ await waitFor(()=>expect(changed).toHaveBeenCalledOnce());
+ view.rerender(<CodexOperationsPanel machine={machine} initialOperation="resetCards.read" onChanged={changed} hostOperations={[{id:'cards',type:'codex.host',state:'succeeded'} as HostOperation]}/>);
+ expect(screen.queryByText('请求已提交，正在等待宿主机回执。')).toBeNull();
+});

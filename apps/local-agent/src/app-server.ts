@@ -1,3 +1,4 @@
+import { recoverCodexAccountReads } from "./codex-account-read.js";
 import type {CursorSettings} from "./cursor-settings.js";
 import { sshAccess } from "./ssh-access.js";
 import {preferenceInstructions} from './voice-preference-rules.js';
@@ -1243,7 +1244,13 @@ export class CodexAppServer implements AppServerClient {
   private readonly activityTimes = new Map<string, number>();
   private readonly turnReferences = new Map<string, import("./attachments.js").MaterializedAttachment[]>();
 
-  private async request(method: string, params: Record<string, unknown> | null): Promise<unknown> {
+  private readonly accountReadRpc = recoverCodexAccountReads((method, params) => this.requestRaw(method, params));
+
+  private request(method: string, params: Record<string, unknown> | null): Promise<unknown> {
+    return this.accountReadRpc(method, params);
+  }
+
+  private async requestRaw(method: string, params: Record<string, unknown> | null): Promise<unknown> {
     if (!APP_SERVER_METHODS.has(method)) throw new AgentError("RPC_FORBIDDEN", `app-server RPC '${method}' is not allowed`);
     if(this.daemon){
       const reads=["initialize","model/list","collaborationMode/list","plugin/list","plugin/read","account/read","account/rateLimits/read","thread/read","thread/items/list","thread/turns/list"];

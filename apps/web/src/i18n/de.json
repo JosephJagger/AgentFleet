@@ -4478,5 +4478,6 @@
   "失效日期：{0}": "Gültig bis: {0}",
   "卡片 ID：{0}": "Karten-ID: {0}",
   "不过期（原生注明）": "Läuft nicht ab (native Angabe)",
-  "未返回有效期": "Gültigkeitsdauer nicht angegeben"
+  "未返回有效期": "Gültigkeitsdauer nicht angegeben",
+  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Ihre Codex-Anmeldung ist abgelaufen. Verbinden Sie Ihr ChatGPT-Konto auf diesem Host erneut und versuchen Sie es noch einmal."
 }

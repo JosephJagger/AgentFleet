@@ -49,6 +49,12 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
   const hostReceipt = hostOperations.find(c => c.id === submitted);
   const hostPending = hostOperations.some(c => c.type === "codex.host" && ["accepted", "running", "unknown"].includes(c.state));
   const pending = hostPending || commands.some(c => c.type === "codex.manage" && ["accepted", "dispatching", "unknown"].includes(c.state));
+  const waitingForReceipt = submitted && (machine
+    ? !hostReceipt || ["accepted", "running"].includes(hostReceipt.state)
+    : !receipt || ["accepted", "dispatching"].includes(receipt.state));
+  const operationError = hostReceipt?.error?.message ?? receipt?.message;
+  const errorText = operationError && (/\btoken_expired\b|authentication token has expired|Codex login has expired/i.test(operationError)
+    ? t("Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。") : systemText(operationError));
   const result = (hostReceipt?.result?.codexResult as CommandReceipt["codexResult"]) ?? receipt?.codexResult;
   const allowed = machine ? machine.reachability === "live" && machine.maintenanceCapabilities?.includes("codex.host") === true : session?.actions?.manage?.allowed === true;
   const editable = (!experimentalOperation(operation) || experimental) && (operation !== "turn.settings" || !!session?.activeTurnId) && allowed && !busy && !pending;
@@ -99,7 +105,7 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
     if (["experiment.configure", "memory.mode"].includes(operation)) args.enabled = fields.enabled !== "false";
     if (operation === "skill.toggle") args.enabled = fields.enabled !== "false";
     if (needsConfirmation(operation)) args.confirmed = true;
-    setBusy(true); setMessage("");
+    setBusy(true); setMessage(""); setSubmitted(undefined);
     try {
       if (machine) {
         const response = await api.hostCodexOperation(machine.id, { operation, arguments: args }, crypto.randomUUID());
@@ -109,7 +115,7 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
         precondition: { nativeThreadId: session.nativeThreadId, executionSegmentId: session.executionSegmentId, threadControlVersion: session.threadControlVersion, expectedActiveTurnId: session?.activeTurnId ?? null, projectLeaseVersion: session.projectLeaseVersion } });
       setSubmitted(response.command.id);
       }
-      setMessage(t("请求已提交，正在等待宿主机回执。")); onChanged();
+      onChanged();
     } catch (e) { setMessage(e instanceof Error ? e.message : t("操作失败")); }
     finally { setBusy(false); }
   }
@@ -158,8 +164,10 @@ export function CodexOperationsPanel({ session, commands = [], machine, hostOper
       {!allowed && <p>{systemText(session?.actions?.manage?.message) || t(machine ? "请连接主机并更新连接服务后使用主机级管理。" : "请更新主机连接服务并接管此会话。")}</p>}
       <button type="submit" className="button button--quiet" disabled={!editable || needsConfirmation(operation) && !confirmed}>{busy || pending ? t("等待主机回执") : t(operations[operation])}</button>
     </form>
-    {hostReceipt?.error && <p role="alert">{systemText(hostReceipt.error.message)}</p>}
-    {receipt?.message ? <p role="alert">{systemText(receipt.message)}</p> : message && !result && <p role="status">{message}</p>}
+    {errorText && <p role="alert">{errorText}</p>}
+    {!errorText && message && <p role="status">{message}</p>}
+    {!errorText && !message && !result && waitingForReceipt && <p role="status">{t("请求已提交，正在等待宿主机回执。")}</p>}
+    {!errorText && !message && !result && (hostReceipt?.state === "unknown" || receipt?.state === "unknown") && <p role="status">{t("结果待核验")}</p>}
     {result && <div className="codex-operation-result" aria-live="polite"><p>{t("宿主机返回")}: {t(statusLabel(result.status))}</p>{result.rows.length > 0 && <dl>{result.rows.map((row, index) => <div key={index}><dt>{codexOperationRowText(result.operation, row, "name")}<small>{codexOperationRowText(result.operation, row, "status")}</small></dt><dd>{codexOperationRowText(result.operation, row, "detail")}</dd></div>)}</dl>}{result.url && <a className="button button--quiet" href={result.url} target="_blank" rel="noopener noreferrer">{t("打开授权页面")}</a>}{result.nextCursor && <button className="button button--quiet" disabled={!editable} onClick={() => void run(result.nextCursor)}>{t("下一页")}</button>}{result.status === "unavailable" && <p>{t("当前账号未返回此项数据，无法据此计算用量。")}</p>}</div>}
   </div></details>;
 }

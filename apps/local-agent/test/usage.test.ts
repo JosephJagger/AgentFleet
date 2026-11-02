@@ -44,3 +44,19 @@ test("concurrent quota reads are coalesced, failures retain timestamps, and acco
  assert.notEqual(quotaSnapshot(limits,{account:{email:"one@example.test"}})?.accountKey,quotaSnapshot(limits,{account:{email:"two@example.test"}})?.accountKey);
  assert.equal(quotaSnapshot(limits)?.accountKey,undefined);
 });
+
+test("quota telemetry uses native refresh recovery without creating a turn",async()=>{
+ const callbacks: AppServerCallbacks = {onEvent:async()=>{},findManagedThread:()=>undefined,findProject:()=>undefined,onVolatile:()=>{},onApproval:async()=>{throw new Error("unexpected approval");},onApprovalResolved:async()=>{},onExit:async()=>{}};
+ const client=new CodexAppServer(callbacks);
+ const internal=client as unknown as {initialized:boolean;requestRaw(method:string,params:Record<string,unknown>|null):Promise<unknown>};
+ internal.initialized=true;let reads=0;const calls:unknown[]=[];
+ internal.requestRaw=async(method,params)=>{
+  calls.push([method,params]);
+  if(method==='account/read')return {account:{email:'test@example.test'}};
+  assert.equal(method,'account/rateLimits/read');
+  if(++reads===1)throw new Error('401 token_expired');
+  return {rateLimits:{secondary:{usedPercent:25,windowDurationMins:10080}}};
+ };
+ await client.refreshQuota();assert.ok(client.getQuotaSnapshot());
+ assert.deepEqual(calls,[['account/read',{refreshToken:false}],['account/rateLimits/read',null],['account/read',{refreshToken:true}],['account/rateLimits/read',null]]);
+});

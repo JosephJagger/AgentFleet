@@ -4478,5 +4478,6 @@
   "失效日期：{0}": "Fecha de caducidad: {0}",
   "卡片 ID：{0}": "ID de la tarjeta: {0}",
   "不过期（原生注明）": "Sin caducidad (según datos nativos)",
-  "未返回有效期": "Fecha de caducidad no disponible"
+  "未返回有效期": "Fecha de caducidad no disponible",
+  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Tu sesión de Codex ha caducado. Vuelve a conectar tu cuenta de ChatGPT en este equipo e inténtalo de nuevo."
 }
