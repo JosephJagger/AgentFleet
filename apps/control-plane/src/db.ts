@@ -808,7 +808,7 @@ export class ControlPlaneDatabase {
 
   private migrate(): void {
     const version = Number((this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
-    if (version > 72) throw new Error(`Database schema ${version} is newer than this binary`);
+    if (version > 73) throw new Error(`Database schema ${version} is newer than this binary`);
     let currentVersion = version;
     if (version < 1) {
       this.transaction(() => {
@@ -1717,6 +1717,13 @@ export class ControlPlaneDatabase {
         token TEXT NOT NULL,
         PRIMARY KEY(workspace_id,user_id,machine_id,root)
       ) STRICT; PRAGMA user_version=72`);
+    });
+    if (version < 73) this.transaction(() => {
+      // The 10s retention sweep filters live blobs by expires_at; without this it
+      // scans every blob (and blocks the event loop) on each tick.
+      this.sqlite.exec(`CREATE INDEX IF NOT EXISTS content_blobs_live_expiry_idx
+        ON content_blobs(expires_at) WHERE deleted_at IS NULL;
+        PRAGMA user_version=73`);
     });
   }
 
