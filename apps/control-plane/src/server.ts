@@ -576,6 +576,18 @@ export async function buildControlPlane(
     request.principal = principal;
   };
 
+  // Count clients still using the byte-heavy contracts so remaining traffic can be attributed.
+  const legacyTraffic = { history: 0, historyLinks: 0, subscribe: 0, subscribeCompact: 0 };
+  const legacyTrafficTimer = setInterval(() => {
+    if (Object.values(legacyTraffic).some(Boolean)) app.log.info({ ...legacyTraffic }, "panel client contract usage (5 min)");
+    for (const key of Object.keys(legacyTraffic) as (keyof typeof legacyTraffic)[]) legacyTraffic[key] = 0;
+  }, 300_000);
+  legacyTrafficTimer.unref();
+  app.addHook("onClose", async () => clearInterval(legacyTrafficTimer));
+  const hasSessionSubscribers = (logicalSessionId: string): boolean => {
+    for (const states of clients.values()) for (const state of states) if (state.subscriptions.has(logicalSessionId)) return true;
+    return false;
+  };
   const broadcastSession = (logicalSessionId: string, message: unknown): void => {
     for (const states of clients.values()) {
       for (const state of states) {
@@ -1591,6 +1603,7 @@ export async function buildControlPlane(
   });
   app.get("/api/sessions/:id/images/:eventId/:hash", { preHandler: authenticate }, async (request, reply) => {
     const params = request.params as { id: string; eventId: string; hash: string };
+    limiter.check(`event-image:${(request.principal as Principal).userId}`, 1_200, 60_000);
     const image = readEventImage(db, request.principal as Principal, params.id, params.eventId, params.hash, String(request.headers["if-none-match"] ?? ""));
     reply.header("cache-control", "private, no-cache");
     reply.header("etag", image.etag);
@@ -1761,6 +1774,7 @@ export async function buildControlPlane(
   });
   app.get("/api/sessions/:id/events", { preHandler: authenticate }, async (request) => {
     const query = request.query as Record<string, unknown>;
+    legacyTraffic[query.images === "links" ? "historyLinks" : "history"] += 1;
     if (query.compact === "1" && query.afterSeq !== undefined) return coordination.historyAfter(request.principal as Principal, routeId(request), {
       imageLinks: query.images === "links", afterSeq: Number(query.afterSeq), limit: pageLimit(query.limit), projectionEpoch: Number(query.projectionEpoch), contentEpoch: Number(query.contentEpoch),
     });
@@ -2074,6 +2088,7 @@ export async function buildControlPlane(
           } else if (message.type === "subscribe") {
             const logicalSessionId = requiredString(message.logicalSessionId, "logicalSessionId", 200);
             const session = registry.getSession(current, logicalSessionId);
+            legacyTraffic[message.notificationsOnly === true ? "subscribeCompact" : "subscribe"] += 1;
             const events = message.notificationsOnly === true ? [] : coordination.replayEvents(
               current,
               logicalSessionId,
@@ -2305,7 +2320,7 @@ export async function buildControlPlane(
                 if (["turn.started","turn.completed","turn.failed","turn.interrupted","item.completed"].includes(message.event.type)) {
                   try { panelVoice.syncSessionMemory(message.event.logicalSessionId,message.event.nativeTurnId); } catch { app.log.warn("Voice task record projection failed; durable event will be reconciled"); }
                 }
-                broadcastSession(message.event.logicalSessionId, { type: "event", event: result.event });
+                if (hasSessionSubscribers(message.event.logicalSessionId)) broadcastSession(message.event.logicalSessionId, { type: "event", event: result.event });
                 // Fleet views do not subscribe to every conversation. Notify authorized
                 // viewers when execution state changes, without streaming other histories.
                 if (["turn.started", "turn.completed", "turn.failed", "turn.interrupted", "thread.status_changed", "approval.requested", "approval.resolved"].includes(message.event.type)) {

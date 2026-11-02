@@ -2712,7 +2712,8 @@ export class CoordinationService {
       if(recognized&&!staleContentEpoch&&!staleAppServerEpoch&&!tombstoneAtIngress&&['thread.started','thread.claimed','turn.completed'].includes(event.type)){
         new CursorPreferencesService(this.db).record(event.logicalSessionId,event.payload,event.occurredAt);
       }
-      const record = this.getEventRecord(event.eventId);
+      // Built on first read: with no subscribed browser the image hydration is never needed.
+      const loadRecord = () => this.getEventRecord(event.eventId);
       return {
         ok: true,
         eventId: event.eventId,
@@ -2720,7 +2721,7 @@ export class CoordinationService {
         projectionEpoch: session.projection_epoch,
         sessionSeq,
         nextExpectedHostSeq: event.hostSeq + 1,
-        event: record,
+        get event() { return loadRecord(); },
       };
     });
   }
