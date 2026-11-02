@@ -4479,5 +4479,8 @@
   "卡片 ID：{0}": "Card ID: {0}",
   "不过期（原生注明）": "No expiry (reported by the native service)",
   "未返回有效期": "Expiry not reported",
-  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Your Codex sign-in has expired. Reconnect your ChatGPT account on this host, then try again."
+  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Your Codex sign-in has expired. Reconnect your ChatGPT account on this host, then try again.",
+  "有新版本可用，刷新后生效": "A new version is available. Refresh to apply.",
+  "立即刷新": "Refresh now",
+  "稍后": "Later"
 }

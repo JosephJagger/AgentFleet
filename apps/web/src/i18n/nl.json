@@ -4479,5 +4479,8 @@
   "卡片 ID：{0}": "Kaart-ID: {0}",
   "不过期（原生注明）": "Verloopt niet (native vermelding)",
   "未返回有效期": "Geldigheidsduur niet gemeld",
-  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Je Codex-aanmelding is verlopen. Koppel je ChatGPT-account opnieuw op deze host en probeer het nog eens."
+  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Je Codex-aanmelding is verlopen. Koppel je ChatGPT-account opnieuw op deze host en probeer het nog eens.",
+  "有新版本可用，刷新后生效": "Er is een nieuwe versie beschikbaar. Vernieuw om deze toe te passen.",
+  "立即刷新": "Nu vernieuwen",
+  "稍后": "Later"
 }

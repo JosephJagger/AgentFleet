@@ -4479,5 +4479,8 @@
   "卡片 ID：{0}": "ID della carta: {0}",
   "不过期（原生注明）": "Senza scadenza (secondo i dati nativi)",
   "未返回有效期": "Scadenza non comunicata",
-  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "La sessione di Codex è scaduta. Ricollega il tuo account ChatGPT su questo host, poi riprova."
+  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "La sessione di Codex è scaduta. Ricollega il tuo account ChatGPT su questo host, poi riprova.",
+  "有新版本可用，刷新后生效": "È disponibile una nuova versione. Aggiorna per applicarla.",
+  "立即刷新": "Aggiorna ora",
+  "稍后": "Più tardi"
 }

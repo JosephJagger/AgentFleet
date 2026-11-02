@@ -4479,5 +4479,8 @@
   "卡片 ID：{0}": "Karten-ID: {0}",
   "不过期（原生注明）": "Läuft nicht ab (native Angabe)",
   "未返回有效期": "Gültigkeitsdauer nicht angegeben",
-  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Ihre Codex-Anmeldung ist abgelaufen. Verbinden Sie Ihr ChatGPT-Konto auf diesem Host erneut und versuchen Sie es noch einmal."
+  "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Ihre Codex-Anmeldung ist abgelaufen. Verbinden Sie Ihr ChatGPT-Konto auf diesem Host erneut und versuchen Sie es noch einmal.",
+  "有新版本可用，刷新后生效": "Eine neue Version ist verfügbar. Zum Anwenden aktualisieren.",
+  "立即刷新": "Jetzt aktualisieren",
+  "稍后": "Später"
 }
