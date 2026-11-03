@@ -24,7 +24,8 @@ export async function migrateSqliteToPostgres(input: { snapshot: string; url: st
     sqlite.exec("BEGIN");
     if (sqlite.prepare("PRAGMA quick_check").get()?.quick_check !== "ok") throw new Error("Snapshot integrity check failed");
     if (sqlite.prepare("PRAGMA foreign_key_check").get()) throw new Error("Snapshot contains foreign-key violations");
-    if (sqlite.prepare("PRAGMA user_version").get()?.user_version !== baseline.sqliteVersion) throw new Error("Snapshot schema version differs from the PostgreSQL baseline; upgrade a separate copy first");
+    // SQLite 73 only added an index over the 72 baseline; the table inventory below still has to match exactly.
+    if (![baseline.sqliteVersion, 73].includes(Number(sqlite.prepare("PRAGMA user_version").get()?.user_version))) throw new Error("Snapshot schema version differs from the PostgreSQL baseline; upgrade a separate copy first");
     const names = (sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {name:string}[]).map(r => r.name);
     if (JSON.stringify(names) !== JSON.stringify(baseline.tables)) throw new Error("Snapshot table inventory differs from the baseline");
     const sourceSha256 = await fileHash(input.snapshot);

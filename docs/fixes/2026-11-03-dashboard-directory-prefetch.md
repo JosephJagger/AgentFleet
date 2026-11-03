@@ -61,15 +61,12 @@ Two existing regression assertions incorrectly expected the SQLite version 73 on
 PostgreSQL as well. They now use the frozen PostgreSQL baseline version for that
 backend, so the command/usage behavior assertions actually run on both engines.
 
-## Separate pre-existing migration finding
+## Offline import and SQLite 73 (resolved)
 
-The additional `postgres.test` run exposes two failing offline-import tests:
-`migrateSqliteToPostgres` requires the source PRAGMA version to equal the frozen
-PostgreSQL baseline exactly, but newly created SQLite databases are now version
-73. Both exact-import and NUL-rollback tests stop at that version guard. Neither
-migration code nor those tests changed here. The PostgreSQL read-batch test passes.
-
-This is not a failure of the live PostgreSQL read path, but the next SQLite to
-PostgreSQL migration needs explicit baseline compatibility work. Do not alter
-migration checksums or bypass the version check. The regression evidence must not
-be described as a fully passing PostgreSQL suite.
+`migrateSqliteToPostgres` required the source PRAGMA version to equal the frozen
+PostgreSQL baseline (72), but SQLite 73 only adds `content_blobs_live_expiry_idx`.
+The importer now accepts 72 or 73; the table-inventory, integrity and foreign-key
+checks are unchanged, and baseline checksums are untouched. The full suite
+(`npm run test:postgres` equivalent, built `dist`) passed 457/457 on an isolated
+PostgreSQL 18.6 instance. Run it from the built `dist`, not through `tsx` on `src`:
+the PostgreSQL worker needs compiled JavaScript and otherwise times out.
