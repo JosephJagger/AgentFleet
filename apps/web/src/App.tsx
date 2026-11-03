@@ -59,7 +59,6 @@ import { SettingsView } from "./components/SettingsView";
 import { UsageView } from "./components/UsageView";
 import { ScheduledTasksView } from "./components/ScheduledTasksView";
 import { NativeSessionDeletion } from "./components/NativeSessionDeletion";
-import { CommandRecovery } from "./components/CommandRecovery";
 import {
   Activity,
   AlertTriangle,
@@ -896,6 +895,8 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
   const lease = session.controlLease;
   const managed = session.state.ownership === "agentfleet_owned";
   const pendingCommand = (detail.commands ?? []).some(commandPending);
+  const recoverySessionId=session.actions?.start?.recoverySessionId;
+  const needsRecovery=session.state.unknownFreeze || (detail.commands??[]).some(c=>c.state==="unknown") || detail.queue.some(q=>q.state==="unknown");
   const canClaim = !pendingCommand && (session.actions?.claim?.allowed ?? (session.state.ownership === "claimable" && session.state.threadRuntime === "idle" && session.state.reachability === "live" && !session.state.unknownFreeze));
   const queueBusy = detail.queue.some((item) => item.state === "queued" || item.state === "dispatching" || item.state === "unknown");
   const canReleaseManagement = !pendingCommand && (session.actions?.release?.allowed ?? Boolean(detail.releaseManagementSupported && session.nativeThreadId && detail.writable && (!lease || lease.isMine) && session.state.threadRuntime === "idle" && !session.activeTurnId && approval?.status !== "pending" && !queueBusy && !session.state.unknownFreeze));
@@ -1049,6 +1050,7 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
       {onOpenSession && session.projectId && <ProjectWorktrees key={`worktrees:${session.projectId}`} projectId={session.projectId} machine={machine} currentSession={{ title: session.title, provider: session.provider ?? "codex", id: session.id, ...(session.state.ownership !== "agentfleet_owned" ? { forkBlocked: t("请先接管并同步这个会话，再复制到工作树") } : session.activeTurnId || session.state.currentTurn === "in_progress" ? { forkBlocked: t("当前会话正在执行，完成后才能复制") } : {}) }} title={displayName(`${session.projectAlias ?? ""} · ${session.machineName ?? ""}`)} onOpenSession={onOpenSession} />}
           <button type="button" className="button button--quiet session-config-trigger" aria-haspopup="dialog" aria-label={t("会话配置")} title={t("会话配置")} onClick={() => setConfiguration({ section: "all", nonce: Date.now() })}><Settings2 size={18} /><span className="buzhou-full-label">{t("会话配置")}</span><span className="buzhou-focus-label" aria-hidden="true">{t("配置")}</span></button>
           <SessionActions>
+            {!needsRecovery && !recoverySessionId && (session.nativeThreadId || pendingCommand) && <SessionRecovery key={`manual-recovery:${session.id}`} machineId={session.machineId} sessionId={session.id} online={detail.hostOnline === true} onChanged={onRefresh} />}
       {(session.provider ?? "codex") === "codex" && managed && <NativeVoicePanel menuEntry key={`voice:${draftOwner}:${session.id}`} sessionId={session.id} activeTurnId={session.activeTurnId} canStart={session.actions?.start?.allowed !== false && !session.activeTurnId && !busy && !pendingCommand} onActiveChange={setVoiceActive} />}
       {managed && (
         <div title={lease && !lease.isMine ? t("其他账号正在操作") : detail.releaseManagementBlockedReason || t("可从面板继续会话")} className={`lease-strip${releaseConfirming ? " lease-strip--confirming" : ""}${lease?.isMine ? " lease-strip--mine" : ""}${(!lease || lease.isMine) && detail.releaseManagementSupported && !releaseConfirming ? " lease-strip--ready" : ""}`}>
@@ -1077,14 +1079,14 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
           </SessionActions>
         </div>
       </header>
-      {session.state.unknownFreeze && <div className="freeze-banner"><AlertTriangle size={17} /><div><strong>{t("上一次任务的结果尚未确认")}</strong><SessionRecovery key={`${draftOwner}:${session.id}`} machineId={session.machineId} sessionId={session.id} online={detail.hostOnline === true} onChanged={onRefresh} /></div></div>}
+      {(needsRecovery || recoverySessionId) && <div className="freeze-banner"><AlertTriangle size={17} /><div><strong>{recoverySessionId && recoverySessionId!==session.id ? t("同一目录的会话需要处理") : t("上一次任务的结果尚未确认")}</strong><SessionRecovery key={`${draftOwner}:${session.id}`} machineId={session.machineId} sessionId={session.id} online={detail.hostOnline === true} onChanged={onRefresh} relatedSessionId={recoverySessionId} onOpenSession={onOpenSession} /></div></div>}
       <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? rawEvents : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}</ConversationViewport>
       {approval?.status === "pending" && (approval.type === "user_input"
         ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} agent={agentName(session.provider)} onChanged={onRefresh} />
         : <ApprovalCard approval={approval} provider={session.provider} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
       {buzhouDesktop ? <BuzhoushanActivity key={`activity:${draftOwner}:${session.id}`} detail={detail} conversation={<ConversationViewport events={conversationEvents}><Timeline events={conversationEvents} sessionId={session.id} provider={session.provider}/></ConversationViewport>}/> : (session.provider??"codex")==="codex" && <RuntimeProgress key={`progress:${session.id}:${session.activeTurnId??"none"}`} sessionId={session.id} active={Boolean(session.activeTurnId)||session.state.currentTurn==="in_progress"||session.state.unknownFreeze} initial={detail.progress}/>}
       <OperationReceipts commands={detail.commands ?? []} mode="outstanding" />
-      {(detail.session.state.unknownFreeze || (detail.commands ?? []).some(command => command.state === "unknown")) && <CommandRecovery key={`recovery:${draftOwner}:${session.machineId}`} machineId={session.machineId} online={session.state.reachability === "live"} supported={detail.commandRecoverySupported === true} onChanged={onRefresh} />}
+
       {detail.queue.some((item) => item.state === "queued" || item.state === "dispatching" || item.state === "unknown") && (
         <section className="turn-queue" aria-label={t("待执行队列")}>
           <div className="turn-queue__head"><strong>{t("待执行队列")}</strong><span>{t("按控制面接受顺序")}</span></div>

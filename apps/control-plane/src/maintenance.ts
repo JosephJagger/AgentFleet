@@ -1,3 +1,4 @@
+import {retryRecoveryTarget,completeRetryRecovery} from "./session-recovery-state.js";
 import { parseManagedEligibility } from "./managed-provider.js";
 import { parseProviderRuntimeRequest,parseProviderRuntimeState } from "./provider-runtime-policy.js";
 import type { ProviderId } from "./provider-catalog.js";
@@ -112,20 +113,21 @@ export class MaintenanceService {
           target={...target,...(typeof result.beforeSha256==="string"?{expectedDigest:result.beforeSha256}:{}),turns:result.targets,previewOperationId};
         }
       } else if(type === "session.reconcile") {
-        invariant(nativeRequest === undefined || JSON.stringify(nativeRequest) === '{"mode":"dismiss"}',400,"INVALID_RECOVERY_MODE","Invalid recovery mode");
+        const retry = nativeRequest && typeof nativeRequest === 'object' && (nativeRequest as any).mode === 'retry';
+        invariant(nativeRequest === undefined || JSON.stringify(nativeRequest) === '{"mode":"dismiss"}' || Boolean(retry),400,"INVALID_RECOVERY_MODE","Invalid recovery mode");
         const dismiss = nativeRequest !== undefined;
         if (dismiss) invariant(admit,400,"RECOVERY_PREFLIGHT_REQUIRED","Use the session recovery endpoint");
-        if (dismiss) invariant(JSON.parse(machine.discovery_json??'{}').sessionRecoveryDismiss===true,409,"RECOVERY_UPDATE_REQUIRED","请更新主机连接服务后使用重试恢复");
+        if (dismiss) invariant(JSON.parse(machine.discovery_json??'{}')[retry ? "sessionRecoveryRetry" : "sessionRecoveryDismiss"]===true,409,"RECOVERY_UPDATE_REQUIRED","请更新主机连接服务后使用重试恢复");
         invariant(typeof logicalSessionId === "string",400,"RECOVERY_TARGET_REQUIRED","Choose a session to recover");
         const session=this.db.get<{logical_session_id:string;project_id:string;content_epoch:number;execution_segment_id:string;native_thread_id:string|null}>(`SELECT s.logical_session_id,s.project_id,s.content_epoch,e.execution_segment_id,e.native_thread_id FROM logical_sessions s JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL WHERE s.logical_session_id=? AND s.machine_id=? AND s.workspace_id=?`,logicalSessionId,machineId,principal.workspaceId);
-        invariant(session?.native_thread_id,404,"SESSION_NOT_FOUND","Session was not found on this host");
-        invariant(!this.db.get("SELECT 1 FROM commands c JOIN command_projection p USING(command_id) WHERE c.logical_session_id=? AND p.state IN ('unknown','accepted','dispatching') LIMIT 1",logicalSessionId),409,"RECOVERY_RECEIPT_UNKNOWN","仍有结果待确认的操作，请先核验原操作回执");
+        invariant(session && (retry || session.native_thread_id),404,"SESSION_NOT_FOUND","Session was not found on this host");
+        invariant(retry || !this.db.get("SELECT 1 FROM commands c JOIN command_projection p USING(command_id) WHERE c.logical_session_id=? AND p.state IN ('unknown','accepted','dispatching') LIMIT 1",logicalSessionId),409,"RECOVERY_RECEIPT_UNKNOWN","仍有结果待确认的操作，请先核验原操作回执");
         const connection = this.db.get<{app_server_epoch:string}>("SELECT app_server_epoch FROM agent_connections WHERE machine_id=? AND disconnected_at IS NULL AND app_server_epoch IS NOT NULL ORDER BY transport_generation DESC LIMIT 1",machineId);
         invariant(connection,409,"MACHINE_RECONNECTING","Wait for the host to finish reconnecting");
         const reservation=this.db.get<{logical_session_id:string;native_turn_id:string|null;bound_app_server_epoch:string|null;binding_state:string}>("SELECT logical_session_id,native_turn_id,bound_app_server_epoch,binding_state FROM project_turn_reservations WHERE project_id=?",session.project_id);
         const recoverableReservation=reservation?.logical_session_id===session.logical_session_id && reservation.binding_state==="bound" && typeof reservation.native_turn_id==="string" && typeof reservation.bound_app_server_epoch==="string" && reservation.bound_app_server_epoch!==connection.app_server_epoch;
-        if (dismiss) invariant(recoverableReservation,409,"RECOVERY_TARGET_CHANGED","会话状态已变化，请重新点击重试恢复");
-        target={...(dismiss?{mode:"dismiss"}:{}),appServerEpoch:connection.app_server_epoch,logicalSessionId:session.logical_session_id,contentEpoch:session.content_epoch,executionSegmentId:session.execution_segment_id,nativeThreadId:session.native_thread_id,...(recoverableReservation?{nativeTurnId:reservation.native_turn_id,previousAppServerEpoch:reservation.bound_app_server_epoch}:{})};
+        if (dismiss && !retry) invariant(recoverableReservation,409,"RECOVERY_TARGET_CHANGED","会话状态已变化，请重新点击重试恢复");
+        target=retry ? retryRecoveryTarget(this.db,session.logical_session_id,String((nativeRequest as any).token)) : {...(dismiss?{mode:"dismiss"}:{}),appServerEpoch:connection.app_server_epoch,logicalSessionId:session.logical_session_id,contentEpoch:session.content_epoch,executionSegmentId:session.execution_segment_id,nativeThreadId:session.native_thread_id,...(recoverableReservation?{nativeTurnId:reservation.native_turn_id,previousAppServerEpoch:reservation.bound_app_server_epoch}:{})};
       } else invariant(logicalSessionId === undefined,400,"INVALID_OPERATION_TARGET","This operation does not accept a session target");
       const timestamp=nowIso();const operationId=newId("op");
       this.db.run("INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,'accepted',?,?,?)",operationId,machineId,principal.workspaceId,principal.clientSessionId,mutationId,type,timestamp,timestamp,futureIso(["codex.host","connection.repair","session.reconcile","images.preview","images.clean","versions.preview","versions.clean"].includes(type) ? 300 : 3600));
@@ -205,7 +207,9 @@ export class MaintenanceService {
       }
       if (row.type === "session.reconcile" && state === "succeeded" && row.request_json && result && typeof result === "object") {
         const proof=result as Record<string,unknown>; const target=JSON.parse(row.request_json);
-        if (proof.recovered === true) {
+        if(target.mode === "retry") {
+          if(proof.recovered===true && !completeRetryRecovery(this.db,machineId,row.workspace_id,operationId,target,proof)) persistedResult=JSON.stringify({...proof,recovered:false,reason:"会话状态已变化，请重新点击重试恢复"});
+        } else if (proof.recovered === true) {
           const session=this.db.get<{project_id:string;active_turn_id:string|null}>(`SELECT s.project_id,s.active_turn_id FROM logical_sessions s JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL JOIN agent_connections a ON a.machine_id=s.machine_id AND a.disconnected_at IS NULL WHERE s.logical_session_id=? AND s.machine_id=? AND s.workspace_id=? AND s.content_epoch=? AND e.execution_segment_id=? AND e.native_thread_id=? AND a.app_server_epoch=?`,target.logicalSessionId,machineId,row.workspace_id,target.contentEpoch,target.executionSegmentId,target.nativeThreadId,target.appServerEpoch);
           const pending=this.db.get("SELECT 1 FROM commands c JOIN command_projection p USING(command_id) WHERE c.logical_session_id=? AND p.state IN ('unknown','accepted','dispatching') LIMIT 1",target.logicalSessionId);
           const reservation=session?this.db.get<{logical_session_id:string;native_turn_id:string|null;bound_app_server_epoch:string|null;binding_state:string}>("SELECT logical_session_id,native_turn_id,bound_app_server_epoch,binding_state FROM project_turn_reservations WHERE project_id=?",session.project_id):undefined;

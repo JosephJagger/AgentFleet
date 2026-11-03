@@ -4490,5 +4490,8 @@
   "已解除挂起，可以继续原会话。上一轮结果仍未确认，原任务没有重发。": "Ya puedes continuar la conversación. El resultado anterior sigue sin confirmarse; la tarea no se ha reenviado.",
   "请更新主机连接服务后使用重试恢复": "Actualiza el servicio de conexión del equipo para reintentar la recuperación.",
   "主机仍报告任务在运行，请先停止任务或检查任务结果": "El equipo indica que la tarea sigue en curso. Detenla o consulta primero el resultado.",
-  "会话状态已变化，请重新点击重试恢复": "El estado de la conversación ha cambiado. Reintenta la recuperación."
+  "会话状态已变化，请重新点击重试恢复": "El estado de la conversación ha cambiado. Reintenta la recuperación.",
+  "同一目录的会话需要处理": "Otra sesión de esta carpeta necesita atención",
+  "打开占用会话": "Abrir la sesión que bloquea el acceso",
+  "已解除等待": "Estado de espera eliminado"
 }

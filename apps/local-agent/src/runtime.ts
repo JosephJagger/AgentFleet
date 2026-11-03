@@ -1,3 +1,4 @@
+import {retrySessionRecovery,recoveredTurnKey} from "./session-retry.js";
 import { ManagedProviderUpdates, fetchManagedTarget } from './managed-provider-updates.js';
 import { parseProviderRuntimeRequest } from './provider-runtime-policy.js';
 import { WorkspaceGitStatusSampler } from "./workspace-git-status.js";
@@ -317,6 +318,8 @@ export class AgentRuntime {
     onRegistryChanged: () => undefined,
   };
   private appServer: AppServerClient | undefined;
+  private readonly executingCommands=new Set<FleetCommand>();
+  private readonly recoveringProjects=new Set<string>();
   private startingAppServer: AppServerClient | undefined;
   private appServerFailure: string | undefined;
   private transportGeneration: number | undefined;
@@ -530,6 +533,18 @@ export class AgentRuntime {
   /** Invoked only by an explicit session.reconcile maintenance request. */
   async recoverFrozenSession(target: Record<string, unknown>): Promise<Record<string, unknown>> {
     const server = this.appServer;
+    if(target.mode==="retry"){
+      if(!server)throw new AgentError("APP_SERVER_UNAVAILABLE","主机连接尚未就绪，请稍后重试恢复");
+      const project=String(target.projectExternalId);
+      if(this.recoveringProjects.has(project)||[...this.executingCommands.values()].some(c=>c.projectId===project))return {recovered:false,reason:"主机正在处理会话操作，请稍后重试恢复"};
+      const alreadyRecovered=Boolean(this.store.snapshot().sessionRecoveryReceipts?.[String(target.recoveryToken)]);
+      this.recoveringProjects.add(project);
+      try{
+        const result=await retrySessionRecovery(this.store,server,target,()=>this.appServer===server&&!this.exitedAppServerEpochs.has(server.appServerEpoch));
+        if(result.recovered&&!alreadyRecovered){if(typeof result.nativeThreadId==="string")this.discardWorkspaceWatch(result.nativeThreadId);this.notifyRegistryChanged();}
+        return result;
+      }finally{this.recoveringProjects.delete(project);}
+    }
     const thread = typeof target.nativeThreadId === "string" ? this.store.snapshot().managedThreads[target.nativeThreadId] : undefined;
     if (server && server.appServerEpoch !== target.appServerEpoch) throw new AgentError("RECOVERY_RUNTIME_CHANGED", "主机刚刚重连，请重新点击解除冻结");
     if (!server?.readTurnOutcome || !thread) throw new AgentError("RECOVERY_UNAVAILABLE", "主机暂时无法核验此会话");
@@ -816,7 +831,7 @@ export class AgentRuntime {
       },
       resumeStreams,
       capacity: this.capacityState(),
-      discovery: { ...this.getDiscoveryStatus(), sessionRecoveryDismiss: true, workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), sessionRecoveryDismiss: true, sessionRecoveryRetry: true, workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       projects: this.projectSummaries(),
       sessions: [...Object.values(state.managedThreads).flatMap((thread) => {
@@ -916,7 +931,7 @@ export class AgentRuntime {
       activeTurns: Object.values(state.managedThreads).filter((thread) => thread.activeTurnId !== undefined).length,
       readOnly: !this.isWritable(),
       readOnlyReasons: this.readOnlyReasons(),
-      discovery: { ...this.getDiscoveryStatus(), sessionRecoveryDismiss: true, workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), sessionRecoveryDismiss: true, sessionRecoveryRetry: true, workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       ...(this.support.codexProfile ? { codexProfile: this.support.codexProfile } : {}),
       ...(this.isWritable() ? {} : { unreachableReason: this.readOnlyReasons().join("; ") }),
@@ -1136,7 +1151,9 @@ export class AgentRuntime {
       return;
     }
     const immutableHash = commandEnvelopeHash(value as Record<string, unknown>);
-    await this.handleParsedCommand(command, deliveryGeneration, immutableHash);
+    if(this.recoveringProjects.has(command.projectId)){this.ackCommand(command,"invalidated",{code:"RECOVERY_IN_PROGRESS",message:"会话正在恢复，请稍后重新发送"});return;}
+    this.executingCommands.add(command);
+    try{await this.handleParsedCommand(command, deliveryGeneration, immutableHash);}finally{this.executingCommands.delete(command);}
   }
 
   private async handleParsedCommand(
@@ -2424,6 +2441,7 @@ export class AgentRuntime {
     if (event.nativeThreadId === undefined) return;
     const thread = this.store.managedThread(event.nativeThreadId);
     if (!thread || thread.appServerEpoch !== epoch) return;
+    if(event.nativeTurnId && event.type.startsWith("turn.") && this.store.snapshot().recoveredTurns?.[recoveredTurnKey(thread.nativeThreadId,epoch,event.nativeTurnId)])return;
     if (event.type === "thread.usage") {
       await this.store.updateManagedThread(thread.nativeThreadId, candidate => { candidate.usageObservedAt = nowIso(); if (isClaudeThread(thread.nativeThreadId) && isRecord(event.payload.usage)) candidate.nativeUsage={usage:event.payload.usage,occurredAt:candidate.usageObservedAt}; });
     }

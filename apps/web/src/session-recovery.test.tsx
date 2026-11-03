@@ -25,3 +25,16 @@ it("恢复失败显示原因，离线不允许重试",async()=>{
  view.rerender(<SessionRecovery machineId="machine" sessionId="session" online={false} onChanged={()=>{}}/>);
  expect((screen.getByRole("button",{name:"重试恢复"}) as HTMLButtonElement).disabled).toBe(true);
 });
+it("同目录的占用会话提供直接入口，不会替用户恢复另一会话",()=>{
+ const open=vi.fn();render(<SessionRecovery machineId="machine" sessionId="here" relatedSessionId="blocking" online onChanged={()=>{}} onOpenSession={open}/>);
+ expect(screen.getAllByRole('button')).toHaveLength(1);fireEvent.click(screen.getByRole('button',{name:'打开占用会话'}));
+ expect(open).toHaveBeenCalledWith('blocking');expect(api.retrySessionRecovery).not.toHaveBeenCalled();
+});
+it("主机暂未恢复后可以再次点击重试",async()=>{
+ vi.mocked(api.retrySessionRecovery).mockResolvedValue({id:'retry',type:'session.reconcile',state:'accepted',createdAt:'',updatedAt:''});
+ vi.mocked(api.hostOperations).mockResolvedValue([{id:'retry',type:'session.reconcile',state:'succeeded',createdAt:'',updatedAt:'',result:{recovered:false,reason:'任务仍在运行'}}]);
+ render(<SessionRecovery machineId="machine" sessionId="session" online onChanged={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'重试恢复'}));await screen.findByText('任务仍在运行');
+ expect((screen.getByRole('button',{name:'重试恢复'}) as HTMLButtonElement).disabled).toBe(false);
+ fireEvent.click(screen.getByRole('button',{name:'重试恢复'}));await waitFor(()=>expect(api.retrySessionRecovery).toHaveBeenCalledTimes(2));
+});

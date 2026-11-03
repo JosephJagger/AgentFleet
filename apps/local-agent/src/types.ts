@@ -255,6 +255,10 @@ export interface ProjectDiscoveryStatus {
 }
 
 export interface AgentState {
+  /** Explicit user recovery keeps the original journal outcome and suppresses replay. */
+  recoveryDisposals?: Record<string,{logicalSessionId:string;executionSegmentId:string;contentEpoch:number;recoveredAt:string}>;
+  recoveredTurns?: Record<string,string>;
+  sessionRecoveryReceipts?: Record<string,Record<string,unknown>>;
   releasedCursorWorkers?: import("./acp-providers.js").ReleasedCursorWorker[];
   managedUpdates?: Partial<Record<import('./managed-provider.js').ManagedProvider,import('./managed-provider-updates.js').ManagedJob>>;
   managedGrok?: {current:import('./managed-grok.js').GrokInstallation;previous?:import('./managed-grok.js').GrokInstallation};

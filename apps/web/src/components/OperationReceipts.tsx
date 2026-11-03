@@ -17,6 +17,7 @@ const commandLabels: Record<string, string> = localized(() => ({
 }));
 
 export function receiptStatus(command: CommandReceipt): { label: string; tone: string } {
+  if (command.errorCode === "RECOVERY_DISMISSED") return {label:t("已解除等待"),tone:"done"};
   if (command.state === "unknown" || command.outcome === "unknown") return { label: t("结果待核验"), tone: "unknown" };
   if (["rejected", "failed", "invalidated", "expired"].includes(command.outcome ?? command.state)) return { label: command.state === "expired" ? t("已过期") : t("未完成"), tone: "failed" };
   if (command.state === "queued") return { label: t("等待上一轮结束"), tone: "pending" };

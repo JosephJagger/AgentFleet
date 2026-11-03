@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { HostOperation } from "../lib/types";
 
-export function SessionRecovery({ machineId, sessionId, online, onChanged }: {
-  machineId: string; sessionId: string; online: boolean; onChanged: () => void;
+export function SessionRecovery({ machineId, sessionId, online, onChanged, relatedSessionId, onOpenSession }: {
+  machineId: string; sessionId: string; online: boolean; onChanged: () => void; relatedSessionId?: string; onOpenSession?: (id:string)=>void;
 }) {
   const [operation, setOperation] = useState<HostOperation>();
   const [submitting, setSubmitting] = useState(false);
@@ -35,6 +35,7 @@ export function SessionRecovery({ machineId, sessionId, online, onChanged }: {
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
   }, [pending, operation?.id, machineId, onChanged]);
+  if(relatedSessionId && relatedSessionId!==sessionId && onOpenSession)return <div className="command-recovery"><button type="button" className="button" onClick={()=>onOpenSession(relatedSessionId)}>{t("打开占用会话")}</button></div>;
   return <div className="command-recovery">
     <button type="button" className="button" disabled={!online || submitting || Boolean(pending)} onClick={async () => {
       setSubmitting(true); setMessage("");

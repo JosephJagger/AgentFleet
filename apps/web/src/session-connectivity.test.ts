@@ -51,3 +51,8 @@ it('a slow refresh never overlaps and cannot keep expired sync wording alive',as
  await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});expect(refresh).toHaveBeenCalledTimes(1);expect(view.result.current).toContain('同步尚未完成');
  await act(async()=>{finish();await vi.advanceTimersByTimeAsync(5000);});expect(refresh).toHaveBeenCalledTimes(1);
 });
+it('recovered operation remains truthful about the unknown result but no longer blocks the UI',async()=>{
+ const {mapCommandReceipt}=await import('./lib/api');const {receiptStatus}=await import('./components/OperationReceipts');
+ const receipt=mapCommandReceipt({commandId:'old',type:'turn.start',state:'invalidated',outcome:'failed',error:{code:'RECOVERY_DISMISSED',message:'原结果仍未确认，未重发任务'}});
+ expect(receiptStatus(receipt)).toEqual({label:'已解除等待',tone:'done'});expect(receipt.message).toContain('原结果仍未确认');
+});

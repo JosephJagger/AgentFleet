@@ -192,6 +192,7 @@ export interface LogicalSessionSummary {
 }
 
 export interface ActionAvailability {
+  recoverySessionId?: string;
   allowed: boolean;
   reasonCode: string | null;
   message: string | null;

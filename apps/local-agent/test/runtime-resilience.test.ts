@@ -2213,3 +2213,89 @@ for(const mode of ['idle','running','unknown','wrong-cwd','changed-turn','runtim
   assert.equal(state.managedThreads[old.nativeThreadId]?.logicalSessionId,old.logicalSessionId);
  }
 });
+
+for(const provider of ['codex','claude','cursor','grok','kimi','qwen','codebuddy'] as const)test(`unified retry durably clears unknown state without replay: ${provider}`,async t=>{
+ const {store,projects,directory}=await fixture();const project=projects[0]!;project.provider=provider;
+ await store.update(s=>{s.projects[0]!.provider=provider;});
+ let server!:FakeAppServer;const runtime=new AgentRuntime({store,identity,pairing,support,appServerFactory:cb=>(server=new FakeAppServer('current-runtime',cb))});
+ captureCallbacks(runtime);await runtime.initialize();t.after(async()=>{await runtime.shutdown();store.close();});
+ const thread:ManagedThread={nativeThreadId:`native-${provider}`,projectId:project.id,logicalSessionId:'session',executionSegmentId:'segment-session',contentEpoch:1,appServerEpoch:server.appServerEpoch,sessionCwd:project.root,policyVersion:'remote-restricted-v1',policyVerified:true,createdAt:new Date().toISOString(),activeTurnId:'stale-turn'};
+ await store.setManagedThread(thread);
+ server.histories.set(thread.nativeThreadId,{nativeThreadId:thread.nativeThreadId,cwd:project.root,executionState:'idle',historyMode:'legacy',updatedAt:1,items:[]});
+ const c=command(project,'uncertain-attempt','uncertain','session',server.appServerEpoch);
+ await store.claimCommand(c,'hash');await store.reserveProjectCommand({projectId:project.id,commandId:c.commandId,attemptId:c.attemptId,envelopeHash:'hash',appServerEpoch:server.appServerEpoch});
+ await store.markCommandUnknown(c.attemptId,{code:'DISCONNECT',message:'Original unknown result'});
+ const before=store.snapshot();assert.equal(store.canSafelyRestart(),false);
+ const target={mode:'retry',appServerEpoch:server.appServerEpoch,projectExternalId:project.id,logicalSessionId:'session',executionSegmentId:'segment-session',contentEpoch:1,nativeThreadId:thread.nativeThreadId,nativeTurnId:'stale-turn',recoveryToken:'a'.repeat(64),commands:[{command_id:c.commandId}]};
+ const result=await runtime.recoverFrozenSession(target);assert.equal(result.recovered,true);assert.equal(result.resultKnown,false);
+ const state=store.snapshot();assert.equal(state.managedThreads[thread.nativeThreadId]?.activeTurnId,undefined);assert.equal(Object.keys(state.projectReservations).length,0);assert.equal(store.canSafelyRestart(),true);
+ assert.deepEqual(state.commandJournal,before.commandJournal,'original unknown result is preserved');assert.deepEqual(state.outbox,before.outbox,'no fabricated native terminal event');
+ assert.equal(server.startTurnCount,0);assert.equal(server.createThreadCount,0);assert.equal(server.interruptTurnCount,0);
+ const reads=server.readCount;assert.deepEqual(await runtime.recoverFrozenSession(target),result);assert.equal(server.readCount,reads,'same request is idempotent');
+ const reopened=new StateStore(join(directory,'state'));await reopened.initialize();t.after(()=>reopened.close());
+ assert.equal(reopened.snapshot().sessionRecoveryReceipts?.[String(target.recoveryToken)]?.recovered,true);
+ await assert.rejects(reopened.claimCommand({...c,attemptId:'late-replay'},'hash'),/不会重发/);
+ // An old completion arriving after the next turn starts cannot unsubscribe it.
+ await store.updateManagedThread(thread.nativeThreadId,v=>{v.activeTurnId='new-turn';v.subscribed=true;});
+ const unsubscribes=server.unsubscribeCount;
+ await server.callbacks.onEvent({type:'turn.completed',nativeThreadId:thread.nativeThreadId,nativeTurnId:'stale-turn',payload:{}},server.appServerEpoch);
+ assert.equal(server.unsubscribeCount,unsubscribes);assert.equal(store.snapshot().managedThreads[thread.nativeThreadId]?.activeTurnId,'new-turn');
+});
+for(const scenario of ['no-turn','sibling-orphan','running','unknown','wrong-cwd','changed-turn','changed-epoch','foreign-binding'] as const)test(`unified retry host checks: ${scenario}`,async t=>{
+ const {store,projects}=await fixture();const project=projects[0]!;
+ let server!:FakeAppServer;const runtime=new AgentRuntime({store,identity,pairing,support,appServerFactory:cb=>(server=new FakeAppServer('same-runtime',cb))});
+ captureCallbacks(runtime);await runtime.initialize();t.after(async()=>{await runtime.shutdown();store.close();});
+ const thread:ManagedThread={nativeThreadId:'original',projectId:project.id,logicalSessionId:'session',executionSegmentId:'segment',contentEpoch:1,appServerEpoch:server.appServerEpoch,policyVersion:'remote-restricted-v1',policyVerified:true,createdAt:new Date().toISOString(),...(scenario==='no-turn'?{}:{activeTurnId:'old-turn'})};
+ await store.setManagedThread(thread);
+ if(scenario==='sibling-orphan')await store.setManagedThread({...thread,nativeThreadId:'sibling',logicalSessionId:'other',activeTurnId:'other-stale'});
+ const sibling=store.snapshot().managedThreads.sibling;
+ const originalRead=server.readThread.bind(server);server.readThread=async id=>{
+  if(scenario==='changed-turn')await store.updateManagedThread(id,v=>{v.activeTurnId='new-turn';});
+  return originalRead(id);
+ };
+ server.histories.set('original',{nativeThreadId:'original',cwd:scenario==='wrong-cwd'?'/wrong':project.root,executionState:scenario==='running'?'running':scenario==='unknown'?'unknown':'idle',historyMode:'legacy',updatedAt:1,items:[]});
+ const target={mode:'retry',appServerEpoch:scenario==='changed-epoch'?'other-runtime':server.appServerEpoch,projectExternalId:project.id,logicalSessionId:scenario==='foreign-binding'?'other':'session',executionSegmentId:'segment',contentEpoch:1,nativeThreadId:'original',nativeTurnId:thread.activeTurnId??null,recoveryToken:'b'.repeat(64),commands:[]};
+ if(['wrong-cwd','changed-turn','changed-epoch','foreign-binding'].includes(scenario))await assert.rejects(runtime.recoverFrozenSession(target));
+ else assert.equal((await runtime.recoverFrozenSession(target)).recovered,['no-turn','sibling-orphan'].includes(scenario));
+ assert.deepEqual(store.snapshot().managedThreads.sibling,sibling,'never clears another session');
+ assert.equal(server.startTurnCount,0);assert.equal(server.createThreadCount,0);assert.equal(server.interruptTurnCount,0);
+});
+test('unified retry refuses an in-flight command and blocks command dispatch while checking native state',async t=>{
+ const {store,projects}=await fixture();const project=projects[0]!;let server!:FakeAppServer;
+ const runtime=new AgentRuntime({store,identity,pairing,support,appServerFactory:cb=>(server=new FakeAppServer('runtime',cb))});runtime.setTransportGeneration(1);
+ const {acks}=captureCallbacks(runtime);await runtime.initialize();t.after(async()=>{await runtime.shutdown();store.close();});
+ const started=deferred<ThreadHistorySnapshot>();let checking=false;
+ await store.setManagedThread({nativeThreadId:'original',projectId:project.id,logicalSessionId:'session',executionSegmentId:'segment-session',contentEpoch:1,appServerEpoch:server.appServerEpoch,policyVersion:'remote-restricted-v1',policyVerified:true,createdAt:new Date().toISOString()});
+ server.readThread=async()=>{checking=true;return started.promise;};
+ const target={mode:'retry',appServerEpoch:server.appServerEpoch,projectExternalId:project.id,logicalSessionId:'session',executionSegmentId:'segment-session',contentEpoch:1,nativeThreadId:'original',nativeTurnId:null,recoveryToken:'c'.repeat(64),commands:[]};
+ const recovery=runtime.recoverFrozenSession(target);await waitFor(()=>checking,'native check did not start');
+ await runtime.handleCommand(command(project,'during-recovery','during-recovery','session',server.appServerEpoch),1);
+ assert.deepEqual(ackStates(acks,'during-recovery'),['invalidated']);assert.equal(server.startTurnCount,0);
+ started.resolve({nativeThreadId:'original',cwd:project.root,executionState:'idle',historyMode:'legacy',updatedAt:1,items:[]});await recovery;
+ const entering=deferred<void>(),release=deferred<TurnStartResult>();
+ server.startTurnHook=async()=>{entering.resolve();return release.promise;};
+ const sending=runtime.handleCommand(command(project,'new-send','new-send','session',server.appServerEpoch),1);
+ await entering.promise;
+ assert.equal((await runtime.recoverFrozenSession({...target,recoveryToken:'d'.repeat(64)})).recovered,false);
+ release.resolve({nativeTurnId:'new-turn',status:'inProgress'});await sending;
+});
+for(const shape of ['before-invoke','existing-original','unknown-invocation'] as const)test(`first-message recovery preserves host identity or proves no native invocation: ${shape}`,async t=>{
+ const {store,projects}=await fixture();const project=projects[0]!;let server!:FakeAppServer;
+ const runtime=new AgentRuntime({store,identity,pairing,support,appServerFactory:cb=>(server=new FakeAppServer('runtime',cb))});captureCallbacks(runtime);await runtime.initialize();t.after(async()=>{await runtime.shutdown();store.close();});
+ const c=command(project,'first-attempt','first-command','first-session',server.appServerEpoch);
+ await store.claimCommand(c,'first-hash');
+ if(shape==='unknown-invocation')await store.update(s=>{s.commandJournal[c.commandId]!.invokingAt=new Date().toISOString();});
+ await store.markCommandUnknown(c.attemptId,{code:'DISCONNECT',message:'disconnected'});
+ if(shape==='existing-original'){
+  await store.setManagedThread({nativeThreadId:'original',projectId:project.id,logicalSessionId:c.logicalSessionId,executionSegmentId:c.executionSegmentId,contentEpoch:1,appServerEpoch:server.appServerEpoch,policyVersion:'remote-restricted-v1',policyVerified:true,createdAt:new Date().toISOString()});
+  server.histories.set('original',{nativeThreadId:'original',cwd:project.root,executionState:'idle',historyMode:'legacy',updatedAt:1,items:[]});
+ }
+ const target={mode:'retry',appServerEpoch:server.appServerEpoch,projectExternalId:project.id,logicalSessionId:c.logicalSessionId,executionSegmentId:c.executionSegmentId,contentEpoch:1,nativeThreadId:null,nativeTurnId:null,recoveryToken:'e'.repeat(64),commands:[{command_id:c.commandId}]};
+ if(shape==='unknown-invocation'){
+  await assert.rejects(runtime.recoverFrozenSession(target),/重新扫描/);assert.equal(store.snapshot().recoveryDisposals?.[c.commandId],undefined);
+ }else{
+  const result=await runtime.recoverFrozenSession(target);assert.equal(result.recovered,true);assert.equal(result.nativeThreadId,shape==='existing-original'?'original':null);
+  assert.equal(server.readCount,shape==='existing-original'?1:0);assert.equal(store.canSafelyRestart(),true);
+ }
+ assert.equal(server.createThreadCount,0);assert.equal(server.startTurnCount,0);
+});

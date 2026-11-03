@@ -1338,3 +1338,118 @@ test('retry requires upgraded host and scoped preflight; direct maintenance cann
   assert.equal(db.all('SELECT * FROM project_turn_reservations').length,1);
  }finally{db.close();}
 });
+
+function unifiedRecoveryFixture(provider='claude') {
+ const f=pendingRecoveryFixture(provider);
+ const discovery=JSON.parse(f.db.get<{discovery_json:string}>("SELECT discovery_json FROM machines WHERE machine_id='retry-host'")!.discovery_json);
+ f.db.run("UPDATE machines SET discovery_json=? WHERE machine_id='retry-host'",JSON.stringify({...discovery,sessionRecoveryRetry:true}));
+ return f;
+}
+function pendingCommand(f:ReturnType<typeof pendingRecoveryFixture>,id='uncertain') {
+ const {db,principal,now}=f;
+ db.run("INSERT INTO commands(command_id,client_mutation_id,payload_hash,workspace_id,actor_user_id,actor_client_session_id,logical_session_id,execution_segment_id,type,precondition_json,payload_json,content_epoch,created_at,expires_at) VALUES(?,?, 'hash',?,?,'retry-client','retry-session','retry-segment','turn.start','{}','{}',1,?,?)",id,id,principal.workspaceId,principal.userId,now,now);
+ db.run("INSERT INTO command_projection(command_id,state,updated_at) VALUES(?,'unknown',?)",id,now);
+ db.run("INSERT INTO command_contents(command_id,body_json,created_at,expires_at) VALUES(?,'{\"prompt\":\"keep my original task\"}',?,?)",id,now,now);
+}
+for(const provider of ['codex','claude','cursor','grok','kimi','qwen','codebuddy'])test(`unified retry recovers unknown receipts without a bound turn: ${provider}`,async()=>{
+ const f=unifiedRecoveryFixture(provider);const {db,principal}=f;
+ try {
+  db.run("DELETE FROM project_turn_reservations");pendingCommand(f);
+  const {SessionRecoveryService}=await import('../src/session-recovery.js');const service=new SessionRecoveryService(db);
+  const before=db.get("SELECT * FROM execution_segments");const token=service.inspect(principal,'retry-session').token;
+  const op=service.dismiss(principal,'retry-session',token).operation;
+  const m=new MaintenanceService(db);const target=m.offers('retry-host')[0]!.recoveryTarget as any;
+  assert.equal(target.mode,'retry');assert.equal(target.nativeTurnId,null);assert.equal(target.commands[0].command_id,'uncertain');
+  assert.equal(db.get<any>("SELECT state FROM command_projection")!.state,'unknown','must wait for host');
+  m.result('retry-host',String(op.operationId),'succeeded',{recovered:true,recoveryToken:token,nativeThreadId:target.nativeThreadId,nativeTurnId:null,status:'idle'},null);
+  assert.equal(db.get<any>("SELECT state FROM command_projection")!.state,'invalidated');
+  const detail=JSON.parse(db.get<any>("SELECT detail_json FROM command_lifecycle ORDER BY lifecycle_id DESC LIMIT 1")!.detail_json);
+  assert.equal(detail.resultKnown,false);assert.equal(detail.error.code,'RECOVERY_DISMISSED');
+  assert.equal(db.get<any>("SELECT body_json FROM command_contents")!.body_json,'{"prompt":"keep my original task"}');
+  assert.equal(sessionActions(db,'retry-session','retry-client').start.allowed,true);
+  assert.deepEqual(db.get("SELECT * FROM execution_segments"),before);
+  assert.equal(db.all("SELECT * FROM commands").length,1);assert.equal(db.all("SELECT * FROM durable_events").length,0);
+ }finally{db.close();}
+});
+for(const shape of ['same-runtime','unbound','unmanaged','no-reservation'])test(`unified retry accepts stale state for host verification: ${shape}`,async()=>{
+ const {db,principal}=unifiedRecoveryFixture();try{
+  if(shape==='same-runtime')db.run("UPDATE project_turn_reservations SET bound_app_server_epoch='new-runtime'");
+  if(shape==='unbound')db.run("UPDATE project_turn_reservations SET binding_state='unbound',native_turn_id=NULL,bound_app_server_epoch=NULL");
+  if(shape==='unmanaged')db.run("UPDATE logical_sessions SET managed=0");
+  if(shape==='no-reservation')db.run("DELETE FROM project_turn_reservations");
+  const {SessionRecoveryService}=await import('../src/session-recovery.js');const svc=new SessionRecoveryService(db);
+  const pre=svc.inspect(principal,'retry-session');assert.equal(pre.canRetry,true);
+  const op=svc.dismiss(principal,'retry-session',pre.token).operation;
+  const m=new MaintenanceService(db);const target=m.offers('retry-host')[0]!.recoveryTarget as any;
+  m.result('retry-host',String(op.operationId),'succeeded',{recovered:true,recoveryToken:pre.token,nativeThreadId:target.nativeThreadId,nativeTurnId:target.nativeTurnId,status:'idle'},null);
+  assert.equal(db.get<any>("SELECT execution_state FROM logical_sessions")!.execution_state,'idle');
+  assert.equal(db.all("SELECT * FROM project_turn_reservations").length,0);
+ }finally{db.close();}
+});
+for(const failure of ['failed','expired','unknown','not-recovered','missing-result'])test(`a subsequent recovery click gets a fresh attempt after ${failure}`,async()=>{
+ const {db,principal}=unifiedRecoveryFixture();try{
+  const {SessionRecoveryService}=await import('../src/session-recovery.js');const svc=new SessionRecoveryService(db);
+  const first=svc.inspect(principal,'retry-session');const op=svc.dismiss(principal,'retry-session',first.token).operation;
+  if(failure==='missing-result')new MaintenanceService(db).result('retry-host',String(op.operationId),'succeeded',{},null);
+  else if(failure==='not-recovered')new MaintenanceService(db).result('retry-host',String(op.operationId),'succeeded',{recovered:false,reason:'still running'},null);
+  else db.run("UPDATE machine_operations SET state=? WHERE operation_id=?",failure,op.operationId as string);
+  const second=svc.inspect(principal,'retry-session');assert.notEqual(second.token,first.token);
+  assert.notEqual(svc.dismiss(principal,'retry-session',second.token).operation.operationId,op.operationId);
+ }finally{db.close();}
+});
+for(const changed of ['command','turn-version','reservation','segment','epoch','wrong-token'])test(`late recovery receipt never clears changed state: ${changed}`,async()=>{
+ const f=unifiedRecoveryFixture();const {db,principal}=f;try{
+  const {SessionRecoveryService}=await import('../src/session-recovery.js');const svc=new SessionRecoveryService(db);
+  const pre=svc.inspect(principal,'retry-session');const op=svc.dismiss(principal,'retry-session',pre.token).operation;
+  if(changed==='command')pendingCommand(f,'new-command');
+  if(changed==='turn-version')db.run('UPDATE logical_sessions SET turn_control_version=turn_control_version+1');
+  if(changed==='reservation')db.run('UPDATE project_turn_reservations SET version=version+1');
+  if(changed==='segment')db.run("UPDATE execution_segments SET native_thread_id='replacement'");
+  if(changed==='epoch')db.run("UPDATE agent_connections SET app_server_epoch='another-runtime'");
+  new MaintenanceService(db).result('retry-host',String(op.operationId),'succeeded',{recovered:true,recoveryToken:changed==='wrong-token'?'bad':pre.token,nativeThreadId:'original-native-session',nativeTurnId:'old-turn',status:'interrupted'},null);
+  assert.equal(db.all('SELECT * FROM project_turn_reservations').length,1);
+  assert.equal(JSON.parse(db.get<any>('SELECT result_json FROM machine_operations')!.result_json).recovered,false);
+ }finally{db.close();}
+});
+test('recovery preserves a command that acquired a real terminal receipt while checking the host',async()=>{
+ const f=unifiedRecoveryFixture();const {db,principal}=f;try{
+  pendingCommand(f);const {SessionRecoveryService}=await import('../src/session-recovery.js');const svc=new SessionRecoveryService(db);
+  const pre=svc.inspect(principal,'retry-session');const op=svc.dismiss(principal,'retry-session',pre.token).operation;
+  db.run("UPDATE command_projection SET state='applied' WHERE command_id='uncertain'");
+  new MaintenanceService(db).result('retry-host',String(op.operationId),'succeeded',{recovered:true,recoveryToken:pre.token,nativeThreadId:'original-native-session',nativeTurnId:'old-turn',status:'interrupted'},null);
+  assert.equal(db.get<any>("SELECT state FROM command_projection")!.state,'applied');assert.equal(db.all("SELECT * FROM command_lifecycle WHERE state='invalidated'").length,0);
+ }finally{db.close();}
+});
+test('uncertain bookkeeping does not remove stop for a bound current-runtime task',()=>{
+ const {db}=unifiedRecoveryFixture();try{
+  db.run("UPDATE logical_sessions SET active_turn_id='old-turn',execution_state='running'");
+  db.run("UPDATE project_turn_reservations SET bound_app_server_epoch='new-runtime',state='unknown'");
+  assert.equal(sessionActions(db,'retry-session','retry-client').cancel.allowed,true);
+  assert.equal(sessionActions(db,'retry-session','retry-client').start.allowed,false);
+  db.run("UPDATE project_turn_reservations SET bound_app_server_epoch='old-runtime'");
+  assert.equal(sessionActions(db,'retry-session','retry-client').cancel.allowed,false);
+ }finally{db.close();}
+});
+test('retry clears a stale queue entry while preserving its already-known command outcome',async()=>{
+ const f=unifiedRecoveryFixture();const {db,principal,now}=f;try{
+  pendingCommand(f);db.run("DELETE FROM project_turn_reservations");db.run("UPDATE logical_sessions SET execution_state='idle'");db.run("UPDATE command_projection SET state='applied'");
+  db.run("INSERT INTO turn_queue(queue_item_id,command_id,workspace_id,logical_session_id,actor_client_session_id,accepted_queue_version,position,state,created_at,expires_at,updated_at) VALUES('stale-queue','uncertain',?,'retry-session','retry-client',1,1,'unknown',?,?,?)",principal.workspaceId,now,now,now);
+  const {SessionRecoveryService}=await import('../src/session-recovery.js');const svc=new SessionRecoveryService(db);const pre=svc.inspect(principal,'retry-session');assert.equal(pre.canRetry,true);
+  const op=svc.dismiss(principal,'retry-session',pre.token).operation;
+  new MaintenanceService(db).result('retry-host',String(op.operationId),'succeeded',{recovered:true,recoveryToken:pre.token,nativeThreadId:'original-native-session',nativeTurnId:null,status:'idle'},null);
+  assert.equal(db.get<any>('SELECT state FROM turn_queue')!.state,'cancelled');assert.equal(db.get<any>('SELECT state FROM command_projection')!.state,'applied');
+ }finally{db.close();}
+});
+for(const native of [null,'host-preserved-native'])test(`first-message retry with initially missing native identity: ${native}`,async()=>{
+ const f=unifiedRecoveryFixture();const {db,principal}=f;try{
+  pendingCommand(f);db.run("UPDATE execution_segments SET native_thread_id=NULL");db.run("DELETE FROM project_turn_reservations");
+  const {SessionRecoveryService}=await import('../src/session-recovery.js');const svc=new SessionRecoveryService(db);const pre=svc.inspect(principal,'retry-session');assert.equal(pre.canRetry,true);
+  const op=svc.dismiss(principal,'retry-session',pre.token).operation;
+  // A registry refresh may learn the host's original identity before the receipt arrives.
+  if(native)db.run('UPDATE execution_segments SET native_thread_id=?',native);
+  new MaintenanceService(db).result('retry-host',String(op.operationId),'succeeded',{recovered:true,recoveryToken:pre.token,nativeThreadId:native,nativeTurnId:null,status:'idle'},null);
+  assert.equal(db.get<any>('SELECT execution_state FROM logical_sessions')!.execution_state,'idle');
+  assert.equal(db.get<any>('SELECT native_thread_id FROM execution_segments')!.native_thread_id,native);
+  assert.equal(db.get<any>('SELECT state FROM command_projection')!.state,'invalidated');assert.equal(db.all('SELECT * FROM commands').length,1);
+ }finally{db.close();}
+});

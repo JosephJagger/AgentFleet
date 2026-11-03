@@ -32,12 +32,16 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     native_thread_id: string | null; history_mode: string | null; machine_reachability: string;
     identity_state: string; security_state: string; compatibility: string; runtime_read_only: number;
     command_types_json: string | null; holder: string | null; pending_approvals: number; queued: number; frozen: number;
-    runtime_settings_json: string | null; maintenance_json: string | null;
+    runtime_settings_json: string | null; maintenance_json: string | null; reservation_session: string | null; current_turn: number;
     paginated_history: number; provider: string; discovery_json: string | null;
   }>(`SELECT s.*,p.provider,p.sync_content,m.discovery_json,e.native_thread_id,e.history_mode,m.reachability AS machine_reachability,
       m.identity_state,m.security_state,m.compatibility,m.runtime_read_only,m.maintenance_json,m.command_types_json,m.paginated_history,
       (SELECT holder_client_session_id FROM control_leases WHERE logical_session_id=s.logical_session_id
         AND state='active' AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY acquired_at DESC LIMIT 1) AS holder,
+      (SELECT logical_session_id FROM project_turn_reservations WHERE project_id=s.project_id) AS reservation_session,
+      EXISTS(SELECT 1 FROM project_turn_reservations r JOIN agent_connections a ON a.machine_id=s.machine_id AND a.disconnected_at IS NULL
+        WHERE r.project_id=s.project_id AND r.logical_session_id=s.logical_session_id AND r.native_turn_id=s.active_turn_id
+        AND r.binding_state='bound' AND r.bound_app_server_epoch=a.app_server_epoch) AS current_turn,
       (SELECT count(*) FROM approvals WHERE logical_session_id=s.logical_session_id AND state='pending') AS pending_approvals,
       (SELECT count(*) FROM turn_queue WHERE logical_session_id=s.logical_session_id AND state IN ('queued','dispatching','unknown')) AS queued,
       EXISTS(
@@ -82,7 +86,7 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     else if (row.reachability !== "live") availability = blocked("SESSION_RECONCILING", "会话正在同步");
     else if (row.security_state !== "normal" || !isAcpProvider(row.provider) && row.runtime_read_only) availability = blocked("MACHINE_READ_ONLY", "主机当前只能读取会话");
     else if (!isAcpProvider(row.provider) && row.compatibility !== "compatible") availability = blocked("MACHINE_INCOMPATIBLE", "当前运行环境尚未验证此操作");
-    else if (row.frozen) availability = blocked("PROJECT_OUTCOME_UNKNOWN", "需要核验上一次操作结果");
+    else if (row.frozen && !(action === "cancel" && row.current_turn)) availability = {...blocked("PROJECT_OUTCOME_UNKNOWN", "请点击重试恢复以继续会话"),...(row.reservation_session && row.reservation_session!==sessionId?{recoverySessionId:row.reservation_session}:{})};
     else if (heldElsewhere) availability = blocked("CONTROL_HELD_ELSEWHERE", "另一个账号正在操作此会话");
     else if (action === "claim" && row.managed) availability = blocked("SESSION_ALREADY_MANAGED", "会话已可在面板操作");
     else if (action !== "claim" && !row.managed) availability = blocked("EXTERNAL_SESSION_READ_ONLY", "先连接此会话的操作能力");
@@ -96,7 +100,7 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     else if (["deletePreview", "delete", "release", "rename", "archive", "unarchive", "fork"].includes(action) && (row.pending_approvals || row.queued)) availability = blocked("SESSION_HAS_PENDING_WORK", "请先处理待审批与排队任务");
     else if (["deletePreview", "delete", "rename", "archive", "unarchive", "fork", "compact", "review", "stop"].includes(action) && !row.native_thread_id) availability = blocked("THREAD_NOT_AVAILABLE", "先发送一条消息建立宿主机会话");
     else if (["claim", "start", "queue", "release", "archive", "fork", "compact", "review"].includes(action) && row.runtime_settings_json && JSON.parse(row.runtime_settings_json)?.archived === true) availability = blocked("THREAD_ARCHIVED", row.managed ? "先恢复宿主机归档会话" : "请先在宿主机恢复归档，再接管原会话");
-    else if (["claim", "start", "compact", "review"].includes(action) && directoryVerdict(action === "start")) availability = blocked("PROJECT_TURN_RESERVED", "此目录已有执行中或待核验任务，请等待完成；Codex 与 Claude Code 共用目录时不能并行执行");
+    else if (["claim", "start", "compact", "review"].includes(action) && directoryVerdict(action === "start")) availability = {...blocked("PROJECT_TURN_RESERVED", "此目录已有执行中或待核验任务，请打开占用会话处理"),...(directoryVerdict(action === "start")!.logical_session_id!==sessionId?{recoverySessionId:directoryVerdict(action === "start")!.logical_session_id}:{})};
     else if (action === "approve" && !row.pending_approvals) availability = blocked("NO_PENDING_APPROVAL", "当前没有待审批操作");
     actions[action] = availability;
   }

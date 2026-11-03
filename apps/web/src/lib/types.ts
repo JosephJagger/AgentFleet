@@ -205,10 +205,11 @@ export interface FleetSession {
   activeTurnId?: string | null;
   controlLease?: ControlLease | null;
   unreadCount?: number;
-  actions?: Partial<Record<"deletePreview" | "delete" | "claim" | "release" | "start" | "queue" | "steer" | "cancel" | "read" | "rename" | "archive" | "unarchive" | "fork" | "compact" | "review" | "inspect" | "manage" | "stop", { allowed: boolean; reasonCode: string | null; message: string | null }>>;
+  actions?: Partial<Record<"deletePreview" | "delete" | "claim" | "release" | "start" | "queue" | "steer" | "cancel" | "read" | "rename" | "archive" | "unarchive" | "fork" | "compact" | "review" | "inspect" | "manage" | "stop", { allowed: boolean; reasonCode: string | null; message: string | null; recoverySessionId?: string }>>;
 }
 
 export interface CommandReceipt {
+  errorCode?: string;
   grokResult?: import("./grok-operations").GrokOperationResult;
   codexResult?: { operation: string; status: string; rows: { name: string; detail: string; status: string }[]; url?: string; nextCursor?: string };
   deletionPreview?: {nativeThreadId:string;fingerprint:string;expiresAt:string;threads:{id:string;title:string;cwd:string}[]};

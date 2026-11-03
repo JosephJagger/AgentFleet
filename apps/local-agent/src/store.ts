@@ -751,7 +751,7 @@ export class StateStore {
     return this.auxiliaryActivities.size === 0 && !state.panelVoiceRuntime && !Object.values(state.maintenanceOperations).some(operation => operation.state === "running" && ["images.preview", "images.clean", "versions.clean", "worktree.create", "worktree.merge", "worktree.remove"].includes(operation.operationType)) &&
       !Object.values(state.managedThreads).some((thread) => thread.activeTurnId !== undefined || thread.realtimeSessionId !== undefined) &&
       !Object.values(state.approvals).some((approval) => approval.state === "pending" || approval.state === "delivery_unknown") &&
-      !Object.values(state.commandJournal).some((command) => ["claimed", "invoking", "responded", "unknown"].includes(command.state) && !ignored.has(command.commandId)) &&
+      !Object.values(state.commandJournal).some((command) => ["claimed", "invoking", "responded", "unknown"].includes(command.state) && !ignored.has(command.commandId) && !state.recoveryDisposals?.[command.commandId]) &&
       Object.values(state.projectReservations).every(reservation => ignored.has(reservation.commandId));
   }
 
@@ -1007,6 +1007,7 @@ export class StateStore {
 
   async claimCommand(command: FleetCommand, envelopeHash: string): Promise<{ entry: InboxEntry; isNew: boolean }> {
     return this.update((state) => {
+      if(state.recoveryDisposals?.[command.commandId])throw new AgentError("COMMAND_RECOVERY_DISMISSED","该操作的等待状态已由用户解除，原命令不会重发");
       const existing = state.inbox[command.attemptId];
       if (existing) {
         const journal = state.commandJournal[command.commandId];
@@ -1325,7 +1326,7 @@ export class StateStore {
       const timestamp = nowIso();
       let unknownCommands = 0;
       for (const journal of Object.values(state.commandJournal)) {
-        if (["applied", "rejected", "unknown"].includes(journal.state)) continue;
+        if (state.recoveryDisposals?.[journal.commandId] || ["applied", "rejected", "unknown"].includes(journal.state)) continue;
         const error = { code: "AGENT_RESTARTED_DURING_COMMAND", message: "agent restarted before command completion was proven" };
         journal.state = "unknown";
         journal.error = error;

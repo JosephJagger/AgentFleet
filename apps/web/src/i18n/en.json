@@ -4490,5 +4490,8 @@
   "已解除挂起，可以继续原会话。上一轮结果仍未确认，原任务没有重发。": "The conversation is available again. The previous outcome is still unknown; the task was not resent.",
   "请更新主机连接服务后使用重试恢复": "Update the host connection service to retry recovery.",
   "主机仍报告任务在运行，请先停止任务或检查任务结果": "The host still reports a running task. Stop it or check its result first.",
-  "会话状态已变化，请重新点击重试恢复": "The conversation has changed. Click Retry recovery again."
+  "会话状态已变化，请重新点击重试恢复": "The conversation has changed. Click Retry recovery again.",
+  "同一目录的会话需要处理": "Another session in this folder needs attention",
+  "打开占用会话": "Open blocking session",
+  "已解除等待": "Waiting state cleared"
 }
