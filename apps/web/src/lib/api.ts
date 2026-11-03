@@ -1042,6 +1042,13 @@ export const api = {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { signal });
     return list(raw.operations).map(mapHostOperation);
   },
+  async retrySessionRecovery(sessionId: string): Promise<HostOperation> {
+    const path = `/api/sessions/${encodeURIComponent(sessionId)}/recovery`;
+    const preview = await request<{ canRetry: boolean; token: string | null; reason: string | null }>(path);
+    if (!preview.canRetry) throw new Error(preview.reason ?? "暂时无法恢复");
+    const raw = await request<JsonObject>(path, { method: "POST", body: JSON.stringify({ token: preview.token }) });
+    return mapHostOperation(raw.operation);
+  },
   async hostOperation(machineId: string, type: MaintenanceType, clientMutationId: string, logicalSessionId?: string): Promise<HostOperation> {
     const raw = await request<JsonObject>(`/api/machines/${encodeURIComponent(machineId)}/operations`, { method: "POST", body: JSON.stringify({ type, clientMutationId, ...(logicalSessionId ? {logicalSessionId} : {}) }) });
     return mapHostOperation(raw.operation);

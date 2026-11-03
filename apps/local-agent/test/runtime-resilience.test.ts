@@ -2187,3 +2187,29 @@ test("a completed Grok session fork requests a catalog scan without failing when
   assert.deepEqual(ackStates(acks, "fork-scan-down"), ["claimed", "invoking", "responded", "applied"]);
   assert.deepEqual(calls, ["tasks.list", "session.fork", "session.fork"]);
 });
+
+for(const mode of ['idle','running','unknown','wrong-cwd','changed-turn','runtime-changed'] as const)test(`user retry clears an orphan only after native activity and identity checks: ${mode}`,async t=>{
+ const {store,projects}=await fixture();const project=projects[0]!;
+ const old:ManagedThread={nativeThreadId:'orphan-native',logicalSessionId:'orphan-session',executionSegmentId:'orphan-segment',projectId:project.id,sessionCwd:project.root,appServerEpoch:'old-runtime',policyVersion:'remote-restricted-v1',policyVerified:true,contentEpoch:1,createdAt:'2026-09-08T00:00:00Z',activeTurnId:'orphan-turn',lastTurnId:'orphan-turn',lastTurnStatus:'inProgress'};
+ await store.setManagedThread(old);let server!:FakeAppServer;let reads=0;
+ const runtime=new AgentRuntime({store,identity,pairing,support,appServerFactory:cb=>{
+  server=new FakeAppServer('new-runtime',cb);
+  return Object.assign(server,{
+   readTurnOutcome:async()=>{throw Error('Retry must not depend on missing terminal proof');},
+   readThread:async()=>{reads++;if(mode==='changed-turn')await store.updateManagedThread(old.nativeThreadId,v=>{v.activeTurnId='new-turn';});return {nativeThreadId:old.nativeThreadId,cwd:mode==='wrong-cwd'?'/wrong':project.root,executionState:mode==='running'?'running':mode==='unknown'?'unknown':'idle',historyMode:'legacy',updatedAt:1,items:[]};},
+  });
+ }});captureCallbacks(runtime);await runtime.initialize();t.after(()=>runtime.shutdown());
+ const target={mode:'dismiss',appServerEpoch:mode==='runtime-changed'?'another-runtime':'new-runtime',nativeThreadId:old.nativeThreadId,nativeTurnId:old.activeTurnId,previousAppServerEpoch:old.appServerEpoch,logicalSessionId:old.logicalSessionId,executionSegmentId:old.executionSegmentId,contentEpoch:old.contentEpoch};
+ if(mode==='runtime-changed'){await assert.rejects(runtime.recoverFrozenSession(target),/重连/);assert.equal(reads,0);return;}
+ const result=await runtime.recoverFrozenSession(target);assert.equal(result.recovered,mode==='idle');
+ assert.equal(server.startTurnCount,0);assert.equal(server.createThreadCount,0);
+ const state=store.snapshot();assert.equal(Object.keys(state.commandJournal).length,0);
+ const events=state.outbox.filter(e=>e.payload.userRequestedRecovery===true);assert.equal(events.length,mode==='idle'?1:0);
+ if(mode==='idle'){
+  assert.equal(events[0]?.type,'turn.interrupted');assert.equal(events[0]?.payload.resultKnown,false);
+  assert.equal(state.managedThreads[old.nativeThreadId]?.activeTurnId,undefined);
+  assert.equal(state.managedThreads[old.nativeThreadId]?.appServerEpoch,'new-runtime');
+  assert.equal(state.managedThreads[old.nativeThreadId]?.lastTurnStatus,'interrupted');
+  assert.equal(state.managedThreads[old.nativeThreadId]?.logicalSessionId,old.logicalSessionId);
+ }
+});

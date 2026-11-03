@@ -21,6 +21,7 @@ import { panelVoiceBindingMatches, type PanelTransportBinding } from './panel-vo
 import { SessionHistoryService } from './session-history.js';
 import { SessionHistoryBroker } from './session-history-broker.js';
 import { SessionProgressService } from "./session-progress.js";
+import { SessionRecoveryService } from "./session-recovery.js";
 import { editQueuedPrompt } from "./queue-edit.js";
 import { reorderQueue } from "./queue-order.js";
 import { VoicePreferencesService } from "./voice-preferences.js";
@@ -1699,6 +1700,16 @@ export async function buildControlPlane(
       commands: coordination.listCommands(principal, logicalSessionId),
       queue: coordination.listQueue(principal, logicalSessionId),
     };
+  });
+  app.get("/api/sessions/:id/recovery", { preHandler: authenticate }, async request =>
+    new SessionRecoveryService(db).inspect(request.principal as Principal, routeId(request)));
+  app.post("/api/sessions/:id/recovery", { preHandler: mutate }, async request => {
+    const sessionId = routeId(request);
+    const result = new SessionRecoveryService(db).dismiss(request.principal as Principal, sessionId, record(request.body).token);
+    offerMaintenance(String(result.operation.machineId));
+    broadcastSession(sessionId, { type: "session.changed", logicalSessionId: sessionId });
+    broadcastSession(sessionId, { type: "queue.changed", logicalSessionId: sessionId });
+    return result;
   });
   app.post("/api/pending-commits/dismiss", { preHandler: mutate }, async request =>
     dismissPendingCommit(db, request.principal as Principal, record(request.body)));

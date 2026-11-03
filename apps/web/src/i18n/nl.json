@@ -4482,5 +4482,13 @@
   "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Je Codex-aanmelding is verlopen. Koppel je ChatGPT-account opnieuw op deze host en probeer het nog eens.",
   "有新版本可用，刷新后生效": "Er is een nieuwe versie beschikbaar. Vernieuw om deze toe te passen.",
   "立即刷新": "Nu vernieuwen",
-  "稍后": "Later"
+  "稍后": "Later",
+  "重试恢复": "Herstel opnieuw proberen",
+  "检查任务结果": "Taakresultaat controleren",
+  "上一次任务的结果尚未确认": "Het resultaat van de vorige taak is nog onbekend",
+  "恢复原会话，不重发任务。排队消息会取消，内容保留。": "Herstel dit gesprek zonder de taak opnieuw te versturen. Berichten in de wachtrij worden geannuleerd; de tekst blijft bewaard.",
+  "已解除挂起，可以继续原会话。上一轮结果仍未确认，原任务没有重发。": "Je kunt het gesprek voortzetten. Het vorige resultaat is nog onbekend; de taak is niet opnieuw verstuurd.",
+  "请更新主机连接服务后使用重试恢复": "Werk de verbindingsservice op de host bij om herstel opnieuw te proberen.",
+  "主机仍报告任务在运行，请先停止任务或检查任务结果": "Volgens de host is er nog een taak actief. Stop deze of controleer eerst het resultaat.",
+  "会话状态已变化，请重新点击重试恢复": "De status van het gesprek is gewijzigd. Probeer herstel opnieuw."
 }

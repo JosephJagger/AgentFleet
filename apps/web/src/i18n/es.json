@@ -4482,5 +4482,13 @@
   "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Tu sesión de Codex ha caducado. Vuelve a conectar tu cuenta de ChatGPT en este equipo e inténtalo de nuevo.",
   "有新版本可用，刷新后生效": "Hay una nueva versión disponible. Actualiza para aplicarla.",
   "立即刷新": "Actualizar ahora",
-  "稍后": "Más tarde"
+  "稍后": "Más tarde",
+  "重试恢复": "Reintentar recuperación",
+  "检查任务结果": "Consultar resultado",
+  "上一次任务的结果尚未确认": "Aún no se conoce el resultado de la tarea anterior",
+  "恢复原会话，不重发任务。排队消息会取消，内容保留。": "Recupera la conversación sin reenviar la tarea. Los mensajes en cola se cancelarán, pero se conservará su contenido.",
+  "已解除挂起，可以继续原会话。上一轮结果仍未确认，原任务没有重发。": "Ya puedes continuar la conversación. El resultado anterior sigue sin confirmarse; la tarea no se ha reenviado.",
+  "请更新主机连接服务后使用重试恢复": "Actualiza el servicio de conexión del equipo para reintentar la recuperación.",
+  "主机仍报告任务在运行，请先停止任务或检查任务结果": "El equipo indica que la tarea sigue en curso. Detenla o consulta primero el resultado.",
+  "会话状态已变化，请重新点击重试恢复": "El estado de la conversación ha cambiado. Reintenta la recuperación."
 }

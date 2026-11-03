@@ -2589,6 +2589,7 @@ export class RegistryService {
     if(providerPolicy)safe.providerRuntimePolicy=providerPolicy;
     safe.managedProviderSupport=discovery.managedProviderSupport===true;
     safe.managedEligibilitySupport=discovery.managedEligibilitySupport===true;
+    safe.sessionRecoveryDismiss=discovery.sessionRecoveryDismiss===true;
     if(discovery.managedEligibility&&typeof discovery.managedEligibility==='object')safe.managedEligibility=Object.fromEntries(['claude','grok'].flatMap(id=>{const value=parseManagedEligibility((discovery.managedEligibility as Record<string,unknown>)[id]);return value?[[id,value]]:[];}));
     if(typeof discovery.managedGrokVersion==='string'&&/^\d+\.\d+\.\d+$/.test(discovery.managedGrokVersion))safe.managedGrokVersion=discovery.managedGrokVersion;
     if(typeof discovery.managedGrokPrevious==='string'&&/^\d+\.\d+\.\d+$/.test(discovery.managedGrokPrevious))safe.managedGrokPrevious=discovery.managedGrokPrevious;

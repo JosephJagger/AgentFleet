@@ -1248,3 +1248,93 @@ test("generated image replay above 1 MB completes reconciliation and restores he
   socket.send(" ".repeat(49_000_000));
   assert.equal(await closed,1009);
 });
+
+function pendingRecoveryFixture(provider = 'claude') {
+  const db = new ControlPlaneDatabase(':memory:'); const owner = db.bootstrap(config(':memory:')); const now = new Date().toISOString();
+  insertMachine(db, owner.workspaceId, 'retry-host', now);
+  db.run("UPDATE machines SET discovery_json=? WHERE machine_id='retry-host'", JSON.stringify({sessionRecoveryDismiss:true,agentRuntimes:{claude:{installed:true},[provider]:{installed:true,state:'ready',capabilities:{prompt:true}}}}));
+  db.run("INSERT INTO client_sessions(client_session_id,workspace_id,user_id,token_hash,csrf_hash,created_at,last_seen_at,expires_at) VALUES('retry-client',?,?,'retry-token','retry-csrf',?,?,?)", owner.workspaceId,owner.userId,now,now,new Date(Date.now()+60000).toISOString());
+  db.run("UPDATE machines SET maintenance_types_json='[\"session.reconcile\"]' WHERE machine_id='retry-host'");
+  db.run("INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,lease_version,created_at,last_reported_at,provider) VALUES('retry-project',?,'retry-host','project','Project','/work','identity',1,?,?,?)",owner.workspaceId,now,now,provider);
+  db.run("INSERT INTO logical_sessions(logical_session_id,workspace_id,machine_id,project_id,external_id,title,managed,execution_state,reachability,created_at,updated_at) VALUES('retry-session',?,'retry-host','retry-project','retry-session','Frozen',1,'unknown','live',?,?)",owner.workspaceId,now,now);
+  db.run("INSERT INTO execution_segments(execution_segment_id,logical_session_id,machine_id,project_id,external_id,native_thread_id,history_mode,created_at) VALUES('retry-segment','retry-session','retry-host','retry-project','retry-segment','original-native-session','paginated',?)",now);
+  db.run("INSERT INTO agent_connections(connection_id,machine_id,transport_generation,producer_epoch,app_server_epoch,connected_at) VALUES('retry-connection','retry-host',1,'new-producer','new-runtime',?)",now);
+  db.run("INSERT INTO project_turn_reservations(project_id,logical_session_id,native_turn_id,state,version,reserved_at,updated_at,bound_producer_epoch,bound_app_server_epoch,binding_state) VALUES('retry-project','retry-session','old-turn','active',1,?,?,'old-producer','old-runtime','bound')",now,now);
+  const principal = { workspaceId:owner.workspaceId,userId:owner.userId,clientSessionId:'retry-client',email:'admin@example.test',csrfHash:'retry-csrf',expiresAt:new Date(Date.now()+60000).toISOString() } as Principal;
+  return {db,principal,now};
+}
+
+for (const provider of ['codex','claude','cursor','grok','kimi','qwen','codebuddy']) test(`user retry releases only obsolete pending state and preserves native identity: ${provider}`, async () => {
+  const {SessionRecoveryService} = await import('../src/session-recovery.js');
+  const {db,principal}=pendingRecoveryFixture(provider);
+  try {
+    const service=new SessionRecoveryService(db);
+    assert.equal(sessionActions(db,'retry-session','retry-client').start.reasonCode,'PROJECT_OUTCOME_UNKNOWN');
+    const nativeBefore=db.get("SELECT * FROM execution_segments WHERE logical_session_id='retry-session'");
+    const preview=service.inspect(principal,'retry-session');assert.equal(preview.canRetry,true);
+    assert.equal(db.get<{execution_state:string}>("SELECT execution_state FROM logical_sessions")?.execution_state,'unknown','inspection never clears the lock');
+    const operation=service.dismiss(principal,'retry-session',preview.token).operation;
+    assert.equal(sessionActions(db,'retry-session','retry-client').start.reasonCode,'PROJECT_OUTCOME_UNKNOWN','pending until host persists recovery');
+    const maintenance=new MaintenanceService(db);
+    const offer=maintenance.offers('retry-host').find(o=>o.operationId===operation.operationId)!;
+    assert.equal((offer.recoveryTarget as {mode:string}).mode,'dismiss');
+    maintenance.result('retry-host',String(operation.operationId),'succeeded',{recovered:true,nativeThreadId:'original-native-session',nativeTurnId:'old-turn',previousAppServerEpoch:'old-runtime',status:'interrupted'},null);
+    assert.equal(sessionActions(db,'retry-session','retry-client').start.allowed,true);
+    assert.deepEqual(db.get("SELECT * FROM execution_segments WHERE logical_session_id='retry-session'"),nativeBefore);
+    assert.equal(db.get<{execution_state:string}>("SELECT execution_state FROM logical_sessions")?.execution_state,'interrupted');
+    assert.equal(db.all('SELECT * FROM commands').length,0,'never replay a prompt');
+    assert.equal(db.all('SELECT * FROM durable_events').length,0,'never fabricate native completion evidence');
+    assert.equal(service.dismiss(principal,'retry-session',preview.token).operation.operationId,operation.operationId);
+    assert.equal(db.all("SELECT * FROM audit_entries WHERE action='session.recovery_requested'").length,1);
+  } finally {db.close();}
+});
+
+for (const change of ['current-runtime','active-turn','new-reservation','new-content','new-segment','offline','foreign-workspace','foreign-session','unknown-command'] as const) test(`retry cannot dismiss changed or active work: ${change}`, async () => {
+  const {SessionRecoveryService}=await import('../src/session-recovery.js');const {db,principal,now}=pendingRecoveryFixture();
+  try {
+    const service=new SessionRecoveryService(db);const preview=service.inspect(principal,'retry-session');
+    if(change==='current-runtime')db.run("UPDATE project_turn_reservations SET bound_app_server_epoch='new-runtime'");
+    if(change==='active-turn')db.run("UPDATE logical_sessions SET active_turn_id='active',execution_state='running'");
+    if(change==='new-reservation')db.run("UPDATE project_turn_reservations SET version=version+1,native_turn_id='different'");
+    if(change==='new-content')db.run('UPDATE logical_sessions SET content_epoch=content_epoch+1');
+    if(change==='new-segment')db.run("UPDATE execution_segments SET native_thread_id='replacement'");
+    if(change==='offline')db.run("UPDATE machines SET reachability='offline'");
+    if(change==='unknown-command'){
+      db.run("INSERT INTO commands(command_id,client_mutation_id,payload_hash,workspace_id,actor_user_id,actor_client_session_id,logical_session_id,execution_segment_id,type,precondition_json,payload_json,content_epoch,created_at,expires_at) VALUES('uncertain','uncertain','hash',?,?,'retry-client','retry-session','retry-segment','turn.start','{}','{}',1,?,?)",principal.workspaceId,principal.userId,now,now);
+      db.run("INSERT INTO command_projection(command_id,state,updated_at) VALUES('uncertain','unknown',?)",now);
+    }
+    assert.throws(()=>service.dismiss(change==='foreign-workspace'?{...principal,workspaceId:'other'}:principal,change==='foreign-session'?'other':'retry-session',preview.token));
+    assert.equal(db.all('SELECT * FROM project_turn_reservations').length,1);
+    assert.equal(db.all("SELECT * FROM audit_entries WHERE action='session.recovery_requested'").length,0);
+  } finally {db.close();}
+});
+
+test('retry cancels queued prompts without deleting content or approving old tools',async()=>{
+ const {SessionRecoveryService}=await import('../src/session-recovery.js');const {db,principal,now}=pendingRecoveryFixture();
+ try {
+  db.run("INSERT INTO commands(command_id,client_mutation_id,payload_hash,workspace_id,actor_user_id,actor_client_session_id,logical_session_id,execution_segment_id,type,precondition_json,payload_json,content_epoch,created_at,expires_at) VALUES('waiting','waiting','hash',?,?,'retry-client','retry-session','retry-segment','turn.queue','{}','{}',1,?,?)",principal.workspaceId,principal.userId,now,now);
+  db.run("INSERT INTO command_projection(command_id,state,updated_at) VALUES('waiting','queued',?)",now);
+  db.run("INSERT INTO command_contents(command_id,body_json,created_at,expires_at) VALUES('waiting','{\"prompt\":\"keep this text\"}',?,?)",now,now);
+  db.run("INSERT INTO turn_queue(queue_item_id,command_id,workspace_id,logical_session_id,actor_client_session_id,accepted_queue_version,position,state,created_at,expires_at,updated_at) VALUES('waiting-item','waiting',?,'retry-session','retry-client',1,1,'queued',?,?,?)",principal.workspaceId,now,now,now);
+  db.run("INSERT INTO approvals(approval_id,logical_session_id,execution_segment_id,action_hash,app_server_epoch,version,context_json,state,created_at) VALUES('old-approval','retry-session','retry-segment','hash','old-runtime',1,'{}','pending',?)",now);
+  const service=new SessionRecoveryService(db);service.dismiss(principal,'retry-session',service.inspect(principal,'retry-session').token);
+  assert.equal(db.get<{state:string}>("SELECT state FROM turn_queue")?.state,'cancelled');
+  assert.equal(db.get<{state:string}>("SELECT state FROM command_projection")?.state,'invalidated');
+  assert.equal(db.get<{body_json:string}>("SELECT body_json FROM command_contents")?.body_json,'{"prompt":"keep this text"}');
+  assert.equal(db.get<{state:string}>("SELECT state FROM approvals")?.state,'pending','approval is never automatically accepted');
+  assert.equal(new CoordinationService(db,config(':memory:')).activateNextQueued('retry-session'),null);
+ }finally{db.close();}
+});
+
+test('retry requires upgraded host and scoped preflight; direct maintenance cannot bypass admission',async()=>{
+ const {SessionRecoveryService}=await import('../src/session-recovery.js');const {db,principal}=pendingRecoveryFixture();
+ try {
+  assert.throws(()=>new MaintenanceService(db).create(principal,'retry-host','session.reconcile','direct-dismiss','retry-session',undefined,undefined,{mode:'dismiss'}),/Use the session recovery endpoint/);
+  const service=new SessionRecoveryService(db);const preview=service.inspect(principal,'retry-session');
+  db.run("UPDATE machines SET discovery_json='{}' WHERE machine_id='retry-host'");
+  assert.equal(service.inspect(principal,'retry-session').reasonCode,'RECOVERY_UPDATE_REQUIRED');
+  assert.throws(()=>service.dismiss(principal,'retry-session',preview.token));
+  assert.equal(db.all('SELECT * FROM machine_operations').length,0);
+  assert.equal(db.all('SELECT * FROM project_turn_reservations').length,1);
+ }finally{db.close();}
+});

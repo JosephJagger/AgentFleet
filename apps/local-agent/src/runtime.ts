@@ -542,7 +542,13 @@ export class AgentRuntime {
     if (!retainedOldTurn && !clearedDuringReconnect) return { recovered: false, reason: "待核验轮次已经变化，请刷新后重试" };
     if (previousAppServerEpoch === server.appServerEpoch) return { recovered: false, reason: "此轮任务仍属于当前执行进程，请等待它结束" };
     if (this.store.snapshot().projectReservations[thread.projectId]) return { recovered: false, reason: "项目仍有结果未知的操作，尚不能解除冻结" };
-    const outcome = await server.readTurnOutcome(thread.nativeThreadId, nativeTurnId);
+    // A user may end the pending state of a lost runtime without claiming the
+    // previous task succeeded. Read native identity/activity, never send a prompt.
+    const dismiss = target.mode === "dismiss";
+    const snapshot = dismiss ? await server.readThread(thread.nativeThreadId, !isAcpProvider(this.store.snapshot().projects.find(p => p.id === thread.projectId)?.provider)) : undefined;
+    if (dismiss && (!snapshot || snapshot.nativeThreadId !== thread.nativeThreadId || !["idle", "completed", "failed", "interrupted"].includes(snapshot.executionState)))
+      return { recovered: false, reason: "主机仍报告任务在运行，请先停止任务或检查任务结果" };
+    const outcome = dismiss && snapshot ? { cwd: snapshot.cwd, status: "interrupted" } : await server.readTurnOutcome(thread.nativeThreadId, nativeTurnId);
     const project = this.store.snapshot().projects.find(p => p.id === thread.projectId);
     if (!outcome || !project || outcome.cwd !== (thread.sessionCwd ?? project.root) || !["completed", "failed", "interrupted"].includes(outcome.status) || this.appServer !== server) return { recovered: false, reason: "主机尚未提供该轮任务的明确结束记录，继续保持冻结" };
     const recovered = await this.store.recoverPreviousRuntimeTurn(thread, {
@@ -550,11 +556,11 @@ export class AgentRuntime {
       projectId: thread.projectId, logicalSessionId: thread.logicalSessionId!, executionSegmentId: thread.executionSegmentId!,
       contentEpoch: thread.contentEpoch, nativeThreadId: thread.nativeThreadId, nativeTurnId,
       type: outcome.status === "completed" ? "turn.completed" : outcome.status === "failed" ? "turn.failed" : "turn.interrupted",
-      payload: { turn: { id: nativeTurnId, status: outcome.status }, recoveredFromHost: true, previousAppServerEpoch },
+      payload: { turn: { id: nativeTurnId, status: outcome.status }, recoveredFromHost: true, previousAppServerEpoch, ...(dismiss ? { userRequestedRecovery: true, resultKnown: false } : {}) },
     }, outcome.status, previousAppServerEpoch);
     if (recovered) { this.callbacks.onOutboxChanged(); this.notifyRegistryChanged(); }
     return { recovered, previousAppServerEpoch, nativeThreadId: thread.nativeThreadId, nativeTurnId, status: outcome.status,
-      reason: recovered ? "已核验结束记录并解除冻结；原命令没有重发" : "核验期间会话状态发生变化，请刷新后重试" };
+      reason: recovered ? (dismiss ? "已解除挂起，可以继续原会话。上一轮结果仍未确认，原任务没有重发。" : "已核验结束记录并解除冻结；原命令没有重发") : "核验期间会话状态发生变化，请刷新后重试" };
   }
 
   async refreshQuota(): Promise<void> { await this.appServer?.refreshQuota?.(); }
@@ -810,7 +816,7 @@ export class AgentRuntime {
       },
       resumeStreams,
       capacity: this.capacityState(),
-      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), sessionRecoveryDismiss: true, workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       projects: this.projectSummaries(),
       sessions: [...Object.values(state.managedThreads).flatMap((thread) => {
@@ -910,7 +916,7 @@ export class AgentRuntime {
       activeTurns: Object.values(state.managedThreads).filter((thread) => thread.activeTurnId !== undefined).length,
       readOnly: !this.isWritable(),
       readOnlyReasons: this.readOnlyReasons(),
-      discovery: { ...this.getDiscoveryStatus(), workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
+      discovery: { ...this.getDiscoveryStatus(), sessionRecoveryDismiss: true, workspaceGitStatus: this.workspaceGitStatus.snapshot(), providerRuntimePolicy:this.providerRuntimeManager.state(), managedUpdates:this.managedProviderUpdates.status(), managedGrokVersion:this.store.snapshot().managedGrok?.current.release.version??null,managedGrokPrevious:this.store.snapshot().managedGrok?.previous?.release.version??null, managedProviderSupport:true,managedEligibilitySupport:true,managedEligibility:this.managedProviderUpdates.eligibility(), agentRuntimes: this.appServer?.getAgentRuntimes?.() ?? {} },
       maintenance: state.maintenanceDrain ?? null,
       ...(this.support.codexProfile ? { codexProfile: this.support.codexProfile } : {}),
       ...(this.isWritable() ? {} : { unreachableReason: this.readOnlyReasons().join("; ") }),

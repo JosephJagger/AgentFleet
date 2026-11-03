@@ -40,7 +40,7 @@ export function requireFirstManagedAdmission(discovery:Record<string,unknown>,re
 export class MaintenanceService {
   constructor(private readonly db: ControlPlaneDatabase) {}
 
-  create(principal: Principal, machineId: string, type: string, mutationId: string, logicalSessionId?: string, previewOperationId?: string, projectTarget?: { provider?: ProviderId; path: string; alias: string; createDirectory: boolean }, nativeRequest?: unknown): Record<string, unknown> {
+  create(principal: Principal, machineId: string, type: string, mutationId: string, logicalSessionId?: string, previewOperationId?: string, projectTarget?: { provider?: ProviderId; path: string; alias: string; createDirectory: boolean }, nativeRequest?: unknown, admit?: () => void): Record<string, unknown> {
     invariant(MAINTENANCE_TYPES.includes(type as MaintenanceType),400,"INVALID_OPERATION","Unsupported machine operation");
     invariant(mutationId.length>=8 && mutationId.length<=200,400,"INVALID_MUTATION_ID","clientMutationId must be between 8 and 200 characters");
     let hostRequest: ReturnType<typeof parseHostCodexOperation> | undefined;
@@ -51,9 +51,10 @@ export class MaintenanceService {
       const previous=this.db.get<{operation_id:string;type:string;request_json:string|null}>("SELECT operation_id,type,request_json FROM machine_operations WHERE machine_id=? AND actor_client_session_id=? AND client_mutation_id=?",machineId,principal.clientSessionId,mutationId);
       if(previous) {
         const previousRequest = previous.request_json ? JSON.parse(previous.request_json) : {};
-        invariant(previous.type===type && (type!=="provider.runtime" || JSON.stringify(previousRequest)===JSON.stringify(providerRequest)) && (type!=="codex.host" || JSON.stringify(previousRequest)===JSON.stringify(hostRequest)) && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)) && (!worktreeRequest || JSON.stringify(previousRequest)===JSON.stringify(worktreeRequest)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
+        invariant(previous.type===type && (type!=="session.reconcile" || previousRequest.mode === (nativeRequest as {mode?:string}|undefined)?.mode) && (type!=="provider.runtime" || JSON.stringify(previousRequest)===JSON.stringify(providerRequest)) && (type!=="codex.host" || JSON.stringify(previousRequest)===JSON.stringify(hostRequest)) && (type!=="images.clean" || previousRequest.previewOperationId===previewOperationId) && previousRequest.logicalSessionId === logicalSessionId && (type!=="project.add" || JSON.stringify(previousRequest)===JSON.stringify(projectTarget)) && (!worktreeRequest || JSON.stringify(previousRequest)===JSON.stringify(worktreeRequest)),409,"IDEMPOTENCY_KEY_REUSE","clientMutationId belongs to another operation");
         return this.get(principal,previous.operation_id);
       }
+      admit?.();
       const machine=this.db.get<{identity_state:string;reachability:string;maintenance_types_json:string;agent_version:string;discovery_json:string|null}>("SELECT identity_state,reachability,maintenance_types_json,agent_version,discovery_json FROM machines WHERE machine_id=? AND workspace_id=?",machineId,principal.workspaceId);
       invariant(machine,404,"MACHINE_NOT_FOUND","Machine was not found");
       invariant(machine.identity_state==="active",409,"MACHINE_REVOKED","Machine was removed");
@@ -111,6 +112,10 @@ export class MaintenanceService {
           target={...target,...(typeof result.beforeSha256==="string"?{expectedDigest:result.beforeSha256}:{}),turns:result.targets,previewOperationId};
         }
       } else if(type === "session.reconcile") {
+        invariant(nativeRequest === undefined || JSON.stringify(nativeRequest) === '{"mode":"dismiss"}',400,"INVALID_RECOVERY_MODE","Invalid recovery mode");
+        const dismiss = nativeRequest !== undefined;
+        if (dismiss) invariant(admit,400,"RECOVERY_PREFLIGHT_REQUIRED","Use the session recovery endpoint");
+        if (dismiss) invariant(JSON.parse(machine.discovery_json??'{}').sessionRecoveryDismiss===true,409,"RECOVERY_UPDATE_REQUIRED","请更新主机连接服务后使用重试恢复");
         invariant(typeof logicalSessionId === "string",400,"RECOVERY_TARGET_REQUIRED","Choose a session to recover");
         const session=this.db.get<{logical_session_id:string;project_id:string;content_epoch:number;execution_segment_id:string;native_thread_id:string|null}>(`SELECT s.logical_session_id,s.project_id,s.content_epoch,e.execution_segment_id,e.native_thread_id FROM logical_sessions s JOIN execution_segments e ON e.logical_session_id=s.logical_session_id AND e.ended_at IS NULL WHERE s.logical_session_id=? AND s.machine_id=? AND s.workspace_id=?`,logicalSessionId,machineId,principal.workspaceId);
         invariant(session?.native_thread_id,404,"SESSION_NOT_FOUND","Session was not found on this host");
@@ -119,7 +124,8 @@ export class MaintenanceService {
         invariant(connection,409,"MACHINE_RECONNECTING","Wait for the host to finish reconnecting");
         const reservation=this.db.get<{logical_session_id:string;native_turn_id:string|null;bound_app_server_epoch:string|null;binding_state:string}>("SELECT logical_session_id,native_turn_id,bound_app_server_epoch,binding_state FROM project_turn_reservations WHERE project_id=?",session.project_id);
         const recoverableReservation=reservation?.logical_session_id===session.logical_session_id && reservation.binding_state==="bound" && typeof reservation.native_turn_id==="string" && typeof reservation.bound_app_server_epoch==="string" && reservation.bound_app_server_epoch!==connection.app_server_epoch;
-        target={appServerEpoch:connection.app_server_epoch,logicalSessionId:session.logical_session_id,contentEpoch:session.content_epoch,executionSegmentId:session.execution_segment_id,nativeThreadId:session.native_thread_id,...(recoverableReservation?{nativeTurnId:reservation.native_turn_id,previousAppServerEpoch:reservation.bound_app_server_epoch}:{})};
+        if (dismiss) invariant(recoverableReservation,409,"RECOVERY_TARGET_CHANGED","会话状态已变化，请重新点击重试恢复");
+        target={...(dismiss?{mode:"dismiss"}:{}),appServerEpoch:connection.app_server_epoch,logicalSessionId:session.logical_session_id,contentEpoch:session.content_epoch,executionSegmentId:session.execution_segment_id,nativeThreadId:session.native_thread_id,...(recoverableReservation?{nativeTurnId:reservation.native_turn_id,previousAppServerEpoch:reservation.bound_app_server_epoch}:{})};
       } else invariant(logicalSessionId === undefined,400,"INVALID_OPERATION_TARGET","This operation does not accept a session target");
       const timestamp=nowIso();const operationId=newId("op");
       this.db.run("INSERT INTO machine_operations(operation_id,machine_id,workspace_id,actor_client_session_id,client_mutation_id,type,state,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,'accepted',?,?,?)",operationId,machineId,principal.workspaceId,principal.clientSessionId,mutationId,type,timestamp,timestamp,futureIso(["codex.host","connection.repair","session.reconcile","images.preview","images.clean","versions.preview","versions.clean"].includes(type) ? 300 : 3600));
@@ -207,7 +213,7 @@ export class MaintenanceService {
           if (valid) {
             this.db.run("DELETE FROM project_turn_reservations WHERE project_id=? AND logical_session_id=? AND native_turn_id=?",session.project_id,target.logicalSessionId,proof.nativeTurnId as string);
             this.db.run("UPDATE logical_sessions SET execution_state=?,active_turn_id=NULL,turn_control_version=turn_control_version+1,updated_at=? WHERE logical_session_id=?",String(proof.status),nowIso(),target.logicalSessionId);
-            this.db.audit({workspaceId:row.workspace_id,machineId,logicalSessionId:target.logicalSessionId,action:"session.manually_recovered",outcome:String(proof.status),metadata:{operationId,nativeTurnId:proof.nativeTurnId,source:"native_turn_history"}});
+            this.db.audit({workspaceId:row.workspace_id,machineId,logicalSessionId:target.logicalSessionId,action:"session.manually_recovered",outcome:String(proof.status),metadata:{operationId,nativeTurnId:proof.nativeTurnId,source:target.mode==="dismiss"?"user_retry":"native_turn_history",resultKnown:target.mode!=="dismiss"}});
           } else persistedResult=JSON.stringify({...proof,recovered:false,reason:"会话状态已变化或仍有未确认操作，继续保持冻结，请刷新后核验"});
         }
       }

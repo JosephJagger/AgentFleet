@@ -4482,5 +4482,13 @@
   "Codex 登录凭据已过期，请在此主机重新授权 ChatGPT 账号后重试。": "Your Codex sign-in has expired. Reconnect your ChatGPT account on this host, then try again.",
   "有新版本可用，刷新后生效": "A new version is available. Refresh to apply.",
   "立即刷新": "Refresh now",
-  "稍后": "Later"
+  "稍后": "Later",
+  "重试恢复": "Retry recovery",
+  "检查任务结果": "Check task result",
+  "上一次任务的结果尚未确认": "The previous task’s outcome is still unknown",
+  "恢复原会话，不重发任务。排队消息会取消，内容保留。": "Recover this conversation without resending the task. Queued messages will be cancelled, but their text is kept.",
+  "已解除挂起，可以继续原会话。上一轮结果仍未确认，原任务没有重发。": "The conversation is available again. The previous outcome is still unknown; the task was not resent.",
+  "请更新主机连接服务后使用重试恢复": "Update the host connection service to retry recovery.",
+  "主机仍报告任务在运行，请先停止任务或检查任务结果": "The host still reports a running task. Stop it or check its result first.",
+  "会话状态已变化，请重新点击重试恢复": "The conversation has changed. Click Retry recovery again."
 }
