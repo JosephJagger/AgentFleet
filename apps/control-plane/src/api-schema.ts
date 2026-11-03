@@ -438,6 +438,7 @@ export type ServerToAgentMessage =
   | { type: "error"; code: string; message: string };
 
 export type ClientToServerMessage =
+  | { type: "fleet.visibility"; visible: boolean }
   | { type: "subscribe"; logicalSessionId: string; lastAppliedSeq?: number; projectionEpoch?: number; notificationsOnly?: boolean }
   | { type: "unsubscribe"; logicalSessionId: string }
   | { type: "ping" };
@@ -457,6 +458,7 @@ export type ServerToClientMessage =
   | { type: "lease.changed"; logicalSessionId: string; controlLease: ControlLeaseView | null }
   | { type: "queue.changed"; logicalSessionId: string; queue?: unknown[] }
   | { type: "machine.changed"; machine: MachineSummary }
+  | { type: "machine.patch"; machineId: string; changes: Partial<MachineSummary>; removed: string[] }
   | { type: "command.changed"; logicalSessionId: string; command: unknown }
   | { type: "content.deleted"; logicalSessionId: string; contentEpoch: number; deletedEvents: number }
   | { type: "pong" }

@@ -1206,6 +1206,8 @@ export function subscribeToFleet(
   let pingTimer: number | undefined;
   let subscriptionTimer: number | undefined;
   const subscribed = new Set<string>();
+  const machineSnapshots = new Map<string, Record<string, unknown>>();
+  let fleetVisible = document.visibilityState !== "hidden";
 
   function clearSocketTimers() {
     window.clearTimeout(connectTimer);
@@ -1243,6 +1245,11 @@ export function subscribeToFleet(
   function syncSubscriptions() {
     const current = socket;
     if (!current || current.readyState !== WebSocket.OPEN) return;
+    const visible = document.visibilityState !== "hidden";
+    if (visible !== fleetVisible) {
+      if (!send(current, { type: "fleet.visibility", visible })) return;
+      fleetVisible = visible;
+    }
     const focused = document.visibilityState === "hidden" ? [] : typeof sessions === "function" ? sessions() : sessions;
     const ids = new Set(focused.map(session => session.id));
     for (const id of subscribed) {
@@ -1268,7 +1275,9 @@ export function subscribeToFleet(
     if (stopped || offline || socket) return;
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
     let current: WebSocket;
-    try { current = new WebSocket(`${protocol}//${location.host}/ws/client`); }
+    fleetVisible = document.visibilityState !== "hidden";
+    machineSnapshots.clear();
+    try { current = new WebSocket(`${protocol}//${location.host}/ws/client?machineUpdates=delta-v1&visible=${fleetVisible}`); }
     catch { onConnection(false); scheduleReconnect(); return; }
     socket = current;
     connectTimer = window.setTimeout(() => disconnect(current), 10_000);
@@ -1311,14 +1320,22 @@ export function subscribeToFleet(
               payload: record(message.payload),
             });
           }
-        } else if (["snapshot", "event", "session.changed", "lease.changed", "queue.changed", "machine.changed", "command.changed", "approval.changed", "content.deleted"].includes(string(message.type))) {
+        } else if (["snapshot", "event", "session.changed", "lease.changed", "queue.changed", "machine.changed", "machine.patch", "command.changed", "approval.changed", "content.deleted"].includes(string(message.type))) {
           const type = string(message.type);
-          if (document.visibilityState === "hidden") return;
-          if (type === "machine.changed") {
-            const machine = mapMachine(message.machine, dashboardCache?.machines.flatMap(m => m.projects) ?? []);
+          if (type === "machine.changed" || type === "machine.patch") {
+            const id = type === "machine.changed" ? string(record(message.machine).machineId) : string(message.machineId);
+            const previous = machineSnapshots.get(id);
+            if (!id || (type === "machine.patch" && !previous)) return;
+            const raw = type === "machine.changed" ? record(message.machine) : { ...previous, ...record(message.changes), machineId: id };
+            if (type === "machine.patch") for (const key of list(message.removed)) if (typeof key === "string" && key !== "machineId") delete raw[key];
+            // Retain in-flight updates even as a tab becomes hidden, so its next
+            // delta cannot lose the catalog or discovery baseline.
+            machineSnapshots.set(id, raw);
+            const machine = mapMachine(raw, dashboardCache?.machines.flatMap(m => m.projects) ?? []);
             if (dashboardCache) dashboardCache = { ...dashboardCache, machines: dashboardCache.machines.map(m => m.id === machine.id ? machine : m) };
-            onChange({ type, machine });
+            onChange({ type: "machine.changed", machine });
           } else {
+            if (document.visibilityState === "hidden") return;
             const id = string(message.logicalSessionId, string(record(message.event).logicalSessionId, string(record(message.session).logicalSessionId)));
             if (id && !subscribed.has(id)) return;
             onChange({ type, logicalSessionId: id || undefined });

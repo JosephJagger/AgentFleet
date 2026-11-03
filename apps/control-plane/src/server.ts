@@ -1,3 +1,4 @@
+import { MachineUpdates } from "./machine-updates.js";
 import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
 const gzipResponse = promisify(gzip);
@@ -149,6 +150,7 @@ interface ClientSocketState {
   sessionToken: string;
   subscriptions: Set<string>;
   notificationsOnly: Set<string>;
+  machineUpdates: MachineUpdates;
 }
 
 export interface ControlPlaneHandle {
@@ -605,7 +607,7 @@ export async function buildControlPlane(
       for (const state of states) {
         try {
           const machine = registry.getMachine(state.principal, machineId);
-          sendJson(state.socket, { type: "machine.changed", machine });
+          state.machineUpdates.publish(machine);
         } catch {
           // The client does not own this Machine or was revoked.
         }
@@ -2079,7 +2081,10 @@ export async function buildControlPlane(
     (socket, request) => {
       const principal = request.principal as Principal;
       const sessionToken = request.cookies[config.cookieName] as string;
-      const state: ClientSocketState = { socket, principal, sessionToken, subscriptions: new Set(), notificationsOnly: new Set() };
+      const query = request.query as Record<string, unknown>;
+      const machineUpdates = new MachineUpdates(query.machineUpdates === "delta-v1", frame => sendJson(socket, frame));
+      machineUpdates.visible = !machineUpdates.compact || query.visible !== "false";
+      const state: ClientSocketState = { socket, principal, sessionToken, subscriptions: new Set(), notificationsOnly: new Set(), machineUpdates };
       let set = clients.get(principal.clientSessionId);
       if (!set) {
         set = new Set();
@@ -2096,6 +2101,17 @@ export async function buildControlPlane(
           const message = record(parseWsMessage(data), "WebSocket message must be an object") as unknown as ClientToServerMessage;
           if (message.type === "ping") {
             sendJson(socket, { type: "pong" });
+          } else if (message.type === "fleet.visibility" && state.machineUpdates.compact) {
+            invariant(typeof message.visible === "boolean", 400, "WS_MESSAGE_INVALID", "visible must be a boolean");
+            state.machineUpdates.visible = message.visible;
+            if (message.visible) {
+              const pending = [...state.machineUpdates.pending];
+              state.machineUpdates.pending.clear();
+              for (const machineId of pending) {
+                // Recheck ownership at delivery time, including after a hidden tab resumes.
+                try { state.machineUpdates.publish(registry.getMachine(current, machineId)); } catch { /* Revoked or removed. */ }
+              }
+            }
           } else if (message.type === "subscribe") {
             const logicalSessionId = requiredString(message.logicalSessionId, "logicalSessionId", 200);
             const session = registry.getSession(current, logicalSessionId);
@@ -2114,7 +2130,7 @@ export async function buildControlPlane(
             state.subscriptions.delete(requiredString(message.logicalSessionId, "logicalSessionId", 200));
             state.notificationsOnly.delete(message.logicalSessionId);
           } else {
-            throw new AppError(400, "WS_MESSAGE_TYPE_DENIED", "Client WebSocket only accepts subscribe, unsubscribe, and ping");
+            throw new AppError(400, "WS_MESSAGE_TYPE_DENIED", "Client WebSocket only accepts subscribe, unsubscribe, ping, and negotiated fleet.visibility");
           }
         } catch (error) {
           const appError = error instanceof AppError ? error : new AppError(400, "WS_MESSAGE_INVALID", "Invalid WebSocket message");
@@ -2241,17 +2257,17 @@ export async function buildControlPlane(
             broadcastMachine(identity.machineId);
           } else if(message.type==="maintenance.result") {
             invariant(state.reconciliationReady,409,"RECONCILIATION_REQUIRED","Machine must finish reconciliation");
-            machineMaintenance.result(identity.machineId,requiredString(message.operationId,"operationId",200),message.state,message.result,message.error);
+            const changed = machineMaintenance.result(identity.machineId,requiredString(message.operationId,"operationId",200),message.state,message.result,message.error);
             for (const sessionId of coordination.recoverCommandResults(identity.machineId,message.operationId)) {
               broadcastSession(sessionId,{type:"command.changed",logicalSessionId:sessionId});
             }
-            if (message.state === "succeeded" && message.result?.cleaned === true && typeof message.result.logicalSessionId === "string") {
+            if (changed && message.state === "succeeded" && message.result?.cleaned === true && typeof message.result.logicalSessionId === "string") {
               broadcastSession(message.result.logicalSessionId,{type:"content.deleted",logicalSessionId:message.result.logicalSessionId});
             }
             // Maintenance results are replayed idempotently by the Agent. Do not
             // introduce an unsolicited acknowledgement: released Agents through
             // 0.20 reject maintenance.ack and can crash while closing the socket.
-            broadcastMachine(identity.machineId);
+            if (changed) broadcastMachine(identity.machineId);
           } else if (message.type === "file.start") {
             const requestId = requiredString(message.requestId, "requestId", 256);
             const transfer = projectFiles.get(requestId);

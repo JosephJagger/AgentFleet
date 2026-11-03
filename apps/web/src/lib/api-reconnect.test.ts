@@ -100,3 +100,33 @@ it('machine notifications carry state without masquerading as history refreshes'
   socket.message({type:'event',event:{logicalSessionId:'not-focused'}});
   expect(onChange).toHaveBeenCalledTimes(calls);
 });
+
+it('negotiates compact machine updates and preserves all unchanged fields', () => {
+  const {onChange}=start();const socket=Socket.instances[0];socket.open();
+  expect(socket.url).toContain('machineUpdates=delta-v1&visible=true');
+  const codexCatalog={models:[{id:'original'}]};
+  socket.message({type:'machine.changed',machine:{machineId:'host',name:'Original',reachability:'online',codexCatalog,maintenanceCapabilities:['session.reconcile'],discovery:{agentRuntimes:{claude:{installed:true}}}}});
+  socket.message({type:'machine.patch',machineId:'host',changes:{capacity:'busy',lastHeartbeatAt:'now'},removed:[]});
+  expect(onChange).toHaveBeenLastCalledWith({type:'machine.changed',machine:expect.objectContaining({id:'host',name:'Original',capacity:'busy',codexCatalog,maintenanceCapabilities:['session.reconcile'],agentRuntimes:{claude:{installed:true}}})});
+  socket.message({type:'machine.patch',machineId:'host',changes:{codexCatalog:null,capacity:'idle'},removed:['discovery']});
+  expect(onChange.mock.calls.at(-1)?.[0].machine).toMatchObject({capacity:'idle',codexCatalog:null,agentRuntimes:{}});
+});
+it('pauses machine traffic at the server while hidden and keeps in-flight baselines', () => {
+  const {onChange}=start();const socket=Socket.instances[0];socket.open();socket.message({type:'pong'});
+  vi.spyOn(document,'visibilityState','get').mockReturnValue('hidden');document.dispatchEvent(new Event('visibilitychange'));
+  expect(socket.sent).toContainEqual({type:'fleet.visibility',visible:false});
+  socket.message({type:'machine.changed',machine:{machineId:'host',name:'Kept',reachability:'online'}});
+  vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');document.dispatchEvent(new Event('visibilitychange'));
+  expect(socket.sent).toContainEqual({type:'fleet.visibility',visible:true});
+  socket.message({type:'machine.patch',machineId:'host',changes:{capacity:'busy'},removed:[]});
+  expect(onChange.mock.calls.at(-1)?.[0].machine).toMatchObject({name:'Kept',capacity:'busy'});
+});
+it('rejects baseless patches and clears old machine baselines on reconnect', () => {
+  const {onChange}=start();const old=Socket.instances[0];old.open();
+  old.message({type:'machine.changed',machine:{machineId:'host',name:'Old'}});
+  vi.advanceTimersByTime(10_001);const current=Socket.instances[1];current.open();const count=onChange.mock.calls.length;
+  current.message({type:'machine.patch',machineId:'host',changes:{capacity:'busy'},removed:[]});
+  expect(onChange).toHaveBeenCalledTimes(count);
+  current.message({type:'machine.changed',machine:{machineId:'host',name:'New'}});
+  expect(onChange.mock.calls.at(-1)?.[0].machine.name).toBe('New');
+});

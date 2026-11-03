@@ -624,10 +624,34 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   await clientInbox.next("snapshot");
 
   const compactInbox = new WsInbox();
-  const compactSocket = await app.injectWS("/ws/client", { headers: { cookie, origin } }, {onInit: socket => compactInbox.attach(socket)});
+  const compactSocket = await app.injectWS("/ws/client?machineUpdates=delta-v1", { headers: { cookie, origin } }, {onInit: socket => compactInbox.attach(socket)});
   sockets.push(compactSocket); await compactInbox.next("welcome");
   compactSocket.send(JSON.stringify({type:"subscribe",logicalSessionId:session.logicalSessionId,notificationsOnly:true}));
   assert.deepEqual((await compactInbox.next("snapshot")).events,[]);
+  const machineFrames: Record<string, unknown>[]=[];
+  const captureMachine=(raw:RawData)=>{const frame=JSON.parse(raw.toString());if(frame.type.startsWith("machine."))machineFrames.push(frame);};
+  compactSocket.on("message",captureMachine);
+  agentSocket.send(JSON.stringify({type:"heartbeat",capacity:"idle",activeTurns:0}));
+  await agentInbox.next("heartbeat.ack");await compactInbox.next("machine.changed");
+  for(let i=0;i<27;i++)agentSocket.send(JSON.stringify({type:"maintenance.result",operationId:maintenanceOffer.operationId,state:"succeeded",result:{version:"0.19.0"}}));
+  agentSocket.send(JSON.stringify({type:"ping"}));await agentInbox.next("pong");
+  compactSocket.send(JSON.stringify({type:"ping"}));await compactInbox.next("pong");
+  assert.equal(machineFrames.length,1,"27 terminal receipt replays must not broadcast 27 host snapshots");
+  agentSocket.send(JSON.stringify({type:"heartbeat",capacity:"busy",activeTurns:1}));
+  await agentInbox.next("heartbeat.ack");
+  const patch=await compactInbox.next("machine.patch");
+  assert.equal((patch.changes as any).capacity,"busy");
+  assert.equal((patch.changes as any).codexCatalog,undefined);
+  assert.equal((patch.changes as any).discovery,undefined);
+  compactSocket.send(JSON.stringify({type:"fleet.visibility",visible:false}));
+  compactSocket.send(JSON.stringify({type:"ping"}));await compactInbox.next("pong");
+  agentSocket.send(JSON.stringify({type:"heartbeat",capacity:"idle",activeTurns:0}));await agentInbox.next("heartbeat.ack");
+  compactSocket.send(JSON.stringify({type:"ping"}));await compactInbox.next("pong");
+  assert.equal(machineFrames.length,2,"hidden sockets receive no host payloads");
+  compactSocket.send(JSON.stringify({type:"fleet.visibility",visible:true}));
+  assert.equal(((await compactInbox.next("machine.patch")).changes as any).capacity,"idle");
+  compactSocket.off("message",captureMachine);
+
 
   agentSocket.send(JSON.stringify({
     type: "volatile",
@@ -684,6 +708,8 @@ test("P0a pairing, signed agent transport, leases, commands, approvals, and dura
   assert.deepEqual(await compactInbox.next("event"),{type:"event",logicalSessionId:session.logicalSessionId});
   compactSocket.send(JSON.stringify({type:"subscribe",logicalSessionId:session.logicalSessionId,notificationsOnly:true,lastAppliedSeq:0}));
   assert.deepEqual((await compactInbox.next("snapshot")).events,[]);
+
+
   const compactHistory = await app.inject({method:"GET",url:`/api/sessions/${session.logicalSessionId}/events?limit=100&compact=1`,headers:browserHeaders});
   assert.equal(compactHistory.statusCode,200); assert.equal(JSON.parse(compactHistory.body).events,undefined);
   assert.equal(JSON.parse(compactHistory.body).items.length,1);

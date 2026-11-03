@@ -182,15 +182,15 @@ export class MaintenanceService {
       JSON.stringify({code:"OPERATION_EXPIRED",message:"操作有效期已过；未执行的操作不会在重连后自动运行"}),timestamp,timestamp);
   }
 
-  result(machineId: string, operationId: string, state: string, result: unknown, error: unknown): void {
+  result(machineId: string, operationId: string, state: string, result: unknown, error: unknown): boolean {
     this.expire();
     invariant(["running","succeeded","failed"].includes(state),400,"INVALID_OPERATION_STATE","Invalid machine operation state");
     const row=this.db.get<{state:string;workspace_id:string;type:string;request_json:string|null}>("SELECT state,workspace_id,type,request_json FROM machine_operations WHERE operation_id=? AND machine_id=?",operationId,machineId);
     invariant(row,404,"OPERATION_NOT_FOUND","Operation does not belong to this machine");
     invariant(row.state!=="expired",409,"OPERATION_EXPIRED","Operation expired before execution");
-    if(row.state==="unknown" && state==="running") return;
+    if(row.state==="unknown" && state==="running") return false;
     if(["succeeded","failed"].includes(row.state)) {
-      invariant(row.state===state,409,"OPERATION_ALREADY_TERMINAL","Operation already completed with a different outcome");return;
+      invariant(row.state===state,409,"OPERATION_ALREADY_TERMINAL","Operation already completed with a different outcome");return false;
     }
     const resultJson=result===undefined?null:JSON.stringify(result);
     invariant(resultJson===null||Buffer.byteLength(resultJson)<=32_000,400,"OPERATION_RESULT_TOO_LARGE","Operation result exceeds limit");
@@ -240,5 +240,6 @@ export class MaintenanceService {
       this.db.run("UPDATE machine_operations SET state=?,result_json=?,error_json=?,updated_at=? WHERE operation_id=?",state,persistedResult,safeError?JSON.stringify(safeError):null,nowIso(),operationId);
       this.db.audit({workspaceId:row.workspace_id,machineId,action:"machine.operation.result",outcome:state,metadata:{operationId}});
     });
+    return true;
   }
 }
