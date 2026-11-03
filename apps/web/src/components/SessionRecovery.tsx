@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { HostOperation } from "../lib/types";
 
-export function SessionRecovery({ machineId, sessionId, online, supported, onChanged }: {
-  machineId: string; sessionId: string; online: boolean; supported: boolean; onChanged: () => void;
+export function SessionRecovery({ machineId, sessionId, online, onChanged }: {
+  machineId: string; sessionId: string; online: boolean; onChanged: () => void;
 }) {
   const [operation, setOperation] = useState<HostOperation>();
   const [submitting, setSubmitting] = useState(false);
@@ -43,15 +43,9 @@ export function SessionRecovery({ machineId, sessionId, online, supported, onCha
       } catch (error) {
         setMessage(error instanceof Error ? error.message : t("核验请求失败"));
       } finally { setSubmitting(false); }
-    }}>{t("重试恢复")}</button>
+    }}>{submitting || pending ? t("正在核验…") : t("重试恢复")}</button>
     <p>{t("恢复原会话，不重发任务。排队消息会取消，内容保留。")}</p>
-    <button type="button" className="button button--quiet" disabled={!online || !supported || submitting || Boolean(pending)} onClick={async () => {
-      setSubmitting(true); setMessage("");
-      try { setOperation(await api.hostOperation(machineId, "session.reconcile", crypto.randomUUID(), sessionId)); }
-      catch (error) { setMessage(error instanceof Error ? error.message : t("核验请求失败")); }
-      finally { setSubmitting(false); }
-    }}>{submitting || pending ? t("正在核验…") : t("检查任务结果")}</button>
-    <p>{!supported ? t("请先在主机页面检查更新，以支持解除冻结。") : !online ? t("等待主机在线后核验。") : t("核验主机保存的执行结果，确认结束或中断后解除冻结，不会重发原命令。")}</p>
+    {!online && <p>{t("等待主机在线后核验。")}</p>}
     {message && <p role="status">{systemText(message)}</p>}
   </div>;
 }

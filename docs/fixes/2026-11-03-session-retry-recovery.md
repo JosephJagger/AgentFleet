@@ -8,7 +8,8 @@ The frozen-session banner now offers **Retry recovery** for every provider.
 Clicking it requests recovery of the original native session; it does not send a
 prompt, replay the previous command, create a replacement session, or claim that
 the previous task succeeded. Pending queued messages are cancelled, with their
-content retained. **Check task result** remains available for proof-based recovery.
+content retained. The banner has one recovery action; native activity and identity
+checks run behind that action, without a separate proof-only button.
 
 The control plane binds the request to the account, session, execution segment,
 content epoch, reservation and live connection. The host verifies the native
