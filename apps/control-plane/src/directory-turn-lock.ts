@@ -57,3 +57,64 @@ export function directoryTurnConflict(db: ControlPlaneDatabase, projectId: strin
     `SELECT project_id,logical_session_id,state FROM voice_sessions WHERE project_id IN (${placeholders}) AND state<>'closed'
      AND NOT (?=1 AND logical_session_id=? AND state='active') LIMIT 1`, ...ids, allowOwnVoice ? 1 : 0, sessionId);
 }
+
+export type DirectoryConflictReader = (projectId: string, sessionId: string) => ReturnType<typeof directoryTurnConflicts>;
+
+/** A page-local read snapshot, never used by command admission or native execution. */
+export function prefetchDirectoryTurnConflicts(db: ControlPlaneDatabase, workspaceId: string, projectIds: string[]): DirectoryConflictReader {
+  type Project = { project_id: string; machine_id: string; canonical_root: string; platform: string };
+  const projects = new Map<string, Project>();
+  const unique = [...new Set(projectIds)];
+  for (let offset = 0; offset < unique.length; offset += 200) {
+    const ids = unique.slice(offset, offset + 200);
+    for (const row of db.all<Project>(
+      `SELECT p.project_id,p.machine_id,p.canonical_root,m.platform FROM projects p JOIN machines m USING(machine_id)
+       WHERE p.machine_id IN (SELECT machine_id FROM projects WHERE workspace_id=? AND project_id IN (${ids.map(() => '?').join(',')}))`, workspaceId, ...ids)) projects.set(row.project_id, row);
+  }
+  const directoryKey = (row: Project) => {
+    const root = ["win32", "windows"].includes(row.platform)
+      ? win32.normalize(row.canonical_root).replace(/[\\/]+$/u, "").toLowerCase()
+      : posix.normalize(row.canonical_root).replace(/\/+$/u, "");
+    return JSON.stringify([row.machine_id, root]);
+  };
+  const byDirectory = new Map<string, string[]>();
+  for (const row of projects.values()) {
+    const key = directoryKey(row);
+    const ids = byDirectory.get(key) ?? [];
+    ids.push(row.project_id);
+    byDirectory.set(key, ids);
+  }
+  const wanted = new Map<string, string>();
+  for (const id of unique) {
+    const row = projects.get(id);
+    if (row) wanted.set(id, directoryKey(row));
+  }
+  const included = new Set([...wanted.values()].flatMap(key => byDirectory.get(key) ?? []));
+  type Occupant = { project_id: string; logical_session_id: string; state: string };
+  const reservations = new Map<string, Occupant[]>(), running = new Map<string, Occupant[]>(), voices = new Map<string, Occupant[]>();
+  const add = (target: Map<string, Occupant[]>, rows: Occupant[]) => {
+    for (const row of rows) {
+      const key = directoryKey(projects.get(row.project_id)!);
+      const entries = target.get(key) ?? [];
+      entries.push(row);
+      target.set(key, entries);
+    }
+  };
+  const ids = [...included];
+  for (let offset = 0; offset < ids.length; offset += 200) {
+    const part = ids.slice(offset, offset + 200), placeholders = part.map(() => '?').join(',');
+    add(reservations, db.all<Occupant>(`SELECT project_id,logical_session_id,state FROM project_turn_reservations WHERE project_id IN (${placeholders})`, ...part));
+    add(running, db.all<Occupant>(`SELECT project_id,logical_session_id,execution_state AS state FROM logical_sessions
+      WHERE project_id IN (${placeholders}) AND (active_turn_id IS NOT NULL OR execution_state IN ('running','awaiting_approval')
+        OR (execution_state='unknown' AND (managed=1 OR reachability<>'unreachable')))`, ...part));
+    add(voices, db.all<Occupant>(`SELECT project_id,logical_session_id,state FROM voice_sessions WHERE project_id IN (${placeholders}) AND state<>'closed'`, ...part));
+  }
+  return (projectId, sessionId) => {
+    const key = wanted.get(projectId);
+    if (!key) return directoryTurnConflicts(db, projectId, sessionId);
+    const conflict = reservations.get(key)?.[0] ?? running.get(key)?.find(row => row.logical_session_id !== sessionId);
+    if (conflict) return { start: conflict, directory: conflict };
+    const active = voices.get(key) ?? [];
+    return { directory: active[0], start: active.find(row => !(row.logical_session_id === sessionId && row.state === "active")) };
+  };
+}

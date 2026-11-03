@@ -1,3 +1,4 @@
+import { baseline } from "../src/postgres-schema.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
@@ -1217,7 +1218,7 @@ test("Project turn reservation atomically fences concurrent starts and keeps UNK
   await app.ready();
   assert.equal(
     Number((db.sqlite.prepare("PRAGMA user_version").get() as { user_version: number }).user_version),
-    73,
+    db.backend === "postgresql" ? baseline.sqliteVersion : 73,
   );
 
   const login = await app.inject({

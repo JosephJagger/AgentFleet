@@ -1,3 +1,4 @@
+import { prefetchDirectoryTurnConflicts, type DirectoryConflictReader } from "./directory-turn-lock.js";
 import { parseManagedUpdate,parseManagedEligibility } from './managed-provider.js';
 import { pendingCommits, parseWorkspaceGitStatus } from "./pending-commits.js";
 import {grokNativeDiscovery} from "./grok-operations.js";
@@ -2830,8 +2831,11 @@ export class RegistryService {
       group.push(row.logical_session_id);
       groups.set(row.project_id, group);
     }
+    let directorySnapshot: DirectoryConflictReader | undefined;
+    const directoryReader: DirectoryConflictReader = (projectId, sessionId) =>
+      (directorySnapshot ??= prefetchDirectoryTurnConflicts(this.db, principal.workspaceId, [...groups.keys()]))(projectId, sessionId);
     return this.db.withReadBatch(rows.map(row => row.logical_session_id), () =>
-      rows.map(row => this.getSession(principal, row.logical_session_id, timestamp)), [...groups.values()]);
+      rows.map(row => this.getSession(principal, row.logical_session_id, timestamp, directoryReader)), [...groups.values()]);
   }
 
   listSessionsPage(principal: Principal, options: ListOptions): { items: LogicalSessionSummary[]; nextCursor: string | null; total: number } {
@@ -2854,7 +2858,7 @@ export class RegistryService {
     return { items,nextCursor:rows.length>limit&&last?pageCursor(scope,[last.updated_at,last.logical_session_id]):null,total };
   }
 
-  getSession(principal: Principal, logicalSessionId: string, timestamp = nowIso()): LogicalSessionSummary {
+  getSession(principal: Principal, logicalSessionId: string, timestamp = nowIso(), directoryReader?: DirectoryConflictReader): LogicalSessionSummary {
     invariant(!this.db.get("SELECT 1 FROM logical_sessions WHERE logical_session_id=? AND workspace_id=? AND deleted_at IS NOT NULL",logicalSessionId,principal.workspaceId),410,"SESSION_DELETED","主机已确认永久删除此会话");
     const lease = this.currentLease(principal, logicalSessionId, timestamp);
     const row = this.db.get<{
@@ -2954,7 +2958,7 @@ export class RegistryService {
       projectBranch: row.project_branch,
       projectRootAlias: row.project_root_alias,
       canonicalRoot: row.canonical_root,
-      actions: sessionActions(this.db, logicalSessionId, principal.clientSessionId),
+      actions: sessionActions(this.db, logicalSessionId, principal.clientSessionId, directoryReader),
     };
   }
 

@@ -6,7 +6,7 @@ import {AuthService} from '../src/auth.js';
 import {RegistryService} from '../src/registry.js';
 import {CoordinationService} from '../src/coordination.js';
 import {sessionActions} from '../src/capabilities.js';
-import {directoryProjectIds, directoryTurnConflict} from '../src/directory-turn-lock.js';
+import {directoryProjectIds, directoryTurnConflict, prefetchDirectoryTurnConflicts} from '../src/directory-turn-lock.js';
 
 function fixture() {
   const config={...loadConfig({AUTH_MODE:'password',ADMIN_EMAIL:'lock@example.test',ADMIN_PASSWORD:'directory-test-password',PUBLIC_ORIGIN:'http://lock.test',COOKIE_SECURE:'false',LOG_LEVEL:'silent'}),databasePath:':memory:'};
@@ -138,4 +138,78 @@ test('queue availability requires an active managed session and project content 
   f.db.run('UPDATE logical_sessions SET managed=1 WHERE logical_session_id=?',f.claude.logicalSessionId);
   f.db.run("UPDATE machines SET reachability='offline'");
   assert.equal(queue().reasonCode,'MACHINE_OFFLINE');
+});
+
+
+test('page directory snapshots preserve live verdicts across providers, paths, uncertainty and voice states', t => {
+  const f=fixture(); t.after(()=>f.db.close());
+  const sessions=[f.codex,f.claude,f.worktree];
+  const check=()=>{
+    const read=prefetchDirectoryTurnConflicts(f.db,f.principal.workspaceId,['codex','claude','worktree']);
+    for(const session of sessions) {
+      const project=session.projectId, id=session.logicalSessionId;
+      assert.equal(Boolean(read(project,id).start),Boolean(directoryTurnConflict(f.db,project,id,true)));
+      assert.equal(Boolean(read(project,id).directory),Boolean(directoryTurnConflict(f.db,project,id,false)));
+      assert.deepEqual(sessionActions(f.db,id,f.principal.clientSessionId,read),sessionActions(f.db,id,f.principal.clientSessionId));
+    }
+    return read;
+  };
+  const initial=check();
+  for(const [managed,state,reachability,turn] of [
+    [0,'running','live',null],[0,'awaiting_approval','live',null],
+    [0,'unknown','live',null],[0,'unknown','unreachable',null],
+    [1,'unknown','unreachable',null],[0,'unknown','unreachable','turn'],
+  ]) {
+    f.db.run('UPDATE logical_sessions SET managed=?,execution_state=?,reachability=?,active_turn_id=? WHERE logical_session_id=?',managed!,state!,reachability!,turn!,f.claude.logicalSessionId);
+    check();
+  }
+  assert.equal(initial('codex',f.codex.logicalSessionId).start,undefined,'snapshot is request-local');
+  assert.ok(directoryTurnConflict(f.db,'codex',f.codex.logicalSessionId),'live admission still sees new activity');
+  for(const [platform,a,b] of [
+    ['win32','C:\\Work\\Repo','c:/work/repo/'],
+    ['windows','\\\\Server\\Share\\Repo','//server/share/repo/'],
+    ['linux','/Fixture','/fixture'],['linux','/fixture/./','/fixture/'],
+  ]) {
+    f.db.run('UPDATE machines SET platform=?',platform!);
+    f.db.run("UPDATE projects SET canonical_root=? WHERE project_id='codex'",a!);
+    f.db.run("UPDATE projects SET canonical_root=? WHERE project_id='claude'",b!);
+    check();
+  }
+  f.db.run("UPDATE logical_sessions SET execution_state='idle',active_turn_id=NULL,managed=1,reachability='live'");
+  const lease=f.coordination.acquireLease(f.principal,f.codex.logicalSessionId), at=new Date().toISOString();
+  f.db.run("INSERT INTO voice_sessions(voice_id,logical_session_id,project_id,machine_id,owner_id,lease_id,binding_json,state,created_at,updated_at) VALUES('voice',?,'codex','m',?,?,'{}','active',?,?)",f.codex.logicalSessionId,f.principal.clientSessionId,lease.leaseId,at,at);
+  for(const state of ['active','starting','closing','closed']) {
+    f.db.run("UPDATE voice_sessions SET state=? WHERE voice_id='voice'",state);
+    check();
+  }
+  f.start(f.codex,'reservation');
+  for(const state of ['active','unknown','migration_conflict']) {
+    f.db.run('UPDATE project_turn_reservations SET state=?',state);
+    check();
+  }
+});
+
+test('directory prefetch is bounded, does not cross hosts, and refreshes between pages', t => {
+  const f=fixture(); t.after(()=>f.db.close());
+  const at=new Date().toISOString();
+  f.db.run(`INSERT INTO machines(machine_id,workspace_id,public_key_spki,public_key_fingerprint,name,platform,platform_release,architecture,created_at,updated_at)
+    VALUES('other',?,'other-key','other-fingerprint','other','linux','6','x64',?,?)`,f.principal.workspaceId,at,at);
+  f.db.run("UPDATE projects SET machine_id='other' WHERE project_id='claude'");
+  f.db.run("UPDATE logical_sessions SET machine_id='other',execution_state='running' WHERE project_id='claude'");
+  const ids=['codex','claude','worktree'];
+  for(let i=0;i<201;i++) {
+    const id='extra-'+i;ids.push(id);
+    f.db.run(`INSERT INTO projects(project_id,workspace_id,machine_id,external_id,alias,canonical_root,identity_hash,created_at,last_reported_at)
+      VALUES(?,?,'m',?,?,?,?,?,?)`,id,f.principal.workspaceId,id,id,'/fixture',id,at,at);
+  }
+  const original=f.db.all.bind(f.db); let queries=0;
+  t.mock.method(f.db,'all',(...args: Parameters<typeof f.db.all>)=>{queries++;assert.ok(args.length<=202);return original(...args);});
+  const read=prefetchDirectoryTurnConflicts(f.db,f.principal.workspaceId,ids);
+  assert.equal(queries,8,'two project chunks and two chunks for each occupant table');
+  for(const id of ids.filter(id=>id!=='claude')) assert.equal(read(id,f.codex.logicalSessionId).start,undefined);
+  assert.equal(queries,8,'reading prefetched verdicts does not perform further SQL');
+  f.db.run("UPDATE logical_sessions SET execution_state='running' WHERE project_id='codex'");
+  const fresh=prefetchDirectoryTurnConflicts(f.db,f.principal.workspaceId,ids);
+  assert.ok(fresh('extra-0','different-session').start);
+  assert.equal(read('extra-0','different-session').start,undefined);
 });

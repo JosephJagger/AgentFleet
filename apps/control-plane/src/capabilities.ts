@@ -1,5 +1,5 @@
 import {isAcpProvider,supportsProviderCommand} from "./provider-catalog.js";
-import { directoryTurnConflicts } from "./directory-turn-lock.js";
+import { directoryTurnConflicts, type DirectoryConflictReader } from "./directory-turn-lock.js";
 import { blocksDuringMaintenance, MAINTENANCE_MESSAGE } from "./host-maintenance.js";
 import type { ControlPlaneDatabase } from "./db.js";
 import { sameLeaseAccount } from "./lease-ownership.js";
@@ -26,7 +26,7 @@ export function supportsCommand(reported: string | null, type: CommandType): boo
 const allowed: ActionAvailability = { allowed: true, reasonCode: null, message: null };
 const blocked = (reasonCode: string, message: string): ActionAvailability => ({ allowed: false, reasonCode, message });
 
-export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clientSessionId: string): SessionActions {
+export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clientSessionId: string, directoryReader?: DirectoryConflictReader): SessionActions {
   const row = db.get<{
     project_id: string; sync_content: number; managed: number; execution_state: string; active_turn_id: string | null; reachability: string;
     native_thread_id: string | null; history_mode: string | null; machine_reachability: string;
@@ -61,7 +61,7 @@ export function sessionActions(db: ControlPlaneDatabase, sessionId: string, clie
     WHERE s.logical_session_id=? ORDER BY e.created_at DESC LIMIT 1`, sessionId);
   // Most rows are blocked before the directory check, so resolve it only when reached.
   let conflicts: ReturnType<typeof directoryTurnConflicts> | undefined;
-  const directoryVerdict = (own: boolean) => row ? (conflicts ??= directoryTurnConflicts(db, row.project_id, sessionId))[own ? "start" : "directory"] : undefined;
+  const directoryVerdict = (own: boolean) => row ? (conflicts ??= directoryReader ? directoryReader(row.project_id, sessionId) : directoryTurnConflicts(db, row.project_id, sessionId))[own ? "start" : "directory"] : undefined;
   let discovery: Record<string, any> | undefined;
   const discoveryOf = () => discovery ??= JSON.parse(row?.discovery_json ?? "{}") ?? {};
   const actions = {} as SessionActions;
