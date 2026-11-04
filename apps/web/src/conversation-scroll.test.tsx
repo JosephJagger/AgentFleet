@@ -151,3 +151,17 @@ it("心跳子组件独立切换为回复时恢复消息，无需父组件刷新"
   container.querySelector('.buzhou-heartbeat')!.setAttribute('data-mode', 'heartbeat');
   await waitFor(() => expect(message.getAttribute('aria-hidden')).toBe('true'));
 });
+
+it('search lands on its message and remains there through stream updates, resizing and pagination',()=>{
+  const exit=vi.fn();
+  function Found({events}:{events:TimelineEvent[]}){return <ConversationViewport events={events} targetEventId="c" onReturnToLatest={exit}>{events.map(item=><article key={item.id} data-scroll-anchor={item.id}>{item.body}</article>)}</ConversationViewport>;}
+  const {rerender}=render(<Found events={initial}/>);
+  const view=screen.getByRole('region',{name:'会话记录'});
+  expect(view.scrollTop).toBe(176);
+  fireEvent.scroll(view);const position=screen.getByText('c').getBoundingClientRect().top;
+  rerender(<Found events={[event('older'),...initial,event('new')]}/>);
+  expect(screen.getByText('c').getBoundingClientRect().top).toBe(position);
+  viewportHeight=100;fireEvent.resize(window);
+  expect(screen.getByText('c').getBoundingClientRect().top).toBe(position);
+  fireEvent.click(screen.getByRole('button',{name:'新消息'}));expect(exit).toHaveBeenCalledOnce();
+});

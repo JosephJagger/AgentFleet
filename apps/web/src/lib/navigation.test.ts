@@ -18,3 +18,11 @@ describe("页面与主机路由", () => {
     expect(routeFromPath("/hosts/%E0%A4%A")).toEqual({ view: "hosts" });
   });
 });
+
+it('keeps the exact message when reloading or going back to a search result',()=>{
+  const route={view:'fleet' as const,sessionId:'remote-session',eventId:'event/历史:42'};
+  const url=new URL(routePath(route),'https://example.test');
+  expect(routeFromPath(url.pathname,url.search)).toEqual(route);
+  expect(routeFromPath(url.pathname,'?event='+ 'x'.repeat(201))).toEqual({view:'fleet',sessionId:'remote-session'});
+  expect(routePath({...route,eventId:undefined})).toBe('/sessions/remote-session');
+});

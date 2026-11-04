@@ -858,6 +858,17 @@ export const api = {
     const cached = dashboardCache;
     return { items: list(raw.items ?? raw.sessions).map((item) => mapSession(item, cached?.machines ?? [], cached?.machines.flatMap((machine) => machine.projects) ?? [], cached?.user.clientSessionId ?? "")), nextCursor: typeof raw.nextCursor === "string" ? raw.nextCursor : null, total: integer(raw.total) };
   },
+  async searchContext(id: string, eventId: string, signal?: AbortSignal) {
+    const query = new URLSearchParams({aroundEventId:eventId, compact:"1", images:"links"});
+    const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}/events?${query}`, {signal});
+    return {events:list(raw.items).map(mapEvent), nextBeforeSeq:typeof raw.nextBeforeSeq === "number" ? raw.nextBeforeSeq : null,
+      nextAfterSeq:typeof raw.nextAfterSeq === "number" ? raw.nextAfterSeq : null, projectionEpoch:integer(raw.projectionEpoch), contentEpoch:integer(raw.contentEpoch)};
+  },
+  async historyForward(id: string, afterSeq: number, projectionEpoch: number, contentEpoch: number, signal?: AbortSignal) {
+    const query = new URLSearchParams({afterSeq:String(afterSeq),projectionEpoch:String(projectionEpoch),contentEpoch:String(contentEpoch),limit:"30",compact:"1",images:"links"});
+    const raw = await request<JsonObject>(`/api/sessions/${encodeURIComponent(id)}/events?${query}`, {signal});
+    return {events:list(raw.items).map(mapEvent),nextAfterSeq:typeof raw.nextAfterSeq === "number" ? raw.nextAfterSeq : null};
+  },
   async history(id: string, beforeSeq?: number | null, signal?: AbortSignal) {
     const query = new URLSearchParams({ limit: "100", compact: "1", images: "links" });
     if (beforeSeq !== undefined && beforeSeq !== null) query.set("beforeSeq", String(beforeSeq));

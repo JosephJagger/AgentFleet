@@ -1,0 +1,5 @@
+.search-message-context { display:flex; flex-direction:column; flex:1; min-height:0; min-width:0; }
+.search-context-bar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:10px 16px; color:var(--ink); background:var(--cobalt-soft); border-bottom:1px solid var(--line); flex-shrink:0; }
+.search-context-bar button, .search-context-status button { color:var(--cobalt); background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm); padding:7px 12px; font:inherit; cursor:pointer; }
+.search-context-status { padding:12px 16px; color:var(--ink); }
+.search-message-context [data-search-hit="true"] { outline:2px solid var(--cobalt); outline-offset:-2px; border-radius:var(--radius-sm); background:var(--cobalt-soft); }

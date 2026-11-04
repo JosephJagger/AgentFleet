@@ -125,3 +125,28 @@ test('abandoned searches skip the expensive content read and release admission s
   await assert.rejects(f.service.search(f.principal,{q:'needle'},controller.signal),{name:'AbortError'});assert.equal(calls,1);
   mock.mock.restore();assert.equal((await f.find('Task')).items.length,1);
 });
+
+test('message hits carry a stable anchor and load bounded context, without scanning from latest',async t=>{
+  const f=fixture();t.after(f.close);const s=f.session('m2','记录测试');
+  let anchor:{id:string;ref:string}|undefined;
+  for(let i=1;i<=250;i++){const value=f.ask(s,i===60?'找到这个历史关键词':'其他消息 '+i);if(i===60)anchor=value;}
+  f.db.run('UPDATE logical_sessions SET next_session_seq=251 WHERE logical_session_id=?',s.logicalSessionId);
+  const hit=(await f.find('历史关键词')).items[0]!;assert.equal(hit.eventId,anchor!.id);
+  const {CoordinationService}=await import('../src/coordination.js');const service=new CoordinationService(f.db,f.config);
+  const page=service.historyAround(f.principal,s.logicalSessionId,hit.eventId!) as {items:any[];nextBeforeSeq:number;nextAfterSeq:number};
+  assert.equal(page.items.length,60);assert.ok(page.items.some(item=>item.eventId===anchor!.id));
+  assert.deepEqual([page.items[0].sessionSeq,page.items.at(-1).sessionSeq],[31,90]);
+  assert.equal(page.nextBeforeSeq,31);assert.equal(page.nextAfterSeq,90);
+  assert.throws(()=>service.historyAround({...f.principal,workspaceId:'other'},s.logicalSessionId,anchor!.id));
+  const other=f.session('m1','其他会话');assert.throws(()=>service.historyAround(f.principal,other.logicalSessionId,anchor!.id));
+  f.db.run('UPDATE projects SET sync_content=0 WHERE project_id=?',s.projectId);
+  assert.throws(()=>service.historyAround(f.principal,s.logicalSessionId,anchor!.id));
+  f.db.run('UPDATE projects SET sync_content=1 WHERE project_id=?',s.projectId);
+  f.db.run("UPDATE content_blobs SET expires_at='2000-01-01T00:00:00Z' WHERE payload_ref=?",anchor!.ref);
+  assert.throws(()=>service.historyAround(f.principal,s.logicalSessionId,anchor!.id));
+});
+
+test('title-only results have no fabricated message anchor',async t=>{
+  const f=fixture();t.after(f.close);f.session('m1','标题关键词');
+  assert.equal((await f.find('标题关键词')).items[0]!.eventId,null);
+});

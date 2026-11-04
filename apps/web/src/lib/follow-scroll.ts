@@ -1,15 +1,15 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 /** Scroll ownership belongs to the reader until they return to the bottom. */
-export function useFollowScroll(latestVersion: string) {
+export function useFollowScroll(latestVersion: string, autoFollow = true) {
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
-  const tracking = useRef(true);
+  const tracking = useRef(autoFollow);
   const initialized = useRef(false);
   const previousVersion = useRef(latestVersion);
   const previousTop = useRef(0);
   const anchor = useRef<{ node: HTMLElement; offset: number } | undefined>(undefined);
-  const [following, setFollowing] = useState(true);
+  const [following, setFollowing] = useState(autoFollow);
   const [hasNewContent, setHasNewContent] = useState(false);
 
   const rememberAnchor = useCallback(() => {
@@ -37,15 +37,24 @@ export function useFollowScroll(latestVersion: string) {
   const pause = useCallback(() => {
     tracking.current = false; setFollowing(false); rememberAnchor();
   }, [rememberAnchor]);
+  const reveal = useCallback((id: string) => {
+    const view = viewport.current;
+    const node = view && Array.from(view.querySelectorAll<HTMLElement>("[data-scroll-anchor]")).find(item => item.dataset.scrollAnchor === id);
+    if (!view || !node) return false;
+    tracking.current = false; setFollowing(false);
+    view.scrollTop += node.getBoundingClientRect().top - view.getBoundingClientRect().top - 24;
+    rememberAnchor();
+    return true;
+  }, [rememberAnchor]);
   const onScroll = useCallback(() => {
     const view = viewport.current;
     if (!view) return;
     const movedUp = view.scrollTop < previousTop.current - 1;
     const atBottom = view.scrollHeight - view.clientHeight - view.scrollTop <= 4;
     if (movedUp && !atBottom) { tracking.current = false; setFollowing(false); }
-    else if (atBottom) { tracking.current = true; setFollowing(true); setHasNewContent(false); }
+    else if (atBottom && autoFollow) { tracking.current = true; setFollowing(true); setHasNewContent(false); }
     rememberAnchor();
-  }, [rememberAnchor]);
+  }, [rememberAnchor, autoFollow]);
 
   // Runs after prepend/append commits, before paint. The old visible node is the
   // anchor, so simultaneous new output cannot distort a scrollHeight-based delta.
@@ -63,5 +72,5 @@ export function useFollowScroll(latestVersion: string) {
     return () => { observer?.disconnect(); window.removeEventListener("resize", maintainPosition); };
   }, [maintainPosition]);
 
-  return { viewport, content, following, hasNewContent, onScroll, pause, jumpToLatest };
+  return { viewport, content, following, hasNewContent, onScroll, pause, jumpToLatest, reveal };
 }

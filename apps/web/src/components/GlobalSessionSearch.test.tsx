@@ -8,7 +8,7 @@ import type { Machine } from '../lib/types';
 
 vi.mock('../lib/api',()=>({api:{searchSessions:vi.fn()}}));
 const hosts=[{id:'remote',name:'B2A'},{id:'local',name:'CVN-78'}] as Machine[];
-const item:SessionSearchItem={id:'ls_remote',title:'权限排查',machineId:'remote',machineName:'B2A',projectId:'p',project:'HeraLens',path:'/opt/HeraLens',provider:'claude',managed:true,online:false,state:'idle',updatedAt:'2026-10-26T00:00:00Z',contentAvailable:true,match:'message',snippet:'之前的 SSH 权限配置',messageRole:'user'};
+const item:SessionSearchItem={id:'ls_remote',eventId:'event-original',title:'权限排查',machineId:'remote',machineName:'B2A',projectId:'p',project:'HeraLens',path:'/opt/HeraLens',provider:'claude',managed:true,online:false,state:'idle',updatedAt:'2026-10-26T00:00:00Z',contentAvailable:true,match:'message',snippet:'之前的 SSH 权限配置',messageRole:'user'};
 const page=(items=[item],overrides:Partial<SessionSearchPage>={}):SessionSearchPage=>({items,total:items.length,nextOffset:null,query:'SSH',terms:['ssh'],mode:'keyword_fuzzy',contentStatus:'searched',...overrides});
 beforeEach(()=>{
   setLocale('zh-CN');
@@ -23,7 +23,7 @@ it('opens cross-host results with provenance and snippets, safely highlights pla
   const input=screen.getByRole('combobox',{name:'搜索全部会话'});expect(document.activeElement).toBe(input);
   const result=await screen.findByRole('option',{name:/权限排查/});
   expect(result.textContent).toContain('B2A · Claude Code · HeraLens');expect(result.textContent).toContain('正文命中 · 离线');expect(result.querySelector('mark')?.textContent).toBe('SSH');expect(result.querySelector('img')).toBeNull();
-  fireEvent.click(result);expect(select.mock.calls[0][0].id).toBe(item.id);expect(close).toHaveBeenCalledOnce();
+  fireEvent.click(result);expect(select.mock.calls[0][0].id).toBe(item.id);expect(select.mock.calls[0][0].eventId).toBe(item.eventId);expect(close).toHaveBeenCalledOnce();
   expect(api.searchSessions).toHaveBeenCalledWith({q:'SSH',offset:0},expect.any(AbortSignal));
 });
 

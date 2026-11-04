@@ -135,7 +135,7 @@ export class SessionSearchService {
         const candidate=hits.get(row.id),hit=candidate&&validHits.has(candidate.eventId)?candidate:undefined,score=scores.get(row.id)!;
         return {...row,managed:Number(row.managed)===1,online:Number(row.online)===1,syncContent:undefined,
           contentAvailable:available.has(row.id),match:hit?'message':score>=100?'title':score===35?'approximate':'location',
-          snippet:hit?searchSnippet(hit.text,terms):'',messageRole:hit?.role==='userMessage'?'user':hit?'assistant':null};
+          eventId:hit?.eventId??null,snippet:hit?searchSnippet(hit.text,terms):'',messageRole:hit?.role==='userMessage'?'user':hit?'assistant':null};
       });
       return {items,total:sorted.length,nextOffset:offset+limit<sorted.length?offset+limit:null,query,terms,mode:'keyword_fuzzy' as const,contentStatus};
     }finally{this.active--;}

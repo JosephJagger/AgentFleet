@@ -4493,5 +4493,8 @@
   "会话状态已变化，请重新点击重试恢复": "De status van het gesprek is gewijzigd. Probeer herstel opnieuw.",
   "同一目录的会话需要处理": "Een andere sessie in deze map heeft aandacht nodig",
   "打开占用会话": "Blokkerende sessie openen",
-  "已解除等待": "Wachtstatus opgeheven"
+  "已解除等待": "Wachtstatus opgeheven",
+  "正在定位消息…": "Bericht zoeken…",
+  "加载后续记录": "Latere berichten laden",
+  "无法定位该消息，正文可能已过期或删除。": "Dit bericht is niet gevonden. Het is mogelijk verlopen of verwijderd."
 }

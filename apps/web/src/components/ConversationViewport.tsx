@@ -1,12 +1,17 @@
 import { t } from "../i18n";
 import { ArrowDown } from "lucide-react";
-import { useLayoutEffect, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { TimelineEvent } from "../lib/types";
 import { useFollowScroll } from "../lib/follow-scroll";
 
-export function ConversationViewport({ events, children, wholeMessagesDuringHeartbeat = false }: { events: TimelineEvent[]; children: ReactNode; wholeMessagesDuringHeartbeat?: boolean }) {
+export function ConversationViewport({ events, children, wholeMessagesDuringHeartbeat = false, targetEventId, onReturnToLatest }: { events: TimelineEvent[]; children: ReactNode; wholeMessagesDuringHeartbeat?: boolean; targetEventId?:string; onReturnToLatest?:()=>void }) {
   const last = events.at(-1);
-  const scroll = useFollowScroll(JSON.stringify(last ? [last.id, last.body, last.command, last.output, last.diff, last.images, last.payloadState] : []));
+  const scroll = useFollowScroll(JSON.stringify(last ? [last.id, last.body, last.command, last.output, last.diff, last.images, last.payloadState] : []), !targetEventId);
+  const located = useRef<string | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (!targetEventId || located.current === targetEventId) return;
+    if (scroll.reveal(targetEventId)) located.current = targetEventId;
+  }, [targetEventId, events, scroll.reveal]);
   useLayoutEffect(() => {
     if (!wholeMessagesDuringHeartbeat) return;
     const view = scroll.viewport.current;
@@ -53,6 +58,6 @@ export function ConversationViewport({ events, children, wholeMessagesDuringHear
     <div className="timeline-scroll" ref={scroll.viewport} onScroll={scroll.onScroll} onWheelCapture={event => { if (event.deltaY < 0) scroll.pause(); }} role="region" aria-label={t("会话记录")} tabIndex={0}>
       <div ref={scroll.content}>{children}</div>
     </div>
-    {!scroll.following && <button type="button" className="timeline-jump" onClick={scroll.jumpToLatest}><ArrowDown size={14} aria-hidden="true" />{scroll.hasNewContent ? t("新消息") : t("回到最新")}</button>}
+    {!scroll.following && <button type="button" className="timeline-jump" onClick={onReturnToLatest ?? scroll.jumpToLatest}><ArrowDown size={14} aria-hidden="true" />{scroll.hasNewContent ? t("新消息") : t("回到最新")}</button>}
   </div>;
 }

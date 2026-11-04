@@ -1,11 +1,14 @@
 import { sessionFromPath, sessionPath } from "./session-workspace";
 
 export type View = "fleet" | "hosts" | "approvals" | "scheduled" | "usage" | "security" | "admin";
-export interface AppRoute { view: View; machineId?: string; sessionId?: string }
+export interface AppRoute { view: View; machineId?: string; sessionId?: string; eventId?: string }
 
-export function routeFromPath(pathname: string): AppRoute {
+export function routeFromPath(pathname: string, search = ""): AppRoute {
   const sessionId = sessionFromPath(pathname);
-  if (sessionId) return { view: "fleet", sessionId };
+  if (sessionId) {
+    const eventId = new URLSearchParams(search).get("event");
+    return { view: "fleet", sessionId, ...(eventId && eventId.length <= 200 ? { eventId } : {}) };
+  }
   if (/^\/admin\/?$/.test(pathname)) return { view: "admin" };
   if (/^\/settings\/?$/.test(pathname)) return { view: "security" };
   if (/^\/approvals\/?$/.test(pathname)) return { view: "approvals" };
@@ -25,7 +28,7 @@ export function routePath(route: AppRoute): string {
   if (route.view === "approvals") return "/approvals";
   if (route.view === "scheduled") return "/scheduled";
   if (route.view === "usage") return route.machineId ? `/usage/${encodeURIComponent(route.machineId)}` : "/usage";
-  if (route.view === "fleet" && route.sessionId) return sessionPath(route.sessionId);
+  if (route.view === "fleet" && route.sessionId) return sessionPath(route.sessionId) + (route.eventId ? `?${new URLSearchParams({ event:route.eventId })}` : "");
   const base = route.view === "hosts" ? "/hosts" : "/workbench";
   return route.machineId ? `${base}/${encodeURIComponent(route.machineId)}` : base;
 }

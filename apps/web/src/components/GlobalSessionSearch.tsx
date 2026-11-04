@@ -9,6 +9,7 @@ import './global-session-search.css';
 export type SessionSearchItem = {
   id:string; title:string; machineId:string; machineName:string; projectId:string; project:string; path:string;
   provider:string; managed:boolean; online:boolean; state:string; updatedAt:string; contentAvailable:boolean;
+  eventId?:string|null;
   match:'title'|'location'|'message'|'approximate'; snippet:string; messageRole:'user'|'assistant'|null;
 };
 export type SessionSearchPage = {items:SessionSearchItem[];total:number;nextOffset:number|null;query:string;terms:string[];

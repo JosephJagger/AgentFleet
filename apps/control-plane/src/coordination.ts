@@ -3041,6 +3041,30 @@ export class CoordinationService {
     };
   }
 
+  historyAround(principal: Principal, logicalSessionId: string, eventId: string): Record<string, unknown> {
+    // The anchor must still belong to this visible session and current content.
+    // Resolve it server-side: a search result is not authority to read an event.
+    const anchor = this.db.get<{session_seq:number;projection_epoch:number;content_epoch:number}>(`
+      SELECT e.session_seq,s.projection_epoch,s.content_epoch FROM durable_events e
+      JOIN logical_sessions s ON s.logical_session_id=e.logical_session_id
+      JOIN projects p ON p.project_id=s.project_id JOIN machines m ON m.machine_id=s.machine_id
+      JOIN content_blobs b ON b.payload_ref=e.payload_ref
+      WHERE e.event_id=? AND s.logical_session_id=? AND s.workspace_id=? AND e.workspace_id=s.workspace_id
+      AND b.workspace_id=s.workspace_id AND p.workspace_id=s.workspace_id AND m.workspace_id=s.workspace_id
+      AND s.deleted_at IS NULL AND m.identity_state='active' AND p.sync_content=1
+      AND e.projection_epoch=s.projection_epoch AND e.content_epoch=s.content_epoch
+      AND e.payload_state='present' AND b.deleted_at IS NULL AND b.expires_at>?
+      AND NOT EXISTS(SELECT 1 FROM content_tombstones t WHERE t.event_id=e.event_id)`,eventId,logicalSessionId,principal.workspaceId,nowIso());
+    invariant(anchor,404,"SEARCH_MESSAGE_UNAVAILABLE","The matched message is no longer available");
+    const epochs = { projectionEpoch: anchor.projection_epoch, contentEpoch: anchor.content_epoch };
+    // Start the backward page at the anchor, guaranteeing it survives the byte
+    // budget even when nearby tool output is large. Never scan from the latest.
+    const before = this.historyPage(principal, logicalSessionId, { ...epochs, imageLinks:true, limit:30, beforeSeq:anchor.session_seq+1 });
+    const after = this.historyAfter(principal, logicalSessionId, { ...epochs, imageLinks:true, limit:30, afterSeq:anchor.session_seq });
+    return { ...epochs, eventId, items:[...before.items as unknown[], ...after.items as unknown[]],
+      nextBeforeSeq:before.nextBeforeSeq, nextAfterSeq:after.nextAfterSeq, throughSeq:after.throughSeq };
+  }
+
   historyPage(principal: Principal, logicalSessionId: string, options: { imageLinks?: boolean; limit: number; beforeSeq?: number; projectionEpoch?: number; contentEpoch?: number }): Record<string, unknown> {
     invariant(Number.isSafeInteger(options.limit) && options.limit >= 1 && options.limit <= 200, 400, "INVALID_LIMIT", "limit must be between 1 and 200");
     invariant(options.beforeSeq === undefined || (Number.isSafeInteger(options.beforeSeq) && options.beforeSeq >= 1), 400, "INVALID_CURSOR", "beforeSeq must be positive");

@@ -1788,6 +1788,7 @@ export async function buildControlPlane(
   app.get("/api/sessions/:id/events", { preHandler: authenticate }, async (request) => {
     const query = request.query as Record<string, unknown>;
     legacyTraffic[query.images === "links" ? "historyLinks" : "history"] += 1;
+    if (query.aroundEventId !== undefined) return coordination.historyAround(request.principal as Principal, routeId(request), requiredString(query.aroundEventId, "aroundEventId", 200));
     if (query.compact === "1" && query.afterSeq !== undefined) return coordination.historyAfter(request.principal as Principal, routeId(request), {
       imageLinks: query.images === "links", afterSeq: Number(query.afterSeq), limit: pageLimit(query.limit), projectionEpoch: Number(query.projectionEpoch), contentEpoch: Number(query.contentEpoch),
     });

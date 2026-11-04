@@ -1,3 +1,4 @@
+import { SearchMessageContext } from "./components/SearchMessageContext";
 import { GlobalSessionSearch } from './components/GlobalSessionSearch';
 import { TurnUsage } from "./components/TurnUsage";
 import { isWorktree, sessionLocation } from "./lib/project-tree";
@@ -601,12 +602,12 @@ function EventIcon({ event }: { event: TimelineEvent }) {
   return <Activity size={15} />;
 }
 
-export function Timeline({ events, sessionId, provider }: { events: TimelineEvent[]; sessionId: string; provider?: string }) {
+export function Timeline({ events, sessionId, provider, targetEventId }: { events: TimelineEvent[]; sessionId: string; provider?: string; targetEventId?: string }) {
   if (events.length === 0) return <div className="timeline-empty"><Clock3 size={19} />{t("发送消息后，{0} 的回复和操作进度会显示在这里。", agentName(provider))}</div>;
   return (
     <div className="timeline">
       {events.map((event) => (
-        <article className={`timeline-event timeline-event--${event.actor ?? "system"}`} key={event.id} data-scroll-anchor={event.id}>
+        <article className={`timeline-event timeline-event--${event.actor ?? "system"}`} key={event.id} data-search-hit={event.id === targetEventId || undefined} data-scroll-anchor={event.id}>
           <span className="timeline-event__node"><EventIcon event={event} /></span>
           <div className="timeline-event__head">
             <strong>{displayName((event.title === "Codex" ? agentName(provider) : systemText(event.title?.replace(/^Codex/, agentName(provider)))) || (event.actor === "user" ? t("你") : event.actor === "agent" ? agentName(provider) : event.type))}</strong>
@@ -659,7 +660,10 @@ type TurnAdditions = {
   goal?: string;
 };
 
-export function SessionInspector({ machine, onOpenSession, detail, loading, onBrowseSessions, catalogExpanded, draftOwner, referenceCandidates = [], onLoadHistory, historyLoading, onRefresh, onClaim, onReleaseManagement,  onSend, onQueue, onSteer, onCancelQueued, onCancel, onApproval, onClose, onNewSession, onSchedule }: { machine?: Machine; onOpenSession?: (id: string) => void; 
+export function SessionInspector({ searchVisit = 0, searchEventId, onReturnToLatest, machine, onOpenSession, detail, loading, onBrowseSessions, catalogExpanded, draftOwner, referenceCandidates = [], onLoadHistory, historyLoading, onRefresh, onClaim, onReleaseManagement,  onSend, onQueue, onSteer, onCancelQueued, onCancel, onApproval, onClose, onNewSession, onSchedule }: { machine?: Machine; onOpenSession?: (id: string) => void;
+  searchVisit?: number;
+  searchEventId?: string;
+  onReturnToLatest?: () => void;
   detail?: SessionDetail;
   loading: boolean;
   draftOwner?: string;
@@ -1080,7 +1084,7 @@ export function SessionInspector({ machine, onOpenSession, detail, loading, onBr
         </div>
       </header>
       {(needsRecovery || recoverySessionId) && <div className="freeze-banner"><AlertTriangle size={17} /><div><strong>{recoverySessionId && recoverySessionId!==session.id ? t("同一目录的会话需要处理") : t("上一次任务的结果尚未确认")}</strong><SessionRecovery key={`${draftOwner}:${session.id}`} machineId={session.machineId} sessionId={session.id} online={detail.hostOnline === true} onChanged={onRefresh} relatedSessionId={recoverySessionId} onOpenSession={onOpenSession} /></div></div>}
-      <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? rawEvents : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}</ConversationViewport>
+      {searchEventId ? <SearchMessageContext key={`${session.id}:${searchEventId}:${searchVisit}`} session={session} eventId={searchEventId} onReturnToLatest={onReturnToLatest!} renderEvents={(events,targetId)=><Timeline events={events} sessionId={session.id} provider={session.provider} targetEventId={targetId}/>} /> : <ConversationViewport key={`${draftOwner}:${session.id}`} events={rawView ? rawEvents : visibleEvents}>{detail.historyPage?.nextBeforeSeq != null && <button className="catalog-more" type="button" disabled={historyLoading} onClick={onLoadHistory}>{historyLoading ? t("正在读取更早记录…") : t("加载更早记录")}</button>}{rawView ? <pre className="codex-raw-view" aria-label={t("已同步内容纯文本")}>{rawEvents.length ? rawEvents.map(event => <span key={event.id} data-scroll-anchor={event.id}>{event.actor}{"\n"}{event.body}{"\n\n"}</span>) : t("尚无已同步正文")}</pre> : <Timeline events={visibleEvents} sessionId={session.id} provider={session.provider} />}</ConversationViewport>}
       {approval?.status === "pending" && (approval.type === "user_input"
         ? <CodexInputCard key={`${draftOwner}:${approval.id}`} request={approval} agent={agentName(session.provider)} onChanged={onRefresh} />
         : <ApprovalCard approval={approval} provider={session.provider} busy={busy} onDecide={async (decision) => { setBusy(true); try { await onApproval(decision); } finally { setBusy(false); } }} />)}
@@ -1525,7 +1529,7 @@ function App() {
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [authKnown, setAuthKnown] = useState(false);
   const [connectionFailed, setConnectionFailed] = useState(false);
-  const [route, setRoute] = useState(() => routeFromPath(location.pathname));
+  const [route, setRoute] = useState(() => routeFromPath(location.pathname, location.search));
   const view = route.view;
   const routeRef = useRef(route);
   const [machineProviders, setMachineProviders] = useState<Record<string, ProviderId>>({});
@@ -1536,6 +1540,7 @@ function App() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [connected, setConnected] = useState(false);
   const [globalSearch, setGlobalSearch] = useState<string>();
+  const [searchVisit, setSearchVisit] = useState(0);
   useEffect(()=>{
     if(!dashboard)return;
     const open=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'&&!event.isComposing&&!event.altKey){event.preventDefault();setGlobalSearch(current=>current===undefined?'':undefined);}};
@@ -1564,6 +1569,7 @@ function App() {
   const applyRoute = useCallback((next: AppRoute) => {
     routeRef.current = next;
     setRoute(next);
+    if (next.eventId) setSearchVisit(value => value + 1);
     const id = next.sessionId;
     if (id !== selectedSessionRef.current) {
       selectedSessionRef.current = id;
@@ -1579,7 +1585,7 @@ function App() {
 
   const navigate = useCallback((next: AppRoute, replace = false) => {
     const path = routePath(next);
-    if (location.pathname !== path || location.search || location.hash) history[replace ? "replaceState" : "pushState"](history.state, "", path);
+    if (location.pathname + location.search !== path || location.hash) history[replace ? "replaceState" : "pushState"](history.state, "", path);
     applyRoute(next);
   }, [applyRoute]);
 
@@ -1603,7 +1609,7 @@ function App() {
 
   useEffect(() => {
     // Browser history restores state only; it must never rewrite the visited URL.
-    const pop = () => applyRoute(routeFromPath(location.pathname));
+    const pop = () => applyRoute(routeFromPath(location.pathname, location.search));
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
   }, [applyRoute]);
@@ -1957,12 +1963,12 @@ function App() {
           setHostProviderFilters(current=>({...current,[selectedMachineId]:provider}));
           // This picker filters session choices; only selecting a session navigates.
         }} sessions={dashboard.activitySessions ?? dashboard.sessions} selectedId={selectedSessionId} detail={detail} onSelect={selectSession} onBrowse={()=>{setStreamFocus(false);setCatalogCollapsed(false);}} onCreate={()=>openCreate()}>
-        <SessionInspector machine={dashboard.machines.find(item => item.id === displayedSession?.machineId)} onOpenSession={id => { selectSession(id); void loadDashboard(true); }} catalogExpanded={!streamFocus && !catalogCollapsed} onBrowseSessions={()=>{if(streamFocus){setStreamFocus(false);setCatalogCollapsed(false);}else setCatalogCollapsed(value=>!value);}} referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => loadDetail(selectedSessionId, true)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, provider: displayedSession.provider ?? selectedProvider, pathHint: displayedSession.projectPath ?? t("当前会话项目"), repoRoot: displayedSession.projectRepoRoot, gitBranch: displayedSession.projectBranch, syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
+        <SessionInspector searchVisit={searchVisit} searchEventId={route.eventId} onReturnToLatest={()=>navigate({view:"fleet",sessionId:selectedSessionId},true)} machine={dashboard.machines.find(item => item.id === displayedSession?.machineId)} onOpenSession={id => { selectSession(id); void loadDashboard(true); }} catalogExpanded={!streamFocus && !catalogCollapsed} onBrowseSessions={()=>{if(streamFocus){setStreamFocus(false);setCatalogCollapsed(false);}else setCatalogCollapsed(value=>!value);}} referenceCandidates={dashboard.sessions} detail={displayedSession && detail?.session.id === displayedSession.id ? detail : undefined} loading={detailLoading} draftOwner={dashboard.user.id} onLoadHistory={() => void loadEarlierHistory()} historyLoading={historyLoading} onRefresh={() => loadDetail(selectedSessionId, true)} onClaim={claimSession} onContinueManaged={continueInManagedSession} onReleaseManagement={releaseManagement} onSend={sendPrompt} onQueue={queuePrompt} onSteer={steerPrompt} onCancelQueued={cancelQueuedTurn} onCancel={cancelTurn} onApproval={decideApproval} onSchedule={() => { if (displayedSession) openScheduled(displayedSession.projectId,displayedSession.id); }} onNewSession={() => { if (displayedSession) openCreate({ id: displayedSession.projectId, machineId: displayedSession.machineId, alias: displayedSession.projectAlias, provider: displayedSession.provider ?? selectedProvider, pathHint: displayedSession.projectPath ?? t("当前会话项目"), repoRoot: displayedSession.projectRepoRoot, gitBranch: displayedSession.projectBranch, syncContent: true, retentionDays: 7 }); }} onClose={() => selectSession(undefined)} />
         </HostSessions>
         {buzhouDesktop && <BuzhoushanScreensaver detail={detail} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected && !connectionFailed} onRefresh={loadDashboard}/>}
         {buzhouDesktop && <footer className="buzhou-status"><strong>{t("不周山")}</strong>{broadcastCanvas&&<BuzhoushanBroadcastStatus/>}<FleetStatus machines={dashboard.machines} sessions={dashboard.activitySessions ?? dashboard.sessions} connected={connected && !connectionFailed} onSession={selectSession} onMachine={id => navigate({ view: "hosts", machineId: id })} /><span>{selectedMachine?.maintenance?t("维护中 · 等待安全重启"):selectedMachine?.reachability === "live"?t("主机在线"):t("主机未就绪")}</span><span>{displayName(displayedSession?.projectAlias)}</span><span className="buzhou-status__right">{displayedSession ? agentName(displayedSession.provider) : t("选择一个会话")}</span><span>{t("真实执行记录")}</span></footer>}
       </div> : view === "hosts" ? <HostsView canManageVersions={dashboard.user.platformAdmin === true} onConfigure={id => { setSettingsMachineId(id); setView("security"); }} machines={dashboard.machines} selectedId={selectedMachineId} onSelect={selectMachine} onPair={() => setPairOpen(true)} onRemove={setRemoveMachine} onChanged={refreshAll} renderCompatibility={(machine) => <CompatibilityProfileCard machine={machine} profile={dashboard.compatibilityProfile} />} /> : view === "approvals" ? <ApprovalsView approvals={dashboard.pendingApprovals} pendingCommits={dashboard.pendingCommits} onDismiss={dismissCommit} onOpen={openApproval} onBack={() => setView("fleet")} /> : view === "scheduled" ? <ScheduledTasksView machines={dashboard.machines} initialProjectId={schedulePrefill.projectId} initialSessionId={schedulePrefill.sessionId} onSession={selectSession} onToast={toast} /> : view === "usage" ? <UsageView machines={dashboard.machines} selectedId={selectedMachineId} onSelect={id=>navigate({view:"usage",machineId:id})} onSession={selectSession} /> : view === "admin" ? dashboard.user.platformAdmin === true ? <AdminView /> : <section className="wide-view"><h1>{t("无权访问管理页面")}</h1><button className="button button--quiet" onClick={() => setView("fleet")}>{t("返回工作台")}</button></section> : <SettingsView initialMachineId={settingsMachineId} dashboard={dashboard} onUpdated={refreshAll} onToast={toast} />}
-      {globalSearch!==undefined&&<GlobalSessionSearch initialQuery={globalSearch} machines={dashboard.machines} onClose={()=>setGlobalSearch(undefined)} onSelect={item=>{setMachineProviders(current=>({...current,[item.machineId]:item.provider as ProviderId}));navigate({view:'fleet',sessionId:item.id});}}/>}
+      {globalSearch!==undefined&&<GlobalSessionSearch initialQuery={globalSearch} machines={dashboard.machines} onClose={()=>setGlobalSearch(undefined)} onSelect={item=>{setMachineProviders(current=>({...current,[item.machineId]:item.provider as ProviderId}));navigate({view:'fleet',sessionId:item.id,...(item.eventId?{eventId:item.eventId}:{})});}}/>}
       <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} onPaired={(machineId) => { if (machineId) navigate({ view: "fleet", machineId }); void loadDashboard(); }} onToast={toast} />
       <RemoveMachineDialog machine={removeMachine} onClose={() => setRemoveMachine(undefined)} onRemoved={() => loadDashboard(true)} onToast={toast} />
       <CreateSessionDialog open={createOpen} provider={selectedProvider} machines={providerMachines} selectedMachineId={selectedMachineId} initialProject={createProject} onClose={() => setCreateOpen(false)} onToast={toast} onCreate={async (machineId, projectId, title, worktree) => {
